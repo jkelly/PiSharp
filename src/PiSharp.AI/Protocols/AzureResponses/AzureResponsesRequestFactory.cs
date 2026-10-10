@@ -88,7 +88,7 @@ public sealed class AzureResponsesRequestFactory
         if (request is null || request.Model != _model) throw Fail(AzureResponsesFailure.Request);
         var input = _projector.ProjectInput(request, token); var tools = _projector.ProjectTools(request, token);
         var root = new JsonObject { ["model"] = DeploymentName, ["input"] = JsonNode.Parse(input.ToString()), ["stream"] = true };
-        if (_options.SessionId is { } session) { Bound(session); ValidateUnicode(session); root["prompt_cache_key"] = string.Concat(session.EnumerateRunes().Take(64).Select(rune => rune.ToString())); }
+        if ((_options.SessionId ?? request.SessionId) is { } session) { Bound(session); ValidateUnicode(session); root["prompt_cache_key"] = string.Concat(session.EnumerateRunes().Take(64).Select(rune => rune.ToString())); }
         root["store"] = false;
         if (_options.MaxTokens is { } cap && cap != 0) root["max_output_tokens"] = Math.Max(cap, 16);
         if (_options.Temperature is { } temperature) root["temperature"] = temperature;
@@ -150,7 +150,10 @@ public sealed class AzureResponsesRequestFactory
         {
             var projected = EcmaScriptJsonProjection.Project(payload, new(MaximumInputCharacters: _options.MaximumPayloadBytes,
                 MaximumInputBytes: _options.MaximumPayloadBytes, MaximumOutputCharacters: _options.MaximumPayloadBytes, MaximumOutputBytes: _options.MaximumPayloadBytes,
-                MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumPayloadBytes), token);
+                MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumPayloadBytes,
+                // Node and number counts grow with the message count; the payload budget bounds them.
+                MaximumNodes: _options.MaximumPayloadBytes, MaximumNumbers: _options.MaximumPayloadBytes,
+                MaximumTotalNumberCharacters: _options.MaximumPayloadBytes), token);
             return JsonData.Parse(projected);
         }
         catch (EcmaScriptJsonProjectionException error)

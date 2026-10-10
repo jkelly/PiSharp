@@ -48,8 +48,9 @@ internal static class Program
             ("cleanup and assistant sink barriers precede turn effects", TurnAssistantBarrierAfterCleanup),
             ("progress sink failure waits for owned run cleanup", TurnSinkFailureSettlesCleanup),
             ("Responses authoritative tool arguments wait for cleanup and assistant barrier", ResponsesTurnTests.AuthoritativeArgumentsAfterBarriers),
-            ("Responses malformed authoritative arguments prevent tool effects", ResponsesTurnTests.MalformedAuthoritativeArgumentsPreventEffects),
-            ("Responses unsupported DTO after valid tool end prevents tool effects", ResponsesTurnTests.UnsupportedDtoAfterToolEndPreventsEffects),
+            ("Responses truncated authoritative arguments finalize to {} and reach the tool", ResponsesTurnTests.TruncatedAuthoritativeArgumentsFinalizeEmpty),
+            ("Responses DTOs with no open slot after a valid tool end are ignored", ResponsesTurnTests.UnmatchedDtosAfterToolEndAreIgnored),
+            ("Responses error event after a valid tool end prevents tool effects", ResponsesTurnTests.ErrorAfterToolEndPreventsEffects),
             ("bounded loop projections match continuation and selected finish-decision cases", AgentLoopRunnerTests.FrozenContinuationProjection),
             ("awaited finish/preparation callbacks block continuation", AgentLoopRunnerTests.AwaitedCallbacksBlockContinuation),
             ("loop callback failures and cancellation prevent later requests", AgentLoopRunnerTests.CallbackFailureAndCancellation),
@@ -918,11 +919,15 @@ internal static class Program
         { Content = [Call("A"), new ToolCallContent("call-B", "B", JsonData.Parse("[]")), Call("missing"), Call("C"), Call("D")] };
         var batch = await new ToolBatchScheduler([new("A", executor), new("B", executor), new("C", executor), new("D", executor)], hooks)
             .RunAsync(message, new Sink());
-        Sequence(["A", "C", "D"], before);
-        Sequence(["C", "D"], executed);
-        Sequence(["C", "D"], after);
+        // The loop admits arguments of any JSON kind: packages/agent/src/agent-loop.ts:716-727 prepareToolCall only looks the tool up
+        // and runs that tool's validateToolArguments. B's plain executor declares no schema, so its non-object [] reaches the
+        // before hook and the executor; a schema-bearing tool rejects it with "root: must be object" (Tools ToolValidationTests).
+        Sequence(["A", "B", "C", "D"], before);
+        Sequence(["B", "C", "D"], executed);
+        Sequence(["B", "C", "D"], after);
         Equal(ToolFailureKind.HookError, batch.Outcomes[0].Result.Failure!.Kind);
-        Equal(ToolFailureKind.InvalidArguments, batch.Outcomes[1].Result.Failure!.Kind);
+        Equal("[]", batch.Outcomes[1].Invocation.Call.Arguments.ToString());
+        Check(!batch.Messages[1].IsError, "The after hook override of B's thrown executor failure did not reach the transcript.");
         Equal(ToolFailureKind.UnknownTool, batch.Outcomes[2].Result.Failure!.Kind);
         Equal(ToolFailureKind.HookError, batch.Outcomes[3].Result.Failure!.Kind);
         Check(!batch.Messages[4].IsError, "Finalized result override did not reach transcript.");
@@ -986,8 +991,13 @@ internal static class Program
             await ThrowsAsync<ArgumentException>(() => scheduler.RunAsync(Message("A") with { StopReason = stopReason }, new Sink()));
         var duplicateSink = new Sink();
         await ThrowsAsync<ArgumentException>(() => scheduler.RunAsync(Message("A", "A") with { Content = [Call("A"), Call("A")] }, duplicateSink));
-        await ThrowsAsync<ArgumentException>(() => scheduler.RunAsync(Message("A") with { Content = [new ToolCallContent("", "A", JsonData.EmptyObject)] }, duplicateSink));
         Equal(0, duplicateSink.Events.Count);
+        // Owner decision 13: agent-loop.ts runs every toolCall block whatever its id and name. Nameless calls find no tool ("Tool  not found")
+        // and id-less calls share the id "".
+        var nameless = await scheduler.RunAsync(Message() with { Content = [new ToolCallContent("", "", JsonData.EmptyObject), new ToolCallContent("", "", JsonData.EmptyObject)] }, new Sink());
+        Equal(2, nameless.Messages.Length);
+        Check(nameless.Messages.All(message => message.ToolCallId == "" && message.ToolName == "" && message.IsError &&
+            message.Content.Single().Text == "Tool  not found"), "Nameless calls did not get upstream's unknown-tool result.");
         var noTools = await scheduler.RunAsync(Message() with { StopReason = StopReason.Stop }, new Sink());
         Check(!noTools.Terminate && !noTools.ShouldContinue, "Empty batch has a continuation hint.");
         var sourceIndexed = await scheduler.RunAsync(Message("A") with { Content = [new TextContent("before"), Call("A")] }, new Sink());

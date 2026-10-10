@@ -12,17 +12,26 @@ namespace PiSharp.Cli.Mcp;
 /// <summary>The built-in `tool_search` of production sessions. It searches the session's registered tools that are not declared
 /// to the model (`codemode` and `deferred` exposure, see <see cref="ToolSearch.IsSearchable"/>) and are not active yet, ranks them
 /// with <see cref="Bm25Ranker"/>, and activates the matches through the session's tool selection, so the next model call
-/// declares them. Activation is recorded in the transcript like any other tool change. Registered for a generation only when
-/// an admitted MCP server has `deferred` tools and the tool selection keeps `tool_search` (see <see cref="McpSessionHost"/>);
-/// it is then active by default, as the original's MCP extension activates it for those servers.</summary>
+/// declares them. Activation is recorded in the transcript like any other tool change. Registered with every session the tool
+/// selection keeps it in, as tool-search/index.ts registers it, inactive (<paramref name="defaultActive"/> false) so that
+/// `--tools tool_search` and `defaultTools` select it; active by default when an admitted MCP server has `deferred` tools, as
+/// the original's MCP extension activates it for those servers (see <see cref="McpSessionHost"/>).</summary>
 internal static class McpToolSearch
 {
     internal const string Name = ToolSearch.Name, RegistrationId = "tool-search";
     private static readonly ConditionalWeakTable<PersistentAgentSession, object> Gates = [];
 
-    /// <summary>A fresh definition for one generation; each binds to exactly one attachment.</summary>
-    internal static McpDiscoveryExecutableDefinition Create() =>
-        McpDiscoveryExecutableDefinition.CreateToolSearch(RegistrationId, ToolSearch.Description, ExecuteAsync);
+    /// <summary>A fresh definition for one generation; each binds to exactly one attachment. With
+    /// <paramref name="waitForServers"/> (index.ts tool_call: tool_search reaches every server) a search first waits for the
+    /// servers still connecting (their tools are registered once connected, also during the run).</summary>
+    internal static McpDiscoveryExecutableDefinition Create(bool defaultActive = true, Func<CancellationToken, Task>? waitForServers = null) =>
+        McpDiscoveryExecutableDefinition.CreateToolSearch(RegistrationId, ToolSearch.Description,
+            async (query, limit, attachment, invocation, token) =>
+            {
+                if (waitForServers is not null) await waitForServers(token).ConfigureAwait(false);
+                return await ExecuteAsync(query, limit, attachment, invocation, token).ConfigureAwait(false);
+            }, null,
+            descriptor => descriptor with { DefaultActive = defaultActive });
 
     /// <summary>The tool's arguments as its schema admits them: a string query and an optional number limit.</summary>
     internal static bool ValidArguments(JsonData arguments) =>

@@ -23,6 +23,8 @@ public sealed class NativeExistingSessionRegistrationActions : IExtensionRegistr
             throw new ArgumentException("One admitted resource policy required.", nameof(expandedInputAdmission));
         this.expandedInputAdmission = expandedInputAdmission;
     }
+    /// <summary>The admission bounds of an extension's user message; null keeps the session defaults.</summary>
+    public PromptInputAdmissionOptions? InputLimits { get; init; }
     public ValueTask<bool> SetModelAsync(ModelDescriptor model, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -46,8 +48,8 @@ public sealed class NativeExistingSessionRegistrationActions : IExtensionRegistr
             ? expandedInputAdmission?.Invoke() ?? throw new NotSupportedException("Expanded input requires the actual admitted resource catalog.")
             : inputAdmission();
         if (admission is null) throw new NotSupportedException("The native input pipeline has not been bound.");
-        var input = NormalizeUserContent(content, behavior);
-        return new(Own(attachment, token, work => attachment.Session.SubmitInputAsync(input, admission, cancellationToken: work), _ => true));
+        var input = NormalizeUserContent(content, behavior, InputLimits);
+        return new(Own(attachment, token, work => attachment.Session.SubmitInputAsync(input, admission, InputLimits, work), _ => true));
     }
     public ValueTask SendMessageAsync(ExtensionCustomMessage message, ExtensionMessageOptions? options, CancellationToken token)
     {
@@ -64,10 +66,10 @@ public sealed class NativeExistingSessionRegistrationActions : IExtensionRegistr
         return new(Own(attachment, token, work => attachment.Session.SendCustomMessageAsync(sessionId,
             new(message.CustomType, message.Content, message.Display, message.Details), delivery, options?.TriggerTurn, work), _ => true));
     }
-    private static PromptInput NormalizeUserContent(JsonData content, PromptInputStreamingBehavior behavior)
+    private static PromptInput NormalizeUserContent(JsonData content, PromptInputStreamingBehavior behavior, PromptInputAdmissionOptions? limits)
     {
         if (content.Value.ValueKind == JsonValueKind.String)
-            return new(content.Value.GetString()!, PromptInputSource.Extension, StreamingBehavior: behavior);
+            return PromptInputValue.Own(new(content.Value.GetString()!, PromptInputSource.Extension, StreamingBehavior: behavior), limits);
         if (content.Value.ValueKind != JsonValueKind.Array) throw new ArgumentException("User content must be text or text/image blocks.", nameof(content));
         var texts = new List<string>(); var images = new List<JsonElement>();
         foreach (var part in content.Value.EnumerateArray())
@@ -78,7 +80,7 @@ public sealed class NativeExistingSessionRegistrationActions : IExtensionRegistr
             else throw new ArgumentException("Invalid user block type.", nameof(content));
         }
         return PromptInputValue.Own(new(string.Join("\n", texts), PromptInputSource.Extension,
-            images.Count == 0 ? null : JsonData.Parse(JsonSerializer.Serialize(images)), behavior));
+            images.Count == 0 ? null : JsonData.Parse(JsonSerializer.Serialize(images)), behavior), limits);
     }
     private static async Task<TResult> Own<TOriginal, TResult>(AgentSessionAttachment attachment, CancellationToken token,
         Func<CancellationToken, Task<TOriginal>> invoke, Func<TOriginal, TResult> project)

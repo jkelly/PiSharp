@@ -38,10 +38,11 @@ public sealed record AnthropicMessagesRequestOptions(
     bool OAuthProjection = false, bool InterleavedThinking = true, bool SupportsMidConversationSystemMessages = false,
     ImmutableArray<string> AllowedFallbackModels = default, ImmutableArray<string> BetaFeatures = default,
     JsonData? ToolChoice = null, string? UserId = null,
-    int MaximumMessages = 256, int MaximumEntryCharacters = 65_536, int MaximumInputCharacters = 1_048_576,
-    int MaximumContentBlocks = 1024, int MaximumDeclarations = 1024, int MaximumActiveTools = 128,
-    int MaximumProjectedMessages = 1024, int MaximumJsonDepth = 32,
-    int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576,
+    int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
+    // anthropic.ts convertTools declares every tool of the context: no tool or declaration count bound (payload bytes bound the size).
+    int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue,
+    int MaximumProjectedMessages = PiRequestBudget.RequestItems, int MaximumJsonDepth = 32,
+    int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes,
     bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
 {
     /// <summary>Upstream stream(): the effort a managed (compat.supportsMidConvoEffort) response records as providerThinkingLevel.</summary>
@@ -179,8 +180,10 @@ public sealed class AnthropicMessagesRequestProjector
                         else if (block is ToolCallContent tool)
                         {
                             var id = same ? tool.Id : NormalizeId(tool.Id);
-                            if (string.IsNullOrWhiteSpace(id) || !_callIds.Add(id)) throw Fail(AnthropicRequestFailure.IdentityCollision);
-                            var name = ToolName(tool.Name); if (string.IsNullOrWhiteSpace(name)) throw Fail(AnthropicRequestFailure.UnsupportedContent);
+                            // convertMessages replays a nameless or id-less call with the empty name/id it was given (owner decision 13); id-less
+                            // calls may share the id "".
+                            if (id.Length > 0 && !_callIds.Add(id)) throw Fail(AnthropicRequestFailure.IdentityCollision);
+                            var name = ToolName(tool.Name);
                             blocks.Add(new JsonObject { ["type"] = "tool_use", ["id"] = id, ["name"] = name, ["input"] = Node(tool.Arguments.Value) });
                             _pendingCalls.Add((id, name));
                         }
@@ -197,7 +200,7 @@ public sealed class AnthropicMessagesRequestProjector
                 {
                     var body = entry.Body.Value; var original = String(body, "toolCallId");
                     var id = _idMap.GetValueOrDefault(original, original);
-                    if (!_pendingCalls.Any(call => call.Id == id) || !_answered.Add(id)) throw Fail(AnthropicRequestFailure.UnmatchedToolResult);
+                    if (!_pendingCalls.Any(call => call.Id == id) || !_answered.Add(id) && id.Length > 0) throw Fail(AnthropicRequestFailure.UnmatchedToolResult);
                     var isError = body.GetProperty("isError");
                     if (isError.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw Fail(AnthropicRequestFailure.InvalidTranscript);
                     var content = body.TryGetProperty("content", out var supplied) ? supplied : default;

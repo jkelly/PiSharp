@@ -33,7 +33,7 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 		<h1 class="ps-h1">How close to <em>Pi</em> are we?</h1>
 		<p class="ps-lede">PiSharp makes three separate promises and tracks each one separately. The baseline below is read from the port's pinned compatibility lock file.</p>
 		<p class="ps-muted assessed">
-			Statuses are assessed against the {parity.baseline} baseline, from PiSharp's own test suites and its <a href={links.compatibility}>compatibility inventories</a>. Last assessed on {assessedOn}. "Ported" means PiSharp's tests pass; side-by-side comparisons against Pi's own output are still to come.
+			Statuses are assessed against the {parity.baseline} baseline, from PiSharp's own test suites and its <a href={links.compatibility}>compatibility inventories</a>. Last assessed on {assessedOn}, for the next release, {parity.release}. "Ported" means it works and PiSharp's tests cover it. Some suites compare against output captured from Pi 1.1.0 itself, such as session files; the rest are authored tests. Differences that remain are named in the notes and listed below the tables.
 		</p>
 	</div>
 
@@ -99,7 +99,28 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 		))
 	}
 
-	<section class="ps-section" style="margin-top: 6rem">
+	<section class="ps-section" style="margin-top: 5rem">
+		<h2 class="ps-h2">Known differences</h2>
+		<div class="devs">
+			{
+				parity.deviations.map((group: { title: string; blurb: string; items: { title: string; notes: string }[] }) => (
+					<div>
+						<h3 class="ps-h3" style="margin-top: 0">{group.title}</h3>
+						<p class="ps-muted" style="max-width: 48rem">{group.blurb}</p>
+						<ul class="dev-list">
+							{group.items.map((item) => (
+								<li>
+									<strong>{item.title}.</strong> <span class="ps-muted">{item.notes}</span>
+								</li>
+							))}
+						</ul>
+					</div>
+				))
+			}
+		</div>
+	</section>
+
+	<section class="ps-section" style="margin-top: 5rem">
 		<div class="road-head">
 			<h2 class="ps-h2" style="margin: 0">Roadmap</h2>
 			<a href={links.plans} class="ps-link-mono">Full plans on GitHub ↗</a>
@@ -222,6 +243,21 @@ const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
 		gap: 0.9rem;
+	}
+	.devs {
+		display: grid;
+		gap: 2rem;
+	}
+	.dev-list {
+		margin: 0;
+		padding-inline-start: 1.2rem;
+		display: grid;
+		gap: 0.5rem;
+		max-width: 52rem;
+		overflow-wrap: anywhere;
+	}
+	.dev-list li {
+		margin: 0;
 	}
 	.phases li {
 		display: flex;

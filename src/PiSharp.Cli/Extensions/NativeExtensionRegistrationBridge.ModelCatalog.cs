@@ -39,7 +39,11 @@ public sealed partial class NativeExtensionRegistrationBridge
         {
             Available();
             var runtime = configuredRuntime ?? throw new InvalidOperationException("Actual model catalog is not configured.");
-            return PublishModelCatalog(runtime, runtime.CaptureModelCatalog().Revision, configuredBaseline, cancellationToken);
+            // Bindings another owner published after the baseline (the session's switchable models, LiveModelCatalog) stay.
+            var current = runtime.CaptureModelCatalog();
+            var baseline = configuredBaseline.Select(binding => binding.Model).ToImmutableHashSet();
+            var retained = current.Bindings.Where(binding => binding.Transport is not CatalogTransport && !baseline.Contains(binding.Model)).ToImmutableArray();
+            return PublishModelCatalog(runtime, current.Revision, configuredBaseline, cancellationToken, retained);
         }
     }
     private void RefreshConfiguredCatalog()
@@ -76,7 +80,11 @@ public sealed partial class NativeExtensionRegistrationBridge
     /// It preserves baseline providers which this host has not overridden and uses real leased transport.
     /// A stale publication refuses without changing the runtime; host reconciliation remains explicit.</summary>
     public SessionModelCatalogPublication PublishModelCatalog(SessionRuntimeRegistry runtime, long expectedRevision,
-        ImmutableArray<SessionModelBinding> admittedBaselineBindings, CancellationToken cancellationToken = default)
+        ImmutableArray<SessionModelBinding> admittedBaselineBindings, CancellationToken cancellationToken = default) =>
+        PublishModelCatalog(runtime, expectedRevision, admittedBaselineBindings, cancellationToken, []);
+
+    private SessionModelCatalogPublication PublishModelCatalog(SessionRuntimeRegistry runtime, long expectedRevision,
+        ImmutableArray<SessionModelBinding> admittedBaselineBindings, CancellationToken cancellationToken, ImmutableArray<SessionModelBinding> retained)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         if (admittedBaselineBindings.IsDefaultOrEmpty) throw new ArgumentException("Actual baseline model bindings required.");
@@ -103,6 +111,7 @@ public sealed partial class NativeExtensionRegistrationBridge
                     throw new InvalidOperationException("Prompt decorator changed admitted execution or provider hooks.");
                 return result;
             }).ToImmutableArray();
+            models = models.AddRange(retained.Where(binding => !names.Contains(binding.Model.Provider) && !models.Any(existing => existing.Model == binding.Model)));
             return runtime.PublishModelCatalog(expectedRevision, models, cancellationToken);
         }
     }

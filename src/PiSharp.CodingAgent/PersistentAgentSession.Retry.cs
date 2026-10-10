@@ -172,6 +172,25 @@ public sealed partial class PersistentAgentSession
         _ => throw new InvalidOperationException("Unsupported retry observation.")
     }).AsTask();
 
+    /// <summary>Source _willRetryAfterAgentEnd: the agent_end event's willRetry. True when automatic retry is enabled, the
+    /// budget has attempts left, no abort was requested, and the last assistant response is a retryable error that is not a
+    /// context overflow (overflow is handled by compaction).</summary>
+    public bool WillRetryAfterAgentEnd(AgentLoopResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        SessionRetryCoordinator? coordinator; AgentRetryPolicy policy; double window;
+        lock (_gate)
+        {
+            if (!_retryConfigured) return false;
+            coordinator = _retryCoordinator; policy = _retryPolicy; window = _retryContextWindow;
+        }
+        if (coordinator is null || result.Turns.IsEmpty || !policy.Enabled || coordinator.Attempt >= policy.MaxRetries ||
+            _agent.Snapshot.CancellationRequested) return false;
+        var assistant = result.Turns[^1].Result.Chat.Message;
+        return !SessionRecoveryClassifier.IsContextOverflow(assistant, window) &&
+            AgentRetryPolicy.IsRetryableError(assistant.StopReason, RetryErrorMessage(assistant));
+    }
+
     private async Task<bool> TryAutomaticRetryAsync(AgentLoopResult result, TaskCompletionSource idle, CancellationToken token)
     {
         SessionRetryCoordinator? coordinator; double window;
@@ -192,7 +211,7 @@ public sealed partial class PersistentAgentSession
         lock (_gate)
         {
             if (!ReferenceEquals(_active, idle)) throw Error(PersistentAgentSessionFailure.StaleSession);
-            var wire = PiWireJson.WriteMessage(assistant).Value;
+            var wire = PersistedWire(PiWireJson.WriteMessage(assistant)).Value;
             var acknowledged = _context.ContextEntries.LastOrDefault(entry => entry.SourceEntry.Id == _lastAcknowledgedAssistantId &&
                 entry.Messages.Any(message => message.Role == "assistant" && JsonElement.DeepEquals(message.WireBody.Value, wire)));
             if (acknowledged is null) throw Error(PersistentAgentSessionFailure.InvalidCommit);

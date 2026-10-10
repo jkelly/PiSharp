@@ -24,13 +24,13 @@ internal static class BashToolTests
         var tool = Make(files, runner); var invoker = tool.CreateInvoker(policy);
         foreach (var raw in new[]
         {
-            """{"command":"echo","extra":true}""", """{"command":4}""", """{"command":"echo","timeout":null}""",
-            """{"command":"echo","timeout":0}""", """{"command":"echo","timeout":-1}""",
-            """{"command":"echo","timeout":1e999}""", """{"command":"echo","timeout":2147483.648}""",
-            """{"command":"\ud800"}""", """{"command":"x\u0000y"}""", """{"command":[]}""",
-            JsonSerializer.Serialize(new { command = new string('x', 12_001) })
+            """{"command":"echo","timeout":1e999}""",
+            """{"command":"\ud800"}""", """{"command":[]}""",
+            JsonSerializer.Serialize(new { command = new string('x', 96_001) })
         })
             Failed(await invoker.ExecuteAsync(Invocation(JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
+        // Source spawn rejects a NUL byte with Node's error (ToolEdgeInputTests); no action reaches the policy.
+        Failed(await invoker.ExecuteAsync(Invocation(JsonData.Parse("""{"command":"x\u0000y"}""")), default), ToolFailureKind.ExecutionError);
         using (var permissive = JsonDocument.Parse("""{"command":"echo",/* forbidden retained syntax */}""",
             new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip }))
             Failed(await invoker.ExecuteAsync(Invocation(JsonData.FromElement(permissive.RootElement)), default), ToolFailureKind.InvalidArguments);
@@ -49,6 +49,18 @@ internal static class BashToolTests
         var tiny = new BashTool(runner, Options(files) with { MaximumArgumentCharacters = 8 }, () => "other.log");
         Failed(await tiny.CreateInvoker(policy).ExecuteAsync(Invocation(Input("echo")), default), ToolFailureKind.InvalidArguments);
         Throws<ArgumentException>(() => new BashTool(runner, Options(files) with { Executable = "relative" }));
+        // Pi resolveTimeoutMs runs inside exec: an out-of-range timeout is a tool error with the source message, and nothing runs.
+        foreach (var (raw, message) in new[]
+        {
+            ("""{"command":"echo","timeout":0}""", "Invalid timeout: must be a finite number of seconds"),
+            ("""{"command":"echo","timeout":-1}""", "Invalid timeout: must be a finite number of seconds"),
+            ("""{"command":"echo","timeout":2147483.648}""", "Invalid timeout: maximum is 2147483.647 seconds")
+        })
+        {
+            File.Delete(files.In("fixed.log"));
+            var invalid = await invoker.ExecuteAsync(Invocation(JsonData.Parse(raw)), default);
+            Failed(invalid, ToolFailureKind.ExecutionError); Equal(message, invalid.Content.Single().Text); Equal(0, runner.Requests.Count);
+        }
         Throws<ArgumentException>(() => new BashTool(runner, Options(files) with
             { Environment = ImmutableDictionary<string, string>.Empty.Add("PATH", "one").Add("Path", "two") }));
     }
@@ -82,7 +94,6 @@ internal static class BashToolTests
             prepared with { CommandArguments = ["-c", "different"] }, prepared with { Target = files.In("other.exe") },
             prepared with { WorkingDirectory = "relative" },
             prepared with { Arguments = ActionArguments("printf 'initial'", Path.Combine(Path.GetDirectoryName(files.Root)!, "outside.log"), 1) },
-            prepared with { Arguments = ActionArguments("printf 'initial'", files.In("fixed.log"), 0) },
             prepared with { Environment = transformedEnv.Add("bad=key", "value") }
         })
         {
@@ -93,7 +104,9 @@ internal static class BashToolTests
         }
         var definition = tool.CreateDefinition(tool.CreateInvoker(new Policy()));
         Equal("bash", definition.Name);
-        Equal(false, tool.Declaration.Value.GetProperty("parameters").GetProperty("additionalProperties").GetBoolean());
+        // Pi bash.ts: TypeBox parameters without additionalProperties; providers add strictness themselves.
+        Equal("""{"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","required":["command"],"properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
+            tool.Declaration.ToString());
     }
 
     private static async Task Formatting()
@@ -102,7 +115,7 @@ internal static class BashToolTests
         async Task<ToolResult> Run(ProcessRunResult result)
         { runner.Next = (_, _, _) => ValueTask.FromResult(result); return await tool.CreateInvoker(new Policy()).ExecuteAsync(Invocation(Input("")), default); }
         var empty = await Run(Result(""));
-        Equal("(no output)", empty.Content.Single().Text); Check(empty.Details.Value.ValueKind == JsonValueKind.Null, "Native undefined representation changed.");
+        Equal("(no output)", empty.Content.Single().Text); Check(!empty.HasProperty("details"), "bash.ts formatOutput: details is undefined (absent) without truncation.");
         Equal("", empty.StructuredContent!.Value.GetProperty("output").GetString());
         var nonzero = await Run(Result("stdout\nstderr\n", ProcessRunStatus.NonZeroExit, 7));
         Equal("stdout\nstderr\n\n\nCommand exited with code 7", nonzero.Content.Single().Text);

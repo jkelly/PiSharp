@@ -20,6 +20,9 @@ public sealed record ProcessRequest(string Executable, ImmutableArray<string> Ar
 {
     /// <summary>MCP process launch only: a command line tail used as is instead of the quoted <see cref="Arguments"/>.</summary>
     public string? VerbatimArguments { get; init; }
+    /// <summary>Bytes written to the child's standard input before it is closed (source commandTransport "stdin"). Null
+    /// gives the child an empty standard input.</summary>
+    public byte[]? StandardInput { get; init; }
 }
 
 public sealed record ProcessRunnerOptions(int MaximumRawBytes = 64 * 1024 * 1024,
@@ -92,7 +95,7 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
         IProcessOutputStorage? outputStorage = null, ProcessLifecycleCallback? lifecycle = null)
     {
         _options = options ?? new();
-        if (_options.MaximumRawBytes is < 1 or > 64 * 1024 * 1024 ||
+        if (_options.MaximumRawBytes < 1 ||
             _options.ModelMaxLines is < 1 or > 2000 || _options.ModelMaxBytes is < 1 or > 50 * 1024 ||
             _options.StructuredMaxBytes < _options.ModelMaxBytes || _options.StructuredMaxBytes > 1024 * 1024 ||
             _options.ReadChunkBytes is < 1 or > 64 * 1024 || _options.QueueChunks is < 1 or > 64 ||
@@ -332,15 +335,15 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
         if (request is null || request.Arguments.IsDefault || request.Arguments.Length > 256 || request.Environment is null ||
             request.Environment.Count > 1024 || !Absolute(request.Executable) || !Absolute(request.WorkingDirectory) ||
             !Absolute(request.SpillPath) || request.Executable.Length > 4096 || request.WorkingDirectory.Length > 4096 ||
-            request.SpillPath.Length > 4096 || request.TimeoutSeconds is { } seconds &&
+            request.SpillPath.Length > 4096 || request.StandardInput is { Length: > 16 * 1024 * 1024 } || request.TimeoutSeconds is { } seconds &&
             (!double.IsFinite(seconds) || seconds <= 0 || seconds * 1000 > int.MaxValue)) return ProcessDiagnostic.InvalidRequest;
-        long characters = request.Executable.Length + 3;
         foreach (var argument in request.Arguments)
-        {
             if (!Text(argument)) return ProcessDiagnostic.InvalidRequest;
-            characters += (long)argument.Length * 2 + 3;
-            if (characters > 32767) return ProcessDiagnostic.InvalidRequest;
-        }
+        // The operating system's own bounds: the CreateProcess command line on Windows, one argument (MAX_ARG_STRLEN) on Unix.
+        if (OperatingSystem.IsWindows()
+            ? WindowsProcessLifetime.CommandLineLength(request.Executable, request.Arguments) > 32_766
+            : request.Arguments.Any(argument => System.Text.Encoding.UTF8.GetByteCount(argument) + 1 > 128 * 1024))
+            return ProcessDiagnostic.InvalidRequest;
         long environmentCharacters = 2;
         var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in request.Environment)

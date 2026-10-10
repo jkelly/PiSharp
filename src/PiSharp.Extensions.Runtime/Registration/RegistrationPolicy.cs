@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Contracts;
+using PiSharp.Extensions;
 
 namespace PiSharp.Extensions.Runtime;
 
@@ -15,10 +16,28 @@ public sealed record ExtensionRegistryOptions
     public int MaximumJsonCharacters { get; init; } = 65_536;
     public int MaximumJsonDepth { get; init; } = 32;
     public int MaximumConcurrentDispatches { get; init; } = 32;
+    /// <summary>Bound of one host-built agent/session event observation (Pi events carry whole messages and context previews).</summary>
+    public int MaximumObservationCharacters { get; init; } = 67_108_864;
+    /// <summary>Bounds of the session branch view each callback context captures (<see cref="ExtensionSessionSnapshotLimits"/> by
+    /// default). A host following Pi, whose runner.ts hands every handler the whole session manager, lifts them.</summary>
+    public int MaximumSessionBranchEntries { get; init; } = ExtensionSessionSnapshotLimits.MaximumBranchEntries;
+    public long MaximumSessionCharacters { get; init; } = ExtensionSessionSnapshotLimits.MaximumCharacters;
+    public long MaximumSessionUtf8Bytes { get; init; } = ExtensionSessionSnapshotLimits.MaximumUtf8Bytes;
     public ImmutableArray<string> ReservedToolNames { get; init; } =
         ["read", "bash", "powershell", "edit", "write", "grep", "find", "ls"];
     public ImmutableArray<string> ReservedCommandNames { get; init; } =
         ["help", "quit", "exit", "reload", "settings", "trust", "permissions"];
+    /// <summary>Command names as Pi accepts them: any non-empty name without whitespace or control characters (Pi's registerCommand
+    /// takes any name, and a duplicate becomes <c>name:N</c>). Registration ids stay identifiers.</summary>
+    public bool AllowAnyCommandName { get; init; }
+    /// <summary>Pi runner resolveRegisteredCommands: owners may register the same command name; every occurrence of a name registered
+    /// more than once (in extension load order) is invoked as <c>name:1</c>, <c>name:2</c>…, skipping taken names. Within one owner
+    /// a name stays unique.</summary>
+    public bool SuffixDuplicateCommandNames { get; init; }
+    /// <summary>Dispatches resolve against the registry's current registrations instead of the captured revision they were given
+    /// (Pi's runner reads its extensions' live handler maps: an owner activated or a handler registered after the session bound, as
+    /// a reload rebuilds the extension runtime, takes part in the next dispatch).</summary>
+    public bool FollowCurrentSnapshot { get; init; }
 }
 
 public enum ExtensionRegistrationFailure
@@ -61,7 +80,8 @@ internal static class RegistrationPolicy
             options.MaximumRegistrationsPerOwner <= 0 || options.MaximumMetadataCharacters <= 0 ||
             options.MaximumIdentifierCharacters <= 0 || options.MaximumDescriptionCharacters < 0 ||
             options.MaximumJsonCharacters <= 0 || options.MaximumJsonDepth is < 1 or > 64 ||
-            options.MaximumConcurrentDispatches <= 0 || options.ReservedToolNames.IsDefault ||
+            options.MaximumConcurrentDispatches <= 0 || options.MaximumSessionBranchEntries <= 0 || options.MaximumSessionCharacters <= 0 ||
+            options.MaximumSessionUtf8Bytes <= 0 || options.ReservedToolNames.IsDefault ||
             options.ReservedCommandNames.IsDefault || options.ReservedToolNames.Length > 256 ||
             options.ReservedCommandNames.Length > 256)
             throw new ArgumentOutOfRangeException(nameof(options));
@@ -74,6 +94,9 @@ internal static class RegistrationPolicy
         value is { Length: > 0 } && value.Length <= maximum &&
         value.All(character => character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or
             >= '0' and <= '9' or '.' or '_' or '-');
+
+    internal static bool CommandName(string? value, int maximum) =>
+        value is { Length: > 0 } && value.Length <= maximum && !value.Any(character => char.IsWhiteSpace(character) || char.IsControl(character));
 
     internal static bool Description(string? value, ExtensionRegistryOptions options) =>
         value is not null && value.Length <= options.MaximumDescriptionCharacters &&

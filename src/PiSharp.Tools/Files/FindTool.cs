@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/find.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
@@ -17,7 +18,7 @@ public sealed class FindTool
     private readonly IFileOperations _files;
     private readonly PathResolver _paths;
     public IPreparedToolAdapter Adapter { get; }
-    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"find","description":"Search for files by glob pattern through an explicitly admitted executor. Returns matching paths relative to the search directory in executor order. Supported glob and ignore behavior is declared by that executor; unsupported syntax is rejected. Output is truncated to 1000 results or 50KB. Bounded admitted-executor profile; no implicit fd acquisition.","parameters":{"type":"object","properties":{"pattern":{"type":"string","description":"Glob pattern supported by the admitted executor"},"path":{"type":"string","description":"Directory to search in (default: current directory)"},"limit":{"type":"number","minimum":1,"maximum":10000,"description":"Maximum number of results (default: 1000); bounded integer profile"}},"required":["pattern"],"additionalProperties":false}}""");
+    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"find","description":"Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).","parameters":{"type":"object","required":["pattern"],"properties":{"pattern":{"type":"string","description":"Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'"},"path":{"type":"string","description":"Directory to search in (default: current directory)"},"limit":{"type":"number","description":"Maximum number of results (default: 1000)"}}}}""");
 
     public FindTool(string workingDirectory, string homeDirectory, IFindExecutor executor, IFileOperations? files = null)
     {
@@ -41,6 +42,8 @@ public sealed class FindTool
         foreach (var property in arguments.Value.EnumerateObject())
         {
             if (!seen.Add(property.Name)) throw new ArgumentException("Duplicate find argument.");
+            // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
+            if (property.Name is "path" or "limit" && property.Value.ValueKind == JsonValueKind.Null) continue;
             if (property.Name == "pattern" && property.Value.ValueKind == JsonValueKind.String) pattern = property.Value.GetString();
             else if (property.Name == "path" && property.Value.ValueKind == JsonValueKind.String) path = property.Value.GetString()!;
             else if (property.Name == "limit" && property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetDouble(out var count) &&
@@ -51,8 +54,10 @@ public sealed class FindTool
             throw new ArgumentException("Unsupported find glob pattern.");
         return new(pattern, path.Length == 0 ? "." : path, limit);
     }
-    private sealed class SearchAdapter(FindTool owner) : IPreparedToolAdapter
+    private sealed class SearchAdapter(FindTool owner) : IToolArgumentSchemaAdapter
     {
+        /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+        public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(owner.Declaration, ToolSchemaOrigin.TypeBox);
         public string Name => "find";
         public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
         {

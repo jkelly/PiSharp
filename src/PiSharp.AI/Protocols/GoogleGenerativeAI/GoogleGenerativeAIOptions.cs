@@ -22,12 +22,12 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
     public GoogleGenerativeAIHooks Hooks { get; init; } = new();
     public Func<HttpResponseMessage, CancellationToken, ValueTask<Stream?>>? BodyReaderFactory { get; init; }
     public int ReadBufferBytes { get; init; } = 4096;
-    public int MaximumFrameCharacters { get; init; } = 1_048_576;
-    public int MaximumPayloadBytes { get; init; } = 1_048_576;
-    public int MaximumEvents { get; init; } = 4096;
-    public long MaximumStreamCharacters { get; init; } = 8_388_608;
-    public int MaximumContentSlots { get; init; } = 256;
-    public int MaximumContentCharacters { get; init; } = 1_048_576;
+    public int MaximumFrameCharacters { get; init; } = PiRequestBudget.StreamCharacters;
+    public int MaximumPayloadBytes { get; init; } = PiRequestBudget.RequestPayloadBytes;
+    public int MaximumEvents { get; init; } = int.MaxValue;
+    public long MaximumStreamCharacters { get; init; } = PiRequestBudget.StreamTotalCharacters;
+    public int MaximumContentSlots { get; init; } = int.MaxValue;
+    public int MaximumContentCharacters { get; init; } = PiRequestBudget.StreamCharacters;
     public int MaximumHeaders { get; init; } = 128;
     public int MaximumHeaderCharacters { get; init; } = 8192;
     public int MaximumErrorBytes { get; init; } = 1_048_576;
@@ -37,9 +37,9 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
         if (ModelMetadata is null || Hooks is null || MaxRetries is < 0 or > 32 || MaxRetryDelayMilliseconds < 0 ||
             RetryTimeProvider is null || RetryJitterSample is null || NoRetryStatuses.IsDefault || NoRetryStatuses.Length > 4096 ||
             ReadBufferBytes is < 1 or > 65536 ||
-            MaximumFrameCharacters is < 1 or > 8388608 || MaximumPayloadBytes is < 1 or > 8388608 ||
-            MaximumEvents is < 1 or > 65536 || MaximumStreamCharacters is < 1 or > 67108864 ||
-            MaximumContentSlots is < 1 or > 256 || MaximumContentCharacters is < 1 or > 8388608 ||
+            MaximumFrameCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumPayloadBytes is < 1 or > PiRequestBudget.MaximumBound ||
+            MaximumEvents < 1 || MaximumStreamCharacters is < 1 or > 67108864 ||
+            MaximumContentSlots < 1 || MaximumContentCharacters is < 1 or > PiRequestBudget.MaximumBound ||
             MaximumHeaders is < 1 or > 4096 || MaximumHeaderCharacters is < 1 or > 65536 ||
             MaximumErrorBytes is < 1 or > 8388608)
             throw new ArgumentOutOfRangeException(nameof(GoogleGenerativeAIOptions));

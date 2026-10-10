@@ -16,7 +16,7 @@ public sealed record OpenAICompletionsTokenRates(decimal Input = 0, decimal Outp
 { public ImmutableArray<TokenRateTier> Tiers { get; init; } = []; }
 
 public sealed record OpenAICompletionsWireOptions(int MaximumChunks = 4096, int MaximumChunkCharacters = 65_536,
-    int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64, int MaximumContentCharacters = 1_048_576,
+    int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
     int MaximumJsonDepth = 32, bool SupportsFinishReason = true, OpenAICompletionsTokenRates? Rates = null)
 {
     /// <summary>Explicit bounded source-view capture; ordinary native progress remains compact.</summary>
@@ -198,7 +198,6 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private readonly Dictionary<string, ToolSlot> _toolsById = new(StringComparer.Ordinal);
         private readonly List<ToolSlot> _tools = [];
         private readonly JsonArray _reasoningDetails = new();
-        private readonly StreamingJsonPreview? _preview;
         private readonly IReadOnlyDictionary<string, string> _grammarInputs;
         private JsonFields _properties = JsonFields.Empty;
         private readonly List<string> _sourcePropertyOrder = [];
@@ -225,8 +224,6 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 ? new CompletionsToolDeclarationProjector((options.ToolDeclarations ?? new()) with
                     { SupportsOpenAIGrammarTools = true }).GrammarInputProperties(request, token)
                 : new Dictionary<string, string>();
-            if (options.CaptureSourceEmissionSnapshots)
-                _preview = new(new(options.MaximumContentCharacters, options.MaximumJsonDepth));
             Charge(request.Model.Api.Length + (long)request.Model.Provider.Length + request.Model.Id.Length);
             Start = new(new(request.Model.Api, request.Model.Provider, request.Model.Id, request.Timestamp,
                 [], TokenUsage.Zero, StopReason.Pending));
@@ -403,7 +400,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     }
                     if (slot is null)
                     {
-                        if (wireIndex is null && string.IsNullOrEmpty(callId)) throw Protocol();
+                        // ensureToolCallBlock: a delta with neither an index nor an id matches no block and opens a new one; a call that
+                        // never gets an id or a name keeps id "" / name "" (owner decision 13).
                         callId ??= ""; name ??= "";
                         if (callId.Contains('\0') || name.Contains('\0')) throw Protocol();
                         Charge(callId.Length + (long)name.Length + 2);
@@ -434,7 +432,6 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                         { if (name.Contains('\0')) throw Protocol(); Charge(name.Length); slot.Name = name; filled = true; }
                         if (filled) Push(new ToolCallHeaderUpdated(slot.ContentIndex, slot.Id, slot.Name));
                     }
-                    if (wireIndex is null && string.IsNullOrEmpty(callId)) throw Protocol();
                     if (isCustom && slot.CustomProperty is null) InitializeCustom(slot, undefinedPartial: false);
                     if (!string.IsNullOrEmpty(arguments))
                     {
@@ -442,9 +439,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                         if (_options.CaptureSourceEmissionSnapshots)
                         {
                             slot.RawArguments += arguments;
-                            var preview = _preview!.Parse(slot.RawArguments);
-                            var projected = EcmaScriptJsonProjection.Project(preview.Value, ProjectionLimits());
-                            slot.DisplayArguments = JsonData.Parse(projected);
+                            // The partial carries block.arguments = parseStreamingJson(block.partialArgs).
+                            slot.DisplayArguments = StreamingJson.Parse(slot.RawArguments);
                         }
                         Push(new ToolCallDelta(slot.ContentIndex, arguments));
                     }
@@ -481,16 +477,17 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             {
                 try
                 {
-                    // Validate every final before exposing any successful tool end. Partial repair cannot authorize work.
+                    // Parse every final before exposing any tool end.
                     var finals = new Dictionary<int, ToolCallContent>();
                     var snapshot = _reducer.Snapshot();
                     var identities = new HashSet<string>(StringComparer.Ordinal);
                     foreach (var slot in _tools)
                     {
-                        if (string.IsNullOrWhiteSpace(slot.Id) || string.IsNullOrWhiteSpace(slot.Name) || !identities.Add(slot.Id)) throw Protocol();
-                        var raw = slot.CustomProperty is null ? _reducer.GetToolJsonPreview(slot.ContentIndex) : CustomArguments(slot).ToString();
-                        var parsed = FinalToolArguments.ParseStrict(raw.Length == 0 ? "{}" : raw).Json;
-                        CheckJson(parsed.Value, 0);
+                        if (slot.Id.Length > 0 && !identities.Add(slot.Id)) throw Protocol();
+                        // openai-completions.ts finishCurrentBlock: block.arguments = parseStreamingJson(block.partialArgs); a custom tool
+                        // call keeps the arguments its input built.
+                        var parsed = slot.CustomProperty is null ? StreamingJson.Parse(_reducer.GetToolJsonPreview(slot.ContentIndex))
+                            : JsonData.Parse(CustomArguments(slot).ToString());
                         finals.Add(slot.ContentIndex, new(slot.Id, slot.Name, parsed));
                     }
                     for (var index = 0; index < snapshot.Content.Length; index++)
@@ -701,7 +698,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             _usage = new(input, output, cacheRead, write, checked(input + output + cacheRead + write),
                 new(source.GetProperty("input").GetDecimal(), source.GetProperty("output").GetDecimal(),
                     source.GetProperty("cacheRead").GetDecimal(), source.GetProperty("cacheWrite").GetDecimal(),
-                    source.GetProperty("total").GetDecimal(), SourceBinary64Cost: sourceCost), extras);
+                    source.GetProperty("total").GetDecimal(), SourceBinary64Cost: sourceCost), extras) { ExtrasBeforeTotal = true };
         }
         private void Set(string name, string text)
         {

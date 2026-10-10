@@ -30,8 +30,13 @@ public sealed class GoogleVertexRequestFactory
         token.ThrowIfCancellationRequested();
         // An exact endpoint is bound to this selected model; no SDK endpoint builder is invented.
         if (GoogleData.String(parameters.Value, "model") != model.Id) throw GoogleData.Fail(GoogleFailure.Configuration);
-        var body = GoogleData.Admit(JsonData.Parse(GoogleRequestProjector.WireBody(parameters).ToJsonString()), projection);
-        var bytes = Encoding.UTF8.GetBytes(EcmaScriptJsonProjection.Project(body));
+        var body = GoogleData.Admit(JsonData.Parse(GoogleRequestProjector.WireBody(parameters, vertex: true).ToJsonString()), projection);
+        // The body (images included) is bounded by the payload budget, not by the projection's 1 MiB string defaults.
+        var budget = Math.Max(projection.MaximumPayloadBytes, 1_048_576);
+        var bytes = Encoding.UTF8.GetBytes(EcmaScriptJsonProjection.Project(body, new(MaximumInputCharacters: budget, MaximumInputBytes: Math.Max(budget, 4_194_304),
+            MaximumOutputCharacters: budget, MaximumOutputBytes: Math.Max(budget, 4_194_304), MaximumStringCharacters: budget,
+            // Node and number counts grow with the message count; the payload budget bounds them.
+            MaximumNodes: budget, MaximumNumbers: budget, MaximumTotalNumberCharacters: budget)));
         if (bytes.Length > projection.MaximumPayloadBytes) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         { ["User-Agent"] = "pi/1.1.0", ["Accept"] = "text/event-stream" };
@@ -50,7 +55,8 @@ public sealed class GoogleVertexRequestFactory
         }
         if (projection.ModelMetadata.Value.TryGetProperty("headers", out var modelHeaders)) Merge(modelHeaders);
         if (projection.Headers is { } extra) Merge(extra.Value);
-        headers["Authorization"] = "Bearer " + options.AccessToken;
+        if (options.ApiKeyMode) headers["x-goog-api-key"] = options.AccessToken;
+        else headers["Authorization"] = "Bearer " + options.AccessToken;
         if (headers.Count + 1 > projection.MaximumHeaders || headers.Any(header => header.Key.Length + header.Value.Length > projection.MaximumHeaderCharacters))
             throw GoogleData.Fail(GoogleFailure.ResourceLimit);
         var owned = new HttpRequestMessage(HttpMethod.Post, options.Endpoint);

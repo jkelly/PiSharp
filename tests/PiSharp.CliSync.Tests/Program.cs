@@ -25,6 +25,8 @@ internal static partial class Program
         if (args.Length != 0 && (args.Length != 2 || args[0] != "--report")) throw new ArgumentException("Use [--report <fresh path>].");
         var cases = new (string Id, Func<Task> Run)[]
         {
+            ("tools.read-image-pi-budget-end-to-end", ReadImageEndToEnd),
+            ("live.image-pi-budget-every-family", LiveImageEveryFamily),
             ("cli.tools.parse-patterns-modifiers-and-no-mcp", Sync(ParseToolFlags)),
             ("cli.tools.exact-upstream-errors-through-commands", CommandErrors),
             ("cli.provider-requires-model-exact-error", ProviderRequiresModel),
@@ -47,6 +49,10 @@ internal static partial class Program
             ("restore.changed-declaration-uses-current-binding", OpenReplacesChangedDeclarations),
             ("restore.hidden-tool-skipped-and-pending", RestoreSkipsHiddenTools),
             ("tree.navigation-without-system-message-keeps-current-tools", NavigationWithoutSystemMessageKeepsTools),
+            ("open.restored-loadout-recorded-at-the-first-prompt", OpenRecordsRestoredLoadoutAtFirstPrompt),
+            ("loadout.tool-change-records-match-declare-tool-changes", Sync(ToolChangeRecords)),
+            ("selection.idle-selection-and-catalog-recorded-at-the-next-prompt", IdleSelectionAndCatalogRecordedAtNextPrompt),
+            ("prompt.in-memory-loadout-prompt-before-the-next-prompt", InMemoryLoadoutPrompt),
             ("prompt.hidden-tools-byte-exact-sections", Sync(HiddenPrompt)),
             ("prompt.skills-hint-reader-fallback-and-indirect", Sync(SkillsHint)),
             ("prompt.unhidden-docs-line-and-options", Sync(DocsAndOptions)),
@@ -64,7 +70,10 @@ internal static partial class Program
             ("auth.anthropic.live-route-stored-oauth-refreshes-mid-session-and-logout-falls-back", LiveStoredOAuthRefreshesMidSession),
             ("auth.anthropic.live-route-stored-key-env-precedence-and-federation", LiveAnthropicPrecedenceAndFederation),
             ("provider.anthropic.live-route-managed-effort-levels-markers-and-recorded-effort", LiveManagedEffortLevels),
+            ("summary.compaction-and-branch-requests-match-upstream-per-family", SummaryRequestsFollowUpstream),
+            ("provider.opencode.live-main-requests-carry-x-opencode-session", LiveOpenCodeSessionHeader),
             ("provider.azure.live-route-responses-completions-and-endpoint-errors", LiveAzureRoutes),
+            ("live.long-session-2000-messages-10000-records-opens-and-sends-whole-transcript", LiveLongSessionOpensAndPrompts),
             ("mcp.session.global-config-direct-background-failure-report-and-no-mcp", McpProductionSession),
             ("mcp.session.oauth-server-sends-stored-mcp-auth-token", McpOAuthServerUsesStoredTokens),
             ("mcp.session.windows-command-resolution-and-cmd-escaping", McpStdioWindowsCommand),

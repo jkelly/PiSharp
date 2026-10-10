@@ -21,7 +21,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
 {
     private readonly object _gate = new();
     private readonly ExtensionRegistry _registry;
-    private readonly PluginAssemblyLoader _loader;
+    private readonly PluginAssemblyLoader? _loader;
     private readonly CancellationTokenSource _closing = new();
     private readonly ImmutableDictionary<string, NativeToolObjectSchema> _schemas;
     private readonly NativeSessionSnapshotProvider _sessionViews;
@@ -33,11 +33,14 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     private Task? _disposal;
     internal ImmutableDictionary<string, string> Targets { get; }
     internal ExtensionAgentBinding Binding { get; private set; } = null!;
+    /// <summary>IMPL-I: resolveToolRenderers for the interactive mode's tool rows (resolvers in load order, then the tool's own).</summary>
+    internal PiSharp.Extensions.ExtensionToolRenderers? ResolveToolRenderers(string toolName) =>
+        Binding is null ? null : _registry.ResolveToolRenderers(Binding.Snapshot, toolName);
     internal IPromptInputAdmission InputAdmission { get; private set; } = null!;
     internal IPromptInputAdmission RawInputHandlers { get; private set; } = null!;
 
     private NativeExtensionActivation(NativeExtensionConfiguration configuration, ExtensionRegistry registry,
-        PluginAssemblyLoader loader, ExtensionRegistrySnapshot snapshot, ImmutableDictionary<string, NativeToolObjectSchema> schemas,
+        PluginAssemblyLoader? loader, ExtensionRegistrySnapshot snapshot, ImmutableDictionary<string, NativeToolObjectSchema> schemas,
         NativeSessionSnapshotProvider sessionViews,
         Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportInputDiagnostic,
         NativeExtensionContextFacadeHost facadeHost, NativeExtensionRegistrationBridge? registrationBridge = null)
@@ -61,7 +64,8 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         IExtensionRegistrationActionHost? configuredRegistrationActions = null,
         PromptTemplateCatalogSnapshot? configuredPromptTemplates = null,
         NativeExtensionInitializerInstallation? configuredInitializerInstallation = null,
-        Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null)
+        Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
+        PiSharp.Cli.Mcp.McpRegisteredServers? mcpServers = null)
     {
         if (configuredExecInstallation is not null && configuredExecInstallation.GetInvocationList().Length != 1)
             throw new ArgumentException("One explicitly supplied execution installation factory required.");
@@ -85,8 +89,11 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             new PiSharp.Cli.Extensions.Execution.NativeExtensionExecContextHost(facadeHost, () => execInstallation);
         IExtensionContextReadHost facadeCapabilities = configuredFacadeCapabilities ??
             new NativeExtensionRegistrationFacadeHost(facadeHost, registrationActions, executionContext);
+        var uiPrompts = uiProvider is null ? null : new NativeUiPromptEvents(uiProvider);
         var registry = new ExtensionRegistry(new() { MaximumOwners = 1, MaximumRegistrations = 64, MaximumRegistrationsPerOwner = 64 },
-            uiProvider ?? new UnavailableExtensionUiProvider(), sessionViews, facadeCapabilities);
+            uiPrompts ?? (IExtensionUiProvider)new UnavailableExtensionUiProvider(), sessionViews, facadeCapabilities);
+        // pi.registerMcpServer(): registrations made while the extension loads are read when the session starts.
+        if (mcpServers is not null) { registry.McpServerHost = mcpServers; mcpServers.OwnerPath = _ => preflight.Configuration.Package; }
         var loader = new PluginAssemblyLoader(new() { SnapshotParentDirectory = preflight.Configuration.SnapshotRoot,
             MaximumOwnedPackages = 1 });
         NativeExtensionRegistrationBridge? registrationBridge = null;
@@ -124,13 +131,14 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
                 registrationBridge is null ? null : scope => RetireConfiguredOwnerAsync(registrationBridge, mcpBridge, scope));
             await loadOriginal.ConfigureAwait(false);
             var snapshot = registry.CaptureSnapshot();
-            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler" or "ToolRenderer")) ||
+            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler" or "ToolRenderer" or "UserBashHandler" or "EventHandler")) ||
                 preflight.Configuration.EnabledTools.Any(name => snapshot.Tools.Count(tool => tool.Name == name) != 1) ||
                 preflight.Configuration.EnabledCommands.Any(name => snapshot.Commands.Count(command => command.Name == name) != 1))
                 throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
             var schemas = snapshot.Tools.ToImmutableDictionary(tool => tool.Name, tool => NativeToolObjectSchema.Read(tool.Parameters), StringComparer.Ordinal);
             token.ThrowIfCancellationRequested();
-            admittedActivation = new(preflight.Configuration, registry, loader, snapshot, schemas, sessionViews, reportInputDiagnostic, facadeHost, registrationBridge);
+            admittedActivation = new(preflight.Configuration, registry, loader, snapshot, schemas, sessionViews, reportInputDiagnostic, facadeHost, registrationBridge)
+                { UiPrompts = uiPrompts, McpServers = mcpServers };
             return admittedActivation;
         }
         catch (Exception original)
@@ -150,11 +158,13 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     internal void Bind(IToolActionPolicy policy, ToolInvokerOptions limits)
     {
         if (Binding is not null) throw new InvalidOperationException("Native generation is already bound.");
+        _boundPolicy = policy; _boundLimits = limits;
         Binding = new(_registry, policy, (tool, arguments, token) =>
         {
             token.ThrowIfCancellationRequested(); _closing.Token.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(_schemas.TryGetValue(tool.Name, out var schema) && schema.Validate(arguments));
-        }, invokerOptions: limits, options: new()
+            // Pi extension tools validate (and coerce) their arguments with upstream's validateToolArguments in their own runtime.
+            return ValueTask.FromResult(Pi is not null || _schemas.TryGetValue(tool.Name, out var schema) && schema.Validate(arguments));
+        }, invokerOptions: limits, options: (Pi is null ? new PiSharp.Extensions.Agent.ExtensionAgentBindingOptions() : PiSharp.Cli.Commands.PiPayloadBudget.PiBinding(new())) with
         {
             RestoreSystemMessage = (messages, token) => new SessionSystemReplay().Replay(messages, token).CurrentMessage,
             ReadSystemPrompt = (messages, token) => new SessionSystemReplay().Replay(messages, token).Prompt,
@@ -162,9 +172,14 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             ReportLoadoutDiagnostic = CaptureLoadoutDiagnostic
         }, sessionCancellationToken: _closing.Token);
         _loadoutDiagnostics?.Bind(Binding.Snapshot);
+        UiPrompts?.Bind(_registry, Binding.Snapshot, _reportInputDiagnostic);
+        BindMcpServersChange();
         // Capture exactly the binding revision, never a second per-operation handler set.
-        var input = new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, sessionCancellationToken: _closing.Token,
-            reportDiagnostic: _reportInputDiagnostic);
+        // runner.ts emitInput runs every input handler with the whole text and every image (the Pi entry lifts the profile bounds).
+        var input = Pi is null
+            ? new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, sessionCancellationToken: _closing.Token, reportDiagnostic: _reportInputDiagnostic)
+            : new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, PiSharp.Cli.Commands.PiPayloadBudget.PiEventDispatch, int.MaxValue,
+                _closing.Token, _reportInputDiagnostic);
         RawInputHandlers = input;
         InputAdmission = new CommandInputAdmission(this, input);
     }
@@ -178,12 +193,15 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     {
         _sessionViews.Attach(owner);
         _facadeHost.Attach(owner);
+        Pi?.AttachSession(owner);
         var compaction = new NativeSessionCompactionObservationBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         compaction.Attach(owner, owner.Current);
         var metadata = new NativeSessionInfoChangedBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         metadata.Attach(owner, owner.Current);
         var settled = new NativeAgentSettledObservationBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         settled.Attach(owner, owner.Current);
+        var sessionEvents = new NativeSessionEventBinding(_registry, Binding.Snapshot, _reportInputDiagnostic, ModelWire);
+        sessionEvents.Attach(owner, owner.Current);
         var replacementStart = new NativeReplacementSessionStartBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         _sessionViews.BeforeSwitch = new NativeSessionBeforeSwitchBinding(_registry, Binding.Snapshot, _closing.Token).BeforeSwitchAsync;
         _sessionViews.AfterSwitch = async replacement =>
@@ -191,6 +209,8 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             compaction.Attach(owner, replacement.Current);
             metadata.Attach(owner, replacement.Current);
             settled.Attach(owner, replacement.Current);
+            sessionEvents.Attach(owner, replacement.Current);
+            Pi?.InstallInputGate(replacement.Current.Session);
             await replacementStart.PublishAsync(owner, replacement).ConfigureAwait(false);
         };
         owner.BeforeReplacement = _sessionViews.BeforeSwitch;
@@ -227,7 +247,13 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     }
 
     internal ImmutableArray<IPreparedToolAdapter> EnabledAdapters => Binding.Adapters
-        .Where(adapter => _configuration.EnabledTools.Contains(adapter.Name, StringComparer.Ordinal)).ToImmutableArray();
+        .Where(adapter => IsEnabledTool(adapter.Name)).ToImmutableArray();
+    private bool IsEnabledTool(string name) => Pi is not null || _configuration.EnabledTools.Contains(name, StringComparer.Ordinal);
+    /// <summary>Pi extensions register commands after their factory returned (and on reload): commands resolve in the registry's
+    /// current snapshot. A published native generation keeps its bound snapshot.</summary>
+    private ExtensionRegistrySnapshot CommandSnapshot => Pi is not null ? _registry.CaptureSnapshot() : Binding.Snapshot;
+    private bool IsEnabledCommand(string name) => Pi is not null ? CommandSnapshot.Commands.Any(command => command.Name == name)
+        : _configuration.EnabledCommands.Contains(name, StringComparer.Ordinal);
 
     internal ExtensionSessionSnapshot? CaptureShutdownSessionSnapshot(AgentSessionAttachment? attached)
         => NativeSessionShutdownBinding.CaptureSnapshot(_registry, attached);
@@ -243,17 +269,17 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             JsonData.Parse(JsonSerializer.Serialize(new { type = "session_shutdown", reason })), _reportInputDiagnostic, retained);
     }
     internal ImmutableArray<ExtensionToolRegistrationInfo> EnabledRegistrations => Binding.Registrations
-        .Where(tool => _configuration.EnabledTools.Contains(tool.Name, StringComparer.Ordinal)).ToImmutableArray();
+        .Where(tool => IsEnabledTool(tool.Name)).ToImmutableArray();
     internal ImmutableArray<JsonData> EnabledDeclarations => Binding.Registrations
-        .Where(tool => _configuration.EnabledTools.Contains(tool.Name, StringComparer.Ordinal)).Select(tool =>
+        .Where(tool => IsEnabledTool(tool.Name)).Select(tool =>
             JsonData.Parse(JsonSerializer.Serialize(new { name = tool.Name, description = tool.Description, parameters = tool.Parameters.Value })))
         .ToImmutableArray();
 
-    public JsonData CommandCatalog => Binding.Snapshot.CommandCatalog;
+    public JsonData CommandCatalog => CommandSnapshot.CommandCatalog;
     public ValueTask<JsonData> CompleteCommandAsync(string name, string prefix, CancellationToken token)
     {
-        if (!_configuration.EnabledCommands.Contains(name, StringComparer.Ordinal)) throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
-        return _registry.CompleteCommandAsync(Binding.Snapshot, name, prefix, token, _closing.Token);
+        if (!IsEnabledCommand(name)) throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
+        return _registry.CompleteCommandAsync(CommandSnapshot, name, prefix, token, _closing.Token);
     }
 
     public bool IsRegisteredCommand(string text)
@@ -261,7 +287,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         _closing.Token.ThrowIfCancellationRequested();
         if (!text.StartsWith('/')) return false;
         var separator = text.IndexOf(' '); var name = separator < 0 ? text[1..] : text[1..separator];
-        return _configuration.EnabledCommands.Contains(name, StringComparer.Ordinal);
+        return IsEnabledCommand(name);
     }
 
     public async ValueTask<bool> TryExecuteAsync(string text, CancellationToken token)
@@ -274,7 +300,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         Task? invocationOriginal = null; Exception? invocationDirect = null;
         try
         {
-            invocationOriginal = _registry.InvokeCommandAsync(Binding.Snapshot, name,
+            invocationOriginal = _registry.InvokeCommandAsync(CommandSnapshot, name,
                 JsonData.Parse(JsonSerializer.Serialize(arguments)), token, _closing.Token).AsTask();
             await invocationOriginal.ConfigureAwait(false);
             return true;
@@ -313,7 +339,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         try { _closing.Cancel(); } catch (Exception error) { failures.Add(error); }
         // Retire before joining: no queued report may start as current, but every admitted original reporter must settle.
         try { await DrainLoadoutDiagnosticsAsync(CancellationToken.None).ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
-        await CollectNativeCleanupAsync(_loader.DisposeAsync, failures).ConfigureAwait(false);
+        if (_loader is not null) await CollectNativeCleanupAsync(_loader.DisposeAsync, failures).ConfigureAwait(false);
         await CollectNativeCleanupAsync(_registry.DisposeAsync, failures).ConfigureAwait(false);
         try { _registrationBridge?.Dispose(); } catch (Exception error) { failures.Add(error); }
         try { _closing.Dispose(); } catch (Exception error) { failures.Add(error); }

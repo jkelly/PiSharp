@@ -10,9 +10,9 @@ public sealed record CompletionsTranscriptProjectionOptions(bool Reasoning = fal
     bool SupportsMidConversationSystemMessages = false, bool RequiresAssistantAfterToolResult = false,
     bool RequiresToolResultName = false, bool RequiresThinkingAsText = false,
     bool RequiresReasoningContentOnAssistantMessages = false, CompletionsToolDeclarationProjectionOptions? ToolDeclarations = null,
-    int MaximumMessages = 256, int MaximumEntryCharacters = 65_536, int MaximumInputCharacters = 1_048_576,
-    int MaximumContentBlocks = 1024, int MaximumOutputMessages = 1024, int MaximumJsonDepth = 32,
-    int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576)
+    int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
+    int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumOutputMessages = PiRequestBudget.RequestItems, int MaximumJsonDepth = 32,
+    int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     // ModelDescriptor currently contains identity only. Keep capability local to this provider,
     // without changing its existing positional constructor/deconstruction contract.
@@ -244,7 +244,9 @@ public sealed class CompletionsTranscriptProjector
                             var wireId = same ? id : NormalizeId(id);
                             // Every preserved call reserves both identities for the entire request history.
                             // A binding is assigned once, so a later turn cannot rename an earlier pair.
-                            if (!_ids.TryAdd(id, wireId) || !_wireIds.Add(wireId))
+                            // An id-less call replays with id "" (owner decision 13): every such call shares it, as upstream sends them.
+                            if (wireId.Length == 0) { if (_ids.GetValueOrDefault(id, wireId) != wireId) throw Fail(CompletionsRequestFailure.InvalidTranscript); _ids[id] = wireId; }
+                            else if (!_ids.TryAdd(id, wireId) || !_wireIds.Add(wireId))
                                 throw Fail(CompletionsRequestFailure.InvalidTranscript);
                             pending.Add((id, name));
                         }
@@ -397,7 +399,8 @@ public sealed class CompletionsTranscriptProjector
         private static IEnumerable<JsonProperty> Properties(JsonElement value) => value.ValueKind == JsonValueKind.Object ? CompletionsJson.Properties(value) : throw Fail(CompletionsRequestFailure.InvalidTranscript);
         private static JsonElement.ArrayEnumerator Array(JsonElement value) => value.ValueKind == JsonValueKind.Array ? value.EnumerateArray() : throw Fail(CompletionsRequestFailure.InvalidTranscript);
         private static string? Optional(JsonElement value, string name) => value.TryGetProperty(name, out var item) && item.ValueKind != JsonValueKind.Null ? Text(item) : null;
-        private static string Identity(JsonElement value, string name) { var text = String(value, name); return string.IsNullOrWhiteSpace(text) || text.Contains('\0') ? throw Fail(CompletionsRequestFailure.InvalidTranscript) : text; }
+        // A nameless or id-less call keeps its empty name/id (owner decision 13).
+        private static string Identity(JsonElement value, string name) { var text = String(value, name); return text.Contains('\0') ? throw Fail(CompletionsRequestFailure.InvalidTranscript) : text; }
         private static string String(JsonElement value, string name) => CompletionsJson.String(value, name);
         private static string Text(JsonElement value) => CompletionsJson.Text(value);
         private static CompletionsRequestException Fail(CompletionsRequestFailure failure) => CompletionsJson.Fail(failure);

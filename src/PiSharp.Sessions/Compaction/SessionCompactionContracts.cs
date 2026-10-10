@@ -15,7 +15,7 @@ public sealed record SessionCompactionSettings(bool Enabled = true, double Reser
     }
 }
 public enum SessionCompactionFailure { InvalidSettings, InvalidMessage, UnsupportedNumber, ResourceLimit, InvalidBoundary,
-    NothingToSummarize, SummaryFailed, StaleSelection }
+    NothingToSummarize, SummaryFailed, StaleSelection, Cancelled }
 public sealed class SessionCompactionException(SessionCompactionFailure failure) : Exception(failure switch
 {
     SessionCompactionFailure.InvalidSettings => "Summary planning settings are invalid.",
@@ -23,8 +23,19 @@ public sealed class SessionCompactionException(SessionCompactionFailure failure)
     SessionCompactionFailure.NothingToSummarize => "The selected context has nothing to compact.",
     SessionCompactionFailure.StaleSelection => "Summary result no longer owns the selected session context.",
     SessionCompactionFailure.SummaryFailed => "Summary generation failed; no summary checkpoint was appended.",
+    SessionCompactionFailure.Cancelled => "Compaction cancelled",
     _ => "Summary planning requires supported canonical context and a valid selected boundary."
-}) { public SessionCompactionFailure Failure { get; } = failure; }
+})
+{
+    public SessionCompactionFailure Failure { get; } = failure;
+    /// <summary>The summarization response's provider error text, when generation failed with a provider error response.</summary>
+    public string? ProviderErrorMessage { get; init; }
+    /// <summary>True when the summarization response was aborted rather than failed.</summary>
+    public bool ProviderAborted { get; init; }
+    /// <summary>compaction.ts getSummarizationFailure: the failure as upstream words it ("&lt;label&gt; failed: …"), when known.</summary>
+    public string? FailureText { get; init; }
+    public override string Message => FailureText ?? base.Message;
+}
 public sealed record SessionContextUsageEstimate(double Tokens, double UsageTokens, double TrailingTokens, int? LastUsageIndex);
 public sealed record SessionFileOperations(ImmutableArray<string> Read, ImmutableArray<string> Written, ImmutableArray<string> Edited)
 {
@@ -48,7 +59,8 @@ public sealed record SessionCompactionPlan(string? FirstKeptEntryId, ImmutableAr
 public sealed record SessionBranchSummaryCollection(ImmutableArray<SessionEntry> Entries, string? CommonAncestorId);
 public sealed record SessionBranchSummaryPlan(ImmutableArray<TranscriptEntry> Messages, SessionFileOperations FileOps,
     double TotalTokens, string? CommonAncestorId = null);
-public sealed record SessionCompactionPlanningOptions(int MaximumEntries = 10_000, int MaximumMessages = 10_000,
+/// <summary>Pi plans compaction over any branch; the entry and message bounds match the session log record bound (100,000).</summary>
+public sealed record SessionCompactionPlanningOptions(int MaximumEntries = 100_000, int MaximumMessages = 100_000,
     int MaximumCharacters = 8_388_608);
 
 internal sealed class SessionFileOperationsBuilder

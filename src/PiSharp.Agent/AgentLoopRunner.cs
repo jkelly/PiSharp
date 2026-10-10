@@ -5,7 +5,7 @@ using PiSharp.Contracts;
 
 namespace PiSharp.Agent;
 
-public sealed record AgentLoopOptions(int MaximumTurns = 16, int MaximumTranscriptMessages = 1024)
+public sealed record AgentLoopOptions(int MaximumTurns = 16, int MaximumTranscriptMessages = PiRequestBudget.RequestMessages)
 {
     /// <summary>Strict admission for retained canonical tool values, with the default execution/message boundary.</summary>
     public ToolResultValueOptions CanonicalToolResultLimits { get; init; } = ToolResultValueOptions.ExecutionBoundary;
@@ -17,7 +17,12 @@ public sealed record AgentLoopTurn(int TurnIndex, TurnResult Result, ImmutableAr
     ImmutableArray<TranscriptEntry> ToolResults);
 public sealed record AgentLoopResult(AgentLoopStopReason Reason, ImmutableArray<TranscriptEntry> Transcript,
     ImmutableArray<AgentLoopTurn> Turns, ImmutableArray<TranscriptEntry> PendingMessages,
-    AssistantMessage? RejectedAssistant = null);
+    AssistantMessage? RejectedAssistant = null)
+{
+    /// <summary>Source agent_end messages (runLoop's newMessages): what this run added, in order, as message_end handlers left them.
+    /// Unlike a suffix of <see cref="Transcript"/>, it stays exact when a turn boundary replaced the transcript. Default when unknown.</summary>
+    public ImmutableArray<TranscriptEntry> RunMessages { get; init; }
+}
 
 /// <summary>Low-level asynchronous callback seams, not high-level Agent queue implementations.</summary>
 public sealed record AgentLoopCallbacks(
@@ -32,6 +37,9 @@ public sealed record AgentLoopCallbacks(
     public Func<AgentRequestBoundary, CancellationToken, ValueTask<AgentLoopRequestPreparation?>>? PrepareRequestBoundary { get; init; }
     /// <summary>Context-only custom inputs after tool results; consuming these never requests another turn.</summary>
     public Func<CancellationToken, ValueTask<ImmutableArray<TranscriptEntry>>>? GetContextOnlyMessages { get; init; }
+    /// <summary>Source turn boundary context refresh: a complete canonical transcript a finish-turn callback committed (for example
+    /// turn_end drafts). The same run continues from it; null keeps the transcript.</summary>
+    public Func<ImmutableArray<TranscriptEntry>?>? TakeTranscriptReplacement { get; init; }
 }
 
 public sealed record AgentLoopStarted : AgentEvent;
@@ -103,6 +111,7 @@ public sealed class AgentLoopRunner
         var deliveryToken = settleAbort ? CancellationToken.None : cancellationToken;
         var transcript = canonicalHistory.IsEmpty ? newInputMessages : canonicalHistory.AddRange(newInputMessages);
         var turns = ImmutableArray.CreateBuilder<AgentLoopTurn>();
+        var added = ImmutableArray.CreateBuilder<TranscriptEntry>();
         var pending = ImmutableArray<TranscriptEntry>.Empty;
         AgentLoopTurn? lastTurn = null;
         var needsRequest = true;
@@ -113,7 +122,13 @@ public sealed class AgentLoopRunner
         {
             await sink.EmitAsync(new AgentLoopTurnStarted(0), deliveryToken).ConfigureAwait(false);
             newInputMessages = await PrepareBoundaryAsync(canonicalHistory, newInputMessages, initial: true).ConfigureAwait(false);
-            foreach (var message in newInputMessages) await EmitInputAsync(message).ConfigureAwait(false);
+            var inputStart = transcript.Length - newInputMessages.Length;
+            for (var index = 0; index < newInputMessages.Length; index++)
+            {
+                var message = await EmitInputAsync(newInputMessages[index]).ConfigureAwait(false);
+                if (!ReferenceEquals(message, newInputMessages[index])) transcript = transcript.SetItem(inputStart + index, message);
+                added.Add(message);
+            }
             pending = await PollAsync(callbacks.GetSteeringMessages).ConfigureAwait(false);
             while (true)
             {
@@ -132,6 +147,7 @@ public sealed class AgentLoopRunner
                         }
                         if (!settleAbort) cancellationToken.ThrowIfCancellationRequested();
                         ValidateInputs(prepared);
+                        ApplyTranscriptReplacement();
                         // Preserve the source's one-poll delivery rule: only poll again when earlier steering was empty.
                         if (pending.Length == 0) pending = await PollAsync(callbacks.GetSteeringMessages).ConfigureAwait(false);
                         pending = prepared.AddRange(pending);
@@ -139,10 +155,10 @@ public sealed class AgentLoopRunner
                         pending = await PrepareBoundaryAsync(transcript, pending, initial: false).ConfigureAwait(false);
                     }
                     if ((long)transcript.Length + pending.Length + 1 > _options.MaximumTranscriptMessages) throw new LoopLimit();
-                    foreach (var message in pending)
+                    foreach (var input in pending)
                     {
-                        await EmitInputAsync(message).ConfigureAwait(false);
-                        transcript = transcript.Add(message);
+                        var message = await EmitInputAsync(input).ConfigureAwait(false);
+                        transcript = transcript.Add(message); added.Add(message);
                     }
                     pending = [];
                     var snapshot = new AgentLoopSnapshot(turns.Count, _model, transcript);
@@ -174,6 +190,7 @@ public sealed class AgentLoopRunner
                     var toolTimestamp = _clock();
                     if (!settleAbort) cancellationToken.ThrowIfCancellationRequested();
                     var assistantCommitted = false;
+                    var replacedResults = new Dictionary<ToolResultMessage, TranscriptEntry>(ReferenceEqualityComparer.Instance);
                     var turnSink = new CallbackSink(async (observation, token) =>
                     {
                         if (observation is AssistantMessageEnded assistant)
@@ -188,20 +205,29 @@ public sealed class AgentLoopRunner
                             assistantCommitted = true;
                         }
                         await sink.EmitAsync(observation, token).ConfigureAwait(false);
+                        // Source _replaceMessageInPlace: the loop's context holds the replaced message object.
+                        if (AgentMessageReplacement.Get(observation) is not { } replacement) return;
+                        if (observation is AssistantMessageEnded) transcript = transcript.SetItem(transcript.Length - 1, replacement);
+                        else if (observation is ToolResultMessageEnded tool) lock (replacedResults) replacedResults[tool.Message] = replacement;
                     });
                     var result = settleAbort ?
                         await requestRunner.RunWithAbortSettlementAsync(request, turnSink, cancellationToken, toolTimestamp).ConfigureAwait(false) :
                         await requestRunner.RunAsync(request, turnSink, cancellationToken).ConfigureAwait(false);
                     if (!assistantCommitted) throw new InvalidOperationException("The completed turn omitted its assistant commit.");
-                    var toolResults = result.Tools.Messages.Select(message => ToolEntry(message, toolTimestamp)).ToImmutableArray();
-                    transcript = transcript.AddRange(toolResults);
+                    added.Add(transcript[^1]);
+                    var toolResults = result.Tools.Messages.Select(message =>
+                        replacedResults.TryGetValue(message, out var replaced) ? replaced : ToolEntry(message, toolTimestamp)).ToImmutableArray();
+                    transcript = transcript.AddRange(toolResults); added.AddRange(toolResults);
                     lastTurn = new(turns.Count, result, transcript, toolResults);
                     turns.Add(lastTurn);
                     if (callbacks.FinishTurn is not null)
                         await callbacks.FinishTurn(lastTurn, cancellationToken).ConfigureAwait(false);
+                    ApplyTranscriptReplacement();
                     if (!settleAbort) cancellationToken.ThrowIfCancellationRequested();
                     var decision = callbacks.FinishTurnDecision is null ? AgentLoopFinishAction.Default :
                         await callbacks.FinishTurnDecision(lastTurn, cancellationToken).ConfigureAwait(false);
+                    // Source finishTurn commits turn_end drafts and refreshes the context; the same run continues from it.
+                    ApplyTranscriptReplacement();
                     if (!settleAbort) cancellationToken.ThrowIfCancellationRequested();
                     var failed = result.Chat.Failure is not null || result.Chat.Message.StopReason is StopReason.Error or StopReason.Aborted || result.Tools.IsCanceled ||
                         (settleAbort && cancellationToken.IsCancellationRequested);
@@ -221,10 +247,10 @@ public sealed class AgentLoopRunner
                         if (contextMessages.Any(message => message.Role != "custom"))
                             throw new ArgumentException("Context-only delivery admits only custom messages.");
                         if ((long)transcript.Length + contextMessages.Length > _options.MaximumTranscriptMessages) throw new LoopLimit();
-                        foreach (var message in contextMessages)
+                        foreach (var input in contextMessages)
                         {
-                            await EmitInputAsync(message).ConfigureAwait(false);
-                            transcript = transcript.Add(message);
+                            var message = await EmitInputAsync(input).ConfigureAwait(false);
+                            transcript = transcript.Add(message); added.Add(message);
                         }
                     }
                     if (failed)
@@ -267,14 +293,28 @@ public sealed class AgentLoopRunner
             requestRunner = prepared.Runner;
             transcript = initial ? history.AddRange(prepared.AdditionalSystemMessages).AddRange(prepared.PendingInputs)
                 : history.AddRange(prepared.AdditionalSystemMessages);
+            added.AddRange(prepared.AdditionalSystemMessages);
             return prepared.PendingInputs;
         }
 
-        async ValueTask EmitInputAsync(TranscriptEntry message)
+        // Returns the message as message_end handlers left it (source in-place replacement).
+        async ValueTask<TranscriptEntry> EmitInputAsync(TranscriptEntry message)
         {
             await sink.EmitAsync(new AgentLoopInputMessageStarted(message), deliveryToken).ConfigureAwait(false);
-            await sink.EmitAsync(new AgentLoopInputMessageEnded(message), deliveryToken).ConfigureAwait(false);
+            var ended = new AgentLoopInputMessageEnded(message);
+            await sink.EmitAsync(ended, deliveryToken).ConfigureAwait(false);
             if (!settleAbort) cancellationToken.ThrowIfCancellationRequested();
+            if (AgentMessageReplacement.Get(ended) is not { } replacement) return message;
+            ValidateInputs([replacement]);
+            return replacement;
+        }
+
+        void ApplyTranscriptReplacement()
+        {
+            if (callbacks.TakeTranscriptReplacement?.Invoke() is not { } replaced) return;
+            ValidateCanonicalHistory(replaced, _canonicalToolResultLimits);
+            if (replaced.Length > _options.MaximumTranscriptMessages) throw new LoopLimit();
+            transcript = replaced;
         }
 
         async ValueTask<ImmutableArray<TranscriptEntry>> PollAsync(
@@ -292,7 +332,7 @@ public sealed class AgentLoopRunner
 
         async Task<AgentLoopResult> EndAsync(AgentLoopStopReason reason, AssistantMessage? rejectedAssistant = null)
         {
-            var result = new AgentLoopResult(reason, transcript, turns.ToImmutable(), pending, rejectedAssistant);
+            var result = new AgentLoopResult(reason, transcript, turns.ToImmutable(), pending, rejectedAssistant) { RunMessages = added.ToImmutable() };
             await sink.EmitAsync(new AgentLoopEnded(result), deliveryToken).ConfigureAwait(false);
             if (!settleAbort) cancellationToken.ThrowIfCancellationRequested();
             return result;
@@ -317,7 +357,7 @@ public sealed class AgentLoopRunner
 
     /// <summary>Validate the supported native request message envelope without modifying canonical history.</summary>
     public static void ValidateRequestMessages(ImmutableArray<TranscriptEntry> messages,
-        ToolResultValueOptions? valueLimits = null, int maximumMessages = 1024)
+        ToolResultValueOptions? valueLimits = null, int maximumMessages = PiRequestBudget.RequestMessages)
     {
         if (maximumMessages <= 0 || messages.IsDefault || messages.Length > maximumMessages)
             throw new ArgumentException("Invalid request message count.", nameof(messages));
@@ -389,14 +429,14 @@ public sealed class AgentLoopRunner
                         string.IsNullOrWhiteSpace(assistant.Model)) throw new JsonException();
                     var ids = new HashSet<string>(StringComparer.Ordinal);
                     foreach (var call in assistant.Content.OfType<ToolCallContent>())
-                        if (string.IsNullOrWhiteSpace(call.Id) || string.IsNullOrWhiteSpace(call.Name) || !ids.Add(call.Id))
+                        if (call.Id is null || call.Name is null || call.Id.Length > 0 && !ids.Add(call.Id))
                             throw new JsonException();
                 }
                 else if (message.Role == "toolResult")
                 {
                     var body = message.WireBody.Value;
-                    if (string.IsNullOrWhiteSpace(body.GetProperty("toolCallId").GetString()) ||
-                        string.IsNullOrWhiteSpace(body.GetProperty("toolName").GetString())) throw new JsonException();
+                    // A nameless or id-less call's result carries the empty toolName/toolCallId it was given (owner decision 13).
+                    if (body.GetProperty("toolCallId").GetString() is null || body.GetProperty("toolName").GetString() is null) throw new JsonException();
                     _ = body.GetProperty("timestamp").GetInt64();
                     _ = body.GetProperty("isError").GetBoolean();
                     if (body.GetProperty("content").ValueKind != JsonValueKind.Array) throw new JsonException();

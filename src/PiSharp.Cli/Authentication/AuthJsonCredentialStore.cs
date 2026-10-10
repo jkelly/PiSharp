@@ -65,6 +65,7 @@ internal sealed class AuthJsonCredentialStore : IAdmittedOAuthCredentialSource
             cancellationToken.ThrowIfCancellationRequested();
             var entry = new JsonObject { ["type"] = "oauth", ["refresh"] = next.Refresh, ["access"] = next.Access, ["expires"] = next.ExpiresUnixMilliseconds };
             foreach (var (key, value) in next.ProviderData) if (key is not ("type" or "refresh" or "access" or "expires")) entry[key] = value;
+            foreach (var (key, value) in next.ProviderJson) if (key is not ("type" or "refresh" or "access" or "expires")) entry[key] = JsonNode.Parse(value.ToString());
             document[provider] = entry;
             return (next, document);
         }, cancellationToken);
@@ -124,10 +125,33 @@ internal sealed class AuthJsonCredentialStore : IAdmittedOAuthCredentialSource
             entry["expires"] is not JsonValue expires || !expires.TryGetValue<double>(out var expiresAt) || !double.IsFinite(expiresAt))
             throw new InvalidDataException($"Invalid auth.json credential for provider \"{provider}\"");
         var data = new Dictionary<string, string>(StringComparer.Ordinal);
+        var json = new Dictionary<string, PiSharp.Contracts.JsonData>(StringComparer.Ordinal);
         foreach (var (key, value) in entry)
-            if (key is not ("type" or "refresh" or "access" or "expires") && value is JsonValue text && text.TryGetValue<string>(out var stringValue))
-                data[key] = stringValue;
-        return new(accessToken, refreshToken, (long)expiresAt, data);
+            if (key is not ("type" or "refresh" or "access" or "expires"))
+            {
+                if (value is JsonValue text && text.TryGetValue<string>(out var stringValue)) data[key] = stringValue;
+                else if (value is not null) json[key] = PiSharp.Contracts.JsonData.Parse(value.ToJsonString());
+            }
+        return new(accessToken, refreshToken, (long)expiresAt, data, json);
+    }
+
+    /// <summary>Source ModelRuntime.login for an api-key method: store <c>{"type":"api_key","key"?,"env"?}</c>.</summary>
+    public Task WriteApiKeyAsync(string provider, string? key, IReadOnlyDictionary<string, string>? environment, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(provider);
+        return WithLockAsync(document =>
+        {
+            var entry = new JsonObject { ["type"] = "api_key" };
+            if (key is not null) entry["key"] = key;
+            if (environment is not null)
+            {
+                var values = new JsonObject();
+                foreach (var (name, value) in environment) values[name] = value;
+                entry["env"] = values;
+            }
+            document[provider] = entry;
+            return Task.FromResult(((OAuthCredentialSnapshot?)null, (JsonObject?)document));
+        }, cancellationToken);
     }
 
     private async Task<T> WithLockAsync<T>(Func<JsonObject, Task<(T Result, JsonObject? Next)>> operation, CancellationToken token)
@@ -157,8 +181,8 @@ internal sealed class AuthJsonCredentialStore : IAdmittedOAuthCredentialSource
         try { text = await File.ReadAllTextAsync(AuthPath, Encoding.UTF8, token).ConfigureAwait(false); }
         catch (FileNotFoundException) { return []; }
         if (text.StartsWith((char)0xFEFF)) text = text[1..];
-        if (text.Length == 0) return [];
-        try { return JsonNode.Parse(text) as JsonObject ?? throw new InvalidDataException("Invalid auth.json: expected an object"); }
+        // auth-storage.ts load: JSON.parse of the whole file, so an empty file fails ("Unexpected end of JSON input").
+        try { return PiSharp.Cli.Pi.PiJson.Parse(text, 64) as JsonObject ?? throw new InvalidDataException("Invalid auth.json: expected an object"); }
         catch (JsonException error) { throw new InvalidDataException("Failed to read auth.json: " + error.Message, error); }
     }
 

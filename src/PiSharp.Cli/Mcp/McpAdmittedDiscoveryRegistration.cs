@@ -13,6 +13,9 @@ public delegate ValueTask<JsonData> McpAdmittedCodemodeExecutor(string code, IEx
 public delegate ValueTask<JsonData> McpAdmittedToolSearchExecutor(string query, double? limit, IExtensionToolInvocationContext invocation, CancellationToken token);
 /// <summary>A search executor that also receives the actual attachment its definition was bound to, whose catalog it searches
 /// and whose selection it changes.</summary>
+/// <summary>A codemode executor bound to the actual attachment of its definition.</summary>
+internal delegate ValueTask<JsonData> McpBoundCodemodeExecutor(string code, AgentSessionAttachment attachment,
+    IExtensionToolInvocationContext invocation, CancellationToken token);
 internal delegate ValueTask<JsonData> McpBoundToolSearchExecutor(string query, double? limit, AgentSessionAttachment attachment,
     IExtensionToolInvocationContext invocation, CancellationToken token);
 
@@ -39,6 +42,26 @@ public sealed class McpDiscoveryExecutableDefinition
         }
         return new(McpDiscoveryKind.Codemode, McpDiscoveryToolIdentity.CreateCodemode(registrationId, description, Execute, prepareLoadout), fence);
     }
+    /// <summary>A codemode executor that also receives the actual attachment its definition was bound to (the session whose
+    /// branch holds the store and whose tools scripts call). <paramref name="configure"/> adds presentation metadata
+    /// (renderers, prompt guidelines, constrained sampling) without changing the tool's identity.</summary>
+    internal static McpDiscoveryExecutableDefinition CreateCodemode(string registrationId, string description,
+        McpBoundCodemodeExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout,
+        Func<ExtensionToolDescriptor, ExtensionToolDescriptor>? configure)
+    {
+        Single(admittedExecutor);
+        var fence = new ExecutionFence();
+        ValueTask<JsonData> Execute(JsonData arguments, IExtensionToolContext context, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (context is not IExtensionToolInvocationContext invocation || invocation.SessionGeneration <= 0) throw new InvalidOperationException("Codemode requires the native captured invocation pipeline.");
+            var attachment = fence.Validate(invocation);
+            var code = arguments.Value.GetProperty("code").GetString() ?? throw new ArgumentException("A source string is required.");
+            return admittedExecutor(code, attachment, invocation, token);
+        }
+        var descriptor = McpDiscoveryToolIdentity.CreateCodemode(registrationId, description, Execute, prepareLoadout);
+        return new(McpDiscoveryKind.Codemode, configure?.Invoke(descriptor) ?? descriptor, fence);
+    }
     public static McpDiscoveryExecutableDefinition CreateToolSearch(string registrationId, string description,
         McpAdmittedToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout = null)
     {
@@ -46,7 +69,13 @@ public sealed class McpDiscoveryExecutableDefinition
         return CreateToolSearch(registrationId, description, (query, limit, _, invocation, token) => admittedExecutor(query, limit, invocation, token), prepareLoadout);
     }
     internal static McpDiscoveryExecutableDefinition CreateToolSearch(string registrationId, string description,
-        McpBoundToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout = null)
+        McpBoundToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout = null) =>
+        CreateToolSearch(registrationId, description, admittedExecutor, prepareLoadout, null);
+    /// <summary><paramref name="configure"/> adds presentation metadata or the default active state (tool-search/index.ts
+    /// registers it inactive) without changing the tool's identity.</summary>
+    internal static McpDiscoveryExecutableDefinition CreateToolSearch(string registrationId, string description,
+        McpBoundToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout,
+        Func<ExtensionToolDescriptor, ExtensionToolDescriptor>? configure)
     {
         Single(admittedExecutor);
         var fence = new ExecutionFence();
@@ -60,7 +89,8 @@ public sealed class McpDiscoveryExecutableDefinition
             if (limit is { } value && !double.IsFinite(value)) throw new ArgumentException("A finite search limit is required.");
             return admittedExecutor(query, limit, attachment, invocation, token);
         }
-        return new(McpDiscoveryKind.ToolSearch, McpDiscoveryToolIdentity.CreateToolSearch(registrationId, description, Execute, prepareLoadout), fence);
+        var descriptor = McpDiscoveryToolIdentity.CreateToolSearch(registrationId, description, Execute, prepareLoadout);
+        return new(McpDiscoveryKind.ToolSearch, configure?.Invoke(descriptor) ?? descriptor, fence);
     }
     private static void Single(Delegate admitted)
     { ArgumentNullException.ThrowIfNull(admitted); if (admitted.GetInvocationList().Length != 1) throw new ArgumentException("One joined semantic implementation is required."); }

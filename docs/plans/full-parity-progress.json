@@ -1,0 +1,220 @@
+{
+  "plan": "docs/plans/full-parity-v1.1.0.md",
+  "baseline": "v1.1.0",
+  "branch": "parity/full",
+  "started": "2026-10-08",
+  "packages": [
+    {
+      "id": "IMPL-A1",
+      "title": "Provider APIs and authentication",
+      "wave": 1,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-A2",
+      "title": "Model catalogs and model selection",
+      "wave": 1,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-B",
+      "title": "Classifiers and image generation",
+      "wave": 1,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-C",
+      "title": "Codemode on Jint",
+      "wave": 1,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-D",
+      "title": "Built-in tools",
+      "wave": 1,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-F",
+      "title": "CLI, configuration and resources",
+      "wave": 2,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-G",
+      "title": "Events, session features and extension events",
+      "wave": 2,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-H",
+      "title": "MCP completion",
+      "wave": 2,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-I",
+      "title": "Interactive mode and slash commands",
+      "wave": 3,
+      "status": "merged",
+      "merged": "2026-10-08"
+    },
+    {
+      "id": "IMPL-E",
+      "title": "Extensions, Node bridge and packages",
+      "wave": 3,
+      "status": "merged",
+      "merged": "2026-10-09"
+    },
+    {
+      "id": "BURN-DOWN",
+      "title": "Deviation burn-down",
+      "wave": 4,
+      "status": "merged",
+      "merged": "2026-10-09"
+    }
+  ],
+  "qualityGates": {
+    "releaseSuites": [
+      "AzureResponses",
+      "MistralConversations",
+      "AnthropicAuthSync",
+      "McpSync",
+      "ProviderSync",
+      "WireSync",
+      "CliSync",
+      "ToolSearch"
+    ],
+    "alsoRequired": [
+      "Rpc",
+      "Sessions"
+    ],
+    "perWave": "merge, refresh pins, all suites green, Linux dry run",
+    "releasePipelineSuites": [
+      "AzureResponses",
+      "MistralConversations",
+      "AnthropicAuthSync",
+      "McpSync",
+      "ProviderSync",
+      "WireSync",
+      "CliSync",
+      "ToolSearch",
+      "Classifiers",
+      "Models",
+      "Codemode",
+      "ProviderApis",
+      "CliParity",
+      "McpParity",
+      "SessionParity",
+      "InteractiveParity",
+      "ExtensionParity"
+    ]
+  },
+  "wave1": {
+    "merged": "2026-10-08",
+    "gate": "all release suites, Rpc, Sessions, Tools and the four new parity suites green"
+  },
+  "carryover": [
+    {
+      "from": "BURN-DOWN",
+      "item": "lone surrogates on input: RPC input and tool-call arguments become U+FFFD; session lines containing one are refused",
+      "owner": "open"
+    },
+    {
+      "from": "BURN-DOWN",
+      "item": "JSON nesting depth 64 on session records, RPC input and streamed tool-call arguments",
+      "owner": "open"
+    },
+    {
+      "from": "BURN-DOWN",
+      "item": "fractional usage token counts refused (Bedrock reads them as 0)",
+      "owner": "open"
+    },
+    {
+      "from": "BURN-DOWN",
+      "item": "byte memory bounds Pi does not have: 64 MiB session line and file, 16/64 MiB stream event/total, 8 MiB tool result, 32 MiB RPC record",
+      "owner": "open"
+    },
+    {
+      "from": "BURN-DOWN",
+      "item": "extension sendMessage with triggerTurn from inside a command handler runs after the handler returns; dropped after about 30 s; untested",
+      "owner": "open"
+    },
+    {
+      "from": "BURN-DOWN",
+      "item": "user bash start failures: Windows answers \"RPC command failed.\", Unix records the shell's exit 127 output, where upstream reports Node's spawn error",
+      "owner": "open"
+    },
+    {
+      "from": "BURN-DOWN",
+      "item": "Linux X11 clipboard: no native helper, xclip or xsel required",
+      "owner": "open"
+    },
+    {
+      "from": "IMPL-F",
+      "item": "-e package sources contribute extensions but not their skills, prompts or themes (PiResourceRequest.ExtensionSources is never set)",
+      "owner": "open"
+    },
+    {
+      "from": "IMPL-F",
+      "item": "pisharp mcp is routed before PiCommand: no --offline/PI_OFFLINE, httpProxy or PI_CODING_AGENT environment setup",
+      "owner": "open"
+    },
+    {
+      "from": "IMPL-B",
+      "item": "llama.cpp router discovery and /llama (upstream extensions/llama); native C# extensions cannot register classifier or image providers",
+      "owner": "open"
+    },
+    {
+      "from": "IMPL-E",
+      "item": "ctx.ui.setTheme returns an error",
+      "owner": "open"
+    },
+    {
+      "from": "IMPL-G",
+      "item": "project_trust and resources_discover are not dispatched to native C# extensions; compatibility/extensions/event-catalog.v1.1.0.overlay.json still marks the agent-loop topics WireOnlyNotDispatchedToExtensions",
+      "owner": "open"
+    },
+    {
+      "from": "IMPL-I",
+      "item": "samples/extensions ship no pisharp-extension.json and target the older package loader",
+      "owner": "open"
+    }
+  ],
+  "wave2": {
+    "merged": "2026-10-08",
+    "followUps": "IMPL-F (untrusted projects keep tools, MCP trust, rg/fd, Unix bash) and IMPL-H (mid-run MCP publication, in-call waits, step-up sign-in) merged"
+  },
+  "wave3": {
+    "merged": "2026-10-09",
+    "followUps": "IMPL-I follow-up (live model switching, extension UI, changelog) and IMPL-E rounds 2-3 (real Pi packages, native C# extensions, provider OAuth, reload rebuild, Linux fixes) merged"
+  },
+  "wave4": {
+    "burnDown": "merged 2026-10-09 (agent-loop boundaries, exact errors, caps removed, session format, Vertex ADC, highlighting, Mermaid); integrity pins refreshed",
+    "reassessment": "2026-10-09: Parity page, website docs, applicability matrix (parity.* rows per package), 1.1.0.2 changelog and release notes"
+  },
+  "release": {
+    "version": "1.1.0.2",
+    "kind": "patch",
+    "baseline": "v1.1.0",
+    "status": "ready",
+    "ships": "everything on parity/full",
+    "notes": "docs/release-notes/1.1.0.2.md",
+    "changelog": "website/src/content/changelog/1.1.0.2.md (date 2026-10-09)",
+    "tag": "not created; the owner confirms the tag",
+    "blockers": [],
+    "dryRun": "run 38007732077 (Linux, tests) green"
+  },
+  "messageCaps": {
+    "status": "merged",
+    "notes": "Transcript message-count caps lifted on every provider route, the agent loop and the session reader (PiRequestBudget.RequestMessages/RequestItems); 2,000-message regression on 15 routes."
+  }
+}

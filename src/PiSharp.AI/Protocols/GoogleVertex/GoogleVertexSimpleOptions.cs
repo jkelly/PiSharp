@@ -7,7 +7,7 @@ public sealed record GoogleVertexSimpleOptions(GoogleVertexOptions DirectOptions
     string? Reasoning = null)
 {
     public PiSharp.Contracts.JsonData? ThinkingBudgets { get; init; }
-    public int MaximumContextMessages { get; init; } = 4096;
-    public int MaximumContextCharacters { get; init; } = 8_388_608;
+    public int MaximumContextMessages { get; init; } = PiRequestBudget.RequestMessages;
+    public int MaximumContextCharacters { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public override string ToString() => nameof(GoogleVertexSimpleOptions);
 }

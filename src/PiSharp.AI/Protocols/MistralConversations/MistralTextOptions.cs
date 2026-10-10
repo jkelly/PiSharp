@@ -13,11 +13,16 @@ public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralT
     public double? Temperature { get; init; }
     public double? MaxTokens { get; init; }
     public int TimeoutMilliseconds { get; init; } = 60_000;
-    public int MaximumPayloadBytes { get; init; } = 1_048_576;
-    public int MaximumFrameCharacters { get; init; } = 1_048_576;
-    public int MaximumTotalCharacters { get; init; } = 8_388_608;
-    public int MaximumContentCharacters { get; init; } = 1_048_576;
-    public int MaximumContentBlocks { get; init; } = 1024;
+    public int MaximumPayloadBytes { get; init; } = PiRequestBudget.RequestPayloadBytes;
+    public int MaximumFrameCharacters { get; init; } = PiRequestBudget.StreamCharacters;
+    public int MaximumTotalCharacters { get; init; } = PiRequestBudget.StreamTotalCharacters;
+    public int MaximumContentCharacters { get; init; } = PiRequestBudget.StreamCharacters;
+    /// <summary>Content parts of one request message (images, replayed parts, tool result parts). mistral.ts converts every part: no
+    /// count bound by default; the payload bytes stay the request's memory bound.</summary>
+    public int MaximumContentBlocks { get; init; } = int.MaxValue;
+    /// <summary>Content blocks (text, thinking, tool calls) of one streamed response. mistral.ts pushes every block onto output.content:
+    /// no count bound by default; the content characters stay the response's memory bound.</summary>
+    public int MaximumResponseContentBlocks { get; init; } = int.MaxValue;
     public JsonData? ToolChoice { get; init; }
     public string? PromptMode { get; init; }
     public string? ReasoningEffort { get; init; }
@@ -58,8 +63,8 @@ public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralT
             Costs.Tiers.IsDefault || Costs.Tiers.Any(tier => tier is null || double.IsNaN(tier.InputTokensAbove) || new[] { tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite }.Any(x => !double.IsFinite(x) || x < 0)) ||
             string.IsNullOrWhiteSpace(UserAgent) || UserAgent.Length > MaximumHeaderCharacters || UserAgent.Contains('\r') || UserAgent.Contains('\n') ||
             Temperature is { } t && !double.IsFinite(t) || MaxTokens is { } m && !double.IsFinite(m) ||
-            TimeoutMilliseconds is < 1 or > 3_600_000 || MaximumPayloadBytes is < 1 or > 8_388_608 || MaximumFrameCharacters is < 1 or > 8_388_608 ||
-            MaximumTotalCharacters is < 1 or > 67_108_864 || MaximumContentCharacters is < 1 or > 8_388_608 || MaximumContentBlocks is < 1 or > 10000 || MaximumErrorBytes is < 1 or > 8_388_608 ||
+            TimeoutMilliseconds is < 1 or > 3_600_000 || MaximumPayloadBytes is < 1 or > PiRequestBudget.MaximumBound || MaximumFrameCharacters is < 1 or > PiRequestBudget.MaximumBound ||
+            MaximumTotalCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumContentCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumContentBlocks < 1 || MaximumResponseContentBlocks < 1 || MaximumErrorBytes is < 1 or > 8_388_608 ||
             MaximumJsonDepth is < 1 or > 64 || MaximumHeaders is < 4 or > 4096 || MaximumHeaderCharacters is < 1 or > 65536 || MaximumTotalHeaderCharacters is < 4 or > 1_048_576)
             throw new MistralTextException(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral text configuration.");
     }

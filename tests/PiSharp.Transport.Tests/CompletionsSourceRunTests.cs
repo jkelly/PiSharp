@@ -637,9 +637,9 @@ internal static class CompletionsSourceRunTests
             }
             finally { fixture.Release(); run.Cancel(); await run.DisposeAsync(); await Observe(drain); }
         }
-        Check(new CompletionsPublicFailure(new string('x', 8192)).Message.Length == 8192 &&
-            new CompletionsPublicFailure(new string('\u03c0', 4096)).Message.Length == 4096, "Inclusive public failure data limits rejected owned values.");
-        foreach (var value in new[] { "", "bad\0data", "bad\ud800", new string('x', 8193), new string('\u03c0', 4097) })
+        Check(new CompletionsPublicFailure(new string('x', CompletionsPublicFailure.MaximumCharacters)).Message.Length == CompletionsPublicFailure.MaximumCharacters &&
+            new CompletionsPublicFailure(new string('\u03c0', CompletionsPublicFailure.MaximumCharacters / 2)).Message.Length == CompletionsPublicFailure.MaximumCharacters / 2, "Inclusive public failure data limits rejected owned values.");
+        foreach (var value in new[] { "", "bad\0data", "bad\ud800", new string('x', CompletionsPublicFailure.MaximumCharacters + 1), new string('\u03c0', CompletionsPublicFailure.MaximumCharacters / 2 + 1) })
         { var denied = false; try { _ = new CompletionsPublicFailure(value); } catch (Exception error) when (error is ArgumentException or StreamProtocolException or CompletionsRequestException) { denied = true; } Check(denied, "Malformed public failure data was admitted."); }
     }
 

@@ -7,8 +7,8 @@ namespace PiSharp.AI.Protocols.AzureResponses;
 public sealed record AzureResponsesSimpleOptions(AzureResponsesOptions DirectOptions,
     string? ApiKey = null, string? Reasoning = null)
 {
-    public int MaximumContextMessages { get; init; } = 4096;
-    public int MaximumContextCharacters { get; init; } = 8_388_608;
+    public int MaximumContextMessages { get; init; } = PiRequestBudget.RequestMessages;
+    public int MaximumContextCharacters { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public override string ToString() => nameof(AzureResponsesSimpleOptions);
 }
 

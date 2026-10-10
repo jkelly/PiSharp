@@ -39,6 +39,9 @@ internal sealed record McpCommandOptions(string Cwd, string AgentDirectory)
     public string HomeDirectory { get; init; } = "";
     /// <summary>A replacement channel for a server (tests); null keeps the stdio or HTTP channel of its config.</summary>
     public Func<McpServerEntry, McpAdmittedChannelFactory?>? CreateChannel { get; init; }
+    /// <summary>The stored trust decision for the project (cli.ts: <c>new ProjectTrustStore(agentDir).get(cwd) === true</c>); the
+    /// project trust store supplies it. Without a stored decision the project is not trusted.</summary>
+    public Func<string, bool> IsProjectTrusted { get; init; } = _ => false;
 
     internal McpSessionHost CreateSessionHost() => new(AgentDirectory, HomeDirectory, ProcessEnvironment)
     { CreateHttpHandler = HttpHandler is { } handler ? () => handler : null, Credentials = Credentials, CreateChannel = CreateChannel };
@@ -62,7 +65,7 @@ internal static class McpCommand
         $"  {AppName} mcp logout <server>",
         "",
         "Configure and check MCP servers and sign in to OAuth servers without starting a session.",
-        "Reads ~/.pi/agent/mcp.json (PiSharp does not read project trust, so .pi/mcp.json is not used).",
+        "Reads ~/.pi/agent/mcp.json and, in trusted projects, .pi/mcp.json.",
         "",
         "Commands:",
         "  add <server>            Add or replace a server in mcp.json",
@@ -103,8 +106,9 @@ internal static class McpCommand
         var environment = new Dictionary<string, string?>(StringComparer.Ordinal)
         { ["PI_CODING_AGENT_DIR"] = System.Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR") };
         var home = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
-        return new(Directory.GetCurrentDirectory(), TerminalKeybindingConfigurationLoader.ResolveAgentDirectory(home, platform, environment))
-        { HomeDirectory = home };
+        var agent = TerminalKeybindingConfigurationLoader.ResolveAgentDirectory(home, platform, environment);
+        // The project trust store (IMPL-F), resolved non-interactively: the stored decision, else defaultProjectTrust.
+        return new(Directory.GetCurrentDirectory(), agent) { HomeDirectory = home, IsProjectTrusted = PiSharp.Cli.Pi.PiProjectTrust.CreateResolver(agent, home) };
     }
 
     /// <summary>Run `mcp &lt;args&gt;` and return the exit code.</summary>
@@ -125,10 +129,18 @@ internal static class McpCommand
         if (command is not ("list" or "login" or "logout")) { Error($"Unknown mcp command \"{command}\".\n{HelpHint}"); return 1; }
 
         McpLoadedConfiguration loaded;
-        try { loaded = McpConfigurationReader.Load(File.Exists(globalConfig) ? new(globalConfig, File.ReadAllText(globalConfig)) : null, null, false); }
-        catch (IOException readError) { Error($"Could not read {globalConfig}: {readError.Message}"); return 1; }
-        // PiSharp reads no project trust store, so the project's mcp.json is never used.
-        var untrustedNote = File.Exists(projectConfig) ? $"{projectConfig} is ignored because PiSharp does not read project trust." : null;
+        var projectTrusted = options.IsProjectTrusted(options.Cwd);
+        var reading = globalConfig;
+        try
+        {
+            var global = File.Exists(globalConfig) ? new McpConfigurationDocument(globalConfig, File.ReadAllText(globalConfig)) : null;
+            reading = projectConfig;
+            loaded = McpConfigurationReader.Load(global,
+                projectTrusted && File.Exists(projectConfig) ? new(projectConfig, File.ReadAllText(projectConfig)) : null, projectTrusted);
+        }
+        catch (IOException readError) { Error($"Could not read {reading}: {readError.Message}"); return 1; }
+        var untrustedNote = !projectTrusted && File.Exists(projectConfig)
+            ? $"{projectConfig} is ignored because the project is not trusted. Start {AppName} in the project to trust it." : null;
         var credentials = new McpOAuthCredentialStore(options.Credentials ?? McpOAuthFileCredentialBackend.InAgentDirectory(options.AgentDirectory));
 
         if (command == "list")
@@ -279,7 +291,8 @@ internal static class McpCommand
         catch (Exception addError) when (addError is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
         { error($"Could not update {path}: {addError.Message}"); return 1; }
         log($"{(replaced ? "Replaced" : "Added")} {scope} MCP server \"{name}\" in {path}.");
-        if (project) log($"{path} is ignored because PiSharp does not read project trust.");
+        if (project && !options.IsProjectTrusted(options.Cwd))
+            log($"The project is not trusted, so {path} is ignored until you start {AppName} in the project and trust it.");
         // HTTP servers without an Authorization header may use OAuth.
         var mayNeedSignIn = valid.Transport == McpTransportKind.Http && !(valid.Raw.Value.TryGetProperty("headers", out var written) &&
             written.EnumerateObject().Any(header => header.Name.Equals("authorization", StringComparison.OrdinalIgnoreCase)));
@@ -321,10 +334,10 @@ internal static class McpCommand
 
     /// <summary>Source editMcpServers: read an `mcp.json` (empty when missing), let <paramref name="edit"/> change its `mcpServers`, and
     /// write it back with its own indentation when the edit returns true. Other content is kept.</summary>
-    private static void EditMcpServers(string path, Func<JsonObject?, JsonObject, bool> edit)
+    internal static void EditMcpServers(string path, Func<JsonObject?, JsonObject, bool> edit)
     {
         var text = File.Exists(path) ? File.ReadAllText(path) : null;
-        var parsed = text is null ? new JsonObject() : JsonNode.Parse(text);
+        var parsed = text is null ? new JsonObject() : PiSharp.Cli.Pi.PiJson.Parse(text);
         if (parsed is not JsonObject root || root.TryGetPropertyValue("mcpServers", out var servers) && servers is not (null or JsonObject))
             throw new InvalidDataException($"{path}: expected an object with an \"mcpServers\" object");
         if (!edit(servers as JsonObject, root)) return;
@@ -340,7 +353,7 @@ internal static class McpCommand
     }
 
     /// <summary>Source list: connect to every enabled server, report its state, tools and errors; exit 1 when one is not connected
-    /// or the config has errors. Resource counts are not reported.</summary>
+    /// or the config has errors. Servers with resources report their resource and URI template counts.</summary>
     private static async Task<int> ListAsync(McpLoadedConfiguration loaded, bool json, string? untrustedNote, McpCommandOptions options,
         Action<string> log, CancellationToken token)
     {
@@ -369,6 +382,11 @@ internal static class McpCommand
                 var overrides = snapshot.Catalog.Tools.Select(tool => (tool.Name, Exposure: McpConfigurationReader.GetToolExposure(entry.Config, tool.Name).ToString().ToLowerInvariant()))
                     .Where(row => row.Exposure != exposure).ToList();
                 if (overrides.Count > 0) report["toolExposure"] = new JsonObject(overrides.Select(row => KeyValuePair.Create(row.Name, (JsonNode?)row.Exposure)));
+                if (snapshot.Catalog.HasResources)
+                {
+                    var (resources, templates) = await runtime.CountResourcesAsync(token).ConfigureAwait(false);
+                    report["resources"] = resources; report["resourceTemplates"] = templates;
+                }
             }
             catch (Exception failure) when (!token.IsCancellationRequested)
             {
@@ -404,6 +422,8 @@ internal static class McpCommand
             if (state == "needs-auth") log($"  sign in with: {AppName} mcp login {name}");
             if (tools.Count > 0)
                 log("  tools: " + string.Join(", ", tools.Select(tool => report["toolExposure"]?[tool] is { } toolExposure ? $"{tool} [{toolExposure.GetValue<string>()}]" : tool)));
+            if (report["resources"] is { } resourceCount)
+                log($"  resources: {resourceCount.GetValue<int>()}, URI templates: {report["resourceTemplates"]?.GetValue<int>() ?? 0}");
             if (report["error"] is { } failure) log("  " + failure.GetValue<string>().Replace("\n", "\n  ", StringComparison.Ordinal));
         }
         foreach (var configError in loaded.Errors) log($"config error: {configError}");
@@ -425,6 +445,12 @@ internal static class McpCommand
         McpCommandOptions options, Action<string> log, Action<string> error, CancellationToken token)
     {
         var name = entry.Name;
+        var host = options.CreateSessionHost();
+        using var connectionClient = host.CreateClient();
+        // Connecting first answers whether a sign-in is needed.
+        var connected = await ConnectAsync(entry, host, connectionClient, options, token).ConfigureAwait(false);
+        if (connected.Tools is { } already) { log($"Already signed in to MCP server \"{name}\" ({already} tools)."); return 0; }
+        if (!connected.NeedsSignIn) { error($"MCP server \"{name}\" failed to connect: {connected.Error}"); return 1; }
         McpOAuthSettings settings;
         try { settings = McpOAuthSettings.From(entry, (value, description) => ResolveConfigValue(value, description, options.Environment)); }
         catch (InvalidOperationException resolveError) { error($"Sign-in to MCP server \"{name}\" failed: {resolveError.Message}"); return 1; }
@@ -442,7 +468,7 @@ internal static class McpCommand
             {
                 log($"Sign in to MCP server \"{name}\" in your browser:\n{authorizationUrl.AbsoluteUri}");
                 openUrl(authorizationUrl.AbsoluteUri);
-            }, readRedirectUrl), AdmittedHttpClientRequestFactory.Create(client)), timeout.Token).ConfigureAwait(false);
+            }, readRedirectUrl), AdmittedHttpClientRequestFactory.Create(client)) { Challenge = connected.Challenge }, timeout.Token).ConfigureAwait(false);
         }
         catch (Exception signInError)
         {
@@ -451,9 +477,38 @@ internal static class McpCommand
                 : $"Sign-in to MCP server \"{name}\" failed: {Message(signInError)}");
             return 1;
         }
-        // The original reconnects here and reports the tool count; this command does not connect to the server.
-        log($"Signed in to MCP server \"{name}\".");
+        var reconnected = await ConnectAsync(entry, host, connectionClient, options, token).ConfigureAwait(false);
+        if (reconnected.Tools is not { } count)
+        {
+            error("Signed in, but " + (reconnected.NeedsSignIn ? McpProviderTokenAuthentication.SignInRequiredMessage(entry)
+                : $"MCP server \"{name}\" failed to connect: {reconnected.Error}"));
+            return 1;
+        }
+        log($"Signed in to MCP server \"{name}\" ({count} tools).");
         return 0;
+    }
+
+    /// <summary>One connection to the server, closed again: its tool count, or whether it needs a sign-in, or its error.</summary>
+    private static async Task<(int? Tools, bool NeedsSignIn, string? Error, PiSharp.Extensions.Mcp.Authentication.McpOAuthChallenge? Challenge)> ConnectAsync(McpServerEntry entry, McpSessionHost host, HttpClient client,
+        McpCommandOptions options, CancellationToken token)
+    {
+        McpServerRuntime? runtime = null; PiSharp.Extensions.Mcp.Authentication.McpOAuthChallenge? challenge = null;
+        try
+        {
+            var runtimeOptions = new McpRuntimeOptions(1, McpSessionHost.ClientVersion);
+            // runtime.ts connection.challenge: the server's challenge, which the sign-in answers.
+            runtime = new McpServerRuntime(entry, runtimeOptions, host.Channel(entry, options.Cwd, runtimeOptions, () => client, challenge: received => challenge = received),
+                (publication, _) => ValueTask.FromResult(new McpCatalogPublicationReceipt(publication.Current.Generation, publication.Current.Revision, true)));
+            var snapshot = await runtime.ConnectAsync(token).ConfigureAwait(false);
+            return (snapshot.Catalog.Tools.Length, false, null, challenge);
+        }
+        catch (Exception failure) when (!token.IsCancellationRequested)
+        {
+            for (Exception? current = failure; current is not null; current = current.InnerException)
+                if (current is PiSharp.Extensions.Mcp.Authentication.McpOAuthAuthorizationRequiredException) return (null, true, null, challenge);
+            return (null, false, failure is AggregateException { InnerExceptions.Count: 1 } single ? single.InnerExceptions[0].Message : failure.Message, challenge);
+        }
+        finally { if (runtime is not null) try { await runtime.CloseAsync().ConfigureAwait(false); } catch (Exception) { } }
     }
 
     private static string Message(Exception error)
@@ -482,7 +537,7 @@ internal static class McpCommand
         catch (OperationCanceledException) { return null; }
     }
 
-    private static void OpenBrowser(string url)
+    internal static void OpenBrowser(string url)
     {
         try
         {
@@ -492,41 +547,8 @@ internal static class McpCommand
         catch (Exception) { /* The URL is printed; the user can open it. */ }
     }
 
-    /// <summary>resolve-config-value.ts templates: `$NAME` and `${NAME}` from the environment, `$$` and `$!` escapes.
-    /// `!command` values are not run by PiSharp.</summary>
-    internal static string ResolveConfigValue(string config, string description, Func<string, string?> environment)
-    {
-        if (config.StartsWith('!')) throw new InvalidOperationException($"Failed to resolve {description}: PiSharp does not run shell commands for config values.");
-        var resolved = new StringBuilder(); var missing = new List<string>(); var index = 0;
-        void Env(string variable)
-        {
-            if (environment(variable) is { Length: > 0 } value) resolved.Append(value);
-            else if (!missing.Contains(variable)) missing.Add(variable);
-        }
-        while (index < config.Length)
-        {
-            var dollar = config.IndexOf('$', index);
-            if (dollar < 0) { resolved.Append(config, index, config.Length - index); break; }
-            resolved.Append(config, index, dollar - index);
-            var next = dollar + 1 < config.Length ? config[dollar + 1] : '\0';
-            if (next is '$' or '!') { resolved.Append(next); index = dollar + 2; continue; }
-            if (next == '{')
-            {
-                var end = config.IndexOf('}', dollar + 2);
-                if (end < 0) { resolved.Append('$'); index = dollar + 1; continue; }
-                var variable = config[(dollar + 2)..end];
-                if (EnvName().IsMatch(variable)) Env(variable); else resolved.Append(config, dollar, end + 1 - dollar);
-                index = end + 1; continue;
-            }
-            var match = EnvPrefix().Match(config, dollar + 1);
-            if (match.Success) { Env(match.Value); index = dollar + 1 + match.Length; continue; }
-            resolved.Append('$'); index = dollar + 1;
-        }
-        if (missing.Count == 1) throw new InvalidOperationException($"Failed to resolve {description} from environment variable: {missing[0]}");
-        if (missing.Count > 1) throw new InvalidOperationException($"Failed to resolve {description} from environment variables: {string.Join(", ", missing)}");
-        return resolved.ToString();
-    }
-
-    private static Regex EnvName() => new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant);
-    private static Regex EnvPrefix() => new(@"\G[A-Za-z_][A-Za-z0-9_]*", RegexOptions.CultureInvariant);
+    /// <summary>resolve-config-value.ts resolveConfigValueOrThrow: `$NAME` and `${NAME}` from the environment, `$$` and `$!`
+    /// escapes, and `!command` run through the shell (owner decision 0004), with the upstream error texts.</summary>
+    internal static string ResolveConfigValue(string config, string description, Func<string, string?> environment) =>
+        new PiSharp.Cli.Models.ConfigValueResolver(environment).ResolveOrThrow(config, description);
 }

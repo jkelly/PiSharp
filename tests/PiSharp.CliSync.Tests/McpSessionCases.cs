@@ -50,8 +50,10 @@ internal static partial class Program
 
     // mcp.exposure-and-prompt + mcp.oauth: the global mcp.json is read at session start. The direct server's tool reaches the first
     // request; a failing direct server is reported and left out (the session still starts); a codemode server connects in the
-    // background when a codemode implementation exists and is reported and skipped without one (deferred servers connect with the
-    // built-in tool_search, see PiSharp.ToolSearch.Tests); disabled servers and the project file are not used; --no-mcp connects nothing.
+    // background with a supplied or the built-in codemode implementation (PiSharp.Codemode.Tests; deferred servers connect with the
+    // built-in tool_search, see PiSharp.ToolSearch.Tests); disabled servers are not connected, and the project file of an untrusted
+    // project is not read (silently, as upstream; IMPL-H, see PiSharp.McpParity.Tests for trusted projects); --no-mcp connects nothing.
+    // Every server connects in the background; the first prompt waits for the direct one, and problems are reported once settled.
     private static Task McpProductionSession() => WithLiveRoot("mcp-session", async root =>
     {
         var agent = Path.Combine(root, "agent"); Directory.CreateDirectory(agent);
@@ -91,29 +93,30 @@ internal static partial class Program
                 new(Env(("ANTHROPIC_API_KEY", "env-key")), () => provider), host);
             await rpc.Prompt("first", "first");
             // The background server connected and its tools were published at an idle boundary before the next prompt.
-            if (host.Discovery is not null && !extra.Contains("--no-mcp")) await laterConnected.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            if (!extra.Contains("--no-mcp")) await laterConnected.Task.WaitAsync(TimeSpan.FromSeconds(20));
             await rpc.Prompt("second", "second");
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
             return (provider.Snapshot(), rpc.Error.ToString());
         }
 
-        var projectNotice = Path.Combine(root, ".pi", "mcp.json") + " is ignored because PiSharp does not read project trust.";
         var (requests, error) = await Session(Host(discovery: true));
         foreach (var request in requests) Check(ToolNames(request).Contains("mcp__docs__search"), "direct MCP tool declared: " + string.Join(",", ToolNames(request)));
         Check(!requests.SelectMany(ToolNames).Any(name => name.Contains("broken", StringComparison.Ordinal) || name.Contains("off", StringComparison.Ordinal)),
             "failed and disabled servers declare nothing");
-        Names([projectNotice, "MCP servers need attention:\n  broken: failed: initialize refused"], McpDiagnostics(error), "startup report with discovery");
+        Names(["MCP servers need attention:\n  broken: failed: initialize refused"], McpDiagnostics(error), "startup report with discovery");
         Equal(1, channels["later"].Single().Lists, "background server listed its tools");
         Check(channels.Values.SelectMany(bag => bag).All(channel => channel.Closes == 1), "every MCP channel closed with the session");
         Check(!channels.ContainsKey("off"), "disabled server not connected");
 
-        // Without a codemode implementation (PiSharp's production default) the codemode server is reported and never connected.
+        // PiSharp 1.1.0.3: without a supplied implementation the production codemode tool is registered, so the codemode server
+        // connects in the background as well and nothing but the failing server is reported.
         channels.Clear();
+        laterConnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         (requests, error) = await Session(Host(discovery: false));
         Check(requests.All(request => ToolNames(request).Contains("mcp__docs__search")), "direct tool without discovery");
-        Names([projectNotice, "MCP servers need attention:\n  later: not connected: its codemode tools need the codemode tool, which PiSharp does not implement yet; set \"exposure\": \"deferred\" or \"direct\" to use it\n  broken: failed: initialize refused"],
-            McpDiagnostics(error), "startup report without discovery");
-        Check(!channels.ContainsKey("later"), "codemode server not connected without discovery");
+        Check(requests.All(request => ToolNames(request).Contains("codemode")), "built-in codemode declared");
+        Names(["MCP servers need attention:\n  broken: failed: initialize refused"], McpDiagnostics(error), "startup report without discovery");
+        Equal(1, channels["later"].Single().Lists, "codemode server connected with the built-in codemode");
 
         // --no-mcp: nothing is read or connected.
         channels.Clear();

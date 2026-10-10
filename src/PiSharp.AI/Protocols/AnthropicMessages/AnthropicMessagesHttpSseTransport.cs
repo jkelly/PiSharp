@@ -1,13 +1,16 @@
 using System.Runtime.CompilerServices;
 using System.Collections.Immutable;
 using System.Text.Json;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.AI.Transports;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
 
-public sealed record AnthropicMessagesHttpSseOptions(int MaximumDataEvents = 4096, int MaximumDataCharacters = 65_536,
-    long MaximumTotalDataCharacters = 1_048_576, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null);
+/// <summary>The SDK reads every event of a stream, of any size: no event count; one event keeps the per-content memory bound and the
+/// whole stream the total one.</summary>
+public sealed record AnthropicMessagesHttpSseOptions(int MaximumDataEvents = int.MaxValue, int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
+    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null);
 
 /// <summary>One configured HTTP/SSE send per enumeration, composed with the accepted Anthropic DTO mapper. Borrows the client.</summary>
 public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
@@ -22,7 +25,6 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
     private readonly SseDecoderOptions _framing;
     private static readonly HashSet<string> MessageEvents = new(StringComparer.Ordinal)
     { "message_start", "message_delta", "message_stop", "content_block_start", "content_block_delta", "content_block_stop" };
-    private static readonly JsonData ProviderError = JsonData.Parse("{\"type\":\"error\",\"error\":{}}");
 
     public AnthropicMessagesHttpSseTransport(HttpClient client,
         Func<ChatRequest, CancellationToken, HttpRequestMessage> requestFactory,
@@ -60,7 +62,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         var framing = _options.Framing ?? new(RejectInvalidUtf8: true, EofBehavior: SseEofBehavior.DispatchPendingEvent);
         if (!framing.RejectInvalidUtf8 || framing.EofBehavior != SseEofBehavior.DispatchPendingEvent)
             throw new ArgumentException("Anthropic SSE requires strict UTF-8 and pending-event dispatch at EOF.", nameof(options));
-        _http = new(client, framing); _messages = new(ReadDtosAsync, messagesOptions);
+        _http = new(client, framing) { Rejection = RejectAsync }; _messages = new(ReadDtosAsync, messagesOptions);
         _framing = framing; _messagesOptions = messagesOptions; _hooks = hooks;
     }
     public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default) =>
@@ -220,7 +222,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                     if (count++ >= transport._options.MaximumDataEvents || data.Length > transport._options.MaximumDataCharacters ||
                         data.Length > transport._options.MaximumTotalDataCharacters - characters) throw Limit();
                     characters += data.Length;
-                    if (frame.EventType == "error") { yield return ProviderError; yield break; }
+                    if (frame.EventType == "error") throw ErrorEvent(data);
                     if (!MessageEvents.Contains(frame.EventType)) continue;
                     var dto = transport.Parse(data);
                     if (transport._hooks!.OnProviderStreamEvent is { } hook)
@@ -261,7 +263,8 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
             // Upstream records providerThinkingLevel on the output before any request work, so pre-stream failures keep it.
             var properties = (partial?.ExtraProperties ?? (transport._messagesOptions?.ProviderThinkingLevel is { } level
                     ? JsonFields.Empty.Set("providerThinkingLevel", JsonData.Parse(JsonSerializer.Serialize(level))) : JsonFields.Empty))
-                .Set("errorMessage",JsonData.Parse(JsonSerializer.Serialize(reason == StopReason.Aborted ? "Anthropic stream was cancelled." : "Anthropic stream did not complete.")))
+                .Set("errorMessage",JsonData.Parse(JsonSerializer.Serialize(reason == StopReason.Aborted ? "Anthropic stream was cancelled." :
+                    PrimaryError is ProviderDisplayException shown ? shown.Message : "Anthropic stream did not complete.")))
                 .Set("anthropicFailure",JsonData.Parse(JsonSerializer.Serialize(failure.ToString())));
             var message = partial ?? new(request.Model.Api,request.Model.Provider,request.Model.Id,request.Timestamp,[],TokenUsage.Zero,reason);
             return new StreamError(reason,message with {StopReason=reason,ExtraProperties=properties});
@@ -285,11 +288,23 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                 data.Length > _options.MaximumTotalDataCharacters - characters) throw Limit();
             characters += data.Length;
             // Pinned iterateAnthropicEvents checks the named error before parsing and ignores all other unnamed/unknown frames.
-            if (frame.EventType == "error") { yield return ProviderError; yield break; }
+            if (frame.EventType == "error") throw ErrorEvent(data);
             if (!MessageEvents.Contains(frame.EventType)) continue;
             yield return Parse(data);
         }
     }
+    /// <summary>@anthropic-ai/sdk APIError for a rejected response: APIError.makeMessage over the whole parsed body
+    /// (anthropic-messages.ts shows error.message unchanged). A body over the stream budget keeps the status-only rejection.</summary>
+    private async ValueTask<Exception> RejectAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        var bytes = await ProviderErrorText.ReadBodyAsync(response, _options.MaximumTotalDataCharacters, token).ConfigureAwait(false);
+        return bytes is null ? new HttpSseRejectedException(response.StatusCode)
+            : new ProviderDisplayException(ProviderErrorText.AnthropicStatus((int)response.StatusCode, ProviderErrorText.FetchText(bytes)));
+    }
+
+    // anthropic-messages.ts iterateAnthropicEvents: a named error event throws new Error(sse.data) before parsing.
+    private static ProviderDisplayException ErrorEvent(string data) => new(data, inStream: true);
+
     private JsonData Parse(string data)
     {
         try

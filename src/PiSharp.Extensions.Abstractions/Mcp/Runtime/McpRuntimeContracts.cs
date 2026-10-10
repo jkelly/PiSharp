@@ -10,7 +10,8 @@ public sealed record McpInvocationIdentity(string OwnerId, long OwnerGeneration,
     string ToolCallId, string? ParentToolCallId);
 public sealed record McpRequestOptions(double TimeoutMilliseconds, McpProgressCallback? OnProgress = null)
 {
-    public int MaximumResponseBytes { get; init; } = 1_048_576;
+    /// <summary>transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES: one response message of up to 16 MiB.</summary>
+    public int MaximumResponseBytes { get; init; } = 16 * 1024 * 1024;
     /// <summary>Native captured identity, not an MCP wire parameter or remote permission grant.</summary>
     public McpInvocationIdentity? InvocationIdentity { get; init; }
 }
@@ -47,8 +48,11 @@ public interface IMcpNotificationRetirementChannel
 
 /// <summary>Transfers a fresh independently closeable admitted lease, never ownership of a global client/process.</summary>
 public delegate ValueTask<IMcpAdmittedRequestChannel> McpAdmittedChannelFactory(McpServerEntry entry, CancellationToken cancellationToken);
-public sealed record McpRuntimeLimits(int MaximumPages = 1000, int MaximumTools = 4096,
-    int MaximumSchemaBytes = 262_144, int MaximumResponseBytes = 1_048_576, int MaximumCatalogBytes = 8_388_608);
+/// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/client.ts MAX_LIST_PAGES (1,000 tools/list pages) and
+/// transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES (16 MiB per message, so per response and per tool schema). The client keeps
+/// every listed tool, so the tool count and the whole catalog have no bound of their own.</summary>
+public sealed record McpRuntimeLimits(int MaximumPages = 1000, int MaximumTools = int.MaxValue,
+    int MaximumSchemaBytes = 16 * 1024 * 1024, int MaximumResponseBytes = 16 * 1024 * 1024, int MaximumCatalogBytes = int.MaxValue);
 public sealed record McpRuntimeOptions(long Generation, string ClientVersion, JsonData? Roots = null)
 {
     public McpRuntimeLimits Limits { get; init; } = new();

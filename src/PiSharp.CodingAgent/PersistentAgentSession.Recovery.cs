@@ -59,16 +59,21 @@ public sealed partial class PersistentAgentSession
     public IDisposable SubscribeOperationEvents(ISessionOperationEventSink sink)
     {
         ArgumentNullException.ThrowIfNull(sink);
-        lock(_gate){ThrowAvailable();if(_operationSubscriptions.Length>=(_agentOptions?.MaximumSubscribers??128))throw new InvalidOperationException("Session subscriber limit reached.");var item=new OperationSubscription(sink);_operationSubscriptions=_operationSubscriptions.Add(item);return new OperationLease(this,item);}
+        // A runtime binding under a replacement reservation subscribes its observers (extension activations bind there too).
+        lock(_gate){ThrowBindable();if(_operationSubscriptions.Length>=(_agentOptions?.MaximumSubscribers??128))throw new InvalidOperationException("Session subscriber limit reached.");var item=new OperationSubscription(sink);_operationSubscriptions=_operationSubscriptions.Add(item);return new OperationLease(this,item);}
     }
     private AgentConfiguration RecoveryConfiguration(AgentConfiguration configuration)
     {
         var original=configuration.Hooks??new();
-        return configuration with { Hooks=original with { PrepareRequestBoundary=PrepareActivationRequestAsync, FinishTurnDecision=async (turn,token)=>
+        // agent.sessionId = sessionManager.getSessionId(): every provider request carries the session id.
+        // Source emitBeforeAgentStart(_baseSystemPromptOptions): before_agent_start sees the prompt of the in-memory loadout.
+        var before=original.BeforePrompt;
+        return configuration with { SessionId=configuration.SessionId??_store.Snapshot.Header.Id, Hooks=original with { BeforePrompt=before is null?null:(start,token)=>before(start with { History=WithPendingSystemRecord(start.History,token) },token), PrepareRequestBoundary=PrepareActivationRequestAsync, FinishTurnDecision=async (turn,token)=>
         {
             var decision=original.FinishTurnDecision is null?AgentLoopFinishAction.Default:await original.FinishTurnDecision(turn,token).ConfigureAwait(false);
             double? desired;lock(_gate)desired=_automaticCompaction is null?null:_recoveryDesiredOutput;
-            return desired is { } max&&SessionRecoveryClassifier.IsRecoverableLength(turn.Result.Chat.Message,max)?AgentLoopFinishAction.End:decision;
+            decision=desired is { } max&&SessionRecoveryClassifier.IsRecoverableLength(turn.Result.Chat.Message,max)?AgentLoopFinishAction.End:decision;
+            return await TurnBoundaryAsync(turn,decision,token).ConfigureAwait(false);
         } } };
     }
     private async ValueTask EmitOperationAsync(SessionOperationEvent observation)
@@ -97,10 +102,17 @@ public sealed partial class PersistentAgentSession
             Func<CancellationToken,ValueTask>? boundary;lock(_gate)boundary=_beforeSettlement;
             SetOperationPhase(SessionOperationPhase.BeforeSettlement);
             if(boundary is not null&&!token.IsCancellationRequested)await boundary(token).ConfigureAwait(false);
+            // Source _runBeforeSettleBoundary: agent_before_settle may append entries and ensure one more provider request.
+            var settle=token.IsCancellationRequested?null:await RunBeforeSettleBoundaryAsync(idle,token).ConfigureAwait(false);
+            if(settle==true)
+            {
+                if(runs>=(_agentOptions?.Loop?.MaximumTurns??16)){result=result with { Reason=AgentLoopStopReason.TurnLimit };break;}
+                SetOperationPhase(SessionOperationPhase.Provider);result=await _agent.ContinueAsync(token).ConfigureAwait(false);runs++;continue;
+            }
             // Default sessions retain the accepted explicit-Continue contract for input admitted
             // during low-level end delivery. Recovery and explicit boundary hooks own the wider settlement loop.
             bool ownsContinuation;lock(_gate)ownsContinuation=boundary is not null||_automaticCompaction is not null&&_recoveryDesiredOutput is not null;
-            var canContinue=ownsContinuation&&result.Reason==AgentLoopStopReason.Completed&&!token.IsCancellationRequested;
+            var canContinue=settle is null&&ownsContinuation&&result.Reason==AgentLoopStopReason.Completed&&!token.IsCancellationRequested;
             AgentPendingInputQueueSnapshot queued;
             lock (_gate)
             {
@@ -130,7 +142,7 @@ public sealed partial class PersistentAgentSession
         if(configured is null||desired is null||result.Turns.IsEmpty)return RecoveryDecision.None;
         var turn=result.Turns[^1];var assistant=turn.Result.Chat.Message;var model=_configuration.Model;
         if(assistant.StopReason==StopReason.Aborted||assistant.Model!=model.Id||assistant.Provider!=model.Provider||assistant.Api!=model.Api)return RecoveryDecision.None;
-        var wire=PiWireJson.WriteMessage(assistant).Value;
+        var wire=PersistedWire(PiWireJson.WriteMessage(assistant)).Value;
         var selected=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="assistant"&&JsonElement.DeepEquals(m.WireBody.Value,wire)));
         if(selected is null)return RecoveryDecision.None;
         var index=context.Ancestry.IndexOf(selected.SourceEntry);
@@ -153,7 +165,7 @@ public sealed partial class PersistentAgentSession
             var targets=new List<string>{selected.SourceEntry.Id};
             foreach(var tool in turn.ToolResults.Where(m=>syntheticIds.Contains(m.WireBody.Value.GetProperty("toolCallId").GetString()!)))
             {
-                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonElement.DeepEquals(m.WireBody.Value,tool.WireBody.Value)));
+                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonElement.DeepEquals(m.WireBody.Value,PersistedWire(tool.WireBody).Value)));
                 if(target is null)throw Error(PersistentAgentSessionFailure.InvalidCommit);targets.Add(target.SourceEntry.Id);
             }
             SetOperationPhase(SessionOperationPhase.RecoveryOmission);await OmitRecoveryAttemptAsync(targets,token,idle).ConfigureAwait(false);
@@ -186,11 +198,13 @@ public sealed partial class PersistentAgentSession
                 token.ThrowIfCancellationRequested();var id=Identity(_nextEntryId,log.Header.Id,entries);token.ThrowIfCancellationRequested();
                 var entry=ContextEditRecord(target,replacement,id,parent,_clock);edits.Add(entry);entries=entries.Add(entry);parent=id;
             }
-            var prospective=_projector.Project(entries,parent,token);ValidateRuntimeContext(prospective,_configuration);
+            var prospective=_projector.Project(entries,parent,token);ValidateRuntimeContext(prospective, _configuration, _toleratedSelection, _toleratedThinking);
             await using(var probe=new NativeAgent(_configuration,_clock,new NoopSink(),_agentOptions))probe.ConfigureAndReplaceMessages(_configuration,SessionContextProjector.AgentMessages(prospective));
             token.ThrowIfCancellationRequested();admitted=true;var acknowledgment=await _store.AppendAsync(edits.ToImmutable(),token).ConfigureAwait(false);
             if(!acknowledgment.CheckpointAcknowledged)throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock(_gate){_agent.ConfigureAndReplaceMessages(RecoveryConfiguration(_configuration),SessionContextProjector.AgentMessages(prospective));_acknowledgedLog=acknowledgment.Snapshot;_context=prospective;}
+            // Source _omitRecoveryAttempt emits entry_appended for each context edit it appends.
+            admitted=false;await PublishAppendedAsync(acknowledgment.Entries).ConfigureAwait(false);
         }
         catch(SessionLogStoreException storage)
         {if(storage.MayHaveWritten||_store.IsPoisoned)lock(_gate)_fault??=new(PersistentAgentSessionFailure.AppendFailed,storage.Failure,storage.MayHaveWritten,storage.DurableFlushCompleted);throw;}

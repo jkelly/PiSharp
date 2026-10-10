@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/grep.ts.
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
@@ -24,7 +25,7 @@ public sealed class GrepTool
     private readonly IDirectoryFileOperations _files;
     private readonly PathResolver _paths;
     public IPreparedToolAdapter Adapter { get; }
-    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"grep","description":"Search file contents through an explicitly admitted ripgrep executor. Regex, literal, ignoreCase and glob options. Positive context requires a separately admitted bounded UTF-8 reader (context 0-100, file 256KiB, cache 1MiB/128 files, 100000 lines/file, formatted output 8MiB). Match lines include paths and line numbers. Output limited to 100 matches, 50KB and 500 characters per line. Complete bounded capture required; no implicit binary acquisition.","parameters":{"type":"object","properties":{"pattern":{"type":"string"},"path":{"type":"string"},"glob":{"type":"string"},"ignoreCase":{"type":"boolean"},"literal":{"type":"boolean"},"context":{"type":"integer","minimum":0,"maximum":100},"limit":{"type":"number","minimum":1,"maximum":10000}},"required":["pattern"],"additionalProperties":false}}""");
+    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"grep","description":"Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.","parameters":{"type":"object","required":["pattern"],"properties":{"pattern":{"type":"string","description":"Search pattern (regex or literal string)"},"path":{"type":"string","description":"Directory or file to search (default: current directory)"},"glob":{"type":"string","description":"Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'"},"ignoreCase":{"type":"boolean","description":"Case-insensitive search (default: false)"},"literal":{"type":"boolean","description":"Treat pattern as literal string instead of regex (default: false)"},"context":{"type":"number","description":"Number of lines to show before and after each match (default: 0)"},"limit":{"type":"number","description":"Maximum number of matches to return (default: 100)"}}}}""");
     public GrepTool(string workingDirectory, string homeDirectory, IGrepExecutor executor, IDirectoryFileOperations? files = null,
         IGrepContextReader? contextReader = null)
     {
@@ -45,14 +46,18 @@ public sealed class GrepTool
         foreach (var property in arguments.Value.EnumerateObject())
         {
             if (!seen.Add(property.Name)) throw new ArgumentException("Duplicate grep argument.");
+            // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
+            if (property.Name is "path" or "glob" or "ignoreCase" or "literal" or "context" or "limit" && property.Value.ValueKind == JsonValueKind.Null) continue;
             if (property.Name == "pattern" && property.Value.ValueKind == JsonValueKind.String) pattern = property.Value.GetString();
             else if (property.Name == "path" && property.Value.ValueKind == JsonValueKind.String) path = property.Value.GetString()!;
             else if (property.Name == "glob" && property.Value.ValueKind == JsonValueKind.String) glob = property.Value.GetString();
             else if (property.Name == "ignoreCase" && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) ignore = property.Value.GetBoolean();
             else if (property.Name == "literal" && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) literal = property.Value.GetBoolean();
+            // Source: context > 0 ? context : 0, and Math.max(1, limit ?? 100). Native bounds keep both integral and bounded.
             else if (property.Name == "context" && property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetDouble(out var context) &&
-                double.IsFinite(context) && context >= 0 && context <= MaximumContext && context == Math.Truncate(context)) contextLines = (int)context;
-            else if (property.Name == "limit" && property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetDouble(out var number) && double.IsFinite(number) && number >= 1 && number <= MaximumMatches && number == Math.Truncate(number)) limit = (int)number;
+                double.IsFinite(context) && (context <= 0 || context <= MaximumContext && context == Math.Truncate(context))) contextLines = context > 0 ? (int)context : 0;
+            else if (property.Name == "limit" && property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetDouble(out var number) && double.IsFinite(number) &&
+                (number < 1 || number <= MaximumMatches && number == Math.Truncate(number))) limit = Math.Max(1, (int)Math.Max(number, 1));
             else throw new ArgumentException("Unsupported grep option; bounded integer context and positive bounded integer limits are required.");
         }
         if (!SearchText(pattern, 1024, allowEmpty: true) || glob is not null && !SearchText(glob, 1024, allowEmpty: true))
@@ -66,8 +71,10 @@ public sealed class GrepTool
         var relative = Path.GetRelativePath(root, path);
         return !Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
-    private sealed class SearchAdapter(GrepTool owner) : IPreparedToolAdapter
+    private sealed class SearchAdapter(GrepTool owner) : IToolArgumentSchemaAdapter
     {
+        /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+        public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(owner.Declaration, ToolSchemaOrigin.TypeBox);
         public string Name => "grep";
         public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
         {

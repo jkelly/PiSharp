@@ -364,9 +364,11 @@ internal static class PiMessagesNativeDiagnosticTests
         {
             ("characters", new string(' ', 4097), 4096, 32, NativeChatFailureCode.ResourceLimit),
             ("depth", new string('[', 9), 1024, 8, NativeChatFailureCode.ResourceLimit),
-            ("number", """{"value":9007199254740992}""", 1024, 32, NativeChatFailureCode.UnsupportedFeature),
-            ("unicode", "{\"value\":\"\\ud800\"}", 1024, 32, NativeChatFailureCode.UnsupportedFeature),
-            ("duplicate", """{"value":1,"value":2}""", 1024, 32, NativeChatFailureCode.MalformedStream)
+            // pi-messages.ts:255-259 previews every toolcall_delta with parseStreamingJson (JSON.parse keeps 2^53, a lone surrogate
+            // and the last duplicate name), so these deltas apply and the body then ends without a terminal event (pi-messages.ts:423).
+            ("number", """{"value":9007199254740992}""", 1024, 32, NativeChatFailureCode.UnexpectedEof),
+            ("unicode", "{\"value\":\"\\ud800\"}", 1024, 32, NativeChatFailureCode.UnexpectedEof),
+            ("duplicate", """{"value":1,"value":2}""", 1024, 32, NativeChatFailureCode.UnexpectedEof)
         };
         foreach (var scenario in scenarios)
         foreach (var wrapped in new[] { false, true })
@@ -398,11 +400,15 @@ internal static class PiMessagesNativeDiagnosticTests
             Check(requests == 1 && body.ReadCalls > 0 && frames.FirstOrDefault() is StreamStarted,
                 "Preview fixture did not admit the HTTP read and startup envelope: " + scenario.Name);
             var terminal = frames.OfType<StreamTerminalEvent>().Single();
-            Equal(new NativeChatDiagnostic(NativeChatAdapter.PiMessages, scenario.Code), terminal.NativeDiagnostic);
+            // At EOF a body cleanup fault is the primary failure: readPiMessagesEvents' finally (pi-messages.ts:308-310) throws out
+            // of the for-await before the "ended without a terminal event" error (pi-messages.ts:423) is reached.
+            var primary = scenario.Code == NativeChatFailureCode.UnexpectedEof && cleanupFails ? NativeChatFailureCode.CleanupFailed : scenario.Code;
+            Equal(new NativeChatDiagnostic(NativeChatAdapter.PiMessages, primary), terminal.NativeDiagnostic);
             Equal(StopReason.Error, terminal.Reason);
-            // These failures occur inside preview parsing, before this delta is applied or any tool is finalized.
+            // Limit failures occur inside preview parsing, before this delta is applied; accepted previews apply it. No tool is finalized.
             Equal(1, frames.OfType<ToolCallStarted>().Count());
-            Equal(0, frames.OfType<ToolCallDelta>().Count()); Equal(0, frames.OfType<ToolCallEnded>().Count());
+            Equal(scenario.Code == NativeChatFailureCode.UnexpectedEof ? 1 : 0, frames.OfType<ToolCallDelta>().Count());
+            Equal(0, frames.OfType<ToolCallEnded>().Count());
             Equal(cleanupFails ? new NativeChatDiagnostic(NativeChatAdapter.PiMessages, NativeChatFailureCode.CleanupFailed) : null,
                 terminal.NativeCleanupDiagnostic);
             Check(body.Disposed && body.AsyncDisposeCalls == 1 && response!.Disposed && requestOwner!.Disposed,

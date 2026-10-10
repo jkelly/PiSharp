@@ -15,11 +15,22 @@ public sealed record ExtensionToolRegistrationInfo(string OwnerId, long OwnerGen
     string RegistrationId, string Name, string Description, JsonData Parameters)
 {
     public bool HasInitialArgumentPreparation { get; init; }
+    /// <summary>The descriptor's parameter schema origin and validation schema (source validateToolArguments).</summary>
+    public ToolSchemaOrigin ParametersOrigin { get; init; } = ToolSchemaOrigin.JsonSchema;
+    public JsonData? ValidationParameters { get; init; }
     public ToolExposure Exposure { get; init; } = ToolExposure.Direct;
     public ToolNamespace? Namespace { get; init; }
     public bool DefaultActive { get; init; } = true;
     public bool HasLoadoutPreparation { get; init; }
     public ImmutableArray<string> PromptGuidelines { get; init; } = [];
+    /// <summary>The descriptor's constrainedSampling, written into the model-facing declaration.</summary>
+    public JsonData? ConstrainedSampling { get; init; }
+    /// <summary>The descriptor's ToolAnnotations hints.</summary>
+    public ImmutableDictionary<string, bool>? Annotations { get; init; }
+    /// <summary>The descriptor's promptSnippet, sequential execution mode and outputSchema.</summary>
+    public string? PromptSnippet { get; init; }
+    public bool SequentialExecution { get; init; }
+    public JsonData? OutputSchema { get; init; }
 }
 
 public sealed record ExtensionCommandRegistrationInfo(string OwnerId, long OwnerGeneration,
@@ -44,13 +55,19 @@ public sealed class ExtensionRegistrySnapshot
     internal object RegistryIdentity { get; }
     internal ImmutableArray<RegistrationEntry> Entries { get; }
 
-    internal ExtensionRegistrySnapshot(object identity, long revision, ImmutableArray<RegistrationEntry> entries)
+    private readonly ImmutableDictionary<RegistrationEntry, string>? _commandNames;
+    /// <summary>The name a registration is invoked by: a duplicated command's <c>name:N</c> (Pi resolveRegisteredCommands), else its name.</summary>
+    internal string NameOf(RegistrationEntry entry) => _commandNames is not null && _commandNames.TryGetValue(entry, out var invocation) ? invocation : entry.Name;
+
+    internal ExtensionRegistrySnapshot(object identity, long revision, ImmutableArray<RegistrationEntry> entries,
+        ImmutableDictionary<RegistrationEntry, string>? commandNames = null)
     {
         RegistryIdentity = identity;
         Revision = revision;
         Entries = entries;
+        _commandNames = commandNames;
         Registrations = entries.Where(entry => entry.Kind != RegistrationKind.EventBus).Select(entry => new ExtensionRegistrationInfo(entry.OwnerId,
-            entry.OwnerGeneration, entry.RegistrationId, entry.Kind.ToString(), entry.Name)).ToImmutableArray();
+            entry.OwnerGeneration, entry.RegistrationId, entry.Kind.ToString(), NameOf(entry))).ToImmutableArray();
         BeforeAgentStartHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.BeforeAgentStartHandler)).ToImmutableArray();
         ContextHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ContextHandler)).ToImmutableArray();
         ContextWithSystemHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ContextWithSystemHandler)).ToImmutableArray();
@@ -61,7 +78,7 @@ public sealed class ExtensionRegistrySnapshot
         {
             var descriptor = (ExtensionCommandDescriptor)entry.Descriptor;
             return new ExtensionCommandRegistrationInfo(entry.OwnerId, entry.OwnerGeneration, entry.RegistrationId,
-                entry.Name, descriptor.Description, descriptor.GetArgumentCompletionsAsync is not null, descriptor.SourcePath);
+                NameOf(entry), descriptor.Description, descriptor.GetArgumentCompletionsAsync is not null, descriptor.SourcePath);
         }).ToImmutableArray();
         CommandCatalog = JsonData.Parse(JsonSerializer.Serialize(Commands.Select(command => new
         {
@@ -75,8 +92,11 @@ public sealed class ExtensionRegistrySnapshot
             return new ExtensionToolRegistrationInfo(entry.OwnerId, entry.OwnerGeneration,
                 entry.RegistrationId, entry.Name, descriptor.Description, descriptor.Parameters)
                 { HasInitialArgumentPreparation = descriptor.PrepareInitialArgumentsAsync is not null,
+                    ParametersOrigin = descriptor.ParametersOrigin, ValidationParameters = descriptor.ValidationParameters,
                     Exposure = descriptor.Exposure, Namespace = descriptor.Namespace, DefaultActive = descriptor.DefaultActive,
-                    HasLoadoutPreparation = descriptor.PrepareLoadout is not null, PromptGuidelines = descriptor.PromptGuidelines };
+                    HasLoadoutPreparation = descriptor.PrepareLoadout is not null, PromptGuidelines = descriptor.PromptGuidelines,
+                    ConstrainedSampling = descriptor.ConstrainedSampling, Annotations = descriptor.Annotations,
+                    PromptSnippet = descriptor.PromptSnippet, SequentialExecution = descriptor.SequentialExecution, OutputSchema = descriptor.OutputSchema };
         }).ToImmutableArray();
         ToolRenderers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ToolRenderer)).ToImmutableArray();
     }
@@ -273,6 +293,7 @@ internal sealed class ExtensionToolInvocationContext(RegistrationScope scope, Ca
         NestedDelivery delivery;
         lock (gate)
         {
+            // In flight, not in total: completed calls leave the list, so a tool such as codemode can make any number of calls.
             if (closed || broker is null || nested.Count >= 4096 ||
                 options?.OnUpdate is { } onUpdate && onUpdate.GetInvocationList().Length != 1)
                 return ValueTask.FromResult(ExtensionToolCallOutcome.Unavailable(name));
@@ -280,6 +301,7 @@ internal sealed class ExtensionToolInvocationContext(RegistrationScope scope, Ca
         }
         delivery.Work = DispatchNestedAsync(name, arguments, options ?? new());
         delivery.Published.TrySetResult();
+        _ = delivery.Work.ContinueWith(_ => { lock (gate) nested.Remove(delivery); }, TaskScheduler.Default);
         return new(delivery.Work!);
     }
     private async Task<ExtensionToolCallOutcome> DispatchNestedAsync(string name, JsonData arguments,

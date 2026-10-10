@@ -21,6 +21,8 @@ public sealed class PathResolver
 
     public string Resolve(string path)
     {
+        // Source resolveToCwd: path.resolve(cwd, "") is the working directory.
+        if (path is { Length: 0 }) return WorkingDirectory;
         CheckText(path);
         var normalized = Regex.Replace(path, "[\u00a0\u2000-\u200a\u202f\u205f\u3000]", " ");
         if (normalized.StartsWith('@')) normalized = normalized[1..];
@@ -41,6 +43,15 @@ public sealed class PathResolver
         if (OperatingSystem.IsWindows() && Regex.IsMatch(normalized, "^[a-z]:($|[^\\\\/])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
             throw new ArgumentException("Drive-relative paths require ambient drive state and are unsupported.", nameof(path));
         return Absolute(Path.GetFullPath(normalized, WorkingDirectory));
+    }
+
+    /// <summary>The absolute path the source would pass to Node for a path containing NUL bytes (path.resolve keeps them), for the
+    /// error text Node then throws.</summary>
+    public string ResolveWithNul(string path)
+    {
+        const char placeholder = '\uE000';
+        if (path.Contains(placeholder)) throw new ArgumentException("Unsupported path.", nameof(path));
+        return Resolve(path.Replace('\0', placeholder)).Replace(placeholder, '\0');
     }
 
     public async ValueTask<string> ResolveReadAsync(string path, CancellationToken cancellationToken)

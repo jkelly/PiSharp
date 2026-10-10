@@ -57,15 +57,17 @@ public sealed class McpOwnedResourceDispatch
             registrationPrefix.Any(character => !(character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '.' or '_' or '-')))
             throw new ArgumentException("A bounded native registration identifier prefix required.", nameof(registrationPrefix));
         if (!Enum.IsDefined(exposure) || exposure == ToolExposure.Hidden) throw new ArgumentException("Visible prepared resource exposure required.", nameof(exposure));
-        var list = JsonData.Parse("""{"type":"object","properties":{"server":{"type":"string"},"cursor":{"type":"string"}},"additionalProperties":false}""");
-        var read = JsonData.Parse("""{"type":"object","properties":{"server":{"type":"string"},"uri":{"type":"string"}},"required":["server","uri"],"additionalProperties":false}""");
+        // resources.ts LIST_PARAMETERS and READ_PARAMETERS.
+        var list = JsonData.Parse("""{"type":"object","properties":{"server":{"type":"string","description":"MCP server name. Omit to list every server with resources."},"cursor":{"type":"string","description":"Opaque cursor from a previous call with the same server; omit for the first page."}},"additionalProperties":false}""");
+        var read = JsonData.Parse("""{"type":"object","properties":{"server":{"type":"string","description":"MCP server name exactly as configured. Must match the 'server' field returned by list_mcp_resources."},"uri":{"type":"string","description":"Resource URI to read. Must be one of the URIs returned by list_mcp_resources."}},"required":["server","uri"],"additionalProperties":false}""");
         ExtensionToolDescriptor Descriptor(string name, string description, JsonData schema) => new(
             registrationPrefix + "." + name, name, description, schema,
             (arguments, context, token) => new(ExecutePreparedAsync(name, arguments, context, token)))
             { Exposure = exposure, DefaultActive = exposure is ToolExposure.Direct or ToolExposure.ModelOnly };
-        return [Descriptor(McpResourceTools.ListResources, "Lists resources from connected MCP servers.", list),
-            Descriptor(McpResourceTools.ListTemplates, "Lists resource templates from connected MCP servers.", list),
-            Descriptor(McpResourceTools.ReadResource, "Reads a resource from its configured MCP server.", read)];
+        // resources.ts createMcpResourceToolDefinitions descriptions.
+        return [Descriptor(McpResourceTools.ListResources, "Lists resources provided by MCP servers. Resources allow servers to share data that provides context to language models, such as files, database schemas, or application-specific information. Prefer resources over web search when possible.", list),
+            Descriptor(McpResourceTools.ListTemplates, "Lists resource templates provided by MCP servers. Parameterized resource templates allow servers to share data that takes parameters and provides context to language models, such as files, database schemas, or application-specific information. Prefer resource templates over web search when possible.", list),
+            Descriptor(McpResourceTools.ReadResource, "Read a specific resource from an MCP server given the server name and resource URI.", read)];
     }
     private async Task<JsonData> ExecutePreparedAsync(string tool, JsonData arguments, IExtensionToolContext context, CancellationToken token)
     {

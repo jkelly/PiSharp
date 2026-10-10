@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/ls.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
@@ -15,12 +16,17 @@ public sealed class LsTool
     private readonly IDirectoryFileOperations _operations;
     private readonly PathResolver _paths;
     public IPreparedToolAdapter Adapter { get; }
-    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"ls","description":"List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first). Bounded native listing profile.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Directory to list (default: current directory)"},"limit":{"type":"number","description":"Maximum number of entries to return (default: 500)"}},"additionalProperties":false}}""");
+    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"ls","description":"List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Directory to list (default: current directory)"},"limit":{"type":"number","description":"Maximum number of entries to return (default: 500)"}}}}""");
 
-    public LsTool(string workingDirectory, string homeDirectory, IDirectoryFileOperations? operations = null)
+    private readonly bool _pi;
+
+    /// <param name="pi">The <c>pi</c> tool policy (owner decision 0004): as ls.ts, entries are stat'ed through links wherever they point,
+    /// unknown arguments are ignored and the listing has no size bounds.</param>
+    public LsTool(string workingDirectory, string homeDirectory, IDirectoryFileOperations? operations = null, bool pi = false)
     {
         _operations = operations ?? new LocalFileOperations();
         _paths = new(workingDirectory, homeDirectory, _operations);
+        _pi = pi;
         Adapter = new ListingAdapter(this);
     }
 
@@ -30,30 +36,37 @@ public sealed class LsTool
     public ToolDefinition CreateDefinition(ToolInvoker invoker) => new("ls", invoker ?? throw new ArgumentNullException(nameof(invoker)));
 
     private sealed record Input(string Path, double Limit);
-    private static Input Parse(JsonData arguments)
+    private Input Parse(JsonData arguments)
     {
-        if (arguments is null || arguments.ToString().Length > 16_384 || arguments.Value.ValueKind != JsonValueKind.Object)
+        if (arguments is null || !_pi && arguments.ToString().Length > 16_384 || arguments.Value.ValueKind != JsonValueKind.Object)
             throw new ArgumentException("Invalid ls arguments.");
         var path = "."; var limit = 500d; var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in arguments.Value.EnumerateObject())
         {
             if (!seen.Add(property.Name)) throw new ArgumentException("Duplicate ls argument.");
+            // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
+            if (property.Name is "path" or "limit" && property.Value.ValueKind == JsonValueKind.Null) continue;
             if (property.Name == "path" && property.Value.ValueKind == JsonValueKind.String)
                 path = property.Value.GetString()!;
             else if (property.Name == "limit" && property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetDouble(out var number)
-                && double.IsFinite(number) && number <= MaximumEntries) limit = number;
-            else throw new ArgumentException("Unsupported ls argument.");
+                && double.IsFinite(number) && (_pi || number <= MaximumEntries)) limit = number;
+            // TypeBox ignores properties the schema does not name.
+            else if (!_pi || property.Name is "path" or "limit") throw new ArgumentException("Unsupported ls argument.");
         }
         return new(path.Length == 0 ? "." : path, limit);
     }
 
-    private sealed class ListingAdapter(LsTool owner) : IPreparedToolAdapter
+    private sealed class ListingAdapter(LsTool owner) : IToolArgumentSchemaAdapter
     {
+        /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+        public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(owner.Declaration, ToolSchemaOrigin.TypeBox);
         public string Name => "ls";
         public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            var input = Parse(invocation.Call.Arguments);
+            var input = owner.Parse(invocation.Call.Arguments);
+            // Source ls.ts: existsSync(path with a NUL byte) is false.
+            if (input.Path.Contains('\0')) throw new ToolSourceErrorException("Path not found: " + owner._paths.ResolveWithNul(input.Path));
             var target = owner._paths.Absolute(await owner._operations.CanonicalizeAsync(owner._paths.Resolve(input.Path), token).ConfigureAwait(false));
             return new(Name, Name, PreparedToolActionKind.Path, target,
                 JsonData.Parse(JsonSerializer.Serialize(new { path = target, limit = input.Limit })), [],
@@ -64,7 +77,7 @@ public sealed class LsTool
             token.ThrowIfCancellationRequested();
             try
             {
-                var input = Parse(action.Arguments);
+                var input = owner.Parse(action.Arguments);
                 return action.ToolName == Name && action.Operation == Name && action.Kind == PreparedToolActionKind.Path &&
                     !action.CommandArguments.IsDefault && action.CommandArguments.IsEmpty && action.Environment is { Count: 0 } &&
                     action.WorkingDirectory == owner._paths.WorkingDirectory && action.Target == input.Path &&
@@ -78,7 +91,7 @@ public sealed class LsTool
         {
             if (!await ValidateAsync(action, token).ConfigureAwait(false))
                 return ToolResult.Error(ToolFailureKind.InvalidArguments, "Invalid final ls action.");
-            return await owner.ListAsync(action.Target, Parse(action.Arguments).Limit, token).ConfigureAwait(false);
+            return await owner.ListAsync(action.Target, owner.Parse(action.Arguments).Limit, token).ConfigureAwait(false);
         }
     }
 
@@ -91,17 +104,18 @@ public sealed class LsTool
             if (!await _operations.IsDirectoryAsync(target, token).ConfigureAwait(false))
                 return ToolResult.Error(ToolFailureKind.ExecutionError, $"Not a directory: {target}");
             ImmutableArray<string> entries;
-            try { entries = await _operations.ReadDirectoryAsync(target, MaximumEntries, MaximumNameCharacters, token).ConfigureAwait(false); }
+            var maximumEntries = _pi ? int.MaxValue : MaximumEntries; var maximumNames = _pi ? int.MaxValue : MaximumNameCharacters;
+            try { entries = await _operations.ReadDirectoryAsync(target, maximumEntries, maximumNames, token).ConfigureAwait(false); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             { return ToolResult.Error(ToolFailureKind.ExecutionError, $"Cannot read directory: {error.Message}"); }
-            if (entries.IsDefault || entries.Length > MaximumEntries) throw new FileToolException(FileToolFailure.ResourceLimit);
+            if (entries.IsDefault || entries.Length > maximumEntries) throw new FileToolException(FileToolFailure.ResourceLimit);
             long characters = 0;
             foreach (var entry in entries)
             {
                 token.ThrowIfCancellationRequested(); characters += entry?.Length ?? 0;
                 // Trusted seams still cannot turn a returned child name into a second traversal target.
                 if (string.IsNullOrEmpty(entry) || entry is "." or ".." || entry.Contains('\0') || entry.Contains(Path.DirectorySeparatorChar) ||
-                    entry.Contains(Path.AltDirectorySeparatorChar) || Path.IsPathRooted(entry) || characters > MaximumNameCharacters)
+                    entry.Contains(Path.AltDirectorySeparatorChar) || Path.IsPathRooted(entry) || characters > maximumNames)
                     throw new ArgumentException("Invalid directory entry.");
                 _paths.Absolute(Path.Combine(target, entry));
             }
@@ -116,8 +130,9 @@ public sealed class LsTool
                 {
                     var child = _paths.Absolute(await _operations.CanonicalizeAsync(Path.Combine(target, entry), token).ConfigureAwait(false));
                     var relative = Path.GetRelativePath(target, child);
-                    // Listing admission does not authorize following a child link outside the admitted directory.
-                    if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+                    // Listing admission does not authorize following a child link outside the admitted directory (explicit policy);
+                    // ls.ts stat()s every entry through its link wherever it points.
+                    if (!_pi && (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))) continue;
                     var directory = await _operations.IsDirectoryAsync(child, token).ConfigureAwait(false);
                     results.Add(entry + (directory ? "/" : ""));
                 }

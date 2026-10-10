@@ -23,6 +23,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     public ImmutableArray<RpcSessionTreePublicationException> SessionTreePublicationFailures
     { get { lock (_gate) return _sessionTreePublicationFailures; } }
     private PersistentAgentSession _session;
+    private readonly SemaphoreSlim _projectionGate = new(1, 1);
     private readonly ReplaceableAgentSession? _sessionOwner;
     private readonly Func<CancellationToken, ValueTask>? _sessionStartup;
     private readonly Func<PersistentAgentSession, Task>? _postInputSettlement, _postRunSettlement;
@@ -109,6 +110,22 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private readonly Func<long> _clock;
     private readonly ImmutableDictionary<ModelDescriptor, JsonData> _models;
     private readonly ImmutableArray<ModelDescriptor> _modelOrder;
+    private readonly RpcModelRuntime? _modelRuntime;
+    /// <summary>The host's SessionManager.open preparation of a session path before switch_session opens it (an empty file gets its
+    /// header, a missing one becomes a new session); an InvalidDataException refuses the switch with its message. The returned undo
+    /// runs when the switch does not happen (an extension veto), so a cancelled switch leaves the path as it was.</summary>
+    private readonly Func<string, CancellationToken, ValueTask<Func<ValueTask>?>>? _prepareSessionPath;
+    private readonly Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? _compactionSettings;
+    /// <summary>The definition of a model: the startup definitions, then the host's current runtime models.</summary>
+    private bool TryGetModel(ModelDescriptor model, out JsonData wire)
+    {
+        if (_models.TryGetValue(model, out wire!)) return true;
+        if (_modelRuntime is not null)
+            foreach (var definition in _modelRuntime.Available())
+                if (definition.Model == model) { wire = definition.WireBody; return true; }
+        wire = null!; return false;
+    }
+    private bool KnowsModel(ModelDescriptor model) => TryGetModel(model, out _);
     private readonly RpcDispatchOptions _options;
     private readonly RpcSessionOwnership _ownership;
     private readonly IPromptInputAdmission? _inputAdmission;
@@ -116,7 +133,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private readonly IRpcExtensionCommandCatalog? _commandCatalog;
     private readonly ISessionSummaryGenerator? _summaryGenerator;
     private readonly ToolInvoker? _exportHtmlWriter;
-    private readonly PiSharp.CodingAgent.Export.SessionHtmlRenderer _htmlRenderer;
+    private readonly PiSharp.CodingAgent.Export.SessionHtmlExportHost _htmlExport;
     private readonly double? _recoveryDesiredMaxOutput;
     private readonly RpcExtensionUiCoordinator? _ui;
     private readonly Queue<DeferredFrame> _deferred = new();
@@ -159,6 +176,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         public TaskCompletionSource Ready = NewGate();
         public readonly TaskCompletionSource Entered = NewGate();
         public readonly TaskCompletionSource Settled = NewGate();
+        /// <summary>Set (under the gate) just before agent_settled is written: a client that saw it may prompt at once.</summary>
+        public bool SettledPublished;
     }
     private sealed class EventSink(RpcSessionDispatcher owner) : IAgentEventSink
     { public ValueTask EmitAsync(AgentEvent observation, CancellationToken token) => owner.ObserveAsync(observation); }
@@ -172,12 +191,15 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         ReplaceableAgentSession? sessionOwner = null, Func<CancellationToken, ValueTask>? sessionStartup = null,
         ISessionSummaryGenerator? summaryGenerator = null, double? recoveryDesiredMaxOutput = null,
         Func<string, IPromptInputAdmission>? inputAdmissionSelector = null,
-        ToolInvoker? exportHtmlWriter = null, PiSharp.CodingAgent.Export.SessionHtmlRenderer? htmlRenderer = null,
+        ToolInvoker? exportHtmlWriter = null, PiSharp.CodingAgent.Export.SessionHtmlExportHost? htmlExport = null,
         Func<SessionTreeNavigationReceipt, string?, ValueTask>? selectedTreePublisher = null,
         Func<PersistentAgentSession, Task>? postInputSettlement = null,
         Func<PersistentAgentSession, Task>? postRunSettlement = null,
-        PiSharp.CodingAgent.Execution.IUserBashExecutor? userBash = null)
+        PiSharp.CodingAgent.Execution.IUserBashExecutor? userBash = null, RpcModelRuntime? modelRuntime = null,
+        Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? compactionSettings = null,
+        Func<string, CancellationToken, ValueTask<Func<ValueTask>?>>? prepareSessionPath = null)
     {
+        _prepareSessionPath = prepareSessionPath;
         ArgumentNullException.ThrowIfNull(session); ArgumentNullException.ThrowIfNull(output); ArgumentNullException.ThrowIfNull(clock);
         if (selectedTreePublisher is not null && selectedTreePublisher.GetInvocationList().Length != 1)
             throw new ArgumentException("Selected tree publication requires one owned callback.", nameof(selectedTreePublisher));
@@ -189,7 +211,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         _ui = extensionUi;
         _commandCatalog = extensionCommandCatalog;
         _summaryGenerator = summaryGenerator;
-        _exportHtmlWriter = exportHtmlWriter; _htmlRenderer = htmlRenderer ?? new();
+        _exportHtmlWriter = exportHtmlWriter; _htmlExport = htmlExport ?? PiSharp.CodingAgent.Export.SessionHtmlExportHost.CreateDefault();
         _recoveryDesiredMaxOutput = recoveryDesiredMaxOutput;
         _sessionOwner = sessionOwner; _sessionStartup = sessionStartup;
         _selectedTreePublisher = selectedTreePublisher;
@@ -199,6 +221,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         if (sessionOwner is not null && (!ReferenceEquals(sessionOwner.Current.Session, session) || sessionOwner.AttachmentChanged is not null))
             throw new ArgumentException("RPC requires the exclusive current session attachment.", nameof(sessionOwner));
         if (sessionStartup is null) _startupReady.TrySetResult();
+        _modelRuntime = modelRuntime; _compactionSettings = compactionSettings;
         _models = RpcCommandCodec.Models(models, _options);
         _modelOrder = models.Select(value => value.Model).ToImmutableArray();
         if (_modelOrder.Select(value => (value.Provider, value.Id)).Distinct().Count() != _modelOrder.Length)
@@ -387,6 +410,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 await WriteAsync(RpcCommandCodec.Error(null, "parse", "Failed to parse command: " + parseFailure, _options)).ConfigureAwait(false);
                 return;
             }
+            if (raw.Value.ValueKind == JsonValueKind.Null) { SignalFatal(RpcDispatchFailure.SessionRunFailed, new RpcInputTypeError()); return; }
             command = RpcCommandCodec.Decode(raw, _options);
             // With no native dialogs registered there is no pending request to resolve. These are never ordinary commands/responses.
             if (command.Type == "extension_ui_response") return;
@@ -424,6 +448,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 SessionCatalogException catalog => catalog.Message,
                 SessionContextEditException edit => edit.Message,
                 PromptInputAdmissionException admission => admission.Message,
+                // rpc-mode.ts prompt: a prompt refused by its preflight answers with the refusal's message.
+                SessionPromptRejectedException rejected => rejected.Message,
                 OperationCanceledException when originatingAttachment is not null && !ReferenceEquals(originatingAttachment, _sessionOwner!.Current) =>
                     "Command canceled after session replacement committed; inspect the current session and durable state.",
                 OperationCanceledException => "Command canceled before acceptance.",
@@ -636,14 +662,28 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             case "switch_session":
             {
                 if (_sessionOwner is null) throw new RpcCommandException(command.Id, command.Type, "Session replacement is unavailable from this host.");
-                var expected = _sessionOwner.Current;
-                var replacement = await _sessionOwner.SwitchAsync(expected, new(command.Message!, command.Mode != "selected", command.Since),
+                var owner = _sessionOwner; var expected = owner.Current;
+                Func<ValueTask>? undoPreparation = null;
+                if (_prepareSessionPath is { } prepare)
+                {
+                    try { undoPreparation = await prepare(command.Message!, startupCancellation.Token).ConfigureAwait(false); }
+                    catch (InvalidDataException error) { throw new RpcCommandException(command.Id, command.Type, error.Message); }
+                }
+                AgentSessionReplacement? replacement;
+                try { replacement = await SwitchWithPreparationAsync().ConfigureAwait(false); }
+                catch when (undoPreparation is not null && ReferenceEquals(owner.Current, expected))
+                {
+                    // agent-session-runtime.ts switchSession: SessionManager.open runs after the session_before_switch veto.
+                    await undoPreparation().ConfigureAwait(false); throw;
+                }
+                if (replacement is null && undoPreparation is not null) await undoPreparation().ConfigureAwait(false);
+                Task<AgentSessionReplacement?> SwitchWithPreparationAsync() => owner.SwitchAsync(expected, new(command.Message!, command.Mode != "selected", command.Since),
                     beforeSwitch: async (previous, target, cancellation) =>
                     {
                         cancellation.ThrowIfCancellationRequested(); PreflightReplacement(command, target, checked(expected.Generation + 1));
-                        return _sessionOwner.BeforeReplacement is not { } veto || await veto(previous, target, cancellation).ConfigureAwait(false);
+                        return owner.BeforeReplacement is not { } veto || await veto(previous, target, cancellation).ConfigureAwait(false);
                     },
-                    cancellationToken: startupCancellation.Token).ConfigureAwait(false);
+                    cancellationToken: startupCancellation.Token);
                 data = RpcCommandCodec.Build(writer =>
                 {
                     writer.WriteBoolean("cancelled", replacement is null);
@@ -740,7 +780,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     {
         var state = _session.Snapshot;
         if (state.Log.Entries.Length > _options.MaximumReturnedEntries) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
-        var tree = new SessionTreeQueries(new(MaximumQueryEntries: _options.MaximumReturnedEntries)).Build(state.Log.Entries, token);
+        // The session's own context bounds (the Pi entry's admit every entry); the returned-entry bound above stays the command's.
+        var tree = _session.CreateTreeQueries().Build(state.Log.Entries, token);
         if (!tree.LabelsAvailable) throw new RpcCommandException(command.Id, command.Type, "Session tree metadata is unavailable under the native profile.");
         var data = RpcCommandCodec.Build(writer =>
         {
@@ -835,11 +876,19 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         finally { _transitions.Release(); }
         await PublishQueueAsync(force: true).ConfigureAwait(false);
     }
+    /// <summary>Pi accepts a prompt as soon as agent_settled has been published; the run releases its ownership right after
+    /// writing it, so a prompt in that window waits for the release instead of being refused as "settling".</summary>
+    private async Task WaitForPublishedSettlementAsync(CancellationToken token)
+    {
+        RunState? published; lock (_gate) published = _run is { SettledPublished: true } run ? run : null;
+        if (published is not null) await published.Settled.Task.WaitAsync(token).ConfigureAwait(false);
+    }
     private async Task PromptAsync(RpcCommandEnvelope command, CancellationToken token)
     {
         var input = Input(command); RunState? run = null; Task<AgentLoopResult>? processing = null; var queued = false; PersistentAgentSession? originating = null;
         var startedResponse = RpcCommandCodec.Success(command, Disposition("started"), _options);
         var queuedResponse = RpcCommandCodec.Success(command, Disposition("queued"), _options);
+        await WaitForPublishedSettlementAsync(token).ConfigureAwait(false);
         await _transitions.WaitAsync(token).ConfigureAwait(false);
         try
         {
@@ -858,7 +907,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             }
             else
             {
-                if (!_models.ContainsKey(snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+                if (!KnowsModel(snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
                 originating = _session;
                 run = new(snapshot.Agent.Messages.Length); lock (_gate) _run = run;
                 try { processing = _session.PromptAsync(input); }
@@ -903,6 +952,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         var queued = RpcCommandCodec.Success(command, Disposition("queued"), _options);
         var handled = RpcCommandCodec.Success(command, Disposition("handled"), _options);
         using var admissionCancellation = CancellationTokenSource.CreateLinkedTokenSource(token, _stopInputToken);
+        if (command.Type == "prompt") await WaitForPublishedSettlementAsync(admissionCancellation.Token).ConfigureAwait(false);
         await _inputCommands.WaitAsync(admissionCancellation.Token).ConfigureAwait(false);
         var candidate = new RunState(0);
         PersistentAgentSession originating;
@@ -919,7 +969,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                     RunState? active; lock (_gate) active = _run;
                     if (active is not null && !_session.Snapshot.Agent.IsRunning)
                         throw new RpcCommandException(command.Id, command.Type, "Session is settling. Wait for agent_settled before prompting again.");
-                    if (!_models.ContainsKey(_session.Snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+                    if (!KnowsModel(_session.Snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
                     lock (_gate) _startingInput = candidate;
                 }
             }
@@ -1018,6 +1068,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             await PublishQueueAsync(force: false).ConfigureAwait(false);
             bool fatal, aborted; lock (_gate) { fatal = _fatal is not null; aborted = run.AbortRequested; }
             // aborted reports whether this session-level run ended because an abort was requested while it ran.
+            lock (_gate) run.SettledPublished = true;
             if (!fatal) await WriteAsync(RpcCommandCodec.Event("agent_settled", writer => writer.WriteBoolean("aborted", aborted), _options)).ConfigureAwait(false);
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); }
@@ -1078,12 +1129,33 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 if (observation is AgentLoopStarted && run is not null)
                     run.HistoryLength = _session.Snapshot.Agent.Messages.Length;
             }
+            if (run is null && observation is AgentLoopInputMessageStarted { Message.Role: "custom" } or AgentLoopInputMessageEnded { Message.Role: "custom" })
+            {
+                // agent-session.ts _appendCustomMessage: an idle session appends an extension's custom message and emits its
+                // message_start/message_end at once, outside any run.
+                lock (_gate) if (_fatal is not null) throw _fatal;
+                await _projectionGate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    foreach (var record in _events.Project(observation, _session.Snapshot, _session.Snapshot.Agent.Messages.Length))
+                        await WriteAsync(record).ConfigureAwait(false);
+                }
+                finally { _projectionGate.Release(); }
+                return;
+            }
             if (run is null) throw new RpcDispatchException(RpcDispatchFailure.SessionRunFailed);
             await run.Ready.Task.ConfigureAwait(false);
             lock (_gate) if (_fatal is not null) throw _fatal;
             if (observation is AgentLoopInputMessageStarted) await PublishQueueAsync(force: false).ConfigureAwait(false);
-            var projected = _events.Project(observation, _session.Snapshot, run.HistoryLength);
-            foreach (var record in projected) await WriteAsync(record).ConfigureAwait(false);
+            // A parallel tool batch reports its tools' progress and ends concurrently; projection and its records stay in order.
+            await _projectionGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                var projected = _events.Project(observation, _session.Snapshot, run.HistoryLength,
+                    observation is AgentLoopEnded ended && _session.WillRetryAfterAgentEnd(ended.Result));
+                foreach (var record in projected) await WriteAsync(record).ConfigureAwait(false);
+            }
+            finally { _projectionGate.Release(); }
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); throw; }
         finally { _inCallback.Value = previous; }
@@ -1177,7 +1249,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private JsonData State()
     {
         var snapshot = _session.Snapshot; var queue = _session.GetPendingInputQueueSnapshot();
-        if (!_models.TryGetValue(snapshot.Agent.Model, out var model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+        if (!TryGetModel(snapshot.Agent.Model, out var model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
         string? name = null;
         foreach (var entry in snapshot.Log.Entries.Reverse())
             if (entry.Type == "session_info")

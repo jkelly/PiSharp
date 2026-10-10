@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using PiSharp.Agent;
 using PiSharp.CodingAgent;
 using PiSharp.Extensions.Mcp.Configuration;
+using PiSharp.Extensions.Mcp.Runtime;
 
 namespace PiSharp.Cli.Mcp;
 
@@ -47,6 +48,20 @@ public sealed record McpSessionRuntimeAdmission(SessionRuntimeRegistry NativeReg
     /// <summary>The generation's MCP call grants: the tools of its admitted servers and host tools such as the built-in
     /// tool_search. The profile's final-action policy admits their exact invoke actions for this generation only.</summary>
     public McpCallGrants? CallGrants { get; init; }
+    /// <summary>Background connections start once this completes (the host started dispatching, like the original's
+    /// session_start), so a fast server never publishes its tools while the host is still taking ownership of the idle
+    /// session. Null starts them when the attachment binds.</summary>
+    public Task? ConnectAfter { get; init; }
+    /// <summary>How long the first prompt waits for background servers with `direct` tools; null is the original's 10 s.</summary>
+    public TimeSpan? StartupWait { get; init; }
+    /// <summary>Informational notices of the background connections, such as servers still connecting after the startup wait.</summary>
+    public Action<string>? Notify { get; init; }
+    /// <summary>Called once every background server connected or failed, unless the attachment retired first.</summary>
+    public Action? BackgroundSettled { get; init; }
+    /// <summary>Called for each background server that connected, before the prompts waiting for it proceed.</summary>
+    public Func<McpServerEntry, McpPreparedServer, McpRuntimeSnapshot, CancellationToken, Task>? BackgroundConnected { get; init; }
+    /// <summary>Called on the bound attachment after the background connections started (the `/mcp` manager binds here).</summary>
+    public Action<ReplaceableAgentSession, AgentSessionAttachment, McpBackgroundConnections?>? BindManager { get; init; }
 }
 
 /// <summary>Assembles explicitly admitted native and MCP resources before historical resolution.</summary>
@@ -111,13 +126,31 @@ public sealed class McpSessionRuntimeFactory
             token.ThrowIfCancellationRequested();
             admission.ServersPromptSource?.Publish(generation, admission.Catalog, activation.ServerSnapshots);
             var connections = background.IsEmpty ? null :
-                new McpBackgroundConnections(background, generation, admission.ServersPromptSource, admission.ReportBackgroundConnection);
+                new McpBackgroundConnections(background, generation, admission.ServersPromptSource, admission.ReportBackgroundConnection)
+                {
+                    ConnectAfter = admission.ConnectAfter, StartupWait = admission.StartupWait ?? McpBackgroundConnections.DefaultStartupWait,
+                    Notify = admission.Notify, AllSettled = admission.BackgroundSettled, Connected = admission.BackgroundConnected
+                };
             transferred = activation.TransferRuntimeOwnership();
             return new SessionRuntimeLease(activation.Registry.WithInitialToolSelectionFromCatalog(),
                 new Resources(transferred, admission.DiscoveryResources, admission.NativeResources), (owner, attachment) =>
                 {
                     activation.BindOwner(owner, attachment);
                     admission.BindProfileView?.Invoke(owner, attachment);
+                    // extensions/mcp/index.ts before_agent_start waitForDirectServers. The tool_call waits (scriptNeedsServer, tool_search,
+                    // resource tools) run inside those tools' calls.
+                    if (connections is not null)
+                    {
+                        // Chained with a gate another host installed (the extensions' pending registrations).
+                        var installed = attachment.Session.BeforeInputAdmission;
+                        attachment.Session.BeforeInputAdmission = async token =>
+                        {
+                            if (installed is not null) await installed(token).ConfigureAwait(false);
+                            await connections.BeforeInputAsync(attachment.Session, token).ConfigureAwait(false);
+                        };
+                    }
+                    // The manager and the resource tools bind before any server can connect.
+                    admission.BindManager?.Invoke(owner, attachment, connections);
                     connections?.Start(owner, attachment);
                 });
         }

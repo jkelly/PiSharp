@@ -19,7 +19,7 @@ public static partial class NativeProviderFactory
     /// </summary>
     public static NativeHttpModelProvider CreateAzureResponses(ModelDescriptor model, string explicitApiKey, JsonData modelMetadata,
         ResponsesTranscriptProjectionOptions projection, double? maxTokens = null, AzureEndpointOptions? azure = null,
-        HttpMessageHandler? handler = null, bool fixedReasoningOff = false)
+        HttpMessageHandler? handler = null, bool fixedReasoningOff = false, JsonData? headers = null)
     {
         ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(modelMetadata); ArgumentNullException.ThrowIfNull(projection);
         if (model.Provider != "azure" || model.Api != "azure-openai-responses" || string.IsNullOrWhiteSpace(model.Id) ||
@@ -37,7 +37,7 @@ public static partial class NativeProviderFactory
         var direct = new AzureResponsesOptions(modelMetadata, projection)
         {
             AzureBaseUrl = azure?.AzureBaseUrl, AzureResourceName = azure?.AzureResourceName, AzureDeploymentName = azure?.AzureDeploymentName,
-            ConfigurationValues = values.ToImmutable(), MaxTokens = maxTokens
+            ConfigurationValues = values.ToImmutable(), MaxTokens = maxTokens, Headers = headers
         };
         return Bind(model, handler, client => new AzureResponsesThinkingTransport(model, client, direct, explicitApiKey, fixedReasoningOff));
     }

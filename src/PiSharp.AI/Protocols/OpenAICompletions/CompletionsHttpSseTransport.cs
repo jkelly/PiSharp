@@ -1,14 +1,15 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.AI.Providers;
 using PiSharp.AI.Transports;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.OpenAICompletions;
 
-public sealed record CompletionsHttpSseOptions(int MaximumDataEvents = 4096, int MaximumDataCharacters = 65_536,
-    long MaximumTotalDataCharacters = 1_048_576, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null)
+public sealed record CompletionsHttpSseOptions(int MaximumDataEvents = int.MaxValue, int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
+    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null)
 {
     public CompletionsLifecycleHooks? Hooks { get; init; }
     public CompletionsResponseBodyReaderFactory? BodyReaderFactory { get; init; }
@@ -190,7 +191,10 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                     _token.ThrowIfCancellationRequested();
                     if (options is null || retryIndex >= options.MaxRetries || !CompletionsRetryPolicy.Retryable(options, status,
                         response is null ? null : CompletionsRetryPolicy.Header(response, "x-should-retry", owner._options.MaximumResponseHeaderCharacters)))
+                    {
+                        if (response is not null) failure = await owner.StatusFailureAsync(response, failure, _token).ConfigureAwait(false);
                         throw failure;
+                    }
                     delay = CompletionsRetryPolicy.Delay(options, retryIndex, response, owner._options.MaximumResponseHeaderCharacters);
                 }
                 finally { if (response is not null) DisposeRejected(response); }
@@ -415,7 +419,14 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                 chunk = Parse(raw, cancellationToken);
             }
             else if (eventName == "error" || chunk.Value.TryGetProperty("error", out var error) && Truthy(error))
-                throw new CompletionsPublicFailureException(new("(no status code or body)"));
+            {
+                // openai SDK Stream throws an APIError without a status; openai-completions.ts then shows
+                // formatProviderError(normalizeProviderError(error)), which is that message.
+                var streamError = ProviderErrorText.OpenAIStreamError(chunk.ToString(), eventName == "error")
+                    ?? ("(no status code or body)", null);
+                throw PublicFailure(streamError.Message, streamError.ErrorJson)
+                    ?? new CompletionsPublicFailureException(new("(no status code or body)"));
+            }
             if (_options.Hooks?.OnProviderStreamEvent is { } observe)
                 await observe(chunk, model, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
@@ -455,6 +466,27 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
         }
         else if (value.ValueKind == JsonValueKind.String) Unicode(value.GetString()!);
     }
+    /// <summary>The openai SDK status error for a rejected response (<c>APIError.generate</c> over <c>response.text()</c>),
+    /// shown as openai-completions.ts shows it. A body over the stream budget, or text public failure data cannot carry,
+    /// keeps the status-only rejection.</summary>
+    private async ValueTask<Exception> StatusFailureAsync(HttpResponseMessage response, Exception rejection, CancellationToken token)
+    {
+        var bytes = await ProviderErrorText.ReadBodyAsync(response,
+            Math.Min(_options.MaximumTotalDataCharacters, CompletionsPublicFailure.MaximumCharacters), token).ConfigureAwait(false);
+        if (bytes is null) return rejection;
+        var error = ProviderErrorText.OpenAIStatus((int)response.StatusCode, ProviderErrorText.FetchText(bytes));
+        return PublicFailure(ProviderErrorText.Format(error), error.Body) ?? rejection;
+    }
+
+    /// <summary>openai-completions.ts errorMessage: the formatted error plus <c>\n${error.error.metadata.raw}</c> when that
+    /// OpenRouter detail is present and not already shown.</summary>
+    private static CompletionsPublicFailureException? PublicFailure(string message, string? sdkErrorJson)
+    {
+        if (ProviderErrorText.MetadataRaw(sdkErrorJson) is { } raw && !message.Contains(raw, StringComparison.Ordinal)) message += "\n" + raw;
+        try { return new(new CompletionsPublicFailure(message)); }
+        catch (Exception error) when (error is ArgumentException or StreamProtocolException) { return null; }
+    }
+
     private static bool Truthy(JsonElement value) => value.ValueKind switch
     {
         JsonValueKind.Null or JsonValueKind.False => false,

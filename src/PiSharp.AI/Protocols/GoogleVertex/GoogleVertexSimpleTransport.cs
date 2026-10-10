@@ -27,7 +27,7 @@ public sealed class GoogleVertexSimpleTransport : IChatTransport
         if (string.IsNullOrWhiteSpace(options.Project) || options.Project.Length > 1024 || options.Project.Any(char.IsControl) ||
             string.IsNullOrWhiteSpace(options.Location) || options.Location.Length > 128 || options.Location.Any(char.IsControl))
             throw GoogleData.Fail(GoogleFailure.Configuration);
-        if (options.MaximumContextMessages is < 1 or > 65_536 || options.MaximumContextCharacters is < 1 or > 8_388_608)
+        if (options.MaximumContextMessages is < 1 or > PiRequestBudget.MaximumCountBound || options.MaximumContextCharacters is < 1 or > PiRequestBudget.MaximumBound)
             throw GoogleData.Fail(GoogleFailure.Configuration);
         if (options.Reasoning is { } requested && !Levels.Contains(requested, StringComparer.Ordinal))
             throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

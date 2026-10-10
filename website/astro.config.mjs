@@ -35,8 +35,12 @@ export default defineConfig({
 					items: ['docs', 'docs/quickstart', 'docs/coming-from-pi', 'docs/versioning'],
 				},
 				{
-					label: 'Extend in C#',
-					items: ['docs/extensions/build-an-extension', 'docs/extensions/node-bridge'],
+					label: 'Use PiSharp',
+					items: ['docs/guides/providers', 'docs/guides/interactive', 'docs/guides/mcp'],
+				},
+				{
+					label: 'Extend',
+					items: ['docs/extensions/node-bridge', 'docs/extensions/build-an-extension', 'docs/extensions/packages'],
 				},
 				{
 					label: 'Embed',
@@ -45,6 +49,8 @@ export default defineConfig({
 				{
 					label: 'Reference',
 					items: [
+						'docs/reference/cli',
+						'docs/reference/configuration',
 						'docs/reference/architecture',
 						{ label: 'Implementation plans', link: 'https://github.com/jkelly/PiSharp/tree/main/docs/plans' },
 					],

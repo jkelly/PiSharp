@@ -113,11 +113,26 @@ internal static class FailedAssistantSettlementTests
             Equal(0, sink.Events.Count);
         }
         foreach (var reason in new[] { StopReason.ToolUse, StopReason.Length })
-        foreach (var body in ProvisionalBodies().Append(ImmutableArray.Create<AssistantContent>(new ToolCallContent("valid-call", "read", null!))))
+        foreach (var body in new[] { ProvisionalBodies()[3], ImmutableArray.Create<AssistantContent>(new ToolCallContent("valid-call", "read", null!)) })
         {
             var sink = new Sink();
             await ThrowsAsync<ArgumentException>(() => scheduler.RunAsync(Message(reason, body), sink));
             Equal(0, sink.Events.Count);
+        }
+        probe.Untouched();
+        // Owner decision 13: agent-loop.ts admits nameless and id-less calls of a finalized message. A nameless call finds no tool and gets
+        // "Tool  not found"; calls of a length-truncated message are refused. Neither reaches preparation, policy, hooks or execution.
+        foreach (var body in new[] { ProvisionalBodies()[0], ProvisionalBodies()[2] })
+        {
+            var nameless = await scheduler.RunAsync(Message(StopReason.ToolUse, body), new Sink());
+            var call = body.OfType<ToolCallContent>().Single();
+            Check(nameless.Messages.Length == 1 && nameless.Messages[0].IsError && nameless.Messages[0].ToolCallId == call.Id &&
+                nameless.Messages[0].ToolName == "" && nameless.Messages[0].Content.Single().Text == "Tool  not found", "Nameless call result differs.");
+        }
+        foreach (var body in ProvisionalBodies()[..3])
+        {
+            var truncated = await scheduler.RunAsync(Message(StopReason.Length, body), new Sink());
+            Check(truncated.Outcomes.Length == 1 && truncated.Outcomes[0].IsError, "A truncated nameless or id-less call was not refused.");
         }
         probe.Untouched();
 

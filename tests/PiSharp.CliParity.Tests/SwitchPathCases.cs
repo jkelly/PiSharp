@@ -1,0 +1,146 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session-runtime.ts (switchSession:
+// SessionManager.open(sessionPath)) and packages/coding-agent/src/core/session-manager.ts (open, _setSessionFile, newSession).
+using System.Text.Json.Nodes;
+
+// switch_session (and /resume, /import) open any session file the way SessionManager.open does, wherever it is: the session directory
+// becomes the file's directory, a missing file is a new session created lazily at that path, an empty file gets its header, and a
+// non-empty file that is not a session is refused with upstream's text. Expectations were checked against Pi 1.1.0 run with node.
+internal static partial class Program
+{
+    private static IEnumerable<(string, Func<Task>)> SwitchPathCases() =>
+    [
+        ("switch.session-files-outside-the-session-directory", async () =>
+        {
+            using var sandbox = new Sandbox("switch-outside");
+            var elsewhere = Path.Combine(sandbox.Root, "elsewhere");
+            Directory.CreateDirectory(elsewhere);
+            var outside = SeedSession(sandbox, "outside.jsonl", "anthropic", "claude-sonnet-4-5", elsewhere);
+            var missing = Path.Combine(elsewhere, "missing.jsonl");
+            var empty = sandbox.Write(Path.Combine(elsewhere, "empty.jsonl"), "");
+            var junk = sandbox.Write(Path.Combine(elsewhere, "junk.jsonl"), "this is not a session\n");
+            static string Json(string text) => JsonValue.Create(text)!.ToJsonString();
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"],
+                """{"id":"1","type":"switch_session","sessionPath":""" + Json(outside) + "}",
+                """{"id":"2","type":"get_state"}""",
+                """{"id":"3","type":"get_messages"}""",
+                """{"id":"4","type":"new_session"}""",
+                """{"id":"5","type":"get_state"}""",
+                """{"id":"6","type":"switch_session","sessionPath":""" + Json(missing) + "}",
+                """{"id":"7","type":"get_state"}""",
+                """{"id":"8","type":"switch_session","sessionPath":""" + Json(empty) + "}",
+                """{"id":"9","type":"get_messages"}""",
+                """{"id":"10","type":"switch_session","sessionPath":""" + Json(junk) + "}",
+                """{"id":"11","type":"get_state"}""");
+            JsonNode Data(int index) => responses[index]["data"]!;
+            string Response(int index) => responses[index].ToJsonString();
+            // An existing session file anywhere opens with its history.
+            Check(responses[0]["success"]!.GetValue<bool>() && Data(0)["cancelled"]!.GetValue<bool>() == false, "outside: " + Response(0));
+            Equal(outside, Data(1)["sessionFile"]!.GetValue<string>(), "outside session file");
+            Equal(2, (Data(2)["messages"] as JsonArray)!.Count, "outside history");
+            // SessionManager.open derives the session directory from the file: a new session goes next to it.
+            Equal(elsewhere, Path.GetDirectoryName(Data(4)["sessionFile"]!.GetValue<string>()), "new session directory");
+            // A missing file is a new session at that path, written only once it has a response.
+            Check(responses[5]["success"]!.GetValue<bool>(), "missing: " + Response(5));
+            Equal(missing, Data(6)["sessionFile"]!.GetValue<string>(), "missing session file");
+            Equal(0, Data(6)["messageCount"]?.GetValue<int>() ?? 0, "missing session is empty");
+            Check(!File.Exists(missing), "a missing session file is created lazily");
+            // An empty file gets a session header.
+            Check(responses[7]["success"]!.GetValue<bool>() && (Data(8)["messages"] as JsonArray)!.Count == 0, "empty: " + Response(7));
+            Check(JsonNode.Parse(File.ReadLines(empty).First())!["type"]!.GetValue<string>() == "session", "empty file gets a header");
+            // sdk.ts: a session without messages records its model and thinking level at once (Pi 1.1.0 writes all three lines).
+            Names(["session", "model_change", "thinking_level_change"], File.ReadLines(empty).Select(line => JsonNode.Parse(line)!["type"]!.GetValue<string>()), "empty file entries");
+            Equal("claude-sonnet-4-5", JsonNode.Parse(File.ReadLines(empty).ElementAt(1))!["modelId"]!.GetValue<string>(), "recorded model");
+            Equal("medium", JsonNode.Parse(File.ReadLines(empty).ElementAt(2))!["thinkingLevel"]!.GetValue<string>(), "recorded thinking level");
+            // A non-empty file that is not a session is refused, unchanged, and the current session stays.
+            Check(!responses[9]["success"]!.GetValue<bool>() && responses[9]["error"]!.GetValue<string>() == "Session file is not a valid pi session: " + junk,
+                "junk: " + Response(9));
+            Equal("this is not a session\n", File.ReadAllText(junk), "junk file unchanged");
+            Equal(empty, Data(10)["sessionFile"]!.GetValue<string>(), "the current session stays");
+        }),
+        ("switch.no-session-run-opens-and-writes-a-session-file", async () =>
+        {
+            using var sandbox = new Sandbox("switch-no-session");
+            var elsewhere = Path.Combine(sandbox.Root, "elsewhere");
+            Directory.CreateDirectory(elsewhere);
+            var outside = SeedSession(sandbox, "outside.jsonl", "anthropic", "claude-sonnet-4-5", elsewhere);
+            // --no-session starts in memory; switchSession opens SessionManager.open(path), a persisted session (Pi 1.1.0 run with
+            // node: the file gains the session_info entry, and a new session afterwards goes next to it).
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--no-session", "--provider", "anthropic", "--model", "claude-sonnet-4-5"],
+                """{"id":"1","type":"switch_session","sessionPath":""" + JsonValue.Create(outside)!.ToJsonString() + "}",
+                """{"id":"2","type":"get_state"}""",
+                """{"id":"3","type":"get_messages"}""",
+                """{"id":"4","type":"set_session_name","name":"renamed"}""",
+                """{"id":"5","type":"new_session"}""",
+                """{"id":"6","type":"get_state"}""");
+            Check(responses[0]["success"]!.GetValue<bool>(), "switched: " + responses[0].ToJsonString());
+            Equal(outside, responses[1]["data"]!["sessionFile"]!.GetValue<string>(), "session file");
+            Equal(2, (responses[2]["data"]!["messages"] as JsonArray)!.Count, "history");
+            Check(responses[3]["success"]!.GetValue<bool>(), "renamed: " + responses[3].ToJsonString());
+            Check(File.ReadLines(outside).Select(line => JsonNode.Parse(line)!).Any(entry => entry["type"]?.GetValue<string>() == "session_info" &&
+                entry["name"]?.GetValue<string>() == "renamed"), "the switched-to file is written");
+            Equal(elsewhere, Path.GetDirectoryName(responses[5]["data"]!["sessionFile"]!.GetValue<string>()), "new session next to it");
+            Equal(0, sandbox.SessionFiles().Length, "nothing in the session directory");
+        }),
+        ("switch.sessions-without-messages-choose-their-model-like-find-initial-model", async () =>
+        {
+            // main.ts createRuntime runs buildSessionOptions and sdk.ts findInitialModel for every session: one without messages
+            // (new_session, a missing file) takes the scoped pick, else the saved default, else the first available model, not
+            // the model set_model chose (rpc set_model does not persist it). Pi 1.1.0 run with node: claude-opus-4-8 without a scope
+            // or default, claude-haiku-4-5 with --models claude-haiku-4-5,claude-sonnet-4-5 or the default claude-haiku-4-5.
+            async Task Expect(string expected, string[] extra, string? settings = null)
+            {
+                using var sandbox = new Sandbox("new-session-model");
+                if (settings is not null) sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), settings);
+                var missing = Path.Combine(sandbox.Root, "elsewhere", "missing.jsonl");
+                var responses = await RpcSequence(sandbox, ["--mode", "rpc", .. extra],
+                    """{"id":"1","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-4-5"}""",
+                    """{"id":"2","type":"new_session"}""",
+                    """{"id":"3","type":"get_state"}""",
+                    """{"id":"4","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-4-5"}""",
+                    """{"id":"5","type":"switch_session","sessionPath":""" + JsonValue.Create(missing)!.ToJsonString() + "}",
+                    """{"id":"6","type":"get_state"}""");
+                Check(responses[0]["success"]!.GetValue<bool>() && responses[3]["success"]!.GetValue<bool>(), "set_model: " + responses[0].ToJsonString());
+                Equal(expected, responses[2]["data"]!["model"]!["id"]!.GetValue<string>(), "new_session model " + string.Join(' ', extra));
+                Equal(expected, responses[5]["data"]!["model"]!["id"]!.GetValue<string>(), "missing file model " + string.Join(' ', extra));
+            }
+            await Expect("claude-opus-4-8", []);
+            await Expect("claude-haiku-4-5", ["--models", "claude-haiku-4-5,claude-sonnet-4-5"]);
+            await Expect("claude-haiku-4-5", [], """{"defaultProvider":"anthropic","defaultModel":"claude-haiku-4-5"}""");
+            // --model is every session's model (buildSessionOptions options.model).
+            await Expect("claude-haiku-4-5", ["--provider", "anthropic", "--model", "claude-haiku-4-5"]);
+        }),
+        ("switch.headerless-entries-are-not-a-valid-session", async () =>
+        {
+            using var sandbox = new Sandbox("headerless");
+            // session-manager.ts loadEntriesFromFile validates the header first and returns no entries without one, so
+            // _setSessionFile refuses the non-empty file (the _loadEntries header-less branch is not reached from a file). Pi 1.1.0
+            // run with node: "Error: Session file is not a valid pi session: <path>" and exit 1 at startup, the same text for
+            // switch_session, the file unchanged.
+            var text = string.Join("\n",
+                "{\"type\":\"message\",\"id\":\"a3\",\"parentId\":null,\"timestamp\":\"2026-10-09T10:00:00.003Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"headerless question\"}],\"timestamp\":1}}",
+                "{\"type\":\"message\",\"id\":\"a4\",\"parentId\":\"a3\",\"timestamp\":\"2026-10-09T10:00:00.004Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"headerless answer\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-haiku-4-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"stop\",\"timestamp\":2}}") + "\n";
+            var headerless = sandbox.Write(Path.Combine(sandbox.Root, "elsewhere", "headerless.jsonl"), text);
+            var (code, stdout, stderr) = await sandbox.Run("-p", "--session", headerless, "hi");
+            Check(code == 1 && stdout == "" && stderr == "Error: Session file is not a valid pi session: " + headerless + "\n", $"startup: {code} {stderr}");
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"],
+                """{"id":"1","type":"switch_session","sessionPath":""" + JsonValue.Create(headerless)!.ToJsonString() + "}");
+            Check(!responses[0]["success"]!.GetValue<bool>() && responses[0]["error"]!.GetValue<string>() == "Session file is not a valid pi session: " + headerless,
+                "switch: " + responses[0].ToJsonString());
+            Equal(text, File.ReadAllText(headerless), "file unchanged");
+            Equal(0, sandbox.Requests.Count, "nothing sent");
+        }),
+        ("switch.empty-session-file-at-startup-records-model-and-thinking", async () =>
+        {
+            using var sandbox = new Sandbox("startup-empty");
+            var empty = sandbox.Write(Path.Combine(sandbox.Root, "elsewhere", "empty.jsonl"), "");
+            // Pi 1.1.0 (--session empty --model claude-sonnet-4-5 --thinking high): header, model_change and thinking_level_change at once.
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--session", empty, "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--thinking", "high"],
+                """{"id":"1","type":"get_state"}""");
+            Equal("high", responses[0]["data"]!["thinkingLevel"]!.GetValue<string>(), "thinking level");
+            var entries = File.ReadLines(empty).Select(line => JsonNode.Parse(line)!).ToArray();
+            Names(["session", "model_change", "thinking_level_change"], entries.Select(entry => entry["type"]!.GetValue<string>()), "startup entries");
+            Equal("claude-sonnet-4-5", entries[1]["modelId"]!.GetValue<string>(), "recorded model");
+            Equal("high", entries[2]["thinkingLevel"]!.GetValue<string>(), "recorded thinking level");
+        }),
+    ];
+}

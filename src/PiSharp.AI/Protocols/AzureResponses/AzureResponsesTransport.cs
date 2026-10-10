@@ -5,6 +5,7 @@ using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using PiSharp.AI.Protocols.OpenAIResponses;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.AI.Transports;
 using PiSharp.Contracts;
 using PiSharp.Contracts.Compatibility;
@@ -188,32 +189,9 @@ public sealed class AzureResponsesTransport : IChatTransport
             if (read > _options.MaximumErrorBodyBytes - bytes.Length) throw new StreamLimitException("Azure Responses HTTP error body exceeds configured limits.");
             bytes.Write(buffer, 0, read);
         }
-        string raw;
-        try { raw = new UTF8Encoding(false, true).GetString(bytes.ToArray()); }
-        catch (DecoderFallbackException) { throw new StreamProtocolException("Invalid Azure Responses error body UTF-8."); }
-        string? innerBody = null, sdkMessage = null;
-        try
-        {
-            var body = JsonData.Parse(raw);
-            if (body.Value.ValueKind != JsonValueKind.Object) throw new StreamProtocolException("Unsupported Azure Responses HTTP error shape.");
-            var inner = body.Value;
-            if (body.Value.TryGetProperty("error", out var supplied) && supplied.ValueKind != JsonValueKind.Null) inner = supplied;
-            if (inner.ValueKind != JsonValueKind.Object) throw new StreamProtocolException("Unsupported Azure Responses HTTP error shape.");
-            {
-                var compact = EcmaScriptJsonProjection.Project(JsonData.FromElement(inner));
-                if (inner.EnumerateObject().Any()) innerBody = Truncate(compact.Trim());
-                sdkMessage = inner.TryGetProperty("message", out var text) && Truthy(text)
-                    ? text.ValueKind == JsonValueKind.String ? text.GetString() : EcmaScriptJsonProjection.Project(JsonData.FromElement(text)) : compact;
-            }
-        }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or EcmaScriptJsonProjectionException) { }
-        sdkMessage = string.IsNullOrEmpty(sdkMessage ?? raw) ? $"{status} status code (no body)" : $"{status} {sdkMessage ?? raw}";
-        var detail = innerBody is not null && !sdkMessage.Contains(innerBody, StringComparison.Ordinal) ? innerBody : sdkMessage;
-        return $"Azure OpenAI API error ({status}): {detail}";
+        // azure-openai-responses.ts formatAzureOpenAIError: formatProviderError(normalizeProviderError(APIError), "Azure OpenAI API error").
+        return ProviderErrorText.Format(ProviderErrorText.OpenAIStatus(status, ProviderErrorText.FetchText(bytes.ToArray())), "Azure OpenAI API error");
     }
-    private static string Truncate(string text) => text.Length <= 4000 ? text : text[..4000] + $"... [truncated {text.Length - 4000} chars]";
-    private static bool Truthy(JsonElement value) => value.ValueKind switch
-    { JsonValueKind.Null or JsonValueKind.False => false, JsonValueKind.String => !string.IsNullOrEmpty(value.GetString()), JsonValueKind.Number => value.GetDouble() != 0, _ => true };
     // Caller callbacks can throw any exception type, including ones that overlap transport failures
     // (JsonException, limits, cancellation). Wrap them so classification never mistakes a callback
     // fault for a malformed, over-limit or timed-out stream. Cancellation of the operation's own

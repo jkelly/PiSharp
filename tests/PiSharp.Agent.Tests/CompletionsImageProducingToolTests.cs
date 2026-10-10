@@ -14,7 +14,10 @@ using PiSharp.Contracts;
 internal static class CompletionsImageProducingToolTests
 {
     private const string FixtureHash = "56f2ee42059897b387e44a6f9300cd0e05f16a00cd1c40fea3ab364736e0f593";
-    private const string Arguments = "{\"value\":1.00,\"keep\":null}";
+    // The captured wire carries {"value":1.00,"keep":null}; pi-ai finalizes it with parseStreamingJson
+    // (packages/ai/src/api/openai-completions.ts:464, packages/ai/src/utils/json-parse.ts:104-110), and the fixture's own
+    // toolExecutions record the unchanged Pi Agent executing with args {"value":1,"keep":null}.
+    private const string Arguments = "{\"value\":1,\"keep\":null}";
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(5);
     private static readonly List<object> Evidence = [];
     public static object DifferentialEvidence => new { fixtureSha256 = FixtureHash, actualNativeLoop = true,

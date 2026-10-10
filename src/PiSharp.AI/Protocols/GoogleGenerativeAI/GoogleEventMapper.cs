@@ -43,29 +43,39 @@ internal sealed class GoogleEventMapper
     }
     internal IReadOnlyList<StreamEvent> Convert(JsonData chunk)
     {
-        var value = chunk.Value; if (value.ValueKind != JsonValueKind.Object) throw GoogleData.Fail(GoogleFailure.MalformedStream);
-        if (value.TryGetProperty("error", out _)) throw GoogleData.Fail(GoogleFailure.ProviderError);
+        // @google/genai generateContentResponseFromMldev/FromVertex keeps only the response fields it knows: a JSON value that is not
+        // an object (null, array, string, number) carries none, and a frame's `error` member is dropped (an in-stream error is only
+        // raised for a whole read chunk, in the decoder). Neither ends the stream.
+        var value = chunk.Value; if (value.ValueKind != JsonValueKind.Object) return [];
         var frames = new List<StreamEvent>();
         var responseId = GoogleData.String(value, "responseId");
         if (!_extra.TryGet("responseId", out _) && !string.IsNullOrEmpty(responseId))
         { Charge(responseId.Length); _extra = _extra.Set("responseId", JsonData.Parse(JsonSerializer.Serialize(responseId))); }
+        // google-generative-ai.ts reads `chunk.candidates?.[0]` and iterates `candidate.content.parts` as given (the SDK copies the
+        // candidate's content unchanged): a non-array candidates value has no first candidate (an object answers its "0" member),
+        // a string parts value iterates characters that carry nothing, any other non-iterable value throws its TypeError, and a
+        // part that is not an object carries nothing (null throws on `.text`).
         JsonElement candidate = default;
         if (value.TryGetProperty("candidates", out var candidates))
         {
-            if (candidates.ValueKind != JsonValueKind.Array) throw GoogleData.Fail(GoogleFailure.MalformedStream);
-            if (candidates.GetArrayLength() > 0) candidate = candidates[0];
+            if (candidates.ValueKind == JsonValueKind.Array) { if (candidates.GetArrayLength() > 0) candidate = candidates[0]; }
+            else if (candidates.ValueKind == JsonValueKind.Object && candidates.TryGetProperty("0", out var first)) candidate = first;
         }
         if (candidate.ValueKind == JsonValueKind.Object && candidate.TryGetProperty("content", out var content) &&
-            content.TryGetProperty("parts", out var parts))
+            content.ValueKind == JsonValueKind.Object && content.TryGetProperty("parts", out var parts) &&
+            Truthy(parts) && parts.ValueKind != JsonValueKind.String)
         {
-            if (parts.ValueKind != JsonValueKind.Array) throw GoogleData.Fail(GoogleFailure.MalformedStream);
+            if (parts.ValueKind != JsonValueKind.Array)
+                throw new GoogleGenerativeAIException(GoogleFailure.MalformedStream, "candidate.content.parts is not iterable");
             foreach (var part in parts.EnumerateArray())
             {
-                if (part.ValueKind != JsonValueKind.Object) throw GoogleData.Fail(GoogleFailure.MalformedStream);
+                if (part.ValueKind == JsonValueKind.Null)
+                    throw new GoogleGenerativeAIException(GoogleFailure.MalformedStream, "Cannot read properties of null (reading 'text')");
+                if (part.ValueKind != JsonValueKind.Object) continue;
                 if (part.TryGetProperty("text", out var textValue))
                 {
-                    if (textValue.ValueKind != JsonValueKind.String) throw GoogleData.Fail(GoogleFailure.MalformedStream);
-                    var text = textValue.GetString()!; var thinking = GoogleData.True(part, "thought");
+                    // `part.text !== undefined`: JSON null and other values join the block as JavaScript strings (`text += part.text`).
+                    var text = ProviderShared.ProviderErrorText.JsString(textValue); var thinking = GoogleData.True(part, "thought");
                     if (_active < 0 || thinking != (_blocks[_active] is ThinkingContent))
                     {
                         End(frames); _active = _blocks.Count;
@@ -95,21 +105,27 @@ internal sealed class GoogleEventMapper
                         frames.Add(new TextDelta(_active, text));
                     }
                 }
-                if (part.TryGetProperty("functionCall", out var call))
+                // google-generative-ai.ts: `if (part.functionCall)` (any truthy value), name = functionCall.name || "", id = the truthy
+                // functionCall.id unless a block already has it, else `${functionCall.name}_${Date.now()}_${++counter}` (the raw name,
+                // so a missing one reads "undefined"), arguments = functionCall.args ?? {}.
+                if (part.TryGetProperty("functionCall", out var call) && Truthy(call))
                 {
-                    if (call.ValueKind != JsonValueKind.Object) throw GoogleData.Fail(GoogleFailure.MalformedStream);
                     End(frames);
-                    var name = GoogleData.String(call, "name") ?? "";
-                    // Native execution requires non-empty identity, even though Source can push an empty name.
-                    if (name.Length == 0) throw GoogleData.Fail(GoogleFailure.MalformedStream);
-                    var id = GoogleData.String(call, "id");
-                    if (string.IsNullOrEmpty(id) || _blocks.OfType<ToolCallContent>().Any(x => x.Id == id))
-                        id = $"{name}_{_request.Timestamp}_{Interlocked.Increment(ref _toolCounter)}";
-                    var args = !call.TryGetProperty("args", out var arguments) || arguments.ValueKind == JsonValueKind.Null ?
-                        JsonData.EmptyObject : JsonData.FromElement(arguments);
-                    FinalToolArguments.ParseStrict(args.ToString());
-                    var delta = EcmaScriptJsonProjection.Project(args);
-                    args = FinalToolArguments.ParseStrict(delta).Json;
+                    JsonElement? Field(string field) => call.ValueKind == JsonValueKind.Object && call.TryGetProperty(field, out var found) ? found : null;
+                    var nameValue = Field("name");
+                    var name = nameValue is { } named && Truthy(named) ? ProviderShared.ProviderErrorText.JsString(named) : "";
+                    // A nameless call (name "", missing, or a non-object functionCall) is pushed as upstream pushes it, with name "" and an id
+                    // "_<ms>_<n>" or "undefined_<ms>_<n>" (owner decision 13); the agent answers it with "Tool  not found".
+                    var provided = Field("id") is { } given && Truthy(given) ? ProviderShared.ProviderErrorText.JsString(given) : null;
+                    var id = provided is null || _blocks.OfType<ToolCallContent>().Any(x => x.Id == provided)
+                        ? (nameValue is { } rawName ? ProviderShared.ProviderErrorText.JsString(rawName) : "undefined") + "_" + _request.Timestamp + "_" +
+                            Interlocked.Increment(ref _toolCounter)
+                        : provided;
+                    // google-generative-ai.ts: arguments = part.functionCall.args ?? {} (whatever JSON value the chunk carried), and the
+                    // delta is JSON.stringify(arguments).
+                    var raw = Field("args") is { ValueKind: not JsonValueKind.Null } arguments ? arguments.GetRawText() : "{}";
+                    var delta = StreamingJson.ParseToJson(raw);
+                    var args = StreamingJson.Parse(raw);
                     var properties = JsonFields.Empty; var signature = GoogleData.String(part, "thoughtSignature");
                     if (!string.IsNullOrEmpty(signature)) properties = properties.Set("thoughtSignature", JsonData.Parse(JsonSerializer.Serialize(signature)));
                     Charge(id.Length + name.Length + delta.Length + (signature?.Length ?? 0));
@@ -145,10 +161,18 @@ internal sealed class GoogleEventMapper
                 new(binary64.Value.GetProperty("input").GetDecimal(), binary64.Value.GetProperty("output").GetDecimal(),
                     binary64.Value.GetProperty("cacheRead").GetDecimal(), binary64.Value.GetProperty("cacheWrite").GetDecimal(),
                     binary64.Value.GetProperty("total").GetDecimal(), SourceBinary64Cost: binary64),
-                JsonFields.Empty.Set("reasoning", JsonData.Parse(thought.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+                JsonFields.Empty.Set("reasoning", JsonData.Parse(thought.ToString(System.Globalization.CultureInfo.InvariantCulture)))) { ExtrasBeforeTotal = true };
         }
         return frames;
     }
+    /// <summary>JavaScript truthiness of a parsed JSON value.</summary>
+    private static bool Truthy(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Null or JsonValueKind.False or JsonValueKind.Undefined => false,
+        JsonValueKind.String => value.GetString()!.Length != 0,
+        JsonValueKind.Number => value.GetDouble() != 0,
+        _ => true
+    };
     private static long Count(JsonElement usage, string name)
     {
         if (!usage.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null) return 0;
@@ -165,7 +189,10 @@ internal sealed class GoogleEventMapper
     internal IReadOnlyList<StreamEvent> EndContent() { var frames = new List<StreamEvent>(); End(frames); return frames; }
     internal StreamTerminalEvent Finish()
     {
-        if (_reason == StopReason.Pending) return Error(GoogleData.Fail(GoogleFailure.UnexpectedEof), false);
+        // google-vertex.ts names its provider in this text; google-generative-ai.ts does not.
+        if (_reason == StopReason.Pending) return Error(_request.Model.Api == "google-vertex"
+            ? new GoogleGenerativeAIException(GoogleFailure.UnexpectedEof, "Google Vertex stream ended without a finish reason")
+            : GoogleData.Fail(GoogleFailure.UnexpectedEof), false);
         if (_reason == StopReason.Error)
         {
             var raw = _extra.TryGet("rawStopReason", out var value) ? value!.Value.GetString() : "";

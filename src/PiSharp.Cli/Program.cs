@@ -5,27 +5,34 @@ namespace PiSharp.Cli;
 
 internal static class Program
 {
-    private const string Usage = "Usage: PiSharp.Cli --offline-demo --workspace <new absolute directory> --session <new absolute JSONL file in workspace>; " + Commands.SessionCommands.Usage + "; " + Commands.RpcSessionCommand.Usage + "; " + Commands.InteractiveSessionCommand.Usage + "; " + Commands.TerminalSessionCommand.Usage + "; " + Commands.SessionCopyCommand.Usage + "; " + Commands.SessionCatalogCommand.Usage + "; " + Commands.SessionContextEditCommand.Usage + "; " + Commands.McpCommand.Usage;
+    private const string Usage = "Usage: PiSharp.Cli --offline-demo --workspace <new absolute directory> --session <new absolute JSONL file in workspace>; " + Commands.SessionCommands.Usage + "; " + Commands.RpcSessionCommand.Usage + "; " + Commands.InteractiveSessionCommand.Usage + "; " + Commands.TerminalSessionCommand.Usage + "; " + Commands.SessionCopyCommand.Usage + "; " + Commands.SessionCatalogCommand.Usage + "; " + Commands.SessionContextEditCommand.Usage + "; " + Commands.McpCommand.Usage + "; " + Models.ModelListing.Usage;
 
     private static async Task<int> Main(string[] args)
     {
-        if (args.Length > 0 && args[0] == "session") return await RunSessionAsync(args).ConfigureAwait(false);
+        // Codemode scripts run in a child process of this executable (see PiSharp.Codemode.CodemodeWorker).
+        if (args is [PiSharp.Codemode.CodemodeWorker.Argument])
+            return await PiSharp.Codemode.CodemodeWorker.RunAsync(Console.OpenStandardInput(), Console.OpenStandardOutput()).ConfigureAwait(false);
+        PiSharp.Codemode.CodemodeWorker.Default ??= PiSharp.Codemode.CodemodeWorkerLauncher.ForCurrentProcess();
+        // Pi interactive mode records an uncaught exception in crashes.json so the next start points at /bug (crash-log.ts).
+        // IMPL-I seam: the interactive host should pass its session file and extensions instead.
+        if (args is ["session", "terminal", ..])
+            AppDomain.CurrentDomain.UnhandledException += (_, crash) =>
+            {
+                if (crash.ExceptionObject is Exception error)
+                    Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], null, Environment.CurrentDirectory);
+            };
+        // Pi rpc/print modes: SIGTERM and SIGHUP shut the host down gracefully, then exit 143 or 129.
+        if (args.Length > 0 && args[0] == "session")
+            return args is ["session", "terminal", ..] ? await RunSessionAsync(args).ConfigureAwait(false)
+                : ShutdownSignals.Process.Exit(await RunSessionAsync(args).ConfigureAwait(false));
         if (args.Length > 0 && args[0] == "mcp") return await RunMcpAsync(args[1..]).ConfigureAwait(false);
+        // Pi's own command line (plain pisharp, -p, --mode json|rpc, --help, --list-models, ...); the offline demo keeps its form.
+        if (args is not ["--offline-demo", ..]) return await RunPiAsync(args).ConfigureAwait(false);
         Stream standardOutput;
         try { standardOutput = StandardOutputStream.Open(); }
         catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
         await using var ownedOutput = standardOutput;
         await using var output = new Utf8StreamTextWriter(standardOutput);
-        if (args is ["--help"])
-        {
-            try
-            {
-                await output.WriteLineAsync(Usage).ConfigureAwait(false);
-                await output.FlushAsync().ConfigureAwait(false);
-                return 0;
-            }
-            catch (Exception) { return Fail("OutputFailed", "Standard output delivery failed.", 1); }
-        }
         if (args.Length != 5 || args[0] != "--offline-demo") return Fail("InvalidArguments", Usage, 2);
         string? workspace = null; string? session = null;
         for (var index = 1; index < args.Length; index += 2)
@@ -53,6 +60,72 @@ internal static class Program
         finally { Console.CancelKeyPress -= cancel; }
     }
 
+    /// <summary>The Pi-compatible entry over the real console. Standard output carries only the mode's own output: other console
+    /// writes go to standard error (source output-guard.ts takeOverStdout).</summary>
+    private static async Task<int> RunPiAsync(string[] args)
+    {
+        Stream standardOutput;
+        try { standardOutput = StandardOutputStream.Open(); }
+        catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
+        await using var ownedOutput = standardOutput;
+        await using var output = new Utf8StreamTextWriter(standardOutput);
+        var originalOut = Console.Out;
+        Console.SetOut(Console.Error);
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, observation) => { observation.Cancel = true; cancellation.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var stdinRedirected = Console.IsInputRedirected;
+            var host = new Pi.PiHost
+            {
+                Cwd = Directory.GetCurrentDirectory(), Home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                GetEnvironment = Environment.GetEnvironmentVariable, SetEnvironment = Environment.SetEnvironmentVariable,
+                Stdout = output, Stderr = Console.Error,
+                Stdin = stdinRedirected ? new StreamReader(Console.OpenStandardInput(), new System.Text.UTF8Encoding(false), false) : Console.In,
+                StdinIsTty = !stdinRedirected, StdoutIsTty = !Console.IsOutputRedirected,
+                Color = !Console.IsErrorRedirected && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")),
+                LiveRuntime = Commands.LiveSessionRuntime.Default,
+                CreateMcpHost = _ => Mcp.McpSessionHost.CreateDefault(),
+                OpenRpcInput = CancellableStandardInput.Open, OpenRpcOutput = () => standardOutput,
+                RunInteractive = (terminalArgs, options, token) => RunPiInteractiveAsync(terminalArgs, options, output, token),
+                TrustPrompt = stdinRedirected || Console.IsOutputRedirected ? null : (title, choices, token) =>
+                    new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).PromptProjectTrustAsync(title, choices, token),
+                SelectSession = stdinRedirected || Console.IsOutputRedirected ? null : (current, all, token) =>
+                    new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).SelectSessionAsync(current, all, token),
+                ConfigSelector = stdinRedirected || Console.IsOutputRedirected ? null : (request, token) =>
+                    new Interactive.Mode.StartupUi(request.AgentDir, request.Cwd).SelectConfigAsync(request, token),
+                PromptMissingSessionCwd = stdinRedirected || Console.IsOutputRedirected ? null : (prompt, fallbackCwd, token) =>
+                    new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).PromptForMissingSessionCwdAsync(prompt, fallbackCwd, token),
+                Signals = () => ShutdownSignals.Process, Timings = PiSharp.CodingAgent.Diagnostics.StartupTimings.Default
+            };
+            return await Pi.PiCommand.RunAsync(args, host, cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return 130; }
+        finally
+        {
+            Console.CancelKeyPress -= cancel;
+            Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>Interactive mode of the Pi entry (IMPL-I): Pi's TUI over the planned session, on Windows, Linux and macOS. An uncaught
+    /// exception is recorded in crashes.json and reported as interactive-mode.ts does.</summary>
+    private static async Task<int> RunPiInteractiveAsync(string[] terminalArgs, Pi.PiEntryOptions options, TextWriter output, CancellationToken token)
+    {
+        var index = Array.IndexOf(terminalArgs, "--session");
+        var sessionFile = index >= 0 && index + 1 < terminalArgs.Length ? terminalArgs[index + 1] : null;
+        AppDomain.CurrentDomain.UnhandledException += (_, crash) =>
+        {
+            if (crash.ExceptionObject is Exception error)
+                Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], sessionFile, Environment.CurrentDirectory);
+        };
+        if (options.Interactive is null)
+            return await RunTerminalHostAsync(terminalArgs, token, liveRuntime: options.LiveRuntime, mcpHost: Mcp.McpSessionHost.CreateDefault()).ConfigureAwait(false);
+        var binding = new Interactive.Mode.McpBinding();
+        var mcpHost = Mcp.McpSessionHost.CreateDefault() with { ObserveManager = manager => binding.Manager = manager, IsProjectTrusted = options.ProjectTrusted };
+        return await Interactive.Mode.InteractiveModeHost.RunAsync(terminalArgs, options, mcpHost, binding, output, Console.Error, token).ConfigureAwait(false);
+    }
     private static async Task<int> RunMcpAsync(string[] args)
     {
         Stream standardOutput;
@@ -90,6 +163,8 @@ internal static class Program
         using var cancellation = new CancellationTokenSource();
         ConsoleCancelEventHandler cancel = (_, observation) => { observation.Cancel = true; cancellation.Cancel(); };
         Console.CancelKeyPress += cancel;
+        using var signalled = args is ["session", "terminal", ..] ? default
+            : ShutdownSignals.Process.Token.Register(static state => ((CancellationTokenSource)state!).Cancel(), cancellation);
         try
         {
             if (args is ["session", "terminal", ..])
@@ -108,7 +183,8 @@ internal static class Program
                 try
                 {
                     await using (input.ConfigureAwait(false))
-                        return await Commands.RpcSessionCommand.RunHostedAsync(args, input, standardOutput, Console.Error, Mcp.McpSessionHost.CreateDefault(), cancellation.Token).ConfigureAwait(false);
+                        return await Commands.RpcSessionCommand.RunHostedAsync(args, input, standardOutput, Console.Error, Mcp.McpSessionHost.CreateDefault(), cancellation.Token,
+                            userShutdown: () => ShutdownSignals.Process.Received is not null).ConfigureAwait(false);
                 }
                 catch (Exception) { return Fail("RpcHostFailed", "RPC host failed after owned input cleanup; inspect durable state.", 1); }
             }

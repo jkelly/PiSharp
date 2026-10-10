@@ -32,14 +32,16 @@ internal sealed class LiveProcessEnvironment : IInjectedEnvironmentLookup
     public override string ToString() => "LiveProcessEnvironment [values redacted]";
 }
 
-/// <summary>Source resolve-config-value.ts for non-command values: <c>$NAME</c>/<c>${NAME}</c> interpolate the credential env, then the
-/// process env (a missing one leaves the value unresolved); <c>$$</c> and <c>$!</c> escape. Commands (<c>!cmd</c>) are not run.</summary>
+/// <summary>Source resolve-config-value.ts resolveConfigValue: <c>$NAME</c>/<c>${NAME}</c> interpolate the credential env, then the
+/// process env (a missing one leaves the value unresolved); <c>$$</c> and <c>$!</c> escape; <c>!cmd</c> runs through the shell and its
+/// trimmed stdout is used (cached for the process; owner decision 0004).</summary>
 internal static class ConfigValueTemplate
 {
     public static bool IsCommand(string config) => config.StartsWith('!');
 
     public static string? Resolve(string config, IReadOnlyDictionary<string, string>? credentialEnvironment, Func<string, string?> process)
     {
+        if (IsCommand(config)) return PiSharp.Cli.Models.ConfigValueResolver.Process.Resolve(config);
         var resolved = new StringBuilder(); var index = 0;
         while (index < config.Length)
         {
@@ -101,6 +103,9 @@ internal sealed class AnthropicLiveAuthentication
         if (store is not null) { refresh = new(this); lifecycle = new(store, refresh, time); }
     }
 
+    /// <summary>The models.json apiKey for anthropic, used when nothing is stored (provider-composer composeApiKeyAuth).</summary>
+    public Func<string?>? ConfiguredApiKey { get; init; }
+
     public async ValueTask<AuthenticationResolution> ResolveAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -115,10 +120,10 @@ internal sealed class AnthropicLiveAuthentication
         }
         if (stored is not null && stored.Type != "api_key") return new(AuthenticationDiagnostic.Missing);
         StoredApiKeyCredential? apiKey = null;
+        // provider-composer composeApiKeyAuth: without a stored credential, a models.json apiKey resolves as a credential key.
+        if (stored is null && ConfiguredApiKey?.Invoke() is { Length: > 0 } configured) apiKey = new(configured);
         if (stored is not null)
         {
-            if (stored.Key is { Length: > 0 } configured && ConfigValueTemplate.IsCommand(configured))
-                throw new InvalidOperationException("Stored API key commands (\"!command\") are not run by PiSharp; store the key value instead.");
             apiKey = new(stored.Key is null ? null : ConfigValueTemplate.Resolve(stored.Key, stored.Environment, environment.Get),
                 stored.Environment is null ? null : new ProviderEnvironmentSnapshot(scoped: stored.Environment.Select(pair => KeyValuePair.Create(pair.Key, (string?)pair.Value))));
         }

@@ -562,7 +562,6 @@ internal static class AgentLoopRunnerTests
             [new("assistant", JsonData.Parse("""{"role":"assistant"}"""))],
             [new("assistant", PiWireJson.WriteMessage(Assistant(tool: false) with { StopReason = StopReason.Pending }))],
             [new("assistant", PiWireJson.WriteMessage(Assistant(tool: false) with { StopReason = StopReason.Deferred }))],
-            [new("assistant", PiWireJson.WriteMessage(Assistant(tool: true) with { Content = [new ToolCallContent("", "lookup", JsonData.EmptyObject)] }))],
             [new("assistant", PiWireJson.WriteMessage(Assistant(tool: true) with { Content = [Assistant(tool: true).Content[0], Assistant(tool: true).Content[0]] }))],
             [new("toolResult", JsonData.Parse("""{"role":"toolResult","toolCallId":"call","toolName":"lookup","timestamp":0,"isError":false,"details":{},"content":[{"type":"toolCall","id":"call","name":"lookup","arguments":{}}]}"""))],
             [new("toolResult", JsonData.Parse("""{"role":"toolResult","toolCallId":"call","toolName":"lookup","timestamp":0,"content":[]}"""))]

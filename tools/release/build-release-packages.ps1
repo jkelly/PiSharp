@@ -16,9 +16,9 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 . (Join-Path $repo 'tools/release/native-sdk-package.ps1')
 
 $libraries = @(
-    'PiSharp.Contracts', 'PiSharp.AI', 'PiSharp.Agent', 'PiSharp.Sessions', 'PiSharp.Tools', 'PiSharp.CodingAgent',
+    'PiSharp.Contracts', 'PiSharp.AI', 'PiSharp.Agent', 'PiSharp.Sessions', 'PiSharp.Tools', 'PiSharp.Tools.Skia', 'PiSharp.CodingAgent',
     'PiSharp.PromptTemplates.Yaml', 'PiSharp.Rpc', 'PiSharp.Tui', 'PiSharp.Extensions.Abstractions',
-    'PiSharp.Extensions.Runtime', 'PiSharp.Extensions.Agent', 'PiSharp.ExtensionHost', 'PiSharp.Compatibility.Node'
+    'PiSharp.Extensions.Runtime', 'PiSharp.Extensions.Agent', 'PiSharp.ExtensionHost', 'PiSharp.Compatibility.Node', 'PiSharp.Codemode'
 )
 
 if ($Version -cnotmatch '^([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:-([0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*))?$') {

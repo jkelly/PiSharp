@@ -1,7 +1,11 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/main.ts (buildSessionOptions: --model, --provider,
+// --models/enabledModels scoping and the saved default inside the scope), packages/coding-agent/src/core/model-resolver.ts
+// (resolveCliModel, resolveModelScope, findInitialModel) and packages/coding-agent/src/core/settings-manager.ts (enabledModels).
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.AI;
 using PiSharp.Cli.Commands;
+using PiSharp.Cli.Models;
 using PiSharp.CodingAgent.Configuration;
 using PiSharp.Contracts;
 
@@ -10,8 +14,112 @@ namespace PiSharp.Cli.Settings;
 /// <summary>Preferences select only already admitted native catalog/binding capabilities.</summary>
 internal sealed record SettingsModelSelection(string? Provider, string? Model, string? MaximumTokens)
 {
+    /// <summary>The <c>--models</c> patterns (comma-separated, already split); null reads settings <c>enabledModels</c>.</summary>
+    internal ImmutableArray<string>? ModelPatterns { get; init; }
+    /// <summary>The explicit <c>--thinking</c> level (it keeps a <c>:level</c> suffix in a fallback id).</summary>
+    internal string? CliThinking { get; init; }
+    /// <summary>Pi-style entries: without <c>MaximumTokens</c>, requests ask for the model's own <c>maxTokens</c> (simple-options.ts
+    /// buildBaseOptions) instead of the explicit verbs' bounded default.</summary>
+    internal bool UseModelMaximumTokens { get; init; }
+    /// <summary>The branch of the session being continued (SessionManager getBranch), whose model sdk.ts restores; null for a new session.</summary>
+    internal System.Collections.Immutable.ImmutableArray<System.Text.Json.Nodes.JsonObject>? SessionBranch { get; init; }
+
+    /// <summary>Exact pinned identities only (no registry, no environment): the CLI identity, else the settings default.</summary>
     internal LiveSessionSelection Resolve(StartupSettingsSnapshot? settings) => LiveSessionSelection.Parse(
         Provider ?? Read(settings, "defaultProvider"), Model ?? Read(settings, "defaultModel"), MaximumTokens);
+
+    /// <summary>
+    /// The live session's model, as upstream selects it: <c>--model</c> (with <c>--provider</c>) through resolveCliModel over every chat
+    /// model; else the scoped models of <c>--models</c>/<c>enabledModels</c> for a new session (the saved default when it is in scope);
+    /// else the settings default; else the first available provider default. Warnings are written as <c>model_diagnostic</c> lines.
+    /// </summary>
+    internal async Task<LiveSessionSelection> ResolveAsync(StartupSettingsSnapshot? settings, LiveSessionRuntime runtime, TextWriter? diagnostics,
+        bool continuing, CancellationToken cancellationToken)
+    {
+        var registry = await runtime.CreateModelRegistryAsync(cancellationToken).ConfigureAwait(false);
+        var warnings = ImmutableArray.CreateBuilder<string>();
+        if (registry.GetError() is { } loadError) warnings.Add("errors loading models.json:\n" + loadError);
+        var patterns = ModelPatterns ?? ReadPatterns(settings);
+        LiveSessionSelection selection;
+        try { selection = Select(registry, settings, patterns, continuing, warnings); }
+        finally
+        {
+            if (diagnostics is not null)
+            {
+                foreach (var warning in warnings)
+                    await diagnostics.WriteLineAsync(JsonSerializer.Serialize(new { type = "model_diagnostic", level = "warning", message = warning })
+                        .AsMemory(), cancellationToken).ConfigureAwait(false);
+                await diagnostics.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        return selection;
+    }
+
+    private LiveSessionSelection Select(ModelRegistry registry, StartupSettingsSnapshot? settings, ImmutableArray<string> patterns, bool continuing,
+        ImmutableArray<string>.Builder warnings)
+    {
+        // main.ts: the scope (--models, else enabledModels) is resolved and kept for cycling even when --model picks the model.
+        var scoped = ImmutableArray<ScopedModel>.Empty;
+        if (!patterns.IsDefaultOrEmpty)
+        {
+            var (models, scopeDiagnostics) = ModelResolver.ResolveModelScope(patterns, registry.GetAvailable());
+            scoped = models;
+            foreach (var diagnostic in scopeDiagnostics) warnings.Add(diagnostic.Message);
+        }
+        if (Model is not null)
+        {
+            var resolved = ModelResolver.ResolveCliModel(Provider, Model, CliThinking, registry.GetAll(), registry.HasConfiguredAuth);
+            if (resolved.Warning is not null) warnings.Add(resolved.Warning);
+            if (resolved.Error is not null || resolved.Model is null)
+                throw new LiveSessionException("UnknownLiveModel", resolved.Error ?? "Select a chat model for the supported live API.");
+            var cli = Annotate(Entry(resolved.Model, registry), CliThinking is null ? resolved.ThinkingLevel : null, scoped, warnings);
+            cli.FromCliModel = true;
+            return cli;
+        }
+        var defaultProvider = Provider ?? Read(settings, "defaultProvider"); var defaultModel = Read(settings, "defaultModel");
+        if (scoped.Length > 0 && !continuing)
+        {
+            var saved = defaultProvider is not null && defaultModel is not null ? registry.Find(defaultProvider, defaultModel) : null;
+            var pick = saved is null ? scoped[0] : scoped.FirstOrDefault(entry => entry.Model.SameIdentity(saved)) ?? scoped[0];
+            return Annotate(Entry(pick.Model, registry), CliThinking is null ? pick.ThinkingLevel : null, scoped, warnings);
+        }
+        // sdk.ts createAgentSession: a continued session restores its branch's model when that model exists and its provider has
+        // configured auth; otherwise modelFallbackMessage names it and findInitialModel picks the model.
+        string? fallbackMessage = null;
+        if (continuing && SessionBranch is { } branch && Pi.PiSessions.BranchSelection(branch,
+            (provider, id) => registry.Find(provider, id) is { } known && VirtualModels.IsVirtual(known)) is { } sessionModel)
+        {
+            if (registry.Find(sessionModel.Provider, sessionModel.ModelId) is { } restored && registry.HasConfiguredAuth(restored.Provider))
+                return Annotate(Entry(restored, registry), null, scoped, warnings);
+            fallbackMessage = $"Could not restore model {sessionModel.Provider}/{sessionModel.ModelId}";
+        }
+        // model-resolver.ts findInitialModel: the saved default when it exists and its provider has configured auth, else the first
+        // available model (a known provider's default first).
+        var initial = ModelResolver.FindInitialModel(null, null, [], continuing, defaultProvider, defaultModel, null, null, registry);
+        if (initial.Model is null) throw new LiveSessionException("NoLiveModel", ModelListing.NoModelsAvailableMessage());
+        var selection = Annotate(Entry(initial.Model, registry), null, scoped, warnings);
+        if (fallbackMessage is not null) selection.FallbackMessage = fallbackMessage + $". Using {initial.Model.Provider}/{initial.Model.Id}";
+        return selection;
+    }
+
+    private LiveSessionSelection Entry(RegistryModel model, ModelRegistry registry) =>
+        UseModelMaximumTokens && MaximumTokens is null ? LiveSessionSelection.FromEntry(model, registry, null, useModelMaximum: true)
+            : LiveSessionSelection.FromEntry(model, registry, MaximumTokens);
+
+    private static LiveSessionSelection Annotate(LiveSessionSelection selection, string? thinking, ImmutableArray<ScopedModel> scoped,
+        ImmutableArray<string>.Builder warnings)
+    {
+        selection.PatternThinkingLevel = thinking; selection.ScopedModels = scoped; selection.Warnings = warnings.ToImmutable();
+        return selection;
+    }
+
+    /// <summary>settings-manager getEnabledModels: an array of pattern strings.</summary>
+    private static ImmutableArray<string> ReadPatterns(StartupSettingsSnapshot? settings)
+    {
+        if (settings is null || !settings.Values.Value.TryGetProperty("enabledModels", out var value) || value.ValueKind == JsonValueKind.Null) return [];
+        if (value.ValueKind != JsonValueKind.Array) throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
+        return [.. value.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!)];
+    }
 
     internal static string? Thinking(StartupSettingsSnapshot? settings, ModelDescriptor model, string? cli,
         bool restoring, ImmutableArray<string> available)
@@ -43,6 +151,11 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
             if (available.Contains(ThinkingLevels.Ordered[previous], StringComparer.Ordinal)) return ThinkingLevels.Ordered[previous];
         return available[0];
     }
+
+    /// <summary>sdk.ts restore fallback for a session switched to (/resume): findInitialModel over the run's current registry as a
+    /// continued session (the saved default with configured auth, else the first available model).</summary>
+    internal static RegistryModel? ContinuingInitialModel(ModelRegistry registry, StartupSettingsSnapshot? settings) =>
+        ModelResolver.FindInitialModel(null, null, [], true, Read(settings, "defaultProvider"), Read(settings, "defaultModel"), null, null, registry).Model;
 
     private static string? Read(StartupSettingsSnapshot? settings, string name)
     {

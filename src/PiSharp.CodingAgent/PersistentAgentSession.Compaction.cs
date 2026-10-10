@@ -134,7 +134,9 @@ public sealed partial class PersistentAgentSession
         var started = false; var aborted = false; JsonData? originalResult = null; string? noPlanMessage = null;
         ImmutableArray<OperationSubscription> lifecycleSubscriptions; long operation;
         lock (_gate) { lifecycleSubscriptions = _operationSubscriptions; operation = _operationGeneration; }
-        Func<SessionCompactionObservation, ValueTask>? observer; lock (_gate) observer = _compactionObservation;
+        Func<SessionCompactionObservation, ValueTask>? observer; SessionBeforeCompactHandler? beforeCompaction;
+        lock (_gate) { observer = _compactionObservation; beforeCompaction = _beforeCompaction; }
+        var cancelledByExtension = false; var fromExtension = false;
         var priorCallback = _configurationCallback.Value; _configurationCallback.Value = idle;
         try
         {
@@ -181,22 +183,42 @@ public sealed partial class PersistentAgentSession
                     }
                     parent = previous.LeafId; firstKept = plan.FirstKeptEntryId; tokensBefore = plan.TokensBefore;
                     provided = request.ExtensionSummary; files = plan.FileOps;
+                    // Source session_before_compact: after compaction_start and before the default summary request.
+                    if (lifecycle && provided is null && beforeCompaction is not null)
+                    {
+                        var decision = await beforeCompaction(new(PreparationJson(plan, plan.FirstKeptEntryId), previous.Ancestry,
+                            request.SummaryOptions?.CustomInstructions, request.Reason, request.WillRetry), work).ConfigureAwait(false);
+                        if (decision?.Cancel == true) { cancelledByExtension = true; throw new SessionCompactionException(SessionCompactionFailure.Cancelled); }
+                        if (decision?.Compaction is { } compaction)
+                        {
+                            provided = new(compaction.Summary, compaction.Usage, compaction.Details);
+                            firstKept = compaction.FirstKeptEntryId; tokensBefore = compaction.TokensBefore;
+                        }
+                        work.ThrowIfCancellationRequested();
+                    }
+                    fromExtension = provided is not null;
                     // Construct/bound every prospective provider request before starting the first transport.
-                    var history = SessionSummaryRequestBuilder.History(plan, configuration.Model, log.Header.Id, request.SummaryOptions);
+                    // agent-session.ts _runDefaultCompaction: compact() gets the session's thinking level (createSummarizationOptions sends
+                    // it as reasoning unless "off"; the summary route applies model.reasoning) and `undefined, // sessionId`, so each
+                    // completeSummarization call routes with its own fresh uuidv7 (kept across that call's retries).
+                    var summaryOptions = request.SummaryOptions ?? new();
+                    if (summaryOptions.ThinkingLevel is null)
+                        summaryOptions = summaryOptions with { ThinkingLevel = configuration.ThinkingLevel, ModelSupportsReasoning = true };
+                    var history = SessionSummaryRequestBuilder.History(plan, configuration.Model, Guid.CreateVersion7().ToString(), summaryOptions);
                     var prefix = plan.IsSplitTurn && !plan.TurnPrefixMessages.IsEmpty
-                        ? SessionSummaryRequestBuilder.TurnPrefix(plan, configuration.Model, log.Header.Id, request.SummaryOptions) : null;
+                        ? SessionSummaryRequestBuilder.TurnPrefix(plan, configuration.Model, Guid.CreateVersion7().ToString(), summaryOptions) : null;
                     if (provided is null)
                     {
-                        if (prefix is null) generated = await GenerateSummaryAsync(generator, history, work).ConfigureAwait(false);
+                        if (prefix is null) generated = await GenerateRetryingSummaryAsync(generator, history, work, "compaction", request.Reason).ConfigureAwait(false);
                         else
                         {
                             var priorText = plan.PreviousSummary ?? "No prior history."; TokenUsage? priorUsage = null;
                             if (!plan.MessagesToSummarize.IsEmpty)
                             {
-                                var result = await GenerateSummaryAsync(generator, history, work).ConfigureAwait(false);
+                                var result = await GenerateRetryingSummaryAsync(generator, history, work, "compaction", request.Reason).ConfigureAwait(false);
                                 ValidateGenerated(result); work.ThrowIfCancellationRequested(); priorText = result.Text; priorUsage = result.Usage;
                             }
-                            var resultPrefix = await GenerateSummaryAsync(generator, prefix, work).ConfigureAwait(false); ValidateGenerated(resultPrefix);
+                            var resultPrefix = await GenerateRetryingSummaryAsync(generator, prefix, work, "compaction", request.Reason).ConfigureAwait(false); ValidateGenerated(resultPrefix);
                             generated = new(priorText + "\n\n---\n\n**Turn Context (split turn):**\n\n" + resultPrefix.Text,
                                 priorUsage is null ? resultPrefix.Usage : CombineSummaryUsage(priorUsage, resultPrefix.Usage));
                         }
@@ -213,13 +235,14 @@ public sealed partial class PersistentAgentSession
                         : planner.Collect(log.Entries, previous.LeafId, branchRequest.TargetId, work);
                     branchPlan = planner.Prepare(collection.Entries, branchRequest.ContextWindow - branchRequest.ReserveTokens, collection.CommonAncestorId, work);
                     parent = branchRequest.TargetId; firstKept = null; provided = branchRequest.ExtensionSummary; files = branchPlan.FileOps;
+                    fromExtension = provided is not null;
                     if (provided is null)
                     {
                         if (branchPlan.Messages.IsEmpty) generated = new("No content to summarize", TokenUsage.Zero);
                         else
                         {
-                            var result = await GenerateSummaryAsync(generator, SessionSummaryRequestBuilder.Branch(branchPlan, configuration.Model,
-                                Guid.CreateVersion7().ToString(), branchRequest.SummaryOptions), work).ConfigureAwait(false);
+                            var result = await GenerateRetryingSummaryAsync(generator, SessionSummaryRequestBuilder.Branch(branchPlan, configuration.Model,
+                                Guid.CreateVersion7().ToString(), branchRequest.SummaryOptions), work, "branchSummary", null).ConfigureAwait(false);
                             ValidateGenerated(result); generated = result with { Text = SessionSummaryRequestBuilder.BranchPreamble + result.Text };
                         }
                     }
@@ -248,7 +271,7 @@ public sealed partial class PersistentAgentSession
                 var entry = SummaryRecord(request is not null, id, parent, firstKept, tokensBefore, text, usage, details,
                     provided is not null, previous, _clock);
                 var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, work);
-                ValidateRuntimeContext(prospective, configuration);
+                ValidateRuntimeContext(prospective, configuration, _toleratedSelection, _toleratedThinking);
                 await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                     probe.ConfigureAndReplaceMessages(configuration, SessionContextProjector.AgentMessages(prospective));
                 if (preflight is not null) await preflight(new(entry, prospective, log), work).ConfigureAwait(false);
@@ -297,7 +320,7 @@ public sealed partial class PersistentAgentSession
         {
             bodyFailure = error; AddDistinctFailure(failures, error);
             // Cancellation provenance is captured before disposing the original linked sources.
-            aborted = token.IsCancellationRequested || _closing.IsCancellationRequested || inputAbort.IsCancellationRequested || abort.Abort.IsCancellationRequested;
+            aborted = cancelledByExtension || token.IsCancellationRequested || _closing.IsCancellationRequested || inputAbort.IsCancellationRequested || abort.Abort.IsCancellationRequested;
             throw;
         }
         finally
@@ -332,7 +355,7 @@ public sealed partial class PersistentAgentSession
                         }) + cause;
                     }
                     await EmitCompactionAsync(lifecycleSubscriptions, new SessionCompactionEnded(operation, request!.Reason,
-                        success ? originalResult : null, !success && aborted, success && request.WillRetry, message)).ConfigureAwait(false);
+                        success ? originalResult : null, !success && aborted, success && request.WillRetry, message) { FromExtension = fromExtension }).ConfigureAwait(false);
                 }
             }
             catch (Exception error) { AddDistinctFailure(failures, error); }
@@ -425,7 +448,7 @@ public sealed partial class PersistentAgentSession
         var data = JsonData.Parse(JsonSerializer.Serialize(costs)); decimal D(string name) => data.Value.GetProperty(name).GetDecimal();
         try { return new(checked(left.Input + right.Input), checked(left.Output + right.Output), checked(left.CacheRead + right.CacheRead),
             checked(left.CacheWrite + right.CacheWrite), checked(left.TotalTokens + right.TotalTokens),
-            new(D("input"), D("output"), D("cacheRead"), D("cacheWrite"), D("total"), SourceBinary64Cost: data), extras); }
+            new(D("input"), D("output"), D("cacheRead"), D("cacheWrite"), D("total"), SourceBinary64Cost: data), extras) { ExtrasBeforeTotal = true }; }
         catch (OverflowException) { throw new SessionCompactionException(SessionCompactionFailure.UnsupportedNumber); }
     }
 }

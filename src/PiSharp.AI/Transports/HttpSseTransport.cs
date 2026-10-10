@@ -44,7 +44,7 @@ public sealed class HttpSseTransport
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!response.IsSuccessStatusCode) throw new HttpSseRejectedException(response.StatusCode);
+            if (!response.IsSuccessStatusCode) throw await RejectAsync(response, cancellationToken).ConfigureAwait(false);
             if (inspect is not null) await inspect(response, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             return new(response, _options);
@@ -58,6 +58,13 @@ public sealed class HttpSseTransport
         }
     }
 
+    /// <summary>Builds the failure for a non-2xx response; the response stays owned here and is disposed afterwards.
+    /// Without it, the rejection is the status-only <see cref="HttpSseRejectedException"/> and the body is never read.</summary>
+    internal Func<HttpResponseMessage, CancellationToken, ValueTask<Exception>>? Rejection { get; init; }
+
+    private ValueTask<Exception> RejectAsync(HttpResponseMessage response, CancellationToken cancellationToken) =>
+        Rejection?.Invoke(response, cancellationToken) ?? new(new HttpSseRejectedException(response.StatusCode));
+
     // Source providers may need to acquire input before an awaited response hook.
     // Transfer the physical owner first, so a rejecting hook cannot dispose an active pull.
     // Existing canonical preparation deliberately keeps its zero-acquisition path above.
@@ -69,7 +76,7 @@ public sealed class HttpSseTransport
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!response.IsSuccessStatusCode) throw new HttpSseRejectedException(response.StatusCode);
+            if (!response.IsSuccessStatusCode) throw await RejectAsync(response, cancellationToken).ConfigureAwait(false);
             return new(response, _options);
         }
         catch (Exception preparationError)

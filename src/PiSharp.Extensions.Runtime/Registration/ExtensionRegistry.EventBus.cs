@@ -8,6 +8,10 @@ public sealed partial class ExtensionRegistry
     private long eventBusSequence;
     private readonly Dictionary<RegistrationEntry, IExtensionEventBusSubscription> eventBusSubscriptions = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>The registry's shared extension event bus, for a host that bridges another runtime's bus into it (the Pi Node host's
+    /// pi.events): <see cref="ExtensionEventBus.Tap"/> observes native emissions, and Emit delivers the other runtime's.</summary>
+    public ExtensionEventBus SharedEventBus => eventBus;
+
     internal void EmitEventBus(RegistrationScope scope, string channel, object? data)
     {
         scope.ExtensionLifetimeCancellationToken.ThrowIfCancellationRequested();

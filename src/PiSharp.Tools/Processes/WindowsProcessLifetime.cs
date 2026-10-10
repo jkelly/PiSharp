@@ -17,7 +17,8 @@ internal sealed class ProcessLaunchException(ProcessDiagnostic diagnostic, bool 
 internal sealed class WindowsProcessLifetime : IAsyncDisposable
 {
     private SafeKernelHandle? _job, _process, _thread, _stdoutClient, _stderrClient, _stdinClient;
-    private NamedPipeServerStream? _stdout, _stderr;
+    private NamedPipeServerStream? _stdout, _stderr, _stdin;
+    private Task? _input;
     private WaitHandle? _processWait;
     private RegisteredWaitHandle? _exitRegistration;
     private readonly TaskCompletionSource<int?> _exit = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -45,9 +46,14 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
             (owned._stderr, owned._stderrClient) = await PipeAsync(PipeDirection.In, token).ConfigureAwait(false);
             // A read-only null-device handle has immediate EOF. A connected named pipe whose
             // server is closed before resume does not establish this contract reliably.
-            var inputSecurity = new SecurityAttributes { Length = Marshal.SizeOf<SecurityAttributes>(), InheritHandle = true };
-            owned._stdinClient = Native.CreateFileW("NUL", 0x80000000, 3, ref inputSecurity, 3, 0, IntPtr.Zero);
-            if (owned._stdinClient.IsInvalid) throw new IOException("Null input creation failed.");
+            if (request.StandardInput is not null)
+                (owned._stdin, owned._stdinClient) = await PipeAsync(PipeDirection.Out, token).ConfigureAwait(false);
+            else
+            {
+                var inputSecurity = new SecurityAttributes { Length = Marshal.SizeOf<SecurityAttributes>(), InheritHandle = true };
+                owned._stdinClient = Native.CreateFileW("NUL", 0x80000000, 3, ref inputSecurity, 3, 0, IntPtr.Zero);
+                if (owned._stdinClient.IsInvalid) throw new IOException("Null input creation failed.");
+            }
             owned._job = Native.CreateJobObjectW(IntPtr.Zero, null);
             if (owned._job.IsInvalid) throw new IOException("Job creation failed.");
             var limits = new ExtendedLimitInformation();
@@ -77,6 +83,9 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
             if (Native.ResumeThread(owned._thread!) == uint.MaxValue) throw new IOException("Process resume failed.");
             owned.Started = true;
             owned._thread!.Dispose(); owned._thread = null;
+            // Source commandTransport "stdin": write the command after resume, then close for EOF. Write errors are ignored
+            // (source child.stdin.on("error", () => {})); a process that exits without reading breaks the pipe.
+            if (owned._stdin is { } input) owned._input = WriteInputAsync(input, request.StandardInput!);
             return owned;
         }
         catch (Exception error)
@@ -86,6 +95,13 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
             throw new ProcessLaunchException(owned.CleanupConfirmed ? diagnostic : ProcessDiagnostic.CleanupFailed,
                 owned.CleanupConfirmed);
         }
+    }
+
+    private static async Task WriteInputAsync(NamedPipeServerStream input, byte[] bytes)
+    {
+        try { await input.WriteAsync(bytes).ConfigureAwait(false); await input.FlushAsync().ConfigureAwait(false); }
+        catch (Exception) { }
+        finally { try { await input.DisposeAsync().ConfigureAwait(false); } catch (Exception) { } }
     }
 
     private static async ValueTask<(NamedPipeServerStream Server, SafeKernelHandle Client)> PipeAsync(
@@ -175,7 +191,11 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
     }
 
     // Windows CRT transport quoting. The explicit application name prevents executable token ambiguity.
-    private static string Quote(string argument)
+    /// <summary>Characters of the CreateProcess command line built for these arguments (at most 32,766 are accepted).</summary>
+    internal static long CommandLineLength(string executable, IEnumerable<string> arguments) =>
+        Quote(executable).Length + arguments.Sum(argument => 1L + Quote(argument).Length);
+
+    internal static string Quote(string argument)
     {
         var quoted = new StringBuilder("\""); var slashes = 0;
         foreach (var character in argument)
@@ -251,7 +271,12 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
         CloseClientCopies();
         try { if (_stdout is not null) await _stdout.DisposeAsync().ConfigureAwait(false); } catch (Exception) { CleanupConfirmed = false; }
         try { if (_stderr is not null) await _stderr.DisposeAsync().ConfigureAwait(false); } catch (Exception) { CleanupConfirmed = false; }
-        _stdout = null; _stderr = null;
+        if (_input is not null)
+        {
+            try { await _input.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); } catch (Exception) { CleanupConfirmed = false; }
+        }
+        else if (_stdin is not null) try { await _stdin.DisposeAsync().ConfigureAwait(false); } catch (Exception) { CleanupConfirmed = false; }
+        _stdout = null; _stderr = null; _stdin = null; _input = null;
         if (_exitRegistration is not null)
         {
             try { await _exitCallbackSettled.Task.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); }

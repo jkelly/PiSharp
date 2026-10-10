@@ -17,10 +17,10 @@ public sealed partial class PersistentAgentSession
         lock (_gate) { ThrowAvailable(); return _registry ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration); }
     }
 
-    /// <summary>Reserves this idle session, validates the complete prepared pipeline and acknowledges
-    /// its durable declaration replacement before the supplied synchronous registry publication.
-    /// The callback must only commit an already prepared registry plan; it must not perform I/O or
-    /// invoke user callbacks. A post-acknowledgment failure faults the session and is not a rollback.</summary>
+    /// <summary>Reserves this idle session, validates the complete prepared pipeline and publishes the catalog and its loadout in
+    /// memory with the supplied synchronous registry publication (source _refreshToolRegistry); the session file is not written,
+    /// and the next request records the loadout's difference from the declared tools. The callback must only commit an already
+    /// prepared registry plan; it must not perform I/O or invoke user callbacks.</summary>
     public Task<SessionToolCatalogReceipt> PublishToolCatalogAsync(SessionRuntimeRegistry expected,
         SessionRuntimeRegistry replacement, ImmutableArray<string> activeNames, Action publishPreparedRegistry,
         CancellationToken cancellationToken = default)
@@ -49,13 +49,12 @@ public sealed partial class PersistentAgentSession
             ThrowUserBashMutationLocked();
             cancellationToken.ThrowIfCancellationRequested();
             if (!ReferenceEquals(_registry, expected) || _active is not null ||
-                _inputSubmission is not null && (reservation is null || !IsExecutingInputCallback) ||
-                reservation is null && _pendingActivation is not null)
+                _inputSubmission is not null && (reservation is null || !IsExecutingInputCallback))
                 throw new InvalidOperationException("Catalog publication requires the captured idle session registry.");
             var state = _agent.Snapshot;
             if (!state.PendingInputs.IsEmpty || state.SteeringCount != 0 || state.FollowUpCount != 0)
                 throw new InvalidOperationException("Catalog publication cannot replace queued input declarations.");
-            idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle; _configuring = true;
+            idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle; _configuring = true; _catalogPublication = idle;
         }
         // Owned retirement publications (reload, resource withdrawal) keep the previous active names pending.
         return PublishToolCatalogCoreAsync(expected, replacement, activeNames, publishPreparedRegistry, cancellationToken, idle, restorePrevious || reservation is not null);
@@ -83,30 +82,25 @@ public sealed partial class PersistentAgentSession
                 (requested, pendingCandidates) = PendingToolRequestLocked(replacement, activeNames, restorePrevious);
             }
             var selected = replacement.NormalizeActiveTools(requested, work);
-            // Always replace declarations, including a changed schema under an unchanged name.
-            var byName = replacement.RegisteredTools.ToDictionary(tool => tool.Adapter.Name, StringComparer.Ordinal);
-            var message = JsonData.Parse(JsonSerializer.Serialize(new { role = "system", content = "", timestamp = _clock(),
-                toolsRemoved = RecordedActiveToolNames(context, work).Select(name => new { name }),
-                toolsAdded = selected.Select(name => byName[name].Declaration.Value) }));
-            var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
-                writer => { writer.WritePropertyName("message"); writer.WriteRawValue(message.Value.GetRawText()); });
-            var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, work);
-            var selection = await replacement.PrepareAndDrainAsync(() => replacement.Resolve(prospective, configuration.Model, work), work)
+            // Source _refreshToolRegistry: the new catalog and loadout apply in memory; the next request records the loadout's
+            // difference from the declared tools (declareToolChanges). The transcript keeps the declarations it has meanwhile.
+            var prospective = context;
+            var selection = await replacement.PrepareAndDrainAsync(() => replacement.Resolve(context with { LlmMessages =
+                WithLoadoutRecord(replacement, context.LlmMessages, selected, work) }, configuration.Model, work, activeOrder: selected), work)
                 .ConfigureAwait(false);
-            ValidateRuntimeContext(prospective, selection.Configuration);
+            ValidateRuntimeContext(prospective, selection.Configuration, _toleratedSelection, _toleratedThinking);
             await using (var probe = new NativeAgent(selection.Configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(selection.Configuration, SessionContextProjector.AgentMessages(prospective));
-            work.ThrowIfCancellationRequested(); writeAdmitted = true;
-            var acknowledged = await _store.AppendAsync([entry], work).ConfigureAwait(false);
-            if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            work.ThrowIfCancellationRequested();
             lock (_gate)
             {
-                // No caller-cancellation check after durable acknowledgment: join the actual publication.
+                if (!ReferenceEquals(_registry, expected) || !ReferenceEquals(_context, context) || !ReferenceEquals(_active, idle))
+                    throw new InvalidOperationException("Captured registry changed.");
                 publishPreparedRegistry();
                 _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(prospective));
                 _registry = replacement; _configuration = selection.Configuration;
-                _acknowledgedLog = acknowledged.Snapshot; _context = prospective;
                 _activationEpoch = nextActivation; _pendingActivation = null;
+                _unrecordedLoadout = true;
                 RetirePendingToolsLocked(pendingCandidates, selected);
             }
             return new(Snapshot with { IsConfiguring = false }, replacement);
@@ -126,7 +120,7 @@ public sealed partial class PersistentAgentSession
         finally
         {
             if (commitHeld) _commits.Release();
-            lock (_gate) if (ReferenceEquals(_active, idle)) { _active = null; _configuring = false; }
+            lock (_gate) { if (ReferenceEquals(_active, idle)) { _active = null; _configuring = false; } if (ReferenceEquals(_catalogPublication, idle)) _catalogPublication = null; }
             idle.TrySetResult(); _configurationCallback.Value = prior;
         }
     }

@@ -14,7 +14,7 @@ public static partial class NativeProviderFactory
         ResponsesTranscriptProjectionOptions projectionOptions, ResponsesKeyAuthRequestOptions? requestOptions = null,
         HttpMessageHandler? handler = null, JsonData? modelMetadata = null)
     {
-        Validate(model, endpoint, explicitApiKey, "openai", "openai-responses", "https://api.openai.com/v1/responses");
+        Validate(model, endpoint, explicitApiKey, "openai", "openai-responses");
         var effectiveRequestOptions = ResponsesCacheOptionsForModel(requestOptions, modelMetadata);
         projectionOptions = ResponsesProjectionOptionsForModel(projectionOptions, modelMetadata);
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.Reasoning);
@@ -37,8 +37,7 @@ public static partial class NativeProviderFactory
     {
         ArgumentNullException.ThrowIfNull(model);
         var openRouter = model.Provider == "openrouter";
-        Validate(model, endpoint, explicitApiKey, openRouter ? "openrouter" : "openai", "openai-completions",
-            openRouter ? "https://openrouter.ai/api/v1/chat/completions" : "https://api.openai.com/v1/chat/completions");
+        Validate(model, endpoint, explicitApiKey, openRouter ? "openrouter" : "openai", "openai-completions");
         projectionOptions ??= new(SupportsDeveloperRole: !openRouter);
         requestOptions ??= openRouter
             ? new(MaxTokensField: "max_tokens", SupportsStore: false, SupportsLongCacheRetention: false)
@@ -77,7 +76,7 @@ public static partial class NativeProviderFactory
         AnthropicMessagesRequestOptions projectionOptions, AnthropicMessagesKeyAuthRequestOptions? requestOptions = null,
         HttpMessageHandler? handler = null, JsonData? modelMetadata = null, AnthropicMessagesHooks? hooks = null)
     {
-        Validate(model, endpoint, explicitApiKey, "anthropic", "anthropic-messages", "https://api.anthropic.com/");
+        Validate(model, endpoint, explicitApiKey, "anthropic", "anthropic-messages");
         var factory = new AnthropicMessagesKeyAuthRequestFactory(endpoint, model, projectionOptions, requestOptions);
         var maximum = requestOptions?.MaxTokens ?? projectionOptions.MaximumTokens;
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
@@ -115,14 +114,16 @@ public static partial class NativeProviderFactory
     internal static AnthropicMessagesOptions? WithThinkingLevel(AnthropicMessagesOptions? options, AnthropicMessagesRequestOptions projection) =>
         projection.ProviderThinkingLevel is { } level ? (options ?? new()) with { ProviderThinkingLevel = level } : options;
 
-    private static void Validate(ModelDescriptor model, Uri endpoint, string key, string provider, string api, string address)
+    private static void Validate(ModelDescriptor model, Uri endpoint, string key, string provider, string api)
     {
         ArgumentNullException.ThrowIfNull(model);
-        // Fixed diagnostics intentionally exclude keys, supplied identities, endpoints and request content.
+        // Fixed diagnostics intentionally exclude keys, supplied identities, endpoints and request content. models.json may point a
+        // built-in provider at another base URL (model-registry.ts provider baseUrl), as the SDK clients take any baseURL; the
+        // provider's own address is only the default.
         if (model.Provider != provider || model.Api != api || string.IsNullOrWhiteSpace(model.Id) ||
             model.Id.Length > 1024 || model.Id.Any(char.IsControl) || endpoint is null ||
             !endpoint.IsAbsoluteUri || endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
-            endpoint.Query.Length != 0 || endpoint != new Uri(address))
+            endpoint.Query.Length != 0 || endpoint.Scheme is not ("http" or "https"))
             throw new ArgumentException("Unsupported native model or endpoint selection.");
         if (string.IsNullOrEmpty(key) || key.Length > 4096 || key.Any(value => value is < '!' or > '~'))
             throw new ArgumentException("Invalid explicit native API key.");

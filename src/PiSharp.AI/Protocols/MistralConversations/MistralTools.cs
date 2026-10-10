@@ -166,7 +166,7 @@ public sealed partial class MistralTextHttpSseTransport
                 throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral replay tool call.");
             var function = call.GetProperty("function");
             if (function.EnumerateObject().Any(p => p.Name is not ("name" or "arguments")) ||
-                string.IsNullOrEmpty(function.GetProperty("name").GetString()) || function.GetProperty("arguments").ValueKind != JsonValueKind.String)
+                function.GetProperty("name").GetString() is null || function.GetProperty("arguments").ValueKind != JsonValueKind.String)
                 throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral replay tool function.");
         }
     }
@@ -178,7 +178,8 @@ internal sealed class MistralToolIds
     private readonly HashSet<string> used = new(StringComparer.Ordinal);
     internal string Normalize(string id)
     {
-        if (string.IsNullOrEmpty(id)) throw MistralTextHttpSseTransport.Fail(NativeChatFailureCode.UnsupportedFeature, "Missing Mistral replay tool id.");
+        // An id-less call of another API replays with a derived id (deriveMistralToolCallId("", n)); a nameless one keeps name "" (owner decision 13).
+        ArgumentNullException.ThrowIfNull(id);
         if (ids.TryGetValue(id, out var existing)) return existing;
         for (var attempt = 0; ; attempt++)
         {

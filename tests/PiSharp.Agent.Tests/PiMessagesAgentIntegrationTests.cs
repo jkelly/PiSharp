@@ -400,9 +400,12 @@ internal static class PiMessagesAgentIntegrationTests
             ("wire", null, 1024, 32, NativeChatFailureCode.ProviderError),
             ("characters", new string(' ', 4097), 4096, 32, NativeChatFailureCode.ResourceLimit),
             ("depth", new string('[', 17), 1024, 16, NativeChatFailureCode.ResourceLimit),
-            ("number", """{"value":9007199254740992}""", 1024, 32, NativeChatFailureCode.UnsupportedFeature),
-            ("unicode", "{\"value\":\"\\ud800\"}", 1024, 32, NativeChatFailureCode.UnsupportedFeature),
-            ("duplicate", """{"value":1,"value":2}""", 1024, 32, NativeChatFailureCode.MalformedStream)
+            // packages/ai/src/api/pi-messages.ts:254-258 previews toolcall_delta with parseStreamingJson, which accepts an unsafe
+            // integer, a lone surrogate and a duplicate name as JSON.parse does; the stream then ends without a terminal event,
+            // the error of pi-messages.ts:423.
+            ("number", """{"value":9007199254740992}""", 1024, 32, NativeChatFailureCode.UnexpectedEof),
+            ("unicode", "{\"value\":\"\\ud800\"}", 1024, 32, NativeChatFailureCode.UnexpectedEof),
+            ("duplicate", """{"value":1,"value":2}""", 1024, 32, NativeChatFailureCode.UnexpectedEof)
         };
         foreach (var scenario in scenarios)
         foreach (var cleanupFails in new[] { false, true })
@@ -461,7 +464,10 @@ internal static class PiMessagesAgentIntegrationTests
                     "Reviewed failure escaped held HTTP cleanup: " + scenario.Name);
                 body.ReleaseCleanup.TrySetResult();
                 var result = await original; var chat = result.Turns.Single().Result.Chat;
-                Equal(new NativeChatDiagnostic(NativeChatAdapter.PiMessages, scenario.Code), chat.NativeDiagnostic);
+                // A missing terminal is not a mapped failure, so there a failed release is the primary diagnostic
+                // (PiMessagesHttpSseTransport cleanup-only rule); a mapped error keeps its own code.
+                var primary = cleanupFails && scenario.Code == NativeChatFailureCode.UnexpectedEof ? NativeChatFailureCode.CleanupFailed : scenario.Code;
+                Equal(new NativeChatDiagnostic(NativeChatAdapter.PiMessages, primary), chat.NativeDiagnostic);
                 Equal(chat.NativeDiagnostic, chat.Failure!.NativeDiagnostic);
                 Equal(cleanupFails ? new NativeChatDiagnostic(NativeChatAdapter.PiMessages, NativeChatFailureCode.CleanupFailed) : null,
                     chat.NativeCleanupDiagnostic);

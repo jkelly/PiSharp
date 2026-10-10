@@ -67,6 +67,15 @@ public sealed class McpAdmittedOAuthRefreshAdapter
     private readonly object gate = new();
     private static readonly AsyncLocal<Frame?> frame = new();
     private Task? inFlight;
+    private readonly Func<double> clock;
+    /// <summary>Access tokens this close to expiry are refreshed before they are sent (oauth.ts REFRESH_SKEW_MS).</summary>
+    public const double RefreshSkewMilliseconds = 30_000;
+    /// <summary>oauth.ts withRefreshLock: held from reading the tokens to saving new ones, so no other process refreshes the same
+    /// server's tokens meanwhile (many servers rotate refresh tokens, and two refreshes with one token lose the grant). Inside the
+    /// lock, tokens that changed meanwhile are used without refreshing. Null serializes refreshes only within this adapter.</summary>
+    public Func<CancellationToken, Task<IAsyncDisposable>>? RefreshLock { get; init; }
+    /// <summary>oauth.ts onChallenge: receives the `WWW-Authenticate` challenge of every 401 or 403 this adapter handles.</summary>
+    public Action<McpOAuthChallenge>? OnChallenge { get; init; }
     public McpAdmittedOAuthRefreshAdapter(Uri exactServer, IMcpAdmittedOAuthStateStore explicitlyAdmittedStore,
         McpAdmittedOAuthExchange explicitlyAdmittedExchange, Func<double> unixMilliseconds, McpOAuthCancellationAdmission cancellationAdmission,
         McpOAuthAdmittedClient? configuredClient = null, int maximumBytes = 1_048_576)
@@ -84,6 +93,7 @@ public sealed class McpAdmittedOAuthRefreshAdapter
         if (addClientAuthentication is { } custom && custom.GetInvocationList().Length != 1) throw new ArgumentException("One admitted custom refresh authentication callback required.");
         this.addClientAuthentication = addClientAuthentication;
         server = exactServer; exchange = (request, token) => InvokeDependency(() => explicitlyAdmittedExchange(request, token)); this.configuredClient = configuredClient; this.maximumBytes = maximumBytes;
+        clock = unixMilliseconds;
         if (configuredClient is not null) ValidateClient(configuredClient);
         state = new(server, new GuardedStore(this, explicitlyAdmittedStore), () => InvokeDependency(() =>
         { var now = unixMilliseconds(); return double.IsFinite(now) ? now : throw new McpOAuthProtocolException("clock_invalid", "Admitted OAuth clock must return finite unix milliseconds."); }));
@@ -116,7 +126,21 @@ public sealed class McpAdmittedOAuthRefreshAdapter
     private async Task<string?> ReadTokenAsync(CancellationToken token)
     {
         RejectReentry(); token.ThrowIfCancellationRequested(); var previous = frame.Value; var owned = new Frame(this, previous, physical); frame.Value = owned;
-        try { return (await ReadState(token).ConfigureAwait(false)).Tokens?.AccessToken; }
+        try
+        {
+            // oauth.ts token(): wait for a running refresh, and refresh a token about to expire before it is sent. Failures fall
+            // through: the request goes out with the old token and a 401 decides what happens.
+            Task? running; lock (gate) running = inFlight;
+            if (running is not null) try { await running.ConfigureAwait(false); } catch (Exception) when (!token.IsCancellationRequested) { }
+            var state = await ReadState(token).ConfigureAwait(false);
+            var current = state.Tokens?.AccessToken;
+            var expired = state.TokensExpireAt is { } expireAt && expireAt - RefreshSkewMilliseconds <= clock();
+            if (!expired || string.IsNullOrEmpty(state.Tokens?.RefreshToken)) return current;
+            Task refresh; lock (gate) refresh = inFlight ??= RefreshAsync(null, current, token);
+            try { await McpOAuthAdmittedWork.Invoke("shared-refresh", () => new ValueTask(refresh), token).ConfigureAwait(false); }
+            catch (Exception) when (!token.IsCancellationRequested) { }
+            return (await ReadState(token).ConfigureAwait(false)).Tokens?.AccessToken;
+        }
         finally { owned.Active = false; frame.Value = previous; }
     }
     private async Task UnauthorizedAsync(McpHttpUnauthorizedContext context, CancellationToken token)
@@ -127,6 +151,10 @@ public sealed class McpAdmittedOAuthRefreshAdapter
         try
         {
             var challenge = Challenge(context.Response);
+            // oauth.ts onChallenge: the connection keeps the challenge, so a sign-in uses its resource metadata URL and scope.
+            if (OnChallenge is { } report)
+                try { report(McpOAuthChallenge.Parse(context.Response.Headers.TryGetValues("WWW-Authenticate", out var values) ? string.Join(",", values) : null)); }
+                catch (Exception) { /* Recording the challenge must not change the request. */ }
             // The original skips refresh for insufficient scope and proceeds to authorization.
             // This bounded adapter refuses before refresh; browser/code acquisition is not admitted.
             if (challenge.Error == "insufficient_scope") throw new McpOAuthAuthorizationRequiredException();
@@ -135,7 +163,7 @@ public sealed class McpAdmittedOAuthRefreshAdapter
             lock (gate)
             {
                 if (inFlight is null && context.RejectedToken is not null && current.Tokens?.AccessToken is { } replacement && replacement != context.RejectedToken) return;
-                original = inFlight ??= RefreshAsync(challenge.MetadataUrl, token);
+                original = inFlight ??= RefreshAsync(challenge.MetadataUrl, context.RejectedToken, token);
             }
             await McpOAuthAdmittedWork.Invoke("shared-refresh", () => new ValueTask(original), token).ConfigureAwait(false);
         }
@@ -143,14 +171,19 @@ public sealed class McpAdmittedOAuthRefreshAdapter
     }
     private Task<McpOAuthState> ReadState(CancellationToken token) =>
         McpOAuthAdmittedWork.Invoke("state-read", () => new ValueTask<McpOAuthState>(state.ReadAsync()), token);
-    private async Task RefreshAsync(Uri? resourceMetadataUrl, CancellationToken token)
+    private async Task RefreshAsync(Uri? resourceMetadataUrl, string? staleToken, CancellationToken token)
     {
         var previous = frame.Value; var ancestry = physical;
         await Task.Yield(); // Publish the one shared original before invoking admitted dependencies; ancestry captured before yielding.
         var owned = new Frame(this, previous, ancestry); frame.Value = owned;
+        IAsyncDisposable? held = null;
         try
         {
-            token.ThrowIfCancellationRequested(); var stored = await ReadState(token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            if (RefreshLock is { } acquire) held = await acquire(token).ConfigureAwait(false);
+            var stored = await ReadState(token).ConfigureAwait(false);
+            // Another process refreshed the tokens, or the user signed in, while this one waited: use them as they are.
+            if (held is not null && staleToken is not null && stored.Tokens?.AccessToken is { } replaced && replaced != staleToken) return;
             var discovered = await Discover(stored.Discovery, resourceMetadataUrl, token).ConfigureAwait(false);
             var discoveryFields = new Dictionary<string, object?> { ["authorizationServerUrl"] = discovered.AuthorizationServerUrl };
             if (discovered.AuthorizationServerMetadata is { } metadata) discoveryFields["authorizationServerMetadata"] = metadata.Value;
@@ -208,7 +241,11 @@ public sealed class McpAdmittedOAuthRefreshAdapter
             token.ThrowIfCancellationRequested();
             await McpOAuthAdmittedWork.Invoke("save-tokens", () => new ValueTask(state.SaveTokensAsync(tokens)), token).ConfigureAwait(false);
         }
-        finally { owned.Active = false; frame.Value = previous; lock (gate) inFlight = null; }
+        finally
+        {
+            if (held is not null) try { await held.DisposeAsync().ConfigureAwait(false); } catch (Exception) { /* A lost lock at worst lets two refreshes overlap. */ }
+            owned.Active = false; frame.Value = previous; lock (gate) inFlight = null;
+        }
     }
     private async Task<McpOAuthDiscoveredServer> Discover(JsonData? cached, Uri? resourceMetadataUrl, CancellationToken token)
     {

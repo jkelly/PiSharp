@@ -45,7 +45,7 @@ public sealed class PiMessagesKeyAuthRequestFactory
         Field("maxTokens", _options.MaxTokens is { } maximum ? JsonValue.Create(maximum) : null);
         Field("reasoning", _options.Reasoning is { } reasoning ? JsonValue.Create(reasoning) : null);
         Field("cacheRetention", ResolveCache() is { } cache ? JsonValue.Create(cache) : null);
-        Field("sessionId", _options.SessionId is { } session ? JsonValue.Create(session) : null);
+        Field("sessionId", (_options.SessionId ?? request.SessionId) is { } session ? JsonValue.Create(session) : null);
         if (_options.ToolChoice is { } toolChoice) values["toolChoice"] = JsonNode.Parse(PiMessagesData.Admit(toolChoice, _options).ToString());
         else undefined.Add("/options/toolChoice");
         var payload = PiMessagesData.Admit(JsonData.Parse(new JsonObject { ["model"] = _model.Id, ["context"] = new JsonObject { ["messages"] = messages }, ["options"] = values }.ToJsonString()), _options);
@@ -56,7 +56,9 @@ public sealed class PiMessagesKeyAuthRequestFactory
         }
         var bytes = Encoding.UTF8.GetBytes(EcmaScriptJsonProjection.Project(payload, new(MaximumInputCharacters: _options.MaximumPayloadBytes,
             MaximumInputBytes: _options.MaximumPayloadBytes, MaximumOutputCharacters: _options.MaximumPayloadBytes, MaximumOutputBytes: _options.MaximumPayloadBytes,
-            MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumPayloadBytes)));
+            MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumPayloadBytes,
+            // Node and number counts grow with the message count; the payload budget bounds them.
+            MaximumNodes: _options.MaximumPayloadBytes, MaximumNumbers: _options.MaximumPayloadBytes, MaximumTotalNumberCharacters: _options.MaximumPayloadBytes)));
         HttpRequestMessage? owned = null;
         try
         {

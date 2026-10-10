@@ -26,9 +26,9 @@ internal static partial class Program
             ("mcp.mcp-servers-section-lists-deferred-servers", ServersSectionForDeferredServers),
             ("mcp.cli-reopen-applies-the-initial-selection", CliReopenAppliesInitialSelection),
             ("selection.tools-and-exclude-tools-gate-tool-search", ToolSelectionGatesToolSearch),
-            ("mcp.codemode-servers-still-need-codemode", CodemodeServersStillSkipped),
+            ("mcp.codemode-servers-connect-with-codemode", CodemodeServersConnect),
             ("calls.direct-server-tool-call-succeeds", DirectServerCallSucceeds),
-            ("calls.late-background-server-tool-call-succeeds-after-registration", LateBackgroundServerCallSucceeds),
+            ("calls.tool-search-waits-for-a-late-background-server-and-its-call-succeeds", LateBackgroundServerCallSucceeds),
             ("calls.skipped-server-and-unloaded-tools-are-not-callable", SkippedServerCallsFail),
             ("calls.grant-rule-exact-name-target-and-admitted-scope", CallGrantRule)
         };

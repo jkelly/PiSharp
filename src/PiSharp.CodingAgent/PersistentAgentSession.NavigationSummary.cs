@@ -31,9 +31,10 @@ public sealed partial class PersistentAgentSession
                     budget.ContextWindow - budget.ReserveTokens, preview.CommonAncestorId, token);
                 if (!plan.Messages.IsEmpty)
                 {
+                    // generateBranchSummary passes no sessionId: completeSummarization routes it with a fresh uuidv7.
                     var request = SessionSummaryRequestBuilder.Branch(plan, revision.Configuration.Model,
-                        revision.Log.Header.Id, new(CustomInstructions: options.CustomInstructions, ReplaceBranchInstructions: options.ReplaceInstructions));
-                    var actual = generator.GenerateAsync(request, token).AsTask();
+                        Guid.CreateVersion7().ToString(), new(CustomInstructions: options.CustomInstructions, ReplaceBranchInstructions: options.ReplaceInstructions));
+                    var actual = RetrySummaryAsync(() => generator.GenerateAsync(request, token), token, "branchSummary", null).AsTask();
                     var generated = await originals.Join(actual, "tree-summary-generator").ConfigureAwait(false);
                     ValidateGenerated(generated);
                     var (read, modified) = plan.FileOps.ComputeFileLists();

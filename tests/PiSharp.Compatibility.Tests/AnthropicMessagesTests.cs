@@ -16,7 +16,7 @@ static class AnthropicMessagesTests
     [
         (nameof(SparseBlocksAndUsage), SparseBlocksAndUsage),
         (nameof(SignaturesRedactionAndOwnership), SignaturesRedactionAndOwnership),
-        (nameof(StrictFinalArguments), StrictFinalArguments),
+        (nameof(FinalArgumentsFollowParseStreamingJson), FinalArgumentsFollowParseStreamingJson),
         (nameof(UsagePresenceAndNumberProfile), UsagePresenceAndNumberProfile),
         (nameof(FallbackRatesAndMarkers), FallbackRatesAndMarkers),
         (nameof(FallbackBoundariesAndProfiles), FallbackBoundariesAndProfiles),
@@ -127,7 +127,8 @@ static class AnthropicMessagesTests
         Equal(2, events.OfType<ToolCallStarted>().Single().ContentIndex);
         Equal("Hi", ((TextContent)done.Message.Content[0]).Text); Equal("reason", ((ThinkingContent)done.Message.Content[1]).Thinking);
         Equal(JsonSerializer.Serialize("s+"), Property(done.Message.Content[1].ExtraProperties, "thinkingSignature"));
-        Equal("9007199254740993", ((ToolCallContent)done.Message.Content[2]).Arguments.Value.GetProperty("n").GetRawText());
+        // anthropic-messages.ts:803 parseStreamingJson is JSON.parse: the number is a binary64 Number, 2^53 + 1 prints as 9007199254740992.
+        Equal("9007199254740992", ((ToolCallContent)done.Message.Content[2]).Arguments.Value.GetProperty("n").GetRawText());
         Equal("null", Property(done.Message.Content[2].ExtraProperties, "namespace"));
         Equal("fixture-model", done.Message.Model); Equal(1_700_000_000_000L, done.Message.Timestamp);
         Equal("\"actual-model\"", Property(done.Message.ExtraProperties, "responseModel")); Equal("\"message\"", Property(done.Message.ExtraProperties, "responseId"));
@@ -161,15 +162,24 @@ static class AnthropicMessagesTests
         Equal(raw, owned.ToString()); Equal("9007199254740993", ((TextContent)Terminal(output).Message.Content[0]).ExtraProperties!.Values["opaque"].Value.GetProperty("n").GetRawText());
     }
 
-    public static async Task StrictFinalArguments()
+    public static async Task FinalArgumentsFollowParseStreamingJson()
     {
         var empty = Terminal(await Collect([Start, ToolStart, BlockStop(99), End, Stop]));
         Assert(empty is StreamDone, "Empty source scratch failed."); Equal("{}", ((ToolCallContent)empty.Message.Content[0]).Arguments.ToString());
-        foreach (var raw in new[] { "{\"secret\":\"unfinished", "{\"n\":1,\"n\":2}", "[]", "null", "{\"n\":1,}", "{\"x\":\"\\uD800\"}", "{\"x\":\"C:\\q\"}" })
+        // Pi abe508 anthropic-messages.ts:803 finalizes with parseStreamingJson (json-parse.ts:104-124: JSON.parse, repairJson,
+        // partial-json, then {}), so malformed, duplicate and non-object arguments complete the turn. Expected values are the installed
+        // pi-ai 1.1.0 parseStreamingJson results; a lone surrogate is owned as U+FFFD (StreamingJson's documented representation limit).
+        foreach (var (raw, expected) in new[]
+        {
+            ("{\"secret\":\"unfinished", "{\"secret\":\"unfinished\"}"), ("{\"n\":1,\"n\":2}", "{\"n\":2}"), ("[]", "[]"), ("null", "null"),
+            ("{\"n\":1,}", "{\"n\":1}"), ("{\"x\":\"\\uD800\"}", "{\"x\":\"\\uFFFD\"}"), ("{\"x\":\"C:\\q\"}", "{\"x\":\"C:\\\\q\"}")
+        })
         {
             var events = await Collect([Start, ToolStart, Delta(99, "input_json_delta", raw), BlockStop(99), End, Stop]);
-            var end = Terminal(events); Failure(end, AnthropicMessagesFailure.MalformedStream);
-            Equal(0, events.OfType<ToolCallEnded>().Count()); Assert(!Property(end.Message.ExtraProperties, "errorMessage").Contains("secret", StringComparison.Ordinal), "Malformed argument leaked in diagnostic.");
+            var end = Terminal(events); Assert(end is StreamDone, "parseStreamingJson final failed the turn: " + raw);
+            Equal(1, events.OfType<ToolCallEnded>().Count());
+            Assert(JsonElement.DeepEquals(JsonData.Parse(expected).Value, ((ToolCallContent)end.Message.Content[0]).Arguments.Value),
+                "Final arguments differ from parseStreamingJson: " + raw);
         }
         var complete = Terminal(await Collect([Start, ToolStart, Delta(99, "input_json_delta", "{\"x\":null,\"u\":\"\\u03C0\\uD83D\\uDE00\"}"), BlockStop(99), End, Stop]));
         Assert(complete is StreamDone, "Complete Unicode object rejected.");
@@ -222,11 +232,13 @@ static class AnthropicMessagesTests
             new[] { Start, TextStart, Delta(9, "thinking_delta", "wrong") },
             new[] { Start, Delta(42, "text_delta", "unknown") }, new[] { Start, TextStart, End, Stop },
             new[] { Start, End, Stop, End },
-            new[] { Start, TextStart, """{"type":"content_block_start","index":0,"content_block":{"type":"fallback","model":"other"}}""" },
-            // Reported transformations are diagnostics (Pi abe508); only malformed entries are rejected.
-            new[] { Start, """{"type":"message_delta","delta":{},"input_transformations":[{"type":1}]}""" },
-            new[] { Start, """{"type":"message_delta","delta":{},"input_transformations":{"type":"unsupported"}}""" }
+            new[] { Start, TextStart, """{"type":"content_block_start","index":0,"content_block":{"type":"fallback","model":"other"}}""" }
         }) Failure(Terminal(await Collect(trace)), AnthropicMessagesFailure.MalformedStream);
+        // Reported transformations are diagnostics (Pi abe508): a non-array is ignored and entry values are copied unchecked.
+        var tolerated = Terminal(await Collect([Start, """{"type":"message_delta","delta":{},"input_transformations":[{"type":1}]}""",
+            """{"type":"message_delta","delta":{},"input_transformations":{"type":"unsupported"}}""", End, Stop]));
+        Assert(tolerated is StreamDone, "Transformations failed the stream.");
+        Assert(Property(tolerated.Message.ExtraProperties, "diagnostics").Contains("\"transformations\":[{\"type\":1}]", StringComparison.Ordinal), "Transformation not copied.");
         Failure(Terminal(await Collect([Start, """{"type":"error","error":{"type":"overloaded_error","message":"private-provider-payload"}}"""])), AnthropicMessagesFailure.ProviderError);
     }
 

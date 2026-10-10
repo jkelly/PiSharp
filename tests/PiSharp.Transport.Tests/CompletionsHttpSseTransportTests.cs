@@ -106,7 +106,8 @@ internal static class CompletionsHttpSseTransportTests
             var final = (StreamDone)frames[^1]; Equal(StopReason.ToolUse, final.Reason);
             Equal("Exact \u03c0\U0001f600\0", ((TextContent)final.Message.Content[0]).Text);
             var call = (ToolCallContent)final.Message.Content[1]; Equal("call-owned", call.Id); Equal("inspect", call.Name);
-            Equal("{\"value\":1.00,\"keep\":null}", call.Arguments.ToString()); Equal(8L, final.Message.Usage.TotalTokens);
+            // openai-completions.ts:656 finalizes with parseStreamingJson (JSON.parse): 1.00 is the Number 1 (installed pi-ai 1.1.0).
+            Equal("{\"value\":1,\"keep\":null}", call.Arguments.ToString()); Equal(8L, final.Message.Usage.TotalTokens);
             Equal(1, body.AsyncDisposeCalls); Check(body.Disposed && !body.SyncBeforeAsync && fixture.Response.Disposed, "Async body/response cleanup order changed.");
             Equal(0, fixture.Response.SerializeCalls); await ThrowsAsync<ObjectDisposedException>(() => fixture.Requests.Single().Content!.ReadAsStringAsync());
             Check(!fixture.Handler.Disposed, "Composition disposed the borrowed client.");
@@ -136,7 +137,9 @@ internal static class CompletionsHttpSseTransportTests
         {
             using var fixture = new Fixture(new ProbeStream(Encoding.UTF8.GetBytes(wire)));
             var result = await new ChatClient(fixture.Transport).CompleteAsync(Request()); Failed(result, failure);
-            Check(!result.Failure!.Message.Contains("private", StringComparison.Ordinal), "SSE failure leaked rejected payload.");
+            // openai SDK Stream: an error event or a truthy data.error is shown as the SDK APIError message.
+            if (wire.Contains("error", StringComparison.Ordinal)) Check(result.Message.ExtraProperties!.Values["errorMessage"].Value.GetString() is "{\"private-message\":\"secret\"}" or "private-message", "SDK stream error message differs.");
+            else Check(!result.Failure!.Message.Contains("private", StringComparison.Ordinal), "SSE failure leaked rejected payload.");
             Check(fixture.Response.Disposed, "Rejected frame retained its response.");
         }
         using (var fixture = new Fixture(new ProbeStream([.. Encoding.UTF8.GetBytes("data: "), 0xff, .. Encoding.UTF8.GetBytes("\n\n")])))
@@ -258,7 +261,8 @@ internal static class CompletionsHttpSseTransportTests
             Failed(await new ChatClient(transport).CompleteAsync(Request()), "SourceFailed");
             if (owned is not null) await ThrowsAsync<ObjectDisposedException>(() => owned.Content!.ReadAsStringAsync());
             if (stage is not ("send" or "factory")) Check(response.Disposed, "Fault stage skipped response disposal: " + stage);
-            if (stage == "status") { Equal(0, response.AcquireCalls); Equal(0, response.SerializeCalls); }
+            // The rejected body is read once into the openai SDK APIError message.
+            if (stage == "status") { Equal(1, response.AcquireCalls); Equal(0, response.SerializeCalls); }
             Equal(stage == "factory" ? 0 : 1, handler.SendCalls); Check(!handler.Disposed, "Fault disposed borrowed client.");
             response.Dispose();
         }

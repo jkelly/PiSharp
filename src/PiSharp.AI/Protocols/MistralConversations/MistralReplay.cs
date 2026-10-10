@@ -11,7 +11,7 @@ public sealed partial class MistralTextHttpSseTransport
 {
     private ImmutableArray<TranscriptEntry> ResolveReplay(ChatRequest request, MistralToolIds ids)
     {
-        if (request.Messages.IsDefault || request.Messages.Length > 256) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral replay message limit.");
+        if (request.Messages.IsDefault || request.Messages.Length > PiRequestBudget.RequestMessages) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral replay message limit.");
         long size = 0;
         foreach (var entry in request.Messages)
         {
@@ -22,8 +22,8 @@ public sealed partial class MistralTextHttpSseTransport
                 throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral replay transcript.");
             if (entry.Role == "system")
             {
-                if (body.EnumerateObject().Any(field => field.Name is not ("role" or "content" or "timestamp" or "sections" or "toolsAdded" or "toolsRemoved")))
-                    throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral system field.");
+                // Pi v1.1.0 reads only the fields it uses and ignores any others (for example "offlineApi": null written
+                // by earlier sessions), so a resumed session replays instead of failing.
                 if (body.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
                     foreach (var part in content.EnumerateArray()) _ = ReadTextPart(part);
             }
@@ -79,7 +79,7 @@ public sealed partial class MistralTextHttpSseTransport
             foreach (var call in pending)
                 if (!existing.Contains(call["id"]!.GetValue<string>()))
                 {
-                    Limit(result.Count + 1, 1024);
+                    Limit(result.Count + 1, PiRequestBudget.RequestItems);
                     result.Add(new("toolResult", JsonData.Parse(new JsonObject
                 {
                     ["role"] = "toolResult", ["toolCallId"] = call["id"]!.GetValue<string>(), ["toolName"] = call["name"]!.GetValue<string>(),
@@ -105,7 +105,7 @@ public sealed partial class MistralTextHttpSseTransport
             else if (entry.Role == "system" && pending.Count > 0) held.Add(entry);
             else { if (entry.Role == "user") Close(); result.Add(entry); }
         }
-        Close(); Limit(result.Count, 1024); return result.ToImmutable();
+        Close(); Limit(result.Count, PiRequestBudget.RequestItems); return result.ToImmutable();
     }
     private ImmutableArray<TranscriptEntry> CollapseSystems(ImmutableArray<TranscriptEntry> messages)
     {

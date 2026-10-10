@@ -94,7 +94,10 @@ internal static class OriginalPiMessagesToolContinuationTests
                     SameJson(ToolResultMessageMaterializer.ToTranscript(toolResult!, 123).WireBody.Value, messages[3]);
                     var providerLayer = RewriteContinuationBody(physical.RootElement, addStamp: false);
                     SameJson(wanted.GetProperty("body"), providerLayer.Value);
-                    Check(Convert.ToBase64String(Encoding.UTF8.GetBytes(providerLayer.ToString())) == wanted.GetProperty("bodyUtf8Base64").GetString(),
+                    using var frozenBytes = JsonDocument.Parse(Convert.FromBase64String(wanted.GetProperty("bodyUtf8Base64").GetString()!));
+                    SameJson(frozenBytes.RootElement, wanted.GetProperty("body"));
+                    // The frozen provider-layer bytes list the assistant's fields in an authored order; the actual bytes are pi-ai's.
+                    Check(providerLayer.ToString() == RewriteContinuationBody(wanted.GetProperty("body"), addStamp: false, frozen: true).ToString(),
                         "Complete projected provider-layer UTF8 bytes differ from frozen request.");
                     if (injectedSecondFailure is not null) throw injectedSecondFailure;
                 }
@@ -243,21 +246,30 @@ internal static class OriginalPiMessagesToolContinuationTests
             return inner.StreamAsync(request with { Messages = mapped }, token);
         }
     }
-    private static JsonData StampAssistant(JsonElement providerAssistant)
+    private static JsonData StampAssistant(JsonElement providerAssistant) => PiAiAssistant(providerAssistant, stamp: true);
+    // pi-ai builds the assistant as one literal (packages/ai/src/api/pi-messages.ts:181-190: role, content, api, provider, model,
+    // usage, stopReason, timestamp); later assignments (responseId, providerThinkingLevel: pi-messages.ts:196-203) follow, and
+    // agent-loop.ts:409 Object.assign adds thinkingLevel last. The frozen fixture lists the fields in an authored order.
+    private static readonly string[] PiAiAssistantOrder = ["role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp"];
+    private static JsonData PiAiAssistant(JsonElement providerAssistant, bool stamp)
     {
         Check(providerAssistant.GetProperty("role").GetString() == "assistant" && !providerAssistant.TryGetProperty("thinkingLevel", out _),
             "Frozen provider assistant already has an Agent stamp.");
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
         {
-            writer.WriteStartObject(); writer.WriteString("thinkingLevel", "off");
-            foreach (var field in providerAssistant.EnumerateObject()) { writer.WritePropertyName(field.Name); field.Value.WriteTo(writer); }
+            writer.WriteStartObject();
+            foreach (var name in PiAiAssistantOrder)
+                if (providerAssistant.TryGetProperty(name, out var value)) { writer.WritePropertyName(name); value.WriteTo(writer); }
+            foreach (var field in providerAssistant.EnumerateObject())
+                if (!PiAiAssistantOrder.Contains(field.Name, StringComparer.Ordinal)) { writer.WritePropertyName(field.Name); field.Value.WriteTo(writer); }
+            if (stamp) writer.WriteString("thinkingLevel", "off");
             writer.WriteEndObject();
         }
         return JsonData.Parse(Encoding.UTF8.GetString(buffer.ToArray()));
     }
     // Explicit r1 Agent expectation layer; retain the pinned provider-only fixture as a separate full assertion.
-    private static JsonData RewriteContinuationBody(JsonElement body, bool addStamp)
+    private static JsonData RewriteContinuationBody(JsonElement body, bool addStamp, bool frozen = false)
     {
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
@@ -277,7 +289,7 @@ internal static class OriginalPiMessagesToolContinuationTests
                     foreach (var message in context.Value.EnumerateArray())
                     {
                         if (index++ != 2) { message.WriteTo(writer); continue; }
-                        if (addStamp) { StampAssistant(message).Value.WriteTo(writer); continue; }
+                        if (addStamp || frozen) { PiAiAssistant(message, stamp: addStamp).Value.WriteTo(writer); continue; }
                         Check(message.GetProperty("role").GetString() == "assistant" && message.GetProperty("thinkingLevel").GetString() == "off",
                             "Actual Agent assistant lacks the pinned off stamp.");
                         writer.WriteStartObject();

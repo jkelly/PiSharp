@@ -29,7 +29,12 @@ public sealed class GoogleKeyAuthRequestFactory(ModelDescriptor model, GoogleGen
         var name = requestModel.StartsWith("models/", StringComparison.Ordinal) ? requestModel[7..] : requestModel;
         var endpoint = new Uri(baseUrl.TrimEnd('/') + "/models/" + Uri.EscapeDataString(name) + ":streamGenerateContent?alt=sse");
         var body = GoogleData.Admit(JsonData.Parse(GoogleRequestProjector.WireBody(parameters).ToJsonString()), options);
-        var projected = EcmaScriptJsonProjection.Project(body);
+        // The body (images included) is bounded by the payload budget, not by the projection's 1 MiB string defaults.
+        var projected = EcmaScriptJsonProjection.Project(body, new(MaximumInputCharacters: options.MaximumPayloadBytes,
+            MaximumInputBytes: options.MaximumPayloadBytes, MaximumOutputCharacters: options.MaximumPayloadBytes,
+            MaximumOutputBytes: options.MaximumPayloadBytes, MaximumStringCharacters: options.MaximumPayloadBytes,
+            // Node and number counts grow with the message count; the payload budget bounds them.
+            MaximumNodes: options.MaximumPayloadBytes, MaximumNumbers: options.MaximumPayloadBytes, MaximumTotalNumberCharacters: options.MaximumPayloadBytes));
         if (Encoding.UTF8.GetByteCount(projected) > options.MaximumPayloadBytes) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
         var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
@@ -47,6 +52,10 @@ public sealed class GoogleKeyAuthRequestFactory(ModelDescriptor model, GoogleGen
             }
         }
         if (options.ModelMetadata.Value.TryGetProperty("headers", out var modelHeaders)) Merge(modelHeaders);
+        // provider-attribution.ts getSessionHeaders (opencode-headers.ts for the bare provider): an OpenCode request carries the
+        // agent session id in x-opencode-session, below the caller's own headers.
+        foreach (var (header, value) in PiSharp.AI.Providers.ProviderHeaderPolicies.OpenCodeSessionHeaders(model.Provider, endpoint, request.SessionId))
+            headers[header] = value;
         if (options.Headers is { } extra) Merge(extra.Value);
         if (headers.Count > options.MaximumHeaders || headers.Any(h => h.Key.Length + (h.Value?.Length ?? 0) > options.MaximumHeaderCharacters))
             throw GoogleData.Fail(GoogleFailure.ResourceLimit);

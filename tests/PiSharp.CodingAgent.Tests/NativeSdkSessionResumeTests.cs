@@ -105,15 +105,17 @@ internal static class NativeSdkSessionResumeTests
         }
     }
 
+    private static readonly ExtensionRegistryOptions SnapshotBounds = new()
+    { MaximumSessionBranchEntries = 4_096, MaximumSessionCharacters = 1_048_576, MaximumSessionUtf8Bytes = 1_048_576 };
+
     private static async Task TargetSnapshotPolicy()
     {
         var specs = new[]
         {
-            new Spec("count", Count: ExtensionSessionSnapshotLimits.MaximumBranchEntries + 1),
-            new Spec("record", Padding: new string('x', 65_536)),
+            // Bounds set explicitly by this host (SnapshotBounds); entries have no per-entry bound, only the aggregates.
+            new Spec("count", Count: 4_097),
             new Spec("characters", Count: 17, Padding: new string('x', 63_000)),
             new Spec("utf8", Count: 11, Padding: new string('\u03c0', 50_000)),
-            new Spec("depth", Depth: 32), // The record object adds one level to the 32 nested arrays.
             new Spec("session-id", SessionId: "bad/session"),
             new Spec("leaf-id", LeafId: "bad/leaf")
         };
@@ -330,7 +332,7 @@ internal static class NativeSdkSessionResumeTests
                     new(SessionLogStoreOptions: new(ReaderOptions: ReaderOptions, StorageFactory: f.Storage)), fileSystem: f.Branches, catalog: catalog);
                 f.Owner = ReplaceableAgentSession.WithLifecycle(source, lifecycle); source = null;
                 f.Owner.AttachmentChanged = _ => { f.AttachmentChanges++; return ValueTask.CompletedTask; };
-                f.Native = new(); f.Native.Attach(f.Owner); f.Provider = new(f.Native); f.Registry = new(null, null, f.Provider); return f;
+                f.Native = new(); f.Native.Attach(f.Owner); f.Provider = new(f.Native); f.Registry = new(SnapshotBounds, null, f.Provider); return f;
             }
             catch
             {

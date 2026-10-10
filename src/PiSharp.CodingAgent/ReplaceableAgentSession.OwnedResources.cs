@@ -24,7 +24,7 @@ public sealed partial class ReplaceableAgentSession
         lock (gate)
         {
             ValidateAttachment(attachment);
-            if (ownedResources.Count >= MaximumOwnedResources) throw new InvalidOperationException("Owned resource bound reached.");
+            if (ownedResources.Count >= ownedResourceLimit) throw new InvalidOperationException("Owned resource bound reached.");
             var lease = new OwnedResourceLease(this, attachment, closeBody, stopBody); ownedResources.Add(lease); return lease;
         }
     }
@@ -152,8 +152,12 @@ public sealed partial class ReplaceableAgentSession
         await admissionOriginal.ConfigureAwait(false);
         bool claimed; Exception? failure;
         lock (gate) { claimed = lease.AdmissionClaimed; failure = lease.AdmissionFailure; }
-        if (claimed)
-        { if (failure is null) lease.Completion!.TrySetResult(); else lease.Completion!.TrySetException(failure); }
+        if (!claimed) return;
+        if (failure is not null) { lease.Completion!.TrySetException(failure); return; }
+        // A resource closed while its attachment continues (an MCP server removed or rebound during the session) is done:
+        // it leaves the owner's set, so it no longer counts toward MaximumOwnedResources and is not retired again.
+        lock (gate) ownedResources.Remove(lease);
+        lease.Completion!.TrySetResult();
     }
 
     // Caller holds the actual owner mutation semaphore and exact persistent reservation.
@@ -191,7 +195,7 @@ public sealed partial class ReplaceableAgentSession
         PersistentAgentSession.ReplacementReservation? reservation)
     {
         lock (gate) { if (lease.BodyStarted) return; lease.BodyStarted = true; }
-        var tx = new OwnedResourceRetirementTransaction(this, lease.Attachment, reservation);
+        var tx = new OwnedResourceRetirementTransaction(this, lease.Attachment, reservation) { IsSessionShutdown = inShutdown.Value };
         var prior = resourceTransaction.Value; resourceTransaction.Value = tx;
         var faults = new List<Exception>();
         BeginOwnedResourceStop(lease);
@@ -219,6 +223,8 @@ public sealed partial class ReplaceableAgentSession
         internal bool Alive = true, BodyEnded;
         internal Task? Publication;
         public AgentSessionAttachment Attachment { get; }
+        /// <summary>Whether the owner retires this resource because it shuts down, rather than for a replacement or an explicit close.</summary>
+        public bool IsSessionShutdown { get; internal init; }
         internal OwnedResourceRetirementTransaction(ReplaceableAgentSession owner, AgentSessionAttachment attachment,
             PersistentAgentSession.ReplacementReservation? reservation)
         { this.owner = owner; Attachment = attachment; this.reservation = reservation; }

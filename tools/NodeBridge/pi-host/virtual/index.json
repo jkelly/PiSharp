@@ -1,0 +1,22 @@
+{
+	"typebox": "typebox.mjs",
+	"typebox/compile": "typebox-compile.mjs",
+	"typebox/value": "typebox-value.mjs",
+	"@sinclair/typebox": "typebox.mjs",
+	"@sinclair/typebox/compile": "typebox-compile.mjs",
+	"@sinclair/typebox/value": "typebox-value.mjs",
+	"@earendil-works/pi-agent-core": "pi-agent-core.mjs",
+	"@earendil-works/pi-tui": "pi-tui.mjs",
+	"@earendil-works/pi-ai": "pi-ai.mjs",
+	"@earendil-works/pi-ai/compat": "pi-ai.mjs",
+	"@earendil-works/pi-ai/oauth": "pi-ai-oauth.mjs",
+	"@earendil-works/pi-ai/providers/all": "pi-ai-providers.mjs",
+	"@earendil-works/pi-coding-agent": "pi-coding-agent.mjs",
+	"@mariozechner/pi-agent-core": "pi-agent-core.mjs",
+	"@mariozechner/pi-tui": "pi-tui.mjs",
+	"@mariozechner/pi-ai": "pi-ai.mjs",
+	"@mariozechner/pi-ai/compat": "pi-ai.mjs",
+	"@mariozechner/pi-ai/oauth": "pi-ai-oauth.mjs",
+	"@mariozechner/pi-ai/providers/all": "pi-ai-providers.mjs",
+	"@mariozechner/pi-coding-agent": "pi-coding-agent.mjs"
+}

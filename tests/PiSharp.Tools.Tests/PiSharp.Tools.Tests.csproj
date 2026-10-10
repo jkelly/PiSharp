@@ -4,5 +4,10 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Tools/PiSharp.Tools.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Upstream validateToolArguments goldens (regenerate with ToolValidation/gen-tool-validation-goldens.mjs). -->
+    <None Update="ToolValidation/tool-validation-goldens.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

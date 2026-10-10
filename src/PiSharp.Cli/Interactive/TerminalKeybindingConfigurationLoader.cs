@@ -98,6 +98,25 @@ public static class TerminalKeybindingConfigurationLoader
         return result.ToString();
     }
 
+    /// <summary>Source migrateKeybindingsConfig (core/keybindings.ts): legacy names renamed (dropped when the new name is also
+    /// present), then the known keybindings in definition order and the others sorted. migrations.ts writes the result back.</summary>
+    internal static System.Text.Json.Nodes.JsonObject MigrateConfig(System.Text.Json.Nodes.JsonObject raw, string platform, out bool migrated)
+    {
+        migrated = false;
+        var renamed = new Dictionary<string, System.Text.Json.Nodes.JsonNode?>(StringComparer.Ordinal);
+        foreach (var key in OwnOrder(raw.Select(pair => pair.Key)))
+        {
+            var next = Migrations.GetValueOrDefault(key) ?? key;
+            if (next != key) { migrated = true; if (raw.ContainsKey(next)) continue; }
+            renamed[next] = raw[key]?.DeepClone();
+        }
+        var definitions = TerminalAgentKeybindingDefinitions.Create(platform, new Dictionary<string, string?>(StringComparer.Ordinal));
+        var known = definitions.Select(pair => pair.Key).Where(renamed.ContainsKey).ToList();
+        var result = new System.Text.Json.Nodes.JsonObject();
+        foreach (var key in known.Concat(renamed.Keys.Where(key => !known.Contains(key)).Order(StringComparer.Ordinal))) result[key] = renamed[key];
+        return result;
+    }
+
     private static IEnumerable<string> OwnOrder(IEnumerable<string> keys)
     {
         var values = keys.ToArray();

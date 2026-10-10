@@ -59,13 +59,21 @@ internal static class AnthropicSourceSnapshotTests
         Check(((ToolCallStarted)captured[1]).ToolCall.Arguments.Value.GetProperty("initial").GetBoolean(), "Native start payload never replaced by preview");
     }
 
-    internal static async Task UnsupportedPreviewIsExplicitAbsence()
+    internal static async Task NonObjectPreviewIsObservedAndFinal()
     {
+        // Pi abe508 anthropic-messages.ts:767 sets block.arguments = parseStreamingJson(block.partialJson) on every input_json_delta and
+        // :803 again at content_block_stop; json-parse.ts:104-124 returns the JSON.parse result of any kind, so "[]" is the preview
+        // and the final arguments, and the turn completes.
         var input = new[] { Start, Tool, Delta(8, "input_json_delta", "partial_json", "[]"), BlockStop(8), End, Stop };
         var captured = await Collect(input, true);
         Equivalent(await Collect(input, false), captured);
-        Check(captured.OfType<ToolCallDelta>().Single().SourceEmissionSnapshot is null, "Nonobject preview remains absent, no compact fallback");
-        Check(captured[^1] is StreamError, "Observation cannot bypass strict final argument admission");
+        var preview = Snapshot(captured.OfType<ToolCallDelta>().Single()).GetProperty("partial").GetProperty("content")[0];
+        Check(preview.GetProperty("arguments").ValueKind == JsonValueKind.Array && preview.GetProperty("arguments").GetArrayLength() == 0 &&
+            preview.GetProperty("partialJson").GetString() == "[]", "Nonobject preview is observed as parseStreamingJson returns it");
+        var ended = Snapshot(captured.OfType<ToolCallEnded>().Single()).GetProperty("toolCall").GetProperty("arguments");
+        Check(ended.ValueKind == JsonValueKind.Array && ended.GetArrayLength() == 0, "Nonobject final observation");
+        Check(captured[^1] is StreamDone done && ((ToolCallContent)done.Message.Content[0]).Arguments.ToString() == "[]",
+            "Nonobject final arguments complete the turn");
     }
 
     internal static Task OptionsKeepConstructorAndDeconstructionShape()
@@ -85,7 +93,7 @@ internal static class AnthropicSourceSnapshotTests
         for (var i = 0; i < expected.Count; i++)
             Check(PiWireJson.WriteEvent(expected[i]).ToString() == PiWireJson.WriteEvent(actual[i]).ToString(), "Compact payload, diagnostics and terminal retained");
     }
-    internal static async Task OriginalBinary64CostsKeepNativeDecimals()
+    internal static async Task Binary64CostsAreNativeCosts()
     {
         var rates = new AnthropicTokenRates(1, 2, .5m, 1.25m);
         var start = Start.Replace("\"input_tokens\":11,\"output_tokens\":2", "\"input_tokens\":36,\"output_tokens\":0", StringComparison.Ordinal);
@@ -95,19 +103,25 @@ internal static class AnthropicSourceSnapshotTests
         Equivalent(native, captured);
         var cost = Snapshot(captured.OfType<TextStarted>().Single()).GetProperty("partial").GetProperty("usage").GetProperty("cost");
         Check(unchecked((ulong)BitConverter.DoubleToInt64Bits(cost.GetProperty("input").GetDouble())) == 0x3f02dfd694ccab3f, "Original divide-before-multiply historical 36-token vector");
+        // Pi abe508 models.ts:1214-1218 calculateCost (called at anthropic-messages.ts:688 and :857) prices in binary64 Numbers, and
+        // that Number is the message's cost: the native decimal is its shortest text and SourceBinary64Cost carries the Number itself.
         var final = (StreamTerminalEvent)captured[^1];
-        Check(final.Message.Usage.Cost.Input == .000036m && final.Message.Usage.Cost.SourceBinary64Cost is null, "Native exact decimal unchanged");
-        // Thirty-six tokens do not distinguish the operations. Five tokens do;
-        // compare the serialized decimal boundary, not an assumed CLR cast result.
+        Check(final.Message.Usage.Cost.Input == .000036m && final.Message.Usage.Cost.SourceBinary64Cost is { } finalBinary64 &&
+            unchecked((ulong)BitConverter.DoubleToInt64Bits(finalBinary64.Value.GetProperty("input").GetDouble())) == 0x3f02dfd694ccab3f,
+            "Native cost is the binary64 Number calculateCost records");
+        // Thirty-six tokens do not distinguish the operations. Five tokens do: node prints 1 / 1e6 * 5 as 0.0000049999999999999996
+        // (0x3ed4f8b588e368f0), not 0.000005 (0x3ed4f8b588e368f1), and Pi records the former.
         var fiveStart = start.Replace("\"input_tokens\":36", "\"input_tokens\":5", StringComparison.Ordinal);
         var fiveFrames = await Collect(new[] { fiveStart, Text, BlockStop(9), End, Stop }, true, rates);
         var fiveSource = Snapshot(fiveFrames.OfType<TextStarted>().Single()).GetProperty("partial").GetProperty("usage").GetProperty("cost").GetProperty("input").GetDouble();
-        var fiveNative = ((StreamTerminalEvent)fiveFrames[^1]).Message.Usage.Cost.Input;
-        var decimalJsonNumber = JsonSerializer.SerializeToElement(fiveNative).GetDouble();
-        Check(fiveNative == .000005m, "Five-token native decimal remains exact");
+        var fiveMessage = ((StreamTerminalEvent)fiveFrames[^1]).Message;
+        var fiveNative = fiveMessage.Usage.Cost.Input;
+        var fiveWire = PiWireJson.WriteMessage(fiveMessage).Value.GetProperty("usage").GetProperty("cost").GetProperty("input").GetDouble();
+        Check(fiveNative == 0.0000049999999999999996m, "Five-token native decimal is the binary64 Number's shortest text");
         Check(unchecked((ulong)BitConverter.DoubleToInt64Bits(fiveSource)) == 0x3ed4f8b588e368f0, "Five-token divide-before-multiply source golden");
-        Check(unchecked((ulong)BitConverter.DoubleToInt64Bits(decimalJsonNumber)) == 0x3ed4f8b588e368f1, "Serialized exact decimal rounds to distinct Number golden");
-        Check(BitConverter.DoubleToInt64Bits(fiveSource) != BitConverter.DoubleToInt64Bits(decimalJsonNumber), "Original arithmetic differs from final-decimal JSON projection");
+        Check(unchecked((ulong)BitConverter.DoubleToInt64Bits(fiveWire)) == 0x3ed4f8b588e368f0, "Native wire writes the same Number as the source observation");
+        Check(unchecked((ulong)BitConverter.DoubleToInt64Bits(JsonSerializer.SerializeToElement(fiveNative).GetDouble())) == 0x3ed4f8b588e368f0,
+            "Native decimal round-trips to the source Number");
         var terminalCost = Snapshot(final).GetProperty("message").GetProperty("usage").GetProperty("cost");
         Check(terminalCost.GetProperty("input").GetDouble() == cost.GetProperty("input").GetDouble(), "Terminal also projects original arithmetic");
         var mixed = """{"type":"message_start","message":{"id":"mixed","model":"fixture","usage":{"input_tokens":101,"output_tokens":23,"cache_read_input_tokens":17,"cache_creation_input_tokens":19,"cache_creation":{"ephemeral_1h_input_tokens":7}}}}""";

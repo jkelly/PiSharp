@@ -24,17 +24,18 @@ public sealed class RpcAgentEventProjector
     }
 
     /// <summary>Projects one sequential observation. End messages must follow the session's durable primary sink.</summary>
-    public ImmutableArray<JsonData> Project(AgentEvent observation, PersistentAgentSessionSnapshot snapshot, int historyLength)
+    /// <param name="willRetry">Source agent_end willRetry, decided by the session (<see cref="PersistentAgentSession.WillRetryAfterAgentEnd"/>).</param>
+    public ImmutableArray<JsonData> Project(AgentEvent observation, PersistentAgentSessionSnapshot snapshot, int historyLength, bool willRetry = false)
     {
         ArgumentNullException.ThrowIfNull(observation); ArgumentNullException.ThrowIfNull(snapshot);
         if (historyLength < 0) throw new ArgumentOutOfRangeException(nameof(historyLength));
         if (Interlocked.CompareExchange(ref _projecting, 1, 0) != 0)
             throw new InvalidOperationException("Concurrent event projection is unsupported.");
-        try { return ProjectCore(observation, snapshot, historyLength); }
+        try { return ProjectCore(observation, snapshot, historyLength, willRetry); }
         finally { Volatile.Write(ref _projecting, 0); }
     }
 
-    private ImmutableArray<JsonData> ProjectCore(AgentEvent observation, PersistentAgentSessionSnapshot snapshot, int historyLength)
+    private ImmutableArray<JsonData> ProjectCore(AgentEvent observation, PersistentAgentSessionSnapshot snapshot, int historyLength, bool willRetry)
     {
         JsonData Event(string kind, Action<Utf8JsonWriter>? fields = null) => RpcCommandCodec.Event(kind, fields, options);
         JsonData Message(string kind, JsonData body) => Event(kind, writer => RpcCommandCodec.Raw(writer, "message", body));
@@ -111,12 +112,14 @@ public sealed class RpcAgentEventProjector
                 })];
             }
             case AgentLoopEnded end:
-                if (historyLength < 0 || historyLength > end.Result.Transcript.Length || _toolStarts.Count != 0)
+                // Source agent_end messages are the run's own messages (newMessages), kept exact when a turn boundary replaced the context.
+                if (end.Result.RunMessages.IsDefault && (historyLength < 0 || historyLength > end.Result.Transcript.Length) || _toolStarts.Count != 0)
                     throw new RpcDispatchException(RpcDispatchFailure.SessionRunFailed);
                 return [Event("agent_end", writer =>
                 {
-                    RpcCommandCodec.Messages(writer, "messages", end.Result.Transcript, options.MaximumReturnedMessages, historyLength);
-                    writer.WriteBoolean("willRetry", false);
+                    if (end.Result.RunMessages.IsDefault) RpcCommandCodec.Messages(writer, "messages", end.Result.Transcript, options.MaximumReturnedMessages, historyLength);
+                    else RpcCommandCodec.Messages(writer, "messages", end.Result.RunMessages, options.MaximumReturnedMessages);
+                    writer.WriteBoolean("willRetry", willRetry);
                 })];
             case TurnStreamObserved stream:
                 var delta = Delta(stream.Event);
@@ -153,7 +156,7 @@ public sealed class RpcAgentEventProjector
         // Native thinking/argument checkpoints and identity fills update reducer state
         // without a source push. Only the later public end is projected; no RPC event
         // is invented for a checkpoint. Final/aborted message bodies retain its state.
-        if (observation is ThinkingCheckpoint or ToolCallCheckpoint or ToolCallHeaderUpdated) return null;
+        if (observation is ThinkingCheckpoint or ToolCallCheckpoint or ToolCallHeaderUpdated or ContentBlockFinalized) return null;
         return RpcCommandCodec.Build(writer =>
         {
             var known = new HashSet<string>(StringComparer.Ordinal) { "type", "partial", "contentIndex" };

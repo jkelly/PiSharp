@@ -96,11 +96,14 @@ internal static class GoogleNativeDiagnosticCases
             {
                 case "tool-success": body = new(Wire(ToolChunk)); break;
                 case "provider-finish": body = new(Wire(ToolChunk.Replace("\"STOP\"", "\"SAFETY\"", StringComparison.Ordinal))); break;
-                case "provider-error-chunk": body = new(Wire("""{"error":{"message":"not copied"}}""")); break;
-                case "http-error": body = new(PrivateText); status = HttpStatusCode.BadRequest; break;
+                // @google/genai throws ApiError only for a whole read chunk whose error.code is in [400, 600); an SSE data frame's error member is dropped.
+                case "provider-error-chunk": body = new("""{"error":{"code":500,"message":"not copied","status":"INTERNAL"}}"""); break;
+                case "http-error": body = new("authored rejected body"); status = HttpStatusCode.BadRequest; break; // @google/genai shows the rejected body in its ApiError message.
                 case "invalid-json": body = new("data: {bad}\n\n"); break;
-                case "invalid-shape": body = new(Wire("""{"candidates":{}}""")); break;
-                case "invalid-tool-args": body = new(Wire(ToolChunk.Replace("""{"value":7,"keep":null}""", "[]", StringComparison.Ordinal))); break;
+                // A parts value for-of cannot iterate throws its TypeError (google-generative-ai.ts); upstream reads {"candidates":{}} as no candidate.
+                case "invalid-shape": body = new(Wire("""{"candidates":[{"content":{"parts":{}},"finishReason":"STOP"}]}""")); break;
+                // arguments = functionCall.args ?? {}: upstream accepts any JSON args, so this tool call completes.
+                case "invalid-tool-args-accepted": body = new(Wire(ToolChunk.Replace("""{"value":7,"keep":null}""", "[]", StringComparison.Ordinal))); break;
                 case "missing-finish": body = new(Wire(TextChunk.Replace(",\"finishReason\":\"STOP\"", "", StringComparison.Ordinal))); break;
                 case "frame-limit": options = options with { MaximumFrameCharacters = 8 }; break;
                 case "unsupported-usage": body = new(Wire(ToolChunk.Replace("\"promptTokenCount\":11", "\"promptTokenCount\":0.5", StringComparison.Ordinal))); break;
@@ -358,7 +361,7 @@ internal static class GoogleNativeDiagnosticCases
                 "eof" => Wire(ToolChunk.Replace(",\"finishReason\":\"STOP\"", "", StringComparison.Ordinal)),
                 "unsupported" => Wire(ToolChunk.Replace("\"promptTokenCount\":11", "\"promptTokenCount\":0.5", StringComparison.Ordinal)),
                 "length" => Wire(ToolChunk.Replace("\"STOP\"", "\"MAX_TOKENS\"", StringComparison.Ordinal)), _ => Wire(ToolChunk) };
-            if (scenario == "http") wire = PrivateText;
+            if (scenario == "http") wire = "authored rejected body"; // @google/genai shows the rejected body in its ApiError message.
             var body = new OwnedBody(wire) { HoldCleanup = true, FailCleanup = scenario is "cleanup" or "cancel" };
             var options = scenario == "callback" ? Options() with { Hooks = new() { OnProviderStreamEvent = (_, _, _) => throw new IOException(PrivateText) } } : Options();
             if (scenario == "resource") options = options with { MaximumContentCharacters = 1 };

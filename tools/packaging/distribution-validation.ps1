@@ -83,7 +83,9 @@ function Assert-PiSharpDistribution {
     $release = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/public-release.json') -Raw | ConvertFrom-Json
     if ($baseline.source.tag -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+$' -or $baseline.source.commit -cnotmatch '^[0-9a-f]{40}$' -or
         $release.upstream.tag -cne $baseline.source.tag -or $release.upstream.commit -cne $baseline.source.commit) { throw 'Pinned Pi baseline changed.' }
-    $files = Get-PiSharpArchiveInventory -Path $Path
+    # The CLI loads Pi extensions through its Node bridge (decisions 0004 items 8-10), so the bridge's own
+    # PiSharp.Compatibility.Node members ship with it; Node/npm executables and node_modules stay forbidden.
+    $files = Get-PiSharpArchiveInventory -Path $Path -AllowNodeBridge
     $sdk = (Get-Content -LiteralPath (Join-Path $Repo 'global.json') -Raw | ConvertFrom-Json).sdk.version
     $provenance = Read-PiSharpArchiveText -Path $Path -Entry 'provenance.json' | ConvertFrom-Json
     if ($provenance.schemaVersion -ne 1 -or $provenance.sourceCommit -cne $SourceCommit -or $provenance.version -cne $Version -or
@@ -145,7 +147,7 @@ function Assert-PiSharpDistribution {
         throw 'Framework-dependent tool runtime configuration required.'
     }
     $deps = Read-PiSharpArchiveText -Path $Path -Entry ($prefix + 'PiSharp.Cli.deps.json') | ConvertFrom-Json -AsHashtable
-    if (@($deps.libraries.Keys | Where-Object { $_ -match '(?i)(PiSharp\.Compatibility\.Node|(^|/)node(js)?/)' }).Count) { throw 'Node dependency in native dependency manifest.' }
+    if (@($deps.libraries.Keys | Where-Object { $_ -match '(?i)(^|/)node(js)?/' }).Count) { throw 'Node dependency in native dependency manifest.' }
     $yamlLibraries = @($deps.libraries.Keys | Where-Object { $_ -match '(?i)^(YamlDotNet|PiSharp\.PromptTemplates\.Yaml)/' })
     $yamlFiles = @($files.Keys | Where-Object { $_ -match '(?i)(^|/)(YamlDotNet|PiSharp\.PromptTemplates\.Yaml)(\.|/|$)' })
     if (-not $deps.ContainsKey('targets') -or -not $deps.targets.ContainsKey($deps.runtimeTarget.name)) { throw 'Dependency runtime target missing.' }

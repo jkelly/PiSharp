@@ -11,8 +11,13 @@ public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = 
     JsonData? ModelHeaders = null, JsonData? Headers = null, JsonData? RuntimeHeaders = null,
     string? SessionId = null, bool SendSessionAffinityHeaders = false, string SessionAffinityHeader = "x-session-affinity",
     double MaximumTokenMagnitude = 1_000_000, int MaximumKeyCharacters = 4096, int MaximumBaseUriCharacters = 4096,
-    int MaximumPayloadBytes = 1_048_576, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
-    int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768);
+    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
+    int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768)
+{
+    /// <summary>Pi abe508e1 anthropic-messages.ts createClient for provider github-copilot: the key travels as
+    /// <c>Authorization: Bearer</c> (the SDK's authToken) instead of x-api-key.</summary>
+    public bool BearerAuthorization { get; init; }
+}
 public enum AnthropicMessagesKeyAuthRequestFailure { InvalidConfiguration, InvalidRequest, InvalidKey, UnsupportedOptions, ResourceLimit }
 public sealed class AnthropicMessagesKeyAuthRequestException : Exception
 {
@@ -40,6 +45,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         AnthropicMessagesRequestOptions projectionOptions, AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
+        _withSession = session => new(baseUri, expectedModel, projectionOptions, _options with { SessionId = session });
         if (baseUri is null || expectedModel is null || projectionOptions is null ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
             _options.MaxTokens is { } tokens && !double.IsFinite(tokens) || _options.MaximumKeyCharacters <= 0 || _options.MaximumBaseUriCharacters <= 0 ||
@@ -51,7 +57,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (baseUri.AbsoluteUri.Length > _options.MaximumBaseUriCharacters ||
             Math.Abs(_options.MaxTokens ?? projectionOptions.MaximumTokens) > _options.MaximumTokenMagnitude)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
-        if (projectionOptions.OAuthProjection || expectedModel.Provider == "github-copilot")
+        if (projectionOptions.OAuthProjection || expectedModel.Provider == "github-copilot" && !_options.BearerAuthorization)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
         // SDK buildURL appends the resource path to a configured base path rather than replacing it.
         try { _endpoint = new Uri(baseUri.AbsoluteUri.TrimEnd('/') + "/v1/messages?beta=true"); }
@@ -75,6 +81,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
                 configured[_options.SessionAffinityHeader] = _options.SessionId;
         }
         ReadHeaders(_options.ModelHeaders, configured, ref supplied);
+        foreach (var (name, value) in PiSharp.AI.Providers.ProviderHeaderPolicies.OpenCodeSessionHeaders(expectedModel.Provider, baseUri, _options.SessionId)) configured[name] = value;
         ReadHeaders(_options.Headers, configured, ref supplied);
         var betaFeatures = projectionOptions.BetaFeatures;
         // Pi getBetaFeatures scans each source in precedence order. A case-sensitive
@@ -102,11 +109,23 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         catch (ArgumentException) { throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration); }
     }
 
+    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
+    private readonly Func<string, AnthropicMessagesKeyAuthRequestFactory> _withSession;
+    private sealed record SessionScoped(string Id, AnthropicMessagesKeyAuthRequestFactory Factory);
+    private SessionScoped? _sessionScoped;
+    private AnthropicMessagesKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
+    {
+        if (request?.SessionId is not { } id || _options.SessionId is not null) return null;
+        if (Volatile.Read(ref _sessionScoped) is { } cached && cached.Id == id) return cached.Factory;
+        var created = _withSession(id); Volatile.Write(ref _sessionScoped, new(id, created)); return created;
+    }
+
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
-        => CreateCore(request, explicitApiKey, cancellationToken, null);
+        => ScopedTo(request) is { } scoped ? scoped.Create(request, explicitApiKey, cancellationToken) : CreateCore(request, explicitApiKey, cancellationToken, null);
 
     public AnthropicMessagesPreparedRequest Prepare(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
     {
+        if (ScopedTo(request) is { } scoped) return scoped.Prepare(request, explicitApiKey, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
         if (string.IsNullOrEmpty(explicitApiKey)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
@@ -169,13 +188,15 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
     }
     private Dictionary<string,string> PreparedHeaders(JsonData projected, string explicitApiKey)
     {
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["x-api-key"] = explicitApiKey };
+        var keyHeader = _options.BearerAuthorization ? "authorization" : "x-api-key";
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        { [keyHeader] = _options.BearerAuthorization ? "Bearer " + explicitApiKey : explicitApiKey };
         foreach (var pair in _headers)
             if (pair.Value is null) headers.Remove(pair.Key); else headers[pair.Key] = pair.Value.Trim(' ', '\t');
         headers["content-type"] = "application/json"; // SDK's JSON encoder body headers override client defaults.
         if (projected.Value.TryGetProperty("betas", out var betas))
             headers["anthropic-beta"] = string.Join(',', betas.EnumerateArray().Select(value => value.GetString()));
-        if (!headers.TryGetValue("x-api-key", out var admittedKey) || admittedKey.Length == 0)
+        if (!headers.TryGetValue(keyHeader, out var admittedKey) || admittedKey.Length == 0)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
         CheckHeaders(headers);
         return headers;

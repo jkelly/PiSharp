@@ -1,9 +1,9 @@
 ---
 title: Coming from Pi
-description: What carries over from Pi, what's imported, and what's different.
+description: What carries over from Pi, and what's different.
 ---
 
-PiSharp follows Pi's design closely, so much of what you know carries over. This page covers what's shared, what's imported, what's different, and what isn't there yet.
+PiSharp follows Pi v1.1.0 closely. Run `pisharp` where you would run `pi`. It reads the same files, takes the same flags and writes the same sessions.
 
 :::tip
 These docs describe PiSharp's current baseline, Pi v1.1.0. Features Pi added later aren't covered until the next sync. Check [Parity](/parity/) for details.
@@ -11,37 +11,37 @@ These docs describe PiSharp's current baseline, Pi v1.1.0. Features Pi added lat
 
 ## What carries over
 
-| From Pi | In PiSharp | Notes |
-| --- | --- | --- |
-| Session files | Read and written | The same JSONL v3 format. Older versions can be migrated with `session migrate`. |
-| `auth.json`, `mcp.json`, `mcp-auth.json`, `keybindings.json` | Shared | Read from Pi's agent folder. See below. |
-| Skills, prompt templates | Loaded by path | Pass each file with `--skill` or `--prompt-template`. Folders aren't discovered yet. |
-| RPC clients | Compatible protocol | The same JSON over stdin/stdout. |
-| `AGENTS.md`, `SYSTEM.md`, themes | Not yet | PiSharp doesn't read these files yet. |
-| TypeScript extensions | Not yet | The Node bridge runs only a pinned set of Pi's examples. See [Node bridge](/docs/extensions/node-bridge/). |
+| From Pi | In PiSharp |
+| --- | --- |
+| Command line | The same flags and modes: `-p`, `--mode json\|rpc`, `--model`, `--continue`, `--resume`, `--tools` and the rest. See [Command line](/docs/reference/cli/). |
+| `~/.pi/agent` | Shared. `settings.json`, `auth.json`, `models.json`, `mcp.json`, `mcp-auth.json`, `keybindings.json` and `trust.json` are read and written in place. |
+| Project `.pi` folder | Read after you trust the project, as in Pi. |
+| `AGENTS.md`, `CLAUDE.md`, `SYSTEM.md`, `APPEND_SYSTEM.md` | Loaded from the same places. |
+| Skills, prompt templates, themes | Discovered in the same folders. |
+| Sessions | Stored in `~/.pi/agent/sessions`, in the same JSONL v3 format. Pi and PiSharp resume each other's sessions. |
+| Sign-ins | `/login` writes `auth.json`. Signing in with one signs in the other. |
+| MCP servers | The same `mcp.json` and `.pi/mcp.json`, OAuth sign-ins, exposure modes, `tool_search` and codemode. |
+| TypeScript extensions and packages | Run through the [Node bridge](/docs/extensions/node-bridge/), with Pi's own npm packages. `pisharp install` installs Pi packages. |
+| RPC clients | The same protocol over stdin and stdout. |
 
-## Where PiSharp keeps its files
+See [Files and settings](/docs/reference/configuration/) for the full list of paths.
 
-PiSharp shares Pi's agent folder, `~/.pi/agent` (or `PI_CODING_AGENT_DIR`), for credentials, MCP servers and keybindings:
+## Older session files
 
-- `auth.json`: `/login` and `/logout` write to the same file Pi uses, so signing in with one signs in the other.
-- `mcp.json` and `mcp-auth.json`: `pisharp mcp add`, `remove`, `login` and `logout` change the same files Pi reads.
-- `keybindings.json`: read only.
+PiSharp opens Pi's current (v3) session files directly. For v1 and v2 files, or to work on a copy:
 
-Settings come only from files you pass with `--user-settings` and `--project-settings`. PiSharp doesn't read Pi's `settings.json` on its own.
-
-Session files are the ones you name with `--session`. PiSharp has no session folder of its own.
-
-## Importing Pi sessions
-
-PiSharp opens Pi's current (v3) session files directly, and appends to the file it opens. To keep a Pi session untouched, work on a copy:
-
-- `pisharp session copy --source <file> --destination <file> --format current-jsonl` writes a Pi-compatible copy. `--format native-exact` keeps everything PiSharp records.
-- `pisharp session copy-inspect --source <file>` reports what a copy would keep or leave out, without writing anything.
-- `pisharp session migrate --source <file> --destination <file>` converts an older (v1 or v2) session file to v3. The original is not changed.
+- `pisharp session migrate --source <file> --destination <file>` converts an older session file to v3. The original is not changed.
+- `pisharp session copy --source <file> --destination <file> --format current-jsonl` writes a Pi-compatible copy.
 
 ## What's different
 
-- **Extensions are C#.** Native extensions are .NET assemblies that implement `IPiSharpExtension`. See [Build an extension](/docs/extensions/build-an-extension/).
-- **No Node required.** Node is only needed for the optional bridge, which is still in development.
+- **It's a .NET tool.** Install and update it with `dotnet tool install|update -g PiSharp.Cli`. `pisharp update` updates packages and model catalogs, but not PiSharp itself.
+- **Node is optional.** The agent runs on .NET alone. Node is needed only to run TypeScript extensions.
+- **C# extensions.** Besides Pi's TypeScript extensions, PiSharp loads native C# extensions from the same extension folders. See [Build an extension](/docs/extensions/build-an-extension/).
+- **Tool policy.** A PiSharp option, `--tool-policy explicit`, limits the built-in tools to paths and commands you grant. The default, `pi`, behaves as Pi does. See [Tool policy](/docs/reference/configuration/#tool-policy).
+- **No telemetry.** PiSharp doesn't report installs to Pi's servers. `PI_TELEMETRY` is ignored.
+- **`/bug` opens a GitHub issue.** Reports never go to Pi's developers. PiSharp writes the report zip and opens a prefilled issue on [PiSharp's GitHub](https://github.com/jkelly/PiSharp/issues) for you to attach it to. See [/bug](/docs/guides/interactive/).
+- **It names itself.** Requests carry a PiSharp user agent, not Pi's.
 - **Versions match Pi's.** See [How versions work](/docs/versioning/).
+
+The [Parity](/parity/) page lists the smaller differences that remain.

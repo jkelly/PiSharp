@@ -41,7 +41,7 @@ internal static class NativeRpcHtmlExportTests
                 "Actual host did not install its explicit existing write invoker.");
             var html = await File.ReadAllBytesAsync(output, stop.Token);
             Check(html.Length > 0 && !(html.Length >= 3 && html[0] == 0xef && html[1] == 0xbb && html[2] == 0xbf) &&
-                System.Text.Encoding.UTF8.GetString(html).Contains("HTML export fixture", StringComparison.Ordinal), "Host output bytes/content changed.");
+                SessionData(System.Text.Encoding.UTF8.GetString(html)).Contains("HTML export fixture", StringComparison.Ordinal), "Host output bytes/content changed.");
             Check(!(await Response(new { id = "denied", type = "export_html", outputPath = denied })).GetProperty("success").GetBoolean() && !File.Exists(denied),
                 "Host exporter created an implicit destination grant.");
             var after = await SourceBytes(source, stop.Token);
@@ -74,6 +74,14 @@ internal static class NativeRpcHtmlExportTests
         await input.ReadExactlyAsync(bytes, token);
         Check(input.Length == bytes.Length && input.Position == bytes.Length, "Fixture source changed during snapshot read.");
         return bytes;
+    }
+    /// <summary>The decoded base64 session data of Pi's export page.</summary>
+    private static string SessionData(string html)
+    {
+        const string opening = "<script id=\"session-data\" type=\"application/json\">"; var start = html.IndexOf(opening, StringComparison.Ordinal);
+        Check(start >= 0, "Missing session data script."); start += opening.Length;
+        var end = html.IndexOf("</script>", start, StringComparison.Ordinal); Check(end >= start, "Unclosed session data script.");
+        return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(html[start..end]));
     }
     private static void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 }

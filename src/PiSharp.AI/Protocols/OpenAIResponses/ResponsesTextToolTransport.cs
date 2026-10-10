@@ -46,9 +46,9 @@ public sealed record ResponsesTokenRates(decimal Input = 0, decimal Output = 0, 
 { public ImmutableArray<ResponsesTokenRateTier> Tiers { get; init; } = []; }
 
 public sealed record ResponsesTextToolOptions(
-    int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
-    int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64,
-    int MaximumContentCharacters = 1_048_576, int MaximumJsonDepth = 32,
+    int MaximumEvents = int.MaxValue, int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
+    int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue,
+    int MaximumContentCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32,
     ResponsesTokenRates? Rates = null, string? ServiceTier = null)
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: selects each custom tool call's grammar input property.</summary>
@@ -232,7 +232,10 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         private readonly ChatRequest _request;
         private Dictionary<string, string>? _grammarInputs;
         private readonly AssistantStreamReducer _reducer;
+        // openai-responses-shared.ts outputSlots: the open slot of each output_index. output_item.done removes it and a
+        // later output_item.added or output_item.done for that index opens a new content block; every block stays in _content.
         private readonly Dictionary<int, Slot> _slots = [];
+        private readonly List<Slot> _content = [];
         private readonly Dictionary<string, Slot> _reasoningById = new(StringComparer.Ordinal);
         private JsonFields _properties = JsonFields.Empty;
         private TokenUsage _usage = TokenUsage.Zero;
@@ -302,18 +305,20 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 case "response.output_item.added":
                     Add(Index(value), Object(value.GetProperty("item")), Emit);
                     break;
+                // openai-responses-shared.ts processResponsesStream: each slot event finds the open slot of its output_index
+                // with getSlot(output_index, type) and does nothing ("if (!slot) continue;") when there is none of that type.
                 case "response.output_text.delta":
                 case "response.refusal.delta":
-                    var text = Active(value, "message");
+                    if (Active(value, "message") is not { } text) break;
                     Emit(new TextDelta(text.Index, String(value, "delta", allowEmpty: true)));
                     break;
                 case "response.reasoning_summary_text.delta":
                 case "response.reasoning_text.delta":
-                    var thinking = Active(value, "reasoning");
+                    if (Active(value, "reasoning") is not { } thinking) break;
                     Emit(new ThinkingDelta(thinking.Index, String(value, "delta", allowEmpty: true)));
                     break;
                 case "response.reasoning_summary_part.done":
-                    var summary = Active(value, "reasoning");
+                    if (Active(value, "reasoning") is not { } summary) break;
                     Emit(new ThinkingDelta(summary.Index, "\n\n"));
                     break;
                 case "response.reasoning_summary_part.added":
@@ -322,11 +327,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     // The pinned mapper obtains authoritative text from output_item.done.
                     break;
                 case "response.function_call_arguments.delta":
-                    var tool = Active(value, "function_call");
+                    if (Active(value, "function_call") is not { } tool) break;
                     Emit(new ToolCallDelta(tool.Index, String(value, "delta", allowEmpty: true)));
                     break;
                 case "response.function_call_arguments.done":
-                    var argsSlot = Active(value, "function_call");
+                    if (Active(value, "function_call") is not { } argsSlot) break;
                     var arguments = String(value, "arguments", allowEmpty: true);
                     var previous = _reducer.GetToolJsonPreview(argsSlot.Index);
                     if (arguments.StartsWith(previous, StringComparison.Ordinal))
@@ -336,18 +341,20 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     else Emit(new ToolCallCheckpoint(argsSlot.Index, arguments));
                     break;
                 case "response.custom_tool_call_input.delta":
-                    var custom = Active(value, "custom_tool_call");
+                    if (Active(value, "custom_tool_call") is not { } custom) break;
                     CustomInput(custom, custom.CustomInput + String(value, "delta", allowEmpty: true), false, Emit);
                     break;
                 case "response.custom_tool_call_input.done":
-                    var customDone = Active(value, "custom_tool_call");
+                    if (Active(value, "custom_tool_call") is not { } customDone) break;
                     CustomInput(customDone, String(value, "input", allowEmpty: true), true, Emit);
                     break;
                 case "response.output_item.done":
                     var item = Object(value.GetProperty("item"));
                     var outputIndex = Index(value);
-                    if (!_slots.TryGetValue(outputIndex, out var slot)) slot = Add(outputIndex, item, Emit);
-                    if (slot.Ended || String(item, "type") != slot.Kind || String(item, "id") != slot.ItemId) throw Protocol();
+                    // getOrCreateSlot(output_index, item): the open slot, else a new one for a supported item type. A slot of
+                    // another type is left open and the event does nothing; the slot's own id, call_id and name stay authoritative.
+                    var slot = _slots.TryGetValue(outputIndex, out var open) ? open : Add(outputIndex, item, Emit);
+                    if (slot is null || String(item, "type") != slot.Kind) break;
                     if (slot.Kind == "reasoning")
                     {
                         var summaryText = ReasoningText(item, "summary");
@@ -355,7 +362,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                         slot.FinalThinking = summaryText.Length > 0 ? summaryText : contentText.Length > 0 ? contentText :
                             ((ThinkingContent)_reducer.Snapshot().Content[slot.Index]).Thinking;
                         slot.ReasoningItem = JsonData.FromElement(item);
-                        _reasoningById[slot.ItemId] = slot;
+                        _reasoningById[String(item, "id")] = slot;
                         // Nonempty encryption is final: Source never replaces it during backfill.
                         // Only incomplete signatures must wait for the immutable native end.
                         if (!string.IsNullOrEmpty(OptionalStringOrNull(item, "encrypted_content"))) EndThinking(slot, Emit);
@@ -376,12 +383,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                                 _ => throw Protocol()
                             });
                         }
-                        var signature = Signature(slot.ItemId, OptionalString(item, "phase"));
+                        var signature = Signature(String(item, "id"), OptionalString(item, "phase"));
                         Emit(new TextEnded(slot.Index, string.Concat(pieces), JsonFields.Empty.Set("textSignature", StringData(signature))));
                     }
                     else if (slot.Kind == "custom_tool_call")
                     {
-                        if (String(item, "call_id") != slot.CallId || String(item, "name") != slot.Name) throw Protocol();
                         CustomInput(slot, OptionalStringOrNull(item, "input") ?? slot.CustomInput, true, Emit);
                         var started = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
                         var customFields = started.ExtraProperties ?? JsonFields.Empty;
@@ -391,20 +397,20 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     }
                     else
                     {
-                        if (String(item, "call_id") != slot.CallId || String(item, "name") != slot.Name) throw Protocol();
                         var raw = OptionalString(item, "arguments");
                         if (string.IsNullOrEmpty(raw)) raw = _reducer.GetToolJsonPreview(slot.Index);
                         if (raw.Length == 0) raw = "{}";
+                        // openai-responses-shared.ts output_item.done: parseStreamingJson(item.arguments || partialJson || "{}").
                         JsonData final;
-                        try { final = FinalToolArguments.ParseStrict(raw).Json; }
-                        catch (Exception exception) when (exception is JsonException or StreamProtocolException) { throw Protocol(); }
-                        CheckJson(final.Value, 0);
+                        try { final = StreamingJson.Parse(raw); }
+                        catch (JsonException) { throw Protocol(); }
                         var original = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
                         var fields = original.ExtraProperties ?? JsonFields.Empty;
                         if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));
                         Emit(new ToolCallEnded(slot.Index, new(original.Id, original.Name, final, fields)));
                     }
                     slot.Ended = true;
+                    _slots.Remove(outputIndex);
                     break;
                 case "error":
                     ProviderFailure("Error Code " + String(value, "code", allowEmpty: true) + ": " + String(value, "message", allowEmpty: true));
@@ -453,11 +459,13 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                             "Response incomplete: " + incompleteReason : "Response incomplete without a provider reason"));
                     if (response.TryGetProperty("usage", out var usage)) _usage = Usage(Object(usage));
                     ApplyServiceTier(OptionalStringOrNull(response, "service_tier") ?? _options.ServiceTier);
-                    foreach (var finished in _slots.Values.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
+                    foreach (var finished in _content.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
                         EndThinking(finished, Emit);
                     _completed = true;
                     break;
-                default: throw Protocol();
+                // openai-responses-shared.ts processResponsesStream: other event types (response.content_part.added,
+                // response.output_text.done, response.content_part.done, ...) fall through its if/else chain and are ignored.
+                default: break;
             }
             return events;
         }
@@ -513,14 +521,18 @@ public sealed class ResponsesTextToolTransport : IChatTransport
 
         private static string? OptionalStringOrNull(JsonElement value, string name) =>
             value.TryGetProperty(name, out var field) && field.ValueKind != JsonValueKind.Null ? String(value, name, allowEmpty: true) : null;
-        private Slot Add(int outputIndex, JsonElement item, Action<StreamEvent> emit)
+        // openai-responses-shared.ts createSlot: a reasoning, message, function_call or custom_tool_call item opens a new
+        // content block and becomes the open slot of its output_index (replacing any open one); other item types open none.
+        private Slot? Add(int outputIndex, JsonElement item, Action<StreamEvent> emit)
         {
-            if (_slots.ContainsKey(outputIndex)) throw Protocol();
-            if (_slots.Count >= _options.MaximumContentSlots) throw Limit();
             var kind = String(item, "type");
-            var itemId = String(item, "id");
+            if (kind is not ("reasoning" or "message" or "function_call" or "custom_tool_call")) return null;
+            if (_content.Count >= _options.MaximumContentSlots) throw Limit();
             var call = kind is "function_call" or "custom_tool_call";
-            var slot = new Slot(_slots.Count, kind, itemId, call ? String(item, "call_id") : null, call ? String(item, "name") : null);
+            // openai-responses-shared.ts: id `${item.call_id}|${item.id}` (a missing part reads "undefined") and name item.name, an empty
+            // string included (owner decision 13); a missing name stays unrepresentable and fails as malformed.
+            var itemId = ItemText(item, "id", call);
+            var slot = new Slot(_content.Count, kind, itemId, call ? CallText(item, "call_id") : null, call ? String(item, "name", allowEmpty: true) : null);
             if (kind == "reasoning") emit(new ThinkingStarted(slot.Index, new ThinkingContent("")));
             else if (kind == "message") emit(new TextStarted(slot.Index, new TextContent("")));
             else if (kind == "function_call")
@@ -540,8 +552,8 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));
                 emit(new ToolCallStarted(slot.Index, new(slot.CallId + "|" + itemId, slot.Name!, JsonData.EmptyObject, fields)));
             }
-            else throw Protocol();
-            _slots.Add(outputIndex, slot);
+            _slots[outputIndex] = slot;
+            _content.Add(slot);
             return slot;
         }
 
@@ -565,28 +577,27 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             emit(new ToolCallDelta(slot.Index, delta.ToString()));
         }
 
-        private Slot Active(JsonElement value, string kind)
-        {
-            if (!_slots.TryGetValue(Index(value), out var slot) || slot.Ended || slot.Kind != kind) throw Protocol();
-            if (value.TryGetProperty("item_id", out _) && String(value, "item_id") != slot.ItemId) throw Protocol();
-            return slot;
-        }
+        // getSlot(event.output_index, type): the open slot of that output_index when it has the type, matched by index alone
+        // (item_id is not consulted); a missing or non-index output_index finds none.
+        private Slot? Active(JsonElement value, string kind) =>
+            value.TryGetProperty("output_index", out var index) && index.ValueKind == JsonValueKind.Number &&
+            index.TryGetInt32(out var outputIndex) && _slots.TryGetValue(outputIndex, out var slot) && slot.Kind == kind ? slot : null;
 
         public List<StreamEvent> EndPendingThinking()
         {
             var events = new List<StreamEvent>();
-            foreach (var slot in _slots.Values.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
+            foreach (var slot in _content.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
                 EndThinking(slot, progress => { _reducer.Apply(progress); events.Add(progress); });
             return events;
         }
         public StreamTerminalEvent Finish()
         {
             if (!_completed) throw new StreamProtocolException("Responses stream ended before a supported terminal response.");
-            var unfinished = _slots.Values.Any(slot => !slot.Ended);
+            var unfinished = _content.Any(slot => !slot.Ended);
             if (!_incomplete && !ProviderFailed && unfinished)
                 throw new StreamProtocolException("Responses stream completed with unfinished content.");
             if (_incomplete && _stopReason == StopReason.Length &&
-                _slots.Values.Any(slot => !slot.Ended && slot.Kind != "message"))
+                _content.Any(slot => !slot.Ended && slot.Kind != "message"))
             {
                 // Preserve usage and partial content, but never invent authoritative ends.
                 _stopReason = StopReason.Error;
@@ -595,7 +606,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var message = _reducer.Snapshot() with
             {
                 Usage = _usage, ExtraProperties = _properties,
-                StopReason = _stopReason == StopReason.Stop && _slots.Values.Any(slot => slot.Kind is "function_call" or "custom_tool_call") ? StopReason.ToolUse : _stopReason
+                StopReason = _stopReason == StopReason.Stop && _content.Any(slot => slot.Kind is "function_call" or "custom_tool_call") ? StopReason.ToolUse : _stopReason
             };
             StreamTerminalEvent terminal = message.StopReason == StopReason.Error ?
                 new StreamError(StopReason.Error, message) : new StreamDone(message.StopReason, message);
@@ -613,13 +624,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         {
             var multiplier = ResponsesServiceTier.Multiplier(_modelId, tier);
             if (multiplier == 1) return;
-            var cost = _usage.Cost;
-            var input = ComputedCost(checked(cost.Input * multiplier));
-            var output = ComputedCost(checked(cost.Output * multiplier));
-            var read = ComputedCost(checked(cost.CacheRead * multiplier));
-            var write = ComputedCost(checked(cost.CacheWrite * multiplier));
-            _usage = _usage with { Cost = cost with { Input = input, Output = output, CacheRead = read, CacheWrite = write,
-                Total = ComputedCost(checked(input + output + read + write)) } };
+            // openai-responses.ts applyServiceTierPricing multiplies the binary64 costs and sums them again.
+            var cost = _usage.Cost; var factor = Number(multiplier);
+            double input = Source(cost, "input") * factor, output = Source(cost, "output") * factor;
+            double read = Source(cost, "cacheRead") * factor, write = Source(cost, "cacheWrite") * factor;
+            _usage = _usage with { Cost = Binary64Cost(input, output, read, write, input + output + read + write) };
         }
         private TokenUsage Usage(JsonElement usage)
         {
@@ -637,19 +646,33 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             // Pi abe508 models.ts calculateCost through the shared tier selection.
             var rates = PromptLengthPricing.TrySelect(_rates.Tiers, candidate => candidate.InputTokensAbove, (decimal)uncached, cached, written, out var tier)
                 ? new ResponsesTokenRates(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite) : _rates;
-            var inputCost = ComputedCost(checked(rates.Input / 1_000_000m * uncached));
-            var outputCost = ComputedCost(checked(rates.Output / 1_000_000m * output));
-            var cachedCost = ComputedCost(checked(rates.CacheRead / 1_000_000m * cached));
-            var writtenCost = ComputedCost(checked(rates.CacheWrite / 1_000_000m * written));
+            // models.ts calculateCost in binary64 Numbers: three divide-then-multiply terms, the cache write term multiplies
+            // before dividing (no 1h writes here), and the total is left associative.
+            var inputCost = Number(rates.Input) / 1_000_000d * uncached;
+            var outputCost = Number(rates.Output) / 1_000_000d * output;
+            var cachedCost = Number(rates.CacheRead) / 1_000_000d * cached;
+            var writtenCost = (Number(rates.CacheWrite) * written + Number(rates.Input) * 2d * 0d) / 1_000_000d;
             return new(uncached, output, cached, written, total,
-                new(inputCost, outputCost, cachedCost, writtenCost, ComputedCost(checked(inputCost + outputCost + cachedCost + writtenCost))),
-                JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+                Binary64Cost(inputCost, outputCost, cachedCost, writtenCost, ((inputCost + outputCost) + cachedCost) + writtenCost),
+                JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(System.Globalization.CultureInfo.InvariantCulture)))) { ExtrasBeforeTotal = true };
         }
 
-        // Only derived costs acquire a canonical decimal scale; raw provider/tool JSON is never rewritten.
-        private static decimal ComputedCost(decimal value) => decimal.Parse(
-            value.ToString("G29", System.Globalization.CultureInfo.InvariantCulture),
+        // A decimal rate as the Number JSON.parse reads from its text.
+        private static double Number(decimal value) => double.Parse(value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+        private static double Source(UsageCost cost, string name) => cost.SourceBinary64Cost is { } source
+            ? source.Value.GetProperty(name).GetDouble()
+            : Number(name switch { "input" => cost.Input, "output" => cost.Output, "cacheRead" => cost.CacheRead, _ => cost.CacheWrite });
+        // The typed decimals are the binary64 values' shortest decimal text; the wire writes the Numbers themselves.
+        private UsageCost Binary64Cost(double input, double output, double read, double write, double total)
+        {
+            if (!double.IsFinite(input) || !double.IsFinite(output) || !double.IsFinite(read) || !double.IsFinite(write) || !double.IsFinite(total))
+                throw Protocol();
+            var data = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new { input, output, cacheRead = read, cacheWrite = write, total })));
+            var value = data.Value;
+            return new(value.GetProperty("input").GetDecimal(), value.GetProperty("output").GetDecimal(), value.GetProperty("cacheRead").GetDecimal(),
+                value.GetProperty("cacheWrite").GetDecimal(), value.GetProperty("total").GetDecimal(), SourceBinary64Cost: data);
+        }
 
         private void CheckJson(JsonElement value, int depth)
         {
@@ -681,6 +704,14 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         }
         private static string? OptionalString(JsonElement value, string name)
             => value.TryGetProperty(name, out _) ? String(value, name, allowEmpty: true) : null;
+        /// <summary>A tool-call identity part as a JavaScript template literal reads it: the string (empty included), "undefined" when
+        /// absent, "null" for null.</summary>
+        private static string CallText(JsonElement value, string name) =>
+            !value.TryGetProperty(name, out var field) ? "undefined" : field.ValueKind switch
+            {
+                JsonValueKind.String => field.GetString()!, JsonValueKind.Null => "null", _ => throw Protocol()
+            };
+        private static string ItemText(JsonElement item, string name, bool call) => call ? CallText(item, name) : String(item, name);
         private static int Index(JsonElement value)
         {
             if (!value.TryGetProperty("output_index", out var index) || !index.TryGetInt32(out var result) || result < 0) throw Protocol();

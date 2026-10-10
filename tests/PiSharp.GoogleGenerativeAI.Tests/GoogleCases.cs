@@ -212,12 +212,21 @@ internal static class GoogleCases
         // Only first candidate is mapped, and signatures alone do not mark thinking.
         var ignored = await Complete(Wire("""{"candidates":[{"content":{"parts":[{"text":"visible","thoughtSignature":"c2ln"}]},"finishReason":"STOP"},{"content":{"parts":[{"text":"ignored"}]}}]}"""));
         Equal("visible", ((TextContent)ignored.Message.Content.Single()).Text);
-        foreach (var framing in new[] { "\uFEFF: ignored comment\n\ndata: " + TextChunk + "\n\n",
-            "data: {\"candidates\":\ndata: [{\"content\":{\"parts\":[{\"text\":\"π\"}]},\"finishReason\":\"STOP\"}]}\n\n",
-            "data: " + TextChunk, Wire(TextChunk) + "data: [DONE]\n\n" })
+        // @google/genai processStreamResponse framing: events split at \n\n, \r\r or \r\n\r\n; non-data events are skipped.
+        foreach (var framing in new[] { "\uFEFF: ignored comment\n\ndata: " + TextChunk + "\n\n", "data: " + TextChunk + "\r\r",
+            "data: " + TextChunk + "\r\n\r\n", "event: ignored\n\n  data:" + TextChunk + "  \n\n\n" })
         {
             var framed = await Complete(framing, Options() with { ReadBufferBytes = 1 });
             Check(framed.Failure is null, "Authored native framing failed."); Equal("π", ((TextContent)framed.Message.Content.Single()).Text);
+        }
+        // Multi-line data is one JSON text, an unterminated frame is an incomplete segment and [DONE] is not JSON.
+        foreach (var (framing, error) in new[] {
+            ("data: {\"candidates\":\ndata: [{\"content\":{\"parts\":[{\"text\":\"π\"}]},\"finishReason\":\"STOP\"}]}\n\n", "Unexpected token 'd', ...\"didates\":\ndata: [{\"c\"... is not valid JSON"),
+            ("data: " + TextChunk, "Incomplete JSON segment at the end"),
+            (Wire(TextChunk) + "data: [DONE]\n\n", "Unexpected token 'D', \"[DONE]\" is not valid JSON") })
+        {
+            var framed = await Complete(framing, Options() with { ReadBufferBytes = 1 });
+            Check(framed.Failure is not null, "Upstream-rejected framing accepted."); Equal(error, Error(framed));
         }
         var raw = JsonNode.Parse(Options().ModelMetadata.ToString())!;
         raw["cost"]!["tiers"] = JsonNode.Parse("""[{"inputTokensAbove":20,"input":9,"output":9,"cacheRead":9,"cacheWrite":0},{"inputTokensAbove":10,"input":4,"output":5,"cacheRead":1,"cacheWrite":0}]""");
@@ -238,14 +247,49 @@ internal static class GoogleCases
             Equal(finish, result.Message.ExtraProperties!.Values["rawStopReason"].Value.GetString());
             Check((result.Failure is null) == (finish is "STOP" or "MAX_TOKENS"), "Finish authority differs.");
         }
-        foreach (var chunk in new[] {
-            """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"","args":{}}}]},"finishReason":"STOP"}]}""",
-            """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":[]}}]},"finishReason":"STOP"}]}""",
-            """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":{"x":1,"x":2}}}]},"finishReason":"STOP"}]}""",
-            """{"candidates":[{"content":{"parts":[{"text":false}]},"finishReason":"STOP"}]}""",
-            "{bad}" })
+        // Captured from the installed pi-ai 1.1.0 google-generative-ai stream (@google/genai 2.21.0): google-generative-ai.ts takes
+        // functionCall.name || "", functionCall.args ?? {} (any JSON value; JSON.parse keeps the last duplicate name), id
+        // `${functionCall.name}_${Date.now()}_${n}` when none is given, and joins any `text` value as a JavaScript string.
+        foreach (var (chunk, toolName, idPrefix, arguments, text) in new (string, string?, string?, string?, string?)[] {
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":[]}}]},"finishReason":"STOP"}]}""", "inspect", "inspect_", "[]", null),
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":"x"}}]},"finishReason":"STOP"}]}""", "inspect", "inspect_", "\"x\"", null),
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":{"x":1,"x":2}}}]},"finishReason":"STOP"}]}""", "inspect", "inspect_", """{"x":2}""", null),
+            ("""{"candidates":[{"content":{"parts":[{"text":false}]},"finishReason":"STOP"}]}""", null, null, null, "false"),
+            ("""{"candidates":[{"content":{"parts":[{"text":null},{"text":1.5},{"text":{"a":1}}]},"finishReason":"STOP"}]}""", null, null, null, "null1.5[object Object]"),
+            ("""{"candidates":[{"content":{"parts":["x"]},"finishReason":"STOP"}]}""", null, null, null, null) })
         {
-            var failed = await Complete(Wire(chunk)); Check(failed.Failure is not null && failed.Message.StopReason == StopReason.Error, "Invalid tool/value accepted.");
+            var result = await Complete(Wire(chunk)); Check(result.Failure is null, "Upstream-accepted chunk failed: " + chunk);
+            Equal(toolName is null ? StopReason.Stop : StopReason.ToolUse, result.Message.StopReason);
+            if (toolName is not null)
+            {
+                var call = (ToolCallContent)result.Message.Content.Single();
+                Equal(toolName, call.Name); Check(call.Id.StartsWith(idPrefix!, StringComparison.Ordinal), "Generated tool id differs: " + call.Id);
+                Equal(arguments, call.Arguments.ToString());
+            }
+            else Equal(text, text is null ? (result.Message.Content.IsEmpty ? null : "content") : ((TextContent)result.Message.Content.Single()).Text);
+        }
+        // Rejected as upstream rejects them: JSON.parse's SyntaxError, the TypeErrors of iterating a non-iterable parts value and of
+        // reading `.text` on a null part, and a candidates value without a first candidate (no finish reason).
+        foreach (var (chunk, error) in new[] {
+            ("{bad}", "Expected property name or '}' in JSON at position 1 (line 1 column 2)"),
+            ("""{"candidates":[{"content":{"parts":{}},"finishReason":"STOP"}]}""", "candidate.content.parts is not iterable"),
+            ("""{"candidates":[{"content":{"parts":[null]},"finishReason":"STOP"}]}""", "Cannot read properties of null (reading 'text')"),
+            ("""{"candidates":{}}""", "Google stream ended without a finish reason") })
+        {
+            var failed = await Complete(Wire(chunk)); Check(failed.Failure is not null && failed.Message.StopReason == StopReason.Error, "Invalid chunk accepted: " + chunk);
+            Equal(error, Error(failed));
+        }
+        // Owner decision 13: upstream pushes a nameless tool call with name "" and an id "_<ms>_<n>" (name "") or "undefined_<ms>_<n>" (name
+        // missing, or a non-object functionCall), and the turn ends as toolUse (captured from @earendil-works/pi-ai@1.1.0).
+        foreach (var (chunk, prefix) in new[] {
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"name":"","args":{}}}]},"finishReason":"STOP"}]}""", "_"),
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"args":{"a":1}}}]},"finishReason":"STOP"}]}""", "undefined_"),
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":"x"}]},"finishReason":"STOP"}]}""", "undefined_") })
+        {
+            var nameless = await Complete(Wire(chunk));
+            Check(nameless.Failure is null && nameless.Message.StopReason == StopReason.ToolUse, "Nameless tool call not pushed: " + chunk);
+            var call = nameless.Message.Content.OfType<ToolCallContent>().Single();
+            Check(call.Name.Length == 0 && System.Text.RegularExpressions.Regex.IsMatch(call.Id, "^" + prefix + "\\d+_\\d+$"), "Nameless identity: " + call.Id + "/" + call.Name);
         }
         var eof = await Complete(Wire(ToolChunk.Replace(",\"finishReason\":\"STOP\"", "", StringComparison.Ordinal)));
         Check(eof.Failure is not null && Error(eof).Contains("without a finish reason", StringComparison.Ordinal), "Missing finish accepted.");

@@ -66,6 +66,9 @@ public interface IExtensionCommandCatalogContext : IExtensionCommandContext
 public delegate ValueTask<JsonData> ExtensionToolCallback(
     JsonData arguments, IExtensionToolContext context, CancellationToken cancellationToken);
 /// <summary>Pure trusted preparation, with cancellation but no host operation or UI context.</summary>
+/// <summary>Source agent-loop prepareToolCall: an error the tool's prepareArguments throws becomes the call's error result, whose text
+/// is the error's message. The registry raises it for any (non-cancellation) failure of a preparation callback.</summary>
+public sealed class ExtensionToolArgumentPreparationException(string message, Exception? innerException = null) : Exception(message, innerException);
 public delegate ValueTask<JsonData> ExtensionToolArgumentPreparationCallback(
     JsonData arguments, CancellationToken cancellationToken);
 public delegate ValueTask ExtensionCommandCallback(
@@ -79,6 +82,12 @@ public sealed record ExtensionToolDescriptor(
     string RegistrationId, string Name, string Description, JsonData Parameters, ExtensionToolCallback ExecuteAsync)
 {
     public ExtensionToolArgumentPreparationCallback? PrepareInitialArgumentsAsync { get; init; }
+    /// <summary>Source validateToolArguments: how <see cref="Parameters"/> was produced. Plain JSON schemas (the default, as MCP
+    /// tools and extensions passing raw objects) get JSON-schema coercion only; TypeBox 1.x schemas are also converted.</summary>
+    public ToolSchemaOrigin ParametersOrigin { get; init; } = ToolSchemaOrigin.JsonSchema;
+    /// <summary>The schema validateToolArguments checks when it differs from the model-facing <see cref="Parameters"/>, for example a
+    /// Node extension's TypeBox schema with its hidden "~kind" markers made visible. Null checks <see cref="Parameters"/>.</summary>
+    public JsonData? ValidationParameters { get; init; }
     public ToolExposure Exposure { get; init; } = ToolExposure.Direct;
     public ToolNamespace? Namespace { get; init; }
     /// <summary>Only direct/model-only tools activate by default. Other exposures require explicit activation.</summary>
@@ -87,8 +96,20 @@ public sealed record ExtensionToolDescriptor(
     public Func<ToolLoadout, ToolLoadoutChanges?>? PrepareLoadout { get; init; }
     /// <summary>Source promptGuidelines, reported to loadout preparation by ToolLoadout.GetPromptGuidelines.</summary>
     public ImmutableArray<string> PromptGuidelines { get; init; } = [];
+    /// <summary>Source constrainedSampling: provider sampling constraints carried on the model-facing declaration, for example
+    /// <c>{ "type": "grammar", "variants": { "openai_lark": "..." } }</c>. Null declares none.</summary>
+    public JsonData? ConstrainedSampling { get; init; }
     /// <summary>The tool's own renderers, consulted after every registered tool renderer resolver.</summary>
     public ExtensionToolRenderers? Renderers { get; init; }
+    /// <summary>Source ToolAnnotations: the author's unverified hints with MCP's meaning (<c>readOnlyHint</c>, <c>destructiveHint</c>,
+    /// <c>idempotentHint</c>, <c>openWorldHint</c>), reported by getAllTools. Null declares none.</summary>
+    public System.Collections.Immutable.ImmutableDictionary<string, bool>? Annotations { get; init; }
+    /// <summary>Source ToolDefinition.promptSnippet: the one-line entry of the system prompt's tool list (none when null).</summary>
+    public string? PromptSnippet { get; init; }
+    /// <summary>Source ToolDefinition.executionMode <c>"sequential"</c>: a batch containing this tool runs its calls one at a time.</summary>
+    public bool SequentialExecution { get; init; }
+    /// <summary>Source ToolDefinition.outputSchema: the JSON schema of the result's <c>structuredContent</c> (codemode resolves to it).</summary>
+    public JsonData? OutputSchema { get; init; }
 }
 
 public sealed record ExtensionCommandDescriptor(

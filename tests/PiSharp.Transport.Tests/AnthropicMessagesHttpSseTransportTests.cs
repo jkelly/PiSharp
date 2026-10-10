@@ -21,6 +21,8 @@ internal static class AnthropicMessagesHttpSseTransportTests
     private const string ToolStart = """{"type":"content_block_start","index":9,"content_block":{"type":"tool_use","id":"call-authored","name":"inspect","input":{}}}""";
     private const string ToolEnd = """{"type":"content_block_stop","index":9}""";
     private const string Arguments = """{"value":1.0,"opaque":"001","nil":null}""";
+    // anthropic-messages.ts:803 finalizes partialJson with parseStreamingJson (JSON.parse): 1.0 is the Number 1 (installed pi-ai 1.1.0).
+    private const string ParsedArguments = """{"value":1,"opaque":"001","nil":null}""";
     private const string Declaration = """{"role":"system","content":"Inspect once.","toolsAdded":[{"name":"inspect","description":"Authored inert declaration.","parameters":{"type":"object","properties":{"value":{"type":"number","minimum":0.5}},"required":[]}}],"timestamp":123}""";
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(5);
 
@@ -71,14 +73,16 @@ internal static class AnthropicMessagesHttpSseTransportTests
             var result = await new ChatClient(transport, capacity: 1).CompleteAsync(Request());
             if (observationFailure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(observationFailure).Throw();
             Equal(1, sends); Equal(Model.Id, result.Message.Model); Equal(fallbackModel, Metadata(result.Message, "responseModel"));
-            Equal(0.0003m, result.Message.Usage.Cost.Input);
+            // models.ts:1214 calculateCost runs in binary64 Numbers: 3 / 1e6 * 100 is 0.00030000000000000003 (installed pi-ai 1.1.0
+            // against a local fake server prices this fallback at input 0.00030000000000000003, output 0.0001, total 0.0004).
+            Equal(0.00030000000000000003m, result.Message.Usage.Cost.Input);
             if (complete)
             {
                 Check(result.Failure is null, "Complete HTTP fallback did not settle successfully.");
                 Equal(0.0001m, result.Message.Usage.Cost.Output); Equal(0.0004m, result.Message.Usage.Cost.Total);
                 Equal(1, result.Message.Content.Length); Check(result.Message.Content[0] is TextContent, "Marker became replayable content.");
             }
-            else { Failed(result, "UnexpectedEof"); Equal(0, result.Message.Content.Length); Equal(0.0003m, result.Message.Usage.Cost.Total); }
+            else { Failed(result, "UnexpectedEof"); Equal(0, result.Message.Content.Length); Equal(0.00030000000000000003m, result.Message.Usage.Cost.Total); }
             Check(response.Disposed, "Fallback terminal skipped response cleanup.");
             await ThrowsAsync<ObjectDisposedException>(() => owned!.Content!.ReadAsStringAsync());
         }
@@ -236,7 +240,7 @@ internal static class AnthropicMessagesHttpSseTransportTests
             Equal(0, effects.Calls); releaseCommit.TrySetResult();
             var turn = await running.WaitAsync(Deadline);
             Check(turn.Chat.Failure is null && turn.Tools.ShouldContinue, "Actual tool turn did not authorize continuation.");
-            Equal(1, effects.Calls); Equal(Arguments, effects.Arguments!.ToString());
+            Equal(1, effects.Calls); Equal(ParsedArguments, effects.Arguments!.ToString());
             var assistant = new TranscriptEntry("assistant", PiWireJson.WriteMessage(turn.Chat.Message));
             var result = Entry("""{"role":"toolResult","toolCallId":"call-authored","toolName":"inspect","content":[{"type":"text","text":"owned result"}],"isError":false,"timestamp":124}""");
             var next = new ChatRequest(Model, first.Messages.Add(assistant).Add(result), 125);
@@ -252,7 +256,7 @@ internal static class AnthropicMessagesHttpSseTransportTests
             Equal("001", call.GetProperty("input").GetProperty("opaque").GetString()); Equal(JsonValueKind.Null, call.GetProperty("input").GetProperty("nil").ValueKind);
             var replayResult = messages[2].GetProperty("content")[0]; Equal("tool_result", replayResult.GetProperty("type").GetString());
             Equal("call-authored", replayResult.GetProperty("tool_use_id").GetString()); Equal("owned result", replayResult.GetProperty("content").GetString());
-            Equal(Arguments, ((ToolCallContent)turn.Chat.Message.Content.Single()).Arguments.ToString());
+            Equal(ParsedArguments, ((ToolCallContent)turn.Chat.Message.Content.Single()).Arguments.ToString());
             Equal("call-authored", result.WireBody.Value.GetProperty("toolCallId").GetString());
         }
         finally { firstBody.ReleaseCleanup.TrySetResult(); releaseCommit.TrySetResult(); try { await running; } catch { } }
@@ -280,6 +284,14 @@ internal static class AnthropicMessagesHttpSseTransportTests
             using var fixture = new Fixture(new ProbeStream(Bytes(positive)));
             Check((await new ChatClient(fixture.Transport).CompleteAsync(Request())).Failure is null, "Source event selection/EOF rule changed.");
         }
+        // anthropic-messages.ts:803 finalizes incomplete argument JSON with parseStreamingJson (partial-json, then {}), so the
+        // turn completes as a tool use with {} arguments (installed pi-ai 1.1.0 against a local fake server: done, toolUse, {}).
+        using (var fixture = new Fixture(new ProbeStream(Bytes(Sse(Start, ToolStart, ToolDelta("{\"private\":"), ToolEnd, Finish("tool_use"), Stop)))))
+        {
+            var repaired = await new ChatClient(fixture.Transport).CompleteAsync(Request());
+            Check(repaired.Failure is null && repaired.Message.StopReason == StopReason.ToolUse, "Incomplete tool arguments failed the turn.");
+            Equal("{}", ((ToolCallContent)repaired.Message.Content.Single()).Arguments.ToString());
+        }
         foreach (var (invalid, category) in new (string, string)[]
         {
             (Frame("message_start", "{private-invalid"), "SourceFailed"),
@@ -289,7 +301,6 @@ internal static class AnthropicMessagesHttpSseTransportTests
             (Frame("message_start", "[DONE]"), "SourceFailed"),
             (Sse(Start, Finish("end_turn")) + Frame("message", "[DONE]"), "UnexpectedEof"),
             (Frame("message", Start) + Sse(Finish("end_turn"), Stop), "MalformedStream"),
-            (Sse(Start, ToolStart, ToolDelta("{\"private\":"), ToolEnd, Finish("tool_use"), Stop), "MalformedStream"),
             (Frame("error", "private provider body; intentionally not JSON"), "ProviderError")
         })
         {
@@ -297,7 +308,9 @@ internal static class AnthropicMessagesHttpSseTransportTests
             var effects = new Executor(); var outcome = await new TurnRunner(new ChatClient(fixture.Transport), new ToolBatchScheduler([new("inspect", effects)]))
                 .RunAsync(Request(), new Sink(_ => Task.CompletedTask));
             Failed(outcome.Chat, category); Equal(0, effects.Calls); Check(fixture.Response.Disposed, "Admission failure retained response.");
-            Check(!outcome.Chat.Failure!.Message.Contains("private", StringComparison.Ordinal), "Rejected source text entered a diagnostic.");
+            // anthropic-messages.ts iterateAnthropicEvents: a named error event is shown as its raw data (new Error(sse.data)).
+            if (category == "ProviderError") Equal("private provider body; intentionally not JSON", Metadata(outcome.Chat.Message, "errorMessage"));
+            else Check(!outcome.Chat.Failure!.Message.Contains("private", StringComparison.Ordinal), "Rejected source text entered a diagnostic.");
         }
         using (var fixture = new Fixture(new ProbeStream([.. Bytes("event: message_start\ndata: "), 0xff, .. Bytes("\n\n")])))
             Failed(await new ChatClient(fixture.Transport).CompleteAsync(Request()), "SourceFailed");
@@ -403,7 +416,9 @@ internal static class AnthropicMessagesHttpSseTransportTests
         await ThrowsAsync<ObjectDisposedException>(() => requests.Single().Content!.ReadAsStringAsync()); Check(!handler.Disposed, "Send fault disposed borrowed client.");
         using (var rejection = new Fixture(new ProbeStream(Bytes("private response body")), status: HttpStatusCode.TooManyRequests))
         {
-            Failed(await new ChatClient(rejection.Transport).CompleteAsync(Request()), "SourceFailed"); Equal(0, rejection.Response.AcquireCalls);
+            // The SDK reads a rejected body into its APIError message: makeMessage(status, safeJSON(text), text).
+            var rejected = await new ChatClient(rejection.Transport).CompleteAsync(Request());
+            Failed(rejected, "SourceFailed"); Equal("429 private response body", Metadata(rejected.Message, "errorMessage")); Equal(1, rejection.Response.AcquireCalls);
             Equal(0, rejection.Response.SerializeCalls); Equal(1, rejection.Handler.SendCalls); Check(rejection.Response.Disposed, "Rejected response retained ownership.");
         }
         foreach (var stream in new Stream[] { new ReadFailureStream(), new HttpCleanupFailureStream() })

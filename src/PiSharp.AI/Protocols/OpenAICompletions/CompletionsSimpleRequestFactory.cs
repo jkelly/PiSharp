@@ -24,8 +24,8 @@ public sealed class CompletionsSimpleRequestFactory : IChatTransport
         if (endpoint is null || model is null || options is null || options.ModelMetadata is null ||
             options.DirectOptions is null || options.HttpOptions is null || !endpoint.IsAbsoluteUri ||
             endpoint.Scheme is not ("http" or "https") || endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
-            model.Api != "openai-completions" || options.MaximumContextMessages is < 1 or > 65_536 ||
-            options.MaximumContextCharacters is < 2 or > 8_388_608 ||
+            model.Api != "openai-completions" || options.MaximumContextMessages is < 1 or > PiRequestBudget.MaximumCountBound ||
+            options.MaximumContextCharacters is < 2 or > PiRequestBudget.MaximumBound ||
             !double.IsFinite(options.DirectOptions.MaximumTokenMagnitude) || options.DirectOptions.MaximumTokenMagnitude <= 0)
             throw Fail(CompletionsRequestFailure.InvalidConfiguration);
         _client = client; _endpoint = endpoint; _model = model; _options = options;

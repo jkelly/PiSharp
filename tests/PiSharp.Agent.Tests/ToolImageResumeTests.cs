@@ -136,7 +136,7 @@ internal static class ToolImageResumeTests
         {
             var changed = JsonNode.Parse(tool)!.AsObject(); changed.Remove(name); await Rejected(history.SetItem(history.Length - 1, Entry(changed.ToJsonString())), "missing-" + name);
         }
-        foreach (var (name, value) in new (string, JsonNode?)[] { ("toolCallId", JsonValue.Create(" ")), ("toolName", JsonValue.Create("")), ("timestamp", JsonValue.Create("wrong")), ("isError", JsonValue.Create("wrong")) })
+        foreach (var (name, value) in new (string, JsonNode?)[] { ("toolCallId", JsonValue.Create(1)), ("toolName", null), ("timestamp", JsonValue.Create("wrong")), ("isError", JsonValue.Create("wrong")) })
         { var changed = JsonNode.Parse(tool)!.AsObject(); changed[name] = value; await Rejected(history.SetItem(history.Length - 1, Entry(changed.ToJsonString())), "invalid-" + name); }
         await Rejected(ReplaceTool(history, "\"content\":[{\"type\":\"image\",\"data\":\"PRIVATE_RESUME_BLOB\",\"mimeType\":null}]"), "sanitized-image-diagnostic");
         var wrong = JsonNode.Parse(tool)!.AsObject(); wrong["role"] = "assistant";
@@ -144,7 +144,7 @@ internal static class ToolImageResumeTests
         var assistantIndex = Array.FindIndex(history.ToArray(), message => message.Role == "assistant");
         foreach (var reason in new[] { "pending", "deferred" })
         { var assistant = JsonNode.Parse(history[assistantIndex].WireBody.ToString())!.AsObject(); assistant["stopReason"] = reason; await Rejected(history.SetItem(assistantIndex, Entry(assistant.ToJsonString())), "unfinished-assistant"); }
-        await Rejected(history.AddRange(Enumerable.Repeat(history[^1], 1024)), "history-count");
+        await Rejected(history.AddRange(Enumerable.Repeat(history[^1], 1024)), "history-count", new(MaximumTranscriptMessages: 1024));
         await Admitted(ReplaceTool(history, "\"content\":[{\"type\":\"image\",\"data\":\"" + new string('x', maximum.MaximumCharacters - 1) + "\",\"mimeType\":\"x\"}]"), "exact-ordinary-quota");
         await Admitted(ReplaceTool(history, "\"content\":[" + string.Join(',', Enumerable.Repeat(image, maximum.MaximumContentBlocks)) + "]"), "exact-block-quota");
         await Admitted(ReplaceTool(history, "\"content\":[{\"type\":\"image\",\"data\":\"not-base64\\u0000π\",\"mimeType\":\"opaque\\u0000\",\"wide\":9007199254740993}],\"details\":null,\"usage\":{\"n\":1.00},\"opaque\":{\"keep\":null}"), "opaque-and-raw-number-retention");

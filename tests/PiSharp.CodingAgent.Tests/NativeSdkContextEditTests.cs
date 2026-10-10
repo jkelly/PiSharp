@@ -156,7 +156,9 @@ internal static class NativeSdkContextEditTests
             var native = new NativeSessionSnapshotProvider(); native.Attach(f.Owner);
             IExtensionSessionViewProvider provider = native;
             if (held) { f.Held = new(native); provider = f.Held; }
-            f.Registry = new(null, null, provider); return f;
+            // This host bounds its callback views explicitly at 4096 entries (the defaults grow with the session).
+            f.Registry = new(new() { MaximumSessionBranchEntries = 4_096, MaximumSessionCharacters = 1_048_576, MaximumSessionUtf8Bytes = 1_048_576 },
+                null, provider); return f;
         }
         internal Task Register(Func<IExtensionCommandContext, CancellationToken, ValueTask> action) => Registry.ActivateAsync("sdk", new Plugin((registry, _) =>
         { registry.RegisterCommand(new("edit-registration", Command, "", (_, context, token) => action(context, token))); return ValueTask.CompletedTask; }));

@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <!-- The SkiaSharp image codec shares the RGBA raster, Lanczos3 resampling and EXIF orientation. -->
+    <InternalsVisibleTo Include="PiSharp.Tools.Skia" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../PiSharp.Agent/PiSharp.Agent.csproj" />
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
   </ItemGroup>

@@ -14,8 +14,8 @@ public sealed record AnthropicMessagesSimpleOptions(JsonData ModelMetadata, Anth
     public AnthropicMessagesHttpSseOptions HttpOptions { get; init; } = new();
     public AnthropicMessagesOptions? MessagesOptions { get; init; }
     public AnthropicMessagesHooks? Hooks { get; init; }
-    public int MaximumContextMessages { get; init; } = 256;
-    public int MaximumContextCharacters { get; init; } = 1_048_576;
+    public int MaximumContextMessages { get; init; } = PiRequestBudget.RequestMessages;
+    public int MaximumContextCharacters { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public override string ToString() => nameof(AnthropicMessagesSimpleOptions);
 }
 

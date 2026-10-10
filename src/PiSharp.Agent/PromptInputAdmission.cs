@@ -27,14 +27,35 @@ public sealed class PromptInputAdmissionException : Exception
         _ => "Prompt input is invalid."
     }) => Failure = failure;
 }
+/// <summary>Prompt admission bounds. Image and message defaults admit Pi-sized prompt images (owner decision 0004: a prompt
+/// carrying images of up to Pi's 4.5MB of base64 each, within one request entry); the text bound is unchanged.</summary>
 public sealed record PromptInputAdmissionOptions(int MaximumTextCharacters = 65_536, int MaximumImages = 16,
-    int MaximumImageCharacters = 262_144, int MaximumImageBytes = 1_048_576, int MaximumJsonDepth = 32,
-    int MaximumMessageCharacters = 1_048_576, int MaximumMessageBytes = 4_194_304)
+    int MaximumImageCharacters = PiSharp.AI.PiRequestBudget.RequestEntryCharacters,
+    int MaximumImageBytes = PiSharp.AI.PiRequestBudget.RequestEntryCharacters, int MaximumJsonDepth = 32,
+    int MaximumMessageCharacters = PiSharp.AI.PiRequestBudget.RequestEntryCharacters,
+    int MaximumMessageBytes = PiSharp.AI.PiRequestBudget.RequestPayloadBytes)
 {
+    /// <summary>No count or size bound beyond JSON depth: for reducers (skills, prompt templates, reload routing) whose caller
+    /// admits the input and their result under its own options, so a reducer never refuses what the caller admits.</summary>
+    public static PromptInputAdmissionOptions Unbounded { get; } = new(int.MaxValue, int.MaxValue, int.MaxValue, int.MaxValue, 64,
+        int.MaxValue, int.MaxValue);
     /// <summary>Explicit queue commands retain their supplied mode even while idle and never start a generation.</summary>
     public bool QueueOnly { get; init; }
     /// <summary>Trusted synchronous preflight over owned values, outside state locks. May be called again if the queue grows.</summary>
     public Action<TranscriptEntry, AgentPendingInputQueueSnapshot, PromptInputStreamingBehavior>? BeforeQueueCommit { get; init; }
+
+    private static readonly AsyncLocal<PromptInputAdmissionOptions?> AmbientDefault = new();
+    /// <summary>The bounds used where a caller passes none (template, skill and extension input admission): the ambient ones set by
+    /// <see cref="UseAsDefault"/> for the current flow, else the defaults.</summary>
+    public static PromptInputAdmissionOptions Default => AmbientDefault.Value ?? new();
+    /// <summary>Makes <paramref name="options"/> the default bounds for this execution flow (and work it starts) until disposed.</summary>
+    public static IDisposable UseAsDefault(PromptInputAdmissionOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var previous = AmbientDefault.Value; AmbientDefault.Value = options;
+        return new Restore(() => AmbientDefault.Value = previous);
+    }
+    private sealed class Restore(Action restore) : IDisposable { public void Dispose() => restore(); }
 }
 
 /// <summary>Pure owned admission/materialization. No clock, effects, queue, or source image normalization.</summary>
@@ -109,7 +130,7 @@ public static class PromptInputValue
 
     private static PromptInputAdmissionOptions Limits(PromptInputAdmissionOptions? options)
     {
-        var value = options ?? new();
+        var value = options ?? PromptInputAdmissionOptions.Default;
         if (value.MaximumTextCharacters <= 0 || value.MaximumImages < 0 || value.MaximumImageCharacters <= 0 ||
             value.MaximumImageBytes <= 0 || value.MaximumJsonDepth is < 1 or > 64 ||
             value.MaximumMessageCharacters <= 0 || value.MaximumMessageBytes <= 0)

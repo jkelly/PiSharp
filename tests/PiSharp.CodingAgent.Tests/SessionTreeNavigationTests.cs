@@ -331,13 +331,13 @@ internal static class SessionTreeNavigationTests
     private static async Task ProjectionAdmission()
     {
         // Pi 0.99.2 navigateTree -> _restoreToolsFromTranscript: the target's unbound tool is left out and pending, not
-        // rejected. The restored loadout is recorded on the target branch, so the leaf is that record.
+        // rejected. The restored loadout is applied in memory: the navigation writes no record (the next request records it).
         await using var unavailable = await Fixture.Open(registerRead: false);
         var view = unavailable.Owner.CaptureTree(unavailable.Owner.Current); var callbacks = 0;
         var restored = await unavailable.Owner.NavigateTreeAsync(view.Attachment,
             new("left-system", view.Revision), beforeTree: (preview, _) => { callbacks++; Check(preview.Configuration.Tools.IsEmpty, "Unbound tool previewed."); return ValueTask.FromResult(true); });
         Equal(SessionTreeNavigationDisposition.Selected, restored.Disposition); Equal(1, callbacks);
-        Equal("left-system", restored.Context.Ancestry[^1].ParentId); Check(restored.Checkpoint is not null, "Restored loadout was not recorded.");
+        Equal("left-system", restored.LeafId); Check(restored.Checkpoint is null, "Navigation recorded the restored loadout.");
         Check(unavailable.Session.GetActiveTools().IsEmpty && unavailable.Session.PendingToolNames.SequenceEqual(["read"]),
             "Unbound navigation tool was not kept pending.");
         await using var f = await Fixture.Open();

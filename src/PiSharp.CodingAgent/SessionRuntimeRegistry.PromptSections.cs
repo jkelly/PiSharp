@@ -59,12 +59,22 @@ public sealed partial class SessionRuntimeRegistry
             if (!previous.TryGetValue(pair.Key, out var before) || before != pair.Value) diff.Add(pair.Key, pair.Value);
         foreach (var pair in previous) if (!desired.ContainsKey(pair.Key)) diff.Add(pair.Key, null);
         if (diff.Count == 0) return (toolDelta, prepared);
-        var fields = new Dictionary<string, object?>(StringComparer.Ordinal);
-        if (toolDelta is not null)
-            foreach (var property in toolDelta.WireBody.Value.EnumerateObject()) fields.Add(property.Name, property.Value.Clone());
-        else { fields.Add("role", "system"); fields.Add("content", ""); fields.Add("timestamp", timestamp); }
-        fields["sections"] = diff;
-        var result = new TranscriptEntry("system", JsonData.Parse(JsonSerializer.Serialize(fields)));
+        // Source prompt/_preparePromptAndToolLoadout then declareToolChanges (withToolChanges): { role, content, sections, timestamp }
+        // with the tool changes after them.
+        using var output = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(output, new JsonWriterOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
+        {
+            writer.WriteStartObject(); writer.WriteString("role", "system"); writer.WriteString("content", "");
+            writer.WritePropertyName("sections"); writer.WriteStartObject();
+            foreach (var pair in diff) { if (pair.Value is null) writer.WriteNull(pair.Key); else writer.WriteString(pair.Key, (string)pair.Value); }
+            writer.WriteEndObject();
+            if (toolDelta?.WireBody.Value.TryGetProperty("timestamp", out var time) == true) { writer.WritePropertyName("timestamp"); writer.WriteRawValue(time.GetRawText()); }
+            else writer.WriteNumber("timestamp", timestamp);
+            foreach (var field in new[] { "toolsAdded", "toolsRemoved" })
+                if (toolDelta?.WireBody.Value.TryGetProperty(field, out var tools) == true) { writer.WritePropertyName(field); writer.WriteRawValue(tools.GetRawText()); }
+            writer.WriteEndObject();
+        }
+        var result = new TranscriptEntry("system", JsonData.Parse(System.Text.Encoding.UTF8.GetString(output.ToArray())));
         if (result.WireBody.ToString().Length > _options.MaximumCharacters) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
         token.ThrowIfCancellationRequested();
         return (result, prepared);

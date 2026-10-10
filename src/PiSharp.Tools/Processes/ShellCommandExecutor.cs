@@ -44,6 +44,9 @@ public sealed class ShellCommandExecutor
         _nextSpillFileName = nextSpillFileName ?? (() => "pi-bash-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)) + ".log");
     }
 
+    /// <summary>The same spill storage and file naming over other operations (a user_bash handler's custom operations).</summary>
+    public ShellCommandExecutor WithOperations(IShellOperations operations) => new(operations, _spillDirectory, _storage, _nextSpillFileName);
+
     public async Task<ShellCommandResult> ExecuteAsync(string command, string workingDirectory, ShellTextCallback? onChunk,
         CancellationToken cancellationToken)
     {
@@ -99,14 +102,20 @@ public sealed class ShellCommandExecutor
 }
 
 /// <summary>Local source createLocalBashOperations over the bounded Windows process primitive: <c>shell -c command</c>
-/// with the host's complete environment. The runner's own spill copy is discarded; the executor owns user-bash spill.</summary>
+/// (or the command over standard input for legacy WSL bash) with the host's complete environment. The runner's own
+/// spill copy is discarded; the executor owns user-bash spill.</summary>
 public sealed class NativeShellOperations : IShellOperations
 {
     private readonly NativeProcessRunner _runner;
-    private readonly string _shell, _scratchDirectory;
+    private readonly ShellConfiguration _shell;
+    private readonly string _scratchDirectory;
     private readonly ImmutableDictionary<string, string> _environment;
 
     public NativeShellOperations(string shell, ImmutableDictionary<string, string> environment, string scratchDirectory,
+        ProcessRunnerOptions? options = null) : this(new ShellConfiguration(shell ?? throw new ArgumentNullException(nameof(shell)), ["-c"]),
+            environment, scratchDirectory, options) { }
+
+    public NativeShellOperations(ShellConfiguration shell, ImmutableDictionary<string, string> environment, string scratchDirectory,
         ProcessRunnerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(shell); ArgumentNullException.ThrowIfNull(environment); ArgumentNullException.ThrowIfNull(scratchDirectory);
@@ -117,8 +126,10 @@ public sealed class NativeShellOperations : IShellOperations
     public async ValueTask<int?> ExecuteAsync(string command, string workingDirectory, ProcessRawOutputCallback onData,
         CancellationToken cancellationToken)
     {
-        var request = new ProcessRequest(_shell, ["-c", command], workingDirectory, _environment,
-            Path.Combine(_scratchDirectory, "pi-bash-discarded-" + Guid.NewGuid().ToString("N") + ".log"));
+        ShellSpawnPreflight.Check(_shell, command, workingDirectory, _environment);
+        var request = new ProcessRequest(_shell.Shell, _shell.CommandArguments(command), workingDirectory, _environment,
+            Path.Combine(_scratchDirectory, "pi-bash-discarded-" + Guid.NewGuid().ToString("N") + ".log"))
+        { StandardInput = _shell.CommandTransport == ShellCommandTransport.Stdin ? Encoding.UTF8.GetBytes(command) : null };
         var result = await _runner.RunStreamingAsync(request, onData, cancellationToken).ConfigureAwait(false);
         return result.Status switch
         {
@@ -131,5 +142,24 @@ public sealed class NativeShellOperations : IShellOperations
     private sealed class DiscardedOutputStorage : IProcessOutputStorage
     {
         public ValueTask<Stream> CreateNewAsync(string absolutePath) => ValueTask.FromResult(Stream.Null);
+    }
+}
+
+/// <summary>Source createLocalShellOperations exec, before anything is spawned, on every platform: the working-directory check, then
+/// child_process.spawn's argument validation (a NUL byte in the file, args, cwd or env is ERR_INVALID_ARG_VALUE) and the operating
+/// system's command-line limit, then the missing shell (spawn ENOENT). Executors report these messages as the command's failure. A NUL
+/// never reaches posix_spawn or CreateProcess, which would cut the string there and run the truncated command.</summary>
+internal static class ShellSpawnPreflight
+{
+    internal static void Check(ShellConfiguration shell, string command, string workingDirectory, IReadOnlyDictionary<string, string> environment)
+    {
+        if (!Directory.Exists(workingDirectory))
+            throw new PiSharp.Agent.ToolSourceErrorException($"Working directory does not exist: {workingDirectory}\nCannot execute bash commands.");
+        var arguments = shell.CommandArguments(command);
+        // With commandTransport "stdin" the command goes to standard input, which Node does not check; only the spawn strings are.
+        if ((NodeArgumentErrors.SpawnNullBytes(shell.Shell, arguments, workingDirectory, environment) ??
+            NodeArgumentErrors.SpawnLimit(shell.Shell, arguments)) is { } spawnError)
+            throw new PiSharp.Agent.ToolSourceErrorException(spawnError);
+        if (!File.Exists(shell.Shell)) throw new PiSharp.Agent.ToolSourceErrorException($"spawn {shell.Shell} ENOENT");
     }
 }

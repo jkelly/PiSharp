@@ -8,7 +8,8 @@ public sealed record PreparedSessionToolCatalog(SessionRuntimeRegistry Registry,
 public sealed partial class ReplaceableAgentSession
 {
     /// <summary>Serializes catalog preparation across every server attached to this actual owner.
-    /// Joins admitted session work before capturing its current registry; no canceled-await wrapper
+    /// A run in its provider phase takes the catalog at once (<see cref="PersistentAgentSession.TryPublishToolCatalogDuringRunAsync"/>);
+    /// otherwise this joins admitted session work before capturing its current registry; no canceled-await wrapper
     /// can leave that run or the preparation behind. The caller cannot recursively mutate this owner.</summary>
     public async Task<SessionToolCatalogReceipt> PrepareAndPublishToolCatalogAsync(AgentSessionAttachment attachment,
         Func<SessionRuntimeRegistry, CancellationToken, ValueTask<PreparedSessionToolCatalog>> prepare,
@@ -20,6 +21,10 @@ public sealed partial class ReplaceableAgentSession
         var prior = inMutation.Value; inMutation.Value = true;
         try
         {
+            ValidateAttachment(attachment);
+            // Source _refreshToolRegistry: a catalog change during a run reaches the run at its next request boundary.
+            if (await attachment.Session.TryPublishToolCatalogDuringRunAsync((expected, _, cancellation) => prepare(expected, cancellation), linked.Token)
+                    .ConfigureAwait(false) is { } during) return during;
             ValidateAttachment(attachment);
             await attachment.Session.WaitForIdleAsync().ConfigureAwait(false);
             ValidateAttachment(attachment); linked.Token.ThrowIfCancellationRequested();

@@ -5,6 +5,7 @@
     <Project Path="src/PiSharp.Agent/PiSharp.Agent.csproj" />
     <Project Path="src/PiSharp.Sessions/PiSharp.Sessions.csproj" />
     <Project Path="src/PiSharp.Tools/PiSharp.Tools.csproj" />
+    <Project Path="src/PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />
     <Project Path="src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
     <Project Path="src/PiSharp.PromptTemplates.Yaml/PiSharp.PromptTemplates.Yaml.csproj" />
     <Project Path="src/PiSharp.Cli/PiSharp.Cli.csproj" />
@@ -15,6 +16,7 @@
     <Project Path="src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
     <Project Path="src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
     <Project Path="src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
+    <Project Path="src/PiSharp.Codemode/PiSharp.Codemode.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj" />
@@ -145,5 +147,32 @@
   </Folder>
   <Folder Name="/tests/sync-1.1.0.x/PiSharp.ToolSearch.Tests/">
     <Project Path="tests/PiSharp.ToolSearch.Tests/PiSharp.ToolSearch.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.Classifiers.Tests/">
+    <Project Path="tests/PiSharp.Classifiers.Tests/PiSharp.Classifiers.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.Models.Tests/">
+    <Project Path="tests/PiSharp.Models.Tests/PiSharp.Models.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.ProviderApis.Tests/">
+    <Project Path="tests/PiSharp.ProviderApis.Tests/PiSharp.ProviderApis.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.Codemode.Tests/">
+    <Project Path="tests/PiSharp.Codemode.Tests/PiSharp.Codemode.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.McpParity.Tests/">
+    <Project Path="tests/PiSharp.McpParity.Tests/PiSharp.McpParity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.CliParity.Tests/">
+    <Project Path="tests/PiSharp.CliParity.Tests/PiSharp.CliParity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.ExtensionParity.Tests/">
+    <Project Path="tests/PiSharp.ExtensionParity.Tests/PiSharp.ExtensionParity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.SessionParity.Tests/">
+    <Project Path="tests/PiSharp.SessionParity.Tests/PiSharp.SessionParity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.InteractiveParity.Tests/">
+    <Project Path="tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj" />
   </Folder>
 </Solution>

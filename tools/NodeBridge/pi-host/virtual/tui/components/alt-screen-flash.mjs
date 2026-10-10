@@ -1,0 +1,39 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/components/alt-screen-flash.ts.
+// Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
+import { truncateToWidth } from "../utils.mjs";
+const DEFAULT_DURATION_MS = 1000;
+export class AltScreenFlashContainer {
+    entries = [];
+    nextId = 0;
+    requestRender;
+    constructor(requestRender){
+        this.requestRender = requestRender;
+    }
+    flash(message, durationMs = DEFAULT_DURATION_MS) {
+        const id = this.nextId++;
+        const timer = setTimeout(()=>{
+            const index = this.entries.findIndex((entry)=>entry.id === id);
+            if (index === -1) return;
+            this.entries.splice(index, 1);
+            this.requestRender();
+        }, Math.max(0, durationMs));
+        timer.unref();
+        this.entries.push({
+            id,
+            message,
+            timer
+        });
+        this.requestRender();
+    }
+    dispose() {
+        for (const entry of this.entries)clearTimeout(entry.timer);
+        this.entries.length = 0;
+    }
+    invalidate() {}
+    render(width) {
+        return this.entries.map((entry)=>{
+            const message = truncateToWidth(` ${entry.message} `, width, "");
+            return `\x1b[7m${message}\x1b[27m`;
+        });
+    }
+}

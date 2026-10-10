@@ -20,8 +20,8 @@ public sealed record CompletionsSimpleOptions(JsonData ModelMetadata, string? Re
     public int? TimeoutMilliseconds { get; init; }
     /// <summary>Retained Simple option; Completions uses SSE and does not apply this WebSocket deadline.</summary>
     public int? WebsocketConnectTimeoutMilliseconds { get; init; }
-    public int MaximumContextMessages { get; init; } = 4096;
-    public int MaximumContextCharacters { get; init; } = 8_388_608;
+    public int MaximumContextMessages { get; init; } = PiRequestBudget.RequestMessages;
+    public int MaximumContextCharacters { get; init; } = PiRequestBudget.RequestPayloadBytes;
 
     // No keys, model headers or opaque metadata enter diagnostic formatting.
     public override string ToString() => nameof(CompletionsSimpleOptions);

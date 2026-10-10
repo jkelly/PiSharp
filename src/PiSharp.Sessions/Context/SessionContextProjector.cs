@@ -39,6 +39,8 @@ public sealed class SessionContextProjectionException : Exception
 public sealed class SessionContextProjector
 {
     private readonly SessionContextProjectionOptions _options;
+    /// <summary>The bounds this projector admits a branch under.</summary>
+    public SessionContextProjectionOptions Options => _options;
     public SessionContextProjector(SessionContextProjectionOptions? options = null)
     {
         _options = options ?? new();

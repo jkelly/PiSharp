@@ -3,31 +3,31 @@ import SitePage from '../components/SitePage.astro';
 import { links } from '../data/site';
 ---
 
-<SitePage title="Extensions" description="Shape the PiSharp harness in C#: tools, commands, shortcuts, renderers and hooks.">
+<SitePage title="Extensions" description="Run Pi's TypeScript extensions and packages, or shape the harness in C#.">
 	<div style="padding-top: 3rem">
 		<div class="ps-eyebrow">Extensions</div>
-		<h1 class="ps-h1">Shape the harness <em>in C#</em></h1>
-		<p class="ps-lede">Add tools, slash commands, shortcuts, renderers and lifecycle hooks with a plain C# class. Package it for NuGet and share it.</p>
+		<h1 class="ps-h1">Pi's extensions, <em>or yours in C#</em></h1>
+		<p class="ps-lede">PiSharp runs Pi's TypeScript extensions and packages as they are. You can also add tools, slash commands and lifecycle hooks with a plain C# class, loaded from the same folders.</p>
 	</div>
 
 	<div class="lanes">
 		<div class="ps-card" style="border-color: var(--sl-color-accent)">
-			<div class="ps-mono tag" style="color: var(--ps-link)">RECOMMENDED</div>
-			<h2 class="ps-h3" style="margin: 0.5rem 0 0.6rem">Native C# extensions</h2>
-			<p class="ps-muted">Implement <code>IPiSharpExtension</code>, register what you need, and ship a NuGet package. In-process, typed, no Node.</p>
-			<a href="/docs/extensions/build-an-extension/" class="ps-link-mono">Build an extension →</a>
+			<div class="ps-mono tag" style="color: var(--ps-link)">PI COMPATIBLE</div>
+			<h2 class="ps-h3" style="margin: 0.5rem 0 0.6rem">Pi's TypeScript extensions</h2>
+			<p class="ps-muted">Drop them in <code>~/.pi/agent/extensions</code> or install a package with <code>pisharp install</code>. PiSharp runs them in Node on Pi's own npm packages, with the whole extension API.</p>
+			<a href="/docs/extensions/node-bridge/" class="ps-link-mono">TypeScript extensions →</a>
 		</div>
-		<div class="ps-card" style="border-style: dashed">
-			<div class="ps-mono tag" style="color: var(--sl-color-gray-3)">OPTIONAL</div>
-			<h2 class="ps-h3" style="margin: 0.5rem 0 0.6rem">Pi extensions via the Node bridge</h2>
-			<p class="ps-muted">In development: a supervised Node worker that runs Pi's TypeScript extensions. Today it admits only a pinned set of Pi's example extensions and isn't switched on from the CLI. Anything unsupported is reported at startup instead of being silently ignored.</p>
-			<a href="/docs/extensions/node-bridge/" class="ps-link-mono">Bridge compatibility →</a>
+		<div class="ps-card">
+			<div class="ps-mono tag" style="color: var(--sl-color-gray-3)">NO NODE</div>
+			<h2 class="ps-h3" style="margin: 0.5rem 0 0.6rem">Native C# extensions</h2>
+			<p class="ps-muted">Implement <code>IPiSharpExtension</code>, add a <code>pisharp-extension.json</code>, and put the folder next to your Pi extensions. In-process and typed.</p>
+			<a href="/docs/extensions/build-an-extension/" class="ps-link-mono">Build a C# extension →</a>
 		</div>
 	</div>
 
 	<section class="ps-section">
 		<h2 class="ps-h2">Same extension, <em>two languages</em></h2>
-		<p class="ps-muted" style="max-width: 45rem; margin-bottom: 1.8rem">The sample todo extension is ported from Pi's own example. If you've written one for Pi, you already know the shape.</p>
+		<p class="ps-muted" style="max-width: 45rem; margin-bottom: 1.8rem">The TypeScript version runs in PiSharp as it is. The C# sample is a port of it. If you've written one for Pi, you already know the shape.</p>
 		<div class="ps-row" style="gap: 1.25rem; align-items: stretch">
 			<div class="ps-term">
 				<div class="ps-termbar"><span>Pi · todo.ts</span><span>TypeScript</span></div>
@@ -81,7 +81,7 @@ import { links } from '../data/site';
 	<section class="ps-section">
 		<h2 class="ps-h2">Community extensions</h2>
 		<div class="ps-card" style="border-style: dashed">
-			<p class="ps-muted" style="margin: 0">A catalog of community extensions published to NuGet will appear here. Building one? Open an issue on <a href={links.issues}>GitHub</a> so it can be listed.</p>
+			<p class="ps-muted" style="margin: 0">Pi packages install with <code>pisharp install</code>. A catalog of C# extensions will appear here. Building one? Open an issue on <a href={links.issues}>GitHub</a> so it can be listed.</p>
 		</div>
 	</section>
 </SitePage>

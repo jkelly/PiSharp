@@ -26,12 +26,16 @@ public interface IExtensionSessionViewProvider
     ExtensionSessionSnapshot? Capture(IExtensionContext context);
 }
 
-/// <summary>Experimental callback-view budgets. Hosts report an explicit resource error rather than
-/// truncate a large branch. These limits do not establish full large-session profile support.</summary>
+/// <summary>Callback-view memory bounds. Pi's runner.ts hands every handler the whole session manager, so these grow with the
+/// session as the request budgets do (PiRequestBudget: one million messages, the 64 MiB request payload); they are not count limits
+/// a long session reaches. Hosts report an explicit resource error rather than truncate a branch beyond them.</summary>
 public static class ExtensionSessionSnapshotLimits
 {
     public const string Feature = "session-branch-snapshot";
-    public const int MaximumBranchEntries = 4_096;
-    public const int MaximumCharacters = 1_048_576;
-    public const int MaximumUtf8Bytes = 1_048_576;
+    /// <summary>PiRequestBudget.RequestMessages.</summary>
+    public const int MaximumBranchEntries = 1_000_000;
+    /// <summary>PiRequestBudget.RequestPayloadBytes.</summary>
+    public const int MaximumCharacters = 64 * 1024 * 1024;
+    /// <summary>PiRequestBudget.RequestPayloadBytes.</summary>
+    public const int MaximumUtf8Bytes = 64 * 1024 * 1024;
 }

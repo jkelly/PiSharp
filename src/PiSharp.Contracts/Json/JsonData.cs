@@ -51,12 +51,17 @@ public sealed class JsonData
 public sealed class JsonFields
 {
     public ImmutableDictionary<string, JsonData> Values { get; }
-    public static JsonFields Empty { get; } = new(ImmutableDictionary<string, JsonData>.Empty);
+    private readonly ImmutableList<string> _order;
+    public static JsonFields Empty { get; } = new(ImmutableDictionary<string, JsonData>.Empty, []);
 
-    private JsonFields(ImmutableDictionary<string, JsonData> values) => Values = values;
-    public JsonFields Set(string name, JsonData value) => new(Values.SetItem(name, value));
-    public JsonFields Remove(string name) => new(Values.Remove(name));
+    private JsonFields(ImmutableDictionary<string, JsonData> values, ImmutableList<string> order) { Values = values; _order = order; }
+    /// <summary>Sets a field. A new name goes last; an existing one keeps its position (JavaScript property order).</summary>
+    public JsonFields Set(string name, JsonData value) =>
+        new(Values.SetItem(name, value), Values.ContainsKey(name) ? _order : _order.Add(name));
+    public JsonFields Remove(string name) => Values.ContainsKey(name) ? new(Values.Remove(name), _order.Remove(name)) : this;
     public bool TryGet(string name, out JsonData? value) => Values.TryGetValue(name, out value);
+    /// <summary>The fields in the order they were first set or read (JavaScript object key order).</summary>
+    public IEnumerable<KeyValuePair<string, JsonData>> Ordered => _order.Select(name => new KeyValuePair<string, JsonData>(name, Values[name]));
 
     public static JsonFields FromObjectExcept(JsonElement value, params string[] knownNames)
     {
@@ -64,8 +69,9 @@ public sealed class JsonFields
         if (value.ValueKind != JsonValueKind.Object) throw new JsonException("Expected a JSON object.");
         var known = knownNames.ToHashSet(StringComparer.Ordinal);
         var builder = ImmutableDictionary.CreateBuilder<string, JsonData>(StringComparer.Ordinal);
+        var order = ImmutableList.CreateBuilder<string>();
         foreach (var property in value.EnumerateObject())
-            if (!known.Contains(property.Name)) builder.Add(property.Name, JsonData.FromElement(property.Value));
-        return new(builder.ToImmutable());
+            if (!known.Contains(property.Name)) { builder.Add(property.Name, JsonData.FromElement(property.Value)); order.Add(property.Name); }
+        return new(builder.ToImmutable(), order.ToImmutable());
     }
 }

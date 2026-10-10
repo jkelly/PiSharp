@@ -23,7 +23,7 @@ public sealed record AzureResponsesOptions(JsonData ModelMetadata, ResponsesTran
     public JsonData? SamplingParams { get; init; }
     public AzureResponsesHooks Hooks { get; init; } = new();
     public int? TimeoutMilliseconds { get; init; }
-    public int MaximumPayloadBytes { get; init; } = 1_048_576;
+    public int MaximumPayloadBytes { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public int MaximumJsonDepth { get; init; } = 32;
     public int MaximumConfigurationCharacters { get; init; } = 65_536;
     public int MaximumHeaderCharacters { get; init; } = 8192;

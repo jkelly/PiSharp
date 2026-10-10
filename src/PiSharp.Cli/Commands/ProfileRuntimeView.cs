@@ -17,8 +17,9 @@ internal sealed class ProfileRuntimeView(NativeExtensionActivation? extension, P
     ProfileViewLifetime lifetime, SessionRuntimeRegistry nativeRegistry)
 {
     internal NativeExtensionActivation? Extension { get; } = extension;
-    internal PromptTemplateCliBinding? Prompts { get; } = prompts;
-    internal SkillCliBinding? Skills { get; } = skills;
+    // A Pi reload (agent-session.ts reload) replaces the prompt templates and skills of the current view in place.
+    internal PromptTemplateCliBinding? Prompts { get; set; } = prompts;
+    internal SkillCliBinding? Skills { get; set; } = skills;
     internal ProfileViewLifetime Lifetime { get; } = lifetime;
     internal SessionRuntimeRegistry NativeRegistry { get; } = nativeRegistry;
     private Func<SkillDiagnostic, CancellationToken, ValueTask>? Report { get; } = report;

@@ -38,7 +38,7 @@ public sealed class SessionCommandException : Exception
         SessionCommandFailure.ResourceLimit => "Session command exceeds configured bounds.",
         SessionCommandFailure.OfflineProviderMismatch => "Selected durable model has no binding in the requested authored offline API profile.",
         SessionCommandFailure.InvalidBashConfiguration => "Offline Bash requires explicit valid executable, workspace spill root and exact command authorization.",
-        SessionCommandFailure.UnsupportedBashPlatform => "The configured offline Bash backend requires Windows.",
+        SessionCommandFailure.UnsupportedBashPlatform => "The configured offline Bash backend requires Windows, Linux or macOS.",
         _ => "Session command failed; inspect durable state before retrying."
     }) => Failure = failure;
     /// <summary>A failure whose message mirrors upstream CLI diagnostic text exactly.</summary>
@@ -49,15 +49,16 @@ public sealed class SessionCommandException : Exception
 public static class SessionCommands
 {
     public const string Usage = "session create --session <new absolute JSONL> --workspace <existing absolute directory> [--offline-api openai-responses|anthropic-messages|openai-completions] " +
-        "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
+        "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
         "session prompt|resume --session <JSONL> --workspace <directory> --offline-script <JSON> --message <text> " +
         "[--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
         "[--output report|print|json] " +
-        "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
+        "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
         NativeExtensionConfiguration.Flags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags +
         " (startup settings/tools apply to create, prompt and resume); session inspect|tree|history --session <JSONL> [--leaf <id>|--root]";
     private static readonly UTF8Encoding Utf8 = new(false, true);
-    private static readonly SessionLogReaderOptions ReaderBounds = new(MaximumInputBytes: 8_388_608, MaximumLines: 10_000, MaximumRecords: 10_000);
+    // Pi-sized records and files (owner decision 0004): sessions hold read images of up to 4.5MB of base64.
+    private static readonly SessionLogReaderOptions ReaderBounds = PiPayloadBudget.SessionReader(new());
     private sealed record Arguments(string Command, string Session, string? Workspace, string? Script, string? Message,
         bool Latest, string? Leaf, ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi,
         OfflineBashAuthorization? Bash, bool Print, bool Json, NativeExtensionConfiguration? Extension, bool SupportsImages,
@@ -66,7 +67,11 @@ public static class SessionCommands
     public static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken = default,
         PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null) =>
-        RunCoreAsync(args, stdout, stderr, new(), cancellationToken, mcpAdmission, persistRetryEnabledOriginal);
+        RunCoreAsync(args, stdout, stderr, JsonOutput, cancellationToken, mcpAdmission, persistRetryEnabledOriginal);
+
+    /// <summary>JSON-mode records carry tool results with Pi-sized images.</summary>
+    internal static SessionJsonEventOutputOptions JsonOutput { get; } =
+        new(MaximumRecordBytes: PiPayloadBudget.OutputRecordBytes, MaximumTotalBytes: 1L << 30);
 
     /// <summary>Explicit trusted native JSON delivery limits; other output modes keep their existing profile.</summary>
     public static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr,
@@ -233,15 +238,16 @@ public static class SessionCommands
         await using var profile = await OfflineSessionProfile.CreateAsync(args.Workspace!, args.Session, args.Script, turns, args.Reads, args.Writes, token,
             offlineApi: args.OfflineApi, bash: args.Bash, extension: args.Extension,
             extensionUi: new UnavailableExtensionUiProvider(args.Json ? ExtensionUiMode.Json : ExtensionUiMode.Print),
-            modelSupportsImages: args.SupportsImages, toolSelection: ToolSelectionCliConfiguration.ResolveOptions(args.Tools, settings), mcpAdmission: args.Tools.NoMcp ? null : mcpAdmission).ConfigureAwait(false);
+            modelSupportsImages: args.SupportsImages, toolSelection: ToolSelectionCliConfiguration.ResolveOptions(args.Tools, settings), mcpAdmission: args.Tools.NoMcp ? null : mcpAdmission,
+            toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values)).ConfigureAwait(false);
         profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
         profile.ConfigureEffectiveSettings(settings);
         profile.BindSettingsThinkingReads();
         await profile.LoadPromptTemplatesAsync(args.Prompts, stderr, token).ConfigureAwait(false);
         await profile.LoadSkillsAsync(args.Skills, stderr, token).ConfigureAwait(false);
         var options = new PersistentAgentSessionOptions(UseLatestLeaf: args.Latest, SelectedLeafId: args.Leaf,
-            AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
-            SessionLogStoreOptions: new(ReaderOptions: ReaderBounds));
+            AgentOptions: PiPayloadBudget.Agent(new(Loop: new(MaximumTurns: 64))),
+            SessionLogStoreOptions: new(ReaderOptions: ReaderBounds), ContextOptions: PiPayloadBudget.Context);
         var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); long sequence = 0;
         long Clock() => startTime + Interlocked.Increment(ref sequence);
         string NextId() => "cli-" + Guid.NewGuid().ToString("N");
@@ -279,7 +285,7 @@ public static class SessionCommands
                 previousLeaf = session.Snapshot.Context.LeafId;
                 await profile.ApplySkillsAsync(session, token).ConfigureAwait(false);
                 await profile.AttachOwnerAsync(session, options, Clock, NextId, lifecycle: lifecycle).ConfigureAwait(false);
-                await profile.ApplyInitialToolSelectionAsync(session, token).ConfigureAwait(false);
+                await profile.ApplyInitialToolSelectionAsync(session, token, resumed: true).ConfigureAwait(false);
                 if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
                 await profile.StartLifecycleAsync("resume", token).ConfigureAwait(false);
                 profile.ConfigureLifecycleModeStop(() => null); // One-shot intent; existing finally owns actual cleanup.

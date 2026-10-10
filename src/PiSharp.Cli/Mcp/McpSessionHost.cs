@@ -1,6 +1,7 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (session start: load the
-// config, connect enabled servers, servers with direct tools before the first prompt and the others in the background,
-// reportProblems, describeState), packages/coding-agent/src/extensions/mcp/runtime.ts (createDefaultTransport, usesOAuth,
+// config, connect every enabled server in the background, the first prompt waiting for servers with direct tools,
+// ensureDiscoveryActive, reportProblems, describeState), packages/coding-agent/src/extensions/tool-search/index.ts (tool_search
+// registered inactive), packages/coding-agent/src/extensions/mcp/runtime.ts (createDefaultTransport, usesOAuth, auth.provider,
 // expandHome, roots), packages/coding-agent/src/extensions/mcp/config.ts (loadMcpConfig), packages/mcp/src/transports/stdio.ts
 // (inherited environment) and cross-spawn 7 (Windows command resolution and cmd.exe escaping).
 using System.Collections.Immutable;
@@ -27,18 +28,30 @@ using PiSharp.Tools.Processes.Mcp;
 namespace PiSharp.Cli.Mcp;
 
 /// <summary>
-/// The MCP servers of a production session, from the global <c>&lt;agent dir&gt;/mcp.json</c> read once at session start.
-/// Servers with direct tools connect before the session opens; a server that fails is reported and left out, so the session
-/// still starts (the original reports it and continues). The other servers connect in the background. Stdio servers inherit
-/// the process environment; HTTP servers that use OAuth read and refresh their tokens in the durable <c>mcp-auth.json</c> store.
-/// The project <c>.pi/mcp.json</c> is not read: PiSharp has no project-trust store. Servers with `deferred` tools connect in the
-/// background and the built-in <c>tool_search</c> (<see cref="McpToolSearch"/>) loads their tools. Servers whose tools are
-/// reached through codemode need the codemode tool PiSharp does not implement yet; without <see cref="Discovery"/> they are
-/// reported and not connected.
+/// The MCP servers of a production session, from the global <c>&lt;agent dir&gt;/mcp.json</c> and, when the project is trusted
+/// (<see cref="IsProjectTrusted"/>), the project <c>.pi/mcp.json</c>, read once at session start. Every enabled server connects in
+/// the background after the session opens; the first prompt waits up to <see cref="StartupWait"/> for servers with `direct`
+/// tools, and a server that fails is reported and left out, so the session still starts. Stdio servers inherit the process
+/// environment; HTTP servers that use OAuth read and refresh their tokens in the durable <c>mcp-auth.json</c> store, and servers
+/// with `auth.provider` send the provider's current login token. The built-in <c>codemode</c> tool (<see cref="McpCodemode"/>, a
+/// Jint sandbox) and <c>tool_search</c> (<see cref="McpToolSearch"/>) are registered with every session the tool selection keeps
+/// them in, inactive unless servers need them (codemode for `codemode` tools unless autoEnableCodemode is false, tool_search for
+/// `deferred` tools) or the selection names them. Servers with resources are reached through the resource tools
+/// (<see cref="McpResourceToolsPublisher"/>), and each generation's servers are managed through an <see cref="McpServerManager"/>.
 /// </summary>
 internal sealed record McpSessionHost(string AgentDirectory, string HomeDirectory, Func<IEnumerable<KeyValuePair<string, string>>> ProcessEnvironment)
 {
     internal const string ClientVersion = "1.1.0";
+    /// <summary>mcp/index.ts registers every tool of every server (runtime.ts lists every page) and calls any number of them at once;
+    /// a tool schema or description is bounded only by its 16 MiB tools/list message (transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES).</summary>
+    internal static ExtensionRegistryOptions RegistryOptions { get; } = new()
+    {
+        MaximumRegistrations = int.MaxValue, MaximumRegistrationsPerOwner = int.MaxValue, MaximumConcurrentDispatches = int.MaxValue,
+        MaximumMetadataCharacters = int.MaxValue, MaximumDescriptionCharacters = 16 * 1024 * 1024, MaximumJsonCharacters = 16 * 1024 * 1024,
+        MaximumJsonDepth = 64
+    };
+    /// <summary>The binding of one server's (or the resource tools') registrations admits every tool it lists.</summary>
+    internal static ToolInvokerOptions BindingInvokerOptions { get; } = new(MaximumTools: int.MaxValue);
     private static readonly TimeSpan OAuthRequestTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>Physical HTTP for HTTP servers and their OAuth refreshes; defaults to a socket handler without redirects.</summary>
@@ -47,12 +60,39 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     public IMcpOAuthCredentialBackend? Credentials { get; init; }
     /// <summary>A replacement channel for a server (tests); null keeps the stdio or HTTP channel of its config.</summary>
     public Func<McpServerEntry, McpAdmittedChannelFactory?>? CreateChannel { get; init; }
-    /// <summary>Executable codemode/tool_search definitions for one generation (tests); null: PiSharp has no codemode, so servers that
-    /// need it are skipped. The built-in tool_search is added when a server has `deferred` tools and none is supplied here.</summary>
+    /// <summary>A replacement channel that also receives the server's notification handler (tests: log messages and tool list
+    /// changes); null falls back to <see cref="CreateChannel"/>.</summary>
+    public Func<McpServerEntry, McpNotificationHandler?, McpAdmittedChannelFactory?>? CreateNotifyingChannel { get; init; }
+    /// <summary>Executable codemode/tool_search definitions for one generation (tests). The built-in codemode and tool_search are
+    /// added unless supplied here or left out by the tool selection.</summary>
     public Func<long, ImmutableArray<McpDiscoveryExecutableDefinition>>? Discovery { get; init; }
     public Func<double> UnixMilliseconds { get; init; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     /// <summary>Each background connection once it connected (its tools published) or failed.</summary>
     public Action<McpBackgroundConnectionReport>? ObserveBackgroundConnection { get; init; }
+    /// <summary>The model registry codemode scripts reach as <c>models</c>; defaults to the CLI registry (embedded catalogs, the
+    /// environment and auth.json), built on first use.</summary>
+    public Func<PiSharp.Codemode.ICodemodeModelRuntime?>? CodemodeModels { get; init; }
+    /// <summary>Whether the session's project is trusted, so its <c>.pi/mcp.json</c> is read (ctx.isProjectTrusted()). The project
+    /// trust store and its startup flow supply it; the default is the original's non-interactive answer without a stored decision
+    /// (defaultProjectTrust "ask" without a UI): not trusted.</summary>
+    public Func<string, bool> IsProjectTrusted { get; init; } = _ => false;
+    /// <summary>The current token of a provider for servers with `auth.provider` (modelRegistry.getApiKeyForProvider); defaults to
+    /// the CLI's credential resolution (auth.json, then the environment).</summary>
+    public Func<string, CancellationToken, ValueTask<string?>>? ProviderToken { get; init; }
+    /// <summary>How long the first prompt waits for servers with `direct` tools (the original's startupWaitMs).</summary>
+    public TimeSpan StartupWait { get; init; } = McpBackgroundConnections.DefaultStartupWait;
+    /// <summary>Opens an OAuth authorization URL for a sign-in from `/mcp`; defaults to the platform browser.</summary>
+    public Action<string>? OpenUrl { get; init; }
+    /// <summary>Each generation's server manager once its session is bound: the seam for the terminal's `/mcp` view and the slash
+    /// command (<see cref="McpServerManager.ManageAsync"/>, <see cref="McpServerManager.ExecuteCommandAsync"/>).</summary>
+    public Action<McpServerManager>? ObserveManager { get; init; }
+    /// <summary>The servers native extensions register (<c>pi.registerMcpServer()</c>); the host passes it to the extensions it loads.</summary>
+    public McpRegisteredServers Registrations { get; init; } = new();
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<McpProfileRuntimeAdmission, TaskCompletionSource> hostStarts = new();
+
+    /// <summary>The host started dispatching on the session the admission opened: its background servers may connect now.</summary>
+    internal void HostStarted(McpProfileRuntimeAdmission admission)
+    { if (hostStarts.TryGetValue(admission, out var started)) started.TrySetResult(); }
 
     /// <summary>The agent directory from PI_CODING_AGENT_DIR or <c>~/.pi/agent</c>, and the real process environment.</summary>
     internal static McpSessionHost CreateDefault()
@@ -61,87 +101,154 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var agent = TerminalKeybindingConfigurationLoader.ResolveAgentDirectory(home, platform,
             new Dictionary<string, string?> { ["PI_CODING_AGENT_DIR"] = Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR") });
+        // Project trust: the Pi entry's own answer for its run, else the trust store read non-interactively (IMPL-F).
+        var resolver = PiSharp.Cli.Pi.PiProjectTrust.CreateResolver(agent, home);
         return new(agent, home, () => Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
-            .Select(entry => KeyValuePair.Create((string)entry.Key, (string?)entry.Value ?? "")));
+            .Select(entry => KeyValuePair.Create((string)entry.Key, (string?)entry.Value ?? "")))
+        { IsProjectTrusted = cwd => PiSharp.Cli.Pi.PiEntryOptions.Current?.ProjectTrusted(cwd) ?? resolver(cwd) };
     }
 
-    /// <summary>Reads the global mcp.json and returns the profile admission, or null when no server is enabled. Configuration
-    /// errors, the ignored project file and skipped servers are written to <paramref name="diagnostics"/>.</summary>
-    internal McpProfileRuntimeAdmission? CreateAdmission(string cwd, TextWriter diagnostics)
+    /// <summary>Reads the global mcp.json and, in a trusted project, the project's (unless <paramref name="noMcp"/>) and returns the
+    /// profile admission. Every session gets the built-in codemode and tool_search tools, inactive unless MCP servers need them or
+    /// the tool selection names them, as the original registers them with every session. Configuration errors and failed servers
+    /// are written to <paramref name="diagnostics"/> once the servers settled.</summary>
+    internal McpProfileRuntimeAdmission? CreateAdmission(string cwd, TextWriter diagnostics, JsonData? settings = null, bool noMcp = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(cwd); ArgumentNullException.ThrowIfNull(diagnostics);
+        // `--no-mcp` leaves the built-in MCP support out: registered servers stay registered, and nothing connects them.
+        Registrations.HostConnects = !noMcp;
         var reporter = new Reporter(diagnostics);
         var globalConfig = Path.Combine(AgentDirectory, "mcp.json");
         var projectConfig = Path.Combine(cwd, ".pi", "mcp.json");
-        if (File.Exists(projectConfig)) reporter.Notice($"{projectConfig} is ignored because PiSharp does not read project trust.");
-        if (!File.Exists(globalConfig)) return null;
-        McpLoadedConfiguration loaded;
-        try { loaded = McpConfigurationReader.Load(new(globalConfig, File.ReadAllText(globalConfig)), null, false); }
-        catch (IOException error) { reporter.Notice($"MCP failed to load: Could not read {globalConfig}: {error.Message}"); return null; }
-        var problems = loaded.Errors.Select(error => "config: " + error).ToList();
-        var environment = InheritedEnvironment();
-        var admitted = ImmutableArray.CreateBuilder<McpServerEntry>();
-        foreach (var entry in loaded.Servers.Where(entry => entry.Config.Enabled))
+        var problems = new List<string>();
+        var configErrors = ImmutableArray<string>.Empty;
+        var configured = ImmutableArray<McpServerEntry>.Empty;
+        string? trustedProject = null;
+        bool? configuredAutoEnable = null;
+        if (!noMcp)
         {
-            if (Discovery is null && McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Codemode))
-            { problems.Add($"{entry.Name}: not connected: its codemode tools need the codemode tool, which PiSharp does not implement yet; set \"exposure\": \"deferred\" or \"direct\" to use it"); continue; }
-            if (entry.Config.AuthProvider is not null)
-            { problems.Add($"{entry.Name}: not connected: auth.provider is not supported by PiSharp"); continue; }
-            admitted.Add(entry);
+            McpConfigurationDocument? Read(string path)
+            {
+                try { return File.Exists(path) ? new(path, File.ReadAllText(path)) : null; }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                { reporter.Notice($"MCP failed to load: Could not read {path}: {error.Message}"); return null; }
+            }
+            // config.ts loadMcpConfig: the global file, then the project file when the project is trusted. Project entries replace
+            // global ones; an entry without command, url or type overrides only enabled, exposure and toolExposure.
+            var trusted = IsProjectTrusted(cwd);
+            var loaded = McpConfigurationReader.Load(Read(globalConfig), trusted ? Read(projectConfig) : null, trusted);
+            configErrors = loaded.Errors;
+            problems.AddRange(loaded.Errors.Select(error => "config: " + error));
+            configuredAutoEnable = loaded.AutoEnableCodemode;
+            configured = loaded.Servers;
+            if (trusted) trustedProject = projectConfig;
+            if (!configured.Any(entry => entry.Config.Enabled)) { reporter.Problems(problems); problems.Clear(); }
         }
-        if (admitted.Count == 0) { reporter.Problems(problems); return null; }
-        var catalog = new McpServerCatalog(admitted.ToImmutable(), []);
-        var autoEnableCodemode = loaded.EffectiveAutoEnableCodemode;
-        return async (currentCwd, generation, nativeRegistry, exactPolicy, token) =>
+        // index.ts registeredServers: the servers extensions registered, except names mcp.json defines, which take precedence.
+        (ImmutableArray<McpServerEntry> Servers, ImmutableArray<string> Overridden) WithRegistered()
+        {
+            if (noMcp) return (configured, []);
+            var registered = new List<McpServerEntry>(); var overriddenNames = new List<string>();
+            foreach (var server in Registrations.List())
+            {
+                if (configured.FirstOrDefault(entry => McpCatalogPlanner.Namespace(entry.Name) == McpCatalogPlanner.Namespace(server.Name)) is { } defined)
+                { overriddenNames.Add($"\"{server.Name}\" registered by {server.ExtensionPath} is overridden by \"{defined.Name}\" in {defined.Source}"); continue; }
+                registered.Add(new(server.Name, server.Config, server.ExtensionPath, McpConfigurationScope.Extension));
+            }
+            return ([.. configured, .. registered], [.. overriddenNames]);
+        }
+        var environment = InheritedEnvironment();
+        var autoEnableCodemode = configuredAutoEnable ?? true;
+        var (codemodeMode, inlineBudget) = PiSharp.Codemode.CodemodeToolDefinition.ReadSettings(settings?.Value);
+        var codemodeModels = CodemodeModels ?? (() => McpCodemode.ModelRuntime.CreateDefault());
+        var credentials = new McpOAuthCredentialStore(Credentials ?? McpOAuthFileCredentialBackend.InAgentDirectory(AgentDirectory));
+        var serverLog = new McpServerLog(Path.Combine(AgentDirectory, "mcp.log"));
+        // One source for every generation: the profile admits a single servers prompt source for its lifetime.
+        var promptSource = new McpServersPromptSource();
+        var hostStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        McpProfileRuntimeAdmission admission = async (currentCwd, generation, nativeRegistry, exactPolicy, token) =>
         {
             var generationProblems = generation == 1 ? new List<string>(problems) : [];
+            // Registrations made while the extensions loaded connect with the configured servers; later ones are applied by the manager.
+            var (generationServers, overridden) = WithRegistered();
+            var admitted = generationServers.Where(entry => entry.Config.Enabled).ToImmutableArray();
+            var failures = new List<string>();
             var owned = new OwnedResources(CreateClient); IAsyncDisposable discovery = new Disposer(() => ValueTask.CompletedTask);
             // Pi trusts the servers of mcp.json: the profile's final-action policy admits the tools of this generation's servers.
             var grants = new McpCallGrants();
             try
             {
                 var options = new McpRuntimeOptions(generation, ClientVersion, Roots(currentCwd));
-                McpAdmittedChannelFactory Channels(McpServerEntry entry) => Channel(entry, currentCwd, options, () => owned.Client, environment);
-                // Servers with direct tools: connected here, in catalog order, so a failure leaves only that server out.
-                var preOpen = new List<(McpServerEntry Entry, McpPreOpenServerCapture Capture)>();
-                var current = nativeRegistry;
-                foreach (var entry in catalog.Servers.Where(entry => McpConfigurationReader.HasDirectTools(entry.Config)))
+                // runtime.ts connection.challenge: each server's last OAuth challenge, which its next sign-in answers.
+                var challenges = new System.Collections.Concurrent.ConcurrentDictionary<string, McpOAuthChallenge>(StringComparer.Ordinal);
+                McpAdmittedChannelFactory Channels(McpServerEntry entry, McpNotificationHandler? notification) =>
+                    Channel(entry, currentCwd, options, () => owned.Client, environment, notification, challenge => challenges[entry.Name] = challenge);
+                var resourceRegistry = owned.Track(new ExtensionRegistry(RegistryOptions));
+                var resourceScope = await resourceRegistry.ActivateAsync("mcp-resources", new EmptyExtension(), token).ConfigureAwait(false);
+                McpServerManager? manager = null;
+                // index.ts tool_call: tool_search and the resource tools reach every server, so they wait for all of them; a codemode
+                // script waits for the servers it needs. They wait inside the call, so a prompt never waits for them.
+                Task WaitForServers(Func<McpServerEntry, bool> include, CancellationToken cancellation) =>
+                    manager?.WaitForServersAsync(include, cancellation) ?? Task.CompletedTask;
+                var resources = new McpResourceToolsPublisher(resourceRegistry, resourceScope, exactPolicy, ValidateArguments, ComposeHooks, grants)
+                { WaitForServers = cancellation => WaitForServers(_ => true, cancellation) };
+                async ValueTask<McpPreparedServer> Bind(McpServerEntry actual, ReplaceableAgentSession owner, AgentSessionAttachment attachment, CancellationToken cancellation)
                 {
-                    token.ThrowIfCancellationRequested();
-                    var registry = owned.Track(new ExtensionRegistry());
-                    try
+                    var registry = owned.Track(new ExtensionRegistry(RegistryOptions));
+                    var scope = await registry.ActivateAsync("mcp-" + actual.Name, new EmptyExtension(), cancellation).ConfigureAwait(false);
+                    grants.AdmitServer(scope);
+                    McpPreparedServer? prepared = null;
+                    var notifications = Notifications(actual.Name, serverLog, () => Volatile.Read(ref prepared), (name, error) => manager?.RefreshFailed(name, error),
+                        (name, server, cancellation) => manager?.CountResourcesAsync(name, server, cancellation) ?? Task.CompletedTask);
+                    // The original records nothing at session_shutdown, so a resumed session declares the tools again once the server connects.
+                    var server = new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual, notifications),
+                        new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks)
                     {
-                        var scope = await registry.ActivateAsync("mcp-" + entry.Name, new EmptyExtension(), token).ConfigureAwait(false);
-                        var capture = await McpPreOpenServerCapture.AcquireAsync(entry, registry, scope, current, exactPolicy, ValidateArguments,
-                            Channels(entry), options, ComposeHooks, token).ConfigureAwait(false);
-                        preOpen.Add((entry, owned.Hold(capture, current))); current = capture.Registry;
-                        grants.AdmitServer(scope);
-                    }
-                    catch (Exception error) when (!token.IsCancellationRequested) { generationProblems.Add($"{entry.Name}: {Describe(entry, error)}"); }
+                        DurableWithdrawalOnShutdown = false, ConvertResults = true,
+                        // runtime.ts withClient: a call the server rejects for authentication marks the server as needing a sign-in.
+                        CallFailed = failure => manager?.CallFailed(actual.Name, failure)
+                    };
+                    Volatile.Write(ref prepared, server);
+                    return server;
                 }
-                var background = catalog.Servers.Where(entry => !McpConfigurationReader.HasDirectTools(entry.Config))
-                    .Select(entry => new McpBackgroundServerAdmission(entry.Name, actual => Same(actual, entry), async (actual, owner, attachment, cancellation) =>
-                    {
-                        var registry = owned.Track(new ExtensionRegistry());
-                        var scope = await registry.ActivateAsync("mcp-" + actual.Name, new EmptyExtension(), cancellation).ConfigureAwait(false);
-                        grants.AdmitServer(scope);
-                        return new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual),
-                            new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks);
-                    })).ToImmutableArray();
+                var background = admitted.Select(entry => new McpBackgroundServerAdmission(entry.Name, actual => Same(actual, entry), async (actual, owner, attachment, cancellation) =>
+                {
+                    var server = await Bind(actual, owner, attachment, cancellation).ConfigureAwait(false);
+                    manager?.Track(actual, server);
+                    return server;
+                })).ToImmutableArray();
                 McpDiscoveryCatalogPreparation prepare = (_, registry) => new(registry, []);
                 var definitions = Discovery?.Invoke(generation) is { IsDefault: false } supplied ? supplied : [];
-                // The original registers tool_search with every session and the MCP extension activates it for `deferred` servers;
-                // here it is registered (active) for them. A tool selection that leaves tool_search out leaves their tools unreachable.
-                if (catalog.Servers.Any(entry => McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Deferred)) &&
-                    !definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch))
+                var exposures = admitted.SelectMany(entry => McpConfigurationReader.ConfiguredExposures(entry.Config)).ToHashSet();
+                var selection = nativeRegistry.LifetimeToolSelection;
+                bool Named(string name) => selection?.IsNamed(name) == true || selection?.InitialNames.Contains(name) == true;
+                // The original registers codemode (inactive) with every session; the MCP extension activates it for `codemode`
+                // servers unless autoEnableCodemode is false. --tools, --exclude-tools and defaultTools select it like any tool.
+                var codemodeActivated = exposures.Contains(McpExposure.Codemode) && autoEnableCodemode;
+                bool codemodeReachable;
+                if (!definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode) && selection?.IsAllowed(McpCodemode.Name) != false)
                 {
-                    if (nativeRegistry.LifetimeToolSelection?.IsAllowed(McpToolSearch.Name) != false) definitions = definitions.Add(McpToolSearch.Create());
-                    else if (generation == 1 && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode))
-                        reporter.Notice("MCP tools are only reachable from the codemode or tool_search tool, but neither is active; they cannot be called.");
+                    definitions = definitions.Add(McpCodemode.Create(codemodeMode, inlineBudget, codemodeModels, codemodeActivated, WaitForServers));
+                    codemodeReachable = codemodeActivated || Named(McpCodemode.Name);
                 }
+                else codemodeReachable = definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode);
+                var codemodeOff = exposures.Contains(McpExposure.Codemode) && !autoEnableCodemode && selection?.IsAllowed(McpCodemode.Name) != false;
+                // tool-search/index.ts registers tool_search inactive with every session; ensureDiscoveryActive activates it for
+                // `deferred` servers. A tool selection that leaves it out leaves their tools unreachable.
+                var toolSearchActivated = exposures.Contains(McpExposure.Deferred);
+                bool toolSearchReachable;
+                if (!definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch) && selection?.IsAllowed(McpToolSearch.Name) != false)
+                {
+                    definitions = definitions.Add(McpToolSearch.Create(toolSearchActivated, cancellation => WaitForServers(_ => true, cancellation)));
+                    toolSearchReachable = toolSearchActivated || Named(McpToolSearch.Name);
+                }
+                else toolSearchReachable = definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch);
+                // ensureDiscoveryActive: tools that are not declared need codemode or tool_search; warn once when neither is active.
+                if (generation == 1 && (exposures.Contains(McpExposure.Codemode) || exposures.Contains(McpExposure.Deferred)) && !codemodeReachable && !toolSearchReachable)
+                    reporter.Notice($"MCP tools are only reachable from the codemode or tool_search tool, but neither is active{(codemodeOff ? " (autoEnableCodemode is false)" : "")}; they cannot be called.");
                 if (!definitions.IsEmpty)
                 {
-                    var discoveryRegistry = new ExtensionRegistry();
+                    var discoveryRegistry = new ExtensionRegistry(RegistryOptions);
                     discovery = new Disposer(() => discoveryRegistry.DisposeAsync());
                     var scope = await discoveryRegistry.ActivateAsync("mcp-discovery", new EmptyExtension(), token).ConfigureAwait(false);
                     prepare = new McpRegisteredProfileDiscoveryAdmission(discoveryRegistry, scope, definitions, exactPolicy, generation,
@@ -149,22 +256,61 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     // The built-in tool_search is host code that only changes the session's tool selection: the profile admits its exact action.
                     if (definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch && definition.Descriptor.RegistrationId == McpToolSearch.RegistrationId))
                         grants.AdmitExact(McpToolSearch.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpToolSearch.RegistrationId}");
+                    // The built-in codemode runs scripts whose nested calls each pass the session's own final-action policy.
+                    if (definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode && definition.Descriptor.RegistrationId == McpCodemode.RegistrationId))
+                        grants.AdmitExact(McpCodemode.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpCodemode.RegistrationId}");
                 }
-                reporter.Problems(generationProblems);
-                var included = preOpen.Select(row => row.Entry).Concat(background.Select(row => catalog.Servers.Single(entry => entry.Name == row.Name)))
-                    .ToHashSet();
-                return new McpSessionRuntimeAdmission(nativeRegistry, owned, discovery, exactPolicy,
-                    new McpServerCatalog([.. catalog.Servers.Where(included.Contains)], []),
-                    [.. preOpen.Select(row => new McpServerActivationAdmission(row.Entry.Name, actual => Same(actual, row.Entry),
-                        (actual, registry, _) => Task.FromResult(owned.Release(row.Capture, registry))))],
+                manager = new McpServerManager(generationServers, configErrors, trustedProject, new(Bind, resources, credentials, CreateClient,
+                    Resolve, OpenUrl ?? PiSharp.Cli.Commands.McpCommand.OpenBrowser, AgentDirectory)
+                {
+                    AutoEnableCodemode = autoEnableCodemode,
+                    ServersChanged = servers => promptSource.ReplaceServers(generation, [.. servers.Where(server => server.Config.Enabled)]),
+                    Challenge = name => challenges.TryGetValue(name, out var challenge) ? challenge : null,
+                    ClearChallenge = name => challenges.TryRemove(name, out _)
+                }) { Overridden = overridden };
+                return new McpSessionRuntimeAdmission(nativeRegistry, owned, discovery, exactPolicy, new McpServerCatalog(admitted, []), [],
                     autoEnableCodemode, prepare)
                 {
                     BackgroundServers = background, CallGrants = grants,
-                    ServersPromptSource = new McpServersPromptSource(),
+                    // The first generation's background servers wait until the host started dispatching; later generations (reload)
+                    // open on a running host.
+                    ConnectAfter = generation == 1 ? hostStarted.Task : null,
+                    ServersPromptSource = promptSource,
+                    StartupWait = StartupWait, Notify = reporter.Notice,
                     ReportBackgroundConnection = report =>
                     {
-                        if (report.Failure is { } failure) reporter.Problems([$"{report.Entry.Name}: {Describe(report.Entry, failure)}"]);
+                        if (report.Failure is { } failure) lock (failures) failures.Add($"{report.Entry.Name}: {Describe(report.Entry, failure)}");
+                        manager.Settled(report);
                         ObserveBackgroundConnection?.Invoke(report);
+                    },
+                    // reportProblems: one message for everything that needs the user, once every server settled.
+                    BackgroundSettled = () => { string[] lines; lock (failures) lines = [.. generationProblems, .. failures]; reporter.Problems(lines); },
+                    BackgroundConnected = async (entry, server, snapshot, cancellation) =>
+                    {
+                        try { await resources.UpdateAsync(entry.Name, server, entry.Config.Exposure, snapshot.Catalog.HasResources, cancellation).ConfigureAwait(false); }
+                        catch (Exception) when (!cancellation.IsCancellationRequested) { /* The resource tools follow on the next change. */ }
+                        await manager.CountResourcesAsync(entry.Name, server, cancellation).ConfigureAwait(false);
+                    },
+                    BindManager = (owner, attachment, connections) =>
+                    {
+                        resources.Bind(owner, attachment);
+                        manager.Bind(owner, attachment, connections);
+                        // index.ts turn_start: servers waiting for a sign-in reconnect once it happened outside the session.
+                        var gate = attachment.Session.BeforeInputAdmission;
+                        attachment.Session.BeforeInputAdmission = async cancellation =>
+                        {
+                            await manager.ReconnectSignedInAsync(cancellation).ConfigureAwait(false);
+                            if (gate is not null) await gate(cancellation).ConfigureAwait(false);
+                        };
+                        // index.ts mcp_servers_change: servers registered or unregistered during the session connect or close right away.
+                        if (!noMcp)
+                        {
+                            // Applied outside the registering callback, whose ambient session state must not flow into the connection work.
+                            var subscription = Registrations.Subscribe(() => { using (ExecutionContext.SuppressFlow()) _ = Task.Run(() => manager.ApplyRegistrationsAsync(WithRegistered())); });
+                            owner.RegisterOwnedResource(attachment, _ => { subscription.Dispose(); return Task.CompletedTask; }, () => { subscription.Dispose(); return Task.CompletedTask; });
+                        }
+                        try { ObserveManager?.Invoke(manager); }
+                        catch (Exception) { /* An observer must not affect the session. */ }
                     }
                 };
             }
@@ -174,7 +320,13 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 throw;
             }
         };
+        hostStarts.Add(admission, hostStarted);
+        return admission;
     }
+
+    /// <summary>The provider token for `auth.provider` servers (<see cref="ProviderToken"/>, else the CLI credentials).</summary>
+    private ValueTask<string?> ProviderTokenAsync(string provider, CancellationToken token) =>
+        ProviderToken?.Invoke(provider, token) ?? McpProviderTokens.ResolveAsync(PiSharp.Cli.Commands.LiveSessionRuntime.Default, provider, token);
 
     private Dictionary<string, string> InheritedEnvironment()
     {
@@ -188,7 +340,10 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         { new { uri = new Uri(Path.GetFullPath(cwd)).AbsoluteUri, name = Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(cwd))) } }));
 
     private static void Same(McpServerEntry actual, McpServerEntry admitted)
-    { if (!ReferenceEquals(actual, admitted)) throw new InvalidOperationException("MCP admission belongs to the exact configured server entry."); }
+    {
+        // `/mcp` reconfigures the server (enabled, exposure) without changing its connection.
+        if (!McpConfigurationReader.SameConnection(actual, admitted)) throw new InvalidOperationException("MCP admission belongs to the exact configured server entry.");
+    }
 
     /// <summary>The MCP server validates its own arguments; the host admits any JSON object. tool_search admits its schema.</summary>
     private static ValueTask<bool> ValidateArguments(ExtensionToolRegistrationInfo tool, JsonData arguments, CancellationToken token) =>
@@ -201,8 +356,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     /// <summary>describeState for the startup report: "needs sign-in" or "failed: &lt;first line&gt;".</summary>
     internal static string Describe(McpServerEntry entry, Exception error)
     {
-        for (Exception? current = error; current is not null; current = current.InnerException)
-            if (current is McpOAuthAuthorizationRequiredException) return $"needs sign-in (run \"{PiSharp.Cli.Commands.McpCommand.AppName} mcp login {entry.Name}\")";
+        if (McpServerManager.NeedsSignIn(error, entry)) return $"needs sign-in (run \"{PiSharp.Cli.Commands.McpCommand.AppName} mcp login {entry.Name}\")";
         var message = error is AggregateException { InnerExceptions.Count: 1 } single ? single.InnerExceptions[0].Message : error.Message;
         var first = message.Split('\n')[0].TrimEnd('\r');
         return "failed: " + (first.Length == 0 ? "unknown error" : first);
@@ -210,15 +364,37 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
 
     /// <summary>createDefaultTransport: the server's stdio or streamable HTTP channel (or the <see cref="CreateChannel"/> replacement).</summary>
     internal McpAdmittedChannelFactory Channel(McpServerEntry entry, string cwd, McpRuntimeOptions options, Func<HttpClient> client,
-        Dictionary<string, string>? inherited = null) =>
-        CreateChannel?.Invoke(entry) ?? (entry.Config.Transport == McpTransportKind.Http
-            ? HttpChannel(entry, options, client()) : StdioChannel(entry, cwd, inherited ?? InheritedEnvironment()));
+        Dictionary<string, string>? inherited = null, McpNotificationHandler? notification = null, Action<McpOAuthChallenge>? challenge = null) =>
+        CreateNotifyingChannel?.Invoke(entry, notification) ?? CreateChannel?.Invoke(entry) ?? (entry.Config.Transport == McpTransportKind.Http
+            ? HttpChannel(entry, options, client(), notification, challenge) : StdioChannel(entry, cwd, inherited ?? InheritedEnvironment(), notification));
+
+    /// <summary>runtime.ts connectOnce notification handlers: <c>notifications/message</c> goes to the server log,
+    /// <c>notifications/tools/list_changed</c> refreshes the server's tools (new tools are added, withdrawn ones become unreachable)
+    /// and <c>notifications/resources/list_changed</c> refreshes its resource count (refreshResources).</summary>
+    private static McpNotificationHandler Notifications(string server, McpServerLog log, Func<McpPreparedServer?> target, Action<string, Exception>? refreshFailed,
+        Func<string, McpPreparedServer, CancellationToken, Task>? resourcesChanged = null) =>
+        async (method, parameters, token) =>
+        {
+            if (method == "notifications/message") { log.Write(server, parameters); return; }
+            if (target() is not { } prepared) return;
+            if (method == "notifications/resources/list_changed")
+            {
+                if (resourcesChanged is not null)
+                    try { await resourcesChanged(server, prepared, token).ConfigureAwait(false); }
+                    catch (Exception) when (!token.IsCancellationRequested) { /* The count follows on the next change. */ }
+                return;
+            }
+            if (method != "notifications/tools/list_changed") return;
+            try { await prepared.RefreshToolsAsync(token).ConfigureAwait(false); }
+            catch (Exception error) when (!token.IsCancellationRequested) { refreshFailed?.Invoke(server, error); }
+        };
 
     /// <summary>A client for HTTP servers and their OAuth requests; an injected handler stays the caller's.</summary>
     internal HttpClient CreateClient() => new(CreateHttpHandler?.Invoke() ?? new SocketsHttpHandler { AllowAutoRedirect = false }, disposeHandler: CreateHttpHandler is null)
     { Timeout = Timeout.InfiniteTimeSpan };
 
-    private McpAdmittedChannelFactory HttpChannel(McpServerEntry entry, McpRuntimeOptions options, HttpClient client)
+    private McpAdmittedChannelFactory HttpChannel(McpServerEntry entry, McpRuntimeOptions options, HttpClient client, McpNotificationHandler? notification,
+        Action<McpOAuthChallenge>? challenge)
     {
         var raw = entry.Config.Raw.Value;
         var url = new Uri(raw.GetProperty("url").GetString()!);
@@ -233,10 +409,14 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
             var store = new McpOAuthCredentialStore(Credentials ?? McpOAuthFileCredentialBackend.InAgentDirectory(AgentDirectory)).ForServer(entry.Name, url);
             var settings = McpOAuthSettings.From(entry, Resolve);
             var adapter = new McpAdmittedOAuthRefreshAdapter(url, store, (request, token) => new(ExchangeAsync(client, request, token)), UnixMilliseconds,
-                new McpOAuthCancellationAdmission(), settings.ClientId is { Length: > 0 } id ? new McpOAuthAdmittedClient(id, settings.ClientSecret) : null);
+                new McpOAuthCancellationAdmission(), settings.ClientId is { Length: > 0 } id ? new McpOAuthAdmittedClient(id, settings.ClientSecret) : null)
+            { RefreshLock = McpOAuthRefreshLock.For(AgentDirectory, entry.Name, url), OnChallenge = challenge };
             authentication = adapter.CreateAuthentication();
         }
-        return AdmittedMcpHttpChannelFactory.Create(entry, binding, client, options, authentication: authentication);
+        // runtime.ts auth.provider: the provider's current token, read on every request so its refreshes apply.
+        else if (entry.Config.AuthProvider is not null && entry.Scope != McpConfigurationScope.Project)
+            authentication = McpProviderTokenAuthentication.Create(entry, ProviderTokenAsync);
+        return AdmittedMcpHttpChannelFactory.Create(entry, binding, client, options, notification: notification, authentication: authentication);
     }
 
     /// <summary>OAuth metadata and refresh requests, each bounded by the original's 15 s timeout.</summary>
@@ -258,7 +438,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         { throw new TimeoutException("OAuth request timed out after 15 s.", canceled); }
     }
 
-    private McpAdmittedChannelFactory StdioChannel(McpServerEntry entry, string cwd, Dictionary<string, string> inherited)
+    private McpAdmittedChannelFactory StdioChannel(McpServerEntry entry, string cwd, Dictionary<string, string> inherited, McpNotificationHandler? notification)
     {
         var raw = entry.Config.Raw.Value;
         var environment = new Dictionary<string, string>(inherited, inherited.Comparer);
@@ -274,7 +454,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         {
             token.ThrowIfCancellationRequested();
             Same(actual, entry);
-            return ValueTask.FromResult<IMcpAdmittedRequestChannel>(new McpJsonRpcRequestChannel(new McpStdioTransport(new McpNativeDuplexLease(admission))));
+            return ValueTask.FromResult<IMcpAdmittedRequestChannel>(new McpJsonRpcRequestChannel(new McpStdioTransport(new McpNativeDuplexLease(admission)), notification: notification));
         };
     }
 
@@ -284,7 +464,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         value.StartsWith("~/", StringComparison.Ordinal) || OperatingSystem.IsWindows() && value.StartsWith("~\\", StringComparison.Ordinal)
             ? Path.Combine(HomeDirectory, value[2..]) : value;
 
-    /// <summary>resolveConfigValueOrThrow over the process environment; commands (`!…`) are not run.</summary>
+    /// <summary>resolveConfigValueOrThrow over the process environment, `!command` values included.</summary>
     private string Resolve(string value, string description)
     {
         var environment = InheritedEnvironment();

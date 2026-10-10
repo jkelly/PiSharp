@@ -132,17 +132,18 @@ internal static class SessionJsonEventCommandTests
         var unsupportedSource = files.In("nul-source.txt");
         await File.WriteAllTextAsync(unsupportedSource, unsupportedSeed, Utf8);
         var unsupportedBytes = await File.ReadAllBytesAsync(unsupportedSource);
+        // Pi read.ts: a file that is not an image is buffer.toString("utf-8"), NUL characters included.
         await Script(files, Tool(api, "read", "nul-read-json", new { path = unsupportedSource }, "read unsupported content"),
-            Text(api, "handled unsupported file content", "Only UTF-8 text is supported; image, binary and other encoding support remains unfinished."));
+            Text(api, "handled unsupported file content", "source 文\U0001f642"));
         var unsupported = await Child(files, Prompt(files, api, "read unsupported content", ["--allow-read", unsupportedSource]));
-        Equal(1, unsupported.Code); Equal("CompletedWithErrors", Diagnostic(unsupported.Error).GetProperty("code").GetString());
+        Equal(0, unsupported.Code);
         var unsupportedEvents = Records(Utf8.GetString(unsupported.Output));
         var unsupportedEnd = unsupportedEvents.Single(record => Type(record) == "tool_execution_end");
-        Check(unsupportedEnd.GetProperty("isError").GetBoolean(), "NUL read unexpectedly became successful text content.");
-        Equal("UnsupportedContent", unsupportedEnd.GetProperty("result").GetProperty("details").GetProperty("fileOperation").GetProperty("code").GetString());
+        Check(!unsupportedEnd.GetProperty("isError").GetBoolean(), "NUL read failed instead of returning text content.");
+        Equal(unsupportedSeed, unsupportedEnd.GetProperty("result").GetProperty("content")[0].GetProperty("text").GetString());
         Correlate(unsupportedEvents, await ReadComplete(files), 4);
         var unsupportedAfter = await File.ReadAllBytesAsync(unsupportedSource);
-        Check(unsupportedBytes.SequenceEqual(unsupportedAfter), "Rejected NUL read changed the original source bytes.");
+        Check(unsupportedBytes.SequenceEqual(unsupportedAfter), "NUL read changed the original source bytes.");
         var deniedTarget = files.In("denied.txt");
         await Script(files, Tool(api, "write", "denied-json", new { path = deniedTarget, content = "unallowed effect" }), Text(api, "handled tool failure"));
         var denied = await Child(files, Prompt(files, api, "deny action"));

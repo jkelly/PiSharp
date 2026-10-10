@@ -10,10 +10,11 @@ public sealed record ToolResultValueOptions(int MaximumCharacters = 65_536,
     int MaximumContentBlocks = 128, int MaximumJsonDepth = 32,
     int MaximumRawCharacters = 7 * 1024 * 1024, int MaximumRawBytes = 28 * 1024 * 1024)
 {
-    /// <summary>Bounded outer execution admission accommodates the existing configured prepared adapters.</summary>
-    public static ToolResultValueOptions ExecutionBoundary { get; } = new(MaximumCharacters: 512 * 1024,
-        MaximumStructuredContentCharacters: 8 * 1024 * 1024, MaximumContentBlocks: 1024,
-        MaximumRawCharacters: 12 * 1024 * 1024, MaximumRawBytes: 48 * 1024 * 1024);
+    /// <summary>Bounded outer execution admission accommodates the existing configured prepared adapters, including a
+    /// Pi-sized image result (owner decision 0004: up to 4.5MB of base64 per image, as Pi's read tool sends).</summary>
+    public static ToolResultValueOptions ExecutionBoundary { get; } = new(MaximumCharacters: 8 * 1024 * 1024,
+        MaximumStructuredContentCharacters: 8 * 1024 * 1024 + 65_536, MaximumContentBlocks: 1024,
+        MaximumRawCharacters: 24 * 1024 * 1024, MaximumRawBytes: 96 * 1024 * 1024);
 }
 
 /// <summary>Strict, bounded admission and complete source result serialization; no numeric rewriting.</summary>

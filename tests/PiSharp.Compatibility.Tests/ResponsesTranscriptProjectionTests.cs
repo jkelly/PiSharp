@@ -90,13 +90,17 @@ static class ResponsesTranscriptProjectionTests
         foreach (var entries in new[]
         {
             new[] { Tool("call odd__|fc_a", model: "model-b"), Tool("call_odd|fc_b", model: "model-b") },
-            new[] { Tool("_|fc_a", model: "model-b") }, new[] { Tool("call|fc_one|extra") },
+            new[] { Tool("call|fc_one|extra") },
             new[] { Assistant([new ToolCallContent("call|fc_one", "read", JsonData.EmptyObject), new ToolCallContent("call|fc_two", "read", JsonData.EmptyObject)]) }
         }) Equal(ResponsesProjectionFailure.IdentityCollision, Throws(() => Project(entries)).Failure);
         var original = "call odd__|foreign:item!/"; var tool = Tool(original, model: "foreign", provider: "foreign"); var result = Result(original);
         var projected = Project([tool, result]).Value;
         Equal("call_odd", projected[0].GetProperty("call_id").GetString()); Equal("fc_1rj8blc1y9mlbs", projected[0].GetProperty("id").GetString());
         Equal("call_odd", projected[1].GetProperty("call_id").GetString()); Equal(original, result.WireBody.Value.GetProperty("toolCallId").GetString());
+        // Owner decision 13: openai-responses-shared.ts normalizeIdPart("_") strips the trailing "_", leaving the call id "", which upstream
+        // replays (as it replays a call whose id is "|"); several calls may share it.
+        var emptied = Project([Tool("_|fc_a", model: "model-b"), Result("_|fc_a")]).Value;
+        Equal("", emptied[0].GetProperty("call_id").GetString()); Equal("", emptied[1].GetProperty("call_id").GetString());
         return Task.CompletedTask;
     }
 

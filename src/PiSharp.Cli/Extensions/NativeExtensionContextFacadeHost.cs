@@ -92,20 +92,20 @@ public sealed partial class NativeExtensionContextFacadeHost : IExtensionSession
     public string GetSystemPrompt(IExtensionContext context) => Read(context, _ => live.GetSystemPrompt(context));
     public string? GetLeafId(IExtensionSessionContext context) => Read(context, attached => attached.Session.Snapshot.Context.LeafId);
     private static SessionTreeSnapshot Tree(AgentSessionAttachment attached)
-        => new SessionTreeQueries().Build(attached.Session.Snapshot.Log.Entries, attached.LifetimeToken);
+        => attached.Session.CreateTreeQueries().Build(attached.Session.Snapshot.Log.Entries, attached.LifetimeToken);
     public JsonData? GetEntry(IExtensionSessionContext context, string entryId)
         => Read(context, attached => Tree(attached).GetEntry(entryId)?.WireBody);
     public JsonData? GetLeafEntry(IExtensionSessionContext context) => Read(context, attached =>
     {
         var state = attached.Session.Snapshot;
-        return state.Context.LeafId is { } id ? new SessionTreeQueries().Build(state.Log.Entries, attached.LifetimeToken).GetEntry(id)?.WireBody : null;
+        return state.Context.LeafId is { } id ? attached.Session.CreateTreeQueries().Build(state.Log.Entries, attached.LifetimeToken).GetEntry(id)?.WireBody : null;
     });
     public ImmutableArray<JsonData> GetEntries(IExtensionSessionContext context)
         => Read(context, attached => Tree(attached).Entries.Select(entry => entry.WireBody).ToImmutableArray());
     public ImmutableArray<JsonData> GetBranch(IExtensionSessionContext context, string? entryId) => Read(context, attached =>
     {
         var state = attached.Session.Snapshot;
-        return new SessionTreeQueries().Build(state.Log.Entries, attached.LifetimeToken)
+        return attached.Session.CreateTreeQueries().Build(state.Log.Entries, attached.LifetimeToken)
             .GetBranch(entryId ?? state.Context.LeafId, attached.LifetimeToken).Select(entry => entry.WireBody).ToImmutableArray();
     });
     public JsonData GetHeader(IExtensionSessionContext context) => Read(context, attached => attached.Session.Snapshot.Log.Header.WireBody);

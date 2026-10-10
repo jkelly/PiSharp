@@ -9,6 +9,7 @@ namespace PiSharp.Extensions.Agent;
 public sealed class RegisteredExtensionInputAdmission : IPromptInputAdmission
 {
     private readonly ExtensionRegistrySnapshot snapshot;
+    private readonly ExtensionRegistry registry;
     private readonly RegisteredExtensionEventDispatcher dispatcher;
     private readonly CancellationToken session;
     private readonly Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportDiagnostic;
@@ -19,14 +20,14 @@ public sealed class RegisteredExtensionInputAdmission : IPromptInputAdmission
         Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportDiagnostic = null)
     {
         ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(snapshot);
-        this.snapshot = snapshot; session = sessionCancellationToken; this.reportDiagnostic = reportDiagnostic;
+        this.snapshot = snapshot; this.registry = registry; session = sessionCancellationToken; this.reportDiagnostic = reportDiagnostic;
         dispatcher = new(registry, value => { _ = ToolResultValueCodec.Read(value); }, options, maximumHandlers);
     }
 
     public async ValueTask<PromptInputDecision> ReduceAsync(PromptInput input, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested();
-        if (snapshot.InputHandlers.IsEmpty) return new(PromptInputAction.Continue);
+        if (registry.Current(snapshot).InputHandlers.IsEmpty) return new(PromptInputAction.Continue);
         try
         {
             var result = await dispatcher.DispatchInputAsync(snapshot,

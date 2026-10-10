@@ -47,7 +47,7 @@ public sealed class LoadoutDiagnosticDelivery
         ArgumentNullException.ThrowIfNull(captured); ArgumentNullException.ThrowIfNull(report);
         if (!generationLifetime.CanBeCanceled)
             throw new ArgumentException("Diagnostic delivery requires an explicitly owned generation lifetime.", nameof(generationLifetime));
-        if (maximumPendingDiagnostics is < 1 or > 4096) throw new ArgumentOutOfRangeException(nameof(maximumPendingDiagnostics));
+        if (maximumPendingDiagnostics < 1) throw new ArgumentOutOfRangeException(nameof(maximumPendingDiagnostics));
         this.captured = captured; this.report = report; this.generationLifetime = generationLifetime;
         this.maximumPendingDiagnostics = maximumPendingDiagnostics;
         identities = captured.Tools.Where(tool => tool.HasLoadoutPreparation).ToImmutableDictionary(tool => tool.Name, tool =>

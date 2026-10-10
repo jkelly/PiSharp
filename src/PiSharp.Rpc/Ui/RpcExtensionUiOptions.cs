@@ -9,7 +9,7 @@ public sealed record RpcExtensionUiOptions(int MaximumOutstandingRequests = 32, 
     {
         if (MaximumOutstandingRequests is < 1 or > 4096 || MaximumRequestBytes is < 256 or > int.MaxValue - 1 ||
             MaximumResponseBytes is < 256 or > int.MaxValue - 1 || MaximumRetainedBytes < MaximumRequestBytes ||
-            MaximumTextCharacters <= 0 || MaximumChoices is < 0 or > 4096 || MaximumJsonDepth is < 1 or > 64 ||
+            MaximumTextCharacters <= 0 || MaximumChoices < 0 || MaximumJsonDepth is < 1 or > 64 ||
             MaximumIdCharacters < 49 || MaximumDeferredOrdinaryFrames is < 1 or > 4096 || MaximumRetainedOrdinaryBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(RpcExtensionUiOptions));
     }

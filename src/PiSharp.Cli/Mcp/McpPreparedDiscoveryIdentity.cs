@@ -52,7 +52,7 @@ public sealed class McpPreparedDiscoveryIdentity
         if (!ReferenceEquals(snapshot, admittedBinding.Snapshot) || !ReferenceEquals(snapshot, semantic.Snapshot)) throw new InvalidOperationException("Discovery requires the exact current semantic/prepared snapshot.");
         var name = kind == McpDiscoveryKind.Codemode ? McpDiscoveryToolIdentity.CodemodeName : McpDiscoveryToolIdentity.ToolSearchName;
         var tool = snapshot.Tools.SingleOrDefault(tool => tool.Name == name && tool.OwnerId == scope.OwnerId && tool.OwnerGeneration == scope.OwnerGeneration && tool.RegistrationId == semantic.RegistrationId);
-        if (tool is null || tool.Exposure != PiSharp.Contracts.ToolExposure.ModelOnly || !tool.DefaultActive ||
+        if (tool is null || tool.Exposure != PiSharp.Contracts.ToolExposure.ModelOnly ||
             !(kind == McpDiscoveryKind.Codemode ? McpDiscoveryToolIdentity.IsCodemodeTool(tool.Name, tool.Parameters) :
                 McpDiscoveryToolIdentity.IsToolSearchTool(tool.Name, tool.Parameters)))
             throw new InvalidOperationException("Discovery metadata is foreign, ordinary or an impostor.");
@@ -73,7 +73,7 @@ public sealed class McpPreparedDiscoveryIdentity
                 current.InvocationOwnerGeneration is { } actual && actual != sessionGeneration) ||
             !current.UsesFinalActionPolicy(policy) || !current.UsesCapturedToolBinding(adapter.Name, declaration, adapter) ||
             !current.RegisteredTools.Any(tool => ReferenceEquals(tool.Declaration, declaration) &&
-                tool.Exposure == ToolExposure.ModelOnly && tool.DefaultActive))
+                tool.Exposure == ToolExposure.ModelOnly))
             throw new InvalidOperationException("Discovery identity belongs to a stale or foreign owner/catalog/adapter.");
     }
 
@@ -88,7 +88,7 @@ public sealed class McpPreparedDiscoveryIdentity
             ArgumentNullException.ThrowIfNull(identity); identity.Validate(current);
             if (!kinds.Add(identity.Kind)) throw new ArgumentException("Duplicate discovery identity.", nameof(admitted));
         }
-        if (plan.NeedsCodemode && !kinds.Contains(McpDiscoveryKind.Codemode))
+        if (NeedsCodemode(plan, current) && !kinds.Contains(McpDiscoveryKind.Codemode))
             throw new InvalidOperationException("MCP exposure requires an admitted executable codemode implementation.");
         if (NeedsToolSearch(plan, current) && !kinds.Contains(McpDiscoveryKind.ToolSearch))
             throw new InvalidOperationException("MCP exposure requires an admitted executable tool_search implementation.");
@@ -99,6 +99,13 @@ public sealed class McpPreparedDiscoveryIdentity
     private static bool NeedsToolSearch(McpToolCatalogPlan plan, SessionRuntimeRegistry current) =>
         plan.NeedsToolSearch && current.LifetimeToolSelection?.IsAllowed(McpDiscoveryToolIdentity.ToolSearchName) != false;
 
+    /// <summary>`codemode` tools need codemode unless the tool selection leaves it out, or autoEnableCodemode is false and the
+    /// selection does not name it; their tools are then unreachable, as in the original, where codemode stays inactive.</summary>
+    private static bool NeedsCodemode(McpToolCatalogPlan plan, SessionRuntimeRegistry current) =>
+        plan.NeedsCodemode && current.LifetimeToolSelection?.IsAllowed(McpDiscoveryToolIdentity.CodemodeName) != false &&
+        (plan.AutoEnableCodemode || current.LifetimeToolSelection?.IsNamed(McpDiscoveryToolIdentity.CodemodeName) == true ||
+            current.LifetimeToolSelection?.InitialNames.Contains(McpDiscoveryToolIdentity.CodemodeName) == true);
+
     internal static void ValidateBound(McpToolCatalogPlan plan, SessionRuntimeRegistry current,
         long actualAttachmentGeneration, ImmutableArray<McpPreparedDiscoveryIdentity> admitted)
     {
@@ -108,7 +115,7 @@ public sealed class McpPreparedDiscoveryIdentity
                 throw new InvalidOperationException("Discovery reserved generation does not match the actual attachment.");
             identity.Validate(current, bound: true);
         }
-        if (plan.NeedsCodemode && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.Codemode) ||
+        if (NeedsCodemode(plan, current) && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.Codemode) ||
             NeedsToolSearch(plan, current) && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.ToolSearch))
             throw new InvalidOperationException("Bound MCP exposure requires its actual discovery implementations.");
     }

@@ -22,8 +22,38 @@ internal static class SessionLogStoreTests
         ("session store partial write flush durable flush and checkpoint faults poison lease", FaultStages),
         ("session store prewrite cancellation preserves bytes late cancellation acknowledges commit", Cancellation),
         ("session store inclusive batch record line and total growth limits reject before writes", GrowthLimits),
-        ("session store Windows lease excludes an independent child writer process", IndependentWriterLease)
+        ("session store Windows lease excludes an independent child writer process", IndependentWriterLease),
+        ("session store JavaScript serialization writes JSON.stringify records", JavaScriptSerialization)
     ];
+
+    // session-manager.ts appends `${JSON.stringify(entry)}\n`: raw non-ASCII, ' and U+2028, only control characters escaped
+    // (lowercase hex), JavaScript number text; the owned entry holds the same text. Without the option a record keeps its tokens.
+    public static async Task JavaScriptSerialization()
+    {
+        static string U(string hex) => "\\" + "u" + hex;
+        var path = TempPath(); var raw = TempPath();
+        try
+        {
+            var header = Codec.Parse("{\"type\":\"session\",\"version\":3,\"id\":\"session\",\"timestamp\":\"2026-10-09T12:34:56.078Z\",\"cwd\":\"a" + U("002B") + "b " + U("00e9") + "\"}");
+            var entry = Codec.Parse("{\"type\":\"custom\",\"customType\":\"x\",\"data\":{\"t\":\"" + U("00e9") + "<&>'" + U("2028") + U("0001") + U("D83D") + U("DE00") +
+                "\",\"n\":0.000030,\"big\":1e21,\"neg\":-0,\"e\":7.5E-7,\"i\":1.0},\"id\":\"one\",\"parentId\":null,\"timestamp\":\"2026-10-09T12:34:56.079Z\"}");
+            var expected = "{\"type\":\"custom\",\"customType\":\"x\",\"data\":{\"t\":\"" + (char)0xE9 + "<&>'" + (char)0x2028 + U("0001") + char.ConvertFromUtf32(0x1F600) +
+                "\",\"n\":0.00003,\"big\":1e+21,\"neg\":0,\"e\":7.5e-7,\"i\":1},\"id\":\"one\",\"parentId\":null,\"timestamp\":\"2026-10-09T12:34:56.079Z\"}";
+            await using (var store = await SessionLogStore.CreateNewAsync(path, header, new(JavaScriptSerialization: true)))
+            {
+                var committed = await store.AppendAsync([entry]);
+                Equal(expected, committed.Entries.Single().WireBody.ToString());
+            }
+            Equal("{\"type\":\"session\",\"version\":3,\"id\":\"session\",\"timestamp\":\"2026-10-09T12:34:56.078Z\",\"cwd\":\"a+b " + (char)0xE9 + "\"}\n" + expected + "\n",
+                Encoding.UTF8.GetString(await ReadBytesAsync(path)));
+            await using (var store = await SessionLogStore.CreateNewAsync(raw, header)) await store.AppendAsync([entry]);
+            var text = Encoding.UTF8.GetString(await ReadBytesAsync(raw));
+            Check(text.Contains("a" + U("002B") + "b", StringComparison.Ordinal) && text.Contains("0.000030", StringComparison.Ordinal), "The default store rewrote record tokens.");
+            await using var reopened = await SessionLogStore.OpenAsync(path, new(JavaScriptSerialization: true));
+            Equal(1, reopened.Snapshot.Entries.Length);
+        }
+        finally { Delete(path); Delete(raw); }
+    }
 
     public static async Task CreateAppendReopen()
     {

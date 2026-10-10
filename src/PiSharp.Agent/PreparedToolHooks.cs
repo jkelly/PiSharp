@@ -3,7 +3,11 @@ using PiSharp.Contracts;
 namespace PiSharp.Agent;
 
 /// <summary>A hook can replace input or deny it; allowing a hook never grants action authorization.</summary>
-public sealed record PreparedToolCallHookResult(JsonData? Arguments = null, bool Block = false, bool Terminate = false);
+public sealed record PreparedToolCallHookResult(JsonData? Arguments = null, bool Block = false, bool Terminate = false)
+{
+    /// <summary>The handler's block reason; agent-loop.ts reports it as the blocked call's error text.</summary>
+    public string? Reason { get; init; }
+}
 
 /// <summary>Trusted composition seam inside the existing invoker. Arguments are already initially validated.
 /// Result patches use the existing source after-hook projection, not complete-result replacement.</summary>
