@@ -61,6 +61,10 @@ The registry also takes handlers for `input`, `before_agent_start`, `context`, `
 
 Tool parameters are declared as JSON Schema. The host validates arguments against the schema before your tool runs.
 
+### Classifier and image providers
+
+If the registry implements `IExtensionModelOperationProviderRegistry`, `RegisterModelOperationProvider` adds classifier and image models, as `pi.registerProvider` with `classifiers` and `images` does in Pi. Give an `ExtensionModelOperationProvider` its models (catalog objects with `type` `"classifier"` or `"image"`) and the implementations by API id. The models join `ctx.modelRegistry` and codemode's `models` global, and leave when your extension unloads. A provider without an `ApiKey` needs a key the user stored with `/login` or passed with the request, as in Pi.
+
 ## The extension folder
 
 Put your build output in a folder with a `pisharp-extension.json` next to it:

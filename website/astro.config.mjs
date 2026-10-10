@@ -36,7 +36,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Use PiSharp',
-					items: ['docs/guides/providers', 'docs/guides/interactive', 'docs/guides/mcp'],
+					items: ['docs/guides/providers', 'docs/guides/llama-cpp', 'docs/guides/interactive', 'docs/guides/mcp'],
 				},
 				{
 					label: 'Extend',
