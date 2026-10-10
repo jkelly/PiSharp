@@ -170,8 +170,16 @@ internal static class X11ClipboardCases
         private Owner(string display, Dictionary<string, byte[]> served, bool refuseTargets, bool stall)
         {
             _refuseTargets = refuseTargets; _stall = stall;
-            _connection = X.xcb_connect(display, out var screenNumber);
-            if (X.xcb_connection_has_error(_connection) != 0) throw new InvalidOperationException("Owner connection failed.");
+            // A loaded CI runner can refuse a connection while the server is busy: a few tries, 200 ms apart, before failing.
+            int screenNumber = 0;
+            for (var attempt = 1; ; attempt++)
+            {
+                _connection = X.xcb_connect(display, out screenNumber);
+                if (X.xcb_connection_has_error(_connection) == 0) break;
+                X.xcb_disconnect(_connection);
+                if (attempt == 5) throw new InvalidOperationException("Owner connection failed.");
+                Thread.Sleep(200);
+            }
             var screens = X.xcb_setup_roots_iterator(X.xcb_get_setup(_connection));
             while (screenNumber-- > 0) X.xcb_screen_next(ref screens);
             var root = (uint)Marshal.ReadInt32(screens.Data);

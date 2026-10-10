@@ -108,7 +108,13 @@ internal sealed class PiSettings
         try
         {
             if (!File.Exists(path)) return [];
-            var text = PiPaths.ReadText(path);
+            // Writers truncate and rewrite the file under <file>.lock (SetField, InteractiveSettings.WithLock), so the read takes the
+            // same lock and never sees a file mid-write (which read as empty, and so as default settings). A lock held past the
+            // retries, or a folder the reader cannot write, falls back to reading without it.
+            string? text = null;
+            try { WithFileLock(path, () => text = File.Exists(path) ? PiPaths.ReadText(path) : ""); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { text = null; }
+            text ??= File.Exists(path) ? PiPaths.ReadText(path) : "";
             if (text.Length == 0) return [];
             var node = PiJson.Parse(text);
             if (node is not JsonObject settings) throw new JsonException("Settings must be a JSON object");

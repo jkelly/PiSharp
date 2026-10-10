@@ -227,15 +227,16 @@
       "tag": "v1.1.0.3 (f46bd6e), release run 38069689117",
       "publishedOn": "2026-10-10"
     },
-    "1.1.0.4": {
-      "version": "1.1.0.4",
+    "1.1.0.5": {
+      "version": "1.1.0.5",
       "kind": "patch",
       "baseline": "v1.1.0",
       "status": "release-candidate",
-      "branch": "release/1.1.0.4",
-      "ships": "startup header names PiSharp and its own version (PR #7)",
-      "notes": "docs/release-notes/1.1.0.4.md",
-      "changelog": "website/src/content/changelog/1.1.0.4.md (date 2026-10-10)",
+      "branch": "fix/1.1.0.4-release-flakes",
+      "supersedes": "1.1.0.4 (tag v1.1.0.4 at b81fb4e, release run 38084810861 failed in tests; never published)",
+      "ships": "startup header names PiSharp (PR #7); lone surrogates in compaction estimates; agent_settled to extensions first; settings reads under the lock",
+      "notes": "docs/release-notes/1.1.0.5.md",
+      "changelog": "website/src/content/changelog/1.1.0.5.md (date 2026-10-10)",
       "blockers": []
     }
   },
