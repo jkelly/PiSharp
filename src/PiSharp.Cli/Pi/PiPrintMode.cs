@@ -82,7 +82,7 @@ internal static class PiPrintMode
                         var stop = last.TryGetProperty("stopReason", out var reason) ? reason.GetString() : null;
                         if (stop is "error" or "aborted")
                         {
-                            var error = last.TryGetProperty("errorMessage", out var text) && text.ValueKind == JsonValueKind.String && text.GetString() is { Length: > 0 } value ? value : $"Request {stop}";
+                            var error = last.TryGetProperty("errorMessage", out var text) && text.ValueKind == JsonValueKind.String && PiSharp.Contracts.JsonUtf16.GetString(text) is { Length: > 0 } value ? value : $"Request {stop}";
                             await PiCommand.Line(stderr, error).ConfigureAwait(false);
                             exitCode = 1;
                         }
@@ -90,7 +90,7 @@ internal static class PiPrintMode
                         {
                             foreach (var block in content.EnumerateArray())
                                 if (block.TryGetProperty("type", out var blockType) && blockType.GetString() == "text" && block.TryGetProperty("text", out var blockText))
-                                    await stdout.WriteAsync((blockText.GetString() + "\n").AsMemory(), token).ConfigureAwait(false);
+                                    await stdout.WriteAsync((PiSharp.Contracts.JsonUtf16.GetString(blockText) + "\n").AsMemory(), token).ConfigureAwait(false);
                             await stdout.FlushAsync(token).ConfigureAwait(false);
                         }
                     }

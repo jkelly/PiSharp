@@ -489,7 +489,7 @@ public sealed partial class OpenAICodexResponsesTransport
             if (message.Length == 0) continue;
             var text = Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length);
             JsonNode? parsed;
-            try { parsed = JsonNode.Parse(text, documentOptions: JsonData.DocumentOptions); }
+            try { parsed = JsonUtf16.MutableNode(text); }
             catch (JsonException error) { throw new CodexProtocolException("Invalid Codex WebSocket JSON: " + error.Message); }
             if (parsed is not JsonObject value) continue;
             var (mapped, completed) = await MapEventAsync(value, invocation, cancellation).ConfigureAwait(false);

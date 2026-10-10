@@ -182,6 +182,45 @@ internal static partial class Program
         // A provider may report fractional token counts: Pi keeps each as the JavaScript number it is, prices it with calculateCost in
         // binary64 and writes it as JSON.stringify does (formerly the response failed, and Bedrock read it as 0). Captured with `pi -p` per
         // API against the same fake responses and rates.
+        // openai-completions.ts and openai-responses-shared.ts read each event with JSON.parse: a lone surrogate in a text delta stays in
+        // the assistant's text and the session line writes it as JSON.stringify's escape (formerly the stream failed).
+        ("json-fidelity.completions-and-responses-events-keep-lone-surrogates", async () =>
+        {
+            using var sandbox = new Sandbox("json-fidelity-stream-events");
+            string[] apis = ["openai-completions", "openai-responses"];
+            sandbox.Write(Path.Combine(sandbox.AgentDir, "models.json"), "{\"providers\":{" + string.Join(",", apis.Select(api =>
+                "\"" + api + "\":{\"baseUrl\":\"https://lone.test/v1\",\"api\":\"" + api + "\",\"apiKey\":\"k\",\"models\":[{\"id\":\"m\"}]}")) + "}}");
+            var current = "";
+            string Data(object value) => "data: " + JsonSerializer.Serialize(value).Replace("@LONE@", "\\ud800", StringComparison.Ordinal) + "\n\n";
+            sandbox.Respond = (_, _) => current switch
+            {
+                "openai-completions" => Sse(
+                    Data(new { id = "c1", @object = "chat.completion.chunk", created = 1, model = "m", choices = new[] { new { index = 0, delta = new { role = "assistant", content = "a@LONE@b" }, finish_reason = (string?)null } } })
+                    + Data(new { id = "c1", @object = "chat.completion.chunk", created = 1, model = "m", choices = new[] { new { index = 0, delta = new { }, finish_reason = "stop" } } })
+                    + Data(new { id = "c1", @object = "chat.completion.chunk", created = 1, model = "m", choices = Array.Empty<object>(), usage = new { prompt_tokens = 1, completion_tokens = 1, total_tokens = 2 } })
+                    + "data: [DONE]\n\n"),
+                _ => Sse(string.Concat(new object[]
+                {
+                    new { type = "response.created", sequence_number = 0, response = new { id = "r1", status = "in_progress", output = Array.Empty<object>() } },
+                    new { type = "response.output_item.added", sequence_number = 1, output_index = 0, item = new { type = "message", id = "m1", role = "assistant", status = "in_progress", content = Array.Empty<object>() } },
+                    new { type = "response.content_part.added", sequence_number = 2, output_index = 0, item_id = "m1", content_index = 0, part = new { type = "output_text", text = "", annotations = Array.Empty<object>() } },
+                    new { type = "response.output_text.delta", sequence_number = 3, output_index = 0, item_id = "m1", content_index = 0, delta = "a@LONE@b" },
+                    new { type = "response.output_item.done", sequence_number = 4, output_index = 0, item = new { type = "message", id = "m1", role = "assistant", status = "completed",
+                        content = new[] { new { type = "output_text", text = "a@LONE@b", annotations = Array.Empty<object>() } } } },
+                    new { type = "response.completed", sequence_number = 5, response = new { id = "r1", status = "completed", output = Array.Empty<object>(), usage = new { input_tokens = 1, output_tokens = 1, total_tokens = 2 } } },
+                }.Select(item => "event: " + JsonSerializer.SerializeToElement(item).GetProperty("type").GetString() + "\n" + Data(item))))
+            };
+            foreach (var api in apis)
+            {
+                current = api;
+                var before = sandbox.SessionFiles().ToHashSet(StringComparer.Ordinal);
+                var (code, _, stderr) = await sandbox.Run(["-p", "--provider", api, "--model", "m", "hello"]);
+                Equal(0, code, api + " exit; " + stderr);
+                var line = File.ReadLines(sandbox.SessionFiles().Single(path => !before.Contains(path))).Single(text => text.Contains("\"role\":\"assistant\"", StringComparison.Ordinal));
+                Check(line.Contains("\"content\":[{\"type\":\"text\",\"text\":\"a\\ud800b\"", StringComparison.Ordinal) && line.Contains("\"stopReason\":\"stop\"", StringComparison.Ordinal),
+                    api + " assistant line: " + line);
+            }
+        }),
         ("json-fidelity.fractional-usage-counts-are-kept-and-priced-as-pi-does", async () =>
         {
             using var sandbox = new Sandbox("json-fidelity-fraction");

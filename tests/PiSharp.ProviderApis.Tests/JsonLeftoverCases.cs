@@ -9,7 +9,26 @@ internal static partial class Program
     [
         ("bedrock.tool-arguments-keep-lone-surrogates-and-deep-values-escaped", BedrockLoneSurrogateArguments),
         ("codex.events-and-arguments-hold-a-thousand-levels", CodexDeepValues),
+        ("codex.text-events-keep-lone-surrogates", CodexLoneSurrogateText),
     ];
+
+    // openai-codex-responses.ts reads each SSE event with JSON.parse: a lone surrogate in a text delta stays in the message text
+    // (formerly the stream failed as invalid JSON data).
+    private static async Task CodexLoneSurrogateText()
+    {
+        var (transport, http, model, _) = Codex();
+        http.OnUrl("https://chatgpt.com/", _ => Sse(
+            """{"type":"response.created","response":{"id":"r1","status":"in_progress"}}""",
+            """{"type":"response.output_item.added","output_index":0,"item":{"type":"message","id":"m1","role":"assistant","status":"in_progress","content":[]}}""",
+            """{"type":"response.content_part.added","output_index":0,"item_id":"m1","content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}""",
+            """{"type":"response.output_text.delta","output_index":0,"item_id":"m1","content_index":0,"delta":"a\ud800b"}""",
+            """{"type":"response.output_item.done","output_index":0,"item":{"type":"message","id":"m1","role":"assistant","status":"completed","content":[{"type":"output_text","text":"a\ud800b","annotations":[]}]}}""",
+            """{"type":"response.completed","response":{"id":"r1","status":"completed","output":[]}}"""));
+        var events = await Collect(transport, new(model, [Entry("""{"role":"user","content":"Hi","timestamp":2}""")], 9));
+        Check(events[^1] is StreamDone, "the stream completes: " + (events[^1] is StreamError ? ErrorMessage(events[^1]) : events[^1].GetType().Name));
+        var text = ((StreamDone)events[^1]).Message.Content.OfType<TextContent>().Single().Text;
+        Equal("a\ud800b", text, "the text keeps the lone surrogate");
+    }
 
     // bedrock-converse-stream.ts sends a tool call's arguments through sanitizeBedrockDocument (empty keys dropped, nothing else changed)
     // and @aws-sdk/client-bedrock-runtime 3.1127.0 serializes the document with JSON.stringify: a lone surrogate of a name or a string

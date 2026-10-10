@@ -517,7 +517,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             var data = frame.Data.Trim();
             if (data.Length == 0 || data == "[DONE]") continue;
             JsonObject value;
-            try { value = JsonNode.Parse(data, documentOptions: JsonData.DocumentOptions) as JsonObject ?? throw new JsonException("not an object"); }
+            // JSON.parse keeps a lone surrogate in a string.
+            try { value = JsonUtf16.MutableNode(data) as JsonObject ?? throw new JsonException("not an object"); }
             catch (JsonException error) { throw new CodexProtocolException("Invalid Codex SSE JSON: " + error.Message); }
             var (mapped, completed) = await MapEventAsync(value, invocation, token).ConfigureAwait(false);
             if (mapped is { } next) yield return next;
@@ -532,7 +533,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     {
         if (_options.OnProviderStreamEvent is { } hook)
         {
-            try { await hook(JsonData.Parse(value.ToJsonString()), _model, token).ConfigureAwait(false); }
+            try { await hook(JsonData.Parse(JsonUtf16.ToJsonString(value)), _model, token).ConfigureAwait(false); }
             catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
             { throw new ProviderStreamEventCallbackException(error); }
         }
@@ -543,7 +544,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             string? Field(string name) => value[name] is JsonValue own && own.TryGetValue<string>(out var text) ? text
                 : nested?[name] is JsonValue inner && inner.TryGetValue<string>(out var innerText) ? innerText : null;
             var code = Field("code"); var message = Field("message");
-            throw new CodexApiException("Codex error: " + (!string.IsNullOrEmpty(message) ? message : !string.IsNullOrEmpty(code) ? code : value.ToJsonString()), code);
+            throw new CodexApiException("Codex error: " + (!string.IsNullOrEmpty(message) ? message : !string.IsNullOrEmpty(code) ? code : JsonUtf16.ToJsonString(value)), code);
         }
         if (type == "response.failed")
         {
@@ -563,9 +564,9 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             var responseTier = response["service_tier"] is JsonValue tierValue && tierValue.TryGetValue<string>(out var tier) ? tier : null;
             var resolvedTier = responseTier == "default" && _options.ServiceTier is "flex" or "priority" ? _options.ServiceTier : responseTier ?? _options.ServiceTier;
             response["service_tier"] = resolvedTier is "flex" or "priority" ? resolvedTier : "default";
-            return (JsonData.Parse(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = response.DeepClone() }.ToJsonString()), true);
+            return (JsonData.Parse(JsonUtf16.ToJsonString(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = JsonUtf16.MutableNode(JsonUtf16.ToJsonString(response)) })), true);
         }
-        return (JsonData.Parse(value.ToJsonString()), false);
+        return (JsonData.Parse(JsonUtf16.ToJsonString(value)), false);
     }
 
     private static JsonData Observation(HttpResponseMessage response)

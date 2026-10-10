@@ -14,7 +14,7 @@ writes, compares and serializes such values (System.Text.Json's own `GetString`,
 |---|---|
 | RPC input (`--mode rpc`) | kept in every string value and object name; echoed and written back as lowercase `\uXXXX` |
 | Prompt text, steering and follow-up | kept in the user message |
-| Streamed text and tool-call arguments | kept, names included (the SDK's `JSON.parse`, then `parseStreamingJson`) |
+| Streamed text and tool-call arguments | kept, names included (the SDK's `JSON.parse`, then `parseStreamingJson`), on every API: anthropic-messages, openai-completions, openai-responses and Codex (SSE and WebSocket) events alike |
 | Session read and write | kept; a session line holding one opens (formerly refused) |
 | Provider requests | message text through `sanitizeSurrogates` (dropped); tool-call arguments (names and strings) kept, escaped, for every built-in converter: anthropic-messages, openai-completions, openai-responses (Azure, Codex), mistral-conversations, google-generative-ai, google-vertex and bedrock-converse-stream (`sanitizeBedrockDocument` drops only empty keys; the AWS SDK's `JSON.stringify` escapes the rest) |
 | pi-messages and extension APIs (`streamSimple`) | the context unchanged, every lone surrogate kept (escaped on the bridge) |
@@ -22,8 +22,7 @@ writes, compares and serializes such values (System.Text.Json's own `GetString`,
 | Extension events, handler contexts, registry values | kept (`runner.ts` emits whatever the session holds) |
 | The `write` tool | written as U+FFFD, as Node's UTF-8 encoder writes it |
 
-Remaining differences: the explicit `session …` and `rpc` verbs keep refusing them; a lone surrogate in a received openai-completions,
-openai-responses or Codex stream event is refused (upstream keeps it).
+Remaining difference: the explicit `session …` and `rpc` verbs keep refusing them.
 
 ## Nesting depth
 

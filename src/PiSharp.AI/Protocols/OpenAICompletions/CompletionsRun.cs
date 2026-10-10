@@ -227,7 +227,7 @@ public sealed class CompletionsRun : IAsyncDisposable
     {
         var captured = _context.Capture(frame).Value;
         var member = frame is StreamTerminalEvent ? frame is StreamDone ? "message" : "error" : "partial";
-        var message = JsonNode.Parse(captured.GetProperty("value").GetProperty(member).GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
+        var message = PiSharp.Contracts.JsonUtf16.MutableNode(captured.GetProperty("value").GetProperty(member))!.AsObject();
         if (frame is StreamError)
         {
             message["errorMessage"] = frame is StreamError { Reason: StopReason.Aborted } ? "Request was aborted" :
@@ -235,7 +235,7 @@ public sealed class CompletionsRun : IAsyncDisposable
         }
         var paths = captured.GetProperty("ownUndefinedPaths").EnumerateArray().Select(path => path.GetString()!)
             .Where(path => path.StartsWith("/" + member + "/", StringComparison.Ordinal)).Select(path => path[(member.Length + 1)..]);
-        _message.Update(Snapshot(JsonData.Parse("{\"value\":" + message.ToJsonString() + ",\"ownUndefinedPaths\":" + JsonSerializer.Serialize(paths) + "}")));
+        _message.Update(Snapshot(JsonData.Parse("{\"value\":" + PiSharp.Contracts.JsonUtf16.ToJsonString(message) + ",\"ownUndefinedPaths\":" + JsonSerializer.Serialize(paths) + "}")));
     }
 
     private CompletionsSourceEvent SourceFrame(StreamEvent frame)
@@ -244,10 +244,10 @@ public sealed class CompletionsRun : IAsyncDisposable
         if (frame is StreamTerminalEvent)
         {
             var member = frame is StreamDone ? "message" : "error";
-            var value = JsonNode.Parse(emission.Value.GetProperty("value").GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
-            value[member] = JsonNode.Parse(_message.Snapshot.Raw.Value.GetProperty("value").GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
+            var value = PiSharp.Contracts.JsonUtf16.MutableNode(emission.Value.GetProperty("value"))!.AsObject();
+            value[member] = PiSharp.Contracts.JsonUtf16.MutableNode(_message.Snapshot.Raw.Value.GetProperty("value"));
             var paths = _message.Snapshot.OwnUndefinedPaths.Select(path => "/" + member + path);
-            emission = JsonData.Parse("{\"value\":" + value.ToJsonString() + ",\"ownUndefinedPaths\":" + JsonSerializer.Serialize(paths) + "}");
+            emission = JsonData.Parse("{\"value\":" + PiSharp.Contracts.JsonUtf16.ToJsonString(value) + ",\"ownUndefinedPaths\":" + JsonSerializer.Serialize(paths) + "}");
         }
         var result = new CompletionsSourceEvent(emission, _message, _options.MaximumSourceValueCharacters, _options.MaximumSourceValueBytes);
         var publication = new CompletionsSourcePublication(++_publicationSequence, Stopwatch.GetTimestamp(), result.Emission);
