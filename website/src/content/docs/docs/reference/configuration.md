@@ -70,6 +70,21 @@ The built-in tools follow a tool policy. This is a PiSharp setting; Pi has no su
 
 `pisharp`, `-p` and `--mode json|rpc` use `pi` by default. The older `pisharp session …` commands use `explicit`. Change it with `--tool-policy pi|explicit` or the `toolPolicy` setting. Untrusted projects keep the `pi` policy, as Pi does. In both policies, PiSharp's own session files, approvals and extension manifests stay protected.
 
+## Built-in extensions
+
+Pi's four built-in extensions are resources like any other, named `builtin:mcp`, `builtin:llama.cpp`, `builtin:codemode` and `builtin:tool-search`. They load by default.
+
+- `"extensions": ["-builtin:mcp"]` in `settings.json` turns one off. In project settings, `+builtin:<name>` or `-builtin:<name>` overrides your setting.
+- `pisharp config` lists them under **Built-in**, where you can switch them.
+- `--no-extensions` turns them off for one run, and `-e builtin:<name>` loads one explicitly. `--no-mcp` leaves out `mcp`.
+- An extension that registers its own `codemode` or `tool_search` tool, or a `/mcp` command, replaces the built-in, which is left out with a warning.
+
+A built-in that is off registers nothing: no `codemode` or `tool_search` tool, no MCP servers or `/mcp`, no llama.cpp provider or `/llama`. `/reload` applies changes.
+
+## Compaction
+
+Automatic compaction is on by default in every mode, as in Pi. The `compaction` settings control it: `enabled`, `reserveTokens` (default 16384), `keepRecentTokens` (default 20000) and `modelOverrides` for single models. `/settings` and the RPC `set_auto_compaction` command change `compaction.enabled` and save it to your `settings.json`, as Pi does.
+
 ## Shell, ripgrep and fd
 
 `bash` finds its shell as Pi does: Git Bash (or `bash.exe` on your `PATH`) on Windows, and `/bin/bash`, then `bash`, then `sh` on Linux and macOS. Set `shellPath` to choose another. `shellCommandPrefix` runs before every command, for the model's `bash` and for your `!` commands.

@@ -1,8 +1,8 @@
 {
   "$comment": "Status per area: ported | partial | planned | wont-port | unknown. Notes and evidence are optional; evidence is a URL. Assessed against the repository, not docs claims: authored test suites, goldens captured from Pi 1.1.0, compatibility/*.v1.1.0 inventories and overlays, and compatibility/sync-1.1.0-applicability.json. deviations lists the differences that remain, intentional ones first.",
-  "assessedOn": "2026-10-09",
+  "assessedOn": "2026-10-10",
   "baseline": "Pi v1.1.0",
-  "release": "1.1.0.2",
+  "release": "1.1.0.3",
   "promises": [
     {
       "id": "behavior",
@@ -18,25 +18,25 @@
         {
           "area": "Built-in tools: read, write, edit, bash, grep, find, ls",
           "status": "ported",
-          "notes": "Pi's declarations, arguments and errors. read returns images, decoded and resized with SkiaSharp. bash finds its shell as Pi does, with shellCommandPrefix and user_bash interception. grep and find use rg and fd, downloaded on first use. Difference: when your own !command shell can't start, the error text differs from Node's spawn error.",
+          "notes": "Pi's declarations, arguments and errors. read returns images, decoded and resized with SkiaSharp. bash finds its shell as Pi does, with shellCommandPrefix and user_bash interception; without a shell it stays registered and each command fails with Pi's message, and a shell that can't start reports Node's spawn error. grep and find use rg and fd, downloaded on first use.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Tools.Tests"
         },
         {
           "area": "Providers and model selection",
-          "status": "partial",
-          "notes": "All 10 of Pi's chat APIs, including Bedrock, Codex and Copilot, and all 42 provider catalogs, each with a live route and /login. --model patterns, --models, --list-models, models.json and the startup catalog refresh work. Gaps: no llama.cpp router discovery and no /llama. Intentional: no Codex WebSocket, no zstd.",
+          "status": "ported",
+          "notes": "All 10 of Pi's chat APIs, including Bedrock, Codex and Copilot, all 42 provider catalogs and the llama.cpp router provider, each with a live route and /login. OpenAI Codex tries a WebSocket first and compresses server-sent-event requests with zstd, as Pi does. --model patterns, --models, --list-models (with extension providers), models.json and the startup catalog refresh work. Azure resource names are taken as Pi takes them (decision 14). Differences: the websocketConnectTimeoutMs setting isn't read (the WebSocket gets 15 seconds), and models.json validation errors only approximate TypeBox's messages.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ProviderApis.Tests"
         },
         {
           "area": "Classifiers and image generation",
           "status": "ported",
-          "notes": "OpenAI decisions (with image input), TypeSafe and Cloudflare system-one, llama.cpp log-probability classification and OpenRouter images. Reachable from codemode, native extensions and TypeScript extensions, which can also register their own classifier and image providers.",
+          "notes": "OpenAI decisions (with image input), TypeSafe and Cloudflare system-one, llama.cpp decision models and log-probability classification, and OpenRouter images. Reachable from codemode, native extensions and TypeScript extensions, both of which can also register their own classifier and image providers.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Classifiers.Tests"
         },
         {
           "area": "CLI flags and print/JSON modes",
           "status": "ported",
-          "notes": "Plain pisharp takes every flag in Pi's args.ts, with -p, --mode json|rpc, @file arguments and the install, remove, update, list, config, auth and mcp commands. Gaps: packages loaded with -e add their extensions but not their skills, prompts or themes; pisharp mcp ignores --offline and httpProxy. pisharp update can't update PiSharp itself.",
+          "notes": "Plain pisharp takes every flag in Pi's args.ts, with -p, --mode json|rpc, @file arguments and the install, remove, update, list, config, auth and mcp commands. -e loads packages with their skills, prompts and themes, and -e builtin:<name> a built-in extension; pisharp config switches the built-ins. Print mode recovers from a context overflow through auto-compaction and exits 0, as Pi does. pisharp update can't update PiSharp itself.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.CliParity.Tests"
         },
         {
@@ -48,31 +48,31 @@
         {
           "area": "Compaction",
           "status": "ported",
-          "notes": "Manual and automatic compaction and branch summaries, with Pi's summary retries and their events.",
+          "notes": "Manual and automatic compaction and branch summaries, with Pi's summary retries, events and error texts. Automatic compaction is on by default in every mode and reads the compaction settings, including per-model overrides.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.SessionParity.Tests"
         },
         {
           "area": "Slash commands",
           "status": "ported",
-          "notes": "All 24 of Pi's built-in commands, with the same names, descriptions and arguments, plus /mcp. /bug builds Pi's local report and opens a prefilled PiSharp GitHub issue instead of uploading to Pi's developers.",
+          "notes": "All 24 of Pi's built-in commands, with the same names, descriptions and arguments, plus /mcp and /llama from the built-in extensions. /bug builds Pi's local report and opens a prefilled PiSharp GitHub issue instead of uploading to Pi's developers.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.InteractiveParity.Tests"
         },
         {
           "area": "Skills, prompt templates and context files",
           "status": "ported",
-          "notes": "AGENTS.md and CLAUDE.md from the agent folder and every parent folder, SYSTEM.md and APPEND_SYSTEM.md, and skills, prompts and themes discovered from Pi's folders and settings, behind project trust.",
+          "notes": "AGENTS.md and CLAUDE.md from the agent folder and every parent folder, SYSTEM.md and APPEND_SYSTEM.md, and skills, prompts and themes discovered from Pi's folders, settings, packages and -e, behind project trust.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.CliParity.Tests"
         },
         {
           "area": "Terminal UI, themes and keybindings",
           "status": "ported",
-          "notes": "Pi's interactive mode on Windows, Linux and macOS: fullscreen and regular modes, every /settings item, the system, dark and light themes and custom theme files, keybindings.json, inline images, Mermaid and highlight.js highlighting. Gap: on Linux X11 the clipboard needs xclip or xsel; Pi also has a built-in helper.",
+          "notes": "Pi's interactive mode on Windows, Linux and macOS: fullscreen and regular modes, every /settings item, the system, dark and light themes and custom theme files, keybindings.json, inline images, Mermaid and highlight.js highlighting. The footer's cost, tokens and context follow the session after every turn. On X11, pasting reads the clipboard through libxcb when xclip and xsel are missing, as Pi's helper does.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.InteractiveParity.Tests"
         },
         {
           "area": "MCP",
           "status": "ported",
-          "notes": "Stdio and HTTP servers, ~/.pi/agent/mcp.json and the trusted project .pi/mcp.json, OAuth with refresh locks, all exposure modes, resource tools, the 10-second wait for direct servers, the mcp_servers prompt section, /mcp and pisharp mcp.",
+          "notes": "Stdio and HTTP servers, ~/.pi/agent/mcp.json and the trusted project .pi/mcp.json, OAuth with refresh locks, all exposure modes, resource tools, the 10-second wait for direct servers, the mcp_servers prompt section, /mcp in every mode and pisharp mcp. MCP is a built-in extension that can be turned off. Difference: /reload keeps the servers connected and doesn't re-read mcp.json unless the mcp, codemode or tool-search built-ins changed; Pi reconnects on every reload.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.McpParity.Tests"
         },
         {
@@ -97,7 +97,7 @@
         {
           "area": "Session file format: read",
           "status": "ported",
-          "notes": "Reads JSONL v3 session trees and keeps unknown entries and fields. Difference: a line with an escaped lone surrogate, or nested deeper than 64 levels, stops the file from opening.",
+          "notes": "Reads JSONL v3 session trees and keeps unknown entries and fields. Lone surrogates are kept as JSON.parse keeps them. Records may nest 1,000 levels; V8 itself stops writing at about 1,700.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Sessions.Tests"
         },
         {
@@ -115,13 +115,13 @@
         {
           "area": "JSON event stream",
           "status": "ported",
-          "notes": "Every event Pi sends, including entry_appended, thinking_level_changed, extension_error, auto_retry_* and summarization_retry_*. agent_end carries willRetry.",
+          "notes": "Every event Pi sends, including entry_appended, thinking_level_changed, extension_error, auto_retry_* and summarization_retry_*. agent_end carries willRetry, and agent_settled arrives before the response to the command that started the run.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.SessionParity.Tests"
         },
         {
           "area": "RPC commands",
           "status": "ported",
-          "notes": "All 33 Pi v1.1.0 RPC commands. Under pisharp --mode rpc, bash runs in your shell with no extra options.",
+          "notes": "All 33 Pi v1.1.0 RPC commands. A failed command answers with the error's message, thinking levels are clamped to the model, and the setters save the global settings.json, as in Pi. Under pisharp --mode rpc, bash runs in your shell with no extra options. Difference: get_session_stats fails on non-finite usage, where Pi reports null.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Rpc.Tests"
         },
         {
@@ -133,7 +133,7 @@
         {
           "area": "RPC framing and shutdown",
           "status": "ported",
-          "notes": "Each line is read and written as rpc-mode.ts does. SIGTERM and SIGHUP shut down as in Pi. Differences: input nested deeper than 64 levels ends the stream, and escaped lone surrogates arrive as U+FFFD.",
+          "notes": "Each line is read and written as rpc-mode.ts does, with lone surrogates kept and lines up to JavaScript's string limit. A line nested deeper than 1,000 levels is answered as a parse failure and the stream goes on. SIGTERM and SIGHUP shut down as in Pi.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.CliParity.Tests"
         },
         {
@@ -152,7 +152,7 @@
         {
           "area": "Loading your own extensions",
           "status": "ported",
-          "notes": "Discovered from ~/.pi/agent/extensions, .pi/extensions (after project trust), settings, packages and -e, as in Pi. Needs Node.js 22.13 or later; Pi asks for 22.19.",
+          "notes": "Discovered from ~/.pi/agent/extensions, .pi/extensions (after project trust), settings, packages and -e, as in Pi. Pi's built-in extensions (mcp, llama.cpp, codemode, tool-search) can be turned off or replaced. Needs Node.js 22.13 or later; Pi asks for 22.19.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         },
         {
@@ -164,13 +164,13 @@
         {
           "area": "ExtensionAPI",
           "status": "ported",
-          "notes": "Every member: tools, commands, shortcuts, flags, providers (chat, classifier and image), virtual models, MCP servers and the event bus. Difference: ctx.ui.setTheme returns an error.",
+          "notes": "Every member: tools, commands, shortcuts, flags, providers (chat, classifier and image), virtual models, MCP servers, ctx.ui.setTheme and the event bus.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         },
         {
           "area": "Event hooks",
           "status": "ported",
-          "notes": "Every v1.1.0 extension event reaches TypeScript handlers. Difference: sendMessage with triggerTurn from inside a command starts its turn after the handler returns, and is dropped if the handler runs longer than about 30 seconds.",
+          "notes": "Every v1.1.0 extension event reaches TypeScript handlers. sendMessage with triggerTurn starts its turn at once, inside a command or from a timer, as in Pi.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         },
         {
@@ -188,7 +188,7 @@
         {
           "area": "Native C# extensions",
           "status": "ported",
-          "notes": "A folder with a pisharp-extension.json loads from the same places as Pi extensions, without Node, and shares the session and command list with TypeScript extensions. 39 of the 41 v1.1.0 events reach native handlers; project_trust and resources_discover reach only TypeScript extensions.",
+          "notes": "A folder with a pisharp-extension.json loads from the same places as Pi extensions, without Node, and shares the session and command list with TypeScript extensions. All 41 v1.1.0 events reach native handlers, and native extensions can register classifier and image providers. Difference: a C# extension that registers codemode, tool_search or /mcp doesn't replace the built-in one; only TypeScript extensions do.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         }
       ]
@@ -203,8 +203,8 @@
         { "title": "User agents", "notes": "Requests to Anthropic, Azure, Bedrock, Mistral, OpenAI-compatible endpoints and OpenRouter images send a PiSharp user agent where Pi's SDKs send their own." },
         { "title": "Codemode worker", "notes": "Each script runs in its own worker process, so one script can't take PiSharp down. That costs about 100 to 300 ms per script. The deadline starts when the script starts running, not when the worker launches." },
         { "title": "Jint limits", "notes": "Codemode runs on Jint, not QuickJS. Memory and recursion overruns end the script instead of throwing a catchable error, and the engine's own error messages differ." },
-        { "title": "No zstd", "notes": ".NET has no zstd encoder, so Codex requests are sent uncompressed." },
-        { "title": "No Codex WebSocket", "notes": "OpenAI Codex uses server-sent events only." },
+        { "title": "/bug opens a GitHub issue", "notes": "/bug builds Pi's report and zip but never uploads them to Pi's developers. It opens a prefilled issue at github.com/jkelly/PiSharp for you to attach the zip to." },
+        { "title": "Version check on NuGet", "notes": "The update check looks up the latest PiSharp.Cli on NuGet and suggests dotnet tool update -g PiSharp.Cli. It never asks pi.dev." },
         { "title": "No self-update", "notes": "pisharp update updates packages and catalogs. Update PiSharp itself with dotnet tool update -g PiSharp.Cli." }
       ]
     },
@@ -212,13 +212,15 @@
       "title": "Still open",
       "blurb": "Differences that remain to be fixed or decided.",
       "items": [
-        { "title": "Lone surrogates", "notes": "Output escapes them as JSON.stringify does. On input, RPC and tool-call arguments turn them into U+FFFD, and a session line that contains one is refused." },
-        { "title": "JSON depth 64", "notes": "Session records, RPC input and streamed tool-call arguments nested deeper than 64 levels are refused. JSON.parse has no such limit." },
-        { "title": "Fractional token counts", "notes": "Usage counts must be whole numbers. A provider that reports a fraction fails the response, and Bedrock reads it as 0." },
-        { "title": "Memory bounds", "notes": "PiSharp keeps byte bounds Pi doesn't have: 64 MiB per session line and session file, 16 MiB per streamed event and 64 MiB per response, 8 MiB per tool result, 32 MiB per RPC record." },
-        { "title": "triggerTurn during a command", "notes": "An extension's sendMessage with triggerTurn from inside a command runs after the command returns, not while it runs." },
-        { "title": "User bash start failures", "notes": "When your !command shell can't start, Windows shows \"RPC command failed.\" and Linux and macOS report the shell's own error with exit code 127, where Pi shows Node's spawn error." },
-        { "title": "Linux X11 clipboard", "notes": "Pi has a built-in X11 clipboard helper. PiSharp needs xclip or xsel." }
+        { "title": "/reload and MCP", "notes": "/reload keeps MCP servers connected, and doesn't re-read mcp.json, unless the mcp, codemode or tool-search built-ins changed. Pi reconnects every server on every reload." },
+        { "title": "/reload diagnostics", "notes": "After /reload, only extension load errors are shown. Pi also shows built-in replacement warnings, unknown built-in names, package resolution problems and skill, prompt and theme conflicts." },
+        { "title": "Built-in replacement", "notes": "A built-in extension yields only to a TypeScript extension that registers codemode, tool_search or /mcp. A C# extension that registers one doesn't replace the built-in." },
+        { "title": "JSON depth 1,000", "notes": "Session records, RPC input and other JSON values hold 1,000 levels of nesting. Pi's JSON.parse has no limit, though V8's JSON.stringify gives up at about 1,700 levels, so Pi can't store deeper values either." },
+        { "title": "Explicit session verbs", "notes": "The pisharp session … and rpc verbs keep their byte bounds (64 MiB session lines and files, 32 MiB RPC records, 8 MiB tool results) and refuse lone surrogates. The Pi command line has neither limit. Provider request bodies stay limited to 64 MiB, and single request entries to 16 MiB, everywhere." },
+        { "title": "Non-finite usage", "notes": "get_session_stats fails when a session holds non-finite usage numbers, where Pi reports null." },
+        { "title": "models.json errors", "notes": "models.json validation errors use TypeBox's wording but not its full list: a failed union reports only \"must match a schema in anyOf\"." },
+        { "title": "WebSocket connect timeout", "notes": "The websocketConnectTimeoutMs setting isn't read. The Codex WebSocket always gets 15 seconds to open, Pi's default." },
+        { "title": "Azure resource names", "notes": "Any resource name is taken as Pi takes it (decision 14). A name that leaves credentials, a fragment or a query in the URL, or a host .NET can't hold (such as one with $ or an empty label), is refused when the session starts; Pi fails only when it sends the request." }
       ]
     }
   ],
@@ -231,7 +233,7 @@
     {
       "title": "Provider layer",
       "status": "ported",
-      "notes": "All 10 of Pi's chat APIs and 42 provider catalogs, logins, classifiers and images."
+      "notes": "All 10 of Pi's chat APIs, 42 provider catalogs, the llama.cpp router, logins, classifiers and images, and the Codex WebSocket transport with zstd."
     },
     {
       "title": "Agent loop and tools",
@@ -251,7 +253,7 @@
     {
       "title": "Native extension SDK",
       "status": "ported",
-      "notes": "C# extensions load from Pi's extension folders. 39 of 41 events reach native handlers."
+      "notes": "C# extensions load from Pi's extension folders. All 41 events reach native handlers, and native extensions register classifier and image providers."
     },
     {
       "title": "Optional Node bridge",
@@ -266,7 +268,7 @@
     {
       "title": "1.1.0.x gap releases",
       "status": "partial",
-      "notes": "tool_search shipped in 1.1.0.1. Everything else on this page ships in 1.1.0.2, in preparation."
+      "notes": "tool_search shipped in 1.1.0.1 and the rest of Pi v1.1.0 in 1.1.0.2. 1.1.0.3, in preparation, fixes issue #5 and closes most of the differences 1.1.0.2 left open."
     }
   ]
 }

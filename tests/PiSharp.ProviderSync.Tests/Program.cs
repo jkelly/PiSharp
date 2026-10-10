@@ -359,13 +359,62 @@ internal static partial class Program
         try { using var _ = NativeProviderFactory.CreateAzureCompletions(model, key, new(), handler: handler, modelMetadata: metadata); }
         catch (ArgumentException error) when (error.Message.StartsWith("Azure OpenAI base URL is required.", StringComparison.Ordinal)) { missing = true; }
         Check(missing && seen.Count == 3, "An unconfigured Azure endpoint was admitted.");
-        foreach (var rejected in new AzureEndpointOptions[] { new() { AzureResourceName = "bad.host/x" }, new() { AzureBaseUrl = "https://proxy.fixture.invalid/v1?x=1" } })
+        foreach (var rejected in new AzureEndpointOptions[] { new() { AzureResourceName = "bad host" }, new() { AzureBaseUrl = "https://proxy.fixture.invalid/v1?x=1" } })
         {
             var refused = false;
             try { using var _ = NativeProviderFactory.CreateAzureCompletions(model, key, rejected, handler: handler, modelMetadata: metadata); }
             catch (ArgumentException) { refused = true; }
             Check(refused, "A malformed Azure endpoint was admitted.");
         }
+        // Owner decision 14: any resource name goes into https://{name}.openai.azure.com/openai/v1 and Node's URL decides what it
+        // means. Expected values are Pi's normalizeAzureBaseUrl(buildDefaultBaseUrl(name)) under Node 22.
+        var mismatches = new List<string>();
+        foreach (var (name, expected) in new (string, string)[]
+        {
+            ("my.res", "https://my.res.openai.azure.com/openai/v1"), ("My_Res", "https://my_res.openai.azure.com/openai/v1"),
+            ("MY-RES", "https://my-res.openai.azure.com/openai/v1"), ("-lead", "https://-lead.openai.azure.com/openai/v1"),
+            ("trail-", "https://trail-.openai.azure.com/openai/v1"), ("my_res", "https://my_res.openai.azure.com/openai/v1"),
+            ("a.b.c.d", "https://a.b.c.d.openai.azure.com/openai/v1"), ("_", "https://_.openai.azure.com/openai/v1"),
+            (new string('x', 70), "https://" + new string('x', 70) + ".openai.azure.com/openai/v1"),
+            ("resource/path", "https://resource/path.openai.azure.com/openai/v1"), ("bad.host/x", "https://bad.host/x.openai.azure.com/openai/v1"),
+            ("a\\b", "https://a/b.openai.azure.com/openai/v1"), ("a/../b", "https://a/b.openai.azure.com/openai/v1"),
+            ("re\tsource", "https://resource.openai.azure.com/openai/v1"), ("r%41", "https://ra.openai.azure.com/openai/v1"),
+            ("résumé", "https://xn--rsum-bpad.openai.azure.com/openai/v1"), ("exämple", "https://xn--exmple-cua.openai.azure.com/openai/v1"),
+            ("FULLWIDTHＡ", "https://fullwidtha.openai.azure.com/openai/v1"),
+            ("r.ai.azure.com", "https://r.ai.azure.com.openai.azure.com/openai/v1"),
+            ("r.openai.azure.com:443/x", "https://r.openai.azure.com/x.openai.azure.com/openai/v1"),
+            ("127.0.0.1", "https://127.0.0.1.openai.azure.com/openai/v1"), ("1.2.3", "https://1.2.3.openai.azure.com/openai/v1")
+        })
+        {
+            string Resolve(AzureEndpointOptions options, string? modelBaseUrl = null)
+            {
+                try { return AzureOpenAIConfiguration.ResolveBaseUrl(modelBaseUrl, options); }
+                catch (ArgumentException error) { return "resource name " + name + ": " + error.Message; }
+            }
+            foreach (var actual in new[] { Resolve(new() { AzureResourceName = name }),
+                Resolve(new() { Environment = new([KeyValuePair.Create<string, string?>(AzureOpenAIConfiguration.ResourceNameVariable, name)]) }, "https://ignored.fixture.invalid/v1") })
+                if (actual != expected) mismatches.Add(expected + " <> " + actual);
+        }
+        Check(mismatches.Count == 0, "Azure resource names resolve differently from Pi: " + string.Join(" | ", mismatches));
+        // Names Node's URL refuses fail with Pi's message (without the value). Refused where Pi only fails on the request: a URL with
+        // credentials, a fragment or a query in front of the request path (as the same base URL is), and a host System.Uri cannot
+        // hold (sub-delimiters, empty labels) that no resolver answers.
+        foreach (var name in new[] { "a b", " a", "a ", "a:8080", "a<b", "a^b", "a|b", "a[b]", "a%2Fb", "[::1]", "a\u0000b", "a\u007Fb",
+            "user@r", "r?x", "r#x", "a/b?c#d", "a..b", "a$b", "a+b", "a~b", "a=b", "a{b}" })
+        {
+            var refused = false;
+            try { _ = AzureOpenAIConfiguration.ResolveBaseUrl(null, new() { AzureResourceName = name }); }
+            catch (ArgumentException error) when (error.Message.StartsWith("Invalid Azure OpenAI base URL", StringComparison.Ordinal) ||
+                error.Message.StartsWith("Unsupported Azure OpenAI base URL query", StringComparison.Ordinal)) { refused = true; }
+            Check(refused, "An Azure resource name Pi's URL refuses was admitted: " + name);
+        }
+        // An empty AZURE_OPENAI_RESOURCE_NAME is falsy, so model.baseUrl applies; a base URL wins over any resource name.
+        Equal("https://model.fixture.invalid/v1", AzureOpenAIConfiguration.ResolveBaseUrl("https://model.fixture.invalid/v1/",
+            new() { Environment = new([KeyValuePair.Create<string, string?>(AzureOpenAIConfiguration.ResourceNameVariable, "")]) }));
+        Equal("https://base.fixture.invalid/v1", AzureOpenAIConfiguration.ResolveBaseUrl(null, new() { AzureBaseUrl = "https://base.fixture.invalid/v1", AzureResourceName = "a b" }));
+        // The request goes to the resolved host.
+        var dotted = await Send(new() { AzureResourceName = "PiSharp.Fixture", Environment = environment }, new() { ModelMetadata = metadata }, metadata);
+        Equal("https://pisharp.fixture.openai.azure.com/openai/v1/chat/completions", dotted.Url);
         Equal("deepseek-v4-pro", AzureOpenAIConfiguration.ResolveDeploymentName("deepseek-v4-pro", new() { Environment = new([KeyValuePair.Create<string, string?>("AZURE_OPENAI_DEPLOYMENT_NAME_MAP", "deepseek-v4-pro=")]) }));
     }
 

@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.AI.Protocols.OpenAIResponses;
+using PiSharp.AI.Protocols.ProviderShared;
+using PiSharp.AI.Providers;
 using PiSharp.Contracts;
 using PiSharp.Contracts.Compatibility;
 
@@ -61,14 +63,18 @@ public sealed class AzureResponsesRequestFactory
             DeploymentName = Truthy(options.AzureDeploymentName) ?? DeploymentMap(Value("AZURE_OPENAI_DEPLOYMENT_NAME_MAP")) ?? model.Id;
             Bound(DeploymentName); ValidateUnicode(DeploymentName);
             var version = Truthy(options.AzureApiVersion) ?? Truthy(Value("AZURE_OPENAI_API_VERSION")) ?? "v1"; Bound(version); ValidateUnicode(version);
-            var baseUrl = Truthy(options.AzureBaseUrl?.Trim()) ?? Truthy(Value("AZURE_OPENAI_BASE_URL")?.Trim());
+            var baseUrl = Truthy(EcmaTrimOrNull(options.AzureBaseUrl)) ?? Truthy(EcmaTrimOrNull(Value("AZURE_OPENAI_BASE_URL")));
             var resource = Truthy(options.AzureResourceName) ?? Truthy(Value("AZURE_OPENAI_RESOURCE_NAME"));
-            if (baseUrl is null && resource is not null && (resource.Length > 63 || resource.Length == 0 ||
-                !char.IsAsciiLetterOrDigit(resource[0]) || !char.IsAsciiLetterOrDigit(resource[^1]) ||
-                resource.Any(c => !(char.IsAsciiLetterOrDigit(c) || c == '-')))) throw Fail(AzureResponsesFailure.UnsupportedOptions);
-            baseUrl ??= resource is null ? String(_metadata, "baseUrl") : "https://" + resource + ".openai.azure.com/openai/v1";
+            // Any resource name goes into the URL text as Pi's buildDefaultBaseUrl puts it (owner decision 14).
+            baseUrl ??= resource is null ? String(_metadata, "baseUrl") : AzureOpenAIConfiguration.BuildDefaultBaseUrl(resource);
             if (baseUrl is null) throw Fail(AzureResponsesFailure.Configuration);
-            Bound(baseUrl); var normalized = NormalizeBaseUrl(baseUrl);
+            Bound(baseUrl);
+            var normalized = AzureOpenAIConfiguration.NormalizeBaseUrl(baseUrl, out var resolved) switch
+            {
+                AzureOpenAIConfiguration.AzureBaseUrlStatus.Valid => resolved,
+                AzureOpenAIConfiguration.AzureBaseUrlStatus.Query => throw Fail(AzureResponsesFailure.UnsupportedOptions),
+                _ => throw Fail(AzureResponsesFailure.Configuration)
+            };
             // SDK 7.19.0's deployment endpoint set excludes /responses. Deployment remains in the body.
             Endpoint = new(normalized.TrimEnd('/') + "/responses?api-version=" + Uri.EscapeDataString(version));
             var headers = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -183,16 +189,6 @@ public sealed class AzureResponsesRequestFactory
             if (headers.Count > _options.MaximumHeaders) throw Fail(AzureResponsesFailure.ResourceLimit);
         }
     }
-    private static string NormalizeBaseUrl(string value)
-    {
-        if (!Uri.TryCreate(value.Trim().TrimEnd('/'), UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.UserInfo.Length != 0 || uri.Fragment.Length != 0)
-            throw Fail(AzureResponsesFailure.Configuration);
-        var azure = uri.Host.EndsWith(".openai.azure.com", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith(".ai.azure.com", StringComparison.OrdinalIgnoreCase);
-        var path = uri.AbsolutePath.TrimEnd('/');
-        if (azure && path is "" or "/openai" or "/openai/v1/responses") return new UriBuilder(uri) { Path = "/openai/v1", Query = "" }.Uri.AbsoluteUri.TrimEnd('/');
-        if (uri.Query.Length != 0) throw Fail(AzureResponsesFailure.UnsupportedOptions);
-        return uri.AbsoluteUri.TrimEnd('/');
-    }
     private string? DeploymentMap(string? map)
     {
         string? deployment = null;
@@ -217,5 +213,6 @@ public sealed class AzureResponsesRequestFactory
     private static string? String(JsonElement value, string key) => value.TryGetProperty(key, out var field) && field.ValueKind != JsonValueKind.Null ? field.GetString() : null;
     private static bool Flag(JsonElement value, string key, bool fallback) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(key, out var flag) ? flag.GetBoolean() : fallback;
     private static string? Truthy(string? value) => string.IsNullOrEmpty(value) ? null : value;
+    private static string? EcmaTrimOrNull(string? value) => value is null ? null : ProviderErrorText.EcmaTrim(value);
     private static AzureResponsesException Fail(AzureResponsesFailure failure) => new(failure);
 }

@@ -88,6 +88,11 @@ internal static class Program
         {
             (Options(), "https://azure.invalid/openai/v1/responses?api-version=v1", Model.Id),
             (Options() with { AzureResourceName = "fixture-r" }, "https://fixture-r.openai.azure.com/openai/v1/responses?api-version=v1", Model.Id),
+            // Owner decision 14: any resource name, parsed as Node's URL parses https://{name}.openai.azure.com/openai/v1.
+            (Options() with { AzureResourceName = "Fixture.R_1" }, "https://fixture.r_1.openai.azure.com/openai/v1/responses?api-version=v1", Model.Id),
+            (Options() with { AzureResourceName = "résumé" }, "https://xn--rsum-bpad.openai.azure.com/openai/v1/responses?api-version=v1", Model.Id),
+            (Options() with { AzureResourceName = "resource/path" }, "https://resource/path.openai.azure.com/openai/v1/responses?api-version=v1", Model.Id),
+            (Options() with { ConfigurationValues = Config(("AZURE_OPENAI_RESOURCE_NAME", "a.b.c")) }, "https://a.b.c.openai.azure.com/openai/v1/responses?api-version=v1", Model.Id),
             (Options() with { AzureBaseUrl = "  https://r.openai.azure.com/openai/v1/responses///  ", AzureApiVersion = "2025-04-01-preview" }, "https://r.openai.azure.com/openai/v1/responses?api-version=2025-04-01-preview", Model.Id),
             (Options() with { AzureBaseUrl = "https://r.cognitiveservices.azure.com/openai?drop=1" }, "https://r.cognitiveservices.azure.com/openai/v1/responses?api-version=v1", Model.Id),
             (Options() with { AzureBaseUrl = "https://r.ai.azure.com/" }, "https://r.ai.azure.com/openai/v1/responses?api-version=v1", Model.Id),
@@ -160,7 +165,8 @@ internal static class Program
         {
             Options() with { AzureBaseUrl = "https://custom.invalid/?query=1" }, Options() with { AzureBaseUrl = "https://custom.invalid/#fragment" },
             Options() with { AzureBaseUrl = "https://user:pass@custom.invalid/" }, Options() with { AzureBaseUrl = "ftp://custom.invalid/" },
-            Options() with { AzureResourceName = "resource/path" }, Options() with { ConfigurationValues = Config(("AZURE_OPENAI_API_KEY", "unsupported")) },
+            Options() with { AzureResourceName = "resource path" }, Options() with { AzureResourceName = "r?query" }, Options() with { AzureResourceName = "a..b" },
+            Options() with { ConfigurationValues = Config(("AZURE_OPENAI_API_KEY", "unsupported")) },
             Options() with { MaxTokens = double.NaN }, Options() with { Temperature = double.PositiveInfinity }, Options() with { SessionId = "\uD800" },
             Options() with { AzureApiVersion = "\uD800" }, Options() with { TimeoutMilliseconds = 0 },
             Options() with { Headers = JsonData.Parse("""{"authorization":"ignored"}""") }, Options() with { Headers = JsonData.Parse("""{"x-bad":"a\nb"}""") },

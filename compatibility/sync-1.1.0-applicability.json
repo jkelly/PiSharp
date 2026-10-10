@@ -168,7 +168,7 @@
         "tests/PiSharp.CliSync.Tests"
       ],
       "outcome": "implemented",
-      "notes": "ShellCommandExecutor ports bash-executor.ts (streaming with ANSI hold-back, 2x50KB rolling buffer, spill file, tail truncation); RPC bash/abort_bash with bash_execution_update, interactive !/!!. The Pi entry (pisharp --mode rpc, interactive) runs user bash in the discovered shell on Windows, Linux and macOS with no extra options; the explicit `session rpc` verb keeps --bash-executable/--bash-spill-root. user_bash extension interception and shellCommandPrefix are ported (parity.builtin-tools). Remaining: a shell that fails to start reports \"RPC command failed.\" on Windows and the shell's exit 127 output on Unix instead of Node's spawn error (burn-down open item)."
+      "notes": "ShellCommandExecutor ports bash-executor.ts (streaming with ANSI hold-back, 2x50KB rolling buffer, spill file, tail truncation); RPC bash/abort_bash with bash_execution_update, interactive !/!!. The Pi entry (pisharp --mode rpc, interactive) runs user bash in the discovered shell on Windows, Linux and macOS with no extra options; the explicit `session rpc` verb keeps --bash-executable/--bash-spill-root. user_bash extension interception and shellCommandPrefix are ported (parity.builtin-tools). 1.1.0.3: a shell that fails to start reports Node's spawn error (libuv's ENOENT/EACCES/ENOTDIR/EPERM/EFTYPE), as upstream (tests/PiSharp.Tools.Tests edge cases, CliParity validation.rpc-user-bash-start-failures-are-node-spawn-errors)."
     },
     {
       "id": "ext.tool-renderer",
@@ -398,7 +398,7 @@
         "tests/PiSharp.CliSync.Tests"
       ],
       "outcome": "implemented",
-      "notes": "Provider id azure; Models/azure.json byte-for-byte from pi-ai 1.1.0 (SHA256 46c4e25b84463c6475e706c581196d2735c35feb9612d2efca0ab932c917d727); azure-openai-responses and openai-completions (Foundry) routes with AZURE_OPENAI_* precedence as upstream. A custom deployment id resolves through the fallback model with upstream's warning, as upstream (burn-down; tests/PiSharp.Models.Tests LiveRouteCases)."
+      "notes": "Provider id azure; Models/azure.json byte-for-byte from pi-ai 1.1.0 (SHA256 46c4e25b84463c6475e706c581196d2735c35feb9612d2efca0ab932c917d727); azure-openai-responses and openai-completions (Foundry) routes with AZURE_OPENAI_* precedence as upstream; any AZURE_OPENAI_RESOURCE_NAME is built into the URL and parsed as Node's URL parses it (1.1.0.3, decision 0004 item 14; formerly one DNS label). A custom deployment id resolves through the fallback model with upstream's warning, as upstream (burn-down; tests/PiSharp.Models.Tests LiveRouteCases)."
     },
     {
       "id": "provider.retry-classification",
@@ -638,7 +638,7 @@
       "release": "1.1.0.1",
       "test": "tests/PiSharp.ToolSearch.Tests",
       "outcome": "partial",
-      "notes": "BM25 ranking, schema, description, result text and errors ported from tool-search/tool.ts; matches activate at the next request boundary and are recorded in the transcript. Full parity (IMPL-H): tool_search is always registered (inactive) as upstream and activates for deferred servers or when named; its call waits for background servers; its promptSnippet is rendered. Remaining: invalid arguments are refused without TypeBox's message text. Responses tool_search_call anchoring (openai-responses-shared.ts) is not ported: PiSharp records full-replacement loadouts, so no transcript is additive and no request would change."
+      "notes": "BM25 ranking, schema, description, result text and errors ported from tool-search/tool.ts; matches activate at the next request boundary and are recorded in the transcript. Full parity (IMPL-H): tool_search is always registered (inactive) as upstream and activates for deferred servers or when named; its call waits for background servers; its promptSnippet is rendered. Invalid arguments are refused with TypeBox's message text (ToolSearchSchema with a TypeBox parameters origin). Responses tool_search_call anchoring (openai-responses-shared.ts) is not ported: PiSharp records full-replacement loadouts, so no transcript is additive and no request would change."
     },
     {
       "id": "gap.classifiers-images",
@@ -661,7 +661,7 @@
       "release": "1.1.0.2",
       "test": "tests/PiSharp.Classifiers.Tests",
       "outcome": "implemented",
-      "notes": "All classifier and image APIs (openai-decisions incl. image input, TypeSafe/Cloudflare system-one, llama.cpp log-probability classification, OpenRouter images), the ModelOperationsRegistry facade and the extension contract (ctx.modelRegistry classify/generateImages). Extensions pass their own model objects with the provider's credentials and stored OAuth is refreshed, as upstream (decision 0004). IMPL-E: TypeScript extensions call classify/generateImages and register classifier and image providers through registerProvider (tests/PiSharp.ExtensionParity.Tests provider.classifier-and-image-providers-registered-by-an-extension). Remaining: llama.cpp router discovery and /llama (upstream extensions/llama) are not ported; native C# extensions cannot register classifier or image providers. Upstream RPC has no classify/images commands."
+      "notes": "All classifier and image APIs (openai-decisions incl. image input, TypeSafe/Cloudflare system-one, llama.cpp log-probability classification, OpenRouter images), the ModelOperationsRegistry facade and the extension contract (ctx.modelRegistry classify/generateImages). Extensions pass their own model objects with the provider's credentials and stored OAuth is refreshed, as upstream (decision 0004). IMPL-E: TypeScript extensions call classify/generateImages and register classifier and image providers through registerProvider (tests/PiSharp.ExtensionParity.Tests provider.classifier-and-image-providers-registered-by-an-extension). 1.1.0.3: the llama.cpp router provider and /llama (upstream extensions/llama) are ported, with decision-model and log-probability classifiers (tests/PiSharp.CliParity.Tests LlamaCases); native C# extensions register classifier and image providers (IExtensionModelOperationProviderRegistry), whose implementations run as leased owner callbacks; a provider without apiKey needs a stored or explicit key, as provider-composer.ts. Upstream RPC has no classify/images commands."
     },
     {
       "id": "gap.codemode",
@@ -842,7 +842,7 @@
       "release": "1.1.0.x",
       "outcome": "implemented",
       "test": "tests/PiSharp.ProviderApis.Tests",
-      "notes": "Native SigV4 and the AWS credential chain (incl. credential_process, decision 0004), event-stream framing; Codex SSE with ChatGPT OAuth; Copilot headers and device login; Cloudflare Workers AI and AI Gateway; Vertex API key and ADC (authorized_user, service_account, impersonated_service_account, external_account and external_account_authorized_user; burn-down); /login for every provider; stored !command keys resolve for every provider. /login secrets are shown unmasked, as upstream login-dialog.ts. Intentional deviations: no Codex WebSocket transport, no zstd request compression, PiSharp user agents where upstream SDKs send their own. Open: per-request message-count caps in the Anthropic, Completions, Responses, Codex and Mistral projectors (removal in progress); Google function calls without a name fail the stream; fractional usage token counts are refused."
+      "notes": "Native SigV4 and the AWS credential chain (incl. credential_process, decision 0004), event-stream framing; Codex SSE with ChatGPT OAuth; Copilot headers and device login; Cloudflare Workers AI and AI Gateway; Vertex API key and ADC (authorized_user, service_account, impersonated_service_account, external_account and external_account_authorized_user; burn-down); /login for every provider; stored !command keys resolve for every provider. /login secrets are shown unmasked, as upstream login-dialog.ts. 1.1.0.3: the Codex WebSocket transport (transport auto/websocket/websocket-cached/sse, connection cache, continuation, retries, SSE fallback diagnostics; ProviderApis codex-ws.*) and zstd SSE request bodies (dependency-free RFC 8878 encoder, frames verified by Node's zlib; ProviderApis zstd.*); previous_response_not_found retried after events; session WebSockets closed on dispose; fractional usage token counts priced in binary64; Bedrock request members in the SDK's schema order; any Azure resource name parsed as Node's URL (decision 0004 item 14). Message-count caps were lifted and nameless Google calls are accepted (1.1.0.2). Intentional deviation: PiSharp user agents where upstream SDKs send their own. Remaining: the websocketConnectTimeoutMs setting is not read (15 s default); Azure resource names that leave credentials, a fragment or a query in the URL, or a host System.Uri cannot hold, are refused at configuration where upstream fails on the request."
     },
     {
       "id": "parity.catalogs-and-model-selection",
@@ -864,7 +864,7 @@
       "release": "1.1.0.x",
       "outcome": "implemented",
       "test": "tests/PiSharp.Models.Tests",
-      "notes": "42 catalog shards byte-for-byte from pi-ai 1.1.0; env key map; models.json (baseUrl overrides reach the built-in providers' fixed routes, burn-down); --model patterns, --models, enabledModels, virtual models; --list-models; !command config values run as upstream (decision 0004). A missing or unauthenticated configured default model falls back as upstream findInitialModel (burn-down); interactive startup refreshes catalogs from pi.dev unless PI_OFFLINE (IMPL-I). Remaining: models.json schema messages are approximations; no llama.cpp router discovery."
+      "notes": "42 catalog shards byte-for-byte from pi-ai 1.1.0; env key map; models.json (baseUrl overrides reach the built-in providers' fixed routes, burn-down); --model patterns, --models, enabledModels, virtual models; --list-models; !command config values run as upstream (decision 0004). A missing or unauthenticated configured default model falls back as upstream findInitialModel (burn-down); interactive startup refreshes catalogs from pi.dev unless PI_OFFLINE (IMPL-I). 1.1.0.3: llama.cpp router discovery (built-in extension, /login llama.cpp, LLAMA_BASE_URL) and --list-models with extension providers. Remaining: models.json schema messages use TypeBox's wording but not its per-branch union errors."
     },
     {
       "id": "parity.builtin-tools",
@@ -888,7 +888,7 @@
         "tests/PiSharp.Tools.Tests",
         "tests/PiSharp.CliSync.Tests"
       ],
-      "notes": "Upstream declarations and errors for all seven tools (TypeBox key order); read images via SkiaSharp (decision 0004) with upstream resize rules; bash shell discovery on Windows, Linux and macOS, shellCommandPrefix, PI_* session environment, user_bash interception; edit decodes files as Node does; grep/find/ls search any path under the pi policy; rg/fd from <agentDir>/bin or PATH, downloaded on first use (decision 0004 item 5); request and image budgets follow upstream. The --tool-policy gate (decision 0004) landed with IMPL-F. Remaining: user-bash start failures report a different text from Node's spawn error."
+      "notes": "Upstream declarations and errors for all seven tools (TypeBox key order); read images via SkiaSharp (decision 0004) with upstream resize rules; bash shell discovery on Windows, Linux and macOS, shellCommandPrefix, PI_* session environment, user_bash interception; edit decodes files as Node does; grep/find/ls search any path under the pi policy; rg/fd from <agentDir>/bin or PATH, downloaded on first use (decision 0004 item 5); request and image budgets follow upstream. The --tool-policy gate (decision 0004) landed with IMPL-F. 1.1.0.3: shell start failures report Node's spawn errors for user and model bash, and bash stays registered without a shell, failing each command with getShellConfig's message, as upstream."
     },
     {
       "id": "parity.cli-config-resources",
@@ -914,7 +914,7 @@
         "tests/PiSharp.CliParity.Tests",
         "tests/PiSharp.CliSync.Tests"
       ],
-      "notes": "PiArgs ports every args.ts flag and alias; plain pisharp picks interactive, print, json or rpc as main.ts does. Global and trusted project settings.json with upstream merge and migrations; AGENTS.md/CLAUDE.md from the agent dir and every ancestor; SYSTEM.md/APPEND_SYSTEM.md; skills, prompts and themes from settings, project, user and packages; sessions in <agentDir>/sessions/--<cwd>--; trust.json, defaultProjectTrust, -a/-na and the trust prompt; --tool-policy pi|explicit (decision 0004; the session verbs default to explicit, untrusted projects keep pi); rg/fd download (decision 0004 item 5); install telemetry accepted and ignored. Remaining: -e package sources contribute extensions but not their skills, prompts or themes; pisharp mcp is routed before PiCommand and ignores --offline/PI_OFFLINE and httpProxy; update self cannot update the dotnet tool."
+      "notes": "PiArgs ports every args.ts flag and alias; plain pisharp picks interactive, print, json or rpc as main.ts does. Global and trusted project settings.json with upstream merge and migrations; AGENTS.md/CLAUDE.md from the agent dir and every ancestor; SYSTEM.md/APPEND_SYSTEM.md; skills, prompts and themes from settings, project, user and packages; sessions in <agentDir>/sessions/--<cwd>--; trust.json, defaultProjectTrust, -a/-na and the trust prompt; --tool-policy pi|explicit (decision 0004; the session verbs default to explicit, untrusted projects keep pi); rg/fd download (decision 0004 item 5); install telemetry accepted and ignored. 1.1.0.3: -e package sources contribute their skills, prompts and themes; pisharp mcp runs inside the Pi entry (--offline/PI_OFFLINE, httpProxy, PI_CODING_AGENT); built-in extensions on/off (builtin:<name> resources, pisharp config, -e builtin:, --no-extensions, --no-mcp); auto-compaction from settings in every mode, print mode recovering from context overflow; RPC/print setters save the global settings. Remaining: /reload keeps MCP servers (and the mcp.json read) unless mcp, codemode or tool-search changed, where upstream reconnects on every reload; /reload does not surface re-resolution diagnostics (built-in errors and replacement warnings, package resolution, resources_discover errors, skill/prompt/theme conflicts); built-in replacement considers only Node extensions; update self cannot update the dotnet tool (intentional)."
     },
     {
       "id": "parity.events-and-sessions",
@@ -944,7 +944,7 @@
         "tests/PiSharp.Rpc.Tests",
         "tests/PiSharp.Sessions.Tests"
       ],
-      "notes": "One event projector for RPC and --mode json with every upstream event; agent_end.willRetry; compaction and branch-summary retries; SIGTERM (143) and SIGHUP (129, not on Windows); /name, /session, HTML export byte-for-byte and /share (Radius upload, gist fallback); usage totals and cache stats. 39 of the 41 catalog events reach native extensions; project_trust and resources_discover reach only TypeScript extensions. Burn-down: turn_end drafts and message_end replacements apply inside the running loop. Remaining: get_session_stats fails on non-finite usage where upstream yields NaN; compatibility/extensions/event-catalog.v1.1.0.overlay.json still marks the agent-loop topics WireOnlyNotDispatchedToExtensions and needs a refresh."
+      "notes": "One event projector for RPC and --mode json with every upstream event; agent_end.willRetry; compaction and branch-summary retries; SIGTERM (143) and SIGHUP (129, not on Windows); /name, /session, HTML export byte-for-byte and /share (Radius upload, gist fallback); usage totals and cache stats. All 41 catalog events reach native extensions (project_trust and resources_discover since 1.1.0.3; the v1.1.0 event overlay is refreshed: 37 ImplementedWithAuthoredTests, 4 PartialRegistryTestOnly). Burn-down: turn_end drafts and message_end replacements apply inside the running loop. 1.1.0.3: thinking levels clamped on open, new, resume, fork, clone and switch (issue #5); RPC errors carry the error's message; agent_settled precedes the command response; compaction, fork and tree-navigation failures carry upstream's texts; lone surrogates, 1,000 JSON levels and JavaScript-string-sized records on the Pi entry (docs/compatibility/json-fidelity-and-bounds.md). Remaining: get_session_stats fails on non-finite usage where upstream yields NaN (written as null); the explicit session and rpc verbs keep their byte bounds and refuse lone surrogates."
     },
     {
       "id": "parity.mcp-completion",
@@ -992,7 +992,7 @@
         "tests/PiSharp.InteractiveParity.Tests",
         "tests/PiSharp.Tui.Tests"
       ],
-      "notes": "Pi's TUI on Windows, Linux and macOS; the 24 built-in slash commands in upstream order plus /mcp; the 39 /settings items; system/dark/light themes and custom theme files with live reload; keybindings.json; Kitty and iTerm2 images; Mermaid; highlight.js 10.7.3 (burn-down); What's New from the shipped CHANGELOG.md; startup catalog refresh; native and extension tool renderers; /login unmasked as upstream. Remaining: on Linux X11 there is no native clipboard helper, so xclip or xsel is required; first-time setup is ported but not wired (upstream shows it only with PI_EXPERIMENTAL on its own distribution); /bug uploads go to Pi's developers as upstream."
+      "notes": "Pi's TUI on Windows, Linux and macOS; the 24 built-in slash commands in upstream order plus /mcp; the 39 /settings items; system/dark/light themes and custom theme files with live reload; keybindings.json; Kitty and iTerm2 images; Mermaid; highlight.js 10.7.3 (burn-down); What's New from the shipped CHANGELOG.md; startup catalog refresh; native and extension tool renderers; /login unmasked as upstream. 1.1.0.3: the X11 clipboard is read over libxcb as upstream's helper (writes stay on wl-copy/xclip/xsel, as upstream); the footer follows the session after every append; /llama; ctx.ui.setTheme. /bug opens a PiSharp GitHub issue instead of uploading (decision 0004 item 11). Remaining: first-time setup is ported but not wired (upstream shows it only with PI_EXPERIMENTAL on its own distribution)."
     },
     {
       "id": "parity.extensions-and-packages",
@@ -1017,7 +1017,7 @@
       "test": [
         "tests/PiSharp.ExtensionParity.Tests"
       ],
-      "notes": "Extensions from <agentDir>/extensions, trusted .pi/extensions, settings, packages and -e run in the user's Node (decision 0004 item 8: user privileges, project trust only); Pi's npm packages 1.1.0 installed with the user's npm into <agentDir>/pisharp/pi-runtime/1.1.0, integrity-checked against the registry, loaded through Pi's jiti; ported shims as the offline fallback (decision 0004 item 9). Every ExtensionAPI member, including shortcuts, flags, renderers, providers (chat, classifier, image), virtual models and the event bus. Packages from npm, git and local paths, global or -l project scope. Native C# extensions: a folder with pisharp-extension.json ({assembly, entryType}) discovered like Pi extensions on every platform without approval or preflight files (decision 0004 item 10). Remaining: ctx.ui.setTheme returns an error; sendMessage with triggerTurn from inside a command runs after the handler returns and is dropped after about 30 s (burn-down open item); no Node version gate (fallback needs Node 22.13+, upstream declares 22.19)."
+      "notes": "Extensions from <agentDir>/extensions, trusted .pi/extensions, settings, packages and -e run in the user's Node (decision 0004 item 8: user privileges, project trust only); Pi's npm packages 1.1.0 installed with the user's npm into <agentDir>/pisharp/pi-runtime/1.1.0, integrity-checked against the registry, loaded through Pi's jiti; ported shims as the offline fallback (decision 0004 item 9). Every ExtensionAPI member, including shortcuts, flags, renderers, providers (chat, classifier, image), virtual models and the event bus. Packages from npm, git and local paths, global or -l project scope. Native C# extensions: a folder with pisharp-extension.json ({assembly, entryType}) discovered like Pi extensions on every platform without approval or preflight files (decision 0004 item 10). 1.1.0.3: ctx.ui.setTheme switches and saves the theme; sendMessage with triggerTurn starts its turn at once, inside a command or on an idle session; built-in extensions are resources (llama.cpp, codemode, tool-search, mcp) that yield to a Node extension registering codemode, tool_search or /mcp; native extensions register classifier and image providers; samples ship pisharp-extension.json. Remaining: no Node version gate (TypeScript needs Node 22.13+, upstream declares 22.19); a native C# extension registering codemode, tool_search or /mcp does not displace the built-in."
     },
     {
       "id": "parity.deviation-burn-down",
@@ -1039,7 +1039,7 @@
       "status": "port",
       "workPackage": "burn-down",
       "release": "1.1.0.2",
-      "outcome": "partial",
+      "outcome": "implemented",
       "test": [
         "tests/PiSharp.CliParity.Tests",
         "tests/PiSharp.SessionParity.Tests",
@@ -1049,7 +1049,7 @@
         "tests/PiSharp.GoogleGenerativeAI.Tests",
         "tests/PiSharp.ExtensionParity.Tests"
       ],
-      "notes": "Session files as JSON.stringify bytes in pi-ai's key order, compared with 29 scenarios captured from Pi 1.1.0 (tests/PiSharp.CliParity.Tests/SessionFormat); tool declarations in TypeBox order; V8 JSON.parse and provider error texts; RPC framing as rpc-mode.ts; count caps lifted on the Pi entry (prompts, images, tools, queues, skills, MCP, stream events, content blocks); turn_end/message_end inside the loop; Vertex external accounts; highlight.js and Mermaid ports. Open: per-request message-count caps in the provider projectors (removal in progress); lone surrogates on input (U+FFFD, session lines refused); JSON depth 64; fractional token counts refused; byte memory bounds (64 MiB session line/file, 16/64 MiB stream, 8 MiB tool result, 32 MiB RPC record); Google function calls without a name fail; sendMessage triggerTurn during a command; user-bash start failure text; Linux X11 clipboard helper."
+      "notes": "Session files as JSON.stringify bytes in pi-ai's key order, compared with 29 scenarios captured from Pi 1.1.0 (tests/PiSharp.CliParity.Tests/SessionFormat); tool declarations in TypeBox order; V8 JSON.parse and provider error texts; RPC framing as rpc-mode.ts; count caps lifted on the Pi entry (prompts, images, tools, queues, skills, MCP, stream events, content blocks); turn_end/message_end inside the loop; Vertex external accounts; highlight.js and Mermaid ports. 1.1.0.3 closed the rest: message-count caps lifted, nameless Google calls accepted, lone surrogates kept, 1,000 JSON levels, fractional token counts, JavaScript-string-sized bounds on the Pi entry, triggerTurn during a command, Node spawn errors for bash, the X11 clipboard helper. The remaining differences are listed in parity.cli-config-resources, parity.events-and-sessions, parity.provider-apis and parity.catalogs-and-model-selection."
     }
   ],
   "catalogRefresh": {

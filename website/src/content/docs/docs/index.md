@@ -11,7 +11,7 @@ PiSharp's version is the Pi version it matches. The current baseline is **Pi v1.
 
 - **Pi's command line:** run `pisharp` as you would run `pi`. The same flags, print and JSON modes, RPC, and the `install`, `update`, `config`, `auth` and `mcp` commands.
 - **Pi's files:** settings, credentials, MCP servers, `AGENTS.md`, skills, prompt templates, themes and sessions, all in `~/.pi/agent` and `.pi`, shared with Pi.
-- **Providers:** every chat API Pi has, every provider in Pi's catalogs, and `/login` for each of them. Classifier and image models too.
+- **Providers:** every chat API Pi has, every provider in Pi's catalogs, and `/login` for each of them. Local models through a [llama.cpp](/docs/guides/llama-cpp/) router. Classifier and image models too.
 - **Tools:** `read` (with images), `write`, `edit`, `bash`, `grep`, `find`, `ls`, `codemode` and `tool_search`.
 - **Interactive mode:** Pi's terminal UI, slash commands and themes, on Windows, Linux and macOS.
 - **MCP:** stdio and HTTP servers, OAuth, deferred and codemode exposure.
