@@ -194,7 +194,10 @@ internal sealed partial class PiExtensionHost
             case "ui.dialog": return await DialogAsync(p, Op(), Args(), token).ConfigureAwait(false);
             case "ui.custom": await OpenComponentAsync(p, token).ConfigureAwait(false); return null;
             case "ui.read": return UiRead(Op());
-            case "ui.setTheme": return new JsonObject { ["success"] = false, ["error"] = "Theme switching from extensions is not available in this PiSharp host" };
+            case "ui.setTheme":
+                // interactive-mode.ts setTheme switches the theme (and saves the setting); rpc-mode.ts has no themes.
+                if (SetTheme is { } setTheme) return setTheme(p.TryGetProperty("name", out var themeName) && themeName.ValueKind == JsonValueKind.String ? themeName.GetString()! : "");
+                return new JsonObject { ["success"] = false, ["error"] = _options.Mode == "rpc" ? "Theme switching not supported in RPC mode" : "UI not available" };
             case "ctx.executeTool": return await ExecuteToolAsync(p, request, token).ConfigureAwait(false);
             case "oauth.prompt": return await OAuthPromptAsync(p, token).ConfigureAwait(false);
             case "ctx.compact":
@@ -216,7 +219,16 @@ internal sealed partial class PiExtensionHost
                     }
                 }
                 return await Compact(customInstructions, token).ConfigureAwait(false);
-            case "command.waitForIdle": await RequireAttached().Session.WaitForIdleAsync(token).ConfigureAwait(false); return null;
+            case "command.waitForIdle":
+            {
+                // agent-session.ts waitForIdle: the command's own input does not count (its callback's flow identifies it).
+                var waitSession = RequireAttached().Session;
+                Task wait = null!;
+                if (FlowOf(p) is { } waitFlow) ExecutionContext.Run(waitFlow, _ => wait = waitSession.WaitForCommandIdleAsync(token), null);
+                else wait = waitSession.WaitForCommandIdleAsync(token);
+                await wait.ConfigureAwait(false);
+                return null;
+            }
             case "command.session":
                 // ctx.navigateTree/newSession/fork/switchSession: the native command context answers only inside the command callback
                 // that created it, so the action runs in that callback's execution context (as the command awaits it upstream).
@@ -245,8 +257,9 @@ internal sealed partial class PiExtensionHost
     {
         switch (method)
         {
-            case "pi.sendMessage": _ = Guard(SendMessageAsync(parameters, CancellationToken.None)); return;
-            case "pi.sendUserMessage": _ = Guard(SendUserMessageAsync(parameters, CancellationToken.None)); return;
+            // agent-session.ts bindCore: a failed sendMessage/sendUserMessage is reported as the "<runtime>" extension's error.
+            case "pi.sendMessage": _ = Guard(SendMessageAsync(parameters, CancellationToken.None), "send_message"); return;
+            case "pi.sendUserMessage": _ = Guard(SendUserMessageAsync(parameters, CancellationToken.None), "send_user_message"); return;
             case "pi.appendEntry":
                 await RequireAttached().Session.AppendCustomEntryAsync(parameters.GetProperty("customType").GetString()!,
                     parameters.TryGetProperty("data", out var data) ? JsonData.Parse(data.GetRawText()) : null).ConfigureAwait(false);
@@ -352,13 +365,16 @@ internal sealed partial class PiExtensionHost
     /// <summary>ctx.compact(): the mode's manual compaction (the RPC dispatcher's), returning the CompactionResult.</summary>
     internal Func<string?, CancellationToken, Task<JsonNode?>>? Compact { get; set; }
 
-    private static async Task Guard(Task work)
+    private async Task Guard(Task work, string? eventName = null)
     {
         try { await work.ConfigureAwait(false); }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
             System.Diagnostics.Trace.TraceWarning("Extension action failed: {0}", error.Message);
             if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") Console.Error.WriteLine("Extension action failed: " + error);
+            if (eventName is not null)
+                try { await ReportAsync("<runtime>", eventName, error.GetBaseException().Message).ConfigureAwait(false); }
+                catch (Exception reportError) when (reportError is not OutOfMemoryException) { }
         }
     }
 
@@ -371,23 +387,14 @@ internal sealed partial class PiExtensionHost
         var options = p.TryGetProperty("options", out var o) && o.ValueKind == JsonValueKind.Object ? o : default;
         var deliverAs = options.ValueKind == JsonValueKind.Object && options.TryGetProperty("deliverAs", out var d) ? d.GetString() : null;
         // agent-session.ts sendCustomMessage: an idle session appends (and emits) the message at once, also while a command's handler
-        // runs inside its prompt's input admission. A message that triggers a turn waits for that admission to finish.
-        for (var attempt = 0; ; attempt++)
-        {
-            try { await Send().ConfigureAwait(false); return; }
-            catch (Exception error) when (attempt < 1200 && InputBusy(error) && !token.IsCancellationRequested)
-            { await Task.Delay(25, token).ConfigureAwait(false); }
-        }
-
-        static bool InputBusy(Exception? error) => error is not null &&
-            (error is InvalidOperationException { Message: "Input admission is already processing." } || InputBusy(error.InnerException));
-        ValueTask Send() => actions.SendMessageAsync(new ExtensionCustomMessage(message.GetProperty("customType").GetString() ?? "",
+        // runs inside its prompt's input admission; a message that triggers a turn starts it at once, while the handler still runs.
+        await actions.SendMessageAsync(new ExtensionCustomMessage(message.GetProperty("customType").GetString() ?? "",
                 message.TryGetProperty("content", out var content) ? JsonData.Parse(content.GetRawText()) : JsonData.Parse("\"\""),
                 !message.TryGetProperty("display", out var display) || display.ValueKind != JsonValueKind.False,
                 message.TryGetProperty("details", out var details) ? JsonData.Parse(details.GetRawText()) : null),
             new ExtensionMessageOptions(options.ValueKind == JsonValueKind.Object && options.TryGetProperty("triggerTurn", out var trigger) && trigger.ValueKind is JsonValueKind.True or JsonValueKind.False ? trigger.GetBoolean() : null,
                 deliverAs switch { "followUp" => ExtensionMessageDelivery.FollowUp, "nextTurn" => ExtensionMessageDelivery.NextTurn, "steer" => ExtensionMessageDelivery.Steer, _ => null }),
-            token);
+            token).ConfigureAwait(false);
     }
 
     private async Task SendUserMessageAsync(JsonElement p, CancellationToken token)
@@ -519,8 +526,9 @@ internal sealed partial class PiExtensionHost
                 return ModelJson?.Invoke(model.Provider, model.Id) ?? new JsonObject { ["id"] = model.Id, ["provider"] = model.Provider, ["api"] = model.Api };
             case "scopedModels": return new JsonArray();
             case "thinkingLevel": return state?.Context.ThinkingLevel;
+            // agent-session.ts isIdle: no agent run and no compaction; a prompt's input handlers and a command's handler do not count.
             case "isIdle":
-                return state is null || !state.Agent.IsRunning && !state.IsProcessingOperation && !state.IsConfiguring && !state.IsAdmittingInput &&
+                return state is null || !state.Agent.IsRunning && !state.IsProcessingOperation && !state.IsConfiguring &&
                     !state.IsAppendingExtensionEntry && !state.IsEditingContext && !state.IsCompacting;
             case "isProjectTrusted": return ProjectTrusted ?? _options.ProjectTrusted(Cwd);
             case "hasPendingMessages":
@@ -636,6 +644,8 @@ internal sealed partial class PiExtensionHost
     /// <summary>IMPL-I: the interactive terminal's size, tools expansion, git branch and provider count (footer data), read without the UI loop.</summary>
     internal Func<(int Columns, int Rows)>? TerminalSize { get; set; }
     internal Func<bool>? ToolsExpanded { get; set; }
+    /// <summary>ctx.ui.setTheme(name) in interactive mode: the <c>{ success, error? }</c> result (null outside interactive mode).</summary>
+    internal Func<string, JsonNode>? SetTheme { get; set; }
     internal Func<string?>? GitBranch { get; set; }
     internal Func<int>? AvailableProviderCount { get; set; }
     /// <summary>IMPL-I: a widget, header or footer component asked to be redrawn (tui.requestRender in Node).</summary>

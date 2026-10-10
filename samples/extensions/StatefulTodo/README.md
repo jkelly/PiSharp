@@ -1,11 +1,37 @@
 # Stateful Todo native sample
 
-This compiled C# extension provides the `todo` tool through the experimental
-native package loader. It depends on the shared extension and JSON contracts;
-it has no Node dependency, external service, credential or external state file.
-The explicit package owner is `sample.todo`, entry type is
-`StatefulTodo.StatefulTodoExtension`, assembly is `StatefulTodo.dll`, and tool
-registration ID and name are both `todo`.
+This compiled C# extension provides the `todo` tool. It depends on the shared
+extension and JSON contracts; it has no Node dependency, external service,
+credential or external state file. The entry type is
+`StatefulTodo.StatefulTodoExtension`, the assembly is `StatefulTodo.dll`, and
+the tool registration ID and name are both `todo`.
+
+## Use it with pisharp
+
+The project ships the `pisharp-extension.json` manifest the Pi entry (plain
+`pisharp`, `-p`, `--mode json|rpc`) loads native extensions from; the build
+copies it next to the assembly:
+
+```powershell
+dotnet build samples/extensions/StatefulTodo/StatefulTodo.csproj -c Release
+```
+
+Then either load the build output for one run:
+
+```text
+pisharp -e samples/extensions/StatefulTodo/bin/Release/net10.0/pisharp-extension.json
+```
+
+or copy the `bin/Release/net10.0` folder to `~/.pi/agent/extensions/stateful-todo/`
+(or, in a trusted project, `.pi/extensions/stateful-todo/`), where it loads like
+a Pi extension. `/reload` loads a rebuilt assembly. The state is rebuilt from the
+session branch each time the tool runs, so `--continue`, `/resume`, `/fork` and
+`/tree` show the todos of the selected branch.
+`closeout.sample-stateful-todo-loads-from-an-extension-folder` in
+`tests/PiSharp.ExtensionParity.Tests` loads the build from a project extension
+folder and lists a todo added by an earlier run of the continued session.
+
+## Tool behavior
 
 The ordinary tool behavior is derived from the unchanged pi v0.99.1 example
 `packages/coding-agent/examples/extensions/todo.ts`, SHA-256
@@ -75,7 +101,11 @@ owns callback admission, the stale-context fence, snapshot limits, active-branch
 selection, final authorization and durable writes. A copied JSON snapshot is
 read-only historical data and grants no operation capability.
 
-## Package use and verification
+## The `session …` package loader
+
+The sample also still runs through the older native package loader of the
+`pisharp session …` commands, where its explicit package owner is `sample.todo`
+(the `pisharp-extension.json` manifest is one more published file there).
 
 Root's native publisher registers this project under `todo` and publishes it
 to `artifacts/extensions/published-fixtures/todo`. The project excludes shared

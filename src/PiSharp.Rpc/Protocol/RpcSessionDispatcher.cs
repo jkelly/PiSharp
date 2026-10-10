@@ -1005,7 +1005,15 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 new InputAdmission(this, selected, token), limits, _stopInputToken);
             // Started coordinator submissions finish after the run. Its actual first event is the admission witness.
             await Task.WhenAny(candidate.Entered.Task, processing).ConfigureAwait(false);
-            if (candidate.Entered.Task.IsCompleted)
+            if (candidate.Entered.Task.IsCompleted && originating.TakeInputTriggeredRun() is { } triggered)
+            {
+                // agent-session.ts sendCustomMessage: a command's sendMessage({ triggerTurn }) runs its turn while the handler still runs;
+                // the turn's events flow at once and the prompt is answered when the handler returns.
+                lock (_gate) if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
+                _ = MonitorAsync(candidate, triggered, originating);
+                candidate.Ready.TrySetResult();
+            }
+            else if (candidate.Entered.Task.IsCompleted)
             {
                 lock (_gate) if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
                 lock (_gate) _postInputMovedToRun.Add(command);
@@ -1121,6 +1129,16 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         try
         {
             RunState? run;
+            // agent-session.ts sendCustomMessage: an extension's sendMessage({ triggerTurn }) on an idle session runs a turn of its own
+            // (a timer, an event handler); the host adopts it, streams its events and settles it as any run.
+            bool unowned; lock (_gate) unowned = observation is AgentLoopStarted && _run is null && _startingInput is null;
+            if (unowned && _session.TakeInputTriggeredRun() is { } triggered)
+            {
+                var adopted = new RunState(_session.Snapshot.Agent.Messages.Length);
+                bool owns; lock (_gate) { owns = _run is null && !_closed; if (owns) _run = adopted; }
+                adopted.Ready.TrySetResult();
+                if (owns) _ = MonitorAsync(adopted, triggered, _session);
+            }
             lock (_gate)
             {
                 if (observation is AgentLoopStarted && _startingInput is { } starting)

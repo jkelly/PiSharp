@@ -66,6 +66,8 @@ internal sealed record PiHost
     /// <summary>The child processes package commands and package resolution run (npm, git), given the host's stdout and stderr; null
     /// runs the user's own tools with this process's environment.</summary>
     internal Func<TextWriter, TextWriter, PiSharp.Cli.Packages.PiPackageProcesses>? PackageProcesses { get; init; }
+    /// <summary>Adjusts the <c>mcp</c> command's collaborators (tests: fake channels and stores); null keeps the defaults.</summary>
+    internal Func<McpCommandOptions, McpCommandOptions>? ConfigureMcp { get; init; }
 }
 
 /// <summary>An exit decided by the entry after its messages were written.</summary>
@@ -79,6 +81,14 @@ internal static class PiCommand
     /// <summary>Source isTruthyEnvFlag.</summary>
     internal static bool IsTruthyEnvFlag(string? value) =>
         !string.IsNullOrEmpty(value) && (value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase) || value.Equals("yes", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>http-dispatcher.ts applyHttpProxySettings: the global httpProxy fills HTTP_PROXY and HTTPS_PROXY when they are unset.</summary>
+    private static void ApplyHttpProxy(PiHost host, JsonObject global)
+    {
+        if (global["httpProxy"] is JsonValue proxyValue && proxyValue.TryGetValue<string>(out var proxy) && PiArgs.JsTrim(proxy) is { Length: > 0 } trimmedProxy)
+            foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY" })
+                if (host.GetEnvironment(name) is null) host.SetEnvironment(name, trimmedProxy);
+    }
 
     internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken cancellationToken)
     {
@@ -105,9 +115,23 @@ internal static class PiCommand
         var offline = args.Contains("--offline") || IsTruthyEnvFlag(host.GetEnvironment("PI_OFFLINE"));
         if (offline) { host.SetEnvironment("PI_OFFLINE", "1"); host.SetEnvironment("PI_SKIP_VERSION_CHECK", "1"); }
         if (args.Length > 0 && args[0] == "auth") return await PiAuthCommand.RunAsync(args, host, token).ConfigureAwait(false);
+        // main.ts: the bootstrap settings (project untrusted) apply the global httpProxy before the package, config and mcp commands.
+        ApplyHttpProxy(host, PiSettings.Load(host.Cwd, PiPaths.AgentDirectory(host.GetEnvironment, host.Home), projectTrusted: false).Global);
         if (args.Length > 0 && PackageCommands.Contains(args[0]))
             return await PiSharp.Cli.Packages.PiPackageCommands.RunAsync(args, host, token).ConfigureAwait(false) ??
                 await PiSharp.Cli.Packages.PiPackageCommands.RunConfigAsync(args, host, token).ConfigureAwait(false) ?? 1;
+        // main.ts: `mcp` runs runMcpCommand(args.slice(1), { cwd, agentDir }) after that setup, before the main argument parser.
+        if (args.Length > 0 && args[0] == "mcp")
+        {
+            var mcpAgentDir = PiPaths.AgentDirectory(host.GetEnvironment, host.Home);
+            var mcpOptions = new McpCommandOptions(host.Cwd, mcpAgentDir)
+            {
+                HomeDirectory = host.Home, Environment = host.GetEnvironment, IsProjectTrusted = PiProjectTrust.CreateResolver(mcpAgentDir, host.Home)
+            };
+            var mcpCode = await McpCommand.RunAsync(args[1..], host.Stdout, host.Stderr, host.ConfigureMcp?.Invoke(mcpOptions) ?? mcpOptions, token).ConfigureAwait(false);
+            await host.Stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+            return mcpCode;
+        }
 
         host.Timings.ResetTimings();
         var parsed = PiArgs.Parse(args);
@@ -138,10 +162,7 @@ internal static class PiCommand
         host.Timings.Time("runMigrations");
         var startupSettings = PiSettings.Load(cwd, agentDir, projectTrusted: true);
         var startupDiagnostics = startupSettings.DrainDiagnostics();
-        // http-dispatcher.ts applyHttpProxySettings: the global httpProxy fills HTTP_PROXY and HTTPS_PROXY when they are unset.
-        if (startupSettings.Global["httpProxy"] is JsonValue proxyValue && proxyValue.TryGetValue<string>(out var proxy) && PiArgs.JsTrim(proxy) is { Length: > 0 } trimmedProxy)
-            foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY" })
-                if (host.GetEnvironment(name) is null) host.SetEnvironment(name, trimmedProxy);
+        ApplyHttpProxy(host, startupSettings.Global);
 
         if (parsed.Help)
         {
@@ -244,9 +265,23 @@ internal static class PiCommand
                 host.PackageProcesses?.Invoke(packageOutput, err) ?? new() { Output = packageOutput, ErrorOutput = err }).ResolveAsync(cancellationToken: token).ConfigureAwait(false);
         }
         catch (PiSharp.Cli.Packages.PiPackageException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
+        // resource-loader.ts reload: packageManager.resolveExtensionSources(-e sources, temporary) contributes the -e packages' skills,
+        // prompts and themes as well as their extensions (their enabled resources lead each list).
+        async Task<PiSharp.Cli.Packages.PiResolvedPaths?> ExtensionSourcesAsync(PiSettings sourceSettings, TextWriter output, TextWriter errorOutput, CancellationToken sourceToken)
+        {
+            if (parsed.Extensions is not { Count: > 0 } sources) return null;
+            try
+            {
+                return await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, sourceSettings, host.GetEnvironment,
+                    host.PackageProcesses?.Invoke(output, errorOutput) ?? new() { Output = output, ErrorOutput = errorOutput })
+                    .ResolveExtensionSourcesAsync(sources, temporary: true, cancellationToken: sourceToken).ConfigureAwait(false);
+            }
+            catch (PiSharp.Cli.Packages.PiPackageException) { return null; } // The extension loader reports the failed source.
+        }
+        var extensionSources = await ExtensionSourcesAsync(settings, appMode == PiAppMode.Interactive ? host.Stdout : err, err, token).ConfigureAwait(false);
         var resources = PiResources.Discover(new(sessionCwd, agentDir, home, settings, projectTrusted)
         {
-            Packages = packageResources,
+            Packages = packageResources, ExtensionSources = extensionSources,
             CliSkills = [.. parsed.Skills ?? []], CliPromptTemplates = [.. parsed.PromptTemplates ?? []], CliThemes = [.. parsed.Themes ?? []],
             NoSkills = parsed.NoSkills, NoPromptTemplates = parsed.NoPromptTemplates, NoThemes = parsed.NoThemes, NoContextFiles = parsed.NoContextFiles,
             SystemPrompt = parsed.SystemPrompt, AppendSystemPrompt = parsed.AppendSystemPrompt is null ? default : [.. parsed.AppendSystemPrompt]
@@ -284,9 +319,10 @@ internal static class PiCommand
                     .ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
             }
             catch (PiSharp.Cli.Packages.PiPackageException) { reloadPackages = packageResources; }
+            var reloadSources = await ExtensionSourcesAsync(reloadSettings, TextWriter.Null, TextWriter.Null, reloadToken).ConfigureAwait(false) ?? extensionSources;
             var reloaded = PiResources.WithDiscovered(PiResources.Discover(new(sessionCwd, agentDir, home, reloadSettings, projectTrusted)
             {
-                Packages = reloadPackages,
+                Packages = reloadPackages, ExtensionSources = reloadSources,
                 CliSkills = [.. parsed.Skills ?? []], CliPromptTemplates = [.. parsed.PromptTemplates ?? []], CliThemes = [.. parsed.Themes ?? []],
                 NoSkills = parsed.NoSkills, NoPromptTemplates = parsed.NoPromptTemplates, NoThemes = parsed.NoThemes, NoContextFiles = parsed.NoContextFiles,
                 SystemPrompt = parsed.SystemPrompt, AppendSystemPrompt = parsed.AppendSystemPrompt is null ? default : [.. parsed.AppendSystemPrompt]

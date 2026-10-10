@@ -1,5 +1,5 @@
 {
-  "$comment": "Authored native status for the v1.1.0 event catalog, applied by tools/SurfaceInventory/build-event-catalog.mjs --overlay. Assessed against PiSharp sources at 95e3c29a7db9434704819f856f20e0bf30f1938f. Tests are authored and registered (except where noted), not executed by the refresh.",
+  "$comment": "Authored native status for the v1.1.0 event catalog, applied by tools/SurfaceInventory/build-event-catalog.mjs --overlay. Assessed against PiSharp sources at b831158a9379e8a7f454a069ee18551c90bd7eac (with the 1.1.0.3 close-out cases in tests/PiSharp.ExtensionParity.Tests/CloseoutCases.cs). All 41 events carry native evidence. Node extensions register through PiNodeOwner in the same ExtensionRegistry as native C# extensions, so host dispatch reaches both; Node-backed cases need Node.js. Tests are authored and registered, not executed by the refresh.",
   "nativeProfile": {
     "registryIntegrated": true,
     "agentIntegrated": true,
@@ -14,9 +14,9 @@
   },
   "dynamicEventBus": {
     "nativeEvidence": {
-      "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+      "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
       "registration": "IExtensionEventBusRegistry.Events (IExtensionEventBus Emit/On; IAsyncExtensionEventBus OnAsync/OnValueTask/Drain)",
-      "hostEmission": "Extension-to-extension only; the host publishes nothing on the bus",
+      "hostEmission": "Extension-to-extension only (native and Node extensions share Registry.SharedEventBus); the host publishes nothing on the bus",
       "tests": [
         {
           "suite": "tests/PiSharp.SdkEventBus.Tests",
@@ -27,6 +27,11 @@
           "suite": "tests/PiSharp.SdkAsyncEventBus.Tests",
           "file": "tests/PiSharp.SdkAsyncEventBus.Tests/Program.cs",
           "case": "drain snapshots exclude later emissions"
+        },
+        {
+          "suite": "tests/PiSharp.ExtensionParity.Tests",
+          "file": "tests/PiSharp.ExtensionParity.Tests/GapCases.cs",
+          "case": "gap.pi-events-shared-with-native-extensions"
         }
       ]
     },
@@ -35,26 +40,21 @@
     }
   },
   "events": {
-    "input": {
+    "project_trust": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.RegisterInputHandler",
-        "hostEmission": "RegisteredExtensionInputAdmission through the profile runtime view and RPC input admission",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterEventHandler (topic project_trust)",
+        "hostEmission": "PiExtensionEvents.ProjectTrustAsync (registry.DispatchUntilAsync over the extensions loaded before trust) from the Pi entry project-trust resolution",
         "tests": [
           {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
-            "case": "input transforms compose, preserve nullish images and stop when handled"
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ExtensionEventCases.cs",
+            "case": "extension-events.project-trust-first-decision-wins-errors-reported-and-remembered"
           },
           {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredExtensionInputTests.cs",
-            "case": "registered input transforms reach actual durable checkpoint, provider history and reopen"
-          },
-          {
-            "suite": "tests/PiSharp.Rpc.Tests",
-            "file": "tests/PiSharp.Rpc.Tests/RegisteredInputRpcTests.cs",
-            "case": "rpc.registered-input-real-two-hook-transform-images-continue-durability-and-reopen"
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/CloseoutCases.cs",
+            "case": "closeout.native-project-trust-handler-decides"
           }
         ],
         "gaps": []
@@ -64,81 +64,156 @@
         "nativeReducer": "ImplementedWithAuthoredTests"
       }
     },
-    "tool_call": {
+    "resources_discover": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.RegisterToolCallHandler",
-        "hostEmission": "ExtensionAgentBinding.PreparedHooks (RegisteredExtensionToolHooks) into PreparedToolHooks",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterEventHandler (topic resources_discover)",
+        "hostEmission": "PiExtensionEvents.ResourcesDiscoverAsync (startup and reload) feeding the run's skill, prompt and theme paths",
         "tests": [
           {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
-            "case": "tool argument replacements compose and the first block stops dispatch"
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ExtensionEventCases.cs",
+            "case": "extension-events.resources-discover-collects-attributed-paths-and-reports-errors"
           },
           {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredEventDispatchTests.cs",
-            "case": "registered tool calls retain exact replacements and first-block decisions"
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/CloseoutCases.cs",
+            "case": "closeout.native-resources-discover-adds-paths"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_start": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic session_start)",
+        "hostEmission": "NativeExtensionActivation.DispatchSessionStartAsync at startup/reload; NativeReplacementSessionStartBinding on replacement",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ReplacementSessionStartTests.cs",
+            "case": "replacement session-start actual switch resume new fork-before and fork-at publish exact previous path and fresh context",
+            "sourcePrefix": "replacement session-start ",
+            "sourceSuffix": "actual switch resume new fork-before and fork-at publish exact previous path and fresh context"
           },
           {
             "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/NativeExtensionSessionCommandTests.cs",
-            "case": "native published call hooks cannot bypass final schema or native file policy"
+            "file": "tests/PiSharp.CodingAgent.Tests/ProfileRuntimeViewNativeTests.cs",
+            "case": "profile view actual native reload targets old activation and final quit targets new activation"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/RebuildCases.cs",
+            "case": "rebuild.session-start-reasons"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_info_changed": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic session_info_changed)",
+        "hostEmission": "NativeSessionInfoChangedBinding",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionInfoChangedTests.cs",
+            "case": "native session-info-changed actual RPC durable event then extension then response with repeated and undefined names",
+            "sourcePrefix": "native session-info-changed ",
+            "sourceSuffix": "actual RPC durable event then extension then response with repeated and undefined names"
           }
         ],
         "gaps": []
       },
       "actualStatus": {
-        "nativeHostIntegration": "ImplementedWithAuthoredTests",
-        "nativeReducer": "ImplementedWithAuthoredTests"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
-    "tool_result": {
+    "session_before_switch": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.RegisterToolResultHandler",
-        "hostEmission": "Same PreparedHooks path as tool_call",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionSessionLifecycleRegistry.RegisterSessionSwitchHandler (typed veto) and Observe",
+        "hostEmission": "NativeSessionBeforeSwitchBinding (resume/switch: veto then observation); AttachOwner.BeforeCreation for reason \"new\"; Node handlers through PiNodeOwner",
         "tests": [
           {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
-            "case": "tool-result patches compose and content redaction clears stale structured content"
-          },
-          {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredEventDispatchTests.cs",
-            "case": "registered tool result patches preserve null and complete result admission"
-          },
-          {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredExtensionToolTests.cs",
-            "case": "registered result projection retains raw status and nullish source after-hook behavior"
-          }
-        ],
-        "gaps": []
-      },
-      "actualStatus": {
-        "nativeHostIntegration": "ImplementedWithAuthoredTests",
-        "nativeReducer": "ImplementedWithAuthoredTests"
-      }
-    },
-    "before_agent_start": {
-      "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.RegisterBeforeAgentStartHandler",
-        "hostEmission": "ExtensionAgentBinding.ContextHooks.BeforePrompt",
-        "tests": [
-          {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
-            "case": "before-agent-start.once per prompt with ordered snapshots and continuation projection",
-            "sourcePrefix": "before-agent-start.",
-            "sourceSuffix": "once per prompt with ordered snapshots and continuation projection"
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeBeforeSwitchPayloadTests.cs",
+            "case": "native before-switch payload actual switch catalog resume and SDK switch expose exact source payload before publication",
+            "sourcePrefix": "native before-switch payload ",
+            "sourceSuffix": "actual switch catalog resume and SDK switch expose exact source payload before publication"
           },
           {
             "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
-            "case": "native before-start actual CLI persists custom messages and preserves user history"
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSdkSessionResumeTests.cs",
+            "case": "native-sdk-session-resume typed veto closes target and preserves both existing files"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/SwitchVetoCases.cs",
+            "case": "switch-veto.cancelled-switch-leaves-the-target-unchanged"
+          }
+        ],
+        "gaps": [
+          "The reason \"new\" observation from BeforeCreation is not asserted."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_before_fork": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionSessionCreationRegistry.RegisterSessionCreationHandler (typed veto for fork/new/clone) and Observe",
+        "hostEmission": "NativeExtensionActivation emits session_before_fork{entryId,position} (typed veto, then observation); PiNodeOwner forwards it to Node handlers",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/SessionCreationRegistryTests.cs",
+            "case": "session-creation-registry. typed veto is ordered and failure remains distinct from cancellation"
+          }
+        ],
+        "gaps": [
+          "No test asserts the session_before_fork observation; the typed veto is tested at registry level only."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "PartialRegistryTestOnly",
+        "nativeReducer": "PartialRegistryTestOnly"
+      }
+    },
+    "session_before_compact": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterEventHandler (topic session_before_compact)",
+        "hostEmission": "NativeSessionEventBinding configures PersistentAgentSession.ConfigureBeforeCompaction (last truthy result wins; cancel or extension compaction)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.session-before-compact-payload-cancel-stops-dispatch"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.session-before-compact-extension-compaction-replaces-summary"
           }
         ],
         "gaps": []
@@ -146,11 +221,155 @@
       "actualStatus": {
         "nativeHostIntegration": "ImplementedWithAuthoredTests",
         "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_compact": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic session_compact)",
+        "hostEmission": "NativeSessionCompactionObservationBinding",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionCompactObservationTests.cs",
+            "case": "session-compact observation manual payload is exact immutable checkpoint after acknowledged context installation",
+            "sourcePrefix": "session-compact observation ",
+            "sourceSuffix": "manual payload is exact immutable checkpoint after acknowledged context installation"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_compact_failed": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic session_compact_failed)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.session-compact-failed-payload"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.session-compact-failed-from-extension"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_shutdown": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic session_shutdown)",
+        "hostEmission": "NativeSessionShutdownBinding (owner.BeforeRetirement) and quit/reload DispatchSessionShutdownAsync",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/SessionShutdownRegistryTests.cs",
+            "case": "session-shutdown-registry. reason and destination are preserved and malformed events are rejected",
+            "sourcePrefix": "session-shutdown-registry.",
+            "sourceSuffix": " reason and destination are preserved and malformed events are rejected"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeShutdownPlacementTests.cs",
+            "case": "native shutdown placement actual offline RPC notifies after terminal join before native disposal",
+            "sourcePrefix": "native shutdown placement ",
+            "sourceSuffix": "actual offline RPC notifies after terminal join before native disposal"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "mcp_servers_change": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic mcp_servers_change); IExtensionMcpServerRegistry register/unregister",
+        "hostEmission": "NativeExtensionActivation.BindMcpServersChange binds McpRegisteredServers.BindDispatch to the captured registration revision",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.McpParity.Tests",
+            "file": "tests/PiSharp.McpParity.Tests/Program.cs",
+            "case": "registration.native-api-validation-ownership-and-change-event",
+            "implementationFile": "tests/PiSharp.McpParity.Tests/RegistrationCases.cs"
+          }
+        ],
+        "gaps": [
+          "The case binds McpRegisteredServers.BindDispatch to the registry itself; no case asserts the observation through NativeExtensionActivation in a running session."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "PartialRegistryTestOnly"
+      }
+    },
+    "session_before_tree": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionSessionTreeLifecycleRegistry.RegisterSessionBeforeTreeHandler",
+        "hostEmission": "NativeExtensionActivation.DispatchBeforeTreeAsync through OfflineSessionProfile.RegisteredTree",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/RegisteredSessionTreeRouteTests.cs",
+            "case": "registered tree veto preserves state and has no after observation"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/RegisteredTreeCancellationClassificationTests.cs",
+            "case": "registered tree exact admitted cancellation joins context cleanup"
+          }
+        ],
+        "gaps": [
+          "RegisteredSessionTreeRouteTests and RegisteredTreeCancellationClassificationTests are registered in tests/PiSharp.CodingAgent.Tests/Program.cs."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_tree": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic session_tree)",
+        "hostEmission": "NativeSessionTreeObservationBinding (selected tree only)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/RegisteredSessionTreeRouteTests.cs",
+            "case": "registered tree provided summary label and actual fresh facade"
+          }
+        ],
+        "gaps": [
+          "RegisteredSessionTreeRouteTests and RegisteredTreeCancellationClassificationTests are registered in tests/PiSharp.CodingAgent.Tests/Program.cs."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
     "context": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "registration": "IExtensionRegistry.RegisterContextHandler",
         "hostEmission": "ExtensionAgentBinding.ContextHooks.TransformRequestMessages",
         "tests": [
@@ -165,9 +384,16 @@
             "suite": "tests/PiSharp.CodingAgent.Tests",
             "file": "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
             "case": "native request-context actual CLI preserves history and transforms provider input"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
           }
         ],
-        "gaps": []
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
       },
       "actualStatus": {
         "nativeHostIntegration": "ImplementedWithAuthoredTests",
@@ -176,7 +402,7 @@
     },
     "context_with_system": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "registration": "IExtensionRegistry.RegisterContextWithSystemHandler",
         "hostEmission": "Same path as context, after the conversation phase",
         "tests": [
@@ -200,72 +426,61 @@
         "nativeReducer": "ImplementedWithAuthoredTests"
       }
     },
-    "session_start": {
+    "cache_warming_decision": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.Observe (topic session_start)",
-        "hostEmission": "NativeExtensionActivation.DispatchSessionStartAsync at startup/reload; NativeReplacementSessionStartBinding on replacement",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterEventHandler (topic cache_warming_decision)",
+        "hostEmission": "NativeExtensionActivation cache-warming decision callback (registry.ReduceEventAsync) handed to the CacheWarmer",
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/ReplacementSessionStartTests.cs",
-            "case": "replacement session-start actual switch resume new fork-before and fork-at publish exact previous path and fresh context",
-            "sourcePrefix": "replacement session-start ",
-            "sourceSuffix": "actual switch resume new fork-before and fork-at publish exact previous path and fresh context"
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.reduce-event-last-result-wins-and-failures-continue"
           },
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/ProfileRuntimeViewNativeTests.cs",
-            "case": "profile view actual native reload targets old activation and final quit targets new activation"
-          }
-        ],
-        "gaps": []
-      },
-      "actualStatus": {
-        "nativeHostIntegration": "ImplementedWithAuthoredTests"
-      }
-    },
-    "session_info_changed": {
-      "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.Observe (topic session_info_changed)",
-        "hostEmission": "NativeSessionInfoChangedBinding",
-        "tests": [
-          {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/SessionInfoChangedTests.cs",
-            "case": "native session-info-changed actual RPC durable event then extension then response with repeated and undefined names",
-            "sourcePrefix": "native session-info-changed ",
-            "sourceSuffix": "actual RPC durable event then extension then response with repeated and undefined names"
-          }
-        ],
-        "gaps": []
-      },
-      "actualStatus": {
-        "nativeHostIntegration": "ImplementedWithAuthoredTests"
-      }
-    },
-    "session_before_switch": {
-      "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionSessionLifecycleRegistry.RegisterSessionSwitchHandler (typed veto) and Observe",
-        "hostEmission": "NativeSessionBeforeSwitchBinding (resume/switch: veto then observation); AttachOwner.BeforeCreation for reason \"new\"",
-        "tests": [
-          {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/NativeBeforeSwitchPayloadTests.cs",
-            "case": "native before-switch payload actual switch catalog resume and SDK switch expose exact source payload before publication",
-            "sourcePrefix": "native before-switch payload ",
-            "sourceSuffix": "actual switch catalog resume and SDK switch expose exact source payload before publication"
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/UsageCases.cs",
+            "case": "cache-warmer/economic-decisions-and-extension-overrides"
           },
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/NativeSdkSessionResumeTests.cs",
-            "case": "native-sdk-session-resume typed veto closes target and preserves both existing files"
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/UsageCases.cs",
+            "case": "cache-warmer/rechecks-deadline-after-extension-decision"
           }
         ],
         "gaps": [
-          "The reason \"new\" observation from BeforeCreation is not asserted."
+          "The reducer is tested on the registry and the CacheWarmer is tested with a decision callback; no case runs a registered handler through the activation into a warming session."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "PartialRegistryTestOnly",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "before_provider_request": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterEventHandler (topic before_provider_request)",
+        "hostEmission": "ExtensionProviderHttpHandler (provider HTTP pipeline built by OfflineSessionProfile when handlers exist)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.provider-request-payload-headers-response-and-stream-events"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.bedrock-event-stream-events-and-signed-payload-hooks"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
         ]
       },
       "actualStatus": {
@@ -273,117 +488,219 @@
         "nativeReducer": "ImplementedWithAuthoredTests"
       }
     },
-    "session_before_fork": {
+    "before_provider_headers": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionSessionCreationRegistry.RegisterSessionCreationHandler (typed veto for fork/new/clone) and Observe",
-        "hostEmission": "NativeExtensionActivation emits session_before_fork{entryId,position}",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterEventHandler (topic before_provider_headers)",
+        "hostEmission": "ExtensionProviderHttpHandler (headers mutated in handler order before signing)",
         "tests": [
           {
-            "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/SessionCreationRegistryTests.cs",
-            "case": "session-creation-registry. typed veto is ordered and failure remains distinct from cancellation"
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.provider-request-payload-headers-response-and-stream-events"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.bedrock-event-stream-events-and-signed-payload-hooks"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
           }
         ],
         "gaps": [
-          "No test asserts the session_before_fork observation; the typed veto is tested at registry level only."
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
         ]
       },
       "actualStatus": {
-        "nativeHostIntegration": "PartialRegistryTestOnly",
-        "nativeReducer": "PartialRegistryTestOnly"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
       }
     },
-    "session_compact": {
+    "after_provider_response": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.Observe (topic session_compact)",
-        "hostEmission": "NativeSessionCompactionObservationBinding",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic after_provider_response)",
+        "hostEmission": "ExtensionProviderHttpHandler",
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/SessionCompactObservationTests.cs",
-            "case": "session-compact observation manual payload is exact immutable checkpoint after acknowledged context installation",
-            "sourcePrefix": "session-compact observation ",
-            "sourceSuffix": "manual payload is exact immutable checkpoint after acknowledged context installation"
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.provider-request-payload-headers-response-and-stream-events"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
           }
         ],
-        "gaps": []
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
       },
       "actualStatus": {
         "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
-    "session_shutdown": {
+    "provider_stream_event": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.Observe (topic session_shutdown)",
-        "hostEmission": "NativeSessionShutdownBinding (owner.BeforeRetirement) and quit/reload DispatchSessionShutdownAsync",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic provider_stream_event)",
+        "hostEmission": "ExtensionProviderHttpHandler (SSE and Bedrock event-stream frames)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.provider-request-payload-headers-response-and-stream-events"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.bedrock-event-stream-events-and-signed-payload-hooks"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "before_agent_start": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterBeforeAgentStartHandler",
+        "hostEmission": "ExtensionAgentBinding.ContextHooks.BeforePrompt",
         "tests": [
           {
             "suite": "tests/PiSharp.Extensions.ContractTests",
-            "file": "tests/PiSharp.Extensions.ContractTests/SessionShutdownRegistryTests.cs",
-            "case": "session-shutdown-registry. reason and destination are preserved and malformed events are rejected",
-            "sourcePrefix": "session-shutdown-registry.",
-            "sourceSuffix": " reason and destination are preserved and malformed events are rejected"
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.once per prompt with ordered snapshots and continuation projection",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "once per prompt with ordered snapshots and continuation projection"
           },
           {
             "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/NativeShutdownPlacementTests.cs",
-            "case": "native shutdown placement actual offline RPC notifies after terminal join before native disposal",
-            "sourcePrefix": "native shutdown placement ",
-            "sourceSuffix": "actual offline RPC notifies after terminal join before native disposal"
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
+            "case": "native before-start actual CLI persists custom messages and preserves user history"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
           }
         ],
-        "gaps": []
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "agent_start": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic agent_start)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.agent-loop-events-order-payloads-and-precede-rpc"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.handler-error-reported-with-message-and-next-handler-runs"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/CloseoutCases.cs",
+            "case": "closeout.trigger-turn-from-a-command-runs-while-the-handler-runs"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
       },
       "actualStatus": {
         "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
-    "session_before_tree": {
+    "agent_end": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionSessionTreeLifecycleRegistry.RegisterSessionBeforeTreeHandler",
-        "hostEmission": "NativeExtensionActivation.DispatchBeforeTreeAsync through OfflineSessionProfile.RegisteredTree",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic agent_end)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them)",
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/RegisteredSessionTreeRouteTests.cs",
-            "case": "registered tree veto preserves state and has no after observation"
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.agent-loop-events-order-payloads-and-precede-rpc"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/CloseoutCases.cs",
+            "case": "closeout.trigger-turn-from-a-command-runs-while-the-handler-runs"
           }
         ],
         "gaps": [
-          "RegisteredSessionTreeRouteTests and RegisteredTreeCancellationClassificationTests are authored but no test Program.cs runs their Cases(); not counted as implemented."
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
         ]
       },
       "actualStatus": {
-        "nativeHostIntegration": "EmittedTestsNotRegistered"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
-    "session_tree": {
+    "agent_before_settle": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "IExtensionRegistry.Observe (topic session_tree)",
-        "hostEmission": "NativeSessionTreeObservationBinding (selected tree only)",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterEventHandler (topic agent_before_settle; boundary entries/continue)",
+        "hostEmission": "NativeSessionEventBinding boundary handler through PersistentAgentSession.ConfigureBoundaryHandlers",
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/RegisteredSessionTreeRouteTests.cs",
-            "case": "registered tree provided summary label and actual fresh facade"
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.agent-before-settle-drafts-and-continue"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
           }
         ],
         "gaps": [
-          "The covering tests are not registered in any test Program.cs; not counted as implemented."
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
         ]
       },
       "actualStatus": {
-        "nativeHostIntegration": "EmittedTestsNotRegistered"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
       }
     },
     "agent_settled": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "registration": "IExtensionRegistry.Observe (topic agent_settled)",
         "hostEmission": "NativeAgentSettledObservationBinding dispatches {\"type\":\"agent_settled\",\"aborted\":bool} from PersistentAgentSession SessionOperationSettled.Aborted",
         "tests": [
@@ -397,22 +714,296 @@
             "suite": "tests/PiSharp.WireSync.Tests",
             "file": "tests/PiSharp.WireSync.Tests/SettledTests.cs",
             "case": "wire.agent-settled.rpc-and-session-aborted-flag"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
           }
         ],
         "gaps": [
-          "v1.1.0 AgentSettledEvent.aborted: the native observer test asserts aborted:false only; aborted:true is asserted on the session record and RPC output."
+          "v1.1.0 AgentSettledEvent.aborted: the native observer test asserts aborted:false only; aborted:true is asserted on the session record and RPC output.",
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
         ]
       },
       "actualStatus": {
         "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
+    "ui_prompt_start": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic ui_prompt_start)",
+        "hostEmission": "NativeUiPromptEvents wraps the extension UI provider (once per outermost dialog, custom and terminal component scopes)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.ui-prompt-start-end-once-for-nested-prompts"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.ui-prompt-wraps-terminal-component-scopes-and-custom"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.ui-prompt-events-reach-every-observer-in-order-under-load"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "ui_prompt_end": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic ui_prompt_end)",
+        "hostEmission": "NativeUiPromptEvents wraps the extension UI provider",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.ui-prompt-start-end-once-for-nested-prompts"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.ui-prompt-wraps-terminal-component-scopes-and-custom"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "hooks.ui-prompt-events-reach-every-observer-in-order-under-load"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "turn_start": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic turn_start)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.agent-loop-events-order-payloads-and-precede-rpc"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "turn_end": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe and RegisterEventHandler (topic turn_end; boundary entries/continue)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them); boundary results through PersistentAgentSession.ConfigureBoundaryHandlers",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.agent-loop-events-order-payloads-and-precede-rpc"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.turn-end-drafts-committed-and-continue-runs-next-request"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.turn-end-invalid-entries-and-unrunnable-continue-reported"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.turn-end-drafts-continue-the-same-run"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "message_start": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic message_start)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.agent-loop-events-order-payloads-and-precede-rpc"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.tool-execution-events-with-duration-and-tool-result-messages"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "message_update": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic message_update)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them) (assistantMessageEvent with the partial message)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.agent-loop-events-order-payloads-and-precede-rpc"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "message_end": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe and RegisterEventHandler (topic message_end; same-role message replacement)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them); replacements through PersistentAgentSession.ConfigureMessageEndHandler",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.agent-loop-events-order-payloads-and-precede-rpc"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.message-end-replacement-persisted-and-role-checked"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.message-end-replacement-applies-within-the-run"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "tool_execution_start": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic tool_execution_start)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.tool-execution-events-with-duration-and-tool-result-messages"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "tool_execution_update": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic tool_execution_update)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them) (ToolExecutionUpdated)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.tool-execution-events-with-duration-and-tool-result-messages"
+          }
+        ],
+        "gaps": [
+          "The binding publishes tool_execution_update from the same sink as tool_execution_start/end, but no authored case asserts an extension handler receiving it (bridge.events-reach-node-handlers registers it and does not assert it)."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "PartialRegistryTestOnly"
+      }
+    },
     "tool_execution_end": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only (RpcAgentEventProjector), including v1.1.0 durationMs; no native extension dispatch",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic tool_execution_end)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them), including v1.1.0 durationMs; the RPC/JSON projection (RpcAgentEventProjector) carries durationMs too",
         "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.tool-execution-events-with-duration-and-tool-result-messages"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          },
           {
             "suite": "tests/PiSharp.WireSync.Tests",
             "file": "tests/PiSharp.WireSync.Tests/SettledTests.cs",
@@ -425,119 +1016,179 @@
           }
         ],
         "gaps": [
-          "v1.1.0 ToolExecutionEndEvent.durationMs reaches RPC/JSON output and tool renderers (ExtensionToolRenderContext.DurationMs), not extension event handlers."
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
         ]
       },
       "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
-    "agent_start": {
+    "model_select": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic model_select)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them) (SessionModelSelected: set and cycle only; restoring a session model emits none)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.thinking-level-select-and-model-select-payloads"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/BoundaryCases.cs",
+            "case": "boundary.switch-emits-no-restore-model-select"
+          }
+        ],
         "gaps": []
       },
       "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
-    "agent_end": {
+    "thinking_level_select": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.Observe (topic thinking_level_select)",
+        "hostEmission": "NativeSessionEventBinding (attached by NativeExtensionActivation on every attachment generation; Node extensions are registry owners through PiNodeOwner, so the same dispatch reaches them) (SessionThinkingLevelChanged)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.thinking-level-select-and-model-select-payloads"
+          }
+        ],
         "gaps": []
       },
       "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
       }
     },
-    "turn_start": {
+    "tool_call": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterToolCallHandler",
+        "hostEmission": "ExtensionAgentBinding.PreparedHooks (RegisteredExtensionToolHooks) into PreparedToolHooks",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
+            "case": "tool argument replacements compose and the first block stops dispatch"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredEventDispatchTests.cs",
+            "case": "registered tool calls retain exact replacements and first-block decisions"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeExtensionSessionCommandTests.cs",
+            "case": "native published call hooks cannot bypass final schema or native file policy"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "tool_result": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterToolResultHandler",
+        "hostEmission": "Same PreparedHooks path as tool_call",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
+            "case": "tool-result patches compose and content redaction clears stale structured content"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredEventDispatchTests.cs",
+            "case": "registered tool result patches preserve null and complete result admission"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredExtensionToolTests.cs",
+            "case": "registered result projection retains raw status and nullish source after-hook behavior"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "user_bash": {
+      "nativeEvidence": {
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionUserBashRegistry.RegisterUserBashHandler",
+        "hostEmission": "NativeExtensionActivation.UserBashHandler (CreateUserBashHandler) in the UserBashHost before local execution",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/NativeEventCases.cs",
+            "case": "native.user-bash-result-operations-invalid-and-failure"
+          }
+        ],
         "gaps": []
       },
       "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
       }
     },
-    "turn_end": {
+    "input": {
       "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
-        "gaps": []
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "registration": "IExtensionRegistry.RegisterInputHandler",
+        "hostEmission": "RegisteredExtensionInputAdmission through the profile runtime view and RPC input admission",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
+            "case": "input transforms compose, preserve nullish images and stop when handled"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredExtensionInputTests.cs",
+            "case": "registered input transforms reach actual durable checkpoint, provider history and reopen"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RegisteredInputRpcTests.cs",
+            "case": "rpc.registered-input-real-two-hook-transform-images-continue-durability-and-reopen"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it."
+        ]
       },
       "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
-      }
-    },
-    "message_start": {
-      "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
-        "gaps": []
-      },
-      "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
-      }
-    },
-    "message_update": {
-      "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
-        "gaps": []
-      },
-      "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
-      }
-    },
-    "message_end": {
-      "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
-        "gaps": []
-      },
-      "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
-      }
-    },
-    "tool_execution_start": {
-      "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
-        "gaps": []
-      },
-      "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
-      }
-    },
-    "tool_execution_update": {
-      "nativeEvidence": {
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "registration": "none",
-        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
-        "tests": [],
-        "gaps": []
-      },
-      "actualStatus": {
-        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
       }
     }
   }

@@ -40,7 +40,11 @@ internal interface IInteractiveExtensionHost
 
 /// <summary>What the extensions read from the mode without entering its loop (ctx.ui.getEditorText, the footer data, tui.terminal).</summary>
 internal sealed record InteractiveExtensionReads(Func<string> EditorText, Func<(int Columns, int Rows)> TerminalSize, Func<bool> ToolsExpanded,
-    Func<string?> GitBranch, Func<int> AvailableProviderCount);
+    Func<string?> GitBranch, Func<int> AvailableProviderCount)
+{
+    /// <summary>ctx.ui.setTheme(name): the mode switches its theme and returns <c>(success, error)</c>.</summary>
+    public Func<string, (bool Success, string? Error)>? SetTheme { get; init; }
+}
 
 /// <summary>The Node extension host behind <see cref="IInteractiveExtensionHost"/>. Renders are answered synchronously (the mode renders
 /// on its loop) with a bounded wait; a render or transform that fails or times out draws nothing or keeps the Markdown.</summary>
@@ -58,6 +62,14 @@ internal sealed class PiInteractiveExtensionHost(PiExtensionHost host) : IIntera
         host.ToolsExpanded = reads.ToolsExpanded;
         host.GitBranch = reads.GitBranch;
         host.AvailableProviderCount = reads.AvailableProviderCount;
+        if (reads.SetTheme is { } setTheme)
+            host.SetTheme = name =>
+            {
+                var (success, error) = setTheme(name);
+                var result = new JsonObject { ["success"] = success };
+                if (error is not null) result["error"] = error;
+                return result;
+            };
     }
 
     private static T? Bounded<T>(Func<CancellationToken, Task<T>> request, T? fallback)
