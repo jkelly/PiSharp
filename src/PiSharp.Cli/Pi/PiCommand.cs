@@ -182,7 +182,34 @@ internal static class PiCommand
         if (parsed.ListModels is { } search)
         {
             await Report(startupDiagnostics).ConfigureAwait(false);
-            var registry = await host.LiveRuntime.CreateModelRegistryAsync(token).ConfigureAwait(false);
+            // main.ts: --list-models lists the runtime's models after createAgentSessionRuntime loaded the extensions (no trust prompt in
+            // this pass): their providers join the registry, and a built-in llama.cpp extension that is not loaded registers none.
+            var listRuntime = host.LiveRuntime;
+            PiExtensionRun? listRun = null;
+            if (host.LoadExtensions is null)
+            {
+                var listTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
+                listRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, listTrusted, "print", false, null, token).ConfigureAwait(false);
+                PiSharp.Cli.Packages.PiResolvedPaths listPackages;
+                try
+                {
+                    listPackages = await new PiSharp.Cli.Packages.PiPackageManager(cwd, agentDir, home, PiSettings.Load(cwd, agentDir, listTrusted), host.GetEnvironment,
+                        host.PackageProcesses?.Invoke(err, err) ?? new() { Output = err, ErrorOutput = err }, PiBuiltinExtensions.Names)
+                        .ResolveAsync(cancellationToken: token).ConfigureAwait(false);
+                }
+                catch (PiSharp.Cli.Packages.PiPackageException) { listPackages = PiSharp.Cli.Packages.PiResolvedPaths.Empty; }
+                var listBuiltins = new PiBuiltinExtensions(PiBuiltinExtensions.Resolve(parsed.Extensions, listPackages, parsed.NoExtensions,
+                    parsed.NoMcp ? [PiBuiltinExtensions.Mcp] : [], listRun.Host?.Extensions ?? []).Enabled);
+                listRuntime = listRuntime with { LlamaProvider = () => listBuiltins.IsEnabled(PiBuiltinExtensions.Llama) };
+                if (listRun.Host is { } listHost)
+                {
+                    var configured = listRuntime.ConfigureRegistry;
+                    var authPath = listRuntime.AuthPath; var time = listRuntime.Time;
+                    listRuntime = listRuntime with { ConfigureRegistry = registry => { configured?.Invoke(registry); listHost.RegisterProviders(registry, authPath, time); listHost.RegisterVirtualModels(registry); } };
+                }
+            }
+            await using var listed = listRun;
+            var registry = await listRuntime.CreateModelRegistryAsync(token).ConfigureAwait(false);
             await PiSharp.Cli.Models.ModelListing.ListAsync(registry, search.Length == 0 ? null : search, console, err, cancellationToken: token).ConfigureAwait(false);
             await console.FlushAsync(token).ConfigureAwait(false);
             return 0;

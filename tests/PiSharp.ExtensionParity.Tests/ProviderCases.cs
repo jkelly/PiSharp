@@ -10,7 +10,29 @@ internal static partial class Program
         ("provider.classifier-and-image-providers-registered-by-an-extension", ClassifierAndImageProviders),
         ("provider.model-registry-complete-from-extension-code", CompleteFromExtension),
         ("provider.classifier-and-image-provider-without-api-key-needs-a-credential", KeylessClassifierAndImageProviders),
+        ("provider.list-models-lists-extension-providers", ListModelsWithExtensionProvider),
     ];
+
+    // main.ts: --list-models runs after createAgentSessionRuntime loaded the extensions, so an extension's provider is listed.
+    private static async Task ListModelsWithExtensionProvider()
+    {
+        using var sandbox = NodeSandbox("list-models");
+        sandbox.Vars["ROCKET_KEY"] = "rocket-secret";
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "rocket.ts"), """
+            export default function (pi: any) {
+              pi.registerProvider("rocketco", {
+                baseUrl: "https://rocket.invalid/v1", apiKey: "ROCKET_KEY", api: "openai-completions",
+                models: [{ id: "rocket-1", name: "Rocket 1", reasoning: false, input: ["text"], cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8000, maxTokens: 1000 }],
+              });
+            }
+            """);
+        var (code, stdout, stderr) = await sandbox.Run(["-e", extension, "--list-models", "rocket"]);
+        Equal(0, code, "exit; " + stderr);
+        Check(stdout.Contains("rocketco", StringComparison.Ordinal) && stdout.Contains("rocket-1", StringComparison.Ordinal), "the extension's model is listed: " + stdout + stderr);
+        (code, stdout, stderr) = await sandbox.Run(["--list-models", "rocket"]);
+        Equal(0, code, "exit without the extension; " + stderr);
+        Check(!stdout.Contains("rocketco", StringComparison.Ordinal), "without the extension the provider is not listed: " + stdout);
+    }
 
     // summarize.ts/qna.ts: an extension calls ctx.modelRegistry.complete() with ctx.model; the request streams through PiSharp's live route.
     private static async Task CompleteFromExtension()
