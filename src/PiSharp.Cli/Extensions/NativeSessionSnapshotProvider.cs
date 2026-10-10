@@ -14,6 +14,8 @@ internal sealed partial class NativeSessionSnapshotProvider : IExtensionSessionC
     private ReplaceableAgentSession? owner;
     internal Func<AgentSessionAttachment, PersistentAgentSession, CancellationToken, ValueTask<bool>>? BeforeSwitch { get; set; }
     internal Func<AgentSessionReplacement, ValueTask>? AfterSwitch { get; set; }
+    /// <summary>The interactive mode's link (null outside interactive mode): its extension session actions frame ctx.newSession/ctx.fork.</summary>
+    internal PiSharp.Cli.Interactive.Mode.InteractiveHostLink? InteractiveLink { get; set; }
     internal void Attach(ReplaceableAgentSession value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -244,7 +246,26 @@ internal sealed partial class NativeSessionSnapshotProvider : IExtensionSessionC
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,
                     context.OperationCancellationToken, context.ExtensionLifetimeCancellationToken, SessionCancellationToken);
                 var nativeRequest = new AgentSessionCreationRequest((AgentSessionCreationKind)request.Kind, request.EntryId, request.ParentSession);
-                var replaced = request.Setup is { } setup
+                // interactive-mode.ts commandContextActions: newSession clears the status indicator first; a failed newSession/fork is
+                // handleFatalRuntimeError; a fork that happened puts its selected text in the editor and shows "Forked to new session".
+                var interactive = provider.InteractiveLink?.ExtensionSessionActions;
+                var isNew = nativeRequest.Kind == AgentSessionCreationKind.New;
+                if (isNew) interactive?.NewSessionStarting();
+                AgentSessionReplacement? replaced;
+                try
+                {
+                    replaced = await CreateReplacementAsync().ConfigureAwait(false);
+                }
+                catch (Exception error) when (interactive is not null && error is not OperationCanceledException)
+                {
+                    interactive.Failed(isNew ? "Failed to create session" : "Failed to fork session", error);
+                    throw;
+                }
+                if (replaced is null) return null;
+                if (!isNew) interactive?.Forked(replaced.SelectedText, replaced.Current.Generation);
+                return new(new Scope(provider, host, replaced.Current, context,
+                    NativeSessionSnapshotProvider.Snapshot(replaced.Current), baseSessionToken), replaced.SelectedText);
+                async Task<AgentSessionReplacement?> CreateReplacementAsync() => request.Setup is { } setup
                     ? await host.CreateWithSetupAsync(attachment, nativeRequest,
                         (manager, setupToken) => setup(new NativeSessionSetupManagerAdapter(manager), setupToken), linked.Token,
                         validateStagedSnapshot is null ? null : (target, validationToken) =>
@@ -253,9 +274,6 @@ internal sealed partial class NativeSessionSnapshotProvider : IExtensionSessionC
                         validateStagedSnapshot is null ? null : (target, _, preflightToken) =>
                             validateStagedSnapshot(NativeSessionSnapshotProvider.Snapshot(target, checked(attachment.Generation + 1)), preflightToken),
                         linked.Token).ConfigureAwait(false);
-                if (replaced is null) return null;
-                return new(new Scope(provider, host, replaced.Current, context,
-                    NativeSessionSnapshotProvider.Snapshot(replaced.Current), baseSessionToken), replaced.SelectedText);
             }));
         }
         public ValueTask<ExtensionSessionCatalogPage> ListAsync(ExtensionSessionCatalogQuery query,

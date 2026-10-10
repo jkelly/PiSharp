@@ -629,6 +629,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation, mcpServers: mcpRegistrations).ConfigureAwait(false);
             else if (piExtensions is not null)
                 activation = await NativeExtensionActivation.LoadPiAsync(piExtensions, token, extensionUi, reportInputDiagnostic, mcpRegistrations).ConfigureAwait(false);
+            if (activation is not null && PiSharp.Cli.Pi.PiEntryOptions.Current?.Interactive is { } interactiveStartup) activation.ConnectInteractive(interactiveStartup.Host);
             // Pi provider request hooks (before_provider_request/headers, after_provider_response, provider_stream_event).
             if (liveSelection is not null && activation?.ProviderHttpHooks(liveSelection.Model) is { } providerHooks)
             {

@@ -42,6 +42,25 @@ internal sealed partial class InteractiveMode
                 footerDataProvider.GetAvailableProviderCount) { SetTheme = SetExtensionTheme });
     }
 
+    /// <summary>interactive-mode.ts bindCurrentSessionExtensions commandContextActions for every extension's ctx.newSession()/ctx.fork():
+    /// newSession clears the status indicator first; a fork that happened puts its selected text in the editor (once the forked
+    /// session shows) and shows "Forked to new session"; a failure of either is handleFatalRuntimeError ("Failed to create session",
+    /// "Failed to fork session").</summary>
+    private void ConnectExtensionSessionActions() => context.Startup.Host.ExtensionSessionActions = new(
+        () => context.Loop.Post(() => ClearStatusIndicator()),
+        (text, generation) => context.Loop.Post(() => Run(async () =>
+        {
+            if (generation > renderedGeneration)
+            {
+                var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                generationWaiters.Add((generation, done));
+                await done.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            }
+            editor.SetText(text ?? "");
+            ShowStatus("Forked to new session");
+        })),
+        (prefix, error) => context.Loop.Post(() => HandleFatalRuntimeError(prefix, error)));
+
     /// <summary>interactive-mode.ts createExtensionUIContext setTheme(name): the theme controller applies the theme (one that fails to
     /// load falls back to the system theme) and a theme that applied becomes the theme setting. The extension host asks from its own
     /// thread: the result is whether the theme loads, and the switch itself runs on the mode's loop.</summary>

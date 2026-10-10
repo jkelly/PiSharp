@@ -33,5 +33,36 @@ internal static class CloseoutCases
             Contains(File.ReadAllText(Path.Combine(pi.AgentDir, "settings.json")), "\"light\"", "a theme that failed is not saved");
             Equal(0, await pi.Quit(), "exit code");
         });
+        // interactive-mode.ts bindCurrentSessionExtensions commandContextActions.fork: a fork that happened puts the selected text in the
+        // editor and shows "Forked to new session"; a failed one is handleFatalRuntimeError ("Failed to fork session: <message>", exit 1).
+        yield return ("e2e.extensions.fork-sets-the-editor-and-a-failed-fork-is-fatal", async () =>
+        {
+            if (PiSharp.Compatibility.Node.Pi.PiNodeHost.FindNode(Environment.GetEnvironmentVariable) is null) throw new SkipCaseException("Node.js is not on PATH.");
+            await using var pi = new InteractiveHarness("extension-fork");
+            foreach (var name in new[] { "SystemRoot", "PISHARP_NODE" })
+                if (Environment.GetEnvironmentVariable(name) is { } value) pi.Vars[name] = value;
+            var extension = pi.Write("project/fork.ts", """
+                export default function (pi: any) {
+                  pi.registerCommand("fk", { description: "Fork probe", handler: async (args: string, ctx: any) => {
+                    const user = ctx.sessionManager.getBranch().find((entry: any) => entry.type === "message" && entry.message.role === "user");
+                    await ctx.fork(args === "bogus" ? "no-such-entry" : user.id);
+                  } });
+                }
+                """);
+            pi.Start([.. Regular, "-e", extension]);
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("first question");
+            await pi.WaitFor("Hello from the fake model.");
+            pi.Type("/fk"); await Task.Delay(300); pi.Type(Enter);
+            var screen = await pi.WaitFor("Forked to new session");
+            Contains(screen, "first question", "the editor holds the forked user message");
+            pi.Terminal.Send("\u0015"); await Task.Delay(100); // clear the editor
+            pi.Type("/fk bogus"); await Task.Delay(300); pi.Type(Enter);
+            Equal(1, await pi.Exit(), "a failed fork ends the run");
+            // recordCrash("fatal_error", error): the crash log keeps the error (the regular renderer stops before the error renders).
+            var crashes = Path.Combine(pi.AgentDir, "crashes.json");
+            Check(File.Exists(crashes), "crash recorded");
+            Contains(File.ReadAllText(crashes), "Invalid entry ID for forking", "the crash names the fork error");
+        });
     }
 }

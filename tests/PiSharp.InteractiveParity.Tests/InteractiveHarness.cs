@@ -50,6 +50,9 @@ internal sealed class InteractiveHarness : IAsyncDisposable
             ProductVersion = ProductVersion, NuGetBaseUrl = "https://nuget.test/v3-flatcontainer", VersionCheckHttp = new HttpMessageInvoker(new Feed(this)),
             ParseChangelogEntries = () => [],
             GetEnvironment = name => Vars.GetValueOrDefault(name),
+            // Crash records go to this run's agent directory, never the user's.
+            RecordCrashImpl = (kind, error, sessionFile, cwd) => PiSharp.Cli.Diagnostics.CrashReporting.RecordCrash(kind, error, sessionFile, cwd,
+                Path.Combine(AgentDir, "crashes.json")),
             Login = null
         };
         return Configure?.Invoke(configured) ?? configured;
