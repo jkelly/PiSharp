@@ -1,7 +1,7 @@
 name: macOS
 
-# Runs the release workflow's offline test suites on Apple Silicon (macos-14, arm64), plus the Tools suite (file tools and the
-# SkiaSharp image library), then packs every package and smoke-tests the installed PiSharp.Cli tool. Releases still build on
+# Runs the release workflow's offline test suites on Apple Silicon (macos-14, arm64), then packs every package and smoke-tests
+# the installed PiSharp.Cli tool (PiSharp.Tools.Tests is left out: its process and shell fixtures are Windows-only). Releases still build on
 # Linux (release.yml); this checks that what they ship works on a Mac. Each suite is its own job so one failure hides no other.
 on:
   pull_request:
@@ -43,7 +43,6 @@ jobs:
           - PiSharp.SessionParity.Tests
           - PiSharp.InteractiveParity.Tests
           - PiSharp.ExtensionParity.Tests
-          - PiSharp.Tools.Tests
     steps:
       - uses: actions/checkout@v5
 
@@ -56,9 +55,12 @@ jobs:
         with:
           node-version: '22'
 
+      # macOS's TMPDIR (/var/folders/…) is a symlink to /private/var/folders/…. A Mac process's working directory is always the
+      # resolved path (getcwd), in Pi and PiSharp alike, so the suites' temp workspaces use it too.
       - name: Run ${{ matrix.suite }}
         run: |
           uname -m
+          export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"
           dotnet run --project "tests/${{ matrix.suite }}/${{ matrix.suite }}.csproj" -c Release \
             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
             -- --report "$RUNNER_TEMP/${{ matrix.suite }}.json"
