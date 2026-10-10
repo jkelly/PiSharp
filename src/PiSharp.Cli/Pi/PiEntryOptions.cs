@@ -94,4 +94,8 @@ internal sealed record PiEntryOptions
     internal string ExtensionMode { get; init; } = "print";
     /// <summary>Interactive mode inputs (IMPL-I): directories, resources and the live host link.</summary>
     internal PiSharp.Cli.Interactive.Mode.InteractiveStartup? Interactive { get; init; }
+    /// <summary>agent-session.ts setSteeringMode, setFollowUpMode, setAutoCompactionEnabled and setAutoRetryEnabled: the global setting
+    /// (<c>steeringMode</c>, <c>followUpMode</c>, <c>compaction.enabled</c>, <c>retry.enabled</c>) the settings manager saves. Null in
+    /// interactive mode, which saves through its own settings.</summary>
+    internal Action<string, System.Text.Json.Nodes.JsonNode>? PersistGlobalSetting { get; init; }
 }

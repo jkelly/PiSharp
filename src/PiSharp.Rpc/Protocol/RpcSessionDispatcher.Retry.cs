@@ -18,8 +18,9 @@ public sealed partial class RpcSessionDispatcher
             _ = RpcCommandCodec.Success(command, null, _options);
         }
         finally { _transitions.Release(); }
-        if (command.Type == "abort_retry") await session.AbortRetryAsync().ConfigureAwait(false);
-        else if (attachment is null) await session.SetAutoRetryEnabledAsync(command.Mode == "enabled", token).ConfigureAwait(false);
+        if (command.Type == "abort_retry") { await session.AbortRetryAsync().ConfigureAwait(false); return null; }
+        GlobalSettingChanged?.Invoke("retry.enabled", command.Mode == "enabled");
+        if (attachment is null) await session.SetAutoRetryEnabledAsync(command.Mode == "enabled", token).ConfigureAwait(false);
         else await _sessionOwner!.SetAutoRetryEnabledAsync(attachment, command.Mode == "enabled", token).ConfigureAwait(false);
         return null;
     }

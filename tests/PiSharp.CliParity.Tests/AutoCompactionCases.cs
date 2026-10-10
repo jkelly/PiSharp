@@ -32,6 +32,30 @@ internal static partial class Program
             responses = await RpcSequence(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], """{"id":"1","type":"get_state"}""");
             Equal(false, responses[0]["data"]!["autoCompactionEnabled"]!.GetValue<bool>(), "compaction.enabled false");
         }),
+        // agent-session.ts setSteeringMode/setFollowUpMode/setAutoCompactionEnabled/setAutoRetryEnabled save the global settings
+        // (settings-manager.ts: globalSettings.<field>, markModified, save), so RPC changes survive the process; other fields stay.
+        ("auto-compaction.rpc-setters-save-the-global-settings", async () =>
+        {
+            using var sandbox = new Sandbox("rpc-setters-persist");
+            var settingsPath = Path.Combine(sandbox.AgentDir, "settings.json");
+            sandbox.Write(settingsPath, """{"theme":"light","compaction":{"keepRecentTokens":5}}""");
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"],
+                """{"id":"1","type":"set_auto_compaction","enabled":false}""",
+                """{"id":"2","type":"set_auto_retry","enabled":false}""",
+                """{"id":"3","type":"set_steering_mode","mode":"all"}""",
+                """{"id":"4","type":"set_follow_up_mode","mode":"all"}""");
+            Check(responses.All(response => response["success"]!.GetValue<bool>()), "every command succeeds: " + string.Join("\n", responses.Select(r => r.ToJsonString())));
+            var saved = JsonNode.Parse(File.ReadAllText(settingsPath))!;
+            Equal(false, saved["compaction"]!["enabled"]!.GetValue<bool>(), "compaction.enabled saved");
+            Equal(5, saved["compaction"]!["keepRecentTokens"]!.GetValue<int>(), "other compaction fields kept");
+            Equal(false, saved["retry"]!["enabled"]!.GetValue<bool>(), "retry.enabled saved");
+            Equal("all", saved["steeringMode"]!.GetValue<string>(), "steeringMode saved");
+            Equal("all", saved["followUpMode"]!.GetValue<string>(), "followUpMode saved");
+            Equal("light", saved["theme"]!.GetValue<string>(), "unrelated settings kept");
+            responses = await RpcSequence(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], """{"id":"1","type":"get_state"}""");
+            Equal(false, responses[0]["data"]!["autoCompactionEnabled"]!.GetValue<bool>(), "the next process reads the saved setting");
+            Equal("all", responses[0]["data"]!["steeringMode"]!.GetValue<string>(), "the next process reads the saved steering mode");
+        }),
         ("auto-compaction.rpc-threshold-follows-the-current-model-window", async () =>
         {
             using var sandbox = new Sandbox("auto-compaction-window");

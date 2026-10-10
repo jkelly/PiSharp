@@ -452,6 +452,9 @@ internal static class PiCommand
             Home = Path.GetFullPath(home)
         };
         var trustedDirectories = new Dictionary<string, bool>(PiPaths.Comparer) { [Path.GetFullPath(sessionCwd)] = projectTrusted };
+        // agent-session.ts: the session's queue-mode and auto-compaction/retry setters save the global settings through the settings
+        // manager (the interactive mode saves through its own settings).
+        var settingsWriter = appMode == PiAppMode.Interactive ? null : new PiSharp.Cli.Interactive.Mode.InteractiveSettings(sessionCwd, agentDir, projectTrusted, host.GetEnvironment);
         var options = new PiEntryOptions
         {
             ToolPolicy = toolPolicy, Settings = startupSnapshot, Selection = selection, LiveRuntime = runtime,
@@ -471,6 +474,16 @@ internal static class PiCommand
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
             Extensions = extensionRun?.Host, ExtensionMode = extensionMode, BuiltinExtensions = builtins,
+            PersistGlobalSetting = settingsWriter is null ? null : (key, value) =>
+            {
+                switch (key)
+                {
+                    case "steeringMode": settingsWriter.SetSteeringMode(value.GetValue<string>()); break;
+                    case "followUpMode": settingsWriter.SetFollowUpMode(value.GetValue<string>()); break;
+                    case "compaction.enabled": settingsWriter.SetCompactionEnabled(value.GetValue<bool>()); break;
+                    case "retry.enabled": settingsWriter.SetRetryEnabled(value.GetValue<bool>()); break;
+                }
+            },
             Interactive = appMode == PiAppMode.Interactive ? new(agentDir, home, sessionCwd, sessionDir, sessionDir is null, resources, projectTrusted, plan.Mode) : null
         };
         var sessionArgs = SessionArguments(plan, parsed);
@@ -498,6 +511,7 @@ internal static class PiCommand
                 {
                     var code = await RpcSessionCommand.RunWithPresentationAsync(["session", "rpc", .. sessionArgs], input, output, err, null!, runToken,
                         userShutdown: userShutdown, mcpHost: mcpHost, javaScriptInput: true).ConfigureAwait(false);
+                    if (settingsWriter is not null) await settingsWriter.FlushAsync().ConfigureAwait(false);
                     return signals?.Exit(code) ?? code;
                 }
             }
@@ -511,6 +525,7 @@ internal static class PiCommand
             default:
             {
                 var code = await PiPrintMode.RunAsync(["session", "rpc", .. sessionArgs], appMode == PiAppMode.Json, plan, options, host, mcpHost, runToken, userShutdown).ConfigureAwait(false);
+                if (settingsWriter is not null) await settingsWriter.FlushAsync().ConfigureAwait(false);
                 return signals?.Exit(code) ?? code;
             }
         }

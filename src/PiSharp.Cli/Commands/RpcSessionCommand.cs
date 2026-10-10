@@ -416,6 +416,7 @@ public static class RpcSessionCommand
             }
             // sdk.ts/agent-session.ts: every mode's session starts with auto-compaction set to compaction.enabled (default true).
             if (pi is not null) await dispatcher.ConfigureAutoCompactionAsync(CompactionEnabled(settings), cancellationToken).ConfigureAwait(false);
+            if (pi?.PersistGlobalSetting is { } persistSetting) dispatcher.GlobalSettingChanged = persistSetting;
             // IMPL-I: the interactive mode reads the live session for features the RPC protocol does not carry.
             var publishedProfile = profile; var publishedSession = session;
             pi?.Interactive?.Host.Publish(() => publishedProfile.Sessions?.Current.Session ?? publishedSession, publishedProfile);

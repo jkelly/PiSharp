@@ -116,6 +116,10 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     /// runs when the switch does not happen (an extension veto), so a cancelled switch leaves the path as it was.</summary>
     private readonly Func<string, CancellationToken, ValueTask<Func<ValueTask>?>>? _prepareSessionPath;
     private readonly Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? _compactionSettings;
+    /// <summary>agent-session.ts setSteeringMode, setFollowUpMode, setAutoCompactionEnabled and setAutoRetryEnabled save the global
+    /// setting (<c>steeringMode</c>, <c>followUpMode</c>, <c>compaction.enabled</c>, <c>retry.enabled</c>) through the settings manager;
+    /// the host persists each accepted change here.</summary>
+    public Action<string, System.Text.Json.Nodes.JsonNode>? GlobalSettingChanged { get; set; }
     /// <summary>The definition of a model: the startup definitions, then the host's current runtime models.</summary>
     private bool TryGetModel(ModelDescriptor model, out JsonData wire)
     {
@@ -528,6 +532,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                     if (command.Type == "set_steering_mode") _session.SteeringMode = mode; else _session.FollowUpMode = mode;
                 }
                 finally { _transitions.Release(); }
+                GlobalSettingChanged?.Invoke(command.Type == "set_steering_mode" ? "steeringMode" : "followUpMode", command.Mode == "all" ? "all" : "one-at-a-time");
                 data = null; break;
             case "get_state": data = State(); break;
             case "set_auto_retry": case "abort_retry":

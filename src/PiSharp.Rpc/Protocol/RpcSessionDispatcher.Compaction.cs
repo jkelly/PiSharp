@@ -24,6 +24,7 @@ public sealed partial class RpcSessionDispatcher
                 ? "Automatic summary configuration generation is stale." : "Summary session generation is stale.");
         // agent-session.ts setAutoCompactionEnabled: the compaction.enabled setting; every check then reads the current model's
         // settings and window (_checkCompaction, _runAutoCompaction), so the toggle reads neither.
+        if (upstreamToggle) GlobalSettingChanged?.Invoke("compaction.enabled", command.Mode == "enabled");
         if (upstreamToggle && _compactionSettings is not null)
         {
             _ = RpcCommandCodec.Success(command, null, _options);
