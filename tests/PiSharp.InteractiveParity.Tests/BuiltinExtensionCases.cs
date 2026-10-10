@@ -73,14 +73,22 @@ internal static class BuiltinExtensionCases
             pi.Start(Regular);
             await pi.WaitFor("escape interrupt");
             await pi.WaitUntil(text => text.Contains("claude-sonnet-4-5", StringComparison.Ordinal), "footer");
-            pi.Type("/l");
-            await pi.WaitFor("Configure provider authentication");
+            // The editor's autocomplete starts once the session's commands are read: type again until the list shows.
+            async Task Complete(string typed, string expected)
+            {
+                for (var attempt = 0; ; attempt++)
+                {
+                    pi.Type(""); pi.Type(typed);
+                    try { await pi.WaitFor(expected, 5_000); return; }
+                    catch (TimeoutException) when (attempt < 5) { }
+                }
+            }
+            await Complete("/l", "Configure provider authentication");
             Check(!pi.Terminal.Text.Contains("Manage llama.cpp router models", StringComparison.Ordinal), "no /llama completion:\n" + pi.Terminal.Text);
             pi.Type("\u001b");
             await Task.Delay(100);
             pi.Type("\u0015");
-            pi.Type("/m");
-            await pi.WaitFor("Select model (opens selector UI)");
+            await Complete("/m", "Select model (opens selector UI)");
             Check(!pi.Terminal.Text.Contains("Manage MCP servers", StringComparison.Ordinal), "no /mcp completion:\n" + pi.Terminal.Text);
             pi.Type("\u001b");
             await Task.Delay(100);
