@@ -35,12 +35,11 @@ internal static class AnthropicMessagesSimpleContextEstimator
                 }
                 latestPrefix = Math.Max(latestPrefix, timestamp);
             }
-            var trailing = 0;
+            // estimateContextTokens sums JavaScript numbers: a fractional usage count stays a fraction (tokens = usageTokens + trailingTokens).
+            var trailing = 0d;
             for (var i = last is { } index ? index + 1 : 0; i < messages.Length; i++)
-            { token.ThrowIfCancellationRequested(); trailing = checked(trailing + MessageTokens(messages[i].WireBody.Value, options)); }
-            // A usage count may be a fraction (Pi keeps the JavaScript number); the integer estimate rounds it up to whole tokens.
-            var whole = checked((int)Math.Ceiling(usageTokens));
-            return new(checked(whole + trailing), whole, trailing, last);
+            { token.ThrowIfCancellationRequested(); trailing += MessageTokens(messages[i].WireBody.Value, options); }
+            return last is null ? new(trailing, 0, trailing, null) : new(usageTokens + trailing, usageTokens, trailing, last);
         }
         catch (EcmaScriptJsonProjectionException) { throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript); }
         catch (OverflowException) { throw Fail(AnthropicMessagesSimpleFailure.ResourceLimit); }

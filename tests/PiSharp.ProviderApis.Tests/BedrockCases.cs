@@ -167,9 +167,22 @@ internal static partial class Program
         JsonSame("""
             {"role":"assistant","content":[{"type":"thinking","thinking":"think","thinkingSignature":"sig"},{"type":"text","text":"Hello"},{"type":"toolCall","id":"t1","name":"read","arguments":{"path":"a.txt"}}],
              "api":"bedrock-converse-stream","provider":"amazon-bedrock","model":"anthropic.claude-sonnet-4-5-20250929-v1:0",
-             "usage":{"input":100,"output":50,"cacheRead":10,"cacheWrite":20,"cacheWrite1h":20,"totalTokens":180,"cost":{"input":0.0003,"output":0.00075,"cacheRead":0.000003,"cacheWrite":0.00012,"total":0.001173}},
+             "usage":{"input":100,"output":50,"cacheRead":10,"cacheWrite":20,"cacheWrite1h":20,"totalTokens":180,"cost":{"input":0.00030000000000000003,"output":0.00075,"cacheRead":0.000003,"cacheWrite":0.00012,"total":0.0011730000000000002}},
              "stopReason":"toolUse","timestamp":77,"rawStopReason":"tool_use"}
             """, Wire(done.Message), "done message");
+        // models.ts calculateCost runs in binary64: (3 / 1000000) * 100 is 0.00030000000000000003 and the total sums those Numbers
+        // (formerly decimal arithmetic wrote 0.0003 and 0.001173). Expected costs computed by calculateCost in Node 22.
+        Check(Wire(done.Message).Contains("\"cost\":{\"input\":0.00030000000000000003,\"output\":0.00075,\"cacheRead\":0.000003,\"cacheWrite\":0.00012,\"total\":0.0011730000000000002}", StringComparison.Ordinal),
+            "binary64 cost text: " + Wire(done.Message));
+        // Fractional counts with a 1h share of the cache writes, priced in binary64 as Pi does.
+        var fraction = Bedrock(SonnetRow);
+        fraction.Http.OnUrl("https://", _ => EventStream(messages: [EventMessage("messageStart", """{"role":"assistant"}"""),
+            EventMessage("contentBlockDelta", """{"contentBlockIndex":0,"delta":{"text":"x"}}"""), EventMessage("contentBlockStop", """{"contentBlockIndex":0}"""),
+            EventMessage("messageStop", """{"stopReason":"end_turn"}"""),
+            EventMessage("metadata", """{"usage":{"inputTokens":3.5,"outputTokens":2.75,"cacheReadInputTokens":1.25,"cacheWriteInputTokens":7,"cacheDetails":[{"inputTokens":2.5,"ttl":"1h"}],"totalTokens":14.5}}""")]));
+        var fractional = (StreamDone)(await Collect(fraction.Transport, new(fraction.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 1)))[^1];
+        Check(Wire(fractional.Message).Contains("\"usage\":{\"input\":3.5,\"output\":2.75,\"cacheRead\":1.25,\"cacheWrite\":7,\"totalTokens\":14.5,\"cost\":{\"input\":0.000010500000000000001,\"output\":0.00004125,\"cacheRead\":3.75e-7,\"cacheWrite\":0.000031875,\"total\":0.00008400000000000001},\"cacheWrite1h\":2.5}", StringComparison.Ordinal),
+            "fractional binary64 cost: " + Wire(fractional.Message));
         // Stop reasons: end_turn/stop_sequence stop, max_tokens/model_context_window_exceeded length.
         foreach (var (raw, expected) in new[] { ("end_turn", StopReason.Stop), ("stop_sequence", StopReason.Stop), ("max_tokens", StopReason.Length), ("model_context_window_exceeded", StopReason.Length) })
         {

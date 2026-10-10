@@ -75,7 +75,7 @@ public sealed record ToolResult
     }
     public bool HasProperty(string name) => _properties.ContainsKey(name);
     public JsonData? Property(string name) => !_properties.TryGetValue(name, out var value) ? null :
-        value is ImmutableArray<TextContent> content ? ToolResultValueCodec.ContentJson(content) : (JsonData?)value;
+        value is ImmutableArray<TextContent> content ? ToolResultValueCodec.ContentJson(content, loneSurrogates: true) : (JsonData?)value;
     public ToolResult WithProperty(string name, JsonData? value) => new(value is null ? _properties.Remove(name) : _properties.SetItem(name, value)) { Failure = Failure };
     /// <summary>Admits a complete strict JSON object; preserves all owned property values and presence.</summary>
     public static ToolResult FromJson(JsonData value, ToolResultValueOptions? options = null) => ToolResultValueCodec.Read(value, options);
@@ -123,7 +123,7 @@ public sealed record ToolResultMessage
     /// <summary>One owned canonical text/image array, shared with the legacy text accessor.</summary>
     public JsonData ContentValue
     {
-        get => _content is ImmutableArray<TextContent> text ? ToolResultValueCodec.ContentJson(text) : (JsonData)_content;
+        get => _content is ImmutableArray<TextContent> text ? ToolResultValueCodec.ContentJson(text, loneSurrogates: true) : (JsonData)_content;
         init => _content = ToolResultValueCodec.ExecutionContent(ToolResultValueCodec.AdmitContent(value));
     }
     public JsonData Details { get => _details; init { _details = value; _hasDetails = true; } }

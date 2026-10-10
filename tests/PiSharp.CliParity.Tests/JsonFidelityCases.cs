@@ -98,6 +98,65 @@ internal static partial class Program
                 Equal(expected, pick(sandbox.Requests[0].Json), api + " request");
             }
         }),
+        // JSON.parse keeps a lone surrogate in an object name too, and JSON.stringify writes it back escaped (formerly it became U+FFFD):
+        // a streamed tool call's argument names reach the tool events, the session line and the replay unchanged. The write tool's
+        // TypeBox schema admits the extra property.
+        ("json-fidelity.lone-surrogate-names-travel-through-rpc-tool-arguments-and-session", async () =>
+        {
+            using var sandbox = new Sandbox("json-fidelity-names");
+            const string arguments = "{\"path\":\"a.txt\",\"content\":\"x\",\"k\\ud800\":[\"v\\udc00\",{\"\\udfff\":1}]}";
+            sandbox.Respond = (_, index) => index == 0 ? AnthropicStream(ToolUseBlock(0, "toolu_n", arguments), "tool_use") : AnthropicText("done");
+            var (exit, frames, stderr) = await RunRpcPrompt(sandbox, "{\"id\":\"p\",\"type\":\"prompt\",\"message\":\"go\",\"x\\ud800\":1}");
+            Equal(0, exit, "rpc exit; " + stderr + "\n" + string.Join("\n", frames));
+            Check(frames.Contains("{\"type\":\"tool_execution_start\",\"toolCallId\":\"toolu_n\",\"toolName\":\"write\",\"args\":" + arguments + "}"),
+                "tool_execution_start: " + string.Join("\n", frames));
+            Equal(2, sandbox.Requests.Count, "requests; " + string.Join("\n", frames));
+            Equal("x", File.ReadAllText(Path.Combine(sandbox.Cwd, "a.txt")), "written");
+            Equal("""[{"role":"user","content":[{"type":"text","text":"go"}]},{"role":"assistant","content":[{"type":"tool_use","id":"toolu_n","name":"write","input":{"path":"a.txt","content":"x","k\ud800":["v\udc00",{"\udfff":1}]}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_n","content":"Successfully wrote to a.txt","is_error":false,"cache_control":{"type":"ephemeral"}}]}]""",
+                RequestMessages(sandbox.Requests[1]), "second request");
+            var session = File.ReadAllText(sandbox.SessionFiles().Single());
+            Check(session.Contains("\"arguments\":" + arguments + "}],", StringComparison.Ordinal), "tool call line: " + session);
+            await Reopen(sandbox, session,
+                """[{"role":"user","content":[{"type":"text","text":"go"}]},{"role":"assistant","content":[{"type":"tool_use","id":"toolu_n","name":"write","input":{"path":"a.txt","content":"x","k\ud800":["v\udc00",{"\udfff":1}]}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_n","content":"Successfully wrote to a.txt","is_error":false}]},{"role":"assistant","content":[{"type":"text","text":"done"}]},{"role":"user","content":[{"type":"text","text":"more","cache_control":{"type":"ephemeral"}}]}]""");
+        }),
+        // Each API's converter replays argument names holding lone surrogates as JSON.stringify writes them, whether stringified into a
+        // string (openai-completions, openai-responses, mistral-conversations) or sent as an object (google-generative-ai, anthropic-messages).
+        ("json-fidelity.each-api-replays-lone-surrogate-names-as-pi-does", async () =>
+        {
+            using var sandbox = new Sandbox("json-fidelity-name-replay");
+            const string stringified = "\"{\\\"path\\\":\\\"a.txt\\\",\\\"k\\\\ud800\\\":[\\\"v\\\\udc00\\\",{\\\"\\\\udfff\\\":1}]}\"";
+            const string objectForm = "{\"path\":\"a.txt\",\"k\\ud800\":[\"v\\udc00\",{\"\\udfff\":1}]}";
+            (string Api, Func<JsonElement, string> Pick, string Expected)[] apis =
+            [
+                ("openai-completions", body => Skip(body.GetProperty("messages")),
+                    "\"function\":{\"name\":\"write\",\"arguments\":" + stringified + "}"),
+                ("openai-responses", body => Skip(body.GetProperty("input")),
+                    "{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"write\",\"arguments\":" + stringified + "}"),
+                ("google-generative-ai", body => PiSharp.AI.StreamingJson.JsonReformat(body.GetProperty("contents").GetRawText()),
+                    "{\"functionCall\":{\"args\":" + objectForm + ",\"name\":\"write\"}}"),
+                ("mistral-conversations", body => Skip(body.GetProperty("messages")),
+                    "\"function\":{\"name\":\"write\",\"arguments\":" + stringified + "}"),
+                ("anthropic-messages", body => PiSharp.AI.StreamingJson.JsonReformat(body.GetProperty("messages").GetRawText()),
+                    "{\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"write\",\"input\":" + objectForm + "}"),
+            ];
+            sandbox.Write(Path.Combine(sandbox.AgentDir, "models.json"), "{\"providers\":{" + string.Join(",", apis.Select(api =>
+                "\"" + Provider(api.Api) + "\":{\"baseUrl\":\"https://replay.test\",\"api\":\"" + api.Api + "\",\"apiKey\":\"k\",\"models\":[{\"id\":\"m\"}]}")) + "}}");
+            sandbox.Respond = (_, _) => new(System.Net.HttpStatusCode.BadRequest) { Content = new StringContent("{\"error\":{\"message\":\"fixture\"}}", Encoding.UTF8, "application/json") };
+            const string usage = "{\"input\":1,\"output\":1,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":2,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}}";
+            foreach (var (api, pick, expected) in apis)
+            {
+                var file = sandbox.Write("names-" + api + ".jsonl", string.Join("\n",
+                    "{\"type\":\"session\",\"version\":3,\"id\":\"seed\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"cwd\":" + JsonSerializer.Serialize(sandbox.Cwd) + "}",
+                    "{\"type\":\"message\",\"id\":\"u1\",\"parentId\":null,\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hi\"}],\"timestamp\":1}}",
+                    "{\"type\":\"message\",\"id\":\"a1\",\"parentId\":\"u1\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"toolCall\",\"id\":\"call_1\",\"name\":\"write\",\"arguments\":" + objectForm + "}],\"api\":\"" + api + "\",\"provider\":\"" + Provider(api) + "\",\"model\":\"m\",\"usage\":" + usage + ",\"stopReason\":\"toolUse\",\"timestamp\":2}}",
+                    "{\"type\":\"message\",\"id\":\"r1\",\"parentId\":\"a1\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":{\"role\":\"toolResult\",\"toolCallId\":\"call_1\",\"toolName\":\"write\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"isError\":false,\"timestamp\":3}}") + "\n");
+                lock (sandbox.Requests) sandbox.Requests.Clear();
+                var (_, _, stderr) = await sandbox.Run(["-p", "--provider", Provider(api), "--model", "m", "--tools", "write", "--session", file, "more"]);
+                Check(sandbox.Requests.Count >= 1, api + ": no request; " + stderr);
+                var actual = pick(sandbox.Requests[0].Json);
+                Check(actual.Contains(expected, StringComparison.Ordinal), api + " request: " + actual);
+            }
+        }),
         // A provider may report fractional token counts: Pi keeps each as the JavaScript number it is, prices it with calculateCost in
         // binary64 and writes it as JSON.stringify does (formerly the response failed, and Bedrock read it as 0). Captured with `pi -p` per
         // API against the same fake responses and rates.

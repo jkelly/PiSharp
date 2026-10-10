@@ -30,7 +30,7 @@ public sealed class AnthropicRequestException : Exception
 }
 public sealed record AnthropicMessagesRequestOptions(
     int MaximumTokens, bool ModelReasoning = false, bool ModelSupportsImages = true,
-    bool? ThinkingEnabled = null, bool ForceAdaptiveThinking = false, int ThinkingBudgetTokens = 1024,
+    bool? ThinkingEnabled = null, bool ForceAdaptiveThinking = false, double ThinkingBudgetTokens = 1024,
     string ThinkingDisplay = "summarized", string? Effort = null, bool SupportsThinkingOff = true,
     decimal? Temperature = null, bool SupportsTemperature = true, bool AllowEmptyThinkingSignatures = false,
     AnthropicCacheRetention CacheRetention = AnthropicCacheRetention.Short, bool SupportsLongCacheRetention = true,
@@ -53,7 +53,6 @@ public sealed record AnthropicMessagesRequestOptions(
 public sealed class AnthropicMessagesRequestProjector
 {
     private readonly AnthropicMessagesRequestOptions _options;
-    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, TypeInfoResolver = JsonUtf16.Resolver, MaxDepth = 2 * JsonData.MaximumDepth };
     private static readonly string[] ClaudeCodeNames = ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "AskUserQuestion",
         "EnterPlanMode", "ExitPlanMode", "KillShell", "NotebookEdit", "Skill", "Task", "TaskOutput", "TodoWrite", "WebFetch", "WebSearch"];
     private static readonly string[] UnsupportedStrictKeys = ["$ref", "$defs", "definitions", "allOf", "oneOf", "patternProperties",
@@ -65,7 +64,7 @@ public sealed class AnthropicMessagesRequestProjector
     public AnthropicMessagesRequestProjector(AnthropicMessagesRequestOptions options)
     {
         ArgumentNullException.ThrowIfNull(options); _options = options;
-        if (options.MaximumTokens <= 0 || options.ThinkingBudgetTokens < 0 || options.MaximumMessages <= 0 ||
+        if (options.MaximumTokens <= 0 || !(options.ThinkingBudgetTokens >= 0) || double.IsInfinity(options.ThinkingBudgetTokens) || options.MaximumMessages <= 0 ||
             options.MaximumEntryCharacters <= 0 || options.MaximumInputCharacters <= 0 || options.MaximumContentBlocks <= 0 ||
             options.MaximumDeclarations <= 0 || options.MaximumActiveTools <= 0 || options.MaximumProjectedMessages <= 0 ||
             options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || options.MaximumOutputCharacters < 2 || options.MaximumOutputBytes < 2 ||
@@ -229,7 +228,7 @@ public sealed class AnthropicMessagesRequestProjector
             {
                 root["thinking"] = options.ForceAdaptiveThinking
                     ? new JsonObject { ["type"] = "adaptive", ["display"] = options.ThinkingDisplay }
-                    : new JsonObject { ["type"] = "enabled", ["budget_tokens"] = options.ThinkingBudgetTokens == 0 ? 1024 : options.ThinkingBudgetTokens, ["display"] = options.ThinkingDisplay };
+                    : new JsonObject { ["type"] = "enabled", ["budget_tokens"] = JsonNumber.Node(options.ThinkingBudgetTokens == 0 ? 1024 : options.ThinkingBudgetTokens), ["display"] = options.ThinkingDisplay };
                 if (options.ForceAdaptiveThinking && options.Effort is not null) root["output_config"] = new JsonObject { ["effort"] = options.Effort };
             }
             else if (options.ModelReasoning && options.ThinkingEnabled == false && options.SupportsThinkingOff) root["thinking"] = new JsonObject { ["type"] = "disabled" };
@@ -255,7 +254,7 @@ public sealed class AnthropicMessagesRequestProjector
                 foreach (var model in options.AllowedFallbackModels) { token.ThrowIfCancellationRequested(); if (string.IsNullOrWhiteSpace(model)) throw Fail(AnthropicRequestFailure.UnsupportedContent); Unicode(model); fallbacks.Add(new JsonObject { ["model"] = model }); }
                 root["fallbacks"] = fallbacks;
             }
-            var raw = root.ToJsonString(OutputJson);
+            var raw = JsonUtf16.ToJsonString(root, JavaScriptEncoder.UnsafeRelaxedJsonEscaping);
             if (raw.Length > options.MaximumOutputCharacters || Encoding.UTF8.GetByteCount(raw) > options.MaximumOutputBytes) throw Fail(AnthropicRequestFailure.ResourceLimit);
             var owned = JsonData.Parse(raw); CheckJson(owned.Value, 0); token.ThrowIfCancellationRequested(); return owned;
         }
@@ -537,7 +536,7 @@ public sealed class AnthropicMessagesRequestProjector
         }
         private void Charge(JsonNode node)
         {
-            var raw = node.ToJsonString(OutputJson); _retainedCharacters += raw.Length; _retainedBytes += Encoding.UTF8.GetByteCount(raw);
+            var raw = JsonUtf16.ToJsonString(node, JavaScriptEncoder.UnsafeRelaxedJsonEscaping); _retainedCharacters += raw.Length; _retainedBytes += Encoding.UTF8.GetByteCount(raw);
             if (_retainedCharacters > options.MaximumOutputCharacters || _retainedBytes > options.MaximumOutputBytes) throw Fail(AnthropicRequestFailure.ResourceLimit);
         }
         private void MakeStrict(JsonNode? node)
@@ -573,7 +572,7 @@ public sealed class AnthropicMessagesRequestProjector
             if (value.ValueKind is JsonValueKind.Array or JsonValueKind.Object)
             {
                 if (++depth > options.MaximumJsonDepth) throw Fail(AnthropicRequestFailure.ResourceLimit);
-                if (value.ValueKind == JsonValueKind.Object) foreach (var property in value.EnumerateObject()) { Unicode(property.Name); CheckJson(property.Value, depth); }
+                if (value.ValueKind == JsonValueKind.Object) foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); CheckJson(property.Value, depth); }
                 else foreach (var item in value.EnumerateArray()) CheckJson(item, depth);
             }
             // A string may hold a lone surrogate only inside a tool call's arguments (TranscriptSurrogates), which go out escaped.
@@ -586,7 +585,7 @@ public sealed class AnthropicMessagesRequestProjector
         switch (value.ValueKind)
         {
             case JsonValueKind.Object:
-                var result = new JsonObject(); foreach (var property in Properties(value)) result[property.Name] = Node(property.Value); return result;
+                var result = new JsonObject(); foreach (var property in Properties(value)) result[JsonUtf16.GetName(property)] = Node(property.Value); return result;
             case JsonValueKind.Array: return new JsonArray(value.EnumerateArray().Select(Node).ToArray());
             case JsonValueKind.String: return JsonUtf16.StringNode(Text(value));
             case JsonValueKind.Number:
@@ -637,7 +636,7 @@ public sealed class AnthropicMessagesRequestProjector
     }
     private static JsonElement.ArrayEnumerator Array(JsonElement value) => value.ValueKind == JsonValueKind.Array ? value.EnumerateArray() : throw Fail(AnthropicRequestFailure.InvalidTranscript);
     private static IEnumerable<JsonProperty> Properties(JsonElement value) => value.ValueKind == JsonValueKind.Object
-        ? value.EnumerateObject().Select((property, position) => (property, position, index: IndexKey(property.Name))).OrderBy(item => item.index is null ? 1 : 0).ThenBy(item => item.index ?? 0).ThenBy(item => item.position).Select(item => item.property)
+        ? value.EnumerateObject().Select((property, position) => (property, position, index: IndexKey(JsonUtf16.GetName(property)))).OrderBy(item => item.index is null ? 1 : 0).ThenBy(item => item.index ?? 0).ThenBy(item => item.position).Select(item => item.property)
         : throw Fail(AnthropicRequestFailure.InvalidTranscript);
     private static IEnumerable<string> OrderedKeys(IEnumerable<string> keys) => keys.Select((key, position) => (key, position, index: IndexKey(key)))
         .OrderBy(item => item.index is null ? 1 : 0).ThenBy(item => item.index ?? 0).ThenBy(item => item.position).Select(item => item.key);

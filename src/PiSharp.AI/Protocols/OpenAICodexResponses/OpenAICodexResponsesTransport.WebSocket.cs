@@ -340,7 +340,7 @@ public sealed partial class OpenAICodexResponsesTransport
     {
         var projector = new ResponsesTranscriptProjector(ProjectionOptions());
         var request = new ChatRequest(_model, [new TranscriptEntry("assistant", PiWireJson.WriteMessage(message))]);
-        var items = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString()) as JsonArray ?? [];
+        var items = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions) as JsonArray ?? [];
         return new JsonArray([.. items.Where(item => item?["type"] is not JsonValue type || !type.TryGetValue<string>(out var name) ||
             name is not ("function_call_output" or "custom_tool_call_output")).Select(item => item?.DeepClone())]);
     }
@@ -489,7 +489,7 @@ public sealed partial class OpenAICodexResponsesTransport
             if (message.Length == 0) continue;
             var text = Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length);
             JsonNode? parsed;
-            try { parsed = JsonNode.Parse(text); }
+            try { parsed = JsonNode.Parse(text, documentOptions: JsonData.DocumentOptions); }
             catch (JsonException error) { throw new CodexProtocolException("Invalid Codex WebSocket JSON: " + error.Message); }
             if (parsed is not JsonObject value) continue;
             var (mapped, completed) = await MapEventAsync(value, invocation, cancellation).ConfigureAwait(false);

@@ -193,7 +193,8 @@ internal static class JsonlRecordCodec
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (var property in value.EnumerateObject())
             {
-                if (!names.Add(property.Name)) throw Failure(JsonlTransportFailure.DuplicateProperty);
+                // Only a record that keeps lone surrogates reaches here with one in a name (the others were refused above).
+                if (!names.Add(PiSharp.Contracts.JsonUtf16.GetName(property))) throw Failure(JsonlTransportFailure.DuplicateProperty);
                 CheckDuplicates(property.Value);
             }
         }

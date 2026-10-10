@@ -153,6 +153,43 @@ public static class JsonUtf16
         return HasEscapedSurrogate(json) ? Raw(json) : JsonNode.Parse(json, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
     }
 
+    /// <summary>A mutable tree of <paramref name="value"/> that also holds lone surrogates: a name keeps every code unit (written as its
+    /// escape by <see cref="Write"/>), a string with a lone surrogate becomes a write-only <see cref="StringNode"/>, a number keeps its text.</summary>
+    public static JsonNode? MutableNode(JsonElement value)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.Object:
+                var result = new JsonObject();
+                foreach (var property in value.EnumerateObject()) result[GetName(property)] = MutableNode(property.Value);
+                return result;
+            case JsonValueKind.Array: return new JsonArray([.. value.EnumerateArray().Select(MutableNode)]);
+            case JsonValueKind.String: return StringNode(GetString(value));
+            case JsonValueKind.Null: return null;
+            case JsonValueKind.True or JsonValueKind.False: return JsonValue.Create(value.GetBoolean());
+            default: return JsonValue.Create(value.Clone());
+        }
+    }
+
+    /// <summary>A mutable tree of an owned value: <see cref="MutableNode(JsonElement)"/> when its text escapes a surrogate, otherwise
+    /// <c>JsonNode.Parse</c>.</summary>
+    public static JsonNode? MutableNode(JsonData value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var text = value.ToString();
+        return HasEscapedSurrogate(text) ? MutableNode(value.Value) : JsonNode.Parse(text, documentOptions: JsonData.DocumentOptions);
+    }
+
+    /// <summary><c>JsonNode.Parse</c> of JSON text at the depth an owned value holds; text that escapes a surrogate becomes a
+    /// <see cref="MutableNode(JsonElement)"/> tree.</summary>
+    public static JsonNode? MutableNode(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        if (!HasEscapedSurrogate(json)) return JsonNode.Parse(json, documentOptions: JsonData.DocumentOptions);
+        using var document = JsonDocument.Parse(json, JsonData.DocumentOptions);
+        return MutableNode(document.RootElement);
+    }
+
     /// <summary><see cref="Node(string)"/> of a value.</summary>
     public static JsonNode? Node(JsonData value)
     {
@@ -176,6 +213,16 @@ public static class JsonUtf16
         switch (node)
         {
             case null: writer.WriteNullValue(); break;
+            // Utf8JsonWriter writes a lone surrogate of a name as U+FFFD: such an object is written as JSON.stringify text instead.
+            case JsonObject obj when obj.Any(member => !IsWellFormed(member.Key)):
+                var text = new StringBuilder("{");
+                foreach (var (name, value) in obj)
+                {
+                    if (text.Length > 1) text.Append(',');
+                    Quote(text, name); text.Append(':').Append(ToJsonString(value, writer.Options.Encoder));
+                }
+                writer.WriteRawValue(text.Append('}').ToString(), skipInputValidation: true);
+                break;
             case JsonObject obj:
                 writer.WriteStartObject();
                 foreach (var (name, value) in obj) { writer.WritePropertyName(name); Write(writer, value); }

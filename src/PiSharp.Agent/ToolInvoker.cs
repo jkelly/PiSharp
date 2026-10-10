@@ -88,9 +88,10 @@ public sealed record ToolInvokerOptions(int MaximumTools = 128, int MaximumTrans
     public int MaximumStructuredContentCharacters { get; init; } = 6 * 1024 * 1024 + 65_536;
     public int MaximumResultRawCharacters { get; init; } = 12 * 1024 * 1024;
     public int MaximumResultRawBytes { get; init; } = 48 * 1024 * 1024;
-    /// <summary>Argument data may hold lone surrogates, as a JavaScript string does (the Pi entry); action targets, argv, cwd and
+    /// <summary>Argument data and tool results (content text, details, structured output and their object names) may hold lone
+    /// surrogates, as a JavaScript string does (the Pi entry: agent-loop.ts keeps whatever a tool returns); action targets, argv, cwd and
     /// environment stay well-formed.</summary>
-    public bool KeepsLoneSurrogatesInArguments { get; init; }
+    public bool KeepsLoneSurrogates { get; init; }
 }
 
 /// <summary>
@@ -469,7 +470,8 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
     }
 
     private ToolResultValueOptions ResultLimits() => new(_options.MaximumResultCharacters, _options.MaximumStructuredContentCharacters,
-        _options.MaximumResultContentBlocks, _options.MaximumJsonDepth, _options.MaximumResultRawCharacters, _options.MaximumResultRawBytes);
+        _options.MaximumResultContentBlocks, _options.MaximumJsonDepth, _options.MaximumResultRawCharacters, _options.MaximumResultRawBytes)
+    { KeepsLoneSurrogates = _options.KeepsLoneSurrogates };
     private static FinalizedToolExecution CompleteResult(ToolResult result) => new(result, result.IsError);
 
     private ImmutableArray<T> Copy<T>(IEnumerable<T>? callbacks) where T : Delegate
@@ -487,7 +489,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
 
     private bool ValidArguments(JsonData? arguments, CancellationToken token, bool anyKind = false) =>
         arguments is not null && (anyKind || arguments.Value.ValueKind == JsonValueKind.Object) &&
-        arguments.ToString().Length <= _options.MaximumArgumentCharacters && ValidJson(arguments.Value, 0, token, allowNulData: true);
+        arguments.ToString().Length <= _options.MaximumArgumentCharacters && ValidJson(arguments.Value, 0, token, allowNulData: true, loneSurrogates: _options.KeepsLoneSurrogates);
 
     private bool ValidAction(PreparedToolAction? action, string name, CancellationToken token)
     {
@@ -525,8 +527,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
     {
         if (result is null || result.Details is null)
             throw new InvalidOperationException("Invalid tool result.");
-        ToolResultValueCodec.Validate(result, new(_options.MaximumResultCharacters, _options.MaximumStructuredContentCharacters,
-            _options.MaximumResultContentBlocks, _options.MaximumJsonDepth, _options.MaximumResultRawCharacters, _options.MaximumResultRawBytes));
+        ToolResultValueCodec.Validate(result, ResultLimits());
         if (result.StructuredContent is { } structured)
         {
             var raw = structured.ToString();
@@ -543,7 +544,9 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
         // Charge retained syntax before strict reparse; retain the original owned value and tokens.
         if (characters > _options.MaximumResultCharacters || !ValidOutputJson(JsonData.Parse(detailsRaw).Value, 0))
             throw new InvalidOperationException("Invalid tool result.");
-        if (result.Failure is { } failure && (!Enum.IsDefined(failure.Kind) || !ValidText(failure.Message, false)))
+        // agent-loop.ts keeps whatever a tool returns: in the Pi entry a lone surrogate of the result is kept (JSON.stringify escapes it).
+        var lone = _options.KeepsLoneSurrogates;
+        if (result.Failure is { } failure && (!Enum.IsDefined(failure.Kind) || !ValidText(failure.Message, false, loneSurrogates: lone)))
             throw new InvalidOperationException("Invalid tool result failure.");
         if (result.OwnedContent is ImmutableArray<TextContent> typed)
         {
@@ -551,13 +554,13 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             {
                 if (content is null || content.Text is null) throw new InvalidOperationException("Invalid tool result.");
                 characters += content.Text.Length;
-                if (characters > _options.MaximumResultCharacters || !ValidText(content.Text, false, allowNul: true)) throw new InvalidOperationException("Tool result exceeds limits.");
+                if (characters > _options.MaximumResultCharacters || !ValidText(content.Text, false, allowNul: true, loneSurrogates: lone)) throw new InvalidOperationException("Tool result exceeds limits.");
                 if (content.ExtraProperties is { } extra)
                     foreach (var (key, value) in extra.Values)
                     {
                         characters += (long)key.Length + value.ToString().Length;
-                        if (characters > _options.MaximumResultCharacters || !ValidText(key, false) ||
-                            !ValidJson(value.Value, 0, CancellationToken.None)) throw new InvalidOperationException("Invalid tool result.");
+                        if (characters > _options.MaximumResultCharacters || !ValidText(key, false, loneSurrogates: lone) ||
+                            !ValidJson(value.Value, 0, CancellationToken.None, loneSurrogates: lone)) throw new InvalidOperationException("Invalid tool result.");
                     }
             }
         }
@@ -566,16 +569,17 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             var image = content.GetProperty("type").GetString() == "image";
             foreach (var name in image ? new[] { "data", "mimeType" } : new[] { "text" })
             {
-                var text = content.GetProperty(name).GetString();
-                characters += text!.Length;
-                if (characters > _options.MaximumResultCharacters || !ValidText(text, false, allowNul: true)) throw new InvalidOperationException("Tool result exceeds limits.");
+                var text = JsonUtf16.GetString(content.GetProperty(name));
+                characters += text.Length;
+                if (characters > _options.MaximumResultCharacters || !ValidText(text, false, allowNul: true, loneSurrogates: lone)) throw new InvalidOperationException("Tool result exceeds limits.");
             }
             foreach (var property in content.EnumerateObject())
             {
-                if (property.Name == "type" || !image && property.Name == "text" || image && property.Name is "data" or "mimeType") continue;
-                characters += (long)property.Name.Length + property.Value.GetRawText().Length;
-                if (characters > _options.MaximumResultCharacters || !ValidText(property.Name, false) ||
-                    !ValidJson(property.Value, 0, CancellationToken.None)) throw new InvalidOperationException("Invalid tool result.");
+                var propertyName = JsonUtf16.GetName(property);
+                if (propertyName == "type" || !image && propertyName == "text" || image && propertyName is "data" or "mimeType") continue;
+                characters += (long)propertyName.Length + property.Value.GetRawText().Length;
+                if (characters > _options.MaximumResultCharacters || !ValidText(propertyName, false, loneSurrogates: lone) ||
+                    !ValidJson(property.Value, 0, CancellationToken.None, loneSurrogates: lone)) throw new InvalidOperationException("Invalid tool result.");
             }
         }
         if (characters > _options.MaximumResultCharacters) throw new InvalidOperationException("Tool result exceeds limits.");
@@ -586,7 +590,8 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
     // finite numbers, scalar Unicode and bounded container depth are required without rewriting tokens.
     private bool ValidOutputJson(JsonElement value, int parentDepth)
     {
-        if (value.ValueKind == JsonValueKind.String) return ValidText(value.GetString(), false, allowNul: true);
+        var lone = _options.KeepsLoneSurrogates;
+        if (value.ValueKind == JsonValueKind.String) return ValidText(JsonUtf16.GetString(value), false, allowNul: true, loneSurrogates: lone);
         if (value.ValueKind == JsonValueKind.Number) return value.TryGetDouble(out var number) && double.IsFinite(number);
         if (value.ValueKind is JsonValueKind.Null or JsonValueKind.True or JsonValueKind.False) return true;
         if (value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)) return false;
@@ -596,31 +601,34 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
         {
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (var property in value.EnumerateObject())
-                if (!names.Add(property.Name) || !ValidText(property.Name, false, allowNul: true) ||
-                    !ValidOutputJson(property.Value, depth)) return false;
+            {
+                var name = JsonUtf16.GetName(property);
+                if (!names.Add(name) || !ValidText(name, false, allowNul: true, loneSurrogates: lone) || !ValidOutputJson(property.Value, depth)) return false;
+            }
         }
         else
             foreach (var child in value.EnumerateArray()) if (!ValidOutputJson(child, depth)) return false;
         return true;
     }
 
-    private bool ValidJson(JsonElement value, int parentDepth, CancellationToken token, bool allowNulData = false)
+    private bool ValidJson(JsonElement value, int parentDepth, CancellationToken token, bool allowNulData = false, bool loneSurrogates = false)
     {
         token.ThrowIfCancellationRequested();
         // Owned JSON string values can contain NUL. Actual executable strings are validated
         // separately by ValidAction; admitting data does not admit NUL targets/argv/cwd/env.
         if (value.ValueKind == JsonValueKind.String)
-            return ValidText(JsonUtf16.GetString(value), false, allowNul: allowNulData, loneSurrogates: allowNulData && _options.KeepsLoneSurrogatesInArguments);
+            return ValidText(JsonUtf16.GetString(value), false, allowNul: allowNulData, loneSurrogates: loneSurrogates);
         if (value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)) return true;
         var depth = parentDepth + 1;
         if (depth > _options.MaximumJsonDepth) return false;
         if (value.ValueKind == JsonValueKind.Object)
         {
             foreach (var property in value.EnumerateObject())
-                if (!ValidText(property.Name, false) || !ValidJson(property.Value, depth, token, allowNulData)) return false;
+                if (!ValidText(JsonUtf16.GetName(property), false, loneSurrogates: loneSurrogates) ||
+                    !ValidJson(property.Value, depth, token, allowNulData, loneSurrogates)) return false;
         }
         else
-            foreach (var child in value.EnumerateArray()) if (!ValidJson(child, depth, token, allowNulData)) return false;
+            foreach (var child in value.EnumerateArray()) if (!ValidJson(child, depth, token, allowNulData, loneSurrogates)) return false;
         return true;
     }
     private static bool ValidText(string? value, bool nonempty, bool allowNul = false, bool loneSurrogates = false)

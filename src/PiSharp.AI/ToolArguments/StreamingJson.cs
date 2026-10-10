@@ -12,9 +12,9 @@ namespace PiSharp.AI;
 /// when the repair changed the text, then partial-json's <c>parse</c> of the text and of its repair, then <c>{}</c>. It never throws for
 /// malformed input. The result is any JSON value (an array, string, number, boolean or null passes through as upstream returns it) and is
 /// owned as its <c>JSON.stringify</c> text: duplicate names keep the last value at the first position, array-index names come first in
-/// ascending order, and numbers are binary64 (non-finite ones become null). A string value keeps every code unit, a lone surrogate as its
-/// escape (see <see cref="JsonUtf16"/>). Two representation limits remain: a lone surrogate of a name becomes U+FFFD (toWellFormed), and a
-/// value nested deeper than <see cref="JsonData.MaximumDepth"/> levels is a <see cref="JsonException"/>.
+/// ascending order, and numbers are binary64 (non-finite ones become null). A name or string value keeps every code unit, a lone
+/// surrogate as its escape (see <see cref="JsonUtf16"/>). One representation limit remains: a value nested deeper than
+/// <see cref="JsonData.MaximumDepth"/> levels is a <see cref="JsonException"/>.
 /// </summary>
 public static class StreamingJson
 {
@@ -22,7 +22,7 @@ public static class StreamingJson
 
     public static JsonData Parse(string? partialJson)
     {
-        var text = Stringify(ParseValue(partialJson), wellFormed: true);
+        var text = Stringify(ParseValue(partialJson));
         try { return JsonData.Parse(text); }
         catch (JsonException) { throw TooDeep(); }
     }
@@ -48,20 +48,20 @@ public static class StreamingJson
             foreach (var key in obj.Order)
             {
                 if (obj.Properties[key] is StringValue member && !ReferenceEquals(ToWellFormed(member.Text), member.Text))
-                    (members ??= new(StringComparer.Ordinal))[ToWellFormed(key)] = member.Text;
+                    (members ??= new(StringComparer.Ordinal))[key] = member.Text;
                 else if (obj.Properties[key] is NumberValue number && !double.IsFinite(number.Number))
-                    (numbers ??= new(StringComparer.Ordinal))[ToWellFormed(key)] = number.Number;
+                    (numbers ??= new(StringComparer.Ordinal))[key] = number.Number;
             }
             loneSurrogateMembers = members; nonFiniteMembers = numbers;
         }
-        var owned = Stringify(value, wellFormed: true);
+        var owned = Stringify(value);
         try { return JsonData.Parse(owned); }
         catch (JsonException) { throw TooDeep(); }
     }
 
     /// <summary><c>JSON.stringify(JSON.parse(text))</c> exactly, lone surrogates escaped as JavaScript writes them. A text JSON.parse
     /// rejects is a <see cref="JsonException"/>.</summary>
-    public static string JsonReformat(string text) => Stringify(Syntax(text), wellFormed: false);
+    public static string JsonReformat(string text) => Stringify(Syntax(text));
 
     /// <summary>JSON.stringify of a string: only <c>"</c>, <c>\</c>, control characters and lone surrogates are escaped.</summary>
     public static string JsonQuote(string text)
@@ -80,7 +80,7 @@ public static class StreamingJson
     }
 
     /// <summary><c>JSON.stringify(parseStreamingJson(partialJson))</c>, lone surrogates escaped as JavaScript writes them.</summary>
-    public static string ParseToJson(string? partialJson) => Stringify(ParseValue(partialJson), wellFormed: false);
+    public static string ParseToJson(string? partialJson) => Stringify(ParseValue(partialJson));
 
     /// <summary>json-parse.ts <c>repairJson</c>: escapes raw control characters in strings and doubles backslashes before invalid escapes.</summary>
     public static string RepairJson(string json)
@@ -486,17 +486,16 @@ public static class StreamingJson
 
     // --- JSON.stringify -------------------------------------------------------------------------------------------------------------
 
-    // wellFormed: String.prototype.toWellFormed on every name (a lone surrogate becomes U+FFFD; names that then collide keep the first
-    // position and the last value), since a JsonData refuses a name System.Text.Json cannot read. String values keep every code unit:
-    // a lone surrogate is written as its JSON.stringify escape, which a JsonData carries (see JsonUtf16).
-    private static string Stringify(Value value, bool wellFormed)
+    // Names and string values keep every code unit: a lone surrogate is written as its JSON.stringify escape, which a JsonData carries
+    // (see JsonUtf16).
+    private static string Stringify(Value value)
     {
         var builder = new StringBuilder();
-        Write(builder, value, wellFormed);
+        Write(builder, value);
         return builder.ToString();
     }
 
-    private static void Write(StringBuilder builder, Value value, bool wellFormed)
+    private static void Write(StringBuilder builder, Value value)
     {
         switch (value)
         {
@@ -509,26 +508,19 @@ public static class StreamingJson
                 for (var index = 0; index < array.Items.Count; index++)
                 {
                     if (index > 0) builder.Append(',');
-                    Write(builder, array.Items[index], wellFormed);
+                    Write(builder, array.Items[index]);
                 }
                 builder.Append(']');
                 break;
             case ObjectValue obj:
-                var members = new List<(string Key, Value Value)>();
-                var positions = new Dictionary<string, int>(StringComparer.Ordinal);
-                foreach (var key in obj.Order.Select((key, position) => (key, position, arrayIndex: ArrayIndex(key)))
+                var members = obj.Order.Select((key, position) => (key, position, arrayIndex: ArrayIndex(key)))
                     .OrderBy(item => item.arrayIndex is null ? 1 : 0).ThenBy(item => item.arrayIndex ?? 0).ThenBy(item => item.position)
-                    .Select(item => item.key))
-                {
-                    var name = wellFormed ? ToWellFormed(key) : key;
-                    if (positions.TryGetValue(name, out var position)) members[position] = (name, obj.Properties[key]);
-                    else { positions.Add(name, members.Count); members.Add((name, obj.Properties[key])); }
-                }
+                    .Select(item => item.key).ToList();
                 builder.Append('{');
                 for (var index = 0; index < members.Count; index++)
                 {
                     if (index > 0) builder.Append(',');
-                    Quote(builder, members[index].Key); builder.Append(':'); Write(builder, members[index].Value, wellFormed);
+                    Quote(builder, members[index]); builder.Append(':'); Write(builder, obj.Properties[members[index]]);
                 }
                 builder.Append('}');
                 break;

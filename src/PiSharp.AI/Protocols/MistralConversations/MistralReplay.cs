@@ -32,7 +32,7 @@ public sealed partial class MistralTextHttpSseTransport
         var transformed = new List<TranscriptEntry>(); var normalized = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var entry in resolved)
         {
-            var body = JsonNode.Parse(entry.WireBody.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
+            var body = JsonUtf16.MutableNode(entry.WireBody)!.AsObject(); // a tool call's arguments may hold lone surrogates
             body["content"] ??= new JsonArray();
             if ((entry.Role is "assistant" or "toolResult") && body["content"] is not JsonArray)
                 throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral replay requires content blocks.");

@@ -11,7 +11,7 @@ internal static class PiJson
 {
     /// <summary><c>JSON.parse</c>: a malformed text throws a <see cref="JsonException"/> carrying V8's SyntaxError message, the
     /// text Pi interpolates into its "Failed to ..." and "Invalid settings file ..." errors.</summary>
-    internal static JsonNode? Parse(string text, int maximumDepth = 256)
+    internal static JsonNode? Parse(string text, int maximumDepth = PiSharp.Contracts.JsonData.MaximumDepth)
     {
         try { return JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { MaxDepth = maximumDepth }); }
         catch (JsonException error) { throw new JsonException(PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(text, error.Message), error); }

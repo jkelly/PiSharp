@@ -30,11 +30,10 @@ internal static partial class Program
             }
             var actual = StreamingJson.ParseToJson(text);
             if (actual != expected) throw new InvalidOperationException($"{label}{Environment.NewLine}Expected {expected}{Environment.NewLine}Actual   {actual}");
-            // The owned value keeps every string value exactly (a lone surrogate as its escape, see JsonUtf16); only a lone surrogate of a
-            // name becomes U+FFFD (toWellFormed), since a JsonData refuses a name System.Text.Json cannot read.
-            var native = item.TryGetProperty("native", out var nativeJson) ? nativeJson.GetString()! : expected;
-            if (native != expected) wellFormed++;
-            using (var parsed = JsonDocument.Parse(expected, PiSharp.Contracts.JsonData.DocumentOptions)) Equal(KeysWellFormed(parsed.RootElement), StreamingJson.Parse(text).ToString());
+            // The owned value keeps every name and string value exactly (a lone surrogate as its escape, see JsonUtf16); the cases with a
+            // "native" field hold lone surrogates (formerly a lone surrogate of a name became U+FFFD there).
+            if (item.TryGetProperty("native", out _)) wellFormed++;
+            Equal(expected, StreamingJson.Parse(text).ToString());
             if (expected[0] != '{') nonObjects++;
             checkedCases++;
         }
@@ -45,14 +44,6 @@ internal static partial class Program
         Equal(deepest, StreamingJson.Parse(deepest).ToString());
         try { StreamingJson.Parse("[" + deepest + "]"); throw new InvalidOperationException("1,001 levels did not fail."); } catch (JsonException) { }
         return Task.CompletedTask;
-
-        static string KeysWellFormed(JsonElement value) => value.ValueKind switch
-        {
-            JsonValueKind.Object => "{" + string.Join(",", value.EnumerateObject().Select(property =>
-                PiSharp.Contracts.JsonUtf16.Quote(PiSharp.Contracts.JsonUtf16.ToWellFormed(PiSharp.Contracts.JsonUtf16.GetName(property))) + ":" + KeysWellFormed(property.Value))) + "}",
-            JsonValueKind.Array => "[" + string.Join(",", value.EnumerateArray().Select(KeysWellFormed)) + "]",
-            _ => value.GetRawText()
-        };
 
         static string Units(string hex)
         {

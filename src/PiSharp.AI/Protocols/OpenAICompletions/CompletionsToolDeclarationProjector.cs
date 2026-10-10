@@ -233,7 +233,7 @@ internal static class CompletionsJson
             {
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in value.EnumerateObject())
-                { if (!names.Add(property.Name)) throw Fail(CompletionsRequestFailure.InvalidTranscript); Unicode(property.Name); Check(property.Value, depth, maximumDepth, token); }
+                { if (!names.Add(JsonUtf16.GetName(property))) throw Fail(CompletionsRequestFailure.InvalidTranscript); Check(property.Value, depth, maximumDepth, token); }
             }
             else foreach (var item in value.EnumerateArray()) Check(item, depth, maximumDepth, token);
         }
@@ -258,7 +258,7 @@ internal static class CompletionsJson
         { throw Fail(error.Failure == EcmaScriptJsonProjectionFailure.ResourceLimit ? CompletionsRequestFailure.ResourceLimit : CompletionsRequestFailure.InvalidTranscript); }
     }
     internal static IEnumerable<JsonProperty> Properties(JsonElement value) => value.EnumerateObject()
-        .Select((property, position) => (property, position, numeric: ArrayIndex(property.Name)))
+        .Select((property, position) => (property, position, numeric: ArrayIndex(JsonUtf16.GetName(property))))
         .OrderBy(item => item.numeric is null ? 1 : 0).ThenBy(item => item.numeric ?? 0).ThenBy(item => item.position)
         .Select(item => item.property);
     private static uint? ArrayIndex(string name) => uint.TryParse(name, NumberStyles.None, CultureInfo.InvariantCulture, out var value) &&

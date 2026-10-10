@@ -152,11 +152,12 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
     public async Task<HttpRequestMessage> CreateRequestAsync(ChatRequest request, CancellationToken cancellationToken = default)
     {
         var resolved = await ResolveAsync(cancellationToken).ConfigureAwait(false);
-        var body = Encoding.UTF8.GetBytes(BuildBody(request, resolved).ToJsonString(BodyJson));
+        var body = Encoding.UTF8.GetBytes(BodyText(BuildBody(request, resolved)));
         return CreateHttpRequest(resolved, body);
     }
 
-    private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    // The SDK's JSON.stringify: a tool call's arguments keep a lone surrogate (name or value) as its escape, at any depth Pi holds.
+    private static string BodyText(JsonNode body) => JsonUtf16.ToJsonString(body, System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping);
 
     private JsonObject BuildBody(ChatRequest request, Resolved resolved)
     {
@@ -233,9 +234,9 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
             {
                 var resolved = await ResolveAsync(token).ConfigureAwait(false);
                 var payload = BuildBody(request, resolved);
-                if (_options.OnPayload is { } hook && await hook(JsonData.Parse(payload.ToJsonString(BodyJson)), request.Model, token).ConfigureAwait(false) is { } replaced)
-                    payload = JsonNode.Parse(replaced.ToString()) as JsonObject ?? throw new InvalidOperationException("Bedrock payload must be an object.");
-                var bytes = Encoding.UTF8.GetBytes(payload.ToJsonString(BodyJson));
+                if (_options.OnPayload is { } hook && await hook(JsonData.Parse(BodyText(payload)), request.Model, token).ConfigureAwait(false) is { } replaced)
+                    payload = JsonUtf16.MutableNode(replaced.Value) as JsonObject ?? throw new InvalidOperationException("Bedrock payload must be an object.");
+                var bytes = Encoding.UTF8.GetBytes(BodyText(payload));
                 if (bytes.Length > _options.MaximumPayloadBytes) throw new BedrockServiceException("Error", "Bedrock request exceeds the configured payload limit.") { Modeled = false };
                 response = await SendWithRetriesAsync(resolved, bytes, token).ConfigureAwait(false);
                 requestId = Normalize(Header(response, "x-amzn-requestid"));

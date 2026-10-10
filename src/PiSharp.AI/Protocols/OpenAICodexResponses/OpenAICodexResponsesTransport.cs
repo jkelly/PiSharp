@@ -142,7 +142,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     /// <summary>The transcript and projection budget (several images of ~4.5 MB each).</summary>
     private int Budget => (int)Math.Min(int.MaxValue / 2, Math.Max(_options.MaximumEntryCharacters, 1_048_576) * 2L);
 
-    private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping, MaxDepth = 2 * JsonData.MaximumDepth };
 
     /// <summary>convertResponsesMessages options for Codex: no system prompt, Codex tool-call providers.</summary>
     private ResponsesTranscriptProjectionOptions ProjectionOptions() => new(
@@ -171,8 +171,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var instructions = initial is null ? "" : ProviderTranscript.SystemText(initial);
         var projection = ProjectionOptions();
         var projector = new ResponsesTranscriptProjector(projection);
-        var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString());
-        var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString()) as JsonArray;
+        var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions);
+        var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions) as JsonArray;
         var cacheKey = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? request.SessionId);
         var body = new JsonObject
         {
@@ -274,7 +274,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var invocation = new Invocation();
         var inner = new ResponsesTextToolTransport((chat, cancellation, context) => PrepareAsync(chat, invocation, cancellation),
             new ResponsesTextToolOptions(MaximumEvents: int.MaxValue, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
-                MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: 64, Rates: _rates)
+                MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: JsonData.MaximumDepth, Rates: _rates)
             { SupportsOpenAIGrammarTools = _grammar });
         var keep = false;
         try
@@ -341,7 +341,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var headers = BuildHeaders(token0, request.SessionId);
         var body = BuildBody(request);
         if (_options.OnPayload is { } hook && await hook(JsonData.Parse(body.ToJsonString(BodyJson)), _model, token).ConfigureAwait(false) is { } replaced)
-            body = JsonNode.Parse(replaced.ToString()) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");
+            body = JsonNode.Parse(replaced.ToString(), documentOptions: JsonData.DocumentOptions) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");
         var bodyJson = body.ToJsonString(BodyJson);
         var transport = _options.Transport?.Invoke() is { Length: > 0 } configured ? configured : "auto";
         var cacheSessionId = _options.CacheRetention == "none" ? null : _options.SessionId ?? request.SessionId;
@@ -492,7 +492,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         string? friendly = null;
         try
         {
-            if (JsonNode.Parse(raw) is JsonObject parsed && parsed["error"] is JsonObject error)
+            if (JsonNode.Parse(raw, documentOptions: JsonData.DocumentOptions) is JsonObject parsed && parsed["error"] is JsonObject error)
             {
                 string? Text(string name) => error[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
                 var code = Text("code") is { Length: > 0 } c ? c : Text("type") ?? "";
@@ -517,7 +517,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             var data = frame.Data.Trim();
             if (data.Length == 0 || data == "[DONE]") continue;
             JsonObject value;
-            try { value = JsonNode.Parse(data) as JsonObject ?? throw new JsonException("not an object"); }
+            try { value = JsonNode.Parse(data, documentOptions: JsonData.DocumentOptions) as JsonObject ?? throw new JsonException("not an object"); }
             catch (JsonException error) { throw new CodexProtocolException("Invalid Codex SSE JSON: " + error.Message); }
             var (mapped, completed) = await MapEventAsync(value, invocation, token).ConfigureAwait(false);
             if (mapped is { } next) yield return next;

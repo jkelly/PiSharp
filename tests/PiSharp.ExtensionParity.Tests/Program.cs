@@ -36,6 +36,7 @@ internal static partial class Program
         cases.AddRange(NativeCases());
         cases.AddRange(OAuthCases());
         cases.AddRange(CapCases());
+        cases.AddRange(JsonLeftoverCases());
         cases.AddRange(CloseoutCases());
         cases.AddRange(LeftoverCases());
         var filter = Environment.GetEnvironmentVariable("EXTPARITY_FILTER");

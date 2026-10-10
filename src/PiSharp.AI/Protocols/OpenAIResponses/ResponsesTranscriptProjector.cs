@@ -387,7 +387,7 @@ public sealed class ResponsesTranscriptProjector
             if (signature.StartsWith('{'))
             {
                 JsonDocument document;
-                try { document = JsonDocument.Parse(signature, new JsonDocumentOptions { MaxDepth = 64 }); }
+                try { document = JsonDocument.Parse(signature, JsonData.DocumentOptions); }
                 catch (JsonException) { return (signature, null); }
                 using (document)
                 {
@@ -440,7 +440,7 @@ public sealed class ResponsesTranscriptProjector
                     case JsonValueKind.Object:
                         result.Append('{'); var firstProperty = true;
                         foreach (var property in Properties(item))
-                        { if (!firstProperty) result.Append(','); firstProperty = false; Quote(result, property.Name); result.Append(':'); Write(property.Value); }
+                        { if (!firstProperty) result.Append(','); firstProperty = false; Quote(result, JsonUtf16.GetName(property)); result.Append(':'); Write(property.Value); }
                         result.Append('}'); break;
                     case JsonValueKind.Array:
                         result.Append('['); var firstItem = true;
@@ -477,7 +477,7 @@ public sealed class ResponsesTranscriptProjector
             {
                 if (depth >= options.MaximumJsonDepth) throw Failure(ResponsesProjectionFailure.ResourceLimit);
                 if (value.ValueKind == JsonValueKind.Object)
-                    foreach (var property in value.EnumerateObject()) { CheckString(property.Name); CheckJson(property.Value, depth + 1); }
+                    foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); CheckJson(property.Value, depth + 1); }
                 else foreach (var child in value.EnumerateArray()) CheckJson(child, depth + 1);
             }
             else if (value.ValueKind == JsonValueKind.String) _ = Text(value); // a lone surrogate only in tool call arguments (TranscriptSurrogates)
@@ -539,16 +539,10 @@ public sealed class ResponsesTranscriptProjector
             if (fields?.TryGet(name, out var value) != true) return false;
             return value!.Value.ValueKind switch { JsonValueKind.True => true, JsonValueKind.False => false, _ => throw Failure(ResponsesProjectionFailure.InvalidTranscript) };
         }
-        private static void CheckString(string value)
-        {
-            for (var index = 0; index < value.Length; index++)
-                if (char.IsSurrogate(value[index]) && (!char.IsHighSurrogate(value[index]) || index + 1 == value.Length || !char.IsLowSurrogate(value[++index])))
-                    throw Failure(ResponsesProjectionFailure.UnsupportedUnicode);
-        }
     }
 
     private static IEnumerable<JsonProperty> Properties(JsonElement value) => value.EnumerateObject()
-        .Select((property, index) => (property, index, key: ArrayIndex(property.Name)))
+        .Select((property, index) => (property, index, key: ArrayIndex(JsonUtf16.GetName(property))))
         .OrderBy(item => item.key is null ? 1 : 0).ThenBy(item => item.key ?? 0).ThenBy(item => item.index).Select(item => item.property);
     private static uint? ArrayIndex(string name) => uint.TryParse(name, NumberStyles.None, CultureInfo.InvariantCulture, out var index) &&
         index != uint.MaxValue && name == index.ToString(CultureInfo.InvariantCulture) ? index : null;
