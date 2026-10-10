@@ -21,6 +21,18 @@ internal static class LlamaCases
         return pi;
     }
 
+    /// <summary>Types <paramref name="text"/> until <paramref name="expected"/> shows, clearing the line between tries: the first
+    /// keystrokes after startup can reach the editor before autocomplete is attached.</summary>
+    private static async Task TypeUntil(InteractiveHarness pi, string text, string expected)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            pi.Type(text);
+            try { await pi.WaitFor(expected, 5_000); return; }
+            catch (TimeoutException) when (attempt < 3) { pi.Type(""); await Task.Delay(200); }
+        }
+    }
+
     /// <summary>A router with <c>alpha</c> loaded and <c>beta</c> unloaded; load and unload change the status after a moment.</summary>
     private sealed class Router : IDisposable
     {
@@ -64,8 +76,7 @@ internal static class LlamaCases
         yield return ("e2e.llama.unconfigured-asks-for-login", async () =>
         {
             await using var pi = await Started("llama-unconfigured");
-            pi.Type("/lla");
-            await pi.WaitFor("Manage llama.cpp router models");
+            await TypeUntil(pi, "/lla", "Manage llama.cpp router models");
             pi.Type(Escape);
             await Task.Delay(100);
             pi.Type("\u0015");
@@ -104,11 +115,18 @@ internal static class LlamaCases
             pi.Type(Enter);
             await pi.WaitFor("Unloaded alpha");
             Check(router.Server.Seen().Contains("POST /models/unload {\"model\":\"alpha\"}"), "unload request");
+            // The manager reads the catalog again before it shows the list; keys sent before that are not the list's.
+            await pi.WaitUntil(text => text.Contains("Download model…", StringComparison.Ordinal)
+                && !pi.Terminal.Lines.Any(line => line.Contains("alpha", StringComparison.Ordinal) && line.Contains("loaded ·", StringComparison.Ordinal)), "list after unload");
+            await Task.Delay(100);
             pi.Type(Escape);
             await pi.WaitUntil(text => !text.Contains("Download model…", StringComparison.Ordinal), "manager closed");
             // The loaded model is selectable in /model.
+            // Filter by name: the list shows 10 rows and the catalog's own models come first.
             await pi.Submit("/model");
-            await pi.WaitUntil(text => text.Contains("beta", StringComparison.Ordinal) && text.Contains("llama.cpp", StringComparison.Ordinal), "llama.cpp model in /model");
+            await pi.WaitFor("Enter to select");
+            pi.Type("beta");
+            await pi.WaitUntil(text => pi.Terminal.Lines.Any(line => line.Contains("beta", StringComparison.Ordinal) && line.Contains("[llama.cpp]", StringComparison.Ordinal)), "llama.cpp model in /model");
             pi.Type(Escape);
         });
 
