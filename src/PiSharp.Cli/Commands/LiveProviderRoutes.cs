@@ -115,7 +115,8 @@ internal sealed class LiveProviderRoute
                 return NativeProviderFactory.CreateCodexResponses(model, definition.Raw, new OpenAICodexResponsesOptions
                 {
                     CacheRetention = summary ? "none" : null,
-                    ModelHeaders = Headers(definition)
+                    ModelHeaders = Headers(definition),
+                    Transport = runtime.Transport
                 }, async token => (await CurrentAsync(token).ConfigureAwait(false)).ApiKey ?? throw new InvalidOperationException("No API key for provider: openai-codex"),
                     handler, plain && Levels(definition).Contains("off") ? "off" : null);
             case "google-vertex":

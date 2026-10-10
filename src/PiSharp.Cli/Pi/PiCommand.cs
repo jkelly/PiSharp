@@ -346,7 +346,10 @@ internal static class PiCommand
         long idleTimeout;
         try { idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged); }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
-        var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout) };
+        // sdk.ts transport: settingsManager.getTransport() ("auto" by default); /settings changes it for the running session.
+        PiTransportSetting.Start(settings.String("transport"));
+        var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout),
+            Transport = host.LiveRuntime.Transport ?? (() => PiTransportSetting.Current()) };
         // runner.ts bindCore: the providers and virtual models the extensions registered join every model registry the run builds
         // (model selection, the live routes and model switching), including ones registered later.
         if (extensionRun?.Host is { } virtualHost)

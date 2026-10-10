@@ -26,7 +26,9 @@ internal static partial class Program
         string id = "gpt-5.5", string token = "")
     {
         var row = CatalogRow("openai-codex", id); var http = new FakeHttp(); var delays = new List<TimeSpan>();
-        options = (options ?? new()) with { Delay = (wait, _) => { delays.Add(wait); return Task.CompletedTask; }, Time = new FixedTime(1_800_000_000_000) };
+        // These cases pin the SSE wire ("sse"); the default "auto" tries the WebSocket first (CodexWebSocketCases).
+        options = (options ?? new()) with { Delay = (wait, _) => { delays.Add(wait); return Task.CompletedTask; }, Time = new FixedTime(1_800_000_000_000),
+            Transport = options?.Transport ?? (() => "sse") };
         var transport = new OpenAICodexResponsesTransport(new HttpClient(http, disposeHandler: false), Descriptor(row), row.Raw, options,
             _ => ValueTask.FromResult(token.Length == 0 ? CodexToken : token));
         return (transport, http, Descriptor(row), delays);

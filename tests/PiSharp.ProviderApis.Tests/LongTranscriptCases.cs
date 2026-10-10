@@ -92,7 +92,7 @@ internal static partial class Program
             ["AWS_ACCESS_KEY_ID"] = "AKIDLONG", ["AWS_SECRET_ACCESS_KEY"] = "s", ["CLOUDFLARE_API_KEY"] = "cf-env-key", ["CLOUDFLARE_ACCOUNT_ID"] = "cf-acct",
         };
         var runtime = new LiveSessionRuntime(name => env.GetValueOrDefault(name), () => http, authPath, () => new HttpMessageInvoker(http, disposeHandler: false),
-            new FixedTime(1_800_000_000_000)) { HomeDirectory = directory };
+            new FixedTime(1_800_000_000_000)) { HomeDirectory = directory, Transport = () => "sse" }; // The Codex body over SSE.
         var routes = new (string Family, string Provider, string Model)[]
         {
             ("anthropic-messages", "anthropic", LongModel("anthropic", "anthropic-messages")),

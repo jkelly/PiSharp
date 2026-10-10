@@ -86,6 +86,8 @@ internal static class PiHttpIdleTimeout
             try { response = await base.SendAsync(request, headers.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             { throw new HttpRequestException("Headers Timeout Error", new TimeoutException($"No response headers within {timeout.TotalMilliseconds} ms.")); }
+            // An upgraded connection (the Codex WebSocket) is no response body: undici's bodyTimeout does not apply to it.
+            if (response.StatusCode == System.Net.HttpStatusCode.SwitchingProtocols) return response;
             var original = response.Content;
             var content = new StreamContent(new IdleStream(await original.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), timeout, original));
             foreach (var header in original.Headers) content.Headers.TryAddWithoutValidation(header.Key, header.Value);

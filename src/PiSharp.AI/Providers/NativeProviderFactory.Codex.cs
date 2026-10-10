@@ -16,6 +16,8 @@ public static partial class NativeProviderFactory
         ArgumentNullException.ThrowIfNull(options); ArgumentNullException.ThrowIfNull(accessToken);
         if (model.Provider != "openai-codex" || model.Api != "openai-codex-responses" || string.IsNullOrWhiteSpace(model.Id) ||
             model.Id.Length > 1024 || model.Id.Any(char.IsControl)) throw new ArgumentException("Unsupported native model or endpoint selection.");
+        // The WebSocket handshake goes through the same handler as the SSE requests (proxies, idle timeouts and offline seams).
+        if (options.WebSocketInvoker is null && handler is not null) options = options with { WebSocketInvoker = new HttpMessageInvoker(handler, disposeHandler: false) };
         return Bind(model, handler, client => new OpenAICodexResponsesTransport(client, model, modelMetadata, options, accessToken, defaultThinkingLevel));
     }
 }

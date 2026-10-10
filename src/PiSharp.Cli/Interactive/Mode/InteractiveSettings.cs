@@ -214,7 +214,7 @@ internal sealed class InteractiveSettings
         modified.Add("modelThinkingLevels"); Save();
     }
     public string Transport => Str(Get("transport")) ?? "auto";
-    public void SetTransport(string transport) => Set("transport", transport);
+    public void SetTransport(string transport) { Set("transport", transport); PiSharp.Cli.Pi.PiTransportSetting.Set(transport); }
     public bool CompactionEnabled => Bool(Get("compaction", "enabled")) ?? true;
     public void SetCompactionEnabled(bool enabled) => SetNested("compaction", "enabled", enabled);
     public bool BranchSummarySkipPrompt => Bool(Get("branchSummary", "skipPrompt")) ?? false;

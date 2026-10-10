@@ -54,7 +54,8 @@ internal static partial class Program
             ("live.long-transcript-2000-messages-with-loadout-records-every-family", LongTranscriptEveryFamily),
             ("login.every-provider-cli-flow-api-key-and-oauth", CliLogin),
         };
-        cases = [.. cases, .. GoogleAdcCases];
+        cases = [.. cases, .. GoogleAdcCases, .. CodexWebSocketCases];
+        if (Environment.GetEnvironmentVariable("PROVIDERAPIS_FILTER") is { Length: > 0 } filter) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {
