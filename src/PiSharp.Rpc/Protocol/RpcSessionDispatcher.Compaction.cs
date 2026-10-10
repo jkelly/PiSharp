@@ -93,14 +93,8 @@ public sealed partial class RpcSessionDispatcher
             }
             catch (Exception error) when (manualWire && error is not RpcDispatchException { Failure: RpcDispatchFailure.OutputFailed })
             {
-                var message = error switch
-                {
-                    RpcCommandException rpc => rpc.Message,
-                    SessionCompactionException summary => summary.Message,
-                    PersistentAgentSessionException session => session.Message,
-                    OperationCanceledException => "Compaction cancelled",
-                    _ => "RPC command failed."
-                };
+                // rpc-mode.ts: the error session.compact throws answers with its message ("Compaction cancelled" when aborted).
+                var message = error is OperationCanceledException ? "Compaction cancelled" : error.Message;
                 throw new RpcCommandException(command.Id, command.Type, message);
             }
         }

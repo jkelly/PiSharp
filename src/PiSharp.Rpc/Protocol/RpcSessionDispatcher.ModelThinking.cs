@@ -6,8 +6,6 @@ namespace PiSharp.Rpc.Protocol;
 
 public sealed partial class RpcSessionDispatcher
 {
-    private static readonly string[] ThinkingOrder = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-
     private async Task<JsonData?> ModelThinkingAsync(RpcCommandEnvelope command,
         AgentSessionAttachment? attachment, CancellationToken token)
     {
@@ -112,15 +110,6 @@ public sealed partial class RpcSessionDispatcher
         writer.WriteEndArray();
     }, _options.MaximumOutputBytes);
 
-    private static string ClampThinkingLevel(string requested, ImmutableArray<string> available)
-    {
-        if (available.Contains(requested)) return requested;
-        var index = Array.IndexOf(ThinkingOrder, requested);
-        if (index < 0) return available.FirstOrDefault() ?? "off";
-        for (var candidate = index; candidate < ThinkingOrder.Length; candidate++)
-            if (available.Contains(ThinkingOrder[candidate])) return ThinkingOrder[candidate];
-        for (var candidate = index - 1; candidate >= 0; candidate--)
-            if (available.Contains(ThinkingOrder[candidate])) return ThinkingOrder[candidate];
-        return available.FirstOrDefault() ?? "off";
-    }
+    /// <summary>agent-session.ts _clampThinkingLevel: models.ts clampThinkingLevel (<see cref="PiSharp.AI.ThinkingLevels.Clamp"/>).</summary>
+    private static string ClampThinkingLevel(string requested, ImmutableArray<string> available) => PiSharp.AI.ThinkingLevels.Clamp(available, requested);
 }

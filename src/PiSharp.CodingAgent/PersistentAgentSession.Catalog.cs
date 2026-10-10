@@ -86,7 +86,8 @@ public sealed partial class PersistentAgentSession
             // difference from the declared tools (declareToolChanges). The transcript keeps the declarations it has meanwhile.
             var prospective = context;
             var selection = await replacement.PrepareAndDrainAsync(() => replacement.Resolve(context with { LlmMessages =
-                WithLoadoutRecord(replacement, context.LlmMessages, selected, work) }, configuration.Model, work, activeOrder: selected), work)
+                WithLoadoutRecord(replacement, context.LlmMessages, selected, work) }, configuration.Model, work, tolerated: _toleratedSelection,
+                thinkingLevel: KeptThinking(configuration), activeOrder: selected), work)
                 .ConfigureAwait(false);
             ValidateRuntimeContext(prospective, selection.Configuration, _toleratedSelection, _toleratedThinking);
             await using (var probe = new NativeAgent(selection.Configuration, _clock, new NoopSink(), _agentOptions))

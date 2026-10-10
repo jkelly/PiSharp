@@ -224,10 +224,9 @@ internal static class RpcCommandCodec
         }
         if (name == "set_thinking_level")
         {
-            var level = Required("level", 16);
-            if (level is not ("off" or "minimal" or "low" or "medium" or "high" or "xhigh" or "max"))
-                throw new RpcCommandException(id, name, "Thinking level is invalid.");
-            return new(id, name, ThinkingLevel: level);
+            // rpc-mode.ts set_thinking_level passes the level to setThinkingLevel, which clamps a level the model does not list (an
+            // unknown one to the model's first level, models.ts clampThinkingLevel) instead of refusing it.
+            return new(id, name, ThinkingLevel: Required("level", 16));
         }
         if (name == "new_session") return new(id, name, Message: Optional("parentSession", 4096));
         if (name == "fork")
