@@ -156,9 +156,11 @@ public sealed class McpBackgroundConnections
         }
         catch (Exception error)
         {
-            // The session ended meanwhile; like the original, late results of a retired session are dropped. Retirement cancels the
-            // attachment's lifetime before it stops these connections, so a connection cancelled in between is dropped too.
-            if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested) return;
+            // The session ended meanwhile; like the original, late results of a retired session are dropped. Only teardown cancels a
+            // connection (the session's retirement or its server's disposal, which can run before `stop` is cancelled); timeouts
+            // fail with their own errors (HttpClient's wraps a TimeoutException). So a cancelled connection is dropped, never reported as a failure.
+            if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested ||
+                error is OperationCanceledException { InnerException: not TimeoutException }) return;
             Report(new(generation, entry, null, error)); return;
         }
         if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested) return;
