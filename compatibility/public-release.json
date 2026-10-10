@@ -24,9 +24,10 @@
     "status": "Version metadata prepared; fresh versioned lock, build, package and consumer evidence required."
   },
   "publication": {
-    "tagCreated": false,
-    "binaryReleasePublished": false,
-    "nugetPackagesPublished": false
+    "tagCreated": true,
+    "binaryReleasePublished": true,
+    "nugetPackagesPublished": true,
+    "publishedOn": "2026-10-09"
   },
   "previousReleases": [
     {

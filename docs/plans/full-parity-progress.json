@@ -205,13 +205,14 @@
     "version": "1.1.0.2",
     "kind": "patch",
     "baseline": "v1.1.0",
-    "status": "ready",
+    "status": "published",
     "ships": "everything on parity/full",
     "notes": "docs/release-notes/1.1.0.2.md",
     "changelog": "website/src/content/changelog/1.1.0.2.md (date 2026-10-09)",
-    "tag": "not created; the owner confirms the tag",
+    "tag": "v1.1.0.2 (dcd9da4), release run 38009832864",
     "blockers": [],
-    "dryRun": "run 38007732077 (Linux, tests) green"
+    "dryRun": "run 38007732077 (Linux, tests) green",
+    "publishedOn": "2026-10-09"
   },
   "messageCaps": {
     "status": "merged",
