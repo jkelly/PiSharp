@@ -13,7 +13,7 @@ internal sealed record UiReply(string? Id, bool Cancelled, string? Text, bool? C
 internal static class RpcExtensionUiCodec
 {
     internal static bool IsResponse(JsonData raw) => raw.Value.ValueKind == JsonValueKind.Object &&
-        raw.Value.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "extension_ui_response";
+        raw.Value.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String && PiSharp.Contracts.JsonUtf16.GetString(type) == "extension_ui_response";
 
     internal static UiReply Decode(JsonData raw, RpcExtensionUiOptions options)
     {

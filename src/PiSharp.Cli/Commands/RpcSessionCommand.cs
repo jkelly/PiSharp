@@ -186,7 +186,8 @@ public static class RpcSessionCommand
             // Pending input commands may carry Pi-sized images; retain two maximal commands while a dialog is open.
             // Pi extensions (IMPL-E) get a UI in the modes upstream gives one (tui and rpc); print and json run without (hasUI false).
             var piExtensions = pi?.Extensions;
-            ui = parsed.Extension is null && (piExtensions is null || pi!.ExtensionMode is not ("rpc" or "tui")) ? null
+            // The built-in extensions (extensions/index.ts: /llama, /mcp) have rpc-mode.ts's UI context too, with no file extension loaded.
+            ui = parsed.Extension is null && (piExtensions is null ? pi?.ExtensionMode != "rpc" : pi!.ExtensionMode is not ("rpc" or "tui")) ? null
                 : new(pi is null ? new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes)
                     // rpc-mode.ts createExtensionUIContext: dialogs, their texts, choices and responses have no limits of their own;
                     // requests and responses stay within one frame and a bounded number of open dialogs.
