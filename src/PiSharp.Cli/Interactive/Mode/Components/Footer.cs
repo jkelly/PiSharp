@@ -47,6 +47,12 @@ internal interface IFooterSession
     string GetCwd();
     /// <summary>sessionManager.getSessionName().</summary>
     string? GetSessionName();
+    /// <summary>
+    /// PiSharp: what <see cref="GetContextUsage"/> reads, when it is not derived from the entries and model at render time. The
+    /// interactive mode mirrors the session over RPC and receives the context usage (get_session_stats) separately from the entries,
+    /// so the cached stats also follow it (compared by reference). Null where the context usage follows the other keys.
+    /// </summary>
+    object? ContextUsageSource => null;
 }
 
 /// <summary>Source UsageTotals.</summary>
@@ -83,7 +89,7 @@ internal sealed partial class FooterComponent : IComponent
     private SessionStats? sessionStats;
 
     private sealed record SessionStats(IFooterSession Session, string SessionId, string? LeafId, int EntryCount, JsonObject? LimitsModel,
-        UsageTotals UsageTotals, double? LatestCacheHitRate, FooterContextUsage? ContextUsage);
+        object? ContextUsageSource, UsageTotals UsageTotals, double? LatestCacheHitRate, FooterContextUsage? ContextUsage);
 
     public FooterComponent(IFooterSession session, IReadonlyFooterDataProvider footerData)
     {
@@ -159,9 +165,11 @@ internal sealed partial class FooterComponent : IComponent
         var sessionId = session.GetSessionId();
         var leafId = session.GetLeafId();
         var limitsModel = session.RoutedModel?.Model ?? session.Model;
+        var contextUsageSource = session.ContextUsageSource;
         var cached = sessionStats;
         if (cached is not null && ReferenceEquals(cached.Session, session) && cached.SessionId == sessionId && cached.LeafId == leafId &&
-            cached.EntryCount == entryCount && ReferenceEquals(cached.LimitsModel, limitsModel))
+            cached.EntryCount == entryCount && ReferenceEquals(cached.LimitsModel, limitsModel) &&
+            ReferenceEquals(cached.ContextUsageSource, contextUsageSource))
             return cached;
 
         // Calculate cumulative usage from ALL session entries (not just post-compaction messages)
@@ -198,14 +206,14 @@ internal sealed partial class FooterComponent : IComponent
         // Calculate context usage from session (handles compaction correctly).
         // After compaction, tokens are unknown until the next LLM response.
         var contextUsage = session.GetContextUsage();
-        sessionStats = new(session, sessionId, leafId, entryCount, limitsModel, usageTotals, latestCacheHitRate, contextUsage);
+        sessionStats = new(session, sessionId, leafId, entryCount, limitsModel, contextUsageSource, usageTotals, latestCacheHitRate, contextUsage);
         return sessionStats;
     }
 
     public List<string> Render(int width)
     {
         var stateModel = session.StateModel;
-        var (_, _, _, _, _, usageTotals, latestCacheHitRate, contextUsage) = GetSessionStats();
+        var (_, _, _, _, _, _, usageTotals, latestCacheHitRate, contextUsage) = GetSessionStats();
         var contextWindow = contextUsage?.ContextWindow ?? (stateModel?["contextWindow"] is { } window ? UsageTotals.Num(window) : 0);
         var contextPercentValue = contextUsage?.Percent ?? 0;
         // `contextUsage?.percent !== null`: an absent context usage still shows 0.0.
