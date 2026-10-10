@@ -156,6 +156,12 @@ internal static partial class Program
             Check(NativeLog(sandbox).Contains("resources_discover " + JsonSerializer.Serialize(new { type = "resources_discover", cwd = sandbox.Cwd, reason = "startup" })),
                 "the native handler saw the event: " + string.Join("|", NativeLog(sandbox)));
             Check(sandbox.Requests.Single().Body!.Contains("Template body from a native extension", StringComparison.Ordinal), "the discovered template expanded: " + sandbox.Requests.Single().Body);
+            // resource-loader.ts reload: /reload asks the reloaded extensions again, with reason "reload".
+            var (rpcCode, records, rpcStderr) = await RunRpc(sandbox, [.. Model, "-e", manifest], ["""{"id":"r","type":"prompt","message":"/reload"}"""],
+                (record, _) => IsResponse(record, "r"));
+            Equal(0, rpcCode, "rpc exit; " + rpcStderr + string.Join("\n", records.Select(record => record.ToJsonString())));
+            Check(NativeLog(sandbox).Contains("resources_discover " + JsonSerializer.Serialize(new { type = "resources_discover", cwd = sandbox.Cwd, reason = "reload" })),
+                "the reloaded native handler saw reason reload: " + string.Join("|", NativeLog(sandbox)));
         }
         finally { Environment.SetEnvironmentVariable(NativePromptVariable, null); }
     }

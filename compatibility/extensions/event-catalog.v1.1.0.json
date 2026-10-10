@@ -439,9 +439,7 @@
             "case": "closeout.native-resources-discover-adds-paths"
           }
         ],
-        "gaps": [
-          "The native case asserts reason \"startup\" only; \"reload\" is asserted at registry level."
-        ]
+        "gaps": []
       }
     },
     {
