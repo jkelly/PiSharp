@@ -1,7 +1,7 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/model-registry.ts (classify,
 // generateImages, getModelsOfType, findOfType, getAvailableOfType), core/model-runtime.ts (prepareRequest),
 // core/auth-storage.ts (stored credentials), packages/ai/src/auth/resolve.ts (resolveProviderAuth, resolveStoredOAuth) and
-// packages/ai/src/models.ts (checkProviderAuth).
+// packages/ai/src/models.ts (checkProviderAuth) and packages/coding-agent/src/extensions/llama/provider.ts (the llama.cpp classifiers).
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.AI.Authentication;

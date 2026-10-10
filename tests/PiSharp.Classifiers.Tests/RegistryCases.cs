@@ -41,6 +41,25 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> RegistryCases() =>
     [
+        // extensions/llama/provider.ts getAllModels: a discovered catalog (llama.cpp) is read on every lookup, and the provider is
+        // available once LLAMA_BASE_URL (or a stored credential) names the server.
+        ("registry.provider-model-source-follows-a-discovered-llama-catalog", async () =>
+        {
+            var current = ImmutableArray<OperationModel>.Empty;
+            var env = new Dictionary<string, string>();
+            var registry = new ModelOperationsRegistry(ModelOperationsAuth.Standard(name => env.GetValueOrDefault(name)));
+            registry.SetProvider(BuiltinModelOperationProviders.LlamaCpp([], () => current));
+            Equal(0, registry.GetModelsOfType(ModelType.Classifier, "llama.cpp").Length, "empty catalog");
+            current = [TestClassifier("llama.cpp", "qwen", "llama-cpp-classify"), TestClassifier("llama.cpp", "kev", "typesafe-system-one")];
+            Names(["qwen", "kev"], registry.GetModelsOfType(ModelType.Classifier, "llama.cpp").Select(model => model.Id), "discovered models");
+            Equal(0, (await registry.GetAvailableOfTypeAsync(ModelType.Classifier, "llama.cpp")).Length, "dormant without a server URL");
+            env["LLAMA_BASE_URL"] = "http://127.0.0.1:8080/v1/";
+            Names(["qwen", "kev"], (await registry.GetAvailableOfTypeAsync(ModelType.Classifier, "llama.cpp")).Select(model => model.Id), "available");
+            var auth = await registry.GetAuthAsync("llama.cpp");
+            Check(auth is { ApiKey: "local", BaseUrl: "http://127.0.0.1:8080/v1" } && auth.Env["LLAMA_BASE_URL"] == "http://127.0.0.1:8080", "llama auth");
+            current = [];
+            Equal(null, registry.GetModelOfType(ModelType.Classifier, "llama.cpp", "qwen"), "a later catalog drops the model");
+        }),
         ("registry.builtin-shards-route-luna-to-decisions-and-openrouter-to-system-one-and-images", async () =>
         {
             var registry = BuiltinRegistry(new Dictionary<string, string> { ["OPENAI_API_KEY"] = "env-openai", ["OPENROUTER_API_KEY"] = "env-openrouter" });

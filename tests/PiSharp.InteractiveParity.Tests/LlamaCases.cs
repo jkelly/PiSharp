@@ -98,9 +98,7 @@ internal static class LlamaCases
             await pi.WaitUntil(text => pi.Terminal.Lines.Any(line => line.Contains("beta", StringComparison.Ordinal) && line.Contains("loaded · 33k context", StringComparison.Ordinal)), "beta loaded in the list");
             Check(router.Server.Seen().Contains("POST /models/load {\"model\":\"beta\"}"), "load request: " + string.Join("\n", router.Server.Seen()));
             Check(!router.Server.Seen().Any(line => line.StartsWith("POST /models/unload", StringComparison.Ordinal)), "alpha kept loaded");
-            // Unloading asks for confirmation.
-            pi.Type(Up);
-            await Task.Delay(100);
+            // Unloading asks for confirmation (the list starts at its first model again).
             pi.Type(Enter);
             await pi.WaitFor("Unload model?");
             pi.Type(Enter);
@@ -125,6 +123,8 @@ internal static class LlamaCases
             Contains(pi.Terminal.Text, "Could not connect to the server.", "message");
             Contains(pi.Terminal.Text, "Retry", "retry");
             pi.Type(Enter);
+            // Retry reconnects (and fails again) before the same choice returns.
+            await Task.Delay(3000);
             await pi.WaitFor("llama.cpp unavailable");
             pi.Type(Down);
             await Task.Delay(100);
@@ -147,20 +147,20 @@ internal static class LlamaCases
                         _ = Task.Run(async () =>
                         {
                             for (var wait = 0; wait < 100 && server.OpenStreams == 0; wait++) await Task.Delay(20);
-                            server.Send("""{"model":"owner/model-GGUF:Q4_K_M","event":"download_progress","data":{"progress":{"a":{"done":512,"total":1024}}}}""");
+                            server.Send("""{"model":"owner/qwen-GGUF:Q4_K_M","event":"download_progress","data":{"progress":{"a":{"done":512,"total":1024}}}}""");
                             await Task.Delay(400);
                             finished = true;
-                            server.Send("""{"model":"owner/model-GGUF:Q4_K_M","event":"download_finished","data":{}}""");
+                            server.Send("""{"model":"owner/qwen-GGUF:Q4_K_M","event":"download_finished","data":{}}""");
                         });
                         return LlamaServer.Json("""{"success":true}""");
                     case "/models" or "/models?reload=1":
                         return LlamaServer.Json(!downloading ? """{"data":[]}""" : finished
-                            ? """{"data":[{"id":"owner/model-GGUF:Q4_K_M","status":{"value":"unloaded"}}]}"""
-                            : """{"data":[{"id":"owner/model-GGUF:Q4_K_M","status":{"value":"downloading","progress":{"a":{"done":512,"total":1024}}}}]}""");
+                            ? """{"data":[{"id":"owner/qwen-GGUF:Q4_K_M","status":{"value":"unloaded"}}]}"""
+                            : """{"data":[{"id":"owner/qwen-GGUF:Q4_K_M","status":{"value":"downloading","progress":{"a":{"done":512,"total":1024}}}}]}""");
                     case "/api/models?search=qwen&filter=gguf&sort=downloads&direction=-1&limit=20":
-                        return LlamaServer.Json("""[{"id":"owner/model-GGUF","downloads":1200}]""");
-                    case "/api/models/owner/model-GGUF?blobs=true":
-                        return LlamaServer.Json("""{"id":"owner/model-GGUF","gated":"manual","siblings":[{"rfilename":"model-Q5_K_M.gguf","size":6000},{"rfilename":"model-Q4_K_M.gguf","size":5000}]}""");
+                        return LlamaServer.Json("""[{"id":"owner/qwen-GGUF","downloads":1200}]""");
+                    case "/api/models/owner/qwen-GGUF?blobs=true":
+                        return LlamaServer.Json("""{"id":"owner/qwen-GGUF","gated":"manual","siblings":[{"rfilename":"model-Q5_K_M.gguf","size":6000},{"rfilename":"model-Q4_K_M.gguf","size":5000}]}""");
                     default: return LlamaServer.NotFound();
                 }
             };
@@ -175,18 +175,18 @@ internal static class LlamaCases
             await pi.WaitFor("Type at least 2 characters");
             Contains(pi.Terminal.Text, "Model name or owner/repository[:quant]", "search hint");
             pi.Type("qwen");
-            await pi.WaitFor("owner/model-GGUF  1.2k downloads");
+            await pi.WaitFor("owner/qwen-GGUF  1.2k downloads");
             pi.Type(Enter);
             await pi.WaitFor("Hugging Face access required");
             Contains(pi.Terminal.Text, "Manual approval is required at:", "approval");
-            Contains(pi.Terminal.Text, "https://huggingface.co/owner/model-GGUF", "access page");
+            Contains(pi.Terminal.Text, "https://huggingface.co/owner/qwen-GGUF", "access page");
             pi.Type(Enter);
             await pi.WaitFor("Select quantization");
             Contains(pi.Terminal.Text, "Q4_K_M · 4.88 KiB · recommended", "recommended quantization first");
             Contains(pi.Terminal.Text, "Q5_K_M · 5.86 KiB", "other quantization");
             pi.Type(Enter);
-            await pi.WaitFor("Downloaded owner/model-GGUF:Q4_K_M");
-            Check(server.Seen().Contains("POST /models {\"model\":\"owner/model-GGUF:Q4_K_M\"}"), "download request: " + string.Join("\n", server.Seen()));
+            await pi.WaitFor("Downloaded owner/qwen-GGUF:Q4_K_M");
+            Check(server.Seen().Contains("POST /models {\"model\":\"owner/qwen-GGUF:Q4_K_M\"}"), "download request: " + string.Join("\n", server.Seen()));
             Check(server.Requests.Where(request => request.Path.StartsWith("/api/", StringComparison.Ordinal)).All(request => request.Header("authorization") == "Bearer hf-test"),
                 "the Hugging Face token");
             pi.Type(Escape);

@@ -679,6 +679,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);
             // pi.getCommands(): extension commands, prompt templates and skills, as the session's command catalog lists them.
             if (piExtensions is not null) { piExtensions.CommandCatalog = () => profile.CommandCatalog; piExtensions.ShutdownRequested = profile.RequestPiShutdown; }
+            profile.BuiltinCommandUi = extensionUi;
             return profile;
         }
         catch (Exception original)

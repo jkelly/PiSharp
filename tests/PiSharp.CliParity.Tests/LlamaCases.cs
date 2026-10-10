@@ -32,6 +32,7 @@ internal static partial class Program
         ("llama.download-reports-byte-progress-and-returns-the-catalog", LlamaDownload),
         ("llama.registry-provider-auth-availability-and-request-auth", LlamaRegistry),
         ("llama.print-mode-streams-a-restored-model-through-v1", LlamaPrintMode),
+        ("llama.command-outside-interactive-mode-only-warns", LlamaOutsideInteractive),
     ];
 
     private const string LlamaFree = """{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}""";
@@ -474,5 +475,16 @@ internal static partial class Program
         Equal("""{"model":"qwen","messages":[{"role":"system","content":"<system prompt>"},{"role":"user","content":[{"type":"text","text":"hi"}]}],"stream":true,"stream_options":{"include_usage":true},"max_tokens":4096,"tools":[""" +
             string.Join(",", new[] { "read", "bash", "edit", "write" }.Select(Tool)) + "]}",
             pinned.ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }), "chat request body");
+    }
+
+    // index.ts: outside interactive mode /llama only warns ("/llama is available in interactive mode"); nothing reaches the model.
+    private static async Task LlamaOutsideInteractive()
+    {
+        using var sandbox = new Sandbox("llama-noninteractive");
+        var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "/llama");
+        Equal(0, code, "print exit; " + stderr);
+        Equal("", stdout, "print output");
+        Equal(0, sandbox.Requests.Count, "print: no model request");
+        // RPC mode with an extension UI: the extension_ui_request notify (ExtensionParity native.llama-command-in-rpc-mode-notifies).
     }
 }
