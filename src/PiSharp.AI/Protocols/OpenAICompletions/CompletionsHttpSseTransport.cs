@@ -9,7 +9,7 @@ using PiSharp.Contracts;
 namespace PiSharp.AI.Protocols.OpenAICompletions;
 
 public sealed record CompletionsHttpSseOptions(int MaximumDataEvents = int.MaxValue, int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
-    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null)
+    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, SseDecoderOptions? Framing = null)
 {
     public CompletionsLifecycleHooks? Hooks { get; init; }
     public CompletionsResponseBodyReaderFactory? BodyReaderFactory { get; init; }
@@ -60,7 +60,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
         _requestFactory = requestFactory; _options = options ?? new();
         _options.Retry?.Validate();
         if (_options.MaximumDataEvents <= 0 || _options.MaximumDataCharacters <= 0 || _options.MaximumTotalDataCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64 || _options.MaximumResponseHeaders <= 0 ||
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || _options.MaximumResponseHeaders <= 0 ||
             _options.MaximumResponseHeaderCharacters <= 0 || _options.MaximumTotalResponseHeaderCharacters <= 0 ||
             _options.MaximumResponseMetadataBytes < 2 || _options.SourceEventCapacity is < 1 or > 4096 ||
             _options.MaximumSourceValueCharacters is < 2 or > 8_388_608 || _options.MaximumSourceValueBytes is < 2 or > 8_388_608 ||
@@ -446,7 +446,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
     {
         try
         {
-            using var document = JsonDocument.Parse(data, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(data, PiSharp.Contracts.JsonData.DocumentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object) throw Protocol();
             Check(document.RootElement, 0, token);
             return JsonData.FromElement(document.RootElement); // Owns all fields; decoded duplicates are rejected.

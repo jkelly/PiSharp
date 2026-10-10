@@ -48,7 +48,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     {
         MaximumRegistrations = int.MaxValue, MaximumRegistrationsPerOwner = int.MaxValue, MaximumConcurrentDispatches = int.MaxValue,
         MaximumMetadataCharacters = int.MaxValue, MaximumDescriptionCharacters = 16 * 1024 * 1024, MaximumJsonCharacters = 16 * 1024 * 1024,
-        MaximumJsonDepth = 64
+        MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth
     };
     /// <summary>The binding of one server's (or the resource tools') registrations admits every tool it lists.</summary>
     internal static ToolInvokerOptions BindingInvokerOptions { get; } = new(MaximumTools: int.MaxValue);
@@ -72,6 +72,9 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     /// <summary>The model registry codemode scripts reach as <c>models</c>; defaults to the CLI registry (embedded catalogs, the
     /// environment and auth.json), built on first use.</summary>
     public Func<PiSharp.Codemode.ICodemodeModelRuntime?>? CodemodeModels { get; init; }
+    /// <summary>The run's model registry (the Pi entry's: built-in providers and the providers its extensions registered), which the
+    /// default <see cref="CodemodeModels"/> uses once the run bound it (codemode reads ctx.modelRegistry upstream).</summary>
+    internal PiSharp.AI.ModelOperations.ModelOperationsRegistry? RunModelOperations { get; set; }
     /// <summary>Whether the session's project is trusted, so its <c>.pi/mcp.json</c> is read (ctx.isProjectTrusted()). The project
     /// trust store and its startup flow supply it; the default is the original's non-interactive answer without a stored decision
     /// (defaultProjectTrust "ask" without a UI): not trusted.</summary>
@@ -160,7 +163,8 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         var environment = InheritedEnvironment();
         var autoEnableCodemode = configuredAutoEnable ?? true;
         var (codemodeMode, inlineBudget) = PiSharp.Codemode.CodemodeToolDefinition.ReadSettings(settings?.Value);
-        var codemodeModels = CodemodeModels ?? (() => McpCodemode.ModelRuntime.CreateDefault());
+        var codemodeModels = CodemodeModels ?? (() => RunModelOperations is { } runModels
+            ? new McpCodemode.ModelRuntime(new PiSharp.Cli.Extensions.NativeExtensionModelOperations(runModels)) : McpCodemode.ModelRuntime.CreateDefault());
         var credentials = new McpOAuthCredentialStore(Credentials ?? McpOAuthFileCredentialBackend.InAgentDirectory(AgentDirectory));
         var serverLog = new McpServerLog(Path.Combine(AgentDirectory, "mcp.log"));
         // One source for every generation: the profile admits a single servers prompt source for its lifetime.

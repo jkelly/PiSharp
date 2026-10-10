@@ -225,7 +225,7 @@ internal sealed class NestedToolCallRecord(int maximumCalls, int maximumArgument
                 {
                     writer.WriteStartObject(); writer.WriteString("id", entry.Id); writer.WriteString("name", entry.Name);
                     writer.WriteString("status", entry.Status);
-                    if (entry.Arguments is { } args) { writer.WritePropertyName("arguments"); writer.WriteRawValue(args.ToString()); }
+                    if (entry.Arguments is { } args) { writer.WritePropertyName("arguments"); writer.WriteRawValue(args.ToString(), skipInputValidation: true); }
                     if (entry.OmittedBytes is { } bytes) writer.WriteNumber("argumentsBytes", bytes);
                     if (entry.Duration is { } duration) writer.WriteNumber("durationMs", duration);
                     if (!string.IsNullOrEmpty(entry.Error)) writer.WriteString("error", entry.Error);

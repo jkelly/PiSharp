@@ -13,7 +13,7 @@ public sealed record ResponsesKeyAuthRequestOptions(
     JsonData? PayloadOverrides = null,
     int MaximumOutputTokens = 1_000_000, int MaximumKeyCharacters = 4096,
     int MaximumEndpointCharacters = 4096, int MaximumModelCharacters = 1024,
-    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = 32,
+    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     string? SessionId = null, double? Temperature = null,
     int MaximumSessionIdCharacters = 4096, double MaximumTemperatureMagnitude = 2,
     string? ReasoningEffort = null, string? ReasoningSummary = null, JsonData? ThinkingLevelMap = null,
@@ -91,7 +91,7 @@ public sealed class ResponsesKeyAuthRequestFactory
         if (endpoint is null || expectedModel is null || projectionOptions is null ||
             _options.MaximumOutputTokens < 16 || _options.MaximumKeyCharacters <= 0 ||
             _options.MaximumEndpointCharacters <= 0 || _options.MaximumModelCharacters <= 0 ||
-            _options.MaximumPayloadBytes <= 0 || _options.MaximumPayloadDepth is < 1 or > 64 ||
+            _options.MaximumPayloadBytes <= 0 || _options.MaximumPayloadDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             _options.MaximumSessionIdCharacters <= 0 || !double.IsFinite(_options.MaximumTemperatureMagnitude) ||
             _options.MaximumTemperatureMagnitude <= 0)
             throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
@@ -198,14 +198,14 @@ public sealed class ResponsesKeyAuthRequestFactory
         var payload = Encoding.UTF8.GetBytes(Prefix + _modelJson + InputField + input + _suffix + toolField + _toolChoiceSuffix + _reasoningSuffix + "}");
         if (_options.ModelSamplingParams is not null || _levelSamplingParams is not null || _options.SamplingParams is not null)
         {
-            var root = JsonNode.Parse(payload)!.AsObject();
+            var root = JsonNode.Parse(payload, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
             // Pi abe508e1b89912adde45528136c3221eb69acdd7 openai-responses.ts buildParams: model, effective level, then request keys.
             foreach (var sampling in new[] { _options.ModelSamplingParams, _levelSamplingParams, _options.SamplingParams })
             {
                 if (sampling is null || sampling.Value.ValueKind == JsonValueKind.Null) continue;
                 if (sampling.Value.ValueKind != JsonValueKind.Object) throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
                 AdmitHookPayload(sampling, cancellationToken);
-                foreach (var property in sampling.Value.EnumerateObject()) root[property.Name] = JsonNode.Parse(property.Value.GetRawText());
+                foreach (var property in sampling.Value.EnumerateObject()) root[property.Name] = JsonNode.Parse(property.Value.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             }
             var merged = JsonData.Parse(root.ToJsonString());
             AdmitHookPayload(merged, cancellationToken);

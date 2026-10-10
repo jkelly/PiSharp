@@ -28,7 +28,7 @@ public sealed class CompletionsRequestException : Exception
 public sealed record CompletionsToolDeclarationProjectionOptions(bool SupportsStrictMode = false,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
     // openai-completions.ts convertTools declares every tool: no tool or declaration count bound (payload bytes bound the size).
-    int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue, int MaximumJsonDepth = 32,
+    int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     public bool SupportsOpenAIGrammarTools { get; init; }
@@ -88,7 +88,7 @@ public sealed class CompletionsToolDeclarationProjector
                             sampling.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "grammar"))
                         {
                             // The shared helper validates schema/replay; provider-local grammar replaces only the wire declaration.
-                            projected ??= JsonNode.Parse(body.ToString())!.AsObject();
+                            projected ??= JsonNode.Parse(body.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
                             projected["toolsAdded"]!.AsArray()[index]!.AsObject().Remove("constrainedSampling");
                         }
                         index++;
@@ -110,7 +110,7 @@ public sealed class CompletionsToolDeclarationProjector
                     result.Add(new JsonObject { ["type"] = "custom", ["custom"] = new JsonObject
                     {
                         ["name"] = CompletionsJson.String(declaration, "name"),
-                        ["description"] = declaration.TryGetProperty("description", out var description) ? JsonNode.Parse(description.GetRawText()) : null,
+                        ["description"] = declaration.TryGetProperty("description", out var description) ? JsonNode.Parse(description.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) : null,
                         ["format"] = new JsonObject { ["type"] = "grammar", ["grammar"] = new JsonObject
                             { ["syntax"] = grammar.Syntax, ["definition"] = grammar.Definition } }
                     } });
@@ -118,7 +118,7 @@ public sealed class CompletionsToolDeclarationProjector
                 }
                 var function = new JsonObject();
                 foreach (var property in declaration.EnumerateObject())
-                    if (property.Name != "type") function[property.Name] = JsonNode.Parse(property.Value.GetRawText());
+                    if (property.Name != "type") function[property.Name] = JsonNode.Parse(property.Value.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
                 result.Add(new JsonObject { ["type"] = "function", ["function"] = function });
             }
             return CompletionsJson.Source(result.Own(), _options.MaximumOutputCharacters, _options.MaximumOutputBytes,
@@ -207,12 +207,13 @@ internal sealed record CompletionsGrammar(string Syntax, string Definition, stri
 
 internal static class CompletionsJson
 {
-    internal static readonly JsonSerializerOptions Output = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    internal static readonly JsonSerializerOptions Output = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, MaxDepth = 2 * JsonData.MaximumDepth };
     internal static CompletionsRequestException Fail(CompletionsRequestFailure failure) => new(failure);
     internal static string Text(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String) throw Fail(CompletionsRequestFailure.InvalidTranscript);
-        var text = value.GetString()!; Unicode(text); return text;
+        // A lone surrogate reaches a request only inside a tool call's arguments (TranscriptSurrogates), which go out escaped.
+        return JsonUtf16.GetString(value);
     }
     internal static string String(JsonElement value, string name) => Text(value.GetProperty(name));
     internal static void Unicode(string text)
@@ -272,7 +273,7 @@ internal static class CompletionsJson
             var raw = item.ToJsonString(Output); var separator = _items.Count == 0 ? 0 : 1;
             if (_items.Count >= maximumItems || raw.Length + separator > maximumCharacters - _characters ||
                 Encoding.UTF8.GetByteCount(raw) + (long)separator > maximumBytes - _bytes) throw Fail(CompletionsRequestFailure.ResourceLimit);
-            using var document = JsonDocument.Parse(raw); Check(document.RootElement, 1, maximumDepth, token);
+            using var document = JsonDocument.Parse(raw, PiSharp.Contracts.JsonData.DocumentOptions); Check(document.RootElement, 1, maximumDepth, token);
             _characters += raw.Length + separator; _bytes += Encoding.UTF8.GetByteCount(raw) + separator; _items.Add(item);
         }
         internal JsonData Own() { token.ThrowIfCancellationRequested(); return JsonData.Parse(_items.ToJsonString(Output)); }

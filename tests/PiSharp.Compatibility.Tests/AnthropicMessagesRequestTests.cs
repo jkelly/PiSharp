@@ -346,7 +346,8 @@ static class AnthropicMessagesRequestTests
         using var document = JsonDocument.Parse("""{"role":"user","content":"text","opaque":{"n":1,}}""", new JsonDocumentOptions { AllowTrailingCommas = true });
         var permissive = new TranscriptEntry("user", JsonData.FromElement(document.RootElement));
         Throws(AnthropicRequestFailure.InvalidTranscript, () => Project(Request(permissive)));
-        Throws(AnthropicRequestFailure.UnsupportedUnicode, () => Project(Request(Entry("""{"role":"user","content":"\uD800"}"""))));
+        // A string value may hold a lone surrogate (Pi keeps it); the agent's TranscriptSurrogates drops it from message text first.
+        _ = Project(Request(Entry("""{"role":"user","content":"\uD800"}""")));
         var invalid = Entry("""{"role":"user","content":[{"type":"audio","data":"private"}]}""");
         var error = Throws(AnthropicRequestFailure.UnsupportedContent, () => Project(Request(invalid)));
         Assert(!error.Message.Contains("private", StringComparison.Ordinal), "Projection diagnostic leaked payload.");
@@ -354,7 +355,7 @@ static class AnthropicMessagesRequestTests
         try { new AnthropicMessagesRequestProjector(exact).Project(request, cancellation.Token); throw new Exception("Cancellation ignored."); }
         catch (OperationCanceledException errorCancelled) { Equal(cancellation.Token, errorCancelled.CancellationToken); }
         Equal(raw, user.WireBody.ToString()); Equal(output, Project(request).ToString());
-        foreach (var options in new[] { new AnthropicMessagesRequestOptions(0), new(128, MaximumJsonDepth: 65), new(128, ThinkingDisplay: "private"), new(128, Effort: "private") })
+        foreach (var options in new[] { new AnthropicMessagesRequestOptions(0), new(128, MaximumJsonDepth: 1001), new(128, ThinkingDisplay: "private"), new(128, Effort: "private") })
         { try { _ = new AnthropicMessagesRequestProjector(options); throw new Exception("Invalid options accepted."); } catch (ArgumentOutOfRangeException) { } }
         return Task.CompletedTask;
     }
@@ -402,7 +403,7 @@ static class AnthropicMessagesRequestTests
         var deep = JsonData.Parse("""{"type":"tool","name":"read","opaque":{"items":[0]}}""");
         Throws(AnthropicRequestFailure.ResourceLimit, () => Project(Request(), new(128, ToolChoice: deep, MaximumJsonDepth: 2)));
         Throws(AnthropicRequestFailure.UnsupportedNumber, () => Project(Request(), new(128, ToolChoice: JsonData.Parse("""{"type":"tool","name":"read","opaque":1e999}"""))));
-        Throws(AnthropicRequestFailure.UnsupportedUnicode, () => Project(Request(), new(128, ToolChoice: JsonData.Parse("""{"type":"tool","name":"\uD800"}"""))));
+        _ = Project(Request(), new(128, ToolChoice: JsonData.Parse("""{"type":"tool","name":"\uD800"}""")));
         JsonData malformed;
         using (var document = JsonDocument.Parse("""{"type":"tool","name":"read",}""", new JsonDocumentOptions { AllowTrailingCommas = true }))
             malformed = JsonData.FromElement(document.RootElement);

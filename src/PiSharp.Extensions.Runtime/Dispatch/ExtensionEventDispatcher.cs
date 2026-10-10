@@ -37,7 +37,7 @@ public sealed class ExtensionEventDispatcher
         this.restoreSystemMessage = restoreSystemMessage;
         this.options = options ?? new();
         if (this.options.MaximumTextCharacters <= 0 || this.options.MaximumJsonCharacters <= 0 ||
-            this.options.MaximumJsonBytes <= 0 || this.options.MaximumJsonDepth is < 1 or > 64 ||
+            this.options.MaximumJsonBytes <= 0 || this.options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             this.options.MaximumImages <= 0 || this.options.MaximumConcurrentDispatches <= 0 ||
             this.options.MaximumDispatchDepth <= 0 || this.options.MaximumContextMessages <= 0)
             throw new ArgumentOutOfRangeException(nameof(options));

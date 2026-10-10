@@ -16,7 +16,7 @@ public sealed record SessionJsonEventOutputOptions(int MaximumRecordBytes = 1_04
     internal void Validate()
     {
         if (MaximumRecordBytes is < 257 or > int.MaxValue - 1 || MaximumTotalBytes < MaximumRecordBytes ||
-            MaximumRecords <= 0 || MaximumPendingObservations <= 0 || MaximumJsonDepth is < 1 or > 64 ||
+            MaximumRecords <= 0 || MaximumPendingObservations <= 0 || MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             MaximumReturnedMessages <= 0 || MaximumPendingToolMessages <= 0)
             throw new ArgumentOutOfRangeException(nameof(SessionJsonEventOutputOptions), "Invalid JSON event output bounds.");
     }

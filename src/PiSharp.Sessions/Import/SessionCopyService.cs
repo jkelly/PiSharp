@@ -90,7 +90,9 @@ public sealed class SessionCopyService
     {
         var configured = options ?? new(); _bounds = configured.ReaderOptions ?? new();
         _ = new SessionLogReader(_bounds);
-        if (_bounds.MaximumInputBytes > 67_108_864 || configured.MaximumOutputBytes is < 1 or > 67_108_864)
+        // A session file as long as the Pi entry reads (V8's longest string; see SessionBranchPublisher.MaximumInputBytes).
+        if (_bounds.MaximumInputBytes > PiSharp.Sessions.Storage.SessionBranchPublisher.MaximumInputBytes ||
+            configured.MaximumOutputBytes is < 1 or > PiSharp.Sessions.Storage.SessionBranchPublisher.MaximumInputBytes)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid session copy bounds.");
         _outputLimit = Math.Min(configured.MaximumOutputBytes, _bounds.MaximumInputBytes);
         _files = fileSystem ?? LocalFileSystem; _codec = new(_bounds.CodecOptions);

@@ -41,9 +41,9 @@ internal static partial class ProviderRequest
     internal const int MaxErrorBodyCharacters = 4000;
     private const int DefaultMaxRetryDelayMs = 60_000;
     private static readonly JavaScriptEncoder Relaxed = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
-    private static readonly JsonSerializerOptions NodeOutput = new() { Encoder = Relaxed };
+    private static readonly JsonSerializerOptions NodeOutput = new() { Encoder = Relaxed, MaxDepth = 2 * JsonData.MaximumDepth };
     private static readonly EcmaScriptJsonProjectionOptions Unbounded = new(MaximumInputCharacters: int.MaxValue,
-        MaximumInputBytes: int.MaxValue, MaximumOutputCharacters: int.MaxValue, MaximumOutputBytes: int.MaxValue, MaximumDepth: 64,
+        MaximumInputBytes: int.MaxValue, MaximumOutputCharacters: int.MaxValue, MaximumOutputBytes: int.MaxValue, MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth,
         MaximumNodes: int.MaxValue, MaximumPropertiesPerObject: int.MaxValue, MaximumNumbers: int.MaxValue,
         MaximumNumberCharacters: 16_384, MaximumTotalNumberCharacters: int.MaxValue, MaximumStringCharacters: int.MaxValue);
     private static readonly Lazy<HttpClient> SharedClient = new(() =>
@@ -92,7 +92,7 @@ internal static partial class ProviderRequest
     internal static string JsNumber(double value) => double.IsNaN(value) ? "NaN" : double.IsPositiveInfinity(value) ? "Infinity"
         : double.IsNegativeInfinity(value) ? "-Infinity" : Stringify(JsonValue.Create(value));
 
-    internal static JsonNode Node(JsonData value) => JsonNode.Parse(value.ToString())!;
+    internal static JsonNode Node(JsonData value) => JsonNode.Parse(value.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
 
     internal static bool IsRecord(JsonElement value) => value.ValueKind == JsonValueKind.Object;
 
@@ -304,14 +304,14 @@ internal static partial class ProviderRequest
     /// <summary><c>response.json()</c>.</summary>
     internal static JsonElement ParseJson(string label, string text)
     {
-        try { using var document = JsonDocument.Parse(text); return document.RootElement.Clone(); }
+        try { using var document = JsonDocument.Parse(text, PiSharp.Contracts.JsonData.DocumentOptions); return document.RootElement.Clone(); }
         // undici's response.json() throws JSON.parse's SyntaxError (classifier-shared.ts, llama-cpp-classify.ts).
         catch (JsonException) { throw new InvalidDataException(PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(text, $"{label} returned invalid JSON")); }
     }
 
     /// <summary>A usage record priced with <see cref="ModelCost.Calculate"/>; the exact binary64 costs travel as the
     /// source cost snapshot.</summary>
-    internal static TokenUsage Usage(long input, long output, long cacheRead, long cacheWrite, long totalTokens,
+    internal static TokenUsage Usage(double input, double output, double cacheRead, double cacheWrite, double totalTokens,
         (double Input, double Output, double CacheRead, double CacheWrite, double Total) cost)
     {
         if (!double.IsFinite(cost.Total)) throw new InvalidDataException("Usage cost is not a finite number.");

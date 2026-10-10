@@ -154,7 +154,7 @@ internal static class PiSessionPlanner
         try
         {
             foreach (var line in File.ReadLines(path))
-                if (line.Contains("\"message\"", StringComparison.Ordinal) && JsonNode.Parse(line) is JsonObject entry && PiSessions.Text(entry, "type") == "message") return true;
+                if (line.Contains("\"message\"", StringComparison.Ordinal) && JsonNode.Parse(line, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) is JsonObject entry && PiSessions.Text(entry, "type") == "message") return true;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
         return false;

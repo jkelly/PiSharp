@@ -69,7 +69,7 @@ public sealed class SessionEntryCodec
     {
         _options = options ?? new();
         if (_options.MaximumRecordCharacters <= 0 || _options.MaximumUtf8Bytes <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid session record codec limits.");
     }
 
@@ -79,7 +79,7 @@ public sealed class SessionEntryCodec
         CheckInput(json);
         try
         {
-            using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(json, PiSharp.Contracts.JsonData.DocumentOptions);
             return ReadValidated(document.RootElement);
         }
         catch (JsonException) { throw Failure(SessionEntryCodecFailure.MalformedJson); }
@@ -164,7 +164,7 @@ public sealed class SessionEntryCodec
         else
         {
             var parent = Required(value, "parentId");
-            if (parent.ValueKind == JsonValueKind.String) parentId = parent.GetString();
+            if (parent.ValueKind == JsonValueKind.String) parentId = JsonUtf16.GetString(parent);
             else if (parent.ValueKind != JsonValueKind.Null) throw Failure(SessionEntryCodecFailure.InvalidRecord);
         }
         switch (kind)
@@ -229,11 +229,8 @@ public sealed class SessionEntryCodec
             }
             else foreach (var item in value.EnumerateArray()) ValidateJson(item, depth);
         }
-        else if (value.ValueKind == JsonValueKind.String)
-        {
-            try { CheckUnicode(value.GetString()!); }
-            catch (InvalidOperationException) { throw Failure(SessionEntryCodecFailure.UnsupportedUnicode); }
-        }
+        // session-manager.ts reads each line with JSON.parse, which keeps an escaped lone surrogate in a string value (and
+        // JSON.stringify writes it back as its escape): the value is retained as that escape (see JsonUtf16).
         else if (value.ValueKind == JsonValueKind.Undefined) throw Failure(SessionEntryCodecFailure.InvalidRecord);
     }
 
@@ -304,8 +301,9 @@ public sealed class SessionEntryCodec
     private static void ValidateUsage(JsonElement value)
     {
         Object(value);
+        // Counts are JavaScript numbers: a provider may report a fraction (or any other number) and Pi keeps it.
         foreach (var name in new[] { "input", "output", "cacheRead", "cacheWrite", "totalTokens" })
-            Integer(value, name, nonnegative: true);
+            if (Required(value, name).ValueKind != JsonValueKind.Number) throw Failure(SessionEntryCodecFailure.InvalidRecord);
         var cost = Required(value, "cost"); Object(cost);
         foreach (var name in new[] { "input", "output", "cacheRead", "cacheWrite", "total" })
             if (Required(cost, name).ValueKind != JsonValueKind.Number) throw Failure(SessionEntryCodecFailure.InvalidRecord);
@@ -318,7 +316,7 @@ public sealed class SessionEntryCodec
     private static string String(JsonElement value, string name)
     {
         var field = Required(value, name);
-        return field.ValueKind == JsonValueKind.String ? field.GetString()! : throw Failure(SessionEntryCodecFailure.InvalidRecord);
+        return field.ValueKind == JsonValueKind.String ? JsonUtf16.GetString(field) : throw Failure(SessionEntryCodecFailure.InvalidRecord);
     }
     private static string NonemptyString(JsonElement value, string name)
     {

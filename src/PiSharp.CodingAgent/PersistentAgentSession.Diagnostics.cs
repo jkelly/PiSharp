@@ -37,14 +37,14 @@ public sealed partial class PersistentAgentSession
                 throw Error(PersistentAgentSessionFailure.InvalidCommit);
             var assistant=previous.Ancestry.LastOrDefault(e=>e.Id==assistantId);
             if(assistant is null||assistant.Kind!=SessionEntryKind.Message||
-                !JsonElement.DeepEquals(assistant.WireBody.Value.GetProperty("message"),PersistedWire(PiWireJson.WriteMessage(chat.Message)).Value))
+                !JsonUtf16.DeepEquals(assistant.WireBody.Value.GetProperty("message"),PersistedWire(PiWireJson.WriteMessage(chat.Message)).Value))
                 throw Error(PersistentAgentSessionFailure.InvalidCommit);
             var data=NativeSessionDiagnosticProjector.RecordData(assistant.Id,generation,primary,cleanup);
             var log=_store.Snapshot;
             var entry=Record(_codec,"custom",Identity(_nextEntryId,log.Header.Id,log.Entries),previous.LeafId,_clock,writer=>
             {
                 writer.WriteString("customType",NativeSessionDiagnosticProjector.CustomType);
-                writer.WritePropertyName("data");writer.WriteRawValue(data.Value.GetRawText());
+                writer.WritePropertyName("data");writer.WriteRawValue(data.Value.GetRawText(), skipInputValidation: true);
             });
             var nextContext=_projector.Project(log.Entries.Add(entry),entry.Id);
             if(previous.LlmMessages.Length!=nextContext.LlmMessages.Length||!previous.LlmMessages.Zip(nextContext.LlmMessages).All(pair=>

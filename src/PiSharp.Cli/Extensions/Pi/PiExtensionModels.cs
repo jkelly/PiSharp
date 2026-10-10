@@ -2,7 +2,8 @@
 // getAvailable, find, findOfType, getModelsOfType, getModelOfType, getAvailableOfType, hasConfiguredAuth, getProviderAuthStatus,
 // getProviderDisplayName, getApiKeyForProvider, classify, generateImages, registerProvider with ProviderConfig.images/classifiers),
 // packages/coding-agent/src/core/provider-composer.ts (an extension provider's image and classifier APIs) and
-// packages/coding-agent/src/core/extensions/types.ts (ProviderConfig, ProviderImageModelConfig, ProviderClassifierModelConfig).
+// packages/coding-agent/src/core/extensions/types.ts (ProviderConfig, ProviderImageModelConfig, ProviderClassifierModelConfig), for Node
+// extensions and native C# extensions (IExtensionModelOperationProviderRegistry).
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -11,16 +12,24 @@ using PiSharp.Cli.Commands;
 using PiSharp.Cli.Models;
 using PiSharp.Contracts;
 using PiSharp.Contracts.ModelOperations;
+using PiSharp.Extensions;
+using PiSharp.Extensions.Facade.Context;
 
 namespace PiSharp.Cli.Extensions.Pi;
 
-/// <summary>The model registry the Node extensions see through <c>ctx.modelRegistry</c>: the run's chat catalog, and classifier and
-/// image models with the providers extensions registered (their <c>classify</c>/<c>generateImages</c> run in Node).</summary>
+/// <summary>The model registry the extensions see through <c>ctx.modelRegistry</c>: the run's chat catalog, and classifier and image
+/// models with the providers Node and native extensions registered (their <c>classify</c>/<c>generateImages</c> run in Node or in the
+/// native extension). Native extensions and codemode read <see cref="Operations"/> too.</summary>
 internal sealed class PiExtensionModels
 {
     private readonly ModelRegistry _chat;
     private readonly ModelOperationsRegistry _builtin;
     private readonly Dictionary<string, string?> _extensionKeys = new(StringComparer.Ordinal);
+    private readonly object _sync = new();
+    private readonly HashSet<(string, string)> _reported = [];
+    private ImmutableHashSet<string> _extensionProviders = ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal);
+    private PiExtensionHost? _host;
+    private Func<string, string?> _environment = _ => null;
     internal ModelOperationsRegistry Operations { get; }
 
     private PiExtensionModels(ModelRegistry chat, ModelOperationsRegistry builtin)
@@ -39,47 +48,130 @@ internal sealed class PiExtensionModels
     {
         var chat = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
         var builtin = NativeExtensionModelOperations.CreateDefaultRegistry(runtime.ReadEnvironment, runtime.AuthPath, runtime.CreateAuthHttp, runtime.Time);
-        var models = new PiExtensionModels(chat, builtin) { _runtime = runtime };
+        var models = new PiExtensionModels(chat, builtin) { _runtime = runtime, _host = host, _environment = runtime.ReadEnvironment };
         host.Stream = models.StreamAsync;
-        foreach (var registration in host.ProviderRegistrations) models.Register(host, registration, runtime.ReadEnvironment);
+        models.SyncProviders();
+        // model-runtime.ts registerProvider/unregisterProvider and reload: the Node and native extensions' providers follow their registrations.
+        host.RegistrationsChanged += models.SyncProviders;
+        host.NativeModelProviders.Changed += models.SyncProviders;
         host.Models = models.CallAsync;
         host.ModelJson = (provider, id) => chat.Find(provider, id) is { } model ? JsonNode.Parse(model.ToJsonString()) : null;
+        // The native extensions' ctx.modelRegistry is this registry too.
+        host.BindModelOperations(models.Operations);
         return models;
     }
 
-    /// <summary>registerProvider(name, config): the config's image and classifier models are served by its <c>images</c> and
-    /// <c>classifiers</c> implementations in Node; <c>apiKey</c> is an environment variable name or a literal key.</summary>
-    private void Register(PiExtensionHost host, JsonObject registration, Func<string, string?> environment)
+    /// <summary>The config object of one registered model (a JSON object, else an empty object that fails validation).</summary>
+    internal static JsonObject ModelObject(JsonData model) => JsonNode.Parse(model.ToString()) as JsonObject ?? new JsonObject();
+
+    /// <summary>The image and classifier models of a provider config: <c>api</c> defaults to the first implementation of the model's type,
+    /// <c>baseUrl</c> to the provider's, <c>name</c> to the id, <c>input</c> to <c>["text"]</c> and <c>cost</c> to zero. Chat models are
+    /// the chat registry's. An invalid model is reported through <paramref name="report"/> and skipped.</summary>
+    internal static ImmutableArray<OperationModel> BuildModels(string provider, string? baseUrl, IReadOnlyList<string> classifierApis,
+        IReadOnlyList<string> imageApis, IEnumerable<JsonObject> configs, Action<string> report)
     {
-        var name = registration["name"]?.GetValue<string>();
-        if (name is null || registration["config"] is not JsonObject config) return;
-        var imageApis = (config["images"] as JsonObject)?.Select(item => item.Key).ToImmutableArray() ?? [];
-        var classifierApis = (config["classifiers"] as JsonObject)?.Select(item => item.Key).ToImmutableArray() ?? [];
-        if (imageApis.IsEmpty && classifierApis.IsEmpty) return;
-        var baseUrl = config["baseUrl"]?.GetValue<string>() ?? "";
         var models = ImmutableArray.CreateBuilder<OperationModel>();
-        foreach (var model in (config["models"] as JsonArray ?? []).OfType<JsonObject>())
+        foreach (var model in configs)
         {
-            var type = model["type"]?.GetValue<string>();
+            var type = model["type"] is JsonValue typeValue && typeValue.TryGetValue<string>(out var text) ? text : null;
             if (type is not ("image" or "classifier")) continue;
             var json = (JsonObject)model.DeepClone();
-            json["provider"] = name;
+            json["provider"] = provider;
             json["api"] ??= type == "image" ? imageApis.FirstOrDefault() : classifierApis.FirstOrDefault();
-            json["baseUrl"] ??= baseUrl;
+            json["baseUrl"] ??= baseUrl ?? "";
             json["name"] ??= json["id"]?.DeepClone();
             json["input"] ??= new JsonArray("text");
             json["cost"] ??= new JsonObject { ["input"] = 0, ["output"] = 0, ["cacheRead"] = 0, ["cacheWrite"] = 0 };
             try { models.Add(OperationModel.FromJson(JsonData.Parse(json.ToJsonString()))); }
-            catch (FormatException error) { _ = host.ReportAsync(registration["extensionPath"]?.GetValue<string>() ?? name, "register_provider", error.Message); }
+            catch (FormatException error) { report($"Provider {provider}, model {json["id"]?.ToJsonString() ?? "?"}: {error.Message}"); }
         }
-        var apiKey = config["apiKey"]?.GetValue<string>();
-        lock (_extensionKeys) _extensionKeys[name] = apiKey is null ? null : environment(apiKey) ?? apiKey;
-        Operations.SetProvider(new ModelOperationsProvider(name, config["name"]?.GetValue<string>() ?? name)
+        return models.ToImmutable();
+    }
+
+    private sealed record ExtensionProvider(string Name, string? DisplayName, string? ApiKey, ImmutableArray<OperationModel> Models,
+        ImmutableDictionary<string, IClassifierApi> Classifiers, ImmutableDictionary<string, IImagesApi> Images);
+
+    /// <summary>registerProvider(name, config) of the Node extensions (their implementations run in Node) and of the native extensions
+    /// (their C# callbacks): every registration with classifier or image implementations or models joins <see cref="Operations"/>; a
+    /// provider of a built-in id keeps the built-in implementations it does not replace (provider-composer.ts), and its models when it
+    /// lists none. Providers no extension registers any more leave (or return to their built-in definition).</summary>
+    internal void SyncProviders()
+    {
+        if (_host is not { } host) return;
+        var providers = new List<ExtensionProvider>();
+        foreach (var registration in host.ProviderRegistrations)
         {
-            Models = models.ToImmutable(),
-            Classifiers = classifierApis.ToImmutableDictionary(api => api, api => (IClassifierApi)new NodeClassifier(host, name, api), StringComparer.Ordinal),
-            Images = imageApis.ToImmutableDictionary(api => api, api => (IImagesApi)new NodeImages(host, name, api), StringComparer.Ordinal)
-        });
+            var name = registration["name"] is JsonValue nameValue && nameValue.TryGetValue<string>(out var text) ? text : null;
+            if (name is null || registration["config"] is not JsonObject config) continue;
+            var imageApis = (config["images"] as JsonObject)?.Select(item => item.Key).ToImmutableArray() ?? [];
+            var classifierApis = (config["classifiers"] as JsonObject)?.Select(item => item.Key).ToImmutableArray() ?? [];
+            if (imageApis.IsEmpty && classifierApis.IsEmpty) continue;
+            var extensionPath = registration["extensionPath"]?.GetValue<string>() ?? name;
+            var models = BuildModels(name, config["baseUrl"]?.GetValue<string>(), classifierApis, imageApis, (config["models"] as JsonArray ?? []).OfType<JsonObject>(),
+                error => { lock (_reported) if (!_reported.Add((extensionPath, error))) return; _ = host.ReportAsync(extensionPath, "register_provider", error); });
+            providers.Add(new(name, config["name"]?.GetValue<string>(), config["apiKey"]?.GetValue<string>(), models,
+                classifierApis.ToImmutableDictionary(api => api, api => (IClassifierApi)new NodeClassifier(host, name, api), StringComparer.Ordinal),
+                imageApis.ToImmutableDictionary(api => api, api => (IImagesApi)new NodeImages(host, name, api), StringComparer.Ordinal)));
+        }
+        foreach (var provider in host.NativeModelProviders.Current)
+        {
+            var models = BuildModels(provider.Name, provider.BaseUrl, [.. provider.Classifiers.Keys], [.. provider.Images.Keys], provider.Models.Select(ModelObject), _ => { });
+            providers.Add(new(provider.Name, provider.DisplayName, provider.ApiKey, models,
+                provider.Classifiers.ToImmutableDictionary(pair => pair.Key, pair => (IClassifierApi)new NativeClassifier(pair.Key, pair.Value), StringComparer.Ordinal),
+                provider.Images.ToImmutableDictionary(pair => pair.Key, pair => (IImagesApi)new NativeImages(pair.Key, pair.Value), StringComparer.Ordinal)));
+        }
+        lock (_sync)
+        {
+            var current = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            foreach (var provider in providers)
+            {
+                current.Add(provider.Name);
+                var builtin = _builtin.GetProvider(provider.Name);
+                lock (_extensionKeys)
+                {
+                    // composeApiKeyAuth: the extension's apiKey (an environment variable name or a literal), else the built-in auth.
+                    if (provider.ApiKey is { } apiKey) _extensionKeys[provider.Name] = _environment(apiKey) ?? apiKey;
+                    else if (builtin is null) _extensionKeys[provider.Name] = null;
+                    else _extensionKeys.Remove(provider.Name);
+                }
+                var keepModels = provider.Models.IsEmpty && builtin is not null;
+                Operations.SetProvider(new ModelOperationsProvider(provider.Name, provider.DisplayName ?? builtin?.Name ?? provider.Name)
+                {
+                    Models = keepModels ? builtin!.Models : provider.Models, ModelSource = keepModels ? builtin!.ModelSource : null,
+                    Classifiers = (builtin?.Classifiers ?? ImmutableDictionary<string, IClassifierApi>.Empty.WithComparers(StringComparer.Ordinal)).SetItems(provider.Classifiers),
+                    Images = (builtin?.Images ?? ImmutableDictionary<string, IImagesApi>.Empty.WithComparers(StringComparer.Ordinal)).SetItems(provider.Images),
+                    ResolveModel = builtin?.ResolveModel, FilterAllModels = builtin?.FilterAllModels
+                });
+            }
+            foreach (var removed in _extensionProviders.Except(current))
+            {
+                lock (_extensionKeys) _extensionKeys.Remove(removed);
+                if (_builtin.GetProvider(removed) is { } builtin) Operations.SetProvider(builtin);
+                else Operations.RemoveProvider(removed);
+            }
+            _extensionProviders = current.ToImmutable();
+        }
+    }
+
+    /// <summary>The request options a provider implementation receives (the Node bridge sends the same fields).</summary>
+    private static ExtensionModelRequestOptions ExtensionOptions(ModelRequestOptions? options) => new()
+    {
+        ApiKey = options?.ApiKey, Headers = options?.Headers ?? [], TimeoutMs = options?.TimeoutMs, MaxRetries = options?.MaxRetries,
+        MaxRetryDelayMs = options?.MaxRetryDelayMs, Temperature = (options as ClassifierOptions)?.Temperature
+    };
+
+    private sealed class NativeClassifier(string api, ExtensionClassifierImplementation implementation) : IClassifierApi
+    {
+        public string Api => api;
+        public Task<ClassifierResult> ClassifyAsync(ClassifierModel model, ClassifierContext context, ClassifierOptions? options = null, CancellationToken cancellationToken = default) =>
+            implementation(model.ToJson(), context, ExtensionOptions(options), cancellationToken);
+    }
+
+    private sealed class NativeImages(string api, ExtensionImagesImplementation implementation) : IImagesApi
+    {
+        public string Api => api;
+        public Task<AssistantImages> GenerateImagesAsync(ImageModel model, ImagesContext context, ImagesOptions? options = null, CancellationToken cancellationToken = default) =>
+            implementation(model.ToJson(), context, ExtensionOptions(options), cancellationToken);
     }
 
     private static JsonObject Options(ModelRequestOptions? options)

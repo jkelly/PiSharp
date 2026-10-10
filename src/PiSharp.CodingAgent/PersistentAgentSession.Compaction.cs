@@ -383,14 +383,14 @@ public sealed partial class PersistentAgentSession
             if (!compaction) writer.WriteString("fromId", previous.LeafId ?? "root");
             writer.WriteString("summary", text);
             if (compaction) { writer.WriteString("firstKeptEntryId", firstKept ?? id); writer.WriteNumber("tokensBefore", tokensBefore); }
-            if (details is not null) { writer.WritePropertyName("details"); writer.WriteRawValue(details.ToString()); }
-            if (usageWire is not null) { writer.WritePropertyName("usage"); writer.WriteRawValue(usageWire.ToString()); }
+            if (details is not null) { writer.WritePropertyName("details"); writer.WriteRawValue(details.ToString(), skipInputValidation: true); }
+            if (usageWire is not null) { writer.WritePropertyName("usage"); writer.WriteRawValue(usageWire.ToString(), skipInputValidation: true); }
             writer.WriteBoolean("fromHook", fromHook);
             if (system is not null)
             {
                 writer.WritePropertyName("systemMessage"); writer.WriteStartObject();
                 foreach (var property in system.WireBody.Value.EnumerateObject())
-                    if (property.Name != "timestamp") { writer.WritePropertyName(property.Name); writer.WriteRawValue(property.Value.GetRawText()); }
+                    if (property.Name != "timestamp") { writer.WritePropertyName(property.Name); writer.WriteRawValue(property.Value.GetRawText(), skipInputValidation: true); }
                 writer.WriteNumber("timestamp", timestamp); writer.WriteEndObject();
             }
         }, "yyyy-MM-dd'T'HH:mm:ss.fff'Z'");

@@ -30,7 +30,7 @@ public sealed class AzureResponsesRequestFactory
         if (model is null || options is null || options.ModelMetadata is null || options.Projection is null || options.Hooks is null ||
             options.ConfigurationValues is null || options.HttpOptions is null || options.StreamOptions is null || model.Api != "azure-openai-responses" ||
             string.IsNullOrWhiteSpace(model.Id) || string.IsNullOrWhiteSpace(model.Provider) ||
-            options.MaximumPayloadBytes <= 0 || options.MaximumJsonDepth is < 1 or > 64 || options.MaximumConfigurationCharacters <= 0 ||
+            options.MaximumPayloadBytes <= 0 || options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || options.MaximumConfigurationCharacters <= 0 ||
             options.MaximumHeaderCharacters <= 0 || options.MaximumHeaders <= 0 || options.MaximumKeyCharacters <= 0 || options.MaximumErrorBodyBytes <= 0 ||
             options.TimeoutMilliseconds is <= 0 || options.MaxTokens is { } max && !double.IsFinite(max) ||
             options.Temperature is { } temperature && !double.IsFinite(temperature) ||

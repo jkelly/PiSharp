@@ -102,7 +102,7 @@ internal static class AgentPendingInputQueueTests
         foreach (var options in new AgentPendingInputQueueOptions[]
         {
             new(MaximumMessagesPerQueue: 0), new(MaximumMessageCharacters: 0), new(MaximumCharactersPerQueue: 0),
-            new(MaximumJsonDepth: 0), new(MaximumJsonDepth: 65), new(SteeringMode: (AgentPendingInputMode)99), new(FollowUpMode: (AgentPendingInputMode)99)
+            new(MaximumJsonDepth: 0), new(MaximumJsonDepth: 1001), new(SteeringMode: (AgentPendingInputMode)99), new(FollowUpMode: (AgentPendingInputMode)99)
         }) Throws<ArgumentException>(() => new AgentPendingInputQueue(options));
         Throws<ArgumentException>(() => queue.SteeringMode = (AgentPendingInputMode)99);
         Throws<ArgumentException>(() => queue.FollowUpMode = (AgentPendingInputMode)99);

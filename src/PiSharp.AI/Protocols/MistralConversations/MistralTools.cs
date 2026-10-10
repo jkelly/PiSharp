@@ -55,7 +55,7 @@ public sealed partial class MistralTextHttpSseTransport
             {
                 var body = new JsonObject { ["role"] = "system" };
                 foreach (var field in new[] { "toolsAdded", "toolsRemoved" })
-                    if (entry.WireBody.Value.TryGetProperty(field, out var tools)) body[field] = JsonNode.Parse(tools.GetRawText());
+                    if (entry.WireBody.Value.TryGetProperty(field, out var tools)) body[field] = JsonNode.Parse(tools.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
                 // Mistral supports JSON-schema constrained sampling only. Original grammar configs are ignored.
                 if (body["toolsAdded"] is JsonArray added)
                     foreach (var declaration in added.OfType<JsonObject>())
@@ -70,7 +70,7 @@ public sealed partial class MistralTextHttpSseTransport
             var result = new JsonArray();
             foreach (var declaration in declarations.Value.EnumerateArray())
             {
-                var function = JsonNode.Parse(declaration.GetRawText())!.AsObject(); function.Remove("type");
+                var function = JsonNode.Parse(declaration.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject(); function.Remove("type");
                 result.Add(new JsonObject { ["type"] = "function", ["function"] = function });
             }
             return result;
@@ -98,7 +98,7 @@ public sealed partial class MistralTextHttpSseTransport
             var function = value.GetProperty("function");
             if (function.ValueKind == JsonValueKind.Object && function.EnumerateObject().All(p => p.Name == "name") &&
                 function.GetProperty("name").ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(function.GetProperty("name").GetString()))
-                return JsonNode.Parse(value.GetRawText())!;
+                return JsonNode.Parse(value.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
         }
         throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral tool choice.");
     }
@@ -130,8 +130,9 @@ public sealed partial class MistralTextHttpSseTransport
                 {
                     var args = block.GetProperty("arguments");
                     if (args.ValueKind != JsonValueKind.Object) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral tool arguments must be objects.");
-                    calls.Add(new JsonObject { ["id"] = block.GetProperty("id").GetString(), ["type"] = "function", ["index"] = 0,
-                        ["function"] = new JsonObject { ["name"] = block.GetProperty("name").GetString(), ["arguments"] = ReplayJson(args) } });
+                    // The SDK writes the call as convertMessages builds it: id, type, function, index.
+                    calls.Add(new JsonObject { ["id"] = block.GetProperty("id").GetString(), ["type"] = "function",
+                        ["function"] = new JsonObject { ["name"] = block.GetProperty("name").GetString(), ["arguments"] = ReplayJson(args) }, ["index"] = 0 });
                 }
                 else throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral assistant replay content.");
             }

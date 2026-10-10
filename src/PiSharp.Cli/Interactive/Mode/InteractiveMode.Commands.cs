@@ -206,6 +206,13 @@ internal sealed partial class InteractiveMode
         if (text == "/dementedelves") { HandleDementedDelves(); editor.SetText(""); return; }
         if (text == "/resume") { ShowSessionSelector(); editor.SetText(""); return; }
         if (text == "/quit") { editor.SetText(""); await ShutdownAsync(); return; }
+        if (Is("/llama") && context.Llama is not null)
+        {
+            editor.SetText("");
+            editor.AddToHistory(text);
+            await HandleLlamaCommandAsync();
+            return;
+        }
         if (Is("/mcp") && context.Mcp is not null)
         {
             editor.SetText("");
@@ -623,7 +630,7 @@ internal sealed partial class InteractiveMode
 
     private async Task HandleSessionCommandAsync()
     {
-        await RefreshStatsAsync();
+        await SyncSessionAsync();
         var stats = state.Stats ?? new JsonObject();
         var sessionName = state.SessionName;
         var cacheWaste = context.ComputeCacheWaste?.Invoke(state.Entries) ?? new CacheWaste(0, 0, 0);
@@ -929,6 +936,7 @@ internal sealed partial class InteractiveMode
         programStatus.Reset();
         ApplyRuntimeSettings();
         await RefreshSessionAsync();
+        await ApplyAutoCompactionSettingAsync();
         renderedGeneration = state.Generation;
         await RefreshAvailableModelsAsync();
         await RefreshCommandsAsync();

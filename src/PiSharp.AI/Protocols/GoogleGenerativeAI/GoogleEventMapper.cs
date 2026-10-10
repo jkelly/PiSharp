@@ -147,12 +147,12 @@ internal sealed class GoogleEventMapper
         if (value.TryGetProperty("usageMetadata", out var usage))
         {
             var cached = Count(usage, "cachedContentTokenCount"); var thought = Count(usage, "thoughtsTokenCount");
-            var inputTokens = checked(Count(usage, "promptTokenCount") - cached);
-            var outputTokens = checked(Count(usage, "candidatesTokenCount") + thought);
+            var inputTokens = Count(usage, "promptTokenCount") - cached;
+            var outputTokens = Count(usage, "candidatesTokenCount") + thought;
             var total = Count(usage, "totalTokenCount"); var costs = _options.ModelMetadata.Value.GetProperty("cost");
             // Pi abe508 models.ts calculateCost through the shared tier selection; Google reports no cache writes.
             if (costs.TryGetProperty("tiers", out var tiers) && tiers.ValueKind != JsonValueKind.Null && PromptLengthPricing.TrySelect(tiers.EnumerateArray(),
-                candidate => candidate.GetProperty("inputTokensAbove").GetDouble(), (double)inputTokens, cached, 0d, out var tier)) costs = tier;
+                candidate => candidate.GetProperty("inputTokensAbove").GetDouble(), inputTokens, cached, 0d, out var tier)) costs = tier;
             var i = Cost(costs, "input", inputTokens); var o = Cost(costs, "output", outputTokens);
             var r = Cost(costs, "cacheRead", cached); var w = Cost(costs, "cacheWrite", 0);
             var sum = i + o + r + w; if (!double.IsFinite(sum)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
@@ -161,7 +161,7 @@ internal sealed class GoogleEventMapper
                 new(binary64.Value.GetProperty("input").GetDecimal(), binary64.Value.GetProperty("output").GetDecimal(),
                     binary64.Value.GetProperty("cacheRead").GetDecimal(), binary64.Value.GetProperty("cacheWrite").GetDecimal(),
                     binary64.Value.GetProperty("total").GetDecimal(), SourceBinary64Cost: binary64),
-                JsonFields.Empty.Set("reasoning", JsonData.Parse(thought.ToString(System.Globalization.CultureInfo.InvariantCulture)))) { ExtrasBeforeTotal = true };
+                JsonFields.Empty.Set("reasoning", JsonData.Parse(JsonNumber.Text(thought)))) { ExtrasBeforeTotal = true };
         }
         return frames;
     }
@@ -173,13 +173,15 @@ internal sealed class GoogleEventMapper
         JsonValueKind.Number => value.GetDouble() != 0,
         _ => true
     };
-    private static long Count(JsonElement usage, string name)
+    // google-generative-ai.ts keeps each count as the JavaScript number the chunk reports (a fraction included).
+    private static double Count(JsonElement usage, string name)
     {
         if (!usage.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null) return 0;
-        if (!value.TryGetInt64(out var n)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        var n = value.ValueKind == JsonValueKind.Number ? JsonNumber.Read(value) : double.NaN;
+        if (!double.IsFinite(n)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         return n;
     }
-    private static double Cost(JsonElement costs, string name, long count)
+    private static double Cost(JsonElement costs, string name, double count)
     {
         var result = costs.GetProperty(name).GetDouble() / 1_000_000 * count;
         if (!double.IsFinite(result) || result < 0 || result > (double)decimal.MaxValue)

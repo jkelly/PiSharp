@@ -78,6 +78,30 @@ internal static class InteractiveHostServices
                 catch (OperationCanceledException) { return new ModelsRefreshResult(true, []); }
             },
             GetModelsJsonError = () => registry?.GetError(),
+            // extensions/llama/index.ts: getProviderAuth("llama.cpp"), and syncCatalog's setCatalog plus a live refresh of llama.cpp
+            // (allowNetwork even with PI_OFFLINE: /llama already contacted the server), then the session's selectable models.
+            Llama = new LlamaServices(async token => (await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false)).ResolveLlamaAuth(),
+                async (catalog, serverUrl, token) =>
+                {
+                    var models = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
+                    models.Llama.SetCatalog(catalog, serverUrl);
+                    var errors = await models.RefreshAsync(allowNetwork: true, force: null, providers: [PiSharp.Cli.Llama.LlamaCatalog.ProviderId], token).ConfigureAwait(false);
+                    if (errors.TryGetValue(PiSharp.Cli.Llama.LlamaCatalog.ProviderId, out var failure)) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+                    registry = models;
+                    if (Profile()?.LiveModels is { } live) await live.RefreshAsync(token).ConfigureAwait(false);
+                })
+            {
+                FindHuggingFaceToken = () => PiSharp.Cli.Llama.HuggingFaceClient.FindTokenAsync(context.GetEnvironment, startup.Home),
+                Refresh = async token =>
+                {
+                    var models = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
+                    var errors = await models.RefreshAsync(allowNetwork: runtime.ReadEnvironment("PI_OFFLINE") is null, force: null,
+                        providers: [PiSharp.Cli.Llama.LlamaCatalog.ProviderId], token).ConfigureAwait(false);
+                    registry = models;
+                    if (Profile()?.LiveModels is { } live) await live.RefreshAsync(token).ConfigureAwait(false);
+                    if (errors.TryGetValue(PiSharp.Cli.Llama.LlamaCatalog.ProviderId, out var failure)) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+                }
+            },
             // agent-session.ts reload(): extensions, skills, prompt templates and context files (IMPL-E's in-place Pi reload).
             ReloadSession = _ => Profile()?.SupportsPiReload == true ? Profile()!.PiReloadAsync(CancellationToken.None) : Task.CompletedTask,
             // model-runtime.ts: credentials or catalogs changed, so the available snapshot (and the session's selectable models) is re-read.

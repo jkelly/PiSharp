@@ -143,7 +143,7 @@ public sealed partial class PersistentAgentSession
         var turn=result.Turns[^1];var assistant=turn.Result.Chat.Message;var model=_configuration.Model;
         if(assistant.StopReason==StopReason.Aborted||assistant.Model!=model.Id||assistant.Provider!=model.Provider||assistant.Api!=model.Api)return RecoveryDecision.None;
         var wire=PersistedWire(PiWireJson.WriteMessage(assistant)).Value;
-        var selected=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="assistant"&&JsonElement.DeepEquals(m.WireBody.Value,wire)));
+        var selected=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="assistant"&&JsonUtf16.DeepEquals(m.WireBody.Value,wire)));
         if(selected is null)return RecoveryDecision.None;
         var index=context.Ancestry.IndexOf(selected.SourceEntry);
         var later=context.Ancestry.Skip(index+1).ToArray();
@@ -165,7 +165,7 @@ public sealed partial class PersistentAgentSession
             var targets=new List<string>{selected.SourceEntry.Id};
             foreach(var tool in turn.ToolResults.Where(m=>syntheticIds.Contains(m.WireBody.Value.GetProperty("toolCallId").GetString()!)))
             {
-                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonElement.DeepEquals(m.WireBody.Value,PersistedWire(tool.WireBody).Value)));
+                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonUtf16.DeepEquals(m.WireBody.Value,PersistedWire(tool.WireBody).Value)));
                 if(target is null)throw Error(PersistentAgentSessionFailure.InvalidCommit);targets.Add(target.SourceEntry.Id);
             }
             SetOperationPhase(SessionOperationPhase.RecoveryOmission);await OmitRecoveryAttemptAsync(targets,token,idle).ConfigureAwait(false);

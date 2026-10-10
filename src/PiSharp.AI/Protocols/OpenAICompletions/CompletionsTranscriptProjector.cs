@@ -11,7 +11,7 @@ public sealed record CompletionsTranscriptProjectionOptions(bool Reasoning = fal
     bool RequiresToolResultName = false, bool RequiresThinkingAsText = false,
     bool RequiresReasoningContentOnAssistantMessages = false, CompletionsToolDeclarationProjectionOptions? ToolDeclarations = null,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
-    int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumOutputMessages = PiRequestBudget.RequestItems, int MaximumJsonDepth = 32,
+    int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumOutputMessages = PiRequestBudget.RequestItems, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     // ModelDescriptor currently contains identity only. Keep capability local to this provider,
@@ -29,7 +29,7 @@ public sealed class CompletionsTranscriptProjector
     {
         _options = options ?? new();
         if (_options.MaximumMessages <= 0 || _options.MaximumEntryCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
-            _options.MaximumContentBlocks <= 0 || _options.MaximumOutputMessages <= 0 || _options.MaximumJsonDepth is < 1 or > 64 ||
+            _options.MaximumContentBlocks <= 0 || _options.MaximumOutputMessages <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             _options.MaximumOutputCharacters < 2 || _options.MaximumOutputBytes < 2)
             throw CompletionsJson.Fail(CompletionsRequestFailure.InvalidConfiguration);
     }
@@ -95,7 +95,7 @@ public sealed class CompletionsTranscriptProjector
                             var tools = additions!.Project(request with { Messages = [new("system", entry.Body)] }, token);
                             // Tool-bearing instructions always use system, before their separately rendered
                             // text/developer instruction. Pairing has already deferred them past pending results.
-                            _output.Add(new() { ["role"] = "system", ["tools"] = JsonNode.Parse(tools.ToString()) });
+                            _output.Add(new() { ["role"] = "system", ["tools"] = JsonNode.Parse(tools.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) });
                         }
                         var system = RenderSystem(body, index == 0);
                         if (system.Length != 0) _output.Add(new() { ["role"] = options.Reasoning && options.SupportsDeveloperRole ? "developer" : "system", ["content"] = system });
@@ -335,7 +335,7 @@ public sealed class CompletionsTranscriptProjector
                 var owned = JsonData.Parse(signature); CompletionsJson.Check(owned.Value, 0, options.MaximumJsonDepth, token);
                 if (owned.Value.ValueKind != JsonValueKind.Array || owned.Value.GetArrayLength() == 0 ||
                     owned.Value.EnumerateArray().Any(value => !ValidDetail(value))) return null;
-                return JsonNode.Parse(owned.ToString());
+                return JsonNode.Parse(owned.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             }
             catch (JsonException) { return null; }
         }
@@ -354,7 +354,7 @@ public sealed class CompletionsTranscriptProjector
             {
                 var data = JsonData.Parse(signature); CompletionsJson.Check(data.Value, 0, options.MaximumJsonDepth, token); var value = data.Value;
                 return ValidDetail(value) && String(value, "type") == "reasoning.encrypted" && Optional(value, "id") is { Length: > 0 } && String(value, "data").Length > 0
-                    ? JsonNode.Parse(data.ToString()) : null;
+                    ? JsonNode.Parse(data.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) : null;
             }
             catch (JsonException) { return null; }
         }

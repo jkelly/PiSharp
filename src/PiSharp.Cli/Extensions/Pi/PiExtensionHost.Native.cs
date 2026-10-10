@@ -76,6 +76,8 @@ internal sealed partial class PiExtensionHost
             native.CatalogToolNames = native.LateActivation ? native.PublishedToolNames
                 : native.Scope is { } scope && _activation?.Registry is { } registry ? [.. registry.CaptureOwnedTools(scope).Select(tool => tool.Descriptor.Name)] : [];
             native.Retire();
+            // Its classifier and image providers leave with it (the reloaded generation registers its own).
+            NativeModelProviders.UnregisterOwner(native.OwnerId);
         }
         lock (_retiredNatives) _retiredNatives.AddRange(previous);
         LoadNative(manifests, generation);

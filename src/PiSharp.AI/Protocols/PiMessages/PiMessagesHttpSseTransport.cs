@@ -127,7 +127,7 @@ public sealed class PiMessagesHttpSseTransport : IChatTransport
         var body = new UTF8Encoding(false, false).GetString(bytes.ToArray()); JsonObject? errorBody = null;
         try
         {
-            var parsed = JsonNode.Parse(body) as JsonObject;
+            var parsed = JsonNode.Parse(body, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) as JsonObject;
             if (parsed?["error"] is JsonObject error) errorBody = error;
         }
         catch (JsonException) { }

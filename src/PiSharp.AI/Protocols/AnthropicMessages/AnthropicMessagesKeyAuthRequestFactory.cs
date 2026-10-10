@@ -11,7 +11,7 @@ public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = 
     JsonData? ModelHeaders = null, JsonData? Headers = null, JsonData? RuntimeHeaders = null,
     string? SessionId = null, bool SendSessionAffinityHeaders = false, string SessionAffinityHeader = "x-session-affinity",
     double MaximumTokenMagnitude = 1_000_000, int MaximumKeyCharacters = 4096, int MaximumBaseUriCharacters = 4096,
-    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
+    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = PiSharp.Contracts.JsonData.MaximumDepth, int MaximumHeaders = 128,
     int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768)
 {
     /// <summary>Pi abe508e1 anthropic-messages.ts createClient for provider github-copilot: the key travels as
@@ -49,7 +49,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (baseUri is null || expectedModel is null || projectionOptions is null ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
             _options.MaxTokens is { } tokens && !double.IsFinite(tokens) || _options.MaximumKeyCharacters <= 0 || _options.MaximumBaseUriCharacters <= 0 ||
-            _options.MaximumPayloadBytes <= 0 || _options.MaximumPayloadDepth is < 1 or > 64 || _options.MaximumHeaders <= 0 ||
+            _options.MaximumPayloadBytes <= 0 || _options.MaximumPayloadDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || _options.MaximumHeaders <= 0 ||
             _options.MaximumHeaderCharacters <= 0 || _options.MaximumTotalHeaderCharacters <= 0 ||
             !baseUri.IsAbsoluteUri || baseUri.Scheme is not ("http" or "https") || baseUri.UserInfo.Length != 0 ||
             baseUri.Fragment.Length != 0 || baseUri.Query.Length != 0 || expectedModel.Api != "anthropic-messages" ||
@@ -166,7 +166,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (property.Name == "betas") continue;
-                writer.WritePropertyName(property.Name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText());
+                writer.WritePropertyName(property.Name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText(), skipInputValidation: true);
             }
             writer.WriteEndObject();
         }

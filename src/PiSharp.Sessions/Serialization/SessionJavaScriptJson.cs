@@ -8,7 +8,7 @@ namespace PiSharp.Sessions.Serialization;
 internal static class SessionJavaScriptJson
 {
     private static readonly EcmaScriptJsonProjectionOptions Unbounded = new(MaximumInputCharacters: int.MaxValue, MaximumInputBytes: int.MaxValue,
-        MaximumOutputCharacters: int.MaxValue, MaximumOutputBytes: int.MaxValue, MaximumDepth: 64, MaximumNodes: int.MaxValue,
+        MaximumOutputCharacters: int.MaxValue, MaximumOutputBytes: int.MaxValue, MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumNodes: int.MaxValue,
         MaximumPropertiesPerObject: int.MaxValue, MaximumNumbers: int.MaxValue, MaximumNumberCharacters: 16_384,
         MaximumTotalNumberCharacters: int.MaxValue, MaximumStringCharacters: int.MaxValue);
 

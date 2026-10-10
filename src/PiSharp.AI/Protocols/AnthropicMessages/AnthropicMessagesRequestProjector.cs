@@ -41,7 +41,7 @@ public sealed record AnthropicMessagesRequestOptions(
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
     // anthropic.ts convertTools declares every tool of the context: no tool or declaration count bound (payload bytes bound the size).
     int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue,
-    int MaximumProjectedMessages = PiRequestBudget.RequestItems, int MaximumJsonDepth = 32,
+    int MaximumProjectedMessages = PiRequestBudget.RequestItems, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes,
     bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
 {
@@ -53,7 +53,7 @@ public sealed record AnthropicMessagesRequestOptions(
 public sealed class AnthropicMessagesRequestProjector
 {
     private readonly AnthropicMessagesRequestOptions _options;
-    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, TypeInfoResolver = JsonUtf16.Resolver, MaxDepth = 2 * JsonData.MaximumDepth };
     private static readonly string[] ClaudeCodeNames = ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "AskUserQuestion",
         "EnterPlanMode", "ExitPlanMode", "KillShell", "NotebookEdit", "Skill", "Task", "TaskOutput", "TodoWrite", "WebFetch", "WebSearch"];
     private static readonly string[] UnsupportedStrictKeys = ["$ref", "$defs", "definitions", "allOf", "oneOf", "patternProperties",
@@ -68,7 +68,7 @@ public sealed class AnthropicMessagesRequestProjector
         if (options.MaximumTokens <= 0 || options.ThinkingBudgetTokens < 0 || options.MaximumMessages <= 0 ||
             options.MaximumEntryCharacters <= 0 || options.MaximumInputCharacters <= 0 || options.MaximumContentBlocks <= 0 ||
             options.MaximumDeclarations <= 0 || options.MaximumActiveTools <= 0 || options.MaximumProjectedMessages <= 0 ||
-            options.MaximumJsonDepth is < 1 or > 64 || options.MaximumOutputCharacters < 2 || options.MaximumOutputBytes < 2 ||
+            options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || options.MaximumOutputCharacters < 2 || options.MaximumOutputBytes < 2 ||
             !Enum.IsDefined(options.CacheRetention) || options.ThinkingDisplay is not ("summarized" or "omitted") ||
             options.Effort is not (null or "low" or "medium" or "high" or "xhigh" or "max"))
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic request profile or limits.");
@@ -215,7 +215,7 @@ public sealed class AnthropicMessagesRequestProjector
             if (options.OAuthProjection) systemBlocks.Add(CacheText("You are Claude Code, Anthropic's official CLI for Claude."));
             if (system.Length > 0) systemBlocks.Add(CacheText(system));
             if (systemBlocks.Count > 0) root["system"] = systemBlocks;
-            if (options.Temperature is { } temperature && options.ThinkingEnabled != true && !options.SupportsMidConversationEffort && options.SupportsTemperature) root["temperature"] = JsonNode.Parse(Number((double)temperature));
+            if (options.Temperature is { } temperature && options.ThinkingEnabled != true && !options.SupportsMidConversationEffort && options.SupportsTemperature) root["temperature"] = JsonNode.Parse(Number((double)temperature), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             var tools = ConvertTools(); if (tools.Count > 0) root["tools"] = tools;
             var betas = Betas(); if (betas.Count > 0) root["betas"] = betas;
             // Managed effort models always use adaptive thinking so prefix mismatches are dropped; per-turn effort rides the markers.
@@ -576,7 +576,8 @@ public sealed class AnthropicMessagesRequestProjector
                 if (value.ValueKind == JsonValueKind.Object) foreach (var property in value.EnumerateObject()) { Unicode(property.Name); CheckJson(property.Value, depth); }
                 else foreach (var item in value.EnumerateArray()) CheckJson(item, depth);
             }
-            else if (value.ValueKind == JsonValueKind.String) Unicode(Text(value));
+            // A string may hold a lone surrogate only inside a tool call's arguments (TranscriptSurrogates), which go out escaped.
+            else if (value.ValueKind == JsonValueKind.String) _ = Text(value);
         }
     }
     private static JsonObject TextBlock(string text) => new() { ["type"] = "text", ["text"] = text };
@@ -587,10 +588,10 @@ public sealed class AnthropicMessagesRequestProjector
             case JsonValueKind.Object:
                 var result = new JsonObject(); foreach (var property in Properties(value)) result[property.Name] = Node(property.Value); return result;
             case JsonValueKind.Array: return new JsonArray(value.EnumerateArray().Select(Node).ToArray());
-            case JsonValueKind.String: return JsonValue.Create(Text(value));
+            case JsonValueKind.String: return JsonUtf16.StringNode(Text(value));
             case JsonValueKind.Number:
                 if (!value.TryGetDouble(out var number)) throw Fail(AnthropicRequestFailure.UnsupportedNumber);
-                return JsonNode.Parse(Number(number));
+                return JsonNode.Parse(Number(number), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             case JsonValueKind.True: return JsonValue.Create(true);
             case JsonValueKind.False: return JsonValue.Create(false);
             case JsonValueKind.Null: return null;
@@ -631,7 +632,7 @@ public sealed class AnthropicMessagesRequestProjector
     private static string Text(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String) throw Fail(AnthropicRequestFailure.InvalidTranscript);
-        try { return value.GetString()!; } catch (ArgumentException) { throw Fail(AnthropicRequestFailure.UnsupportedUnicode); }
+        try { return JsonUtf16.GetString(value); } catch (ArgumentException) { throw Fail(AnthropicRequestFailure.UnsupportedUnicode); }
         catch (InvalidOperationException) { throw Fail(AnthropicRequestFailure.UnsupportedUnicode); }
     }
     private static JsonElement.ArrayEnumerator Array(JsonElement value) => value.ValueKind == JsonValueKind.Array ? value.EnumerateArray() : throw Fail(AnthropicRequestFailure.InvalidTranscript);

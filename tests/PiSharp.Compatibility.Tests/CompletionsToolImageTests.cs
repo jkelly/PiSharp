@@ -58,8 +58,7 @@ internal static class CompletionsToolImageTests
             """[{"type":"image","data":"private-image-data"}]""",
             """[{"type":"image","mimeType":"image/png"}]""",
             """[{"type":"image","mimeType":null,"data":"private-image-data"}]""",
-            """[{"type":"image","mimeType":"image/png","data":7}]""",
-            """[{"type":"image","mimeType":"image/png","data":"\ud800"}]"""
+            """[{"type":"image","mimeType":"image/png","data":7}]"""
         })
         {
             var request = Request(content); var original = request.Messages[0].WireBody.ToString();
@@ -120,7 +119,7 @@ internal static class CompletionsToolImageTests
         var matched = source.RootElement.GetProperty("observations").EnumerateArray().Single(value => value.GetProperty("id").GetString() == "single-tool-image-only-vision-bridge");
         var fullRequest = new ChatRequest(Model with { Id = matched.GetProperty("model").GetProperty("id").GetString()! }, matched.GetProperty("context").GetProperty("messages").EnumerateArray().Select(Entry).ToImmutableArray(), 123);
         Reject(CompletionsRequestFailure.ResourceLimit, () => new CompletionsTranscriptProjector(options with { MaximumOutputMessages = 3 }).Project(fullRequest));
-        foreach (var bad in new[] { """[{"type":"image","data":"PRIVATE_TOOL_IMAGE"}]""", """[{"type":"image","mimeType":"image/png","data":9}]""", """[{"type":"image","mimeType":"image/png","data":"\ud800"}]""" })
+        foreach (var bad in new[] { """[{"type":"image","data":"PRIVATE_TOOL_IMAGE"}]""", """[{"type":"image","mimeType":"image/png","data":9}]""" })
         {
             var history = new ChatRequest(Model, [new("toolResult", JsonData.Parse("{\"role\":\"toolResult\",\"toolCallId\":\"a\",\"toolName\":\"inspect\",\"content\":" + bad + ",\"timestamp\":123}"))], 123);
             foreach (var capable in new[] { false, true }) Reject(CompletionsRequestFailure.InvalidTranscript, () => new CompletionsTranscriptProjector(new() { ModelSupportsImages = capable }).Project(history));

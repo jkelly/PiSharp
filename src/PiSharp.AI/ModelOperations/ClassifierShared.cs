@@ -85,8 +85,9 @@ internal static class ClassifierShared
         return json;
     }
 
-    private static long TokenCount(JsonElement? value) =>
-        value is { } element && ProviderRequest.FiniteNumber(element, out var number) && number > 0 ? (long)Math.Min(number, long.MaxValue) : 0;
+    // tokenCount: a finite positive number as it is (a fraction included), else 0.
+    private static double TokenCount(JsonElement? value) =>
+        value is { } element && ProviderRequest.FiniteNumber(element, out var number) && number > 0 ? number : 0;
 
     /// <summary><c>parseClassifierUsage</c>: usage from <c>{ input_tokens, output_tokens }</c> priced from the catalog. A
     /// missing or malformed usage object leaves the result without usage.</summary>

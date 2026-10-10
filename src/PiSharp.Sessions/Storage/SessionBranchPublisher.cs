@@ -102,11 +102,14 @@ public sealed class SessionBranchPublisher
     private readonly SessionBranchPublishOptions options;
     private readonly ISessionBranchFileSystem files;
     public static ISessionBranchFileSystem LocalFileSystem { get; } = new LocalFiles();
+    /// <summary>The largest session file a publisher reads: V8's longest string, what Pi can read into one string.</summary>
+    public const int MaximumInputBytes = 536_870_888;
     public SessionBranchPublisher(SessionBranchPublishOptions? options = null, ISessionBranchFileSystem? fileSystem = null)
     {
         this.options = options ?? new(); this.files = fileSystem ?? LocalFileSystem;
         _ = new SessionLogReader(this.options.ReaderOptions); _ = new SessionContextProjector(this.options.GraphOptions);
-        if ((this.options.ReaderOptions ?? new()).MaximumInputBytes > 67_108_864) throw new ArgumentOutOfRangeException(nameof(options));
+        // The Pi entry reads a session file as long as a JavaScript string (536,870,888); that is also this reader's ceiling.
+        if ((this.options.ReaderOptions ?? new()).MaximumInputBytes > MaximumInputBytes) throw new ArgumentOutOfRangeException(nameof(options));
     }
     public async Task<PublishedSessionBranch> PrepareAsync(SessionBranchPlan plan, string destinationPath,
         CancellationToken cancellationToken = default)

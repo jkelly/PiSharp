@@ -17,7 +17,7 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     bool SupportsLongCacheRetention = true, string? SessionId = null, bool SendSessionAffinityHeaders = false,
     string SessionAffinityFormat = "openai", JsonData? ToolChoice = null, JsonData? ModelHeaders = null, JsonData? Headers = null,
     int MaximumKeyCharacters = 4096, int MaximumEndpointCharacters = 4096, int MaximumModelCharacters = 1024,
-    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
+    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = PiSharp.Contracts.JsonData.MaximumDepth, int MaximumHeaders = 128,
     int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768, double MaximumTokenMagnitude = 1_000_000,
     double MaximumTemperatureMagnitude = 2)
 {
@@ -70,7 +70,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
             expectedModel.Api != "openai-completions" || !Identity(expectedModel.Id) || !Identity(expectedModel.Provider) ||
             _options.MaximumKeyCharacters <= 0 || _options.MaximumEndpointCharacters <= 0 || _options.MaximumModelCharacters <= 0 ||
-            _options.MaximumPayloadBytes < 2 || _options.MaximumPayloadDepth is < 1 or > 64 || _options.MaximumHeaders <= 0 ||
+            _options.MaximumPayloadBytes < 2 || _options.MaximumPayloadDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || _options.MaximumHeaders <= 0 ||
             _options.MaximumHeaderCharacters <= 0 || _options.MaximumTotalHeaderCharacters <= 0 ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
             !double.IsFinite(_options.MaximumTemperatureMagnitude) || _options.MaximumTemperatureMagnitude <= 0 ||
@@ -255,7 +255,7 @@ public sealed class CompletionsKeyAuthRequestFactory
         using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Encoder = CompletionsJson.Output.Encoder }))
         {
             writer.WriteStartObject();
-            foreach (var field in fields) { cancellationToken.ThrowIfCancellationRequested(); writer.WritePropertyName(field.Key); writer.WriteRawValue(field.Value.ToString()); }
+            foreach (var field in fields) { cancellationToken.ThrowIfCancellationRequested(); writer.WritePropertyName(field.Key); writer.WriteRawValue(field.Value.ToString(), skipInputValidation: true); }
             writer.WriteEndObject();
         }
         if (buffer.Length > _options.MaximumPayloadBytes) throw Fail(CompletionsRequestFailure.ResourceLimit);
@@ -474,8 +474,8 @@ public sealed class CompletionsKeyAuthRequestFactory
     {
         // Only owned request projections are changed. Source canonical history and declarations stay borrowed.
         token.ThrowIfCancellationRequested();
-        var projectedMessages = JsonNode.Parse(messages.ToString())!.AsArray();
-        var projectedTools = JsonNode.Parse(tools.ToString())!.AsArray();
+        var projectedMessages = JsonNode.Parse(messages.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsArray();
+        var projectedTools = JsonNode.Parse(tools.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsArray();
         JsonObject CacheControl() => _options.CacheRetention == CompletionsCacheRetention.Long && _options.SupportsLongCacheRetention
             ? new() { ["type"] = "ephemeral", ["ttl"] = "1h" } : new() { ["type"] = "ephemeral" };
         bool Mark(JsonObject message)
@@ -673,7 +673,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             // Assignment to the ordinary Source object invokes its prototype setter.
             // Every supported resolved value is primitive, so this key is never an own field.
             if (!IsOwnTemplateField(property.Name)) continue;
-            if (value.ValueKind != JsonValueKind.Object) { result[property.Name] = JsonNode.Parse(value.GetRawText()); continue; }
+            if (value.ValueKind != JsonValueKind.Object) { result[property.Name] = JsonNode.Parse(value.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions); continue; }
             if (requested is null && value.TryGetProperty("omitWhenOff", out var omit) && omit.GetBoolean()) continue;
             switch (value.GetProperty("$var").GetString())
             {

@@ -9,7 +9,7 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI;
 
-public sealed record StreamingJsonPreviewOptions(int MaximumCharacters = 65_536, int MaximumDepth = 32);
+public sealed record StreamingJsonPreviewOptions(int MaximumCharacters = 65_536, int MaximumDepth = JsonData.MaximumDepth);
 public enum StreamingJsonPreviewStage { Empty, Strict, Repaired, Partial, RepairedPartial, Fallback }
 public enum StreamingJsonPreviewFailure { CharacterLimit, DepthLimit, UnsupportedNumber, UnsupportedUnicode, DuplicateProperty }
 public sealed class StreamingJsonPreviewException(StreamingJsonPreviewFailure failure, string message) : Exception(message)
@@ -28,7 +28,7 @@ public sealed class StreamingJsonPreview
         _options = options ?? new();
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_options.MaximumCharacters);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_options.MaximumDepth);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(_options.MaximumDepth, 64);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(_options.MaximumDepth, JsonData.MaximumDepth);
     }
 
     public StreamingJsonPreviewResult Parse(string? rawInput)
@@ -188,11 +188,11 @@ public sealed class StreamingJsonPreview
             { escape = text[_index] == '\\' ? !escape : false; _index++; }
             var complete = _index < text.Length;
             var token = complete ? text[start..++_index] : text[start..(_index - (escape ? 1 : 0))] + '"';
-            if (owner.TryStrict(token, out var value)) return JsonNode.Parse(value!.ToString())!;
+            if (owner.TryStrict(token, out var value)) return JsonNode.Parse(value!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
             if (!complete)
             {
                 var lastSlash = text.LastIndexOf('\\');
-                if (lastSlash > start && owner.TryStrict(text[start..lastSlash] + '"', out value)) return JsonNode.Parse(value!.ToString())!;
+                if (lastSlash > start && owner.TryStrict(text[start..lastSlash] + '"', out value)) return JsonNode.Parse(value!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
             }
             throw new SyntaxFailure();
         }
@@ -231,9 +231,9 @@ public sealed class StreamingJsonPreview
             if (_index == 0) _index = text.Length;
             else while (_index < text.Length && !",]}".Contains(text[_index])) _index++;
             var token = text[start.._index];
-            if (owner.TryStrict(token, out var value)) return JsonNode.Parse(value!.ToString())!;
+            if (owner.TryStrict(token, out var value)) return JsonNode.Parse(value!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
             var exponent = text.LastIndexOf('e');
-            if (exponent > start && owner.TryStrict(text[start..exponent], out value)) return JsonNode.Parse(value!.ToString())!;
+            if (exponent > start && owner.TryStrict(text[start..exponent], out value)) return JsonNode.Parse(value!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
             throw new SyntaxFailure();
         }
         private void Blank() { while (_index < text.Length && " \t\r\n".Contains(text[_index])) _index++; }

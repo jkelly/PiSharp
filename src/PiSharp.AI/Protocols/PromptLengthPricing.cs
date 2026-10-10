@@ -29,8 +29,8 @@ internal static class PromptLengthPricing
 
     internal static (decimal Input, decimal Output, decimal CacheRead, decimal CacheWrite) Select(
         decimal input, decimal output, decimal cacheRead, decimal cacheWrite, ImmutableArray<TokenRateTier> tiers,
-        long inputTokens, long cacheReadTokens, long cacheWriteTokens) =>
-        TrySelect(tiers.IsDefault ? [] : tiers, candidate => candidate.InputTokensAbove, (decimal)inputTokens, cacheReadTokens, cacheWriteTokens, out var tier)
+        double inputTokens, double cacheReadTokens, double cacheWriteTokens) =>
+        TrySelect(tiers.IsDefault ? [] : tiers, candidate => (double)candidate.InputTokensAbove, inputTokens, cacheReadTokens, cacheWriteTokens, out var tier)
             ? (tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite) : (input, output, cacheRead, cacheWrite);
 
     internal static bool Valid(ImmutableArray<TokenRateTier> tiers) =>

@@ -63,7 +63,7 @@ internal static class RpcExtensionUiCodec
             if (method != ExtensionUiFeature.Editor && timing?.TimeoutMilliseconds is { } value)
             {
                 writer.WritePropertyName("timeout");
-                writer.WriteRawValue(EcmaScriptJsonProjection.Project(value.ToString("R", CultureInfo.InvariantCulture)));
+                writer.WriteRawValue(EcmaScriptJsonProjection.Project(value.ToString("R", CultureInfo.InvariantCulture)), skipInputValidation: true);
             }
         }, limits.MaximumRequestBytes);
     }

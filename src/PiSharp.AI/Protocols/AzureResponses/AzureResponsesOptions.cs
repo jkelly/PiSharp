@@ -24,7 +24,7 @@ public sealed record AzureResponsesOptions(JsonData ModelMetadata, ResponsesTran
     public AzureResponsesHooks Hooks { get; init; } = new();
     public int? TimeoutMilliseconds { get; init; }
     public int MaximumPayloadBytes { get; init; } = PiRequestBudget.RequestPayloadBytes;
-    public int MaximumJsonDepth { get; init; } = 32;
+    public int MaximumJsonDepth { get; init; } = PiSharp.Contracts.JsonData.MaximumDepth;
     public int MaximumConfigurationCharacters { get; init; } = 65_536;
     public int MaximumHeaderCharacters { get; init; } = 8192;
     public int MaximumHeaders { get; init; } = 128;

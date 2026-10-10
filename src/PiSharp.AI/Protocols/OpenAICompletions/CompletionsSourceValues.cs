@@ -47,7 +47,7 @@ public sealed class CompletionsSourceSnapshot
             .Select(path => path.GetString()!).ToImmutableArray();
         SerializedJson = EcmaScriptJsonProjection.Project(JsonData.Parse(Raw.Value.GetProperty("value").GetRawText()), new(MaximumInputCharacters: maximumCharacters,
             MaximumInputBytes: maximumBytes, MaximumOutputCharacters: maximumCharacters,
-            MaximumOutputBytes: maximumBytes, MaximumDepth: 64, MaximumStringCharacters: maximumCharacters));
+            MaximumOutputBytes: maximumBytes, MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumStringCharacters: maximumCharacters));
     }
 }
 
@@ -78,7 +78,7 @@ public sealed class CompletionsSourceEvent
     {
         Type = emission.Value.GetProperty("value").GetProperty("type").GetString()!;
         _member = Type == "done" ? "message" : Type == "error" ? "error" : "partial";
-        var descriptor = JsonNode.Parse(emission.Value.GetProperty("value").GetRawText())!.AsObject();
+        var descriptor = JsonNode.Parse(emission.Value.GetProperty("value").GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
         descriptor.Remove(_member); _descriptor = JsonData.Parse(descriptor.ToJsonString());
         Message = message; _characters = characters; _bytes = bytes;
         Emission = new(emission, characters, bytes);
@@ -88,8 +88,8 @@ public sealed class CompletionsSourceEvent
         get
         {
             var message = Message.Snapshot.Raw.Value;
-            var value = JsonNode.Parse(_descriptor.ToString())!.AsObject();
-            value[_member] = JsonNode.Parse(message.GetProperty("value").GetRawText());
+            var value = JsonNode.Parse(_descriptor.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
+            value[_member] = JsonNode.Parse(message.GetProperty("value").GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             var paths = message.GetProperty("ownUndefinedPaths").EnumerateArray()
                 .Select(path => "/" + _member + path.GetString()).ToArray();
             return new(JsonData.Parse("{\"value\":" + value.ToJsonString() + ",\"ownUndefinedPaths\":" +

@@ -83,7 +83,7 @@ internal static class GoogleSimpleContextEstimator
     private static string JsonText(JsonElement value, GoogleSimpleOptions options) => EcmaScriptJsonProjection.Project(JsonData.FromElement(value), new(
         MaximumInputCharacters: options.MaximumContextCharacters, MaximumInputBytes: options.MaximumContextCharacters * 4,
         MaximumOutputCharacters: options.MaximumContextCharacters, MaximumOutputBytes: options.MaximumContextCharacters * 4,
-        MaximumDepth: 64, MaximumStringCharacters: options.MaximumContextCharacters));
+        MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumStringCharacters: options.MaximumContextCharacters));
     private static double TextTokens(string text) => Math.Ceiling(text.Length / CharsPerToken);
     internal static double Number(JsonElement value, string name)
     {

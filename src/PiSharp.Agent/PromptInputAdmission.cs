@@ -38,9 +38,11 @@ public sealed record PromptInputAdmissionOptions(int MaximumTextCharacters = 65_
     /// <summary>No count or size bound beyond JSON depth: for reducers (skills, prompt templates, reload routing) whose caller
     /// admits the input and their result under its own options, so a reducer never refuses what the caller admits.</summary>
     public static PromptInputAdmissionOptions Unbounded { get; } = new(int.MaxValue, int.MaxValue, int.MaxValue, int.MaxValue, 64,
-        int.MaxValue, int.MaxValue);
+        int.MaxValue, int.MaxValue) { KeepsLoneSurrogates = true };
     /// <summary>Explicit queue commands retain their supplied mode even while idle and never start a generation.</summary>
     public bool QueueOnly { get; init; }
+    /// <summary>Text and image strings keep lone surrogates, as a JavaScript string does (the Pi entry); otherwise they are refused.</summary>
+    public bool KeepsLoneSurrogates { get; init; }
     /// <summary>Trusted synchronous preflight over owned values, outside state locks. May be called again if the queue grows.</summary>
     public Action<TranscriptEntry, AgentPendingInputQueueSnapshot, PromptInputStreamingBehavior>? BeforeQueueCommit { get; init; }
 
@@ -68,7 +70,7 @@ public static class PromptInputValue
         if (!Enum.IsDefined(input.Source) || input.StreamingBehavior is { } behavior && !Enum.IsDefined(behavior) ||
             input.Text is null) throw Invalid();
         if (input.Text.Length > limits.MaximumTextCharacters) throw Bound();
-        if (!Scalar(input.Text)) throw Invalid();
+        if (!limits.KeepsLoneSurrogates && !Scalar(input.Text)) throw Invalid();
         JsonData? images = input.Images;
         if (images is not null)
         {
@@ -78,14 +80,14 @@ public static class PromptInputValue
             {
                 using var parsed = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = limits.MaximumJsonDepth });
                 images = JsonData.FromElement(parsed.RootElement);
-                if (!JsonScalar(images.Value)) throw Invalid();
+                if (!JsonScalar(images.Value, limits.KeepsLoneSurrogates)) throw Invalid();
                 if (images.Value.ValueKind != JsonValueKind.Null)
                 {
                     if (images.Value.ValueKind != JsonValueKind.Array) throw Invalid();
                     if (images.Value.GetArrayLength() > limits.MaximumImages) throw Bound();
                     foreach (var image in images.Value.EnumerateArray())
                         if (image.ValueKind != JsonValueKind.Object || !image.TryGetProperty("type", out var type) ||
-                            type.ValueKind != JsonValueKind.String || type.GetString() != "image" ||
+                            type.ValueKind != JsonValueKind.String || !type.ValueEquals("image") ||
                             !image.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.String ||
                             !image.TryGetProperty("mimeType", out var mime) || mime.ValueKind != JsonValueKind.String) throw Invalid();
                 }
@@ -112,9 +114,9 @@ public static class PromptInputValue
         using (var writer = new Utf8JsonWriter(output))
         {
             writer.WriteStartObject(); writer.WriteString("role", "user"); writer.WriteStartArray("content");
-            writer.WriteStartObject(); writer.WriteString("type", "text"); writer.WriteString("text", input.Text); writer.WriteEndObject();
+            writer.WriteStartObject(); writer.WriteString("type", "text"); JsonUtf16.WriteString(writer, "text", input.Text); writer.WriteEndObject();
             if (input.Images is { Value.ValueKind: JsonValueKind.Array } images)
-                foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText());
+                foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText(), skipInputValidation: true);
             writer.WriteEndArray(); writer.WriteNumber("timestamp", timestamp); writer.WriteEndObject();
         }
         if (output.Length > limits.MaximumMessageBytes) throw Bound();
@@ -132,16 +134,16 @@ public static class PromptInputValue
     {
         var value = options ?? PromptInputAdmissionOptions.Default;
         if (value.MaximumTextCharacters <= 0 || value.MaximumImages < 0 || value.MaximumImageCharacters <= 0 ||
-            value.MaximumImageBytes <= 0 || value.MaximumJsonDepth is < 1 or > 64 ||
+            value.MaximumImageBytes <= 0 || value.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             value.MaximumMessageCharacters <= 0 || value.MaximumMessageBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid prompt input limits.");
         return value;
     }
-    private static bool JsonScalar(JsonElement value) => value.ValueKind switch
+    private static bool JsonScalar(JsonElement value, bool keepsLoneSurrogates) => value.ValueKind switch
     {
-        JsonValueKind.Object => value.EnumerateObject().All(p => Scalar(p.Name) && JsonScalar(p.Value)),
-        JsonValueKind.Array => value.EnumerateArray().All(JsonScalar),
-        JsonValueKind.String => Scalar(value.GetString()!),
+        JsonValueKind.Object => value.EnumerateObject().All(p => Scalar(p.Name) && JsonScalar(p.Value, keepsLoneSurrogates)),
+        JsonValueKind.Array => value.EnumerateArray().All(item => JsonScalar(item, keepsLoneSurrogates)),
+        JsonValueKind.String => keepsLoneSurrogates || Scalar(value.GetString()!),
         JsonValueKind.Number => value.TryGetDouble(out var number) && double.IsFinite(number),
         _ => value.ValueKind is JsonValueKind.Null or JsonValueKind.True or JsonValueKind.False
     };

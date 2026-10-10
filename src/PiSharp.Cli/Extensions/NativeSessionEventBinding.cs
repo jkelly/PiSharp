@@ -362,7 +362,7 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
             var assistant = Session.PersistedWire(turn.Transcript[assistantIndex].WireBody);
             var toolResults = turn.ToolResults.Select(message => Session.PersistedWire(message.WireBody)).ToImmutableArray();
             string? EntryId(JsonData message) => context.ContextEntries.IsDefault ? null : context.ContextEntries.LastOrDefault(entry =>
-                entry.Messages.Any(candidate => JsonElement.DeepEquals(candidate.WireBody.Value, message.Value)))?.SourceEntry.Id;
+                entry.Messages.Any(candidate => JsonUtf16.DeepEquals(candidate.WireBody.Value, message.Value)))?.SourceEntry.Id;
             var messageEntryId = EntryId(assistant);
             if (messageEntryId is null) return null;
             var turnIndex = _turnIndex;

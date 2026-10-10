@@ -44,7 +44,7 @@ public sealed record WorkerProtocolOptions(int MaximumFrameBytes = 1_048_576, in
 {
     internal void Validate()
     {
-        if (MaximumFrameBytes is < 1 or > 16_777_216 || MaximumJsonDepth is < 1 or > 64 ||
+        if (MaximumFrameBytes is < 1 or > 16_777_216 || MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             MaximumJsonValues is < 1 or > 1_048_576 || MaximumPendingCalls is < 1 or > 4096 ||
             MaximumCallbacks is < 1 or > 4096 || MaximumPendingWrites is < 1 or > 4096 ||
             MaximumHandles is < 1 or > 4096 || MaximumOwners is < 1 or > 4096 ||

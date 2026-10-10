@@ -26,7 +26,7 @@ public sealed class AzureResponsesTransport : IChatTransport
         ArgumentNullException.ThrowIfNull(client); ArgumentNullException.ThrowIfNull(factory); ArgumentNullException.ThrowIfNull(explicitApiKey);
         _client = client; _factory = factory; _key = explicitApiKey; _options = factory.Options;
         var http = _options.HttpOptions;
-        if (http.MaximumDataEvents <= 0 || http.MaximumDataCharacters <= 0 || http.MaximumTotalDataCharacters <= 0 || http.MaximumJsonDepth is < 1 or > 64)
+        if (http.MaximumDataEvents <= 0 || http.MaximumDataCharacters <= 0 || http.MaximumTotalDataCharacters <= 0 || http.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentException("Invalid Azure Responses SSE limits.", nameof(factory));
         _framing = http.Framing ?? new(RejectInvalidUtf8: true);
         if (!_framing.RejectInvalidUtf8) throw new ArgumentException("Azure Responses requires strict UTF-8.", nameof(factory));

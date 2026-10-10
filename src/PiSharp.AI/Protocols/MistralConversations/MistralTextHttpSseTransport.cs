@@ -59,7 +59,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                     token.ThrowIfCancellationRequested();
                     if (replacement is not null) { Admit(() => { AdmitPayload(replacement.Value, camel: true); return true; }); payload = replacement; }
                 }
-                var wire = JsonNode.Parse(payload.ToString())!.AsObject();
+                var wire = JsonNode.Parse(payload.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
                 MapRequestOptions(wire);
                 foreach (var message in wire["messages"]!.AsArray())
                 {

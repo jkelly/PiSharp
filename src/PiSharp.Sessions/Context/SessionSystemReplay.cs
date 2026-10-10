@@ -85,10 +85,10 @@ public sealed class SessionSystemReplay
             if (!resolvedTools.IsEmpty)
             {
                 writer.WritePropertyName("toolsAdded"); writer.WriteStartArray();
-                foreach (var tool in resolvedTools) { token.ThrowIfCancellationRequested(); writer.WriteRawValue(tool.Value.GetRawText()); }
+                foreach (var tool in resolvedTools) { token.ThrowIfCancellationRequested(); writer.WriteRawValue(tool.Value.GetRawText(), skipInputValidation: true); }
                 writer.WriteEndArray();
             }
-            writer.WritePropertyName("timestamp"); if (timestamp is { } value) writer.WriteRawValue(value.GetRawText()); else writer.WriteNumberValue(0);
+            writer.WritePropertyName("timestamp"); if (timestamp is { } value) writer.WriteRawValue(value.GetRawText(), skipInputValidation: true); else writer.WriteNumberValue(0);
             writer.WriteEndObject(); writer.Flush();
         }
         var bodyText = Encoding.UTF8.GetString(output.ToArray());
