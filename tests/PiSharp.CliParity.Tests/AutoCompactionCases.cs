@@ -57,6 +57,26 @@ internal static partial class Program
             Check(File.ReadLines(file).Any(line => line.Contains("\"type\":\"compaction\"", StringComparison.Ordinal)), "compaction recorded");
             Equal("claude-haiku-4-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the summary ran on the current model");
         }),
+        // print mode runs with auto-compaction on (compaction.enabled default): _checkCompaction treats "prompt is too long" as an
+        // overflow, omits the failed attempt (_omitRecoveryAttempt: a context_edit) and finds nothing to compact (prepareCompaction:
+        // one user message), so print-mode.ts sees no failed assistant message as the last one and exits 0 without printing.
+        ("auto-compaction.print-overflow-omits-the-failed-attempt", async () =>
+        {
+            using var sandbox = new Sandbox("auto-compaction-print-overflow");
+            sandbox.Vars["PI_OFFLINE"] = "1";
+            sandbox.Respond = (_, _) => AnthropicError(400, "prompt is too long");
+            sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"retry":{"enabled":false}}""");
+            var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "x");
+            Equal(0, code, "exit; " + stderr);
+            Equal("", stdout, "nothing on stdout");
+            Equal("", stderr, "nothing on stderr");
+            Equal(1, sandbox.Requests.Count, "no retry");
+            var entries = File.ReadLines(sandbox.SessionFiles().Single()).Skip(1).Select(line => JsonNode.Parse(line)!).ToList();
+            var edit = entries.Single(entry => entry["type"]!.GetValue<string>() == "context_edit");
+            var failed = entries.Single(entry => Kind(entry) == "message:assistant");
+            Equal(failed["id"]!.GetValue<string>(), edit["targetId"]!.GetValue<string>(), "the failed attempt is omitted");
+            Check(!entries.Any(entry => entry["type"]!.GetValue<string>() == "compaction"), "nothing compacted");
+        }),
     ];
 
     /// <summary>An Anthropic Messages stream answering with one text block and <paramref name="input"/> input tokens.</summary>
