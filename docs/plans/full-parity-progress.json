@@ -205,12 +205,13 @@
     "version": "1.1.0.2",
     "kind": "patch",
     "baseline": "v1.1.0",
-    "status": "in-preparation",
+    "status": "ready",
     "ships": "everything on parity/full",
     "notes": "docs/release-notes/1.1.0.2.md",
-    "changelog": "website/src/content/changelog/1.1.0.2.md (status in-progress, no date; set to released with the date at tag time)",
+    "changelog": "website/src/content/changelog/1.1.0.2.md (date 2026-10-09)",
     "tag": "not created; the owner confirms the tag",
-    "blockers": []
+    "blockers": [],
+    "dryRun": "run 38007732077 (Linux, tests) green"
   },
   "messageCaps": {
     "status": "merged",

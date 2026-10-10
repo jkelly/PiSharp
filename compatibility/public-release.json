@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "product": "PiSharp",
-  "version": "1.1.0.1",
-  "proposedReleaseTag": "v1.1.0.1",
+  "version": "1.1.0.2",
+  "proposedReleaseTag": "v1.1.0.2",
   "upstream": {
     "repository": "https://github.com/earendil-works/pi",
     "tag": "v1.1.0",
     "commit": "abe508e1b89912adde45528136c3221eb69acdd7"
   },
   "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
-  "productAndPackageVersion": "1.1.0.1",
+  "productAndPackageVersion": "1.1.0.2",
   "assemblyIdentityPolicy": {
-    "defaultSdkDerivedVersion": "1.1.0.1",
+    "defaultSdkDerivedVersion": "1.1.0.2",
     "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
     "fixedSupervisorAssemblyVersion": "1.0.0.0",
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
@@ -24,10 +24,9 @@
     "status": "Version metadata prepared; fresh versioned lock, build, package and consumer evidence required."
   },
   "publication": {
-    "tagCreated": true,
-    "binaryReleasePublished": true,
-    "nugetPackagesPublished": true,
-    "publishedOn": "2026-10-08"
+    "tagCreated": false,
+    "binaryReleasePublished": false,
+    "nugetPackagesPublished": false
   },
   "previousReleases": [
     {
@@ -43,6 +42,16 @@
     {
       "version": "1.1.0",
       "tag": "v1.1.0",
+      "upstreamTag": "v1.1.0",
+      "upstreamCommit": "abe508e1b89912adde45528136c3221eb69acdd7",
+      "tagCreated": true,
+      "githubReleasePublished": true,
+      "nugetPackagesPublished": true,
+      "publishedOn": "2026-10-08"
+    },
+    {
+      "version": "1.1.0.1",
+      "tag": "v1.1.0.1",
       "upstreamTag": "v1.1.0",
       "upstreamCommit": "abe508e1b89912adde45528136c3221eb69acdd7",
       "tagCreated": true,

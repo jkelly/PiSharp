@@ -1014,7 +1014,7 @@
       "originalSha256": "2551376cd09efe8406c1558c4e98f334f34756d1fa900e8e30a5a5dcf400421c"
     },
     {
-      "currentSha256": "e7a6f37731373d1eb7acdd7c49231b4d06a132ea00f7dc1f47eeb127ee44131b",
+      "currentSha256": "369c5d943e38e90464f454d3fec148532b05f4b5d6e4a1a22d38fa24099d86d9",
       "currentBytes": 764,
       "originalBytes": 380,
       "path": "Directory.Build.props",

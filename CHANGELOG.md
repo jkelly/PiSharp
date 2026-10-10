@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0.2]
+## [1.1.0.2] - 2026-10-09
 
 A C#-only patch on the Pi v1.1.0 baseline that ports the rest of Pi v1.1.0. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.2.md).
 
