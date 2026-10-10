@@ -210,6 +210,12 @@ internal static partial class Program
                 await File.WriteAllBytesAsync(empty, []);
                 Equal(OperatingSystem.IsWindows() ? "spawn EFTYPE" : $"spawn {empty} EACCES", (await Bash(empty, "empty")).GetProperty("error").GetString(),
                     "empty shell");
+                // A text file as the shell (Node 22 on Windows: CreateProcess ERROR_BAD_EXE_FORMAT, thrown as "spawn EFTYPE"; Linux and
+                // macOS: not executable, EACCES).
+                var text = Path.Combine(root, "shell.txt");
+                await File.WriteAllTextAsync(text, "hello\n");
+                Equal(OperatingSystem.IsWindows() ? "spawn EFTYPE" : $"spawn {text} EACCES", (await Bash(text, "text")).GetProperty("error").GetString(),
+                    "text file shell");
             }
             finally { try { Directory.Delete(root, true); } catch (IOException) { } }
         }),
