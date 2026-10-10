@@ -18,12 +18,12 @@ writes, compares and serializes such values (System.Text.Json's own `GetString`,
 | Session read and write | kept; a session line holding one opens (formerly refused) |
 | Provider requests | message text through `sanitizeSurrogates` (dropped); tool-call arguments (names and strings) kept, escaped, for every built-in converter: anthropic-messages, openai-completions, openai-responses (Azure, Codex), mistral-conversations, google-generative-ai, google-vertex and bedrock-converse-stream (`sanitizeBedrockDocument` drops only empty keys; the AWS SDK's `JSON.stringify` escapes the rest) |
 | pi-messages and extension APIs (`streamSimple`) | the context unchanged, every lone surrogate kept (escaped on the bridge) |
-| Tool results (built-in, extension) | kept in text, details and their names (`agent-loop.ts` keeps whatever a tool returns); the session line and events carry the escape |
+| Tool results (built-in, extension, MCP) | kept in text, details and their names (`agent-loop.ts` keeps whatever a tool returns); the session line and events carry the escape |
 | Extension events, handler contexts, registry values | kept (`runner.ts` emits whatever the session holds) |
 | The `write` tool | written as U+FFFD, as Node's UTF-8 encoder writes it |
 
 Remaining differences: the explicit `session …` and `rpc` verbs keep refusing them; a lone surrogate in a received openai-completions,
-openai-responses or Codex stream event is refused (upstream keeps it); MCP tool results holding one are refused.
+openai-responses or Codex stream event is refused (upstream keeps it).
 
 ## Nesting depth
 
@@ -35,7 +35,8 @@ depth; an RPC line nested deeper is answered as a parse failure (`JSON nests dee
 65 levels ended it). Codex events and request bodies, Bedrock request bodies, the extension registry (registrations, session entries
 handed to handlers, observations), the Node extension bridge (formerly 256), extension event dispatch, provider error bodies, Responses
 reasoning signatures, the HTML export and the user's `models.json`, `settings.json`, `keybindings.json` and `auth.json` hold it too
-(formerly 64). A registered tool schema deeper than 64 levels still fails where the tool declarations are serialized.
+(formerly 64), and so do the tool declarations a session records and sends (a registered tool's parameter schema, formerly
+refused past 64 levels).
 
 ## Token counts
 

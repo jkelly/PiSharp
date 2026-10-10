@@ -13,7 +13,32 @@ internal static partial class Program
         ("json.extension-tool-result-with-lone-surrogates-is-kept", LoneSurrogateToolResult),
         ("json.extension-results-and-session-entries-hold-deep-values", DeepExtensionValues),
         ("json.extension-stream-simple-receives-lone-surrogates-unchanged", LoneSurrogateExtensionProvider),
+        ("json.extension-tool-schema-deeper-than-64-levels-is-declared", DeepToolSchema),
     ];
+
+    // A tool's parameter schema is a JavaScript value: anthropic-messages.ts sends it as input_schema however deep it nests (formerly
+    // the declaration serializer stopped at 64 levels).
+    private static async Task DeepToolSchema()
+    {
+        using var sandbox = NodeSandbox("deep-schema");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "deep.ts"), """
+            export default function (pi: any) {
+              let schema: any = { type: "string" };
+              for (let i = 0; i < 100; i++) schema = { type: "object", properties: { n: schema } };
+              pi.registerTool({ name: "deep", label: "Deep", description: "Deep schema", parameters: schema,
+                async execute() { return { content: [{ type: "text", text: "ok" }], details: {} }; } });
+            }
+            """);
+        sandbox.Respond = (_, _) => AnthropicText("done");
+        var (code, stdout, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "hi"]);
+        Equal(0, code, "exit; " + stderr);
+        Equal("done", stdout.Trim(), "final text");
+        using var body = JsonDocument.Parse(sandbox.Requests.Single().Body!, new JsonDocumentOptions { MaxDepth = 1000 });
+        var tool = body.RootElement.GetProperty("tools").EnumerateArray().Single(item => item.GetProperty("name").GetString() == "deep");
+        var schema = tool.GetProperty("input_schema"); var levels = 0;
+        while (schema.TryGetProperty("properties", out var properties)) { schema = properties.GetProperty("n"); levels++; }
+        Equal(100, levels, "every level declared");
+    }
 
     // Only Pi's own provider converters apply sanitizeSurrogates: an extension's streamSimple receives the context as the agent holds it
     // (formerly PiSharp dropped the lone surrogate before the extension saw the request).

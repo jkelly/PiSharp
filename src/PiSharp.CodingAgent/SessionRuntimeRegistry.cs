@@ -305,7 +305,7 @@ public sealed partial class SessionRuntimeRegistry
         if (!replaceDeclarations && previous.SequenceEqual(selected, StringComparer.Ordinal)) return null;
         var body = JsonData.Parse(JsonSerializer.Serialize(new { role = "system", content = "", timestamp,
             toolsRemoved = previous.Select(name => new { name }),
-            toolsAdded = selected.Select(name => _tools[name].Declaration.Value) }));
+            toolsAdded = selected.Select(name => _tools[name].Declaration.Value) }, JsonData.SerializerOptions));
         long characters = 0; Charge(body.Value, ref characters, cancellationToken);
         return new("system", body);
     }

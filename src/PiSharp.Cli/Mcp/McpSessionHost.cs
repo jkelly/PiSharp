@@ -52,7 +52,8 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth
     };
     /// <summary>The binding of one server's (or the resource tools') registrations admits every tool it lists.</summary>
-    internal static ToolInvokerOptions BindingInvokerOptions { get; } = new(MaximumTools: int.MaxValue);
+    // mcp/index.ts: a tools/call result is what JSON.parse read, lone surrogates included.
+    internal static ToolInvokerOptions BindingInvokerOptions { get; } = new(MaximumTools: int.MaxValue) { KeepsLoneSurrogates = true };
     private static readonly TimeSpan OAuthRequestTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>Physical HTTP for HTTP servers and their OAuth refreshes; defaults to a socket handler without redirects.</summary>

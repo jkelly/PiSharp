@@ -17,6 +17,10 @@ public sealed class JsonData
     /// <summary>Document options that admit <see cref="MaximumDepth"/> levels (System.Text.Json's default is 64).</summary>
     public static JsonDocumentOptions DocumentOptions => new() { MaxDepth = MaximumDepth };
 
+    /// <summary>Serializer options whose writer admits the levels of a <see cref="MaximumDepth"/> value nested in a serialized object
+    /// (System.Text.Json's default is 64).</summary>
+    public static JsonSerializerOptions SerializerOptions { get; } = new() { MaxDepth = 2 * MaximumDepth };
+
     public JsonElement Value { get; }
 
     private JsonData(JsonElement value)

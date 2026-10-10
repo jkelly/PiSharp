@@ -355,20 +355,23 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             content = literalSystem,
             timestamp = 0, toolsAdded = (_initialActiveTools is { } active ? active.Select(name => registrations.Single(value => value.Adapter.Name == name)) :
                 registrations.Where(value => ToolExposureSemantics.ActivatesOnRegistration(value.Exposure,
-                value.DefaultActive))).Select(value => value.Declaration.Value).ToArray(), offlineApi = live is null ? model.Api : null }));
+                value.DefaultActive))).Select(value => value.Declaration.Value).ToArray(), offlineApi = live is null ? model.Api : null },
+            NativeExtensionActivation.DeclarationJson));
         // A live session's system message carries no offlineApi field (it was written as null): strict replays such as the
         // Mistral route admit only Pi's system fields.
         if (live is not null)
         {
-            var withoutOfflineApi = System.Text.Json.Nodes.JsonNode.Parse(InitialSystem.ToString())!.AsObject();
-            withoutOfflineApi.Remove("offlineApi"); InitialSystem = JsonData.Parse(withoutOfflineApi.ToJsonString());
+            var withoutOfflineApi = System.Text.Json.Nodes.JsonNode.Parse(InitialSystem.ToString(), documentOptions: JsonData.DocumentOptions)!.AsObject();
+            withoutOfflineApi.Remove("offlineApi"); InitialSystem = JsonData.Parse(withoutOfflineApi.ToJsonString(NativeExtensionActivation.DeclarationJson));
         }
         if (originalSystemPrompt is not null)
         {
-            var built = System.Text.Json.Nodes.JsonNode.Parse(OriginalSystemPromptBuilder.Message(startupOriginalPrompt, 0, allowForce: false).ToString())!.AsObject();
+            var built = System.Text.Json.Nodes.JsonNode.Parse(OriginalSystemPromptBuilder.Message(startupOriginalPrompt, 0, allowForce: false).ToString(),
+                documentOptions: JsonData.DocumentOptions)!.AsObject();
             foreach (var property in InitialSystem.Value.EnumerateObject())
-                if (property.Name is "toolsAdded" or "offlineApi") built[property.Name] = System.Text.Json.Nodes.JsonNode.Parse(property.Value.GetRawText());
-            InitialSystem = JsonData.Parse(built.ToJsonString());
+                if (property.Name is "toolsAdded" or "offlineApi")
+                    built[property.Name] = System.Text.Json.Nodes.JsonNode.Parse(property.Value.GetRawText(), documentOptions: JsonData.DocumentOptions);
+            InitialSystem = JsonData.Parse(built.ToJsonString(NativeExtensionActivation.DeclarationJson));
         }
     }
 

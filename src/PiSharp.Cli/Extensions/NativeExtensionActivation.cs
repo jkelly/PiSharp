@@ -272,8 +272,10 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         .Where(tool => IsEnabledTool(tool.Name)).ToImmutableArray();
     internal ImmutableArray<JsonData> EnabledDeclarations => Binding.Registrations
         .Where(tool => IsEnabledTool(tool.Name)).Select(tool =>
-            JsonData.Parse(JsonSerializer.Serialize(new { name = tool.Name, description = tool.Description, parameters = tool.Parameters.Value })))
+            JsonData.Parse(JsonSerializer.Serialize(new { name = tool.Name, description = tool.Description, parameters = tool.Parameters.Value }, DeclarationJson)))
         .ToImmutableArray();
+    /// <summary>A tool's parameter schema keeps every JSON level Pi carries (JsonData.MaximumDepth), past the serializer's default 64.</summary>
+    internal static JsonSerializerOptions DeclarationJson => JsonData.SerializerOptions;
 
     public JsonData CommandCatalog => CommandSnapshot.CommandCatalog;
     public ValueTask<JsonData> CompleteCommandAsync(string name, string prefix, CancellationToken token)

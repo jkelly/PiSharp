@@ -16,6 +16,28 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> JsonFidelityCases() =>
     [
+        // mcp/index.ts: a tools/call result's text is whatever JSON.parse read, a lone surrogate included; the session keeps it and
+        // anthropic-messages.ts sanitizeSurrogates drops it from the tool_result text it sends.
+        ("json-fidelity.mcp-tool-result-keeps-a-lone-surrogate", async () =>
+        {
+            using var sandbox = new Sandbox("json-fidelity-mcp");
+            sandbox.Write(Path.Combine(sandbox.AgentDir, "mcp.json"), """{"mcpServers":{"docs":{"command":"docs-server","exposure":"direct"}}}""");
+            sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("mcp__docs__lookup", new { }) : AnthropicText("done");
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            var host = sandbox.Host(stdout, stderr, null) with
+            {
+                CreateMcpHost = agentDir => new PiSharp.Cli.Mcp.McpSessionHost(agentDir, sandbox.Home, () => [])
+                {
+                    CreateChannel = entry => (actual, token) => ValueTask.FromResult<PiSharp.Extensions.Mcp.Runtime.IMcpAdmittedRequestChannel>(
+                        new FakeMcpChannel("lookup", "{\"content\":[{\"type\":\"text\",\"text\":\"a\\udc00b\"}]}"))
+                }
+            };
+            Equal(0, await PiCommand.RunAsync(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "look"], host, CancellationToken.None), "exit; " + stderr);
+            Equal(2, sandbox.Requests.Count, "the tool result reached the model");
+            Check(RequestMessages(sandbox.Requests[1]).Contains("\"content\":\"ab\",\"is_error\":false", StringComparison.Ordinal),
+                "sanitized tool_result: " + RequestMessages(sandbox.Requests[1]));
+            Check(File.ReadAllText(sandbox.SessionFiles().Single()).Contains("a\\udc00b", StringComparison.Ordinal), "the session keeps the lone surrogate");
+        }),
         ("json-fidelity.lone-surrogates-travel-through-rpc-prompt-tool-arguments-and-session", async () =>
         {
             using var sandbox = new Sandbox("json-fidelity-surrogates");
