@@ -20,6 +20,7 @@ internal static partial class Program
         Case("hooks.reduce-event-last-result-wins-and-failures-continue", ReduceEventOrder),
         Case("hooks.ui-prompt-start-end-once-for-nested-prompts", UiPromptEvents),
         Case("hooks.ui-prompt-wraps-terminal-component-scopes-and-custom", UiPromptCustomComponents),
+        Case("hooks.ui-prompt-events-reach-every-observer-in-order-under-load", UiPromptOrderUnderLoad),
         Case("hooks.bedrock-event-stream-events-and-signed-payload-hooks", BedrockProviderHooks),
         Case("events.usage-entry-shape-and-entry-appended", UsageEntry),
     ];
@@ -208,6 +209,81 @@ internal static partial class Program
             """{"type":"ui_prompt_start","reason":"ui_prompt","kind":"input"}""",
             """{"type":"ui_prompt_end","reason":"ui_prompt","kind":"input"}"""]), "ui prompt events: " + string.Join("\n", seen));
     }
+    // runner.ts emitUIPromptEvent queues each emit (queueMicrotask) in the order the prompts open and close, and emit awaits every
+    // handler in turn: each observer sees ui_prompt_start before its ui_prompt_end, nested prompts once, whatever its handlers await
+    // and however busy the thread pool is. Several observers with synchronous, yielding, delaying and spinning handlers, many prompt
+    // sequences (outer select with a nested confirm, confirm, untitled input), and the thread pool kept busy throughout.
+    private static async Task UiPromptOrderUnderLoad()
+    {
+        const int iterations = 150, observers = 4;
+        await using var f = await CreateAsync();
+        var logs = Enumerable.Range(0, observers).Select(_ => new List<string>()).ToArray();
+        var dialogs = new DialogProvider(); var prompts = new NativeUiPromptEvents(dialogs);
+        await f.Activate(api =>
+        {
+            for (var index = 0; index < observers; index++)
+            {
+                var observer = index; var log = logs[observer];
+                foreach (var topic in new[] { "ui_prompt_start", "ui_prompt_end" })
+                    api.Observe(new(topic + "-" + observer, topic, async (value, _, _) =>
+                    {
+                        switch (observer)
+                        {
+                            case 1: await Task.Yield(); break;
+                            case 2: await Task.Delay(Random.Shared.Next(0, 3)); break;
+                            case 3: Thread.SpinWait(Random.Shared.Next(0, 20_000)); break;
+                        }
+                        lock (log) log.Add(value.ToString());
+                    }));
+            }
+        });
+        prompts.Bind(f.Registry, f.Registry.CaptureSnapshot(), f.Report);
+        // CPU load on dedicated threads (every core busy), plus a burst of short thread-pool work items competing with the dispatches.
+        using var stop = new CancellationTokenSource();
+        var load = Enumerable.Range(0, Environment.ProcessorCount).Select(_ =>
+        {
+            var thread = new Thread(() => { while (!stop.IsCancellationRequested) Thread.SpinWait(50_000); }) { IsBackground = true };
+            thread.Start(); return thread;
+        }).ToArray();
+        var churn = Task.Run(async () =>
+        {
+            while (!stop.IsCancellationRequested)
+                await Task.WhenAll(Enumerable.Range(0, 16).Select(_ => Task.Run(() => Thread.SpinWait(Random.Shared.Next(0, 5_000)))));
+        });
+        var expected = new List<string>();
+        try
+        {
+            var context = new Context();
+            for (var iteration = 0; iteration < iterations; iteration++)
+            {
+                await using var scope = prompts.OpenScope(context);
+                var title = "Pick " + iteration;
+                dialogs.DuringSelect = iteration % 2 == 0
+                    ? async () => { await using var nested = prompts.OpenScope(context); await nested.ConfirmAsync("Nested " + iteration, "ok?"); }
+                    : null;
+                await scope.SelectAsync(title, ["a", "b"]);
+                await scope.ConfirmAsync("Sure " + iteration, "really");
+                await scope.InputAsync("");
+                expected.Add("{\"type\":\"ui_prompt_start\",\"reason\":\"ui_prompt\",\"kind\":\"select\",\"title\":\"" + title + "\"}");
+                expected.Add("{\"type\":\"ui_prompt_end\",\"reason\":\"ui_prompt\",\"kind\":\"select\",\"title\":\"" + title + "\"}");
+                expected.Add("{\"type\":\"ui_prompt_start\",\"reason\":\"ui_prompt\",\"kind\":\"confirm\",\"title\":\"Sure " + iteration + "\"}");
+                expected.Add("{\"type\":\"ui_prompt_end\",\"reason\":\"ui_prompt\",\"kind\":\"confirm\",\"title\":\"Sure " + iteration + "\"}");
+                expected.Add("""{"type":"ui_prompt_start","reason":"ui_prompt","kind":"input"}""");
+                expected.Add("""{"type":"ui_prompt_end","reason":"ui_prompt","kind":"input"}""");
+            }
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+            while (DateTime.UtcNow < deadline && logs.Any(log => { lock (log) return log.Count < expected.Count; })) await Task.Delay(20);
+        }
+        finally { dialogs.DuringSelect = null; stop.Cancel(); foreach (var thread in load) thread.Join(); await churn; }
+        for (var observer = 0; observer < observers; observer++)
+        {
+            string[] seen; lock (logs[observer]) seen = [.. logs[observer]];
+            var first = Enumerable.Range(0, Math.Min(seen.Length, expected.Count)).FirstOrDefault(index => seen[index] != expected[index], -1);
+            Check(seen.SequenceEqual(expected), $"observer {observer} saw {seen.Length}/{expected.Count} events" +
+                (first >= 0 ? $"; first difference at {first}: {seen[first]} (expected {expected[first]})" : ""));
+        }
+    }
+
     // runner.ts wrapUIPromptContext wraps every UI context, including the interactive one: dialogs report ui_prompt_start/end, and
     // custom() is a "custom" prompt (no title) until the component is done. The wrapped scope keeps its capability interfaces.
     private sealed class ComponentProvider(DialogProvider dialogs) : IExtensionUiProvider

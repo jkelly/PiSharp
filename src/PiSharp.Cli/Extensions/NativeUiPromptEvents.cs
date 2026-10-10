@@ -10,7 +10,7 @@ namespace PiSharp.Cli.Extensions;
 
 /// <summary>Source ui_prompt_start/ui_prompt_end: while an extension waits on a blocking dialog (select, confirm, input, editor),
 /// extensions are told the host is waiting on the user. Nested prompts report once, for the outermost prompt. The events are
-/// published asynchronously, as Pi queues them. A custom terminal component (ctx.ui.custom) is a "custom" prompt from its open until
+/// published asynchronously in raise order, as Pi queues them (one dispatch after another). A custom terminal component (ctx.ui.custom) is a "custom" prompt from its open until
 /// done(). Scopes keep exactly the capability interfaces of the scope they wrap.</summary>
 internal sealed class NativeUiPromptEvents(IExtensionUiProvider inner) : IExtensionUiProvider
 {
@@ -55,12 +55,11 @@ internal sealed class NativeUiPromptEvents(IExtensionUiProvider inner) : IExtens
             writer.WriteString("type", type); writer.WriteString("reason", "ui_prompt"); writer.WriteString("kind", kind);
             if (!string.IsNullOrEmpty(title)) writer.WriteString("title", title);
         });
-        _ = Task.Run(async () =>
-        {
-            try { await target.Registry.DispatchObservationsReportingAsync(target.Snapshot, type, value, target.Report).ConfigureAwait(false); }
-            catch (Exception) { }
-        });
+        // runner.ts emitUIPromptEvent: queued in raise order (queueMicrotask), never awaited by the dialog. Each dispatch waits for
+        // the previous one, so every observer sees ui_prompt_start before its ui_prompt_end.
+        _ = _queue.Enqueue(() => target.Registry.DispatchObservationsReportingAsync(target.Snapshot, type, value, target.Report).AsTask());
     }
+    private readonly OrderedObservationQueue _queue = new();
     private sealed class Finish(NativeUiPromptEvents owner, string kind, string? title) : IDisposable
     {
         private int disposed;
