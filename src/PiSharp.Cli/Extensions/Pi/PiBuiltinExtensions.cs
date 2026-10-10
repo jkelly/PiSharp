@@ -48,6 +48,25 @@ internal sealed class PiBuiltinExtensions
     /// <summary>Replaces the enabled set (a reload).</summary>
     internal void Set(ImmutableHashSet<string> value) => Volatile.Write(ref enabled, value);
 
+    /// <summary>The commands the built-in extensions register (llama/index.ts and mcp/index.ts registerCommand), in load order.</summary>
+    internal static ImmutableArray<(string Builtin, string Name, string Description)> Commands { get; } =
+    [
+        (Llama, "llama", "Manage llama.cpp router models"),
+        (Mcp, "mcp", "Manage MCP servers: sign in, reconnect, enable or disable, and change exposure")
+    ];
+
+    private ImmutableDictionary<string, string> scopes = ImmutableDictionary<string, string>.Empty;
+
+    /// <summary>The sourceInfo scope of a built-in extension (resource-loader.ts metadataByPath from resolve(): "user", or "project" for
+    /// a project override).</summary>
+    internal string ScopeOf(string name) => Volatile.Read(ref scopes).GetValueOrDefault(name, "user");
+
+    /// <summary>Takes the scopes of the built-in extension resources <paramref name="resolved"/> lists (startup and every reload).</summary>
+    internal void SetScopes(PiSharp.Cli.Packages.PiResolvedPaths? resolved) => Volatile.Write(ref scopes,
+        (resolved?.Extensions ?? []).Where(resource => resource.Path.StartsWith(PathPrefix, StringComparison.Ordinal))
+            .GroupBy(resource => resource.Path[PathPrefix.Length..], StringComparer.Ordinal)
+            .ToImmutableDictionary(group => group.Key, group => group.First().Metadata.Scope, StringComparer.Ordinal));
+
     internal sealed record Resolution(ImmutableHashSet<string> Enabled, ImmutableArray<PiDiagnostic> Errors, ImmutableArray<PiDiagnostic> Warnings);
 
     /// <summary>resource-loader.ts: the <c>builtin:</c> paths of <c>mergePaths(-e, resolve())</c> (only the <c>-e</c> ones with

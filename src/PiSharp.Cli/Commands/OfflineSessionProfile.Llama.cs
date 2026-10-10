@@ -24,7 +24,7 @@ internal sealed partial class OfflineSessionProfile
         if (BuiltinExtensions?.IsEnabled(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Llama) == false) return false;
         try
         {
-            var catalog = CommandCatalog.Value;
+            var catalog = ExtensionCommandCatalog();
             return catalog.ValueKind != JsonValueKind.Array || !catalog.EnumerateArray().Any(row => row.ValueKind == JsonValueKind.Object &&
                 row.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String && name.GetString() == "llama");
         }

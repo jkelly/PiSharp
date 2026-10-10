@@ -98,4 +98,6 @@ internal sealed record PiEntryOptions
     /// (<c>steeringMode</c>, <c>followUpMode</c>, <c>compaction.enabled</c>, <c>retry.enabled</c>) the settings manager saves. Null in
     /// interactive mode, which saves through its own settings.</summary>
     internal Action<string, System.Text.Json.Nodes.JsonNode>? PersistGlobalSetting { get; init; }
+    /// <summary>The current MCP server manager outside interactive mode, for the built-in <c>/mcp</c> (the interactive mode has its own).</summary>
+    internal Func<PiSharp.Cli.Mcp.McpServerManager?>? McpManager { get; init; }
 }

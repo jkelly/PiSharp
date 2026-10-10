@@ -298,6 +298,7 @@ internal static class PiCommand
         string[] disabledBuiltins = parsed.NoMcp ? [PiBuiltinExtensions.Mcp] : [];
         var builtinResolution = PiBuiltinExtensions.Resolve(parsed.Extensions, packageResources, parsed.NoExtensions, disabledBuiltins, extensionRun?.Host?.Extensions ?? []);
         var builtins = new PiBuiltinExtensions(builtinResolution.Enabled);
+        builtins.SetScopes(packageResources);
         runtimeDiagnostics.AddRange([.. builtinResolution.Errors, .. builtinResolution.Warnings]);
         // resource-loader.ts reload: packageManager.resolveExtensionSources(-e sources, temporary) contributes the -e packages' skills,
         // prompts and themes as well as their extensions (their enabled resources lead each list).
@@ -356,6 +357,7 @@ internal static class PiCommand
             // The reload resolves the built-in extensions again over the reloaded settings and extensions.
             builtins.Set(PiBuiltinExtensions.Resolve(parsed.Extensions, reloadPackages, parsed.NoExtensions, disabledBuiltins,
                 activation?.Pi?.Extensions ?? extensionRun?.Host?.Extensions ?? []).Enabled);
+            builtins.SetScopes(reloadPackages);
             var reloadSources = await ExtensionSourcesAsync(reloadSettings, TextWriter.Null, TextWriter.Null, reloadToken).ConfigureAwait(false) ?? extensionSources;
             var reloaded = PiResources.WithDiscovered(PiResources.Discover(new(sessionCwd, agentDir, home, reloadSettings, projectTrusted)
             {
@@ -482,6 +484,8 @@ internal static class PiCommand
         // agent-session.ts: the session's queue-mode and auto-compaction/retry setters save the global settings through the settings
         // manager (the interactive mode saves through its own settings).
         var settingsWriter = appMode == PiAppMode.Interactive ? null : new PiSharp.Cli.Interactive.Mode.InteractiveSettings(sessionCwd, agentDir, projectTrusted, host.GetEnvironment);
+        // The built-in /mcp outside interactive mode acts on the current MCP generation's server manager.
+        PiSharp.Cli.Mcp.McpServerManager? mcpManager = null;
         var options = new PiEntryOptions
         {
             ToolPolicy = toolPolicy, Settings = startupSnapshot, Selection = selection, LiveRuntime = runtime,
@@ -501,6 +505,7 @@ internal static class PiCommand
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
             Extensions = extensionRun?.Host, ExtensionMode = extensionMode, BuiltinExtensions = builtins,
+            McpManager = appMode == PiAppMode.Interactive ? null : () => Volatile.Read(ref mcpManager),
             PersistGlobalSetting = settingsWriter is null ? null : (key, value) =>
             {
                 switch (key)
@@ -516,6 +521,11 @@ internal static class PiCommand
         var sessionArgs = SessionArguments(plan, parsed);
         // The project .pi/mcp.json is read only for a trusted project (IMPL-H seam): the run's own trust answer.
         var mcpHost = host.CreateMcpHost(agentDir) is { } createdHost ? createdHost with { IsProjectTrusted = options.ProjectTrusted } : null;
+        if (mcpHost is not null && appMode != PiAppMode.Interactive)
+        {
+            var observe = mcpHost.ObserveManager;
+            mcpHost = mcpHost with { ObserveManager = manager => { observe?.Invoke(manager); Volatile.Write(ref mcpManager, manager); } };
+        }
         using var entered = options.Enter();
         // print-mode.ts/rpc-mode.ts registerSignalHandlers: SIGTERM (and SIGHUP off Windows) shut the host down gracefully, then the
         // process exits 143 (129). Interactive mode keeps the terminal's own handling.

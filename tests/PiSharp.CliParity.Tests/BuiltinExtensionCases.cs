@@ -23,7 +23,63 @@ internal static partial class Program
         ("builtins.reload-resolves-the-built-in-extensions-again", BuiltinReload),
         ("builtins.reload-loads-a-built-in-extension-enabled-meanwhile", BuiltinReloadEnables),
         ("builtins.rpc-mode-registers-no-disabled-built-in", BuiltinRpc),
+        ("builtins.rpc-get-commands-lists-built-in-commands-and-mcp-runs-outside-the-terminal", BuiltinRpcCommands),
     ];
+
+    // rpc-mode.ts get_commands: extensionRunner.getRegisteredCommands() lists the built-in extensions' /llama and /mcp (builtin:
+    // sourceInfo); mcp/index.ts /mcp outside interactive mode notifies formatStatus() instead of prompting the model.
+    private static async Task BuiltinRpcCommands()
+    {
+        using var sandbox = new Sandbox("builtins-rpc-commands");
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "mcp.json"), """{"mcpServers":{"docs":{"command":"docs-server","exposure":"direct"}}}""");
+        async Task<(List<JsonNode> Responses, List<JsonNode> Events)> Run()
+        {
+            lock (sandbox.Requests) sandbox.Requests.Clear();
+            var commands = new[] { """{"id":"1","type":"get_commands"}""", """{"id":"2","type":"prompt","message":"/mcp"}""", """{"id":"3","type":"get_state"}""" };
+            var input = new ScriptedInput(); var responses = new List<JsonNode>(); var events = new List<JsonNode>();
+            var stateSent = 0;
+            void SendState() { if (Interlocked.Exchange(ref stateSent, 1) == 0) input.Send(commands[2]); }
+            using var output = new LineOutput(line =>
+            {
+                if (line["type"]?.GetValue<string>() != "response") { lock (events) events.Add(line); if (line["type"]?.GetValue<string>() == "agent_end") SendState(); return; }
+                int count; lock (responses) { responses.Add(line); count = responses.Count; }
+                if (count == 1) input.Send(commands[1]);
+                // A handled /mcp runs no turn: get_state follows once the notification had time to arrive.
+                else if (count == 2) _ = Task.Delay(1500).ContinueWith(_ => SendState(), TaskScheduler.Default);
+                else if (count >= 3) input.Complete();
+            });
+            input.Send(commands[0]);
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            using var registration = deadline.Token.Register(input.Complete);
+            var host = sandbox.Host(stdout, stderr, null, rpcInput: input, rpcOutput: output) with
+            {
+                StdoutIsTty = false,
+                CreateMcpHost = agentDir => new McpSessionHost(agentDir, sandbox.Home, () => [])
+                {
+                    CreateChannel = entry => (actual, token) => ValueTask.FromResult<PiSharp.Extensions.Mcp.Runtime.IMcpAdmittedRequestChannel>(new FakeMcpChannel("lookup"))
+                }
+            };
+            Equal(0, await PiCommand.RunAsync(["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], host, CancellationToken.None), "rpc exit; " + stderr);
+            return (responses, events);
+        }
+        var (responses, events) = await Run();
+        var rows = responses[0]["data"]!["commands"]!.AsArray().OfType<JsonObject>().ToList();
+        foreach (var (name, builtin) in new[] { ("llama", "llama.cpp"), ("mcp", "mcp") })
+        {
+            var row = rows.SingleOrDefault(candidate => candidate["name"]!.GetValue<string>() == name);
+            Check(row is not null, $"/{name} listed: " + responses[0].ToJsonString());
+            Equal("extension", row!["source"]!.GetValue<string>(), name + " source");
+            Equal($$"""{"path":"builtin:{{builtin}}","source":"builtin","scope":"user","origin":"top-level"}""", row["sourceInfo"]!.ToJsonString(), name + " sourceInfo");
+        }
+        Equal(0, sandbox.Requests.Count, "/mcp does not prompt the model");
+        var notify = events.Where(frame => frame["type"]?.GetValue<string>() == "extension_ui_request" && frame["method"]?.GetValue<string>() == "notify").ToList();
+        Check(notify.Any(frame => frame["message"]!.GetValue<string>() == "docs: connected, 1 tools (direct)"), "status notified: " + string.Join("\n", events.Select(e => e.ToJsonString())));
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"extensions":["-builtin:mcp","-builtin:llama.cpp"]}""");
+        (responses, events) = await Run();
+        Check(!responses[0]["data"]!["commands"]!.AsArray().OfType<JsonObject>().Any(row => row["name"]!.GetValue<string>() is "mcp" or "llama"), "disabled built-ins list no commands");
+        Equal(1, sandbox.Requests.Count, "without the mcp extension /mcp is a prompt");
+    }
 
     private static async Task BuiltinRpc()
     {
