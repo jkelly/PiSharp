@@ -130,8 +130,9 @@ public sealed partial class MistralTextHttpSseTransport
                 {
                     var args = block.GetProperty("arguments");
                     if (args.ValueKind != JsonValueKind.Object) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral tool arguments must be objects.");
-                    calls.Add(new JsonObject { ["id"] = block.GetProperty("id").GetString(), ["type"] = "function", ["index"] = 0,
-                        ["function"] = new JsonObject { ["name"] = block.GetProperty("name").GetString(), ["arguments"] = ReplayJson(args) } });
+                    // The SDK writes the call as convertMessages builds it: id, type, function, index.
+                    calls.Add(new JsonObject { ["id"] = block.GetProperty("id").GetString(), ["type"] = "function",
+                        ["function"] = new JsonObject { ["name"] = block.GetProperty("name").GetString(), ["arguments"] = ReplayJson(args) }, ["index"] = 0 });
                 }
                 else throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral assistant replay content.");
             }

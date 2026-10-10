@@ -215,7 +215,12 @@ internal static class SessionEntryCodecTests
         Equal("\u03C0\U0001F600", codec.Parse(raw).WireBody.Value.GetProperty("literal").GetString());
         Equal("e\u0301", codec.Parse(raw).WireBody.Value.GetProperty("combining").GetString());
         Equal(raw, codec.Serialize(codec.Parse(raw))); RoundTrip(codec, codec.ParseUtf8(Encoding.UTF8.GetBytes(raw)));
-        foreach (var fields in new[] { Fields("""{"customType":"x","data":"\uD800"}"""), Fields("""{"customType":"x","data":{"\uDC00":1}}"""), "\"customType\":\"x\",\"data\":\"" + '\uD800' + "\"" })
+        // session-manager.ts JSON.parse keeps an escaped lone surrogate of a string value, and JSON.stringify writes it back as its escape.
+        var lone = Entry("custom", Fields("""{"customType":"x","data":["\uD800","a\udc00b"]}"""));
+        Equal(lone, codec.Serialize(codec.Parse(lone)));
+        Equal("a\udc00b", PiSharp.Contracts.JsonUtf16.GetString(codec.Parse(lone).WireBody.Value.GetProperty("data")[1]));
+        // A lone surrogate of a name, or a raw (unescaped) lone surrogate code unit, stays outside the owned profile.
+        foreach (var fields in new[] { Fields("""{"customType":"x","data":{"\uDC00":1}}"""), "\"customType\":\"x\",\"data\":\"" + '\uD800' + "\"" })
             Fails(SessionEntryCodecFailure.UnsupportedUnicode, () => codec.Parse(Entry("custom", fields)));
         Fails(SessionEntryCodecFailure.UnsupportedUnicode, () => codec.ParseUtf8(new byte[] { 0xC0, 0xAF }));
         Fails(SessionEntryCodecFailure.MalformedJson, () => codec.ParseUtf8(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(raw)).ToArray()));

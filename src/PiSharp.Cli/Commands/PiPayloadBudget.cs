@@ -45,7 +45,7 @@ internal static class PiPayloadBudget
 
     /// <summary>Pi entry tool results: agent-loop.ts keeps every content block of a result (the 128-block profile bound is lifted);
     /// the character and byte bounds stay the memory bounds above.</summary>
-    public static ToolResultValueOptions PiToolResults { get; } = ToolResults with { MaximumContentBlocks = int.MaxValue };
+    public static ToolResultValueOptions PiToolResults { get; } = ToolResults with { MaximumContentBlocks = int.MaxValue, KeepsLoneSurrogates = true };
 
     /// <summary>agent.ts steer/followUp push onto plain arrays: the Pi entry's queues have no message-count or size bound.</summary>
     public static AgentPendingInputQueueOptions PiQueue { get; } = new(MaximumMessagesPerQueue: int.MaxValue,
@@ -59,7 +59,7 @@ internal static class PiPayloadBudget
     /// <summary>agent-session.ts prompt/sendUserMessage: an extension's user message has no text or image-count bound; the message keeps
     /// the request-entry and payload memory bounds every prompt has (the record's other defaults).</summary>
     public static PromptInputAdmissionOptions PiExtensionInput { get; } = new(
-        MaximumTextCharacters: PiSharp.AI.PiRequestBudget.RequestEntryCharacters, MaximumImages: int.MaxValue, MaximumJsonDepth: 64);
+        MaximumTextCharacters: PiSharp.AI.PiRequestBudget.RequestEntryCharacters, MaximumImages: int.MaxValue, MaximumJsonDepth: 64) { KeepsLoneSurrogates = true };
 
     /// <summary>The agent options of the Pi entry: no tool, subscriber, queue, progress or result-block count bound (agent.ts has none).</summary>
     public static AgentOptions PiAgent(AgentOptions options)
@@ -79,7 +79,7 @@ internal static class PiPayloadBudget
         return options with
         {
             MaximumTools = int.MaxValue, MaximumTransforms = int.MaxValue, MaximumAssistantContentBlocks = int.MaxValue,
-            MaximumResultContentBlocks = int.MaxValue
+            MaximumResultContentBlocks = int.MaxValue, KeepsLoneSurrogatesInArguments = true
         };
     }
 

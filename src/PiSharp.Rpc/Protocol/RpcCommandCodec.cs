@@ -40,14 +40,14 @@ internal static class RpcCommandCodec
         try { Strict(input, options.MaximumCommandBytes, options.MaximumJsonDepth); }
         catch (JsonlTransportException) { throw new RpcCommandException(null, "parse", "Failed to parse command: invalid strict JSON object."); }
         var body = input.Value; string? id = null;
-        // An id or type with a lone surrogate is echoed exactly (the owned record holds U+FFFD there).
+        // An id or type with a lone surrogate is echoed exactly.
         JsonlRecordCodec.ExactMembers.TryGetValue(input, out var exact);
-        string Exact(string field, JsonElement value) => exact is not null && exact.TryGetValue(field, out var text) ? text : value.GetString()!;
+        string Exact(string field, JsonElement value) => exact is not null && exact.TryGetValue(field, out var text) ? text : JsonUtf16.GetString(value);
         if (body.TryGetProperty("id", out var identity))
         {
             // rpc-mode.ts echoes command.id as it came: a non-string id is written back as that JSON value.
             if (identity.ValueKind != JsonValueKind.String) id = RawJson(identity);
-            else if (identity.GetString()!.Length > options.MaximumIdCharacters)
+            else if (JsonUtf16.GetString(identity).Length > options.MaximumIdCharacters)
                 throw new RpcCommandException(null, "parse", "Command id must be a bounded string when present.");
             else id = Exact("id", identity);
         }
@@ -61,7 +61,7 @@ internal static class RpcCommandCodec
                 ? double.IsPositiveInfinity(number) ? "Infinity" : "-Infinity" : JsString(type);
             throw new RpcCommandException(id, RawJson(type), "Unknown command: " + text);
         }
-        if (type.GetString()!.Length > options.MaximumCommandTypeCharacters)
+        if (JsonUtf16.GetString(type).Length > options.MaximumCommandTypeCharacters)
             throw new RpcCommandException(id, "parse", "Command type must be a bounded string.");
         var name = Exact("type", type);
         try { _ = ErrorCore(id, name, "RPC command failed.", options); }
@@ -70,7 +70,7 @@ internal static class RpcCommandCodec
         {
             if (!body.TryGetProperty(field, out var value) || value.ValueKind != JsonValueKind.String)
                 throw new RpcCommandException(id, name, "Command requires a string " + field + ".");
-            var text = value.GetString()!;
+            var text = JsonUtf16.GetString(value);
             if (text.Length > maximum) throw new RpcCommandException(id, name, "Command " + field + " exceeds configured limits.");
             return text;
         }
@@ -165,7 +165,7 @@ internal static class RpcCommandCodec
                     throw new RpcCommandException(id, name, "Command images must be a bounded array.");
                 foreach (var image in value.EnumerateArray())
                     if (image.ValueKind != JsonValueKind.Object || !image.TryGetProperty("type", out var kind) ||
-                        kind.ValueKind != JsonValueKind.String || kind.GetString() != "image" ||
+                        kind.ValueKind != JsonValueKind.String || !kind.ValueEquals("image") ||
                         !image.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.String ||
                         !image.TryGetProperty("mimeType", out var mime) || mime.ValueKind != JsonValueKind.String)
                         throw new RpcCommandException(id, name, "Command image requires type, data and mimeType strings.");
@@ -245,7 +245,7 @@ internal static class RpcCommandCodec
         new("user", Build(writer =>
         {
             writer.WriteString("role", "user"); writer.WritePropertyName("content"); writer.WriteStartArray();
-            writer.WriteStartObject(); writer.WriteString("type", "text"); writer.WriteString("text", command.Message); writer.WriteEndObject();
+            writer.WriteStartObject(); writer.WriteString("type", "text"); JsonUtf16.WriteString(writer, "text", command.Message!); writer.WriteEndObject();
             if (command.Images is { } images) foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText());
             writer.WriteEndArray(); writer.WriteNumber("timestamp", timestamp);
         }, options.MaximumCommandBytes));
@@ -293,7 +293,7 @@ internal static class RpcCommandCodec
     // String(value) for a JSON value, as a template literal converts it.
     private static string JsString(JsonElement value) => value.ValueKind switch
     {
-        JsonValueKind.String => value.GetString()!,
+        JsonValueKind.String => JsonUtf16.GetString(value),
         JsonValueKind.Null => "null", JsonValueKind.True => "true", JsonValueKind.False => "false",
         JsonValueKind.Number => PiSharp.AI.StreamingJson.ParseToJson(value.GetRawText()),
         JsonValueKind.Array => string.Join(",", value.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.Null ? "" : JsString(item))),
@@ -327,17 +327,17 @@ internal static class RpcCommandCodec
     internal static string Text(TranscriptEntry message)
     {
         if (!message.WireBody.Value.TryGetProperty("content", out var content)) return "";
-        if (content.ValueKind == JsonValueKind.String) return content.GetString()!;
+        if (content.ValueKind == JsonValueKind.String) return JsonUtf16.GetString(content);
         if (content.ValueKind != JsonValueKind.Array) return "";
         return string.Concat(content.EnumerateArray().Where(part => part.ValueKind == JsonValueKind.Object &&
-            part.TryGetProperty("type", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() == "text")
-            .Select(part => part.GetProperty("text").GetString()));
+            part.TryGetProperty("type", out var kind) && kind.ValueKind == JsonValueKind.String && kind.ValueEquals("text"))
+            .Select(part => JsonUtf16.GetString(part.GetProperty("text"))));
     }
     internal static void Queue(Utf8JsonWriter writer, AgentPendingInputQueueSnapshot queue)
     {
         Write("steering", queue.SteeringMessages); Write("followUp", queue.FollowUpMessages);
         void Write(string name, ImmutableArray<TranscriptEntry> messages)
-        { writer.WritePropertyName(name); writer.WriteStartArray(); foreach (var message in messages) writer.WriteStringValue(Text(message)); writer.WriteEndArray(); }
+        { writer.WritePropertyName(name); writer.WriteStartArray(); foreach (var message in messages) JsonUtf16.WriteStringValue(writer, Text(message)); writer.WriteEndArray(); }
     }
     internal static string Mode(AgentPendingInputMode mode) => mode == AgentPendingInputMode.All ? "all" : "one-at-a-time";
     internal static string TrimSource(string value)
@@ -350,7 +350,7 @@ internal static class RpcCommandCodec
             >= '\u2000' and <= '\u200A' or '\u2028' or '\u2029' or '\u202F' or '\u205F' or '\u3000' or '\uFEFF';
     }
     internal static void Strict(JsonData data, int maximumBytes, int maximumDepth) =>
-        _ = JsonlRecordCodec.Encode(data, new(MaximumFrameBytes: maximumBytes, MaximumJsonDepth: maximumDepth));
+        _ = JsonlRecordCodec.Encode(data, new(MaximumFrameBytes: maximumBytes, MaximumJsonDepth: maximumDepth, JavaScriptOutput: true));
 
     internal static ImmutableDictionary<ModelDescriptor, JsonData> Models(ImmutableArray<RpcModelDefinition> definitions,
         RpcDispatchOptions options)

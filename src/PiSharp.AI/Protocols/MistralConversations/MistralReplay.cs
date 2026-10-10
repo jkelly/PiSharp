@@ -70,7 +70,7 @@ public sealed partial class MistralTextHttpSseTransport
                 body["content"] = parts;
             }
             else if (entry.Role == "toolResult" && normalized.TryGetValue(body["toolCallId"]!.GetValue<string>(), out var mapped)) body["toolCallId"] = mapped;
-            transformed.Add(new(entry.Role, JsonData.Parse(body.ToJsonString())));
+            transformed.Add(new(entry.Role, JsonData.Parse(JsonUtf16.ToJsonString(body))));
         }
         var result = ImmutableArray.CreateBuilder<TranscriptEntry>(); var pending = new List<JsonObject>();
         var existing = new HashSet<string>(StringComparer.Ordinal); var held = new List<TranscriptEntry>();

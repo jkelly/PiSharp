@@ -635,16 +635,16 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var input = Number(usage, "input_tokens");
             var output = Number(usage, "output_tokens");
             var total = Number(usage, "total_tokens");
-            long cached = 0, written = 0, reasoning = 0;
+            double cached = 0, written = 0, reasoning = 0;
             if (usage.TryGetProperty("input_tokens_details", out var details))
             {
                 Object(details); cached = Number(details, "cached_tokens"); written = Number(details, "cache_write_tokens");
             }
             if (usage.TryGetProperty("output_tokens_details", out var outputDetails))
                 reasoning = Number(Object(outputDetails), "reasoning_tokens");
-            var uncached = Math.Max(0, checked(input - cached - written));
+            var uncached = Math.Max(0, input - cached - written);
             // Pi abe508 models.ts calculateCost through the shared tier selection.
-            var rates = PromptLengthPricing.TrySelect(_rates.Tiers, candidate => candidate.InputTokensAbove, (decimal)uncached, cached, written, out var tier)
+            var rates = PromptLengthPricing.TrySelect(_rates.Tiers, candidate => Number(candidate.InputTokensAbove), uncached, cached, written, out var tier)
                 ? new ResponsesTokenRates(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite) : _rates;
             // models.ts calculateCost in binary64 Numbers: three divide-then-multiply terms, the cache write term multiplies
             // before dividing (no 1h writes here), and the total is left associative.
@@ -654,7 +654,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var writtenCost = (Number(rates.CacheWrite) * written + Number(rates.Input) * 2d * 0d) / 1_000_000d;
             return new(uncached, output, cached, written, total,
                 Binary64Cost(inputCost, outputCost, cachedCost, writtenCost, ((inputCost + outputCost) + cachedCost) + writtenCost),
-                JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(System.Globalization.CultureInfo.InvariantCulture)))) { ExtrasBeforeTotal = true };
+                JsonFields.Empty.Set("reasoning", JsonData.Parse(JsonNumber.Text(reasoning)))) { ExtrasBeforeTotal = true };
         }
 
         // A decimal rate as the Number JSON.parse reads from its text.
@@ -717,10 +717,12 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             if (!value.TryGetProperty("output_index", out var index) || !index.TryGetInt32(out var result) || result < 0) throw Protocol();
             return result;
         }
-        private static long Number(JsonElement value, string name)
+        // openai-responses-shared.ts keeps each count as the JavaScript number the response reports (a fraction included).
+        private static double Number(JsonElement value, string name)
         {
-            if (!value.TryGetProperty(name, out var field)) return 0;
-            if (!field.TryGetInt64(out var result) || result < 0) throw Protocol();
+            if (!value.TryGetProperty(name, out var field) || field.ValueKind == JsonValueKind.Null) return 0;
+            var result = field.ValueKind == JsonValueKind.Number ? JsonNumber.Read(field) : double.NaN;
+            if (!double.IsFinite(result)) throw Protocol();
             return result;
         }
     }

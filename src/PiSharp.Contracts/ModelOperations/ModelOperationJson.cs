@@ -307,9 +307,9 @@ public static class ModelOperationJson
     private static void WriteUsage(Utf8JsonWriter writer, TokenUsage usage)
     {
         writer.WriteStartObject();
-        writer.WriteNumber("input", usage.Input); writer.WriteNumber("output", usage.Output);
-        writer.WriteNumber("cacheRead", usage.CacheRead); writer.WriteNumber("cacheWrite", usage.CacheWrite);
-        writer.WriteNumber("totalTokens", usage.TotalTokens);
+        JsonNumber.Write(writer, "input", usage.Input); JsonNumber.Write(writer, "output", usage.Output);
+        JsonNumber.Write(writer, "cacheRead", usage.CacheRead); JsonNumber.Write(writer, "cacheWrite", usage.CacheWrite);
+        JsonNumber.Write(writer, "totalTokens", usage.TotalTokens);
         writer.WritePropertyName("cost");
         if (usage.Cost.SourceBinary64Cost is { } exact) exact.Value.WriteTo(writer);
         else

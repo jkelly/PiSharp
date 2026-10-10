@@ -158,7 +158,7 @@ public sealed class ChatRun : IAsyncDisposable
         try
         {
             _cancellation.Token.ThrowIfCancellationRequested();
-            var events = transport.StreamAsync(request, _cancellation.Token);
+            var events = transport.StreamAsync(TranscriptSurrogates.Sanitize(request), _cancellation.Token);
             if (_googleDiagnostics || _mistralDiagnostics)
                 events = ObserveGoogleCleanup(events, () => googleCleanupDiagnostic = CleanupDiagnostic(),
                     () => googleConsumerFailed, _cancellation.Token);

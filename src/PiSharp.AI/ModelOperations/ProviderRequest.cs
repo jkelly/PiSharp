@@ -311,7 +311,7 @@ internal static partial class ProviderRequest
 
     /// <summary>A usage record priced with <see cref="ModelCost.Calculate"/>; the exact binary64 costs travel as the
     /// source cost snapshot.</summary>
-    internal static TokenUsage Usage(long input, long output, long cacheRead, long cacheWrite, long totalTokens,
+    internal static TokenUsage Usage(double input, double output, double cacheRead, double cacheWrite, double totalTokens,
         (double Input, double Output, double CacheRead, double CacheWrite, double Total) cost)
     {
         if (!double.IsFinite(cost.Total)) throw new InvalidDataException("Usage cost is not a finite number.");

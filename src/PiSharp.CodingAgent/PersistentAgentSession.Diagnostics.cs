@@ -37,7 +37,7 @@ public sealed partial class PersistentAgentSession
                 throw Error(PersistentAgentSessionFailure.InvalidCommit);
             var assistant=previous.Ancestry.LastOrDefault(e=>e.Id==assistantId);
             if(assistant is null||assistant.Kind!=SessionEntryKind.Message||
-                !JsonElement.DeepEquals(assistant.WireBody.Value.GetProperty("message"),PersistedWire(PiWireJson.WriteMessage(chat.Message)).Value))
+                !JsonUtf16.DeepEquals(assistant.WireBody.Value.GetProperty("message"),PersistedWire(PiWireJson.WriteMessage(chat.Message)).Value))
                 throw Error(PersistentAgentSessionFailure.InvalidCommit);
             var data=NativeSessionDiagnosticProjector.RecordData(assistant.Id,generation,primary,cleanup);
             var log=_store.Snapshot;

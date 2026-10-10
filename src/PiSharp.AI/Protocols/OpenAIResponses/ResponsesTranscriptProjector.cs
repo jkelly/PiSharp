@@ -480,7 +480,7 @@ public sealed class ResponsesTranscriptProjector
                     foreach (var property in value.EnumerateObject()) { CheckString(property.Name); CheckJson(property.Value, depth + 1); }
                 else foreach (var child in value.EnumerateArray()) CheckJson(child, depth + 1);
             }
-            else if (value.ValueKind == JsonValueKind.String) CheckString(Text(value));
+            else if (value.ValueKind == JsonValueKind.String) _ = Text(value); // a lone surrogate only in tool call arguments (TranscriptSurrogates)
         }
         // Pi abe508 openai-responses-shared.ts convertToolResultOutput (after transform-messages.ts downgradeUnsupportedImages).
         private JsonNode ToolOutput(JsonElement body)
@@ -530,7 +530,7 @@ public sealed class ResponsesTranscriptProjector
         private static string Text(JsonElement value)
         {
             if (value.ValueKind != JsonValueKind.String) throw Failure(ResponsesProjectionFailure.InvalidTranscript);
-            try { return value.GetString()!; }
+            try { return JsonUtf16.GetString(value); }
             catch (InvalidOperationException) { throw Failure(ResponsesProjectionFailure.UnsupportedUnicode); }
         }
         private static string? OptionalString(JsonFields? fields, string name) => fields?.TryGet(name, out var value) == true ? Text(value!.Value) : null;
@@ -552,19 +552,8 @@ public sealed class ResponsesTranscriptProjector
         .OrderBy(item => item.key is null ? 1 : 0).ThenBy(item => item.key ?? 0).ThenBy(item => item.index).Select(item => item.property);
     private static uint? ArrayIndex(string name) => uint.TryParse(name, NumberStyles.None, CultureInfo.InvariantCulture, out var index) &&
         index != uint.MaxValue && name == index.ToString(CultureInfo.InvariantCulture) ? index : null;
-    private static void Quote(StringBuilder builder, string value)
-    {
-        builder.Append('"');
-        foreach (var character in value)
-            switch (character)
-            {
-                case '"': builder.Append("\\\""); break; case '\\': builder.Append("\\\\"); break;
-                case '\b': builder.Append("\\b"); break; case '\f': builder.Append("\\f"); break;
-                case '\n': builder.Append("\\n"); break; case '\r': builder.Append("\\r"); break; case '\t': builder.Append("\\t"); break;
-                default: if (character < 0x20) builder.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture)); else builder.Append(character); break;
-            }
-        builder.Append('"');
-    }
+    // JSON.stringify of a string: a lone surrogate of a tool call's arguments is written as its escape.
+    private static void Quote(StringBuilder builder, string value) => JsonUtf16.Quote(builder, value);
     private static string ShortHash(string value)
     {
         unchecked

@@ -325,7 +325,8 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                 foreach (var property in value.EnumerateObject()) { Unicode(property.Name); Check(property.Value, depth); }
             else foreach (var item in value.EnumerateArray()) Check(item, depth);
         }
-        else if (value.ValueKind == JsonValueKind.String) Unicode(value.GetString()!);
+        // The SDK JSON.parse's each event: a string value keeps a lone surrogate (as its escape in the owned value).
+        else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
     }
     private static void Unicode(string value)
     {

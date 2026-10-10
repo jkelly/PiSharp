@@ -659,8 +659,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private void ReadUsage(JsonElement usage)
         {
             var prompt = Count(usage, "prompt_tokens"); var output = Count(usage, "completion_tokens");
-            long? read = null;
-            var write = 0L; var reasoning = 0L;
+            double? read = null;
+            var write = 0d; var reasoning = 0d;
             if (usage.TryGetProperty("prompt_tokens_details", out var promptDetails) && promptDetails.ValueKind != JsonValueKind.Null)
             {
                 Object(promptDetails);
@@ -671,8 +671,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             if (usage.TryGetProperty("completion_tokens_details", out var outputDetails) && outputDetails.ValueKind != JsonValueKind.Null)
                 reasoning = Count(Object(outputDetails), "reasoning_tokens");
             if (reasoning > output) throw Protocol();
-            var input = Math.Max(0, checked(prompt - cacheRead - write));
-            var extras = JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(CultureInfo.InvariantCulture)));
+            var input = Math.Max(0, prompt - cacheRead - write);
+            var extras = JsonFields.Empty.Set("reasoning", JsonData.Parse(JsonNumber.Text(reasoning)));
             var extraCharacters = "reasoning".Length + extras.Values["reasoning"].ToString().Length;
             Charge(extraCharacters - _usageCharacters); _usageCharacters = extraCharacters;
             // Pinned models.ts: three divide-then-multiply terms, cache write
@@ -695,7 +695,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             var source = sourceCost.Value;
             var costCharacters = sourceCost.ToString().Length;
             Charge(costCharacters - _costCharacters); _costCharacters = costCharacters;
-            _usage = new(input, output, cacheRead, write, checked(input + output + cacheRead + write),
+            _usage = new(input, output, cacheRead, write, input + output + cacheRead + write,
                 new(source.GetProperty("input").GetDecimal(), source.GetProperty("output").GetDecimal(),
                     source.GetProperty("cacheRead").GetDecimal(), source.GetProperty("cacheWrite").GetDecimal(),
                     source.GetProperty("total").GetDecimal(), SourceBinary64Cost: sourceCost), extras) { ExtrasBeforeTotal = true };
@@ -753,8 +753,11 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 number < 0 || number > 9_007_199_254_740_991) throw Protocol();
             return number;
         }
-        private static long? OptionalCount(JsonElement value, string name) =>
-            value.TryGetProperty(name, out var item) && item.ValueKind != JsonValueKind.Null ? Number(item) : null;
-        private static long Count(JsonElement value, string name) => OptionalCount(value, name) ?? 0;
+        // parseChunkUsage keeps each count as the JavaScript number the chunk reports (a fraction included).
+        private static double? OptionalCount(JsonElement value, string name) =>
+            value.TryGetProperty(name, out var item) && item.ValueKind != JsonValueKind.Null ? Tokens(item) : null;
+        private static double Tokens(JsonElement value)
+        { var number = value.ValueKind == JsonValueKind.Number ? JsonNumber.Read(value) : double.NaN; return double.IsFinite(number) ? number : throw Protocol(); }
+        private static double Count(JsonElement value, string name) => OptionalCount(value, name) ?? 0;
     }
 }

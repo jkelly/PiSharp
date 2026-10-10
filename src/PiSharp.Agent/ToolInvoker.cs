@@ -88,6 +88,9 @@ public sealed record ToolInvokerOptions(int MaximumTools = 128, int MaximumTrans
     public int MaximumStructuredContentCharacters { get; init; } = 6 * 1024 * 1024 + 65_536;
     public int MaximumResultRawCharacters { get; init; } = 12 * 1024 * 1024;
     public int MaximumResultRawBytes { get; init; } = 48 * 1024 * 1024;
+    /// <summary>Argument data may hold lone surrogates, as a JavaScript string does (the Pi entry); action targets, argv, cwd and
+    /// environment stay well-formed.</summary>
+    public bool KeepsLoneSurrogatesInArguments { get; init; }
 }
 
 /// <summary>
@@ -350,7 +353,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                 if (validated.ArgumentsJson is not { } coercedJson) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
                 var coerced = JsonData.Parse(coercedJson);
                 if (!ValidArguments(coerced, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
-                if (!JsonElement.DeepEquals(coerced.Value, initialView.Call.Arguments.Value))
+                if (!JsonUtf16.DeepEquals(coerced.Value, initialView.Call.Arguments.Value))
                 {
                     var call = initialView.Call with { Arguments = coerced };
                     initialView = initialView with { AssistantMessage = initialView.AssistantMessage with
@@ -606,7 +609,8 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
         token.ThrowIfCancellationRequested();
         // Owned JSON string values can contain NUL. Actual executable strings are validated
         // separately by ValidAction; admitting data does not admit NUL targets/argv/cwd/env.
-        if (value.ValueKind == JsonValueKind.String) return ValidText(value.GetString(), false, allowNul: allowNulData);
+        if (value.ValueKind == JsonValueKind.String)
+            return ValidText(JsonUtf16.GetString(value), false, allowNul: allowNulData, loneSurrogates: allowNulData && _options.KeepsLoneSurrogatesInArguments);
         if (value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)) return true;
         var depth = parentDepth + 1;
         if (depth > _options.MaximumJsonDepth) return false;
@@ -619,7 +623,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             foreach (var child in value.EnumerateArray()) if (!ValidJson(child, depth, token, allowNulData)) return false;
         return true;
     }
-    private static bool ValidText(string? value, bool nonempty, bool allowNul = false)
+    private static bool ValidText(string? value, bool nonempty, bool allowNul = false, bool loneSurrogates = false)
     {
         if (value is null || (nonempty && string.IsNullOrWhiteSpace(value))) return false;
         for (var index = 0; index < value.Length; index++)
@@ -627,9 +631,10 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             if (!allowNul && value[index] == '\0') return false;
             if (char.IsHighSurrogate(value[index]))
             {
-                if (index + 1 >= value.Length || !char.IsLowSurrogate(value[++index])) return false;
+                if (index + 1 < value.Length && char.IsLowSurrogate(value[index + 1])) index++;
+                else if (!loneSurrogates) return false;
             }
-            else if (char.IsLowSurrogate(value[index])) return false;
+            else if (char.IsLowSurrogate(value[index]) && !loneSurrogates) return false;
         }
         return true;
     }

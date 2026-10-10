@@ -175,9 +175,9 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
             foreach (var name in path) if (cursor.ValueKind == JsonValueKind.Object && cursor.TryGetProperty(name, out var child)) cursor = child; else { found = false; break; }
             if (found && cursor.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)) { cached = cursor; break; }
         }
-        var cache = cached.ValueKind == JsonValueKind.Number && cached.TryGetDouble(out var n) && double.IsFinite(n) ? Math.Clamp(n, 0, prompt) : 0;
-        if (cache != Math.Truncate(cache)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Nonintegral Mistral usage unsupported.");
-        var input = prompt - (long)cache; if (total == 0) total = checked(input + output + (long)cache);
+        // getMistralCachedPromptTokens: Math.min(promptTokens, Math.max(0, cachedTokens)) of a finite number, else 0.
+        var cache = cached.ValueKind == JsonValueKind.Number && JsonNumber.Read(cached) is var n && double.IsFinite(n) ? Math.Min(prompt, Math.Max(0, n)) : 0;
+        var input = Math.Max(0, prompt - cache); if (total == 0) total = input + output + cache + 0;
         // Pi abe508 models.ts calculateCost: a prompt-length tier prices the whole request; Mistral reports no cache writes.
         var rates = PromptLengthPricing.TrySelect(options.Costs.Tiers, candidate => candidate.InputTokensAbove, (double)input, cache, 0d, out var tier)
             ? new MistralTokenCosts(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite) : options.Costs;
@@ -187,15 +187,17 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
         // Typed decimals must describe the exact serialized binary64 values used by
         // PiWireJson snapshots. A direct double cast can round away their final digits.
         var wireCost = binary.Value;
-        usage = new(input, output, (long)cache, 0, total, new(wireCost.GetProperty("input").GetDecimal(),
+        usage = new(input, output, cache, 0, total, new(wireCost.GetProperty("input").GetDecimal(),
             wireCost.GetProperty("output").GetDecimal(), wireCost.GetProperty("cacheRead").GetDecimal(),
             wireCost.GetProperty("cacheWrite").GetDecimal(), wireCost.GetProperty("total").GetDecimal(), SourceBinary64Cost: binary));
     }
-    private static long Count(JsonElement value, string name)
+    // mistral-conversations.ts keeps each count as the JavaScript number the chunk reports (a fraction included).
+    private static double Count(JsonElement value, string name)
     {
         if (!value.TryGetProperty(name, out var item) || item.ValueKind == JsonValueKind.Null) return 0;
-        if (item.ValueKind != JsonValueKind.Number || !item.TryGetDouble(out var numeric) || !double.IsFinite(numeric) || numeric < 0 || numeric > 9_007_199_254_740_991 || numeric != Math.Truncate(numeric)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral usage number.");
-        var number = (long)numeric;
+        var numeric = item.ValueKind == JsonValueKind.Number ? JsonNumber.Read(item) : double.NaN;
+        if (!double.IsFinite(numeric)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral usage number.");
+        var number = numeric;
         return number;
     }
     private static JsonData String(string value) => JsonData.Parse(JsonSerializer.Serialize(value));

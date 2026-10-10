@@ -119,7 +119,7 @@ public static class GoogleRequestProjector
             }
             config["thinkingConfig"] = control;
         }
-        return GoogleData.Admit(JsonData.Parse(new JsonObject { ["model"] = request.Model.Id, ["contents"] = contents, ["config"] = config }.ToJsonString()), options);
+        return GoogleData.Admit(JsonData.Parse(JsonUtf16.ToJsonString(new JsonObject { ["model"] = request.Model.Id, ["contents"] = contents, ["config"] = config })), options);
     }
 
     // @google/genai 2.21.0 generateContentConfigToMldev/ToVertex: generation fields in the converter's order (pass-through ones only).

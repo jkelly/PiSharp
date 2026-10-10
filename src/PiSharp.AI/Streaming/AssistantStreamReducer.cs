@@ -96,7 +96,7 @@ public sealed class AssistantStreamReducer
                     throw new StreamProtocolException("Terminal changes the requested model identity.");
                 var expected = PiWireJson.WriteMessage(snapshot).Value.GetProperty("content");
                 var actual = PiWireJson.WriteMessage(done.Message).Value.GetProperty("content");
-                if (!JsonElement.DeepEquals(expected, actual))
+                if (!JsonUtf16.DeepEquals(expected, actual))
                     throw new StreamProtocolException("Terminal content differs from authoritative content ends.");
                 CheckSize(EnvelopeCharacters(done.Message) - EnvelopeCharacters(_start!));
                 _terminal = done with { SourceEmissionSnapshot = null, SourceDrainSnapshot = null };

@@ -212,7 +212,8 @@ internal static class CompletionsJson
     internal static string Text(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String) throw Fail(CompletionsRequestFailure.InvalidTranscript);
-        var text = value.GetString()!; Unicode(text); return text;
+        // A lone surrogate reaches a request only inside a tool call's arguments (TranscriptSurrogates), which go out escaped.
+        return JsonUtf16.GetString(value);
     }
     internal static string String(JsonElement value, string name) => Text(value.GetProperty(name));
     internal static void Unicode(string text)

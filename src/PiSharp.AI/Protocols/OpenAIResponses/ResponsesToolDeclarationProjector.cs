@@ -220,7 +220,7 @@ public sealed class ResponsesToolDeclarationProjector
     private static string Text(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String) throw Failure(ResponsesProjectionFailure.UnsupportedContent);
-        try { return value.GetString()!; }
+        try { return JsonUtf16.GetString(value); }
         catch (InvalidOperationException) { throw Failure(ResponsesProjectionFailure.UnsupportedUnicode); }
     }
     private void CheckJson(JsonElement value, int depth, CancellationToken token)
@@ -240,7 +240,7 @@ public sealed class ResponsesToolDeclarationProjector
             }
             else foreach (var child in value.EnumerateArray()) CheckJson(child, depth + 1, token);
         }
-        else if (value.ValueKind == JsonValueKind.String) CheckString(Text(value));
+        else if (value.ValueKind == JsonValueKind.String) _ = Text(value); // a lone surrogate only in tool call arguments (TranscriptSurrogates)
     }
     private static void CheckString(string value)
     {

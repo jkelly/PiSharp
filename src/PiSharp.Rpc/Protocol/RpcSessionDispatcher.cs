@@ -992,7 +992,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 _options.MaximumCommandBytes, _options.MaximumCommandBytes, _options.MaximumJsonDepth,
                 _options.MaximumCommandBytes, _options.MaximumCommandBytes)
             {
-                QueueOnly = command.Type != "prompt",
+                QueueOnly = command.Type != "prompt", KeepsLoneSurrogates = PromptInputAdmissionOptions.Default.KeepsLoneSurrogates,
                 BeforeQueueCommit = (message, queue, behavior) =>
                 {
                     admissionCancellation.Token.ThrowIfCancellationRequested();

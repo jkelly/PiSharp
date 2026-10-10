@@ -28,10 +28,11 @@ internal static partial class Program
             }
             var actual = StreamingJson.ParseToJson(text);
             if (actual != expected) throw new InvalidOperationException($"{label}{Environment.NewLine}Expected {expected}{Environment.NewLine}Actual   {actual}");
-            // The owned value is toWellFormed() of it: System.Text.Json cannot carry a lone surrogate.
+            // The owned value keeps every string value exactly (a lone surrogate as its escape, see JsonUtf16); only a lone surrogate of a
+            // name becomes U+FFFD (toWellFormed), since a JsonData refuses a name System.Text.Json cannot read.
             var native = item.TryGetProperty("native", out var nativeJson) ? nativeJson.GetString()! : expected;
             if (native != expected) wellFormed++;
-            Equal(native, StreamingJson.Parse(text).ToString());
+            using (var parsed = JsonDocument.Parse(expected)) Equal(KeysWellFormed(parsed.RootElement), StreamingJson.Parse(text).ToString());
             if (expected[0] != '{') nonObjects++;
             checkedCases++;
         }
@@ -39,6 +40,14 @@ internal static partial class Program
             throw new InvalidOperationException($"corpus {checkedCases}/{nonObjects}/{tooDeep}/{wellFormed}");
         Equal("{}", StreamingJson.Parse(null).ToString());
         return Task.CompletedTask;
+
+        static string KeysWellFormed(JsonElement value) => value.ValueKind switch
+        {
+            JsonValueKind.Object => "{" + string.Join(",", value.EnumerateObject().Select(property =>
+                PiSharp.Contracts.JsonUtf16.Quote(PiSharp.Contracts.JsonUtf16.ToWellFormed(PiSharp.Contracts.JsonUtf16.GetName(property))) + ":" + KeysWellFormed(property.Value))) + "}",
+            JsonValueKind.Array => "[" + string.Join(",", value.EnumerateArray().Select(KeysWellFormed)) + "]",
+            _ => value.GetRawText()
+        };
 
         static string Units(string hex)
         {

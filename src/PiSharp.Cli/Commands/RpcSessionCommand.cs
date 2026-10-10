@@ -48,7 +48,7 @@ public static class RpcSessionCommand
     /// <summary>Pi-entry prompt bounds: no text length or image count limit; the images and the message stay within one RPC frame.</summary>
     private static readonly PromptInputAdmissionOptions PiPromptBounds = new(MaximumTextCharacters: int.MaxValue, MaximumImages: int.MaxValue,
         MaximumImageCharacters: PiPayloadBudget.RpcCommandBytes, MaximumImageBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 64,
-        MaximumMessageCharacters: PiPayloadBudget.RpcCommandBytes);
+        MaximumMessageCharacters: PiPayloadBudget.RpcCommandBytes) { KeepsLoneSurrogates = true };
     private static readonly JsonlTransportOptions Framing =new(MaximumFrameBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
@@ -344,7 +344,8 @@ public static class RpcSessionCommand
             // pi --mode rpc reads each line as rpc-mode.ts handleInputLine does (StringDecoder + JSON.parse). JSON.parse and
             // JSON.stringify have no depth limit; 64 levels is what an owned JsonData holds.
             // The in-process print, json and interactive connections carry the same values (a custom entry or message of any depth).
-            var framing = javaScriptInput ? Framing with { MaximumJsonDepth = 64, JavaScriptInput = true } : pi is not null ? Framing with { MaximumJsonDepth = 64 } : Framing;
+            var framing = javaScriptInput ? Framing with { MaximumJsonDepth = 64, JavaScriptInput = true, KeepsLoneSurrogates = true }
+                : pi is not null ? Framing with { MaximumJsonDepth = 64, KeepsLoneSurrogates = true } : Framing;
             // Every frame Pi writes is serializeJsonLine, JSON.stringify(value) + "\n".
             var outputFraming = framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes, JavaScriptInput = false, JavaScriptOutput = javaScriptInput };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);

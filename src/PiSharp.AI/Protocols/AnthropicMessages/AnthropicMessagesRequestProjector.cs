@@ -53,7 +53,7 @@ public sealed record AnthropicMessagesRequestOptions(
 public sealed class AnthropicMessagesRequestProjector
 {
     private readonly AnthropicMessagesRequestOptions _options;
-    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, TypeInfoResolver = JsonUtf16.Resolver };
     private static readonly string[] ClaudeCodeNames = ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "AskUserQuestion",
         "EnterPlanMode", "ExitPlanMode", "KillShell", "NotebookEdit", "Skill", "Task", "TaskOutput", "TodoWrite", "WebFetch", "WebSearch"];
     private static readonly string[] UnsupportedStrictKeys = ["$ref", "$defs", "definitions", "allOf", "oneOf", "patternProperties",
@@ -576,7 +576,8 @@ public sealed class AnthropicMessagesRequestProjector
                 if (value.ValueKind == JsonValueKind.Object) foreach (var property in value.EnumerateObject()) { Unicode(property.Name); CheckJson(property.Value, depth); }
                 else foreach (var item in value.EnumerateArray()) CheckJson(item, depth);
             }
-            else if (value.ValueKind == JsonValueKind.String) Unicode(Text(value));
+            // A string may hold a lone surrogate only inside a tool call's arguments (TranscriptSurrogates), which go out escaped.
+            else if (value.ValueKind == JsonValueKind.String) _ = Text(value);
         }
     }
     private static JsonObject TextBlock(string text) => new() { ["type"] = "text", ["text"] = text };
@@ -587,7 +588,7 @@ public sealed class AnthropicMessagesRequestProjector
             case JsonValueKind.Object:
                 var result = new JsonObject(); foreach (var property in Properties(value)) result[property.Name] = Node(property.Value); return result;
             case JsonValueKind.Array: return new JsonArray(value.EnumerateArray().Select(Node).ToArray());
-            case JsonValueKind.String: return JsonValue.Create(Text(value));
+            case JsonValueKind.String: return JsonUtf16.StringNode(Text(value));
             case JsonValueKind.Number:
                 if (!value.TryGetDouble(out var number)) throw Fail(AnthropicRequestFailure.UnsupportedNumber);
                 return JsonNode.Parse(Number(number));
@@ -631,7 +632,7 @@ public sealed class AnthropicMessagesRequestProjector
     private static string Text(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String) throw Fail(AnthropicRequestFailure.InvalidTranscript);
-        try { return value.GetString()!; } catch (ArgumentException) { throw Fail(AnthropicRequestFailure.UnsupportedUnicode); }
+        try { return JsonUtf16.GetString(value); } catch (ArgumentException) { throw Fail(AnthropicRequestFailure.UnsupportedUnicode); }
         catch (InvalidOperationException) { throw Fail(AnthropicRequestFailure.UnsupportedUnicode); }
     }
     private static JsonElement.ArrayEnumerator Array(JsonElement value) => value.ValueKind == JsonValueKind.Array ? value.EnumerateArray() : throw Fail(AnthropicRequestFailure.InvalidTranscript);
