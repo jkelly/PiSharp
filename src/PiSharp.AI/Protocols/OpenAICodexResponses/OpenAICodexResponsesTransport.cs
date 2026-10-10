@@ -263,7 +263,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         internal bool? EndTurn;
         internal readonly List<JsonObject> Diagnostics = [];
         internal WebSocketLease? Lease;
-        internal bool WebSocketStarted, UseCachedContext;
+        internal bool WebSocketStarted, UseCachedContext, RetriedMissingContinuation;
         internal JsonObject? FullBody;
         internal string? CacheSessionId, ConfiguredTransport;
         internal int RequestBytes;
@@ -351,8 +351,17 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         {
             if (OpenAICodexWebSockets.IsFallbackActive(cacheSessionId)) OpenAICodexWebSockets.RecordSseFallback(cacheSessionId);
             else if (await TryWebSocketAsync(body, token0, accountId, cacheSessionId, transport, invocation, token).ConfigureAwait(false) is { } events)
-                return events;
+                return RetryMissingContinuationAsync(events, invocation, async () =>
+                    await TryWebSocketAsync(body, token0, accountId, cacheSessionId, transport, invocation, token).ConfigureAwait(false)
+                    ?? await SendSseAsync(headers, bodyJson, invocation, token).ConfigureAwait(false), token).GetAsyncEnumerator(token);
         }
+        return await SendSseAsync(headers, bodyJson, invocation, token).ConfigureAwait(false);
+    }
+
+    /// <summary>The SSE request with retries; the response's events.</summary>
+    private async ValueTask<IAsyncEnumerator<JsonData>> SendSseAsync(List<KeyValuePair<string, string>> headers, string bodyJson, Invocation invocation,
+        CancellationToken token)
+    {
         // compressRequestBodyZstd: the SSE body is a zstd frame (Content-Encoding: zstd); the WebSocket frame above stays plain JSON.
         var bytes = Encoding.UTF8.GetBytes(bodyJson);
         if (CompressBody(bytes) is { } compressed) { bytes = compressed; headers.Add(new("content-encoding", "zstd")); }
