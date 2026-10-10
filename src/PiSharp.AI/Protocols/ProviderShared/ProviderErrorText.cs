@@ -248,13 +248,13 @@ internal static class ProviderErrorText
 
     /// <summary><c>safeJSON(text)</c> as the canonical <c>JSON.stringify(JSON.parse(text))</c> tree: duplicate names keep the
     /// last value at the first position, numbers and strings are in JavaScript form. Null when <c>JSON.parse</c> throws.
-    /// Bodies nested deeper than 64 levels are treated as unparsed.</summary>
+    /// Bodies nested deeper than JsonData.MaximumDepth levels are treated as unparsed.</summary>
     private static JsonElement? SafeJson(string text)
     {
         try
         {
             var canonical = EcmaScriptJsonProjection.Project(text, Unbounded);
-            using var document = JsonDocument.Parse(canonical, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(canonical, PiSharp.Contracts.JsonData.DocumentOptions);
             return document.RootElement.Clone();
         }
         catch (Exception error) when (error is EcmaScriptJsonProjectionException or JsonException) { return null; }

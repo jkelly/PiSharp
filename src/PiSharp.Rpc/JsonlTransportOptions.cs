@@ -7,7 +7,7 @@ namespace PiSharp.Rpc;
 
 public enum JsonlStreamOwnership { Borrowed, Owned }
 /// <param name="JavaScriptInput">Read each frame as rpc-mode.ts handleInputLine does: StringDecoder("utf8") (invalid bytes become U+FFFD)
-/// and <c>JSON.parse</c>, so duplicate names keep the last value, escaped lone surrogates are accepted (owned as U+FFFD) and any JSON
+/// and <c>JSON.parse</c>, so duplicate names keep the last value, escaped lone surrogates are kept (as their escapes; see JsonUtf16) and any JSON
 /// value, not only an object, is a record. Only a JSON.parse SyntaxError rejects a frame.</param>
 /// <param name="JavaScriptOutput">Write each record as jsonl.ts serializeJsonLine does, <c>JSON.stringify(value)</c>: non-ASCII and
 /// <c>'</c> raw, control characters and lone surrogates as lowercase <c>\uXXXX</c> (or their short escapes), JavaScript number text
@@ -15,10 +15,13 @@ public enum JsonlStreamOwnership { Borrowed, Owned }
 public sealed record JsonlTransportOptions(int ReadBufferBytes = 4096, int MaximumFrameBytes = 1_048_576,
     int MaximumJsonDepth = 32, int MaximumPendingWrites = 16, bool JavaScriptInput = false, bool JavaScriptOutput = false)
 {
+    /// <summary>Strict frames may carry escaped lone surrogates in string values, as a JavaScript string holds them (the Pi entry's
+    /// in-process connections); otherwise such a frame is refused.</summary>
+    public bool KeepsLoneSurrogates { get; init; }
     internal void Validate(JsonlStreamOwnership ownership)
     {
         if (ReadBufferBytes is < 1 or > 65_536 || MaximumFrameBytes is < 1 or > int.MaxValue - 1 ||
-            MaximumJsonDepth is < 1 or > 64 || MaximumPendingWrites <= 0 || !Enum.IsDefined(ownership))
+            MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || MaximumPendingWrites <= 0 || !Enum.IsDefined(ownership))
             throw new ArgumentOutOfRangeException(nameof(JsonlTransportOptions), "Invalid JSONL transport limits or ownership.");
     }
 }
@@ -56,11 +59,18 @@ internal static class JsonlRecordCodec
         if (options.JavaScriptInput)
         {
             var text = ReplacingUtf8.GetString(bytes);
-            CheckDepth(text, options.MaximumJsonDepth);
+            // JSON.parse has no depth limit; a frame nested deeper than an owned value holds is answered as a parse failure (the stream
+            // goes on) rather than ending the stream.
+            try { CheckDepth(text, options.MaximumJsonDepth); }
+            catch (JsonlTransportException)
+            {
+                throw new JsonlTransportException(final ? JsonlTransportFailure.PartialFinalFrame : JsonlTransportFailure.MalformedJson,
+                    $"JSON nests deeper than {options.MaximumJsonDepth} levels");
+            }
             try
             {
                 var record = PiSharp.AI.StreamingJson.JsonParse(text, out var exact, out var nonFinite);
-                // The owned record is well-formed; an id or type with a lone surrogate is still echoed exactly, and a type of 1e999
+                // The owned record keeps lone surrogates of string values (a lone surrogate of a name becomes U+FFFD); a type of 1e999
                 // still reads as String(Infinity).
                 if (exact is not null) ExactMembers.AddOrUpdate(record, exact);
                 if (nonFinite is not null) NonFiniteMembers.AddOrUpdate(record, nonFinite);
@@ -78,8 +88,8 @@ internal static class JsonlRecordCodec
         CheckDepth(raw, options.MaximumJsonDepth);
         try
         {
-            using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 });
-            Validate(document.RootElement, raw);
+            using var document = JsonDocument.Parse(raw, PiSharp.Contracts.JsonData.DocumentOptions);
+            Validate(document.RootElement, raw, options.KeepsLoneSurrogates);
             return JsonData.FromElement(document.RootElement);
         }
         catch (JsonException)
@@ -110,7 +120,7 @@ internal static class JsonlRecordCodec
         }
         // JsonData may originate from a document parsed with comments/trailing commas enabled.
         // Owned structural validation does not establish strict retained wire syntax.
-        using var strict = ReparseStrict(raw); Validate(strict.RootElement, raw);
+        using var strict = ReparseStrict(raw); Validate(strict.RootElement, raw, options.KeepsLoneSurrogates);
         var compact = new StringBuilder(Math.Min(raw.Length, options.MaximumFrameBytes));
         var quoted = false; var escaped = false;
         foreach (var character in raw)
@@ -135,7 +145,7 @@ internal static class JsonlRecordCodec
 
     private static JsonDocument ReparseStrict(string raw)
     {
-        try { return JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 }); }
+        try { return JsonDocument.Parse(raw, PiSharp.Contracts.JsonData.DocumentOptions); }
         catch (JsonException) { throw Failure(JsonlTransportFailure.MalformedJson); }
     }
 
@@ -156,11 +166,11 @@ internal static class JsonlRecordCodec
         }
     }
 
-    private static void Validate(JsonElement value, string raw)
+    private static void Validate(JsonElement value, string raw, bool keepsLoneSurrogates)
     {
         if (value.ValueKind != JsonValueKind.Object) throw Failure(JsonlTransportFailure.InvalidRecord);
         // Strict UTF-8 cannot contain literal unpaired surrogates; escaped surrogates need their own check.
-        for (var index = 0; index < raw.Length; index++)
+        for (var index = 0; !keepsLoneSurrogates && index < raw.Length; index++)
         {
             if (raw[index] != '\\') continue;
             if (++index >= raw.Length || raw[index] != 'u') continue;
@@ -183,7 +193,8 @@ internal static class JsonlRecordCodec
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (var property in value.EnumerateObject())
             {
-                if (!names.Add(property.Name)) throw Failure(JsonlTransportFailure.DuplicateProperty);
+                // Only a record that keeps lone surrogates reaches here with one in a name (the others were refused above).
+                if (!names.Add(PiSharp.Contracts.JsonUtf16.GetName(property))) throw Failure(JsonlTransportFailure.DuplicateProperty);
                 CheckDuplicates(property.Value);
             }
         }

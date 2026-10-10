@@ -137,7 +137,7 @@ public sealed partial class OpenRouterImages : IImagesApi
         var completion = Count(ClassifierShared.Field(raw, "completion_tokens"));
         var inputCost = model.Cost.Input / 1000000 * input; var outputCost = model.Cost.Output / 1000000 * completion;
         var readCost = model.Cost.CacheRead / 1000000 * cacheRead; var writeCost = model.Cost.CacheWrite / 1000000 * cacheWrite;
-        static long Tokens(double value) => (long)Math.Min(value, long.MaxValue);
+        static double Tokens(double value) => value;
         return ProviderRequest.Usage(Tokens(input), Tokens(completion), Tokens(cacheRead), Tokens(cacheWrite),
             Tokens(input + completion + cacheRead + cacheWrite),
             (inputCost, outputCost, readCost, writeCost, inputCost + outputCost + readCost + writeCost));

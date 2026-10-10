@@ -23,7 +23,8 @@ internal static class RpcCompactionTests
         ("rpc.compaction prospective response budget rejects before append and writer remains usable", ResponseBound),
         ("rpc.compaction held generator state and Abort join actual cleanup before returning", GeneratorAbort),
         ("rpc.compaction admitted durable checkpoint wins late Abort and state remains responsive", CheckpointAbort),
-        ("rpc.compaction EOF cancels held generator and joins borrowed owner without writes", EofJoin)
+        ("rpc.compaction EOF cancels held generator and joins borrowed owner without writes", EofJoin),
+        ("rpc.errors a command that throws answers the thrown error's message, not a fixed text", FailureMessage)
     ];
     private static async Task DurableGrammar()
     {
@@ -104,6 +105,25 @@ internal static class RpcCompactionTests
         }
         finally { f.Summary.Release.TrySetResult(); await run; }
     }
+    // rpc-mode.ts handleInputLine: a command that throws answers error(id, command.type, commandError.message). An error PiSharp has
+    // no specific mapping for (here a user bash executor that cannot start its shell) travels as its message; it was the fixed
+    // "RPC command failed." (issue #5). The message never carries the .NET stack.
+    private static async Task FailureMessage()
+    {
+        await using var f = await Fixture.Create(userBash: new FailingBash());
+        await f.Send(new { id = "bash", type = "bash", command = "echo hi" });
+        var response = f.Response("bash").Value;
+        Check(!response.GetProperty("success").GetBoolean() && response.GetProperty("error").GetString() == "spawn /missing/bash ENOENT",
+            "A failing command did not answer the thrown error's message: " + response.GetRawText());
+        await f.Send(new { id = "after", type = "get_state" });
+        Check(f.Response("after").Value.GetProperty("success").GetBoolean() && f.Owner.Current.Session.Snapshot.Fault is null, "The failure poisoned the session.");
+    }
+    private sealed class FailingBash : PiSharp.CodingAgent.Execution.IUserBashExecutor
+    {
+        public Task<PiSharp.CodingAgent.Execution.UserBashResult> ExecuteAsync(PiSharp.CodingAgent.Execution.UserBashExecutionRequest request,
+            PiSharp.CodingAgent.Execution.UserBashProgress progress, CancellationToken cancellationToken) =>
+            throw new IOException("spawn /missing/bash ENOENT");
+    }
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static void Check(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
     private static async Task<byte[]> Bytes(string path) { await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete); using var bytes = new MemoryStream(); await file.CopyToAsync(bytes); return bytes.ToArray(); }
@@ -126,7 +146,8 @@ internal static class RpcCompactionTests
         internal JsonData Response(string id) => Records.Single(record => record.Value.TryGetProperty("id", out var value) && value.GetString() == id);
         internal Task Send(object command) => Dispatcher.SubmitAsync(JsonData.Parse(JsonSerializer.Serialize(command)));
         private Task<PersistentAgentSession> Open(string path) => PersistentAgentSession.OpenWithRegistryAsync(path, runtime, () => 0, () => generated ?? "summary-" + Interlocked.Increment(ref ids), new(SessionLogStoreOptions: new(StorageFactory: Storage)), fallbackModel: Model);
-        internal static async Task<Fixture> Create(RpcDispatchOptions? options = null, string? generatedId = null)
+        internal static async Task<Fixture> Create(RpcDispatchOptions? options = null, string? generatedId = null,
+            PiSharp.CodingAgent.Execution.IUserBashExecutor? userBash = null)
         {
             var f = new Fixture { generated = generatedId }; Directory.CreateDirectory(f.Root); f.runtime = new([new(Model, new NoTransport())], [], new NoPolicy()); var codec = new SessionEntryCodec();
             foreach (var path in new[] { f.Source, f.Other })
@@ -137,7 +158,7 @@ internal static class RpcCompactionTests
             }
             var session = await f.Open(f.Source); f.Owner = new(session, (request, _) => f.Open(request.Path));
             f.Dispatcher = new(session, new JsonlWriter(f.output, ownership: JsonlStreamOwnership.Borrowed), () => 0, [new(Model, ModelWire)], options,
-                RpcSessionOwnership.Borrowed, sessionOwner: f.Owner, summaryGenerator: f.Summary); return f;
+                RpcSessionOwnership.Borrowed, sessionOwner: f.Owner, summaryGenerator: f.Summary, userBash: userBash); return f;
         }
         public async ValueTask DisposeAsync()
         {

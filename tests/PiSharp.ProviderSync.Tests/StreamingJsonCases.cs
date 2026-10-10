@@ -19,25 +19,30 @@ internal static partial class Program
             var expected = item.GetProperty("json").GetString()!;
             var label = "parseStreamingJson(" + JsonSerializer.Serialize(text) + ")";
             if (StreamingJson.RepairJson(text) != repaired) throw new InvalidOperationException("repairJson differs for " + label);
-            if (item.GetProperty("depth").GetInt32() > 64)
+            // The corpus's deep values (formerly beyond the 64 levels a JsonData held) are now kept, as upstream keeps them.
+            if (item.GetProperty("depth").GetInt32() > 64) tooDeep++;
+            if (item.GetProperty("depth").GetInt32() > PiSharp.Contracts.JsonData.MaximumDepth)
             {
-                // Upstream keeps the value; a JsonData holds 64 levels, so the native boundary reports it instead of truncating it.
+                // Upstream keeps the value; a JsonData holds JsonData.MaximumDepth levels, so the native boundary reports it instead of truncating it.
                 try { StreamingJson.Parse(text); throw new InvalidOperationException(label + " is not representable but did not fail."); }
-                catch (JsonException) { tooDeep++; }
+                catch (JsonException) { }
                 continue;
             }
             var actual = StreamingJson.ParseToJson(text);
             if (actual != expected) throw new InvalidOperationException($"{label}{Environment.NewLine}Expected {expected}{Environment.NewLine}Actual   {actual}");
-            // The owned value is toWellFormed() of it: System.Text.Json cannot carry a lone surrogate.
-            var native = item.TryGetProperty("native", out var nativeJson) ? nativeJson.GetString()! : expected;
-            if (native != expected) wellFormed++;
-            Equal(native, StreamingJson.Parse(text).ToString());
+            // The owned value keeps every name and string value exactly (a lone surrogate as its escape, see JsonUtf16); the cases with a
+            // "native" field hold lone surrogates (formerly a lone surrogate of a name became U+FFFD there).
+            if (item.TryGetProperty("native", out _)) wellFormed++;
+            Equal(expected, StreamingJson.Parse(text).ToString());
             if (expected[0] != '{') nonObjects++;
             checkedCases++;
         }
         if (checkedCases < 3000 || nonObjects < 400 || tooDeep < 3 || wellFormed < 10)
             throw new InvalidOperationException($"corpus {checkedCases}/{nonObjects}/{tooDeep}/{wellFormed}");
         Equal("{}", StreamingJson.Parse(null).ToString());
+        var deepest = new string('[', PiSharp.Contracts.JsonData.MaximumDepth) + new string(']', PiSharp.Contracts.JsonData.MaximumDepth);
+        Equal(deepest, StreamingJson.Parse(deepest).ToString());
+        try { StreamingJson.Parse("[" + deepest + "]"); throw new InvalidOperationException("1,001 levels did not fail."); } catch (JsonException) { }
         return Task.CompletedTask;
 
         static string Units(string hex)

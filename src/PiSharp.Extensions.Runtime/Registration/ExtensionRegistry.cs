@@ -870,7 +870,7 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
         var owned = ImmutableArray.CreateBuilder<JsonData>(captured.BranchEntries.Length);
         // Session entries are the session's own records (runner.ts hands handlers the session manager as it is): no per-entry bound
         // beyond the snapshot's aggregate, and the depth an owned JSON value holds, not the registration JSON bounds.
-        var entryOptions = options with { MaximumJsonCharacters = int.MaxValue, MaximumJsonDepth = 64 };
+        var entryOptions = options with { MaximumJsonCharacters = int.MaxValue, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth };
         foreach (var entry in captured.BranchEntries)
         {
             if (entry is null)

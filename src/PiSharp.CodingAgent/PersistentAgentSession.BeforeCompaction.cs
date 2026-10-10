@@ -22,9 +22,9 @@ public sealed record SessionBeforeCompactProposal(JsonData Preparation, Immutabl
         using (var writer = new Utf8JsonWriter(bytes, new JsonWriterOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
         {
             writer.WriteStartObject(); writer.WriteString("type", "session_before_compact");
-            writer.WritePropertyName("preparation"); writer.WriteRawValue(Preparation.Value.GetRawText());
+            writer.WritePropertyName("preparation"); writer.WriteRawValue(Preparation.Value.GetRawText(), skipInputValidation: true);
             writer.WritePropertyName("branchEntries"); writer.WriteStartArray();
-            foreach (var entry in BranchEntries) writer.WriteRawValue(entry.WireBody.Value.GetRawText());
+            foreach (var entry in BranchEntries) writer.WriteRawValue(entry.WireBody.Value.GetRawText(), skipInputValidation: true);
             writer.WriteEndArray();
             if (CustomInstructions is not null) writer.WriteString("customInstructions", CustomInstructions);
             writer.WriteString("reason", SessionSummarizationRetryAttemptStarted.ReasonText(Reason)); writer.WriteBoolean("willRetry", WillRetry);
@@ -59,10 +59,10 @@ public sealed partial class PersistentAgentSession
         {
             writer.WriteStartObject(); writer.WriteString("firstKeptEntryId", firstKept);
             writer.WritePropertyName("messagesToSummarize"); writer.WriteStartArray();
-            foreach (var message in plan.MessagesToSummarize) writer.WriteRawValue(message.WireBody.Value.GetRawText());
+            foreach (var message in plan.MessagesToSummarize) writer.WriteRawValue(message.WireBody.Value.GetRawText(), skipInputValidation: true);
             writer.WriteEndArray();
             writer.WritePropertyName("turnPrefixMessages"); writer.WriteStartArray();
-            foreach (var message in plan.TurnPrefixMessages) writer.WriteRawValue(message.WireBody.Value.GetRawText());
+            foreach (var message in plan.TurnPrefixMessages) writer.WriteRawValue(message.WireBody.Value.GetRawText(), skipInputValidation: true);
             writer.WriteEndArray();
             writer.WriteBoolean("isSplitTurn", plan.IsSplitTurn); writer.WriteNumber("tokensBefore", plan.TokensBefore);
             if (plan.PreviousSummary is not null) writer.WriteString("previousSummary", plan.PreviousSummary);

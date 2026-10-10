@@ -17,6 +17,9 @@ internal sealed partial class NativeExtensionActivation
     /// extension generation.</summary>
     internal PiExtensionHost? Pi { get; private init; }
 
+    /// <summary>The interactive mode's link: ctx.newSession()/ctx.fork() of these extensions run the mode's command context actions.</summary>
+    internal void ConnectInteractive(PiSharp.Cli.Interactive.Mode.InteractiveHostLink link) => _sessionViews.InteractiveLink = link;
+
     /// <summary>Binds the extensions a Pi-style run loaded (<see cref="PiExtensionHost"/>) to a session: one registry owner per
     /// extension, in load order, with every tool and command enabled as upstream enables them. Upstream has no approval step for
     /// extensions; the run's discovery (settings, packages, project trust) is the admission.</summary>
@@ -37,6 +40,9 @@ internal sealed partial class NativeExtensionActivation
         var registry = new ExtensionRegistry(PiExtensionHost.RegistryOptions, uiPrompts ?? (IExtensionUiProvider)new UnavailableExtensionUiProvider(),
             sessionViews, facadeCapabilities);
         if (mcpServers is not null) { registry.McpServerHost = mcpServers; mcpServers.OwnerPath = pi.PathOfOwner; }
+        // registerProvider with classifiers or images from native extensions; the run's model registry follows them.
+        registry.ModelOperationProviderHost = pi.NativeModelProviders;
+        if (pi.RunModelOperations is { } runModels) facadeHost.BindRunModelOperations(runModels);
         try
         {
             await pi.ActivateAsync(registry, token, session: true).ConfigureAwait(false);

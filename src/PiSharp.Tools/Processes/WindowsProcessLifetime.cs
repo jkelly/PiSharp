@@ -10,6 +10,8 @@ internal sealed class ProcessLaunchException(ProcessDiagnostic diagnostic, bool 
 {
     public ProcessDiagnostic Diagnostic { get; } = diagnostic;
     public bool CleanupConfirmed { get; } = cleanupConfirmed;
+    /// <summary>The Win32 error of a refused CreateProcess.</summary>
+    public int? NativeError { get; init; }
 }
 
 /// <summary>Owns one suspended launch, its private non-breakaway job, restricted inherited handles and async pipes.</summary>
@@ -93,7 +95,7 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
             await owned.DisposeAsync().ConfigureAwait(false);
             if (error is OperationCanceledException && token.IsCancellationRequested && owned.CleanupConfirmed) throw;
             throw new ProcessLaunchException(owned.CleanupConfirmed ? diagnostic : ProcessDiagnostic.CleanupFailed,
-                owned.CleanupConfirmed);
+                owned.CleanupConfirmed) { NativeError = (error as System.ComponentModel.Win32Exception)?.NativeErrorCode };
         }
     }
 
@@ -171,7 +173,7 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
             {
                 if (!Native.CreateProcessW(request.Executable, command, IntPtr.Zero, IntPtr.Zero, true,
                         0x4 | 0x400 | 0x80000 | 0x08000000, environment, request.WorkingDirectory, ref start, out var process))
-                    throw new IOException("Process creation failed.");
+                    throw new System.ComponentModel.Win32Exception(Marshal.GetLastPInvokeError(), "Process creation failed.");
                 _process = new(process.Process, true); _thread = new(process.Thread, true);
                 ProcessId = checked((int)process.ProcessId);
             }

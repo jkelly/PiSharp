@@ -27,7 +27,7 @@ public sealed partial class PersistentAgentSession
             var entry = Record(_codec, "usage", Identity(_nextEntryId, log.Header.Id, log.Entries), previous.LeafId, _clock, writer =>
             {
                 writer.WriteString("kind", kind); writer.WriteString("provider", provider); writer.WriteString("model", model);
-                writer.WritePropertyName("usage"); writer.WriteRawValue(usageWire);
+                writer.WritePropertyName("usage"); writer.WriteRawValue(usageWire, skipInputValidation: true);
                 if (!string.IsNullOrEmpty(note)) writer.WriteString("note", note);
             }, "yyyy-MM-dd'T'HH:mm:ss.fff'Z'");
             var next = _projector.Project(log.Entries.Add(entry), entry.Id);

@@ -91,7 +91,7 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
     {
         var original = new JsonObject();
         foreach (var header in request.Headers) original[header.Key] = string.Join(", ", header.Value);
-        var initial = Event("before_provider_headers", writer => { writer.WritePropertyName("headers"); writer.WriteRawValue(original.ToJsonString()); });
+        var initial = Event("before_provider_headers", writer => { writer.WritePropertyName("headers"); writer.WriteRawValue(original.ToJsonString(), skipInputValidation: true); });
         var reduced = await _registry.ReduceEventAsync(_captured, "before_provider_headers", initial,
             (current, result) => result.Value.ValueKind == JsonValueKind.Object ? Event("before_provider_headers", writer => Raw(writer, "headers", result)) : null, _report, token).ConfigureAwait(false);
         var headers = reduced.Value.GetProperty("headers");
@@ -118,7 +118,7 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
 
     private static JsonData Event(string type, Action<Utf8JsonWriter> fields) => Json(writer => { writer.WriteString("type", type); fields(writer); });
     private static JsonData Json(Action<Utf8JsonWriter> write) => NativeSessionEventBinding.Json(write);
-    private static void Raw(Utf8JsonWriter writer, string name, JsonData value) { writer.WritePropertyName(name); writer.WriteRawValue(value.ToString()); }
+    private static void Raw(Utf8JsonWriter writer, string name, JsonData value) { writer.WritePropertyName(name); writer.WriteRawValue(value.ToString(), skipInputValidation: true); }
 
     /// <summary>Passes Bedrock's AWS event-stream bytes through unchanged, decoding each complete message as it is read: an event is
     /// <c>{ [:event-type]: payload }</c> and a modeled exception <c>{ [:exception-type]: payload }</c>, as the SDK's ConverseStream

@@ -179,7 +179,7 @@ internal static partial class Program
                 complete.AddRange(Encoding.UTF8.GetString(bytes, scanned, end + 1 - scanned).Split('\n', StringSplitOptions.RemoveEmptyEntries));
                 scanned = end + 1;
             }
-            foreach (var line in complete) onLine(JsonNode.Parse(line)!);
+            foreach (var line in complete) onLine(JsonNode.Parse(line, documentOptions: new System.Text.Json.JsonDocumentOptions { MaxDepth = 4096 })!);
         }
     }
 }

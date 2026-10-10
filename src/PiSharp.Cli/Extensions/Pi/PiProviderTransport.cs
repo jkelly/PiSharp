@@ -25,7 +25,8 @@ internal sealed class PiProviderTransport(PiExtensionHost host, RegistryModel en
         if (auth?.ApiKey is { } apiKey) options["apiKey"] = apiKey;
         if (auth?.Headers is { Count: > 0 } headers) options["headers"] = new JsonObject([.. headers.Select(header => KeyValuePair.Create(header.Key, (JsonNode?)header.Value))]);
         if (request.ThinkingLevel is { } level && level != "off") options["reasoning"] = level;
-        var messages = new JsonArray([.. request.Messages.Select(message => JsonNode.Parse(message.WireBody.ToString()))]);
+        // The extension's streamSimple receives the context as Pi holds it: a lone surrogate travels as JSON.stringify's escape.
+        var messages = new JsonArray([.. request.Messages.Select(message => JsonUtf16.Node(message.WireBody))]);
         var events = Channel.CreateUnbounded<JsonElement>(new() { SingleReader = true });
         var call = host.CallAsync("provider.stream", new JsonObject
         {

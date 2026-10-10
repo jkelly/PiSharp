@@ -14,7 +14,7 @@ public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, 
 public sealed record AnthropicFallbackModel(string Provider, string Model, AnthropicTokenRates Rates);
 public sealed record AnthropicMessagesOptions(int MaximumEvents = int.MaxValue, int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
-    int MaximumSignatureCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32, AnthropicTokenRates? Rates = null,
+    int MaximumSignatureCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, AnthropicTokenRates? Rates = null,
     ImmutableArray<AnthropicFallbackModel> AllowedFallbackModels = default, bool OAuthToolNames = false,
     int MaximumToolDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue)
 {
@@ -37,7 +37,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         ArgumentNullException.ThrowIfNull(source); _source = source; _options = options ?? new();
         if (_options.MaximumEvents <= 0 || _options.MaximumEventCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
             _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumSignatureCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64 || _options.MaximumToolDeclarations <= 0 || _options.MaximumActiveTools <= 0 || _options.Clock is null) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || _options.MaximumToolDeclarations <= 0 || _options.MaximumActiveTools <= 0 || _options.Clock is null) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
         if (_options.ProviderThinkingLevel is not (null or "low" or "medium" or "high" or "xhigh" or "max"))
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic provider thinking level.");
         ValidateRates(_options.Rates ?? new());
@@ -155,8 +155,8 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private JsonFields _properties = JsonFields.Empty;
         private JsonElement _transformations;
         private TokenUsage _usage = TokenUsage.Zero;
-        private long _cacheWrite1h;
-        private long? _reasoning;
+        private double _cacheWrite1h;
+        private double? _reasoning;
         private long _signatureCharacters;
         private int _events;
         private long _inputCharacters;
@@ -377,7 +377,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                     if (item.ValueKind == JsonValueKind.Object)
                         foreach (var name in new[] { "type", "path", "reason" })
                             if (item.TryGetProperty(name, out var field) && field.ValueKind != JsonValueKind.Null)
-                                projected[name] = System.Text.Json.Nodes.JsonNode.Parse(field.GetRawText());
+                                projected[name] = System.Text.Json.Nodes.JsonNode.Parse(field.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
                     transformations.Add(projected);
                 }
                 if (failure is null)
@@ -408,14 +408,14 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 _cacheWrite1h = Count(Object(cache), "ephemeral_1h_input_tokens", _cacheWrite1h);
             if (!initial && usage.TryGetProperty("output_tokens_details", out var details) && details.ValueKind != JsonValueKind.Null &&
                 Object(details).TryGetProperty("thinking_tokens", out var thinking) && thinking.ValueKind != JsonValueKind.Null)
-                _reasoning = Number(thinking);
+                _reasoning = Tokens(thinking);
             if (_cacheWrite1h > write || _reasoning > output) throw Protocol();
-            var total = checked(input + output + read + write);
+            var total = input + output + read + write;
             // Pi abe508 models.ts calculateCost: prompt-length tiers price the whole request, 1h writes at 2x the tier input.
             // Pi abe508 models.ts calculateCost runs in binary64 Numbers (prompt-length tiers price the whole request, 1h writes at 2x
             // the tier input), so the costs are those Numbers: 5 / 1e6 * 3 is 0.000015000000000000002, as Pi records it.
-            var extras = JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(_cacheWrite1h.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-            if (_reasoning is { } tokens) extras = extras.Set("reasoning", JsonData.Parse(tokens.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            var extras = JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(JsonNumber.Text(_cacheWrite1h)));
+            if (_reasoning is { } tokens) extras = extras.Set("reasoning", JsonData.Parse(JsonNumber.Text(tokens)));
             var counts = new TokenUsage(input, output, read, write, total, new(0, 0, 0, 0, 0));
             var binary64 = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(
                 OriginalAnthropicUsageCostProjection.Create(_rates, counts, _cacheWrite1h)));
@@ -446,7 +446,8 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                     foreach (var property in value.EnumerateObject()) { Unicode(property.Name); CheckJson(property.Value, depth); }
                 else foreach (var item in value.EnumerateArray()) CheckJson(item, depth);
             }
-            else if (value.ValueKind == JsonValueKind.String) Unicode(value.GetString()!);
+            // A string value keeps a lone surrogate, as the SDK's JSON.parse does.
+            else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
         }
         private static StopReason Stop(string value) => value switch
         {
@@ -454,8 +455,11 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             "max_tokens" => StopReason.Length, "tool_use" => StopReason.ToolUse,
             "refusal" or "sensitive" => StopReason.Error, _ => throw Protocol()
         };
-        private static long Count(JsonElement value, string name, long fallback) => value.TryGetProperty(name, out var count) &&
-            count.ValueKind != JsonValueKind.Null ? Number(count) : fallback;
+        // anthropic-messages.ts keeps each count as the JavaScript number the stream reports (a fraction included).
+        private static double Count(JsonElement value, string name, double fallback) => value.TryGetProperty(name, out var count) &&
+            count.ValueKind != JsonValueKind.Null ? Tokens(count) : fallback;
+        private static double Tokens(JsonElement value)
+        { var number = value.ValueKind == JsonValueKind.Number ? JsonNumber.Read(value) : double.NaN; return double.IsFinite(number) ? number : throw Protocol(); }
         private static long Number(JsonElement value)
         { if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt64(out var number) || number < 0) throw Protocol(); return number; }
         private static int Index(JsonElement value)
@@ -464,13 +468,13 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private static string String(JsonElement value, string name, bool allowEmpty = false)
         {
             var item = value.GetProperty(name);
-            if (item.ValueKind != JsonValueKind.String) throw Protocol(); var text = item.GetString()!;
+            if (item.ValueKind != JsonValueKind.String) throw Protocol(); var text = JsonUtf16.GetString(item);
             if (!allowEmpty && text.Length == 0) throw Protocol(); return text;
         }
         private static string? OptionalString(JsonElement value, string name)
         {
             if (!value.TryGetProperty(name, out var item) || item.ValueKind == JsonValueKind.Null) return null;
-            return item.ValueKind == JsonValueKind.String ? item.GetString() : throw Protocol();
+            return item.ValueKind == JsonValueKind.String ? JsonUtf16.GetString(item) : throw Protocol();
         }
         private static void Unicode(string value)
         {

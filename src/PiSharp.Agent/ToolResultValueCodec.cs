@@ -15,6 +15,8 @@ public sealed record ToolResultValueOptions(int MaximumCharacters = 65_536,
     public static ToolResultValueOptions ExecutionBoundary { get; } = new(MaximumCharacters: 8 * 1024 * 1024,
         MaximumStructuredContentCharacters: 8 * 1024 * 1024 + 65_536, MaximumContentBlocks: 1024,
         MaximumRawCharacters: 24 * 1024 * 1024, MaximumRawBytes: 96 * 1024 * 1024);
+    /// <summary>Result strings may hold lone surrogates, as a JavaScript string does (the Pi entry); otherwise they are refused.</summary>
+    public bool KeepsLoneSurrogates { get; init; }
 }
 
 /// <summary>Strict, bounded admission and complete source result serialization; no numeric rewriting.</summary>
@@ -50,7 +52,7 @@ public static class ToolResultValueCodec
         long ordinary = result.Failure?.Message?.Length ?? 0, rawCharacters = 2, rawBytes = 2;
         var first = true;
         if (ordinary > limits.MaximumCharacters || result.Failure is { } failure &&
-            (!Enum.IsDefined(failure.Kind) || !ScalarText(failure.Message) || failure.Message.Contains('\0'))) throw Invalid();
+            (!Enum.IsDefined(failure.Kind) || !Text(failure.Message, limits.KeepsLoneSurrogates) || failure.Message.Contains('\0'))) throw Invalid();
         if (result.OwnedContent is ImmutableArray<TextContent> typed && (typed.IsDefault || typed.Length > limits.MaximumContentBlocks)) throw Invalid();
         if (result.OwnedContent is JsonData ownedContent)
         {
@@ -68,20 +70,20 @@ public static class ToolResultValueCodec
                 long retained = 0;
                 foreach (var block in content)
                 {
-                    if (block?.Text is null || !ScalarText(block.Text)) throw Invalid();
+                    if (block?.Text is null || !Text(block.Text, limits.KeepsLoneSurrogates)) throw Invalid();
                     retained += block.Text.Length;
                     foreach (var (key, extra) in (block.ExtraProperties ?? JsonFields.Empty).Values)
                         retained += key.Length + (long)extra.ToString().Length;
                 }
                 ordinary += retained;
                 if (ordinary > limits.MaximumCharacters) throw Invalid();
-                raw = ContentJson(content).ToString();
+                raw = ContentJson(content, limits.KeepsLoneSurrogates).ToString();
             }
             else
             {
                 if (value is not JsonData json) throw Invalid();
                 raw = json.ToString();
-                if (name != "structuredContent") ordinary += name is "content" ? ContentCharacters(json) :
+                if (name != "structuredContent") ordinary += name is "content" ? ContentCharacters(json, limits.KeepsLoneSurrogates) :
                     name == "details" ? raw.Length : name.Length + (long)raw.Length;
                 if (name == "structuredContent" && raw.Length > limits.MaximumStructuredContentCharacters) throw Invalid();
             }
@@ -92,10 +94,10 @@ public static class ToolResultValueCodec
                 throw Invalid();
             var strict = Strict(raw);
             // Fixed content array/block envelopes do not consume the metadata container budget.
-            if (!ValidJson(strict.Value, 0, name == "content" ? limits.MaximumJsonDepth + 2 : limits.MaximumJsonDepth)) throw Invalid();
+            if (!ValidJson(strict.Value, 0, name == "content" ? limits.MaximumJsonDepth + 2 : limits.MaximumJsonDepth, limits.KeepsLoneSurrogates)) throw Invalid();
         }
         // Content is nullable/absent in the raw result; the typed compatibility view is [] in both cases.
-        if (result.HasProperty("content")) _ = ContentCharacters(result.Property("content")!);
+        if (result.HasProperty("content")) _ = ContentCharacters(result.Property("content")!, limits.KeepsLoneSurrogates);
     }
 
     public static JsonData Write(ToolResult result, ToolResultValueOptions? options = null)
@@ -118,7 +120,7 @@ public static class ToolResultValueCodec
     private static void WriteAdmittedProperties(Utf8JsonWriter writer, ToolResult result)
     {
         foreach (var (name, _) in result.OwnedProperties)
-        { writer.WritePropertyName(name); writer.WriteRawValue(result.Property(name)!.ToString()); }
+        { writer.WritePropertyName(name); writer.WriteRawValue(result.Property(name)!.ToString(), skipInputValidation: true); }
     }
 
     internal static long AdditionalCharacters(ToolResult result)
@@ -149,7 +151,7 @@ public static class ToolResultValueCodec
         Validate(result, ToolResultValueOptions.ExecutionBoundary);
         return JsonData.FromElement(value.Value);
     }
-    internal static JsonData ContentJson(ImmutableArray<TextContent> content)
+    internal static JsonData ContentJson(ImmutableArray<TextContent> content, bool loneSurrogates = false)
     {
         if (content.IsDefault) throw Invalid();
         using var buffer = new MemoryStream();
@@ -158,14 +160,14 @@ public static class ToolResultValueCodec
             writer.WriteStartArray();
             foreach (var block in content)
             {
-                if (block?.Text is null || !ScalarText(block.Text)) throw Invalid();
-                writer.WriteRawValue(PiWireJson.WriteContent(block).ToString());
+                if (block?.Text is null || !Text(block.Text, loneSurrogates)) throw Invalid();
+                writer.WriteRawValue(PiWireJson.WriteContent(block).ToString(), skipInputValidation: true);
             }
             writer.WriteEndArray();
         }
         return JsonData.Parse(Encoding.UTF8.GetString(buffer.GetBuffer(), 0, checked((int)buffer.Length)));
     }
-    internal static long ContentCharacters(JsonData value)
+    internal static long ContentCharacters(JsonData value, bool loneSurrogates = false)
     {
         if (value.Value.ValueKind == JsonValueKind.Null) return 0;
         if (value.Value.ValueKind != JsonValueKind.Array) throw Invalid();
@@ -173,30 +175,31 @@ public static class ToolResultValueCodec
         foreach (var block in value.Value.EnumerateArray())
         {
             if (block.ValueKind != JsonValueKind.Object) throw Invalid();
-            var type = ContentString(block, "type");
-            if (type == "text") result += ContentString(block, "text").Length;
-            else if (type == "image") result += ContentString(block, "data").Length + (long)ContentString(block, "mimeType").Length;
+            var type = ContentString(block, "type", loneSurrogates);
+            if (type == "text") result += ContentString(block, "text", loneSurrogates).Length;
+            else if (type == "image") result += ContentString(block, "data", loneSurrogates).Length + (long)ContentString(block, "mimeType", loneSurrogates).Length;
             else throw Invalid();
             foreach (var property in block.EnumerateObject())
             {
-                if (property.Name == "type" || type == "text" && property.Name == "text" ||
-                    type == "image" && property.Name is "data" or "mimeType") continue;
-                result += property.Name.Length + (long)property.Value.GetRawText().Length;
+                var name = JsonUtf16.GetName(property);
+                if (name == "type" || type == "text" && name == "text" || type == "image" && name is "data" or "mimeType") continue;
+                if (!Text(name, loneSurrogates)) throw Invalid();
+                result += name.Length + (long)property.Value.GetRawText().Length;
             }
         }
         return result;
     }
-    private static string ContentString(JsonElement block, string name)
+    private static string ContentString(JsonElement block, string name, bool loneSurrogates)
     {
         if (!block.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String) throw Invalid();
-        var text = value.GetString();
-        return ScalarText(text) ? text! : throw Invalid();
+        var text = JsonUtf16.GetString(value);
+        return Text(text, loneSurrogates) ? text : throw Invalid();
     }
     private static ToolResultValueOptions Limits(ToolResultValueOptions? options)
     {
         var result = options ?? new();
         if (result.MaximumCharacters <= 0 || result.MaximumStructuredContentCharacters <= 0 || result.MaximumContentBlocks <= 0 ||
-            result.MaximumJsonDepth is < 1 or > 64 || result.MaximumRawCharacters <= 0 || result.MaximumRawBytes <= 0)
+            result.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || result.MaximumRawCharacters <= 0 || result.MaximumRawBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(options));
         return result;
     }
@@ -206,9 +209,9 @@ public static class ToolResultValueCodec
         try { return JsonData.Parse(raw); }
         catch (Exception error) when (error is JsonException or InvalidOperationException or ArgumentException) { throw Invalid(); }
     }
-    private static bool ValidJson(JsonElement value, int parentDepth, int maximumDepth)
+    private static bool ValidJson(JsonElement value, int parentDepth, int maximumDepth, bool loneSurrogates)
     {
-        if (value.ValueKind == JsonValueKind.String) return ScalarText(value.GetString());
+        if (value.ValueKind == JsonValueKind.String) return Text(JsonUtf16.GetString(value), loneSurrogates);
         if (value.ValueKind == JsonValueKind.Number) return value.TryGetDouble(out var number) && double.IsFinite(number);
         if (value.ValueKind is JsonValueKind.Null or JsonValueKind.True or JsonValueKind.False) return true;
         if (value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array) || parentDepth >= maximumDepth) return false;
@@ -216,11 +219,15 @@ public static class ToolResultValueCodec
         {
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (var property in value.EnumerateObject())
-                if (!names.Add(property.Name) || !ScalarText(property.Name) || !ValidJson(property.Value, parentDepth + 1, maximumDepth)) return false;
+            {
+                var name = JsonUtf16.GetName(property);
+                if (!names.Add(name) || !Text(name, loneSurrogates) || !ValidJson(property.Value, parentDepth + 1, maximumDepth, loneSurrogates)) return false;
+            }
         }
-        else foreach (var child in value.EnumerateArray()) if (!ValidJson(child, parentDepth + 1, maximumDepth)) return false;
+        else foreach (var child in value.EnumerateArray()) if (!ValidJson(child, parentDepth + 1, maximumDepth, loneSurrogates)) return false;
         return true;
     }
+    private static bool Text(string? text, bool loneSurrogates) => text is not null && (loneSurrogates || ScalarText(text));
     internal static bool ScalarText(string? text)
     {
         if (text is null) return false;

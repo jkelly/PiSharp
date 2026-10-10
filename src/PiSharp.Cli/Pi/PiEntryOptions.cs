@@ -87,8 +87,17 @@ internal sealed record PiEntryOptions
     internal ImmutableDictionary<string, string?> ExtensionFlagValues { get; init; } = ImmutableDictionary<string, string?>.Empty;
     /// <summary>The extensions the run loaded (TypeScript/JavaScript in the Node host), bound to the session by the RPC host; null without.</summary>
     internal PiSharp.Cli.Extensions.Pi.PiExtensionHost? Extensions { get; init; }
+    /// <summary>The built-in extensions the run loads (settings, <c>-e builtin:&lt;name&gt;</c>, <c>--no-extensions</c>, <c>--no-mcp</c>);
+    /// a reload resolves them again.</summary>
+    internal PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions BuiltinExtensions { get; init; } = PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.AllEnabled();
     /// <summary>Source ExtensionMode of the run: <c>tui</c>, <c>rpc</c>, <c>json</c> or <c>print</c>.</summary>
     internal string ExtensionMode { get; init; } = "print";
     /// <summary>Interactive mode inputs (IMPL-I): directories, resources and the live host link.</summary>
     internal PiSharp.Cli.Interactive.Mode.InteractiveStartup? Interactive { get; init; }
+    /// <summary>agent-session.ts setSteeringMode, setFollowUpMode, setAutoCompactionEnabled and setAutoRetryEnabled: the global setting
+    /// (<c>steeringMode</c>, <c>followUpMode</c>, <c>compaction.enabled</c>, <c>retry.enabled</c>) the settings manager saves. Null in
+    /// interactive mode, which saves through its own settings.</summary>
+    internal Action<string, System.Text.Json.Nodes.JsonNode>? PersistGlobalSetting { get; init; }
+    /// <summary>The current MCP server manager outside interactive mode, for the built-in <c>/mcp</c> (the interactive mode has its own).</summary>
+    internal Func<PiSharp.Cli.Mcp.McpServerManager?>? McpManager { get; init; }
 }

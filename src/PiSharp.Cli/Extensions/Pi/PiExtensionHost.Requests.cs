@@ -45,7 +45,7 @@ internal sealed partial class PiExtensionHost
             // Node's own emission is not echoed back to Node; an emission a native listener makes meanwhile is forwarded.
             if (_deliveringFromNode && channel == _deliveringChannel && ReferenceEquals(data, _deliveringData)) return;
             JsonNode? json;
-            try { json = data switch { null => null, JsonData value => JsonNode.Parse(value.ToString()), JsonElement element => JsonNode.Parse(element.GetRawText()),
+            try { json = data switch { null => null, JsonData value => PiSharp.Contracts.JsonUtf16.MutableNode(value.ToString()), JsonElement element => PiSharp.Contracts.JsonUtf16.MutableNode(element.GetRawText()),
                 JsonNode node => node.DeepClone(), _ => JsonSerializer.SerializeToNode(data, data.GetType()) }; }
             catch (Exception error) when (error is NotSupportedException or JsonException or InvalidOperationException) { return; }
             if (IsRunning) _ = Node.NotifyAsync("events.deliver", new JsonObject { ["channel"] = channel, ["data"] = json });
@@ -180,13 +180,17 @@ internal sealed partial class PiExtensionHost
             case "pi.setActiveTools":
             {
                 var names = p.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!).ToImmutableArray();
-                await RequireAttached().Session.SetActiveToolsAsync(names, token).ConfigureAwait(false);
+                var tools = RequireAttached().Session;
+                await InCommandInput(() => tools.SetActiveToolsAsync(names, token)).ConfigureAwait(false);
                 return null;
             }
             case "pi.setThinkingLevel":
-                await RequireAttached().Session.ConfigureAsync(new SessionRuntimeUpdate(ThinkingLevel: p.GetProperty("level").GetString()), token).ConfigureAwait(false);
+            {
+                var thinking = RequireAttached().Session; var level = p.GetProperty("level").GetString();
+                await InCommandInput(() => thinking.ConfigureAsync(new SessionRuntimeUpdate(ThinkingLevel: level), token)).ConfigureAwait(false);
                 return null;
-            case "pi.setModel": return await SetModelAsync(p.GetProperty("model"), token).ConfigureAwait(false);
+            }
+            case "pi.setModel": return await InCommandInput(() => SetModelAsync(p.GetProperty("model").Clone(), token)).ConfigureAwait(false);
             case "pi.sendMessage": await SendMessageAsync(p, token).ConfigureAwait(false); return null;
             case "pi.sendUserMessage": await SendUserMessageAsync(p, token).ConfigureAwait(false); return null;
             case "ctx.read": return ContextRead(p, Op());
@@ -194,7 +198,10 @@ internal sealed partial class PiExtensionHost
             case "ui.dialog": return await DialogAsync(p, Op(), Args(), token).ConfigureAwait(false);
             case "ui.custom": await OpenComponentAsync(p, token).ConfigureAwait(false); return null;
             case "ui.read": return UiRead(Op());
-            case "ui.setTheme": return new JsonObject { ["success"] = false, ["error"] = "Theme switching from extensions is not available in this PiSharp host" };
+            case "ui.setTheme":
+                // interactive-mode.ts setTheme switches the theme (and saves the setting); rpc-mode.ts has no themes.
+                if (SetTheme is { } setTheme) return setTheme(p.TryGetProperty("name", out var themeName) && themeName.ValueKind == JsonValueKind.String ? themeName.GetString()! : "");
+                return new JsonObject { ["success"] = false, ["error"] = _options.Mode == "rpc" ? "Theme switching not supported in RPC mode" : "UI not available" };
             case "ctx.executeTool": return await ExecuteToolAsync(p, request, token).ConfigureAwait(false);
             case "oauth.prompt": return await OAuthPromptAsync(p, token).ConfigureAwait(false);
             case "ctx.compact":
@@ -216,7 +223,16 @@ internal sealed partial class PiExtensionHost
                     }
                 }
                 return await Compact(customInstructions, token).ConfigureAwait(false);
-            case "command.waitForIdle": await RequireAttached().Session.WaitForIdleAsync(token).ConfigureAwait(false); return null;
+            case "command.waitForIdle":
+            {
+                // agent-session.ts waitForIdle: the command's own input does not count (its callback's flow identifies it).
+                var waitSession = RequireAttached().Session;
+                Task wait = null!;
+                if (FlowOf(p) is { } waitFlow) ExecutionContext.Run(waitFlow, _ => wait = waitSession.WaitForCommandIdleAsync(token), null);
+                else wait = waitSession.WaitForCommandIdleAsync(token);
+                await wait.ConfigureAwait(false);
+                return null;
+            }
             case "command.session":
                 // ctx.navigateTree/newSession/fork/switchSession: the native command context answers only inside the command callback
                 // that created it, so the action runs in that callback's execution context (as the command awaits it upstream).
@@ -245,8 +261,9 @@ internal sealed partial class PiExtensionHost
     {
         switch (method)
         {
-            case "pi.sendMessage": _ = Guard(SendMessageAsync(parameters, CancellationToken.None)); return;
-            case "pi.sendUserMessage": _ = Guard(SendUserMessageAsync(parameters, CancellationToken.None)); return;
+            // agent-session.ts bindCore: a failed sendMessage/sendUserMessage is reported as the "<runtime>" extension's error.
+            case "pi.sendMessage": _ = Guard(SendMessageAsync(parameters, CancellationToken.None), "send_message"); return;
+            case "pi.sendUserMessage": _ = Guard(SendUserMessageAsync(parameters, CancellationToken.None), "send_user_message"); return;
             case "pi.appendEntry":
                 await RequireAttached().Session.AppendCustomEntryAsync(parameters.GetProperty("customType").GetString()!,
                     parameters.TryGetProperty("data", out var data) ? JsonData.Parse(data.GetRawText()) : null).ConfigureAwait(false);
@@ -287,18 +304,18 @@ internal sealed partial class PiExtensionHost
                     _shellOutputs[callId] = (output.Callback, output.Chain.ContinueWith(_ => output.Callback(bytes).AsTask(), TaskScheduler.Default).Unwrap());
                 return;
             }
-            case "provider.register": lock (_providers) _providers.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
+            case "provider.register": lock (_providers) _providers.Add(PiSharp.Contracts.JsonUtf16.MutableNode(parameters.GetRawText())!.AsObject()); RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
             case "provider.unregister":
                 lock (_providers) _providers.RemoveAll(item => item["name"]?.GetValue<string>() == parameters.GetProperty("name").GetString());
                 RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
-            case "virtualModel.register": lock (_virtualModels) _virtualModels.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
+            case "virtualModel.register": lock (_virtualModels) _virtualModels.Add(PiSharp.Contracts.JsonUtf16.MutableNode(parameters.GetRawText())!.AsObject()); RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
             case "virtualModel.unregister":
                 lock (_virtualModels) _virtualModels.RemoveAll(item => item["definition"]?["provider"]?.GetValue<string>() == parameters.GetProperty("provider").GetString() &&
                     item["definition"]?["id"]?.GetValue<string>() == parameters.GetProperty("id").GetString());
                 RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
             case "mcp.register":
             {
-                var server = JsonNode.Parse(parameters.GetRawText())!.AsObject();
+                var server = PiSharp.Contracts.JsonUtf16.MutableNode(parameters.GetRawText())!.AsObject();
                 lock (_mcpServers) { _mcpServers.RemoveAll(item => item["name"]?.GetValue<string>() == server["name"]?.GetValue<string>()); _mcpServers.Add(server); }
                 // A server registered after loading connects right away (registerMcpServer); one registered while loading is read when its
                 // owner activates.
@@ -324,7 +341,7 @@ internal sealed partial class PiExtensionHost
             {
                 var index = parameters.GetProperty("ext").GetInt32();
                 lock (_extensions) foreach (var extension in _extensions.Where(item => item.Index == index))
-                        extension.Descriptor = JsonNode.Parse(parameters.GetProperty("extension").GetRawText())!.AsObject();
+                        extension.Descriptor = PiSharp.Contracts.JsonUtf16.MutableNode(parameters.GetProperty("extension").GetRawText())!.AsObject();
                 // Registrations made after the factory returned take effect in the running session (commands, tools, handlers).
                 _ = SyncRegistrationsAsync(index, force: false);
                 RegistrationsChanged?.Invoke();
@@ -352,13 +369,16 @@ internal sealed partial class PiExtensionHost
     /// <summary>ctx.compact(): the mode's manual compaction (the RPC dispatcher's), returning the CompactionResult.</summary>
     internal Func<string?, CancellationToken, Task<JsonNode?>>? Compact { get; set; }
 
-    private static async Task Guard(Task work)
+    private async Task Guard(Task work, string? eventName = null)
     {
         try { await work.ConfigureAwait(false); }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
             System.Diagnostics.Trace.TraceWarning("Extension action failed: {0}", error.Message);
             if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") Console.Error.WriteLine("Extension action failed: " + error);
+            if (eventName is not null)
+                try { await ReportAsync("<runtime>", eventName, error.GetBaseException().Message).ConfigureAwait(false); }
+                catch (Exception reportError) when (reportError is not OutOfMemoryException) { }
         }
     }
 
@@ -371,23 +391,14 @@ internal sealed partial class PiExtensionHost
         var options = p.TryGetProperty("options", out var o) && o.ValueKind == JsonValueKind.Object ? o : default;
         var deliverAs = options.ValueKind == JsonValueKind.Object && options.TryGetProperty("deliverAs", out var d) ? d.GetString() : null;
         // agent-session.ts sendCustomMessage: an idle session appends (and emits) the message at once, also while a command's handler
-        // runs inside its prompt's input admission. A message that triggers a turn waits for that admission to finish.
-        for (var attempt = 0; ; attempt++)
-        {
-            try { await Send().ConfigureAwait(false); return; }
-            catch (Exception error) when (attempt < 1200 && InputBusy(error) && !token.IsCancellationRequested)
-            { await Task.Delay(25, token).ConfigureAwait(false); }
-        }
-
-        static bool InputBusy(Exception? error) => error is not null &&
-            (error is InvalidOperationException { Message: "Input admission is already processing." } || InputBusy(error.InnerException));
-        ValueTask Send() => actions.SendMessageAsync(new ExtensionCustomMessage(message.GetProperty("customType").GetString() ?? "",
+        // runs inside its prompt's input admission; a message that triggers a turn starts it at once, while the handler still runs.
+        await actions.SendMessageAsync(new ExtensionCustomMessage(message.GetProperty("customType").GetString() ?? "",
                 message.TryGetProperty("content", out var content) ? JsonData.Parse(content.GetRawText()) : JsonData.Parse("\"\""),
                 !message.TryGetProperty("display", out var display) || display.ValueKind != JsonValueKind.False,
                 message.TryGetProperty("details", out var details) ? JsonData.Parse(details.GetRawText()) : null),
             new ExtensionMessageOptions(options.ValueKind == JsonValueKind.Object && options.TryGetProperty("triggerTurn", out var trigger) && trigger.ValueKind is JsonValueKind.True or JsonValueKind.False ? trigger.GetBoolean() : null,
                 deliverAs switch { "followUp" => ExtensionMessageDelivery.FollowUp, "nextTurn" => ExtensionMessageDelivery.NextTurn, "steer" => ExtensionMessageDelivery.Steer, _ => null }),
-            token);
+            token).ConfigureAwait(false);
     }
 
     private async Task SendUserMessageAsync(JsonElement p, CancellationToken token)
@@ -399,6 +410,24 @@ internal sealed partial class PiExtensionHost
             new ExtensionUserMessageOptions(deliverAs == "followUp" ? ExtensionMessageDelivery.FollowUp : deliverAs == "steer" ? ExtensionMessageDelivery.Steer : null,
                 options.ValueKind == JsonValueKind.Object && options.TryGetProperty("expandPromptTemplates", out var expand) && expand.ValueKind == JsonValueKind.True ? true : null),
             token).ConfigureAwait(false);
+    }
+
+    /// <summary>agent-session.ts: a pi.* action an extension command's handler awaits acts at once, within the command's input (the
+    /// callback flow whose session input is executing); outside a command it runs on its own.</summary>
+    private Task<T> InCommandInput<T>(Func<Task<T>> action)
+    {
+        if (Attached?.Session is { } session)
+            foreach (var flow in _flows.Values)
+            {
+                if (flow is null) continue;
+                var inInput = false;
+                ExecutionContext.Run(flow, _ => inInput = session.IsExecutingInputCallback, null);
+                if (!inInput) continue;
+                Task<T> started = null!;
+                ExecutionContext.Run(flow, _ => started = action(), null);
+                return started;
+            }
+        return action();
     }
 
     private async Task<JsonNode?> SetModelAsync(JsonElement model, CancellationToken token)
@@ -450,7 +479,7 @@ internal sealed partial class PiExtensionHost
             var info = new JsonObject
             {
                 ["name"] = name, ["description"] = declaration.TryGetProperty("description", out var description) ? description.GetString() : "",
-                ["parameters"] = declaration.TryGetProperty("parameters", out var parameters) ? JsonNode.Parse(parameters.GetRawText()) : new JsonObject(),
+                ["parameters"] = declaration.TryGetProperty("parameters", out var parameters) ? PiSharp.Contracts.JsonUtf16.MutableNode(parameters.GetRawText()) : new JsonObject(),
                 ["exposure"] = registered.Exposure switch
                 {
                     ToolExposure.ModelOnly => "model-only", ToolExposure.Codemode => "codemode", ToolExposure.Deferred => "deferred", ToolExposure.Hidden => "hidden", _ => "direct"
@@ -485,7 +514,7 @@ internal sealed partial class PiExtensionHost
             var rows = new JsonArray();
             foreach (var row in catalog.Value.EnumerateArray())
             {
-                var item = JsonNode.Parse(row.GetRawText())!.AsObject();
+                var item = PiSharp.Contracts.JsonUtf16.MutableNode(row.GetRawText())!.AsObject();
                 var owner = item["ownerId"]?.GetValue<string>();
                 item.Remove("ownerId"); item.Remove("ownerGeneration"); item.Remove("registrationId");
                 if (owner is not null && byOwner.TryGetValue(owner, out var extension)) item["sourceInfo"] = SourceInfoOf(extension);
@@ -519,8 +548,9 @@ internal sealed partial class PiExtensionHost
                 return ModelJson?.Invoke(model.Provider, model.Id) ?? new JsonObject { ["id"] = model.Id, ["provider"] = model.Provider, ["api"] = model.Api };
             case "scopedModels": return new JsonArray();
             case "thinkingLevel": return state?.Context.ThinkingLevel;
+            // agent-session.ts isIdle: no agent run and no compaction; a prompt's input handlers and a command's handler do not count.
             case "isIdle":
-                return state is null || !state.Agent.IsRunning && !state.IsProcessingOperation && !state.IsConfiguring && !state.IsAdmittingInput &&
+                return state is null || !state.Agent.IsRunning && !state.IsProcessingOperation && !state.IsConfiguring &&
                     !state.IsAppendingExtensionEntry && !state.IsEditingContext && !state.IsCompacting;
             case "isProjectTrusted": return ProjectTrusted ?? _options.ProjectTrusted(Cwd);
             case "hasPendingMessages":
@@ -575,7 +605,7 @@ internal sealed partial class PiExtensionHost
         var state = attached.Session.Snapshot;
         SessionTreeSnapshot Tree() => attached.Session.CreateTreeQueries().Build(state.Log.Entries, attached.LifetimeToken);
         string? Arg(int index) => args.ValueKind == JsonValueKind.Array && args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.String ? args[index].GetString() : null;
-        static JsonNode Node(JsonData value) => JsonNode.Parse(value.ToString())!;
+        static JsonNode Node(JsonData value) => PiSharp.Contracts.JsonUtf16.MutableNode(value.ToString())!;
         switch (op)
         {
             case "getCwd": return state.Log.Header.WireBody.Value.TryGetProperty("cwd", out var cwd) ? cwd.GetString() : Cwd;
@@ -610,7 +640,7 @@ internal sealed partial class PiExtensionHost
         JsonObject Build(string id)
         {
             var node = tree.ById[id];
-            var item = new JsonObject { ["entry"] = JsonNode.Parse(node.Entry.WireBody.ToString()) };
+            var item = new JsonObject { ["entry"] = PiSharp.Contracts.JsonUtf16.MutableNode(node.Entry.WireBody.ToString()) };
             if (node.ResolvedLabel is { } label) item["label"] = label.Label;
             item["children"] = new JsonArray([.. node.ChildIds.Select(child => (JsonNode)Build(child))]);
             return item;
@@ -636,6 +666,8 @@ internal sealed partial class PiExtensionHost
     /// <summary>IMPL-I: the interactive terminal's size, tools expansion, git branch and provider count (footer data), read without the UI loop.</summary>
     internal Func<(int Columns, int Rows)>? TerminalSize { get; set; }
     internal Func<bool>? ToolsExpanded { get; set; }
+    /// <summary>ctx.ui.setTheme(name) in interactive mode: the <c>{ success, error? }</c> result (null outside interactive mode).</summary>
+    internal Func<string, JsonNode>? SetTheme { get; set; }
     internal Func<string?>? GitBranch { get; set; }
     internal Func<int>? AvailableProviderCount { get; set; }
     /// <summary>IMPL-I: a widget, header or footer component asked to be redrawn (tui.requestRender in Node).</summary>
@@ -758,11 +790,11 @@ internal sealed partial class PiExtensionHost
         if (ContextOf(p) is not IExtensionToolContext context)
             return Outcome(p.GetProperty("name").GetString()!, "Nested tool calls are not available in this context", true, $"{p.GetProperty("toolCallId").GetString()}/0");
         var outcome = await context.ExecuteToolAsync(p.GetProperty("name").GetString()!, JsonData.Parse(p.GetProperty("args").GetRawText()),
-            new ExtensionExecuteToolOptions(token, async (partial, cancellation) => await request.ReportProgress(JsonNode.Parse(partial.ToString())).ConfigureAwait(false))).ConfigureAwait(false);
+            new ExtensionExecuteToolOptions(token, async (partial, cancellation) => await request.ReportProgress(PiSharp.Contracts.JsonUtf16.MutableNode(partial.ToString())).ConfigureAwait(false))).ConfigureAwait(false);
         return new JsonObject
         {
-            ["toolCall"] = new JsonObject { ["type"] = "toolCall", ["id"] = outcome.ToolCallId, ["name"] = outcome.ToolName, ["arguments"] = JsonNode.Parse(p.GetProperty("args").GetRawText()) },
-            ["result"] = JsonNode.Parse(outcome.Result.ToString()), ["isError"] = outcome.IsError
+            ["toolCall"] = new JsonObject { ["type"] = "toolCall", ["id"] = outcome.ToolCallId, ["name"] = outcome.ToolName, ["arguments"] = PiSharp.Contracts.JsonUtf16.MutableNode(p.GetProperty("args").GetRawText()) },
+            ["result"] = PiSharp.Contracts.JsonUtf16.MutableNode(outcome.Result.ToString()), ["isError"] = outcome.IsError
         };
         static JsonObject Outcome(string name, string text, bool isError, string id) => new()
         {
@@ -788,8 +820,8 @@ internal sealed partial class PiExtensionHost
                 if (ContextOf(p) is not IExtensionToolContext context)
                     throw new NotSupportedException("Built-in tools run from extension code need a tool execution context in PiSharp");
                 var outcome = await context.ExecuteToolAsync(call.GetProperty("name").GetString()!, JsonData.Parse(call.GetProperty("params").GetRawText()),
-                    new ExtensionExecuteToolOptions(token, async (partial, _) => await request.ReportProgress(JsonNode.Parse(partial.ToString())).ConfigureAwait(false))).ConfigureAwait(false);
-                var result = JsonNode.Parse(outcome.Result.ToString())!.AsObject();
+                    new ExtensionExecuteToolOptions(token, async (partial, _) => await request.ReportProgress(PiSharp.Contracts.JsonUtf16.MutableNode(partial.ToString())).ConfigureAwait(false))).ConfigureAwait(false);
+                var result = PiSharp.Contracts.JsonUtf16.MutableNode(outcome.Result.ToString())!.AsObject();
                 // Upstream execute throws for a failed call; the error text is the result's text.
                 if (outcome.IsError) throw new InvalidOperationException(string.Concat((result["content"] as JsonArray ?? []).Select(item => item?["text"]?.GetValue<string>())));
                 result.Remove("isError");
@@ -1029,7 +1061,7 @@ internal sealed partial class PiExtensionHost
     private async ValueTask<PiSharp.Cli.Models.ModelRoute> RouteAsync(PiSharp.Cli.Models.ModelRegistry registry, string provider, string id,
         PiSharp.Cli.Models.ModelRouteRequest request)
     {
-        static JsonNode Model(PiSharp.Cli.Models.RegistryModel model) => JsonNode.Parse(model.ToJsonString())!;
+        static JsonNode Model(PiSharp.Cli.Models.RegistryModel model) => PiSharp.Contracts.JsonUtf16.MutableNode(model.ToJsonString())!;
         var payload = new JsonObject
         {
             ["model"] = Model(request.Model), ["thinkingLevel"] = request.ThinkingLevel,
@@ -1047,9 +1079,9 @@ internal sealed partial class PiExtensionHost
         if (route is not { ValueKind: JsonValueKind.Object } value || !value.TryGetProperty("model", out var target) || target.ValueKind != JsonValueKind.Object)
             throw new InvalidOperationException($"Virtual model {provider}/{id} returned no route.");
         var routedProvider = target.GetProperty("provider").GetString()!; var routedId = target.GetProperty("id").GetString()!;
-        var physical = registry.Find(routedProvider, routedId) ?? PiSharp.Cli.Models.RegistryModel.FromJson(JsonNode.Parse(target.GetRawText())!.AsObject());
+        var physical = registry.Find(routedProvider, routedId) ?? PiSharp.Cli.Models.RegistryModel.FromJson(PiSharp.Contracts.JsonUtf16.MutableNode(target.GetRawText())!.AsObject());
         return new(physical, value.TryGetProperty("thinkingLevel", out var level) && level.ValueKind == JsonValueKind.String ? level.GetString()! : request.ThinkingLevel,
-            value.TryGetProperty("state", out var state) ? JsonNode.Parse(state.GetRawText()) : null);
+            value.TryGetProperty("state", out var state) ? PiSharp.Contracts.JsonUtf16.MutableNode(state.GetRawText()) : null);
     }
 
     // ----------------------------------------------------------------------------------------------------------------- user bash output

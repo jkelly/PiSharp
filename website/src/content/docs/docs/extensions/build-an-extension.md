@@ -18,8 +18,8 @@ Reference the extension contracts without copying them into your output, and ena
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="PiSharp.Extensions.Abstractions" Version="1.1.0.2" ExcludeAssets="runtime" />
-    <PackageReference Include="PiSharp.Contracts" Version="1.1.0.2" ExcludeAssets="runtime" />
+    <PackageReference Include="PiSharp.Extensions.Abstractions" Version="1.1.0.3" ExcludeAssets="runtime" />
+    <PackageReference Include="PiSharp.Contracts" Version="1.1.0.3" ExcludeAssets="runtime" />
   </ItemGroup>
 </Project>
 ```
@@ -60,6 +60,10 @@ public sealed class HelloExtension : IPiSharpExtension
 The registry also takes handlers for `input`, `before_agent_start`, `context`, `tool_call` and `tool_result`. If it implements `IExtensionEventBusRegistry`, its `Events` property is the event bus Pi extensions use with `pi.events`.
 
 Tool parameters are declared as JSON Schema. The host validates arguments against the schema before your tool runs.
+
+### Classifier and image providers
+
+If the registry implements `IExtensionModelOperationProviderRegistry`, `RegisterModelOperationProvider` adds classifier and image models, as `pi.registerProvider` with `classifiers` and `images` does in Pi. Give an `ExtensionModelOperationProvider` its models (catalog objects with `type` `"classifier"` or `"image"`) and the implementations by API id. The models join `ctx.modelRegistry` and codemode's `models` global, and leave when your extension unloads. A provider without an `ApiKey` needs a key the user stored with `/login` or passed with the request, as in Pi.
 
 ## The extension folder
 
@@ -108,7 +112,7 @@ Don't keep mutable state in fields. Rebuild it from the current branch's session
 - [StatefulTodo](https://github.com/jkelly/PiSharp/tree/main/samples/extensions/StatefulTodo): a tool whose state is rebuilt from the session branch, ported from Pi's `todo.ts` example.
 - [SessionCheckpoint](https://github.com/jkelly/PiSharp/tree/main/samples/extensions/SessionCheckpoint): a `/checkpoint` command, a session-start observer and a pre-switch handler.
 
-The samples were written for PiSharp's earlier package loader. To load one through the extension folders, add a `pisharp-extension.json` as shown above.
+Each sample ships a `pisharp-extension.json`, so its build output loads straight from an extension folder or with `-e`. The older `session …` loader still accepts them too.
 
 :::note[The older package loader]
 The `pisharp session …` commands keep an older, Windows-only loader with a signed manifest, defined in [`schemas/pisharp-extension.schema.json`](https://github.com/jkelly/PiSharp/blob/main/schemas/pisharp-extension.schema.json), and an approval file. Plain `pisharp` doesn't use it.

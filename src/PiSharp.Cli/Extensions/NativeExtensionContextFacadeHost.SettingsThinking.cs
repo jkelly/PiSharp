@@ -32,6 +32,16 @@ public sealed partial class NativeExtensionContextFacadeHost : IExtensionSetting
         return JsonData.FromElement(snapshot.Values.Value);
     });
 
+    private Func<ModelDescriptor, string?>? modelSwitchThinking;
+    /// <summary>agent-session.ts _getThinkingLevelForModelSwitch for an extension's setModel: the settings' per-model level, else
+    /// defaultThinkingLevel; null keeps the current level (setThinkingLevel clamps either to the new model).</summary>
+    internal void ConfigureModelSwitchThinking(Func<ModelDescriptor, string?> resolve)
+    {
+        ArgumentNullException.ThrowIfNull(resolve);
+        Volatile.Write(ref modelSwitchThinking, resolve);
+    }
+    internal string? ModelSwitchThinkingLevel(ModelDescriptor model) => Volatile.Read(ref modelSwitchThinking)?.Invoke(model);
+
     public string GetThinkingLevel(IExtensionContext context)
         => Read(context, attached => attached.Session.Snapshot.Context.ThinkingLevel);
 }

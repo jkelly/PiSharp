@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.1.0.3] - 2026-10-10
+
+A C#-only patch on the Pi v1.1.0 baseline that fixes the `/clear` crash ([#5](https://github.com/jkelly/PiSharp/issues/5)) and closes most of the differences 1.1.0.2 left open. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.3.md).
+
+### Behaviour changes
+
+- Auto-compaction is on by default in every mode, read from the `compaction` settings, as in Pi.
+- OpenAI Codex tries a WebSocket first and compresses server-sent-event requests with zstd, as in Pi. Set `transport` to `sse` to stay on server-sent events.
+- Print mode recovers from "prompt is too long" by compacting, and exits 0.
+- RPC and print setters (`set_auto_compaction`, `set_auto_retry`, `set_steering_mode`, `set_follow_up_mode`) save to the global `settings.json`, as Pi does.
+- `AZURE_OPENAI_RESOURCE_NAME` is taken as Pi takes it: any name, read as part of a URL.
+
+### Fixed
+
+- `/clear` and `/new` no longer crash on models whose thinking can't be turned off; thinking levels are clamped everywhere Pi clamps them ([#5](https://github.com/jkelly/PiSharp/issues/5))
+- Failed RPC commands answer with the real error message instead of "RPC command failed."
+- The interactive footer's cost, tokens and context usage update after every turn
+- `agent_settled` arrives before the command's response, and an extension's `triggerTurn` starts its turn at once
+- Shell start failures report Node's spawn errors; `bash` stays registered without a shell, as in Pi
+- Compaction, fork and tree-navigation failures carry Pi's texts
+
+### New features
+
+- Built-in extensions (`mcp`, `llama.cpp`, `codemode`, `tool-search`) can be turned on and off: `builtin:` entries in `extensions`, `pisharp config`, `-e builtin:<name>`
+- The llama.cpp provider, `/llama` and Pi's [llama.cpp guide](https://pisharp.ai/docs/guides/llama-cpp/)
+- Native C# extensions can register classifier and image providers
+- `ctx.ui.setTheme` switches the theme
+- Packages loaded with `-e` add their skills, prompt templates and themes
+- The OpenAI Codex WebSocket transport and zstd request compression
+- Pasting from the X11 clipboard without `xclip` or `xsel`
+- Lone surrogates, fractional token counts and 1,000 levels of JSON nesting are carried as Pi carries them, and the Pi command line's size bounds are JavaScript's string limit
+
+### Known differences
+
+- See [Parity](https://pisharp.ai/parity/) for what still differs from Pi.
+
 ## [1.1.0.2] - 2026-10-09
 
 A C#-only patch on the Pi v1.1.0 baseline that ports the rest of Pi v1.1.0. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.2.md).

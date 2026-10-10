@@ -30,7 +30,7 @@ public sealed class GoogleVertexRequestFactory
         token.ThrowIfCancellationRequested();
         // An exact endpoint is bound to this selected model; no SDK endpoint builder is invented.
         if (GoogleData.String(parameters.Value, "model") != model.Id) throw GoogleData.Fail(GoogleFailure.Configuration);
-        var body = GoogleData.Admit(JsonData.Parse(GoogleRequestProjector.WireBody(parameters, vertex: true).ToJsonString()), projection);
+        var body = GoogleData.Admit(JsonData.Parse(JsonUtf16.ToJsonString(GoogleRequestProjector.WireBody(parameters, vertex: true))), projection);
         // The body (images included) is bounded by the payload budget, not by the projection's 1 MiB string defaults.
         var budget = Math.Max(projection.MaximumPayloadBytes, 1_048_576);
         var bytes = Encoding.UTF8.GetBytes(EcmaScriptJsonProjection.Project(body, new(MaximumInputCharacters: budget, MaximumInputBytes: Math.Max(budget, 4_194_304),

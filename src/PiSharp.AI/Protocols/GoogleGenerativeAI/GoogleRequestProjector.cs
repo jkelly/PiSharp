@@ -28,7 +28,11 @@ public static class GoogleRequestProjector
         var tools = new List<JsonObject>(); var conversation = new List<JsonObject>();
         foreach (var message in request.Messages)
         {
-            var body = JsonNode.Parse(message.WireBody.ToString()) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+            // A tool call's arguments may hold lone surrogates in names and strings (TranscriptSurrogates keeps them for the SDK's
+            // JSON.stringify): such a message becomes a tree that holds them.
+            var raw = message.WireBody.ToString();
+            var body = (JsonUtf16.HasEscapedSurrogate(raw) ? JsonUtf16.MutableNode(message.WireBody.Value)
+                : JsonNode.Parse(raw, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
             if (Text(body, "role") != message.Role) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
             if (message.Role != "system") { conversation.Add(body); continue; }
             var text = ContentText(body["content"]); if (text.Length > 0) prompts.Add(text);
@@ -119,7 +123,7 @@ public static class GoogleRequestProjector
             }
             config["thinkingConfig"] = control;
         }
-        return GoogleData.Admit(JsonData.Parse(new JsonObject { ["model"] = request.Model.Id, ["contents"] = contents, ["config"] = config }.ToJsonString()), options);
+        return GoogleData.Admit(JsonData.Parse(JsonUtf16.ToJsonString(new JsonObject { ["model"] = request.Model.Id, ["contents"] = contents, ["config"] = config })), options);
     }
 
     // @google/genai 2.21.0 generateContentConfigToMldev/ToVertex: generation fields in the converter's order (pass-through ones only).
@@ -138,7 +142,7 @@ public static class GoogleRequestProjector
     /// </summary>
     internal static JsonObject WireBody(JsonData parameters, bool vertex = false)
     {
-        var root = JsonNode.Parse(parameters.ToString()) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        var root = (JsonUtf16.HasEscapedSurrogate(parameters.ToString()) ? JsonUtf16.MutableNode(parameters.Value) : JsonNode.Parse(parameters.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         var config = root["config"] as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         // tContents: an array of Content objects (a parts array each); no other shape is projected here.
         if (root["contents"] is not JsonArray { Count: > 0 } contents) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

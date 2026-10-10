@@ -92,7 +92,7 @@ public sealed partial class PersistentAgentSession
             }
             SessionEntry? target = null;
             if (request.TargetId is { } targetId && !revision.Log.ById.TryGetValue(targetId, out target))
-                throw new SessionTreeNavigationException(SessionTreeNavigationFailure.UnknownTarget);
+                throw new SessionTreeNavigationException(SessionTreeNavigationFailure.UnknownTarget, targetId);
             var newLeaf = request.TargetId; string? editorText = null;
             if (target?.Kind == SessionEntryKind.Message &&
                 target.WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "user")

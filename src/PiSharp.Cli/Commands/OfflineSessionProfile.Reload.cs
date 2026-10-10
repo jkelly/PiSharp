@@ -77,7 +77,7 @@ internal sealed partial class OfflineSessionProfile
     {
         var view = CaptureRuntimeView();
         using var use = view.Lifetime.Enter();
-        return IsReloadCommand(text) || view.Admission("prompt") is not null ? InputAdmission : null;
+        return IsReloadCommand(text) || IsLlamaCommand(text) || IsMcpCommand(text) || view.Admission("prompt") is not null ? InputAdmission : null;
     }
     private static bool IsReloadCommand(string text) => text.StartsWith("/reload", StringComparison.Ordinal) &&
         (text.Length == 7 || char.IsWhiteSpace(text[7]));
@@ -93,6 +93,18 @@ internal sealed partial class OfflineSessionProfile
             token.ThrowIfCancellationRequested();
             // The extensions' pending registrations were joined by the session's input gate before this input was admitted.
             var text = input.Text;
+            // The built-in llama.cpp extension's /llama outside interactive mode (index.ts): a warning, no prompt.
+            if (type == "prompt" && profile.IsLlamaCommand(text))
+            {
+                await profile.NotifyLlamaUnavailableAsync(token).ConfigureAwait(false);
+                return new(PromptInputAction.Handled);
+            }
+            // The built-in mcp extension's /mcp outside interactive mode (index.ts): the status, or login/logout/reconnect.
+            if (type == "prompt" && profile.IsMcpCommand(text))
+            {
+                await profile.RunMcpCommandAsync(text, token).ConfigureAwait(false);
+                return new(PromptInputAction.Handled);
+            }
             var command = IsReloadCommand(text);
             if (!command)
             {

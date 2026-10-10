@@ -8,4 +8,8 @@
     <ProjectReference Include="../../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" Private="false" ExcludeAssets="runtime" />
     <ProjectReference Include="../../../src/PiSharp.Contracts/PiSharp.Contracts.csproj" Private="false" ExcludeAssets="runtime" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The Pi entry loads a native extension from the folder holding this manifest and the built assembly. -->
+    <None Include="pisharp-extension.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

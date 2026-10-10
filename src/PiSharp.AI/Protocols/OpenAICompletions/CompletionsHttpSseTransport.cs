@@ -9,7 +9,7 @@ using PiSharp.Contracts;
 namespace PiSharp.AI.Protocols.OpenAICompletions;
 
 public sealed record CompletionsHttpSseOptions(int MaximumDataEvents = int.MaxValue, int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
-    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null)
+    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, SseDecoderOptions? Framing = null)
 {
     public CompletionsLifecycleHooks? Hooks { get; init; }
     public CompletionsResponseBodyReaderFactory? BodyReaderFactory { get; init; }
@@ -60,7 +60,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
         _requestFactory = requestFactory; _options = options ?? new();
         _options.Retry?.Validate();
         if (_options.MaximumDataEvents <= 0 || _options.MaximumDataCharacters <= 0 || _options.MaximumTotalDataCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64 || _options.MaximumResponseHeaders <= 0 ||
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || _options.MaximumResponseHeaders <= 0 ||
             _options.MaximumResponseHeaderCharacters <= 0 || _options.MaximumTotalResponseHeaderCharacters <= 0 ||
             _options.MaximumResponseMetadataBytes < 2 || _options.SourceEventCapacity is < 1 or > 4096 ||
             _options.MaximumSourceValueCharacters is < 2 or > 8_388_608 || _options.MaximumSourceValueBytes is < 2 or > 8_388_608 ||
@@ -446,7 +446,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
     {
         try
         {
-            using var document = JsonDocument.Parse(data, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(data, PiSharp.Contracts.JsonData.DocumentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object) throw Protocol();
             Check(document.RootElement, 0, token);
             return JsonData.FromElement(document.RootElement); // Owns all fields; decoded duplicates are rejected.
@@ -461,10 +461,11 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
         {
             if (++depth > _options.MaximumJsonDepth) throw Limit();
             if (value.ValueKind == JsonValueKind.Object)
-                foreach (var property in value.EnumerateObject()) { Unicode(property.Name); Check(property.Value, depth, token); }
+                foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); Check(property.Value, depth, token); }
             else foreach (var item in value.EnumerateArray()) Check(item, depth, token);
         }
-        else if (value.ValueKind == JsonValueKind.String) Unicode(value.GetString()!);
+        // The SDK reads each chunk with JSON.parse: a string keeps a lone surrogate.
+        else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
     }
     /// <summary>The openai SDK status error for a rejected response (<c>APIError.generate</c> over <c>response.text()</c>),
     /// shown as openai-completions.ts shows it. A body over the stream budget, or text public failure data cannot carry,
@@ -490,17 +491,10 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
     private static bool Truthy(JsonElement value) => value.ValueKind switch
     {
         JsonValueKind.Null or JsonValueKind.False => false,
-        JsonValueKind.String => value.GetString()!.Length != 0,
+        JsonValueKind.String => JsonUtf16.GetString(value).Length != 0,
         JsonValueKind.Number => !value.TryGetDouble(out var number) || number != 0,
         _ => true
     };
-    private static void Unicode(string value)
-    {
-        for (var index = 0; index < value.Length; index++)
-            if (char.IsHighSurrogate(value[index]))
-            { if (++index >= value.Length || !char.IsLowSurrogate(value[index])) throw Protocol(); }
-            else if (char.IsLowSurrogate(value[index])) throw Protocol();
-    }
     private static StreamProtocolException Protocol() => new("Invalid Completions SSE JSON data.");
     private static StreamLimitException Limit() => new("Completions SSE data exceeds configured limits.");
 }

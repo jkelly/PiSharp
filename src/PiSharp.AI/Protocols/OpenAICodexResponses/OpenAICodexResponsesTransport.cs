@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE, streamSimple,
-// buildRequestBody, resolveCodexUrl, mapCodexEvents, normalizeCodexStatus, parseErrorResponse, extractAccountId, buildSSEHeaders,
-// the retry helpers and service tier pricing) and providers/openai-codex.ts. Event processing reuses the native Responses state
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE with the zstd
+// request body, streamSimple, buildRequestBody, resolveCodexUrl, mapCodexEvents, normalizeCodexStatus, parseErrorResponse,
+// extractAccountId, buildSSEHeaders, the retry helpers and service tier pricing; the WebSocket transport is in the .WebSocket part) and
+// providers/openai-codex.ts. Event processing reuses the native Responses state
 // machine (openai-responses-shared.ts processResponsesStream).
 using System.Collections.Immutable;
 using System.Globalization;
@@ -47,9 +48,23 @@ public sealed record OpenAICodexResponsesOptions
     public int MaximumMessages { get; init; } = PiRequestBudget.RequestMessages;
     /// <summary>Pi has no request-size cap; the default admits image payloads of several megabytes.</summary>
     public int MaximumEntryCharacters { get; init; } = 64 * 1_048_576;
+    /// <summary>StreamOptions.transport, read for every request (the setting can change mid-session): "sse", "websocket",
+    /// "websocket-cached" or "auto" (null or empty, the default). Every value but "sse" tries the WebSocket first.</summary>
+    public Func<string?>? Transport { get; init; }
+    /// <summary>StreamOptions.websocketConnectTimeoutMs: the WebSocket open handshake's limit (default 15 s; zero waits indefinitely).</summary>
+    public TimeSpan? WebSocketConnectTimeout { get; init; }
+    /// <summary>Sends the WebSocket handshake (the provider's HTTP handler, so proxies and test seams apply); null uses the transport's client.</summary>
+    public HttpMessageInvoker? WebSocketInvoker { get; init; }
 }
 
 public sealed class CodexApiException(string message, string? code = null) : Exception(message) { public string? Code { get; } = code; }
+
+/// <summary>Source CodexProtocolError: an unparseable Codex event (never retried over SSE).</summary>
+public sealed class CodexProtocolException(string message) : InvalidOperationException(message);
+
+/// <summary>Source ProviderStreamEventCallbackError: the onProviderStreamEvent hook failed (kept out of the WebSocket retry and SSE
+/// fallback path).</summary>
+public sealed class ProviderStreamEventCallbackException(Exception inner) : Exception(inner.Message, inner);
 
 /// <summary>
 /// OpenAI Codex Responses (ChatGPT backend) over SSE. The access token comes from <paramref name="accessToken"/> for every request
@@ -127,7 +142,21 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     /// <summary>The transcript and projection budget (several images of ~4.5 MB each).</summary>
     private int Budget => (int)Math.Min(int.MaxValue / 2, Math.Max(_options.MaximumEntryCharacters, 1_048_576) * 2L);
 
-    private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping, MaxDepth = 2 * JsonData.MaximumDepth };
+
+    /// <summary>convertResponsesMessages options for Codex: no system prompt, Codex tool-call providers.</summary>
+    private ResponsesTranscriptProjectionOptions ProjectionOptions() => new(
+            Reasoning: _metadata.TryGetProperty("reasoning", out var reasoning) && reasoning.ValueKind == JsonValueKind.True,
+            SupportsDeveloperRole: _developerRole, SupportsMidConversationSystemMessages: _midConversation, IncludeInitialSystemPrompt: false,
+            MaximumMessages: _options.MaximumMessages, MaximumEntryCharacters: _options.MaximumEntryCharacters,
+            MaximumInputCharacters: Budget, MaximumOutputCharacters: Budget,
+            ToolDeclarations: new(SupportsStrictMode: _strictMode, Strict: null, MaximumMessages: _options.MaximumMessages,
+                MaximumEntryCharacters: _options.MaximumEntryCharacters, MaximumInputCharacters: Budget,
+                MaximumOutputCharacters: Budget, MaximumOutputBytes: Budget) { SupportsOpenAIGrammarTools = _grammar })
+        {
+            ModelSupportsImages = _metadata.TryGetProperty("input", out var inputs) && inputs.ValueKind == JsonValueKind.Array &&
+                inputs.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && item.GetString() == "image")
+        };
 
     /// <summary>buildRequestBody for the request's thinking level (streamSimple clamps it; "off" omits reasoningEffort).</summary>
     public JsonObject BuildBody(ChatRequest request)
@@ -140,21 +169,10 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var resolved = _midConversation ? messages : ProviderTranscript.CollapseSystemMessages(messages);
         var initial = resolved.Count > 0 && ProviderTranscript.Role(resolved[0]) == "system" ? resolved[0] : null;
         var instructions = initial is null ? "" : ProviderTranscript.SystemText(initial);
-        var projection = new ResponsesTranscriptProjectionOptions(
-            Reasoning: _metadata.TryGetProperty("reasoning", out var reasoning) && reasoning.ValueKind == JsonValueKind.True,
-            SupportsDeveloperRole: _developerRole, SupportsMidConversationSystemMessages: _midConversation, IncludeInitialSystemPrompt: false,
-            MaximumMessages: _options.MaximumMessages, MaximumEntryCharacters: _options.MaximumEntryCharacters,
-            MaximumInputCharacters: Budget, MaximumOutputCharacters: Budget,
-            ToolDeclarations: new(SupportsStrictMode: _strictMode, Strict: null, MaximumMessages: _options.MaximumMessages,
-                MaximumEntryCharacters: _options.MaximumEntryCharacters, MaximumInputCharacters: Budget,
-                MaximumOutputCharacters: Budget, MaximumOutputBytes: Budget) { SupportsOpenAIGrammarTools = _grammar })
-        {
-            ModelSupportsImages = _metadata.TryGetProperty("input", out var inputs) && inputs.ValueKind == JsonValueKind.Array &&
-                inputs.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && item.GetString() == "image")
-        };
+        var projection = ProjectionOptions();
         var projector = new ResponsesTranscriptProjector(projection);
-        var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString());
-        var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString()) as JsonArray;
+        var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions);
+        var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions) as JsonArray;
         var cacheKey = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? request.SessionId);
         var body = new JsonObject
         {
@@ -192,21 +210,42 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     /// the account id, OpenAI-Beta, accept, content-type and the session headers.</summary>
     public List<KeyValuePair<string, string>> BuildHeaders(string token, string? sessionId = null)
     {
+        var headers = BaseHeaders(token);
+        Set(headers, "openai-beta", "responses=experimental"); Set(headers, "accept", "text/event-stream"); Set(headers, "content-type", "application/json");
+        var session = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? sessionId);
+        if (session is not null) { Set(headers, "session-id", session); Set(headers, "x-client-request-id", session); }
+        return headers;
+    }
+
+    /// <summary>buildWebSocketHeaders: the base headers without accept, content-type and the caller's OpenAI-Beta, then the WebSocket
+    /// beta and the request id as x-client-request-id and session-id. connectWebSocket's delete of "OpenAI-Beta" misses the lowercased
+    /// key headersToRecord produces, so the beta header is sent.</summary>
+    public List<KeyValuePair<string, string>> BuildWebSocketHeaders(string token, string requestId)
+    {
+        var headers = BaseHeaders(token);
+        Set(headers, "accept", null); Set(headers, "content-type", null); Set(headers, "openai-beta", null);
+        Set(headers, "openai-beta", OpenAIBetaResponsesWebSockets);
+        Set(headers, "x-client-request-id", requestId); Set(headers, "session-id", requestId);
+        return headers;
+    }
+
+    /// <summary>buildBaseCodexHeaders: originator and user agent defaults, model then caller headers (null deletes), then the bearer
+    /// token and the account id.</summary>
+    private List<KeyValuePair<string, string>> BaseHeaders(string token)
+    {
         var accountId = ExtractAccountId(token);
         var headers = new List<KeyValuePair<string, string>>();
-        void Set(string name, string? value)
-        {
-            headers.RemoveAll(pair => pair.Key.Equals(name, StringComparison.OrdinalIgnoreCase));
-            if (value is not null) headers.Add(new(name.ToLowerInvariant(), value));
-        }
-        Set("originator", _options.Originator); Set("user-agent", _options.UserAgent);
-        foreach (var (name, value) in _options.ModelHeaders ?? ImmutableDictionary<string, string>.Empty) Set(name, value);
-        foreach (var (name, value) in _options.Headers ?? ImmutableDictionary<string, string?>.Empty) Set(name, value);
-        Set("authorization", "Bearer " + token); Set("chatgpt-account-id", accountId);
-        Set("openai-beta", "responses=experimental"); Set("accept", "text/event-stream"); Set("content-type", "application/json");
-        var session = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? sessionId);
-        if (session is not null) { Set("session-id", session); Set("x-client-request-id", session); }
+        Set(headers, "originator", _options.Originator); Set(headers, "user-agent", _options.UserAgent);
+        foreach (var (name, value) in _options.ModelHeaders ?? ImmutableDictionary<string, string>.Empty) Set(headers, name, value);
+        foreach (var (name, value) in _options.Headers ?? ImmutableDictionary<string, string?>.Empty) Set(headers, name, value);
+        Set(headers, "authorization", "Bearer " + token); Set(headers, "chatgpt-account-id", accountId);
         return headers;
+    }
+
+    private static void Set(List<KeyValuePair<string, string>> headers, string name, string? value)
+    {
+        headers.RemoveAll(pair => pair.Key.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (value is not null) headers.Add(new(name.ToLowerInvariant(), value));
     }
 
     public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default)
@@ -217,38 +256,115 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         return StreamCore(request, cancellationToken);
     }
 
-    private sealed class Invocation { internal bool? EndTurn; }
+    /// <summary>One stream call: the end_turn flag, the transport diagnostics appended to the message, and the WebSocket lease and
+    /// continuation state the call settles.</summary>
+    private sealed class Invocation
+    {
+        internal bool? EndTurn;
+        internal readonly List<JsonObject> Diagnostics = [];
+        internal WebSocketLease? Lease;
+        internal bool WebSocketStarted, UseCachedContext, RetriedMissingContinuation;
+        internal JsonObject? FullBody;
+        internal string? CacheSessionId, ConfiguredTransport;
+        internal int RequestBytes;
+    }
 
     private async IAsyncEnumerable<StreamEvent> StreamCore(ChatRequest request, [EnumeratorCancellation] CancellationToken token)
     {
         var invocation = new Invocation();
         var inner = new ResponsesTextToolTransport((chat, cancellation, context) => PrepareAsync(chat, invocation, cancellation),
             new ResponsesTextToolOptions(MaximumEvents: int.MaxValue, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
-                MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: 64, Rates: _rates)
+                MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: JsonData.MaximumDepth, Rates: _rates)
             { SupportsOpenAIGrammarTools = _grammar });
-        await foreach (var frame in inner.StreamAsync(request, token).ConfigureAwait(false))
+        var keep = false;
+        try
         {
-            if (frame is StreamDone done && invocation.EndTurn is { } endTurn)
+            await foreach (var frame in inner.StreamAsync(request, token).ConfigureAwait(false))
             {
-                yield return done with { Message = done.Message with { ExtraProperties = (done.Message.ExtraProperties ?? JsonFields.Empty)
-                    .Set("endTurn", JsonData.Parse(endTurn ? "true" : "false")) } };
-                continue;
+                if (frame is StreamDone done)
+                {
+                    var message = done.Message;
+                    if (invocation.EndTurn is { } endTurn)
+                        message = message with { ExtraProperties = (message.ExtraProperties ?? JsonFields.Empty).Set("endTurn", JsonData.Parse(endTurn ? "true" : "false")) };
+                    // processWebSocketStream: a completed response keeps the connection; the cached context remembers it for the next delta.
+                    if (invocation.Lease is { } lease && !token.IsCancellationRequested)
+                    {
+                        keep = true;
+                        if (invocation.UseCachedContext && lease.Entry is { } entry && ResponseId(message) is { } responseId)
+                            entry.Continuation = new(invocation.FullBody!, responseId, ResponseItems(message));
+                    }
+                    yield return done with { Message = WithDiagnostics(message, invocation) };
+                    continue;
+                }
+                if (frame is StreamError error)
+                {
+                    // An error after the WebSocket stream started is a failure of this transport (no SSE retry once events were emitted).
+                    if (invocation.Lease is not null && invocation.WebSocketStarted && !token.IsCancellationRequested &&
+                        error.NativeSourceException is { } failure && !IsNonTransport(failure))
+                    {
+                        AppendDiagnostic(invocation, failure, started: true);
+                        OpenAICodexWebSockets.RecordFailure(invocation.CacheSessionId, failure);
+                    }
+                    yield return error with { Message = WithDiagnostics(error.Message, invocation) };
+                    continue;
+                }
+                yield return frame;
             }
-            yield return frame;
         }
+        finally
+        {
+            if (invocation.Lease is { } lease)
+            {
+                if (!keep && lease.Entry is { } entry) entry.Continuation = null;
+                lease.Release(keep);
+            }
+        }
+    }
+
+    private static string? ResponseId(AssistantMessage message) =>
+        message.ExtraProperties is { } properties && properties.Values.TryGetValue("responseId", out var id) && id.Value.ValueKind == JsonValueKind.String ? id.Value.GetString() : null;
+
+    private static AssistantMessage WithDiagnostics(AssistantMessage message, Invocation invocation)
+    {
+        if (invocation.Diagnostics.Count == 0) return message;
+        var existing = message.ExtraProperties is { } properties && properties.Values.TryGetValue("diagnostics", out var value) && JsonNode.Parse(value.ToString()) is JsonArray array
+            ? array : new JsonArray();
+        foreach (var diagnostic in invocation.Diagnostics) existing.Add(diagnostic.DeepClone());
+        return message with { ExtraProperties = (message.ExtraProperties ?? JsonFields.Empty).Set("diagnostics", JsonData.Parse(existing.ToJsonString())) };
     }
 
     private async ValueTask<IAsyncEnumerator<JsonData>> PrepareAsync(ChatRequest request, Invocation invocation, CancellationToken token)
     {
         var token0 = await _accessToken(token).ConfigureAwait(false);
         if (string.IsNullOrEmpty(token0)) throw new InvalidOperationException($"No API key for provider: {_model.Provider}");
+        var accountId = ExtractAccountId(token0);
         var headers = BuildHeaders(token0, request.SessionId);
         var body = BuildBody(request);
         if (_options.OnPayload is { } hook && await hook(JsonData.Parse(body.ToJsonString(BodyJson)), _model, token).ConfigureAwait(false) is { } replaced)
-            body = JsonNode.Parse(replaced.ToString()) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");
-        // The Codex backend accepts zstd bodies; .NET 10 ships no zstd encoder, so the uncompressed JSON is sent (upstream's
-        // fallback when compression is unavailable).
-        var bytes = Encoding.UTF8.GetBytes(body.ToJsonString(BodyJson));
+            body = JsonNode.Parse(replaced.ToString(), documentOptions: JsonData.DocumentOptions) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");
+        var bodyJson = body.ToJsonString(BodyJson);
+        var transport = _options.Transport?.Invoke() is { Length: > 0 } configured ? configured : "auto";
+        var cacheSessionId = _options.CacheRetention == "none" ? null : _options.SessionId ?? request.SessionId;
+        invocation.CacheSessionId = cacheSessionId; invocation.ConfiguredTransport = transport;
+        invocation.RequestBytes = Encoding.UTF8.GetByteCount(bodyJson);
+        if (transport != "sse")
+        {
+            if (OpenAICodexWebSockets.IsFallbackActive(cacheSessionId)) OpenAICodexWebSockets.RecordSseFallback(cacheSessionId);
+            else if (await TryWebSocketAsync(body, token0, accountId, cacheSessionId, transport, invocation, token).ConfigureAwait(false) is { } events)
+                return RetryMissingContinuationAsync(events, invocation, async () =>
+                    await TryWebSocketAsync(body, token0, accountId, cacheSessionId, transport, invocation, token).ConfigureAwait(false)
+                    ?? await SendSseAsync(headers, bodyJson, invocation, token).ConfigureAwait(false), token).GetAsyncEnumerator(token);
+        }
+        return await SendSseAsync(headers, bodyJson, invocation, token).ConfigureAwait(false);
+    }
+
+    /// <summary>The SSE request with retries; the response's events.</summary>
+    private async ValueTask<IAsyncEnumerator<JsonData>> SendSseAsync(List<KeyValuePair<string, string>> headers, string bodyJson, Invocation invocation,
+        CancellationToken token)
+    {
+        // compressRequestBodyZstd: the SSE body is a zstd frame (Content-Encoding: zstd); the WebSocket frame above stays plain JSON.
+        var bytes = Encoding.UTF8.GetBytes(bodyJson);
+        if (CompressBody(bytes) is { } compressed) { bytes = compressed; headers.Add(new("content-encoding", "zstd")); }
         var response = await SendAsync(headers, bytes, token).ConfigureAwait(false);
         try
         {
@@ -257,6 +373,18 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             return new OwnedEnumerator(ReadEventsAsync(stream, invocation, token), response, stream);
         }
         catch { response.Dispose(); throw; }
+    }
+
+    /// <summary>The zstd frame of the body (upstream: zstdCompressSync at level 3), checked by decoding it again; null sends the plain
+    /// JSON, as upstream does when compression is unavailable or throws.</summary>
+    internal static byte[]? CompressBody(byte[] body)
+    {
+        try
+        {
+            var frame = PiSharp.AI.Compression.Zstd.Compress(body);
+            return PiSharp.AI.Compression.ZstdDecoder.Decompress(frame, body.Length).AsSpan().SequenceEqual(body) ? frame : null;
+        }
+        catch (Exception error) when (error is InvalidDataException or IndexOutOfRangeException or ArgumentException or OverflowException) { return null; }
     }
 
     private sealed class OwnedEnumerator(IAsyncEnumerable<JsonData> source, HttpResponseMessage response, Stream stream) : IAsyncEnumerator<JsonData>
@@ -284,7 +412,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new ByteArrayContent(body), Version = HttpVersion.Version11 };
                 foreach (var (name, value) in headers)
-                    if (name == "content-type") request.Content.Headers.TryAddWithoutValidation("Content-Type", value);
+                    if (name is "content-type" or "content-encoding") request.Content.Headers.TryAddWithoutValidation(name, value);
                     else request.Headers.TryAddWithoutValidation(name, value);
                 using var timeout = _options.Timeout is { } limit && limit > TimeSpan.Zero ? new CancellationTokenSource(limit, _options.Time ?? TimeProvider.System) : null;
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, timeout?.Token ?? CancellationToken.None);
@@ -364,7 +492,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         string? friendly = null;
         try
         {
-            if (JsonNode.Parse(raw) is JsonObject parsed && parsed["error"] is JsonObject error)
+            if (JsonNode.Parse(raw, documentOptions: JsonData.DocumentOptions) is JsonObject parsed && parsed["error"] is JsonObject error)
             {
                 string? Text(string name) => error[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
                 var code = Text("code") is { Length: > 0 } c ? c : Text("type") ?? "";
@@ -389,41 +517,56 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             var data = frame.Data.Trim();
             if (data.Length == 0 || data == "[DONE]") continue;
             JsonObject value;
-            try { value = JsonNode.Parse(data) as JsonObject ?? throw new JsonException("not an object"); }
-            catch (JsonException error) { throw new InvalidOperationException("Invalid Codex SSE JSON: " + error.Message); }
-            if (_options.OnProviderStreamEvent is { } hook) await hook(JsonData.Parse(value.ToJsonString()), _model, token).ConfigureAwait(false);
-            if (value["type"] is not JsonValue typeValue || !typeValue.TryGetValue<string>(out var type)) continue;
-            if (type == "error")
-            {
-                var nested = value["error"] as JsonObject;
-                string? Field(string name) => value[name] is JsonValue own && own.TryGetValue<string>(out var text) ? text
-                    : nested?[name] is JsonValue inner && inner.TryGetValue<string>(out var innerText) ? innerText : null;
-                var code = Field("code"); var message = Field("message");
-                throw new CodexApiException("Codex error: " + (!string.IsNullOrEmpty(message) ? message : !string.IsNullOrEmpty(code) ? code : value.ToJsonString()), code);
-            }
-            if (type == "response.failed")
-            {
-                var error = value["response"]?["error"] as JsonObject;
-                var message = error?["message"] is JsonValue text && text.TryGetValue<string>(out var failure) && failure.Length != 0 ? failure : "Codex response failed";
-                throw new CodexApiException(message, error?["code"]?.GetValue<string>());
-            }
-            if (type is "response.done" or "response.completed" or "response.incomplete")
-            {
-                var response = value["response"] as JsonObject ?? new JsonObject();
-                if (response["end_turn"] is JsonValue end && end.TryGetValue<bool>(out var endTurn)) invocation.EndTurn = endTurn;
-                var status = response["status"] is JsonValue statusValue && statusValue.TryGetValue<string>(out var raw) && Statuses.Contains(raw) ? raw : null;
-                // mapStopReason: failed/cancelled carry no message ("An unknown error occurred"); queued/in_progress/absent settle as stop.
-                if (status is "failed" or "cancelled") throw new InvalidOperationException("An unknown error occurred");
-                response["status"] = status == "incomplete" ? "incomplete" : "completed";
-                // resolveCodexServiceTier and Codex pricing: "default" defers to a requested flex/priority tier; "fast" is unpriced.
-                var responseTier = response["service_tier"] is JsonValue tierValue && tierValue.TryGetValue<string>(out var tier) ? tier : null;
-                var resolvedTier = responseTier == "default" && _options.ServiceTier is "flex" or "priority" ? _options.ServiceTier : responseTier ?? _options.ServiceTier;
-                response["service_tier"] = resolvedTier is "flex" or "priority" ? resolvedTier : "default";
-                yield return JsonData.Parse(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = response.DeepClone() }.ToJsonString());
-                yield break;
-            }
-            yield return JsonData.Parse(value.ToJsonString());
+            // JSON.parse keeps a lone surrogate in a string.
+            try { value = JsonUtf16.MutableNode(data) as JsonObject ?? throw new JsonException("not an object"); }
+            catch (JsonException error) { throw new CodexProtocolException("Invalid Codex SSE JSON: " + error.Message); }
+            var (mapped, completed) = await MapEventAsync(value, invocation, token).ConfigureAwait(false);
+            if (mapped is { } next) yield return next;
+            if (completed) yield break;
         }
+    }
+
+    /// <summary>mapCodexEvents for one event: the onProviderStreamEvent hook, then "error" and "response.failed" as Codex API errors, the
+    /// terminal events normalized to response.completed or response.incomplete (ending the stream), anything else passed on. Events
+    /// without a type are dropped.</summary>
+    private async ValueTask<(JsonData? Event, bool Completed)> MapEventAsync(JsonObject value, Invocation invocation, CancellationToken token)
+    {
+        if (_options.OnProviderStreamEvent is { } hook)
+        {
+            try { await hook(JsonData.Parse(JsonUtf16.ToJsonString(value)), _model, token).ConfigureAwait(false); }
+            catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
+            { throw new ProviderStreamEventCallbackException(error); }
+        }
+        if (value["type"] is not JsonValue typeValue || !typeValue.TryGetValue<string>(out var type)) return (null, false);
+        if (type == "error")
+        {
+            var nested = value["error"] as JsonObject;
+            string? Field(string name) => value[name] is JsonValue own && own.TryGetValue<string>(out var text) ? text
+                : nested?[name] is JsonValue inner && inner.TryGetValue<string>(out var innerText) ? innerText : null;
+            var code = Field("code"); var message = Field("message");
+            throw new CodexApiException("Codex error: " + (!string.IsNullOrEmpty(message) ? message : !string.IsNullOrEmpty(code) ? code : JsonUtf16.ToJsonString(value)), code);
+        }
+        if (type == "response.failed")
+        {
+            var error = value["response"]?["error"] as JsonObject;
+            var message = error?["message"] is JsonValue text && text.TryGetValue<string>(out var failure) && failure.Length != 0 ? failure : "Codex response failed";
+            throw new CodexApiException(message, error?["code"] is JsonValue codeValue && codeValue.TryGetValue<string>(out var errorCode) ? errorCode : null);
+        }
+        if (type is "response.done" or "response.completed" or "response.incomplete")
+        {
+            var response = value["response"] as JsonObject ?? new JsonObject();
+            if (response["end_turn"] is JsonValue end && end.TryGetValue<bool>(out var endTurn)) invocation.EndTurn = endTurn;
+            var status = response["status"] is JsonValue statusValue && statusValue.TryGetValue<string>(out var raw) && Statuses.Contains(raw) ? raw : null;
+            // mapStopReason: failed/cancelled carry no message ("An unknown error occurred"); queued/in_progress/absent settle as stop.
+            if (status is "failed" or "cancelled") throw new InvalidOperationException("An unknown error occurred");
+            response["status"] = status == "incomplete" ? "incomplete" : "completed";
+            // resolveCodexServiceTier and Codex pricing: "default" defers to a requested flex/priority tier; "fast" is unpriced.
+            var responseTier = response["service_tier"] is JsonValue tierValue && tierValue.TryGetValue<string>(out var tier) ? tier : null;
+            var resolvedTier = responseTier == "default" && _options.ServiceTier is "flex" or "priority" ? _options.ServiceTier : responseTier ?? _options.ServiceTier;
+            response["service_tier"] = resolvedTier is "flex" or "priority" ? resolvedTier : "default";
+            return (JsonData.Parse(JsonUtf16.ToJsonString(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = JsonUtf16.MutableNode(JsonUtf16.ToJsonString(response)) })), true);
+        }
+        return (JsonData.Parse(JsonUtf16.ToJsonString(value)), false);
     }
 
     private static JsonData Observation(HttpResponseMessage response)

@@ -34,7 +34,8 @@ If the install can't run (offline, no npm, or a failed install), extensions stil
 
 The whole `ExtensionAPI`: tools, commands, shortcuts, flags, message and tool renderers, providers (chat, classifier and image), virtual models, MCP servers, the event bus, and every extension event. `ctx.ui` dialogs, widgets and custom components show in the terminal UI and over RPC.
 
-## Differences from Pi
+`ctx.ui.setTheme()` switches the theme in the terminal UI and saves it, as in Pi. `pi.sendMessage(…, { triggerTurn: true })` starts its turn at once, also from inside a command's handler. Packages loaded with `-e` add their skills, prompt templates and themes as well as their extensions.
 
-- `ctx.ui.setTheme()` returns an error. Choose a theme in `/settings` instead.
-- `pi.sendMessage(…, { triggerTurn: true })` from inside a command starts its turn after the command's handler returns. In Pi the turn starts while the handler is still running. A handler that runs longer than about 30 seconds drops the message.
+Pi's built-in extensions (`mcp`, `llama.cpp`, `codemode` and `tool-search`) are extensions here too, and an extension that registers its own `codemode` or `tool_search` tool or `/mcp` command replaces the built-in one. See [Built-in extensions](/docs/reference/configuration/#built-in-extensions).
+
+The [Parity](/parity/) page lists the differences that remain.

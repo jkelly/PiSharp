@@ -250,7 +250,8 @@ internal static class CompletionsRequestFactoryTests
         Throws(CompletionsRequestFailure.ResourceLimit, () => new CompletionsTranscriptProjector(new(MaximumJsonDepth: 2)).Project(Request(E("""{"role":"user","content":"ok","opaque":{"deep":[]},"timestamp":0}"""))));
         // Both user/tool images now have source-backed projection; unsupported audio remains rejected.
         Throws(CompletionsRequestFailure.UnsupportedContent, () => Factory().Create(Request(E("""{"role":"toolResult","toolCallId":"audio-call","toolName":"probe","content":[{"type":"audio","data":"a","mimeType":"audio/wav"}],"timestamp":0}""")), Key));
-        Throws(CompletionsRequestFailure.InvalidTranscript, () => Factory().Create(Request(E("""{"role":"user","content":"\ud800","timestamp":0}""")), Key));
+        // A string value may hold a lone surrogate (Pi keeps it); the agent's TranscriptSurrogates drops it from message text first.
+        _ = Factory().Create(Request(E("""{"role":"user","content":"\ud800","timestamp":0}""")), Key);
         using (var permissive = JsonDocument.Parse("{\"role\":\"user\",\"content\":\"ok\",\"timestamp\":0,}", new() { AllowTrailingCommas = true }))
             Throws(CompletionsRequestFailure.InvalidTranscript, () => Factory().Create(Request(new TranscriptEntry("user", JsonData.FromElement(permissive.RootElement))), Key));
         using (var permissive = JsonDocument.Parse("{\"role\":\"system\",\"content\":\"ok\",\"opaque\":{/*retained*/\"keep\":null},\"timestamp\":0}", new() { CommentHandling = JsonCommentHandling.Skip }))

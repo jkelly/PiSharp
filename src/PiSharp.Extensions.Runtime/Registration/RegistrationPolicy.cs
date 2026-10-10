@@ -38,6 +38,9 @@ public sealed record ExtensionRegistryOptions
     /// (Pi's runner reads its extensions' live handler maps: an owner activated or a handler registered after the session bound, as
     /// a reload rebuilds the extension runtime, takes part in the next dispatch).</summary>
     public bool FollowCurrentSnapshot { get; init; }
+    /// <summary>JSON values (tool results, session entries, events) may hold lone surrogates in names and strings, as JavaScript values
+    /// do (the Pi entry: runner.ts and agent-loop.ts pass whatever an extension or the session holds); otherwise they are refused.</summary>
+    public bool KeepsLoneSurrogates { get; init; }
 }
 
 public enum ExtensionRegistrationFailure
@@ -79,7 +82,7 @@ internal static class RegistrationPolicy
         if (options.MaximumOwners <= 0 || options.MaximumRegistrations <= 0 ||
             options.MaximumRegistrationsPerOwner <= 0 || options.MaximumMetadataCharacters <= 0 ||
             options.MaximumIdentifierCharacters <= 0 || options.MaximumDescriptionCharacters < 0 ||
-            options.MaximumJsonCharacters <= 0 || options.MaximumJsonDepth is < 1 or > 64 ||
+            options.MaximumJsonCharacters <= 0 || options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             options.MaximumConcurrentDispatches <= 0 || options.MaximumSessionBranchEntries <= 0 || options.MaximumSessionCharacters <= 0 ||
             options.MaximumSessionUtf8Bytes <= 0 || options.ReservedToolNames.IsDefault ||
             options.ReservedCommandNames.IsDefault || options.ReservedToolNames.Length > 256 ||
@@ -113,7 +116,7 @@ internal static class RegistrationPolicy
             // FromElement may retain permissive comments/trailing commas. Validate retained syntax before traversal.
             using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = options.MaximumJsonDepth });
             return (!requireObject || document.RootElement.ValueKind == JsonValueKind.Object) &&
-                JsonValue(document.RootElement, retainOpaqueNumbers);
+                JsonValue(document.RootElement, retainOpaqueNumbers, options.KeepsLoneSurrogates);
         }
         catch (Exception error) when (error is JsonException or InvalidOperationException or ArgumentException)
         {
@@ -121,19 +124,23 @@ internal static class RegistrationPolicy
         }
     }
 
-    private static bool JsonValue(JsonElement value, bool retainOpaqueNumbers)
+    private static bool JsonValue(JsonElement value, bool retainOpaqueNumbers, bool loneSurrogates)
     {
         switch (value.ValueKind)
         {
             case JsonValueKind.Object:
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in value.EnumerateObject())
-                    if (!Scalars(property.Name) || !names.Add(property.Name) || !JsonValue(property.Value, retainOpaqueNumbers)) return false;
+                {
+                    var name = JsonUtf16.GetName(property);
+                    if (!loneSurrogates && !Scalars(name) || !names.Add(name) || !JsonValue(property.Value, retainOpaqueNumbers, loneSurrogates)) return false;
+                }
                 return true;
             case JsonValueKind.Array:
-                return value.EnumerateArray().All(item => JsonValue(item, retainOpaqueNumbers));
+                return value.EnumerateArray().All(item => JsonValue(item, retainOpaqueNumbers, loneSurrogates));
             case JsonValueKind.String:
-                return Scalars(value.GetString()!);
+                var text = JsonUtf16.GetString(value);
+                return loneSurrogates || Scalars(text);
             case JsonValueKind.Number:
                 return retainOpaqueNumbers || value.TryGetDouble(out var number) && double.IsFinite(number);
             default:

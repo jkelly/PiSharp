@@ -166,7 +166,10 @@ public sealed class McpPreparedServer : IAsyncDisposable
             await Task.WhenAll(originals).ConfigureAwait(false);
             // index.ts session_shutdown records nothing: the tools leave with the session. Only a close while the session
             // continues (disable, reconnect with a new configuration, reload) withdraws them durably.
-            var withdrew = registrationIds.IsEmpty || transaction.IsSessionShutdown && !DurableWithdrawalOnShutdown;
+            // An attachment whose lifetime ended is being replaced by a runtime generation (a reload loading or leaving out built-in
+            // extensions) with a catalog of its own without these tools: there is nothing to withdraw from it.
+            var withdrew = registrationIds.IsEmpty || transaction.IsSessionShutdown && !DurableWithdrawalOnShutdown ||
+                attachment.LifetimeToken.IsCancellationRequested;
             // Withdrawal is host-owned; runtime close only marks its borrowed metadata disconnected.
             // Last committed ownership is retained until the same durable catalog boundary acknowledges.
             if (!withdrew)

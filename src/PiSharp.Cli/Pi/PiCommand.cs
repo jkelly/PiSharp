@@ -66,6 +66,8 @@ internal sealed record PiHost
     /// <summary>The child processes package commands and package resolution run (npm, git), given the host's stdout and stderr; null
     /// runs the user's own tools with this process's environment.</summary>
     internal Func<TextWriter, TextWriter, PiSharp.Cli.Packages.PiPackageProcesses>? PackageProcesses { get; init; }
+    /// <summary>Adjusts the <c>mcp</c> command's collaborators (tests: fake channels and stores); null keeps the defaults.</summary>
+    internal Func<McpCommandOptions, McpCommandOptions>? ConfigureMcp { get; init; }
 }
 
 /// <summary>An exit decided by the entry after its messages were written.</summary>
@@ -79,6 +81,14 @@ internal static class PiCommand
     /// <summary>Source isTruthyEnvFlag.</summary>
     internal static bool IsTruthyEnvFlag(string? value) =>
         !string.IsNullOrEmpty(value) && (value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase) || value.Equals("yes", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>http-dispatcher.ts applyHttpProxySettings: the global httpProxy fills HTTP_PROXY and HTTPS_PROXY when they are unset.</summary>
+    private static void ApplyHttpProxy(PiHost host, JsonObject global)
+    {
+        if (global["httpProxy"] is JsonValue proxyValue && proxyValue.TryGetValue<string>(out var proxy) && PiArgs.JsTrim(proxy) is { Length: > 0 } trimmedProxy)
+            foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY" })
+                if (host.GetEnvironment(name) is null) host.SetEnvironment(name, trimmedProxy);
+    }
 
     internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken cancellationToken)
     {
@@ -105,9 +115,23 @@ internal static class PiCommand
         var offline = args.Contains("--offline") || IsTruthyEnvFlag(host.GetEnvironment("PI_OFFLINE"));
         if (offline) { host.SetEnvironment("PI_OFFLINE", "1"); host.SetEnvironment("PI_SKIP_VERSION_CHECK", "1"); }
         if (args.Length > 0 && args[0] == "auth") return await PiAuthCommand.RunAsync(args, host, token).ConfigureAwait(false);
+        // main.ts: the bootstrap settings (project untrusted) apply the global httpProxy before the package, config and mcp commands.
+        ApplyHttpProxy(host, PiSettings.Load(host.Cwd, PiPaths.AgentDirectory(host.GetEnvironment, host.Home), projectTrusted: false).Global);
         if (args.Length > 0 && PackageCommands.Contains(args[0]))
             return await PiSharp.Cli.Packages.PiPackageCommands.RunAsync(args, host, token).ConfigureAwait(false) ??
                 await PiSharp.Cli.Packages.PiPackageCommands.RunConfigAsync(args, host, token).ConfigureAwait(false) ?? 1;
+        // main.ts: `mcp` runs runMcpCommand(args.slice(1), { cwd, agentDir }) after that setup, before the main argument parser.
+        if (args.Length > 0 && args[0] == "mcp")
+        {
+            var mcpAgentDir = PiPaths.AgentDirectory(host.GetEnvironment, host.Home);
+            var mcpOptions = new McpCommandOptions(host.Cwd, mcpAgentDir)
+            {
+                HomeDirectory = host.Home, Environment = host.GetEnvironment, IsProjectTrusted = PiProjectTrust.CreateResolver(mcpAgentDir, host.Home)
+            };
+            var mcpCode = await McpCommand.RunAsync(args[1..], host.Stdout, host.Stderr, host.ConfigureMcp?.Invoke(mcpOptions) ?? mcpOptions, token).ConfigureAwait(false);
+            await host.Stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+            return mcpCode;
+        }
 
         host.Timings.ResetTimings();
         var parsed = PiArgs.Parse(args);
@@ -138,10 +162,7 @@ internal static class PiCommand
         host.Timings.Time("runMigrations");
         var startupSettings = PiSettings.Load(cwd, agentDir, projectTrusted: true);
         var startupDiagnostics = startupSettings.DrainDiagnostics();
-        // http-dispatcher.ts applyHttpProxySettings: the global httpProxy fills HTTP_PROXY and HTTPS_PROXY when they are unset.
-        if (startupSettings.Global["httpProxy"] is JsonValue proxyValue && proxyValue.TryGetValue<string>(out var proxy) && PiArgs.JsTrim(proxy) is { Length: > 0 } trimmedProxy)
-            foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY" })
-                if (host.GetEnvironment(name) is null) host.SetEnvironment(name, trimmedProxy);
+        ApplyHttpProxy(host, startupSettings.Global);
 
         if (parsed.Help)
         {
@@ -161,7 +182,34 @@ internal static class PiCommand
         if (parsed.ListModels is { } search)
         {
             await Report(startupDiagnostics).ConfigureAwait(false);
-            var registry = await host.LiveRuntime.CreateModelRegistryAsync(token).ConfigureAwait(false);
+            // main.ts: --list-models lists the runtime's models after createAgentSessionRuntime loaded the extensions (no trust prompt in
+            // this pass): their providers join the registry, and a built-in llama.cpp extension that is not loaded registers none.
+            var listRuntime = host.LiveRuntime;
+            PiExtensionRun? listRun = null;
+            if (host.LoadExtensions is null)
+            {
+                var listTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
+                listRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, listTrusted, "print", false, null, token).ConfigureAwait(false);
+                PiSharp.Cli.Packages.PiResolvedPaths listPackages;
+                try
+                {
+                    listPackages = await new PiSharp.Cli.Packages.PiPackageManager(cwd, agentDir, home, PiSettings.Load(cwd, agentDir, listTrusted), host.GetEnvironment,
+                        host.PackageProcesses?.Invoke(err, err) ?? new() { Output = err, ErrorOutput = err }, PiBuiltinExtensions.Names)
+                        .ResolveAsync(cancellationToken: token).ConfigureAwait(false);
+                }
+                catch (PiSharp.Cli.Packages.PiPackageException) { listPackages = PiSharp.Cli.Packages.PiResolvedPaths.Empty; }
+                var listBuiltins = new PiBuiltinExtensions(PiBuiltinExtensions.Resolve(parsed.Extensions, listPackages, parsed.NoExtensions,
+                    parsed.NoMcp ? [PiBuiltinExtensions.Mcp] : [], listRun.Host?.Extensions ?? []).Enabled);
+                listRuntime = listRuntime with { LlamaProvider = () => listBuiltins.IsEnabled(PiBuiltinExtensions.Llama) };
+                if (listRun.Host is { } listHost)
+                {
+                    var configured = listRuntime.ConfigureRegistry;
+                    var authPath = listRuntime.AuthPath; var time = listRuntime.Time;
+                    listRuntime = listRuntime with { ConfigureRegistry = registry => { configured?.Invoke(registry); listHost.RegisterProviders(registry, authPath, time); listHost.RegisterVirtualModels(registry); } };
+                }
+            }
+            await using var listed = listRun;
+            var registry = await listRuntime.CreateModelRegistryAsync(token).ConfigureAwait(false);
             await PiSharp.Cli.Models.ModelListing.ListAsync(registry, search.Length == 0 ? null : search, console, err, cancellationToken: token).ConfigureAwait(false);
             await console.FlushAsync(token).ConfigureAwait(false);
             return 0;
@@ -241,12 +289,34 @@ internal static class PiCommand
         {
             var packageOutput = appMode == PiAppMode.Interactive ? host.Stdout : err;
             packageResources = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, settings, host.GetEnvironment,
-                host.PackageProcesses?.Invoke(packageOutput, err) ?? new() { Output = packageOutput, ErrorOutput = err }).ResolveAsync(cancellationToken: token).ConfigureAwait(false);
+                host.PackageProcesses?.Invoke(packageOutput, err) ?? new() { Output = packageOutput, ErrorOutput = err }, PiBuiltinExtensions.Names)
+                .ResolveAsync(cancellationToken: token).ConfigureAwait(false);
         }
         catch (PiSharp.Cli.Packages.PiPackageException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
+        // resource-loader.ts: the builtin: extension paths of -e and resolve() (main.ts disabledBuiltinExtensions: --no-mcp leaves mcp
+        // out), less the replaceable ones another loaded extension takes over from.
+        string[] disabledBuiltins = parsed.NoMcp ? [PiBuiltinExtensions.Mcp] : [];
+        var builtinResolution = PiBuiltinExtensions.Resolve(parsed.Extensions, packageResources, parsed.NoExtensions, disabledBuiltins, extensionRun?.Host?.Extensions ?? []);
+        var builtins = new PiBuiltinExtensions(builtinResolution.Enabled);
+        builtins.SetScopes(packageResources);
+        runtimeDiagnostics.AddRange([.. builtinResolution.Errors, .. builtinResolution.Warnings]);
+        // resource-loader.ts reload: packageManager.resolveExtensionSources(-e sources, temporary) contributes the -e packages' skills,
+        // prompts and themes as well as their extensions (their enabled resources lead each list).
+        async Task<PiSharp.Cli.Packages.PiResolvedPaths?> ExtensionSourcesAsync(PiSettings sourceSettings, TextWriter output, TextWriter errorOutput, CancellationToken sourceToken)
+        {
+            if (parsed.Extensions is not { Count: > 0 } sources) return null;
+            try
+            {
+                return await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, sourceSettings, host.GetEnvironment,
+                    host.PackageProcesses?.Invoke(output, errorOutput) ?? new() { Output = output, ErrorOutput = errorOutput })
+                    .ResolveExtensionSourcesAsync(sources, temporary: true, cancellationToken: sourceToken).ConfigureAwait(false);
+            }
+            catch (PiSharp.Cli.Packages.PiPackageException) { return null; } // The extension loader reports the failed source.
+        }
+        var extensionSources = await ExtensionSourcesAsync(settings, appMode == PiAppMode.Interactive ? host.Stdout : err, err, token).ConfigureAwait(false);
         var resources = PiResources.Discover(new(sessionCwd, agentDir, home, settings, projectTrusted)
         {
-            Packages = packageResources,
+            Packages = packageResources, ExtensionSources = extensionSources,
             CliSkills = [.. parsed.Skills ?? []], CliPromptTemplates = [.. parsed.PromptTemplates ?? []], CliThemes = [.. parsed.Themes ?? []],
             NoSkills = parsed.NoSkills, NoPromptTemplates = parsed.NoPromptTemplates, NoThemes = parsed.NoThemes, NoContextFiles = parsed.NoContextFiles,
             SystemPrompt = parsed.SystemPrompt, AppendSystemPrompt = parsed.AppendSystemPrompt is null ? default : [.. parsed.AppendSystemPrompt]
@@ -280,13 +350,18 @@ internal static class PiCommand
             try
             {
                 reloadPackages = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, reloadSettings, host.GetEnvironment,
-                    host.PackageProcesses?.Invoke(TextWriter.Null, TextWriter.Null) ?? new() { Output = TextWriter.Null, ErrorOutput = TextWriter.Null })
-                    .ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
+                    host.PackageProcesses?.Invoke(TextWriter.Null, TextWriter.Null) ?? new() { Output = TextWriter.Null, ErrorOutput = TextWriter.Null },
+                    PiBuiltinExtensions.Names).ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
             }
             catch (PiSharp.Cli.Packages.PiPackageException) { reloadPackages = packageResources; }
+            // The reload resolves the built-in extensions again over the reloaded settings and extensions.
+            builtins.Set(PiBuiltinExtensions.Resolve(parsed.Extensions, reloadPackages, parsed.NoExtensions, disabledBuiltins,
+                activation?.Pi?.Extensions ?? extensionRun?.Host?.Extensions ?? []).Enabled);
+            builtins.SetScopes(reloadPackages);
+            var reloadSources = await ExtensionSourcesAsync(reloadSettings, TextWriter.Null, TextWriter.Null, reloadToken).ConfigureAwait(false) ?? extensionSources;
             var reloaded = PiResources.WithDiscovered(PiResources.Discover(new(sessionCwd, agentDir, home, reloadSettings, projectTrusted)
             {
-                Packages = reloadPackages,
+                Packages = reloadPackages, ExtensionSources = reloadSources,
                 CliSkills = [.. parsed.Skills ?? []], CliPromptTemplates = [.. parsed.PromptTemplates ?? []], CliThemes = [.. parsed.Themes ?? []],
                 NoSkills = parsed.NoSkills, NoPromptTemplates = parsed.NoPromptTemplates, NoThemes = parsed.NoThemes, NoContextFiles = parsed.NoContextFiles,
                 SystemPrompt = parsed.SystemPrompt, AppendSystemPrompt = parsed.AppendSystemPrompt is null ? default : [.. parsed.AppendSystemPrompt]
@@ -310,7 +385,12 @@ internal static class PiCommand
         long idleTimeout;
         try { idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged); }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
-        var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout) };
+        // sdk.ts transport: settingsManager.getTransport() ("auto" by default); /settings changes it for the running session.
+        PiTransportSetting.Start(settings.String("transport"));
+        var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout),
+            Transport = host.LiveRuntime.Transport ?? (() => PiTransportSetting.Current()),
+            // extensions/llama: the llama.cpp provider is the built-in llama.cpp extension's registration.
+            LlamaProvider = () => builtins.IsEnabled(PiBuiltinExtensions.Llama) };
         // runner.ts bindCore: the providers and virtual models the extensions registered join every model registry the run builds
         // (model selection, the live routes and model switching), including ones registered later.
         if (extensionRun?.Host is { } virtualHost)
@@ -380,10 +460,10 @@ internal static class PiCommand
         var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics]);
         if (appMode != PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
         // main.ts: runtime errors (an extension that failed to load, an unknown extension flag) stop the run in every mode.
-        if (extensionRun?.Diagnostics.Any(diagnostic => diagnostic.Type == "error") == true)
+        if (extensionRun?.Diagnostics.Any(diagnostic => diagnostic.Type == "error") == true || !builtinResolution.Errors.IsEmpty)
         {
             if (appMode == PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
-            if (extensionRun.HasLoadErrors) await Line(err, Paint(Yellow, PiExtensionLoading.LoadFailureHint)).ConfigureAwait(false);
+            if (extensionRun?.HasLoadErrors == true || !builtinResolution.Errors.IsEmpty) await Line(err, Paint(Yellow, PiExtensionLoading.LoadFailureHint)).ConfigureAwait(false);
             return 1;
         }
         if (IsTruthyEnvFlag(host.GetEnvironment("PI_STARTUP_BENCHMARK")) && appMode != PiAppMode.Interactive)
@@ -401,6 +481,11 @@ internal static class PiCommand
             Home = Path.GetFullPath(home)
         };
         var trustedDirectories = new Dictionary<string, bool>(PiPaths.Comparer) { [Path.GetFullPath(sessionCwd)] = projectTrusted };
+        // agent-session.ts: the session's queue-mode and auto-compaction/retry setters save the global settings through the settings
+        // manager (the interactive mode saves through its own settings).
+        var settingsWriter = appMode == PiAppMode.Interactive ? null : new PiSharp.Cli.Interactive.Mode.InteractiveSettings(sessionCwd, agentDir, projectTrusted, host.GetEnvironment);
+        // The built-in /mcp outside interactive mode acts on the current MCP generation's server manager.
+        PiSharp.Cli.Mcp.McpServerManager? mcpManager = null;
         var options = new PiEntryOptions
         {
             ToolPolicy = toolPolicy, Settings = startupSnapshot, Selection = selection, LiveRuntime = runtime,
@@ -419,12 +504,28 @@ internal static class PiCommand
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
-            Extensions = extensionRun?.Host, ExtensionMode = extensionMode,
+            Extensions = extensionRun?.Host, ExtensionMode = extensionMode, BuiltinExtensions = builtins,
+            McpManager = appMode == PiAppMode.Interactive ? null : () => Volatile.Read(ref mcpManager),
+            PersistGlobalSetting = settingsWriter is null ? null : (key, value) =>
+            {
+                switch (key)
+                {
+                    case "steeringMode": settingsWriter.SetSteeringMode(value.GetValue<string>()); break;
+                    case "followUpMode": settingsWriter.SetFollowUpMode(value.GetValue<string>()); break;
+                    case "compaction.enabled": settingsWriter.SetCompactionEnabled(value.GetValue<bool>()); break;
+                    case "retry.enabled": settingsWriter.SetRetryEnabled(value.GetValue<bool>()); break;
+                }
+            },
             Interactive = appMode == PiAppMode.Interactive ? new(agentDir, home, sessionCwd, sessionDir, sessionDir is null, resources, projectTrusted, plan.Mode) : null
         };
         var sessionArgs = SessionArguments(plan, parsed);
         // The project .pi/mcp.json is read only for a trusted project (IMPL-H seam): the run's own trust answer.
         var mcpHost = host.CreateMcpHost(agentDir) is { } createdHost ? createdHost with { IsProjectTrusted = options.ProjectTrusted } : null;
+        if (mcpHost is not null && appMode != PiAppMode.Interactive)
+        {
+            var observe = mcpHost.ObserveManager;
+            mcpHost = mcpHost with { ObserveManager = manager => { observe?.Invoke(manager); Volatile.Write(ref mcpManager, manager); } };
+        }
         using var entered = options.Enter();
         // print-mode.ts/rpc-mode.ts registerSignalHandlers: SIGTERM (and SIGHUP off Windows) shut the host down gracefully, then the
         // process exits 143 (129). Interactive mode keeps the terminal's own handling.
@@ -447,6 +548,7 @@ internal static class PiCommand
                 {
                     var code = await RpcSessionCommand.RunWithPresentationAsync(["session", "rpc", .. sessionArgs], input, output, err, null!, runToken,
                         userShutdown: userShutdown, mcpHost: mcpHost, javaScriptInput: true).ConfigureAwait(false);
+                    if (settingsWriter is not null) await settingsWriter.FlushAsync().ConfigureAwait(false);
                     return signals?.Exit(code) ?? code;
                 }
             }
@@ -460,6 +562,7 @@ internal static class PiCommand
             default:
             {
                 var code = await PiPrintMode.RunAsync(["session", "rpc", .. sessionArgs], appMode == PiAppMode.Json, plan, options, host, mcpHost, runToken, userShutdown).ConfigureAwait(false);
+                if (settingsWriter is not null) await settingsWriter.FlushAsync().ConfigureAwait(false);
                 return signals?.Exit(code) ?? code;
             }
         }

@@ -103,7 +103,7 @@ internal static partial class PiSessions
                 if (scanned > MaximumHeaderScanBytes + 1) return null;
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 JsonNode? node;
-                try { node = JsonNode.Parse(line); } catch (JsonException) { continue; }
+                try { node = JsonNode.Parse(line, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions); } catch (JsonException) { continue; }
                 return node is JsonObject entry && Text(entry, "type") == "session" && entry["id"] is JsonValue id && id.GetValueKind() == JsonValueKind.String ? entry : null;
             }
             return null;
@@ -125,7 +125,7 @@ internal static partial class PiSessions
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 JsonNode? node;
-                try { node = JsonNode.Parse(line); } catch (JsonException) { continue; }
+                try { node = JsonNode.Parse(line, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions); } catch (JsonException) { continue; }
                 if (node is not JsonObject entry || Text(entry, "type") is null or "session" || Text(entry, "id") is not { } id) continue;
                 byId[id] = entry; leaf = id;
             }
@@ -248,7 +248,7 @@ internal static partial class PiSessions
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 JsonObject? entry;
-                try { entry = JsonNode.Parse(line) as JsonObject; } catch (JsonException) { continue; }
+                try { entry = JsonNode.Parse(line, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) as JsonObject; } catch (JsonException) { continue; }
                 if (entry is null) continue;
                 if (header is null) { if (Text(entry, "type") != "session") return null; header = entry; continue; }
                 if (Text(entry, "type") == "session_info") name = Text(entry, "name") is { } raw && PiArgs.JsTrim(raw).Length > 0 ? PiArgs.JsTrim(raw) : null;
@@ -288,7 +288,7 @@ internal static partial class PiSessions
         foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
-            try { if (JsonNode.Parse(line) is JsonObject entry) entries.Add(entry); } catch (JsonException) { }
+            try { if (JsonNode.Parse(line, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) is JsonObject entry) entries.Add(entry); } catch (JsonException) { }
         }
         if (entries.Count == 0 || Text(entries[0], "type") != "session" || entries[0]["id"] is not JsonValue)
             throw new PiSessionException($"Cannot fork: source session file is empty or invalid: {source}");

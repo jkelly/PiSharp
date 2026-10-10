@@ -27,7 +27,7 @@ pisharp mcp <add|remove|list|login|logout>
 | `pisharp --mode rpc` | Speaks Pi's RPC protocol over stdin and stdout. |
 | `pisharp --export <file> [output]` | Writes a session file as HTML and exits. |
 
-When stdin or stdout is redirected, PiSharp uses print mode, as Pi does. `@path` arguments add a text file or image to the first prompt. Piped stdin is added in front of the first prompt.
+When stdin or stdout is redirected, PiSharp uses print mode, as Pi does. Automatic compaction runs in every mode; in print mode a "prompt is too long" error compacts the session and retries, as in Pi. `@path` arguments add a text file or image to the first prompt. Piped stdin is added in front of the first prompt.
 
 ## Common options
 
@@ -44,9 +44,9 @@ When stdin or stdout is redirected, PiSharp uses print mode, as Pi does. `@path`
 | `--no-session` | Keeps the session in memory only. |
 | `-t`, `--tools <list>` | Tool allowlist. `+name` and `-name` change the defaults instead. |
 | `-xt`, `--exclude-tools <list>` | Tools to turn off, MCP tools included. |
-| `-e`, `--extension <path>` | Loads an extension or package for this run. Repeatable. |
-| `-ne`, `--no-extensions` | Turns off discovered extensions. `-e` still works. |
-| `--no-mcp` | No MCP servers and no MCP tools. |
+| `-e`, `--extension <path>` | Loads an extension or package for this run, with its skills, prompt templates and themes. `-e builtin:<name>` loads a [built-in extension](/docs/reference/configuration/#built-in-extensions). Repeatable. |
+| `-ne`, `--no-extensions` | Turns off discovered and built-in extensions. `-e` still works. |
+| `--no-mcp` | No MCP servers and no MCP tools: the `mcp` built-in extension stays out. |
 | `-a`, `--approve` / `-na`, `--no-approve` | Trusts, or ignores, project files for this run. |
 | `--offline` | No startup network use. Same as `PI_OFFLINE=1`. |
 | `-v`, `--version` | Prints the PiSharp version. |

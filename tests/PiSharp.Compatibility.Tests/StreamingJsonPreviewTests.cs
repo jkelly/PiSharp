@@ -98,7 +98,7 @@ static class StreamingJsonPreviewTests
         Equal(StreamingJsonPreviewFailure.DuplicateProperty, ThrowsPreview(() => new StreamingJsonPreview().Parse("{\"private-key\":1,\"private-key\":2}")).Failure);
         var privateError = ThrowsPreview(() => new StreamingJsonPreview(new(MaximumCharacters: 1)).Parse("private-payload"));
         Assert(!privateError.Message.Contains("private", StringComparison.Ordinal), "Rejected payload leaked in diagnostic.");
-        foreach (var options in new[] { new StreamingJsonPreviewOptions(MaximumCharacters: 0), new(MaximumDepth: 0), new(MaximumDepth: 65) })
+        foreach (var options in new[] { new StreamingJsonPreviewOptions(MaximumCharacters: 0), new(MaximumDepth: 0), new(MaximumDepth: 1001) })
         {
             try { _ = new StreamingJsonPreview(options); throw new Exception("Invalid preview options accepted."); }
             catch (ArgumentOutOfRangeException) { }

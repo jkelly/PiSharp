@@ -54,10 +54,10 @@ internal sealed partial class PiExtensionHost
                 {
                     var path = item.GetProperty("path").GetString()!;
                     if (item.TryGetProperty("error", out var error)) { var failure = new PiExtensionLoadError(path, error.GetString() ?? "Failed to load extension"); _errors.Add(failure); errors.Add(failure); continue; }
-                    var descriptor = JsonNode.Parse(item.GetProperty("extension").GetRawText())!.AsObject();
+                    var descriptor = PiSharp.Contracts.JsonUtf16.MutableNode(item.GetProperty("extension").GetRawText())!.AsObject();
                     _extensions.Add(new(descriptor["index"]!.GetValue<int>(), path, descriptor["resolvedPath"]!.GetValue<string>()) { Descriptor = descriptor, Generation = generation });
                 }
-                foreach (var flag in reloaded.GetProperty("flagValues").EnumerateObject()) _flagValues[flag.Name] = JsonNode.Parse(flag.Value.GetRawText());
+                foreach (var flag in reloaded.GetProperty("flagValues").EnumerateObject()) _flagValues[flag.Name] = PiSharp.Contracts.JsonUtf16.MutableNode(flag.Value.GetRawText());
             }
             previous = _owners; _owners = [];
         }

@@ -13,12 +13,20 @@ public static class PiRequestBudget
     public const int RequestPayloadBytes = 64 * 1024 * 1024;
     /// <summary>One projected request message, such as a tool result or user message carrying an image.</summary>
     public const int RequestEntryCharacters = 16 * 1024 * 1024;
-    /// <summary>One streamed event, content block or accumulated assistant message.</summary>
-    public const int StreamCharacters = 16 * 1024 * 1024;
-    /// <summary>All streamed data of one response.</summary>
-    public const int StreamTotalCharacters = 64 * 1024 * 1024;
+    /// <summary>
+    /// V8's <c>String::kMaxLength</c> on 64-bit Node 22, the runtime Pi 1.1.0 requires (<c>buffer.constants.MAX_STRING_LENGTH</c>): the
+    /// longest JavaScript string, in UTF-16 code units. Pi bounds nothing itself, so the longest string is what it can actually process:
+    /// an SSE event's data, a content block or a whole session file read into one string.
+    /// </summary>
+    public const int JavaScriptStringLength = 536_870_888;
+    /// <summary>One streamed event, content block or accumulated assistant message: the longest string Pi's SDKs can hold
+    /// (formerly 16 MiB).</summary>
+    public const int StreamCharacters = JavaScriptStringLength;
+    /// <summary>All streamed data of one response (formerly 64 MiB). Pi keeps a response's strings on the heap with no total; this is
+    /// an out-of-memory ceiling of two of the longest strings (2 GiB of UTF-16).</summary>
+    public const int StreamTotalCharacters = 2 * JavaScriptStringLength;
     /// <summary>The largest value an options record admits for these bounds.</summary>
-    public const int MaximumBound = 256 * 1024 * 1024;
+    public const int MaximumBound = StreamTotalCharacters;
     /// <summary>
     /// Messages in one request, and the messages or input items a projection emits for them. Pi caps no count: a request is
     /// bounded by the model's context window, which compaction maintains, and here also by the byte and character budgets

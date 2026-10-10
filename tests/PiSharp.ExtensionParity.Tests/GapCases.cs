@@ -124,10 +124,12 @@ internal static partial class Program
         File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
         (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", first, "-e", second, "/list-one"]);
         Equal(0, code, "exit; " + stderr);
-        Equal("""["names","one",["dup:1","list-one","dup:2","list-two"]]""", LogLines(sandbox).Single(), "getCommands invocation names");
+        // The built-in extensions (extensions/index.ts) load after the file extensions: their /llama and /mcp follow.
+        Equal("""["names","one",["dup:1","list-one","dup:2","list-two","llama","mcp"]]""", LogLines(sandbox).Single(), "getCommands invocation names");
     }
 
-    // agent-session.ts getCommands: extension commands, then prompt templates, then skills (skill:<name>).
+    // agent-session.ts getCommands: extension commands (the built-in extensions' /llama and /mcp last), then prompt templates, then skills
+    // (skill:<name>).
     private static async Task GetCommandsCatalog()
     {
         using var sandbox = NodeSandbox("get-commands");
@@ -141,7 +143,7 @@ internal static partial class Program
             """);
         var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "/list"]);
         Equal(0, code, "exit; " + stderr);
-        Equal("""[[["list","extension","List commands",true],["review","prompt","Review the change",true],["skill:deploy","skill","Deploy the app",true]]]""",
+        Equal("""[[["list","extension","List commands",true],["llama","extension","Manage llama.cpp router models",false],["mcp","extension","Manage MCP servers: sign in, reconnect, enable or disable, and change exposure",false],["review","prompt","Review the change",true],["skill:deploy","skill","Deploy the app",true]]]""",
             LogLines(sandbox).Single(), "getCommands rows");
     }
 

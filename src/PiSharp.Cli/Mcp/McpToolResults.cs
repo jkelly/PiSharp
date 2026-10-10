@@ -41,8 +41,22 @@ internal static partial class McpToolResults
         var scriptResult = value.EnumerateObject().Where(property => property.Name != "_meta").ToDictionary(property => property.Name, property => (object?)property.Value, StringComparer.Ordinal);
         var output = new Dictionary<string, object?> { ["content"] = limited, ["details"] = details, ["structuredContent"] = scriptResult };
         if (isError) output["isError"] = true;
-        return JsonData.Parse(JsonSerializer.Serialize(output, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+        return Owned(output);
     }
+
+    /// <summary>The result as an owned value: strings keep every UTF-16 code unit JSON.parse read (a lone surrogate is written back as its
+    /// escape, as JSON.stringify writes it), and the server's own values are carried as read.</summary>
+    private static JsonData Owned(object? value) => JsonData.Parse(JsonUtf16.ToJsonString(Node(value), JavaScriptEncoder.UnsafeRelaxedJsonEscaping));
+    private static System.Text.Json.Nodes.JsonNode? Node(object? value) => value switch
+    {
+        null => null,
+        string text => JsonUtf16.StringNode(text),
+        bool flag => System.Text.Json.Nodes.JsonValue.Create(flag),
+        JsonElement element => JsonUtf16.MutableNode(element),
+        Dictionary<string, object?> map => new System.Text.Json.Nodes.JsonObject(map.Select(pair => KeyValuePair.Create(pair.Key, Node(pair.Value)))),
+        System.Collections.IEnumerable items => new System.Text.Json.Nodes.JsonArray([.. items.Cast<object?>().Select(Node)]),
+        _ => System.Text.Json.Nodes.JsonValue.Create(JsonSerializer.SerializeToElement(value))
+    };
 
     /// <summary>A call that failed, as the original's agent loop reports a tool that threw: an error result with the error's message.
     /// A server that needs a sign-in names how to sign in (runtime.ts signInRequiredMessage).</summary>
@@ -63,10 +77,10 @@ internal static partial class McpToolResults
             }
             message = current.Message.Length == 0 ? $"MCP tool {entry.Name}/{tool} failed" : current.Message;
         }
-        return JsonData.Parse(JsonSerializer.Serialize(new Dictionary<string, object?>
+        return Owned(new Dictionary<string, object?>
         {
             ["content"] = new[] { Text(message) }, ["details"] = new Dictionary<string, object?> { ["server"] = entry.Name, ["tool"] = tool }, ["isError"] = true
-        }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+        });
     }
 
     private static async Task<IEnumerable<object>> BlockAsync(string server, JsonElement block, bool readableResources, Saver save, CancellationToken token)
@@ -156,5 +170,5 @@ internal static partial class McpToolResults
         .Where(block => block["type"] as string == "text").Select(block => block["text"] as string));
     private static Dictionary<string, object?> Text(string text) => new() { ["type"] = "text", ["text"] = text };
     private static string? String(JsonElement value, string name) =>
-        value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString() : null;
+        value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? JsonUtf16.GetString(property) : null;
 }

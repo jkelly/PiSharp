@@ -40,15 +40,15 @@ public static class RpcSessionCommand
     /// <summary>session-manager.ts loads every line of the file: the Pi entry has no line or record cap (the explicit verbs keep the
     /// session log reader's 100,000 records).</summary>
     internal static PiSharp.Sessions.Storage.SessionLogReaderOptions ReaderOptions(bool pi) =>
-        PiPayloadBudget.SessionReader(pi ? new(MaximumLines: int.MaxValue, MaximumRecords: int.MaxValue) : new());
+        pi ? PiPayloadBudget.PiSessionReader(new(MaximumLines: int.MaxValue, MaximumRecords: int.MaxValue)) : PiPayloadBudget.SessionReader(new());
     /// <summary>buildSessionContext walks every entry of the branch: the Pi entry has no entry, ancestor or message cap.</summary>
     internal static PiSharp.Sessions.Context.SessionContextProjectionOptions ContextOptions(bool pi) => pi
-        ? PiPayloadBudget.Context with { MaximumEntries = int.MaxValue, MaximumAncestorSteps = int.MaxValue, MaximumOutputMessages = int.MaxValue }
+        ? PiPayloadBudget.PiContext with { MaximumEntries = int.MaxValue, MaximumAncestorSteps = int.MaxValue, MaximumOutputMessages = int.MaxValue }
         : PiPayloadBudget.Context;
     /// <summary>Pi-entry prompt bounds: no text length or image count limit; the images and the message stay within one RPC frame.</summary>
     private static readonly PromptInputAdmissionOptions PiPromptBounds = new(MaximumTextCharacters: int.MaxValue, MaximumImages: int.MaxValue,
-        MaximumImageCharacters: PiPayloadBudget.RpcCommandBytes, MaximumImageBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 64,
-        MaximumMessageCharacters: PiPayloadBudget.RpcCommandBytes);
+        MaximumImageCharacters: PiPayloadBudget.PiRpcCommandBytes, MaximumImageBytes: PiPayloadBudget.PiRpcCommandBytes, MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth,
+        MaximumMessageCharacters: PiPayloadBudget.PiRpcCommandBytes) { KeepsLoneSurrogates = true };
     private static readonly JsonlTransportOptions Framing =new(MaximumFrameBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
@@ -136,6 +136,11 @@ public static class RpcSessionCommand
         return new(enabled, Token("reserveTokens", defaults.ReserveTokens), Token("keepRecentTokens", defaults.KeepRecentTokens));
     }
 
+    /// <summary>settings-manager.ts getCompactionEnabled: compaction.enabled ?? true.</summary>
+    internal static bool CompactionEnabled(StartupSettingsSnapshot? settings) =>
+        !(settings?.Values.Value is { ValueKind: JsonValueKind.Object } values && values.TryGetProperty("compaction", out var compaction) &&
+            compaction.ValueKind == JsonValueKind.Object && compaction.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.False);
+
     private static async Task<int> RunCoreAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         IRpcExtensionUiPresentationObserver? presentation, CancellationToken cancellationToken, Func<bool>? userShutdown = null,
         Func<RpcSessionShutdownSettlement, ValueTask<RpcTerminalStoppedAcknowledgment>>? stopTerminalAndJoin = null,
@@ -170,23 +175,25 @@ public static class RpcSessionCommand
                 parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false));
             // Production sessions read the global mcp.json once at start (--no-mcp connects nothing); every session gets the built-in codemode.
             var hostAdmission = mcpAdmission is null && mcpHost is not null;
-            if (hostAdmission) mcpAdmission = mcpHost!.CreateAdmission(parsed.Workspace, stderr, settings?.Values, parsed.Tools.NoMcp);
+            if (hostAdmission) mcpAdmission = mcpHost!.CreateAdmission(parsed.Workspace, stderr, settings?.Values, parsed.Tools.NoMcp, pi?.BuiltinExtensions);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
                 parsed.SessionMode == "new-memory" ? SessionStorageMode.InMemory : SessionStorageMode.LazyLocal,
-                new(MaximumFileBytes: PiPayloadBudget.SessionFileBytes, MaximumResidentBytes: PiPayloadBudget.SessionFileBytes));
+                pi is null ? new(MaximumFileBytes: PiPayloadBudget.SessionFileBytes, MaximumResidentBytes: PiPayloadBudget.SessionFileBytes)
+                    : new(MaximumFileBytes: PiPayloadBudget.PiSessionFileBytes, MaximumResidentBytes: PiPayloadBudget.PiSessionFileBytes));
             var turns = parsed.Script is null ? ImmutableArray<JsonData>.Empty :
                 await SessionCommands.ScriptAsync(parsed.Script, cancellationToken).ConfigureAwait(false);
             gate = OfflineGate.From(turns);
             // Pending input commands may carry Pi-sized images; retain two maximal commands while a dialog is open.
             // Pi extensions (IMPL-E) get a UI in the modes upstream gives one (tui and rpc); print and json run without (hasUI false).
             var piExtensions = pi?.Extensions;
-            ui = parsed.Extension is null && (piExtensions is null || pi!.ExtensionMode is not ("rpc" or "tui")) ? null
+            // The built-in extensions (extensions/index.ts: /llama, /mcp) have rpc-mode.ts's UI context too, with no file extension loaded.
+            ui = parsed.Extension is null && (piExtensions is null ? pi?.ExtensionMode != "rpc" : pi!.ExtensionMode is not ("rpc" or "tui")) ? null
                 : new(pi is null ? new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes)
                     // rpc-mode.ts createExtensionUIContext: dialogs, their texts, choices and responses have no limits of their own;
                     // requests and responses stay within one frame and a bounded number of open dialogs.
                     : new RpcExtensionUiOptions(MaximumOutstandingRequests: 4096, MaximumRequestBytes: PiPayloadBudget.OutputRecordBytes,
                         MaximumResponseBytes: PiPayloadBudget.RpcCommandBytes, MaximumRetainedBytes: 4 * PiPayloadBudget.RpcCommandBytes,
-                        MaximumTextCharacters: int.MaxValue, MaximumChoices: int.MaxValue, MaximumJsonDepth: 64, MaximumIdCharacters: int.MaxValue,
+                        MaximumTextCharacters: int.MaxValue, MaximumChoices: int.MaxValue, MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumIdCharacters: int.MaxValue,
                         MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes),
                     presentationObserver: presentation);
             if (piExtensions is not null)
@@ -197,7 +204,7 @@ public static class RpcSessionCommand
                     if (dispatcher is { } rpc) await rpc.PublishExtensionErrorAsync(path, eventName, error).ConfigureAwait(false);
                     else { await stderr.WriteAsync(($"Extension error ({path}): {error}\n").AsMemory()).ConfigureAwait(false); await stderr.FlushAsync().ConfigureAwait(false); }
                 };
-                piExtensions.Settings = () => settings?.Values is { } values ? System.Text.Json.Nodes.JsonNode.Parse(values.ToString()) : null;
+                piExtensions.Settings = () => settings?.Values is { } values ? System.Text.Json.Nodes.JsonNode.Parse(values.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) : null;
             }
             IExtensionUiProvider? activationUi = ui is null ? null : decorateTerminalUi?.Invoke(ui) ?? ui;
             if (activationUi is not null && terminalInputAdmission is not null) activationUi = terminalInputAdmission.Decorate(activationUi);
@@ -231,13 +238,21 @@ public static class RpcSessionCommand
                 deferMissingCredentials: pi is not null, piEntry: pi is not null).ConfigureAwait(false);
             // A virtual selection's router reads this profile's session branch and records its state there.
             if (liveSelection is { IsVirtual: true } virtualSelection) virtualSelection.VirtualSession = profile.CurrentVirtualModelSession;
-            if (pi?.Extensions is { } modelsHost) await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
+            if (pi?.Extensions is { } modelsHost)
+            {
+                var runModels = await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
+                // Codemode scripts reach the same registry as ctx.modelRegistry (the extensions' classifier and image providers included).
+                if (mcpHost is not null) mcpHost.RunModelOperations = runModels.Operations;
+            }
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
+            // agent-session.ts setModel from an extension (pi.setModel): the settings files the Pi entry reads now.
+            if (pi is not null) profile.ModelSwitchThinking = model => ModelSwitchThinkingLevel(pi.ReloadSettings is { } reloadSwitch
+                ? reloadSwitch(CancellationToken.None).GetAwaiter().GetResult() : settings, model);
             profile.BindSettingsThinkingReads();
             if (pi?.Skills is { } piSkills) profile.AdoptOriginalPromptSkills(piSkills);
             // /reload and ctx.reload() (agent-session.ts reload): the Pi entry reloads extensions and resources in place.
-            if (pi is not null) { profile.PiReloadResources = pi.ReloadResources; if (pi.Extensions is { } reloading) { var reloader = profile; reloading.Reload = reloader.PiReloadAsync; } }
+            if (pi is not null) { profile.PiReloadResources = pi.ReloadResources; profile.BuiltinExtensions = pi.BuiltinExtensions; profile.McpManager = pi.McpManager; if (pi.Extensions is { } reloading) { var reloader = profile; reloading.Reload = reloader.PiReloadAsync; } }
             else await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
@@ -342,11 +357,12 @@ public static class RpcSessionCommand
             observedInput = new InputObservation(stdin, gate);
             // Events and responses carry tool results with Pi-sized images (owner decision 0004).
             // pi --mode rpc reads each line as rpc-mode.ts handleInputLine does (StringDecoder + JSON.parse). JSON.parse and
-            // JSON.stringify have no depth limit; 64 levels is what an owned JsonData holds.
+            // JSON.stringify have no depth limit of their own; JsonData.MaximumDepth (1,000) levels is what an owned JsonData holds.
             // The in-process print, json and interactive connections carry the same values (a custom entry or message of any depth).
-            var framing = javaScriptInput ? Framing with { MaximumJsonDepth = 64, JavaScriptInput = true } : pi is not null ? Framing with { MaximumJsonDepth = 64 } : Framing;
+            var framing = javaScriptInput ? Framing with { MaximumFrameBytes = PiPayloadBudget.PiRpcCommandBytes, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, JavaScriptInput = true, KeepsLoneSurrogates = true }
+                : pi is not null ? Framing with { MaximumFrameBytes = PiPayloadBudget.PiRpcCommandBytes, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, KeepsLoneSurrogates = true } : Framing;
             // Every frame Pi writes is serializeJsonLine, JSON.stringify(value) + "\n".
-            var outputFraming = framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes, JavaScriptInput = false, JavaScriptOutput = javaScriptInput };
+            var outputFraming = framing with { MaximumFrameBytes = pi is null ? PiPayloadBudget.OutputRecordBytes : PiPayloadBudget.PiOutputRecordBytes, JavaScriptInput = false, JavaScriptOutput = javaScriptInput };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);
             reader = new JsonlReader(observedInput, framing);
             writer = new JsonlWriter(observedOutput, outputFraming);
@@ -367,7 +383,7 @@ public static class RpcSessionCommand
                 SwitchThinkingLevel = model => ModelSwitchThinkingLevel(pi?.ReloadSettings is { } reload ? reload(CancellationToken.None).GetAwaiter().GetResult() : settings, model)
             };
             dispatcher = new(session, writer, Clock, [new(profile.SelectedModel, profile.SelectedModelWire)],
-                options: new PiSharp.Rpc.Protocol.RpcDispatchOptions(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
+                options: new PiSharp.Rpc.Protocol.RpcDispatchOptions(MaximumCommandBytes: pi is null ? PiPayloadBudget.RpcCommandBytes : PiPayloadBudget.PiRpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
                     MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024, MaximumJsonDepth: framing.MaximumJsonDepth,
                     // rpc-mode.ts has no id or type length limit.
                     MaximumIdCharacters: javaScriptInput ? int.MaxValue : 256, MaximumCommandTypeCharacters: javaScriptInput ? int.MaxValue : 128,
@@ -397,8 +413,11 @@ public static class RpcSessionCommand
             {
                 var compactor = dispatcher;
                 compactingExtensions.Compact = async (instructions, token) =>
-                    System.Text.Json.Nodes.JsonNode.Parse((await compactor.CompactForExtensionAsync(profile.ManualCompactionRequest(instructions), token).ConfigureAwait(false)).ToString());
+                    System.Text.Json.Nodes.JsonNode.Parse((await compactor.CompactForExtensionAsync(profile.ManualCompactionRequest(instructions), token).ConfigureAwait(false)).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             }
+            // sdk.ts/agent-session.ts: every mode's session starts with auto-compaction set to compaction.enabled (default true).
+            if (pi is not null) await dispatcher.ConfigureAutoCompactionAsync(CompactionEnabled(settings), cancellationToken).ConfigureAwait(false);
+            if (pi?.PersistGlobalSetting is { } persistSetting) dispatcher.GlobalSettingChanged = persistSetting;
             // IMPL-I: the interactive mode reads the live session for features the RPC protocol does not carry.
             var publishedProfile = profile; var publishedSession = session;
             pi?.Interactive?.Host.Publish(() => publishedProfile.Sessions?.Current.Session ?? publishedSession, publishedProfile);

@@ -62,14 +62,14 @@ public static class CompletionsSourceEventProjection
         {
             if (tool.Ended) continue;
             var node = content[tool.ContentIndex]!.AsObject();
-            node["arguments"] = JsonNode.Parse(tool.DisplayArguments.ToString());
+            node["arguments"] = PiSharp.Contracts.JsonUtf16.MutableNode(tool.DisplayArguments.ToString());
             // Pi's catch removes parsing buffers before its error publication.
             // Retain the real parsed preview, without reconstructing scratch fields on a terminal.
             if (frame is StreamTerminalEvent) continue;
             if (tool.CustomInput is { } custom)
             {
                 node.Remove("partialArgs");
-                node["customInput"] = JsonNode.Parse(custom.ToString());
+                node["customInput"] = PiSharp.Contracts.JsonUtf16.MutableNode(custom.ToString());
                 if (tool.UndefinedPartialArguments) undefined.Add($"/partial/content/{tool.ContentIndex}/partialArgs");
             }
             else
@@ -120,7 +120,7 @@ public static class CompletionsSourceEventProjection
     private static JsonObject SourceMessage(AssistantMessage snapshot, bool responseIdAssigned, JsonData? responseId,
         IReadOnlyList<string>? addedPropertyOrder)
     {
-        var native = JsonNode.Parse(PiWireJson.WriteMessage(snapshot).ToString())!.AsObject();
+        var native = PiSharp.Contracts.JsonUtf16.MutableNode(PiWireJson.WriteMessage(snapshot).ToString())!.AsObject();
         native["content"] = new JsonArray(snapshot.Content.Select(block => (JsonNode)SourceContent(block)).ToArray());
         var usage = native["usage"]!.AsObject();
         usage["cost"] = InOrder(usage["cost"]!.AsObject(), ["input", "output", "cacheRead", "cacheWrite", "total"]);
@@ -128,7 +128,7 @@ public static class CompletionsSourceEventProjection
         if (responseIdAssigned)
         {
             if (responseId is null) native.Remove("responseId");
-            else native["responseId"] = JsonNode.Parse(responseId.ToString());
+            else native["responseId"] = PiSharp.Contracts.JsonUtf16.MutableNode(responseId.ToString());
         }
         return InOrder(native, new[] { "role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp" }
             .Concat(addedPropertyOrder ?? []).Concat(["responseId", "responseModel", "rawStopReason", "errorMessage"]));
@@ -136,7 +136,7 @@ public static class CompletionsSourceEventProjection
 
     private static JsonObject SourceContent(AssistantContent content)
     {
-        var native = JsonNode.Parse(PiWireJson.WriteContent(content).ToString())!.AsObject();
+        var native = PiSharp.Contracts.JsonUtf16.MutableNode(PiWireJson.WriteContent(content).ToString())!.AsObject();
         return InOrder(native, content switch
         {
             TextContent => ["type", "text"],
@@ -189,6 +189,7 @@ public static class CompletionsSourceEventProjection
         }
     }
 
-    private static JsonData Own(JsonObject value, JsonArray undefined) => JsonData.Parse(
-        new JsonObject { ["value"] = value, ["ownUndefinedPaths"] = undefined }.ToJsonString());
+    // A value read from the stream keeps a lone surrogate (JSON.parse); JsonUtf16 writes it back as its escape.
+    private static JsonData Own(JsonObject value, JsonArray undefined) => JsonData.Parse(PiSharp.Contracts.JsonUtf16.ToJsonString(
+        new JsonObject { ["value"] = value, ["ownUndefinedPaths"] = undefined }));
 }

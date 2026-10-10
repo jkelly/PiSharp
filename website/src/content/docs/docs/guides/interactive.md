@@ -15,7 +15,7 @@ Type `/` to search the commands of the current session. PiSharp has all of Pi's 
 | Sessions | `/new`, `/resume`, `/name`, `/session`, `/tree`, `/fork`, `/clone`, `/compact`, `/import` |
 | Export and share | `/copy`, `/export`, `/share`, `/bug` |
 | Runtime and project | `/trust`, `/reload`, `/hotkeys`, `/changelog`, `/quit` |
-| MCP | `/mcp`, when MCP is on |
+| Built-in extensions | `/mcp` and [`/llama`](/docs/guides/llama-cpp/), while those [built-in extensions](/docs/reference/configuration/#built-in-extensions) are on |
 
 Extensions, prompt templates and skills add their own commands, as in Pi. Pi's [Slash commands](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/slash-commands.md) page describes each one.
 
@@ -43,9 +43,7 @@ See Pi's [Themes](https://github.com/earendil-works/pi/blob/v1.1.0/packages/codi
 
 ## Clipboard
 
-`/copy` and pasting work as in Pi. On Linux, PiSharp uses `wl-copy` and `wl-paste` on Wayland, and `xclip` or `xsel` on X11.
-
-Pi also has a built-in X11 clipboard helper, which it uses when those programs are missing. PiSharp has none, so on X11 install `xclip` (or `xsel` for text only).
+`/copy` and pasting work as in Pi. On Linux, PiSharp copies with `wl-copy` on Wayland and `xclip` or `xsel` on X11, as Pi does. Pasting tries `wl-paste`, `xclip` and `xsel`, then reads the X11 clipboard itself through `libxcb`, like Pi's built-in helper, so pasting text and images works on X11 without those programs.
 
 ## What's New
 

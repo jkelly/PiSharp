@@ -52,17 +52,10 @@ internal static partial class Program
         using var request = await fixture.Transport.CreateRequestAsync(new(fixture.Model, ClaudeTranscript(), 10) { ThinkingLevel = "medium" });
         Equal("https://bedrock-runtime.us-east-1.amazonaws.com/model/anthropic.claude-sonnet-4-5-20250929-v1%3A0/converse-stream", request.RequestUri!.AbsoluteUri, "url");
         var body = await request.Content!.ReadAsStringAsync();
-        JsonEqual("""
-            {"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":8192,"display":"summarized"},"anthropic_beta":["interleaved-thinking-2025-05-14"]},
-             "inferenceConfig":{"maxTokens":64000},
-             "messages":[
-               {"content":[{"text":"Hi"},{"image":{"format":"png","source":{"bytes":"AAEC"}}}],"role":"user"},
-               {"content":[{"reasoningContent":{"reasoningText":{"text":"Let me think","signature":"sig-1"}}},{"text":"Calling a tool"},{"toolUse":{"input":{"path":"a.txt"},"name":"read","toolUseId":"toolu_1"}}],"role":"assistant"},
-               {"content":[{"toolResult":{"content":[{"text":"file body"},{"image":{"format":"jpeg","source":{"bytes":"AAEC"}}}],"status":"success","toolUseId":"toolu_1"}}],"role":"user"},
-               {"content":[{"text":"Next"},{"cachePoint":{"type":"default"}}],"role":"user"}],
-             "system":[{"text":"You are helpful.\n\nSection one\n\nSection B"},{"cachePoint":{"type":"default"}}],
-             "toolConfig":{"tools":[{"toolSpec":{"description":"Read a file","inputSchema":{"json":{"type":"object","properties":{"path":{"type":"string"},"limit":{"anyOf":[{"type":"number"},{"type":"null"}]}},"required":["path","limit"],"additionalProperties":false}},"name":"read","strict":true}}]}}
-            """, body, "claude budget request");
+        // Member order is the order @aws-sdk/client-bedrock-runtime 3.1127.0's schema serializer writes whatever the input's order (checked
+        // in Node 22): messages, system, inferenceConfig, toolConfig, additionalModelRequestFields, requestMetadata; role, content;
+        // toolUseId, name, input; toolUseId, content, status; name, inputSchema, description, strict; tools, toolChoice.
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"image":{"format":"png","source":{"bytes":"AAEC"}}}]},{"role":"assistant","content":[{"reasoningContent":{"reasoningText":{"text":"Let me think","signature":"sig-1"}}},{"text":"Calling a tool"},{"toolUse":{"toolUseId":"toolu_1","name":"read","input":{"path":"a.txt"}}}]},{"role":"user","content":[{"toolResult":{"toolUseId":"toolu_1","content":[{"text":"file body"},{"image":{"format":"jpeg","source":{"bytes":"AAEC"}}}],"status":"success"}}]},{"role":"user","content":[{"text":"Next"},{"cachePoint":{"type":"default"}}]}],"system":[{"text":"You are helpful.\n\nSection one\n\nSection B"},{"cachePoint":{"type":"default"}}],"inferenceConfig":{"maxTokens":64000},"toolConfig":{"tools":[{"toolSpec":{"name":"read","inputSchema":{"json":{"type":"object","properties":{"path":{"type":"string"},"limit":{"anyOf":[{"type":"number"},{"type":"null"}]}},"required":["path","limit"],"additionalProperties":false}},"description":"Read a file","strict":true}}]},"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":8192,"display":"summarized"},"anthropic_beta":["interleaved-thinking-2025-05-14"]}}""", body, "claude budget request");
         // SigV4 headers over the exact body; the date and payload hash travel as x-amz-* headers.
         var bytes = Encoding.UTF8.GetBytes(body);
         var hash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
@@ -81,19 +74,11 @@ internal static partial class Program
             Entry("""{"role":"user","content":"   ","timestamp":3}"""));
         var longFixture = Bedrock(SonnetRow, options: new() { CacheRetention = "long", ToolChoice = JsonData.Parse("\"none\""), Temperature = 0.5, RequestMetadata = ImmutableDictionary<string, string>.Empty.Add("team", "a") });
         using var longRequest = await longFixture.Transport.CreateRequestAsync(new(longFixture.Model, crossModel, 10));
-        JsonEqual("""
-            {"inferenceConfig":{"maxTokens":64000,"temperature":0.5},
-             "messages":[
-               {"content":[{"text":"Go"}],"role":"user"},
-               {"content":[{"text":"plan"},{"toolUse":{"input":{"path":"x"},"name":"read","toolUseId":"call_id_with_bad_chars"}}],"role":"assistant"},
-               {"content":[{"toolResult":{"content":[{"text":"No result provided"}],"status":"error","toolUseId":"call_id_with_bad_chars"}}],"role":"user"},
-               {"content":[{"text":"<empty>"},{"cachePoint":{"type":"default","ttl":"1h"}}],"role":"user"}],
-             "requestMetadata":{"team":"a"}}
-            """, await longRequest.Content!.ReadAsStringAsync(), "long retention cross-model request");
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Go"}]},{"role":"assistant","content":[{"text":"plan"},{"toolUse":{"toolUseId":"call_id_with_bad_chars","name":"read","input":{"path":"x"}}}]},{"role":"user","content":[{"toolResult":{"toolUseId":"call_id_with_bad_chars","content":[{"text":"No result provided"}],"status":"error"}}]},{"role":"user","content":[{"text":"<empty>"},{"cachePoint":{"type":"default","ttl":"1h"}}]}],"inferenceConfig":{"maxTokens":64000,"temperature":0.5},"requestMetadata":{"team":"a"}}""", await longRequest.Content!.ReadAsStringAsync(), "long retention cross-model request");
         // Nova: no thinking fields, no cache points, the model cap clamped to the context.
         var nova = Bedrock(NovaRow);
         using var novaRequest = await nova.Transport.CreateRequestAsync(new(nova.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 1));
-        JsonEqual("""{"inferenceConfig":{"maxTokens":10000},"messages":[{"content":[{"text":"Hi"}],"role":"user"}]}""", await novaRequest.Content!.ReadAsStringAsync(), "nova request");
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"}]}],"inferenceConfig":{"maxTokens":10000}}""", await novaRequest.Content!.ReadAsStringAsync(), "nova request");
     }
 
     private static async Task<string> BodyFor(string row, string? level, Dictionary<string, string?>? env = null, BedrockConverseOptions? options = null)
@@ -105,25 +90,25 @@ internal static partial class Program
 
     private static async Task BedrockReasoningFields()
     {
-        JsonEqual("""{"additionalModelRequestFields":{"thinking":{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"output_config":{"effort":"xhigh"},"anthropic_beta":["thinking-binding-controls-2026-08-01"]},"inferenceConfig":{"maxTokens":128000},"messages":[{"content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}],"role":"user"}]}""",
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}]}],"inferenceConfig":{"maxTokens":128000},"additionalModelRequestFields":{"thinking":{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"output_config":{"effort":"xhigh"},"anthropic_beta":["thinking-binding-controls-2026-08-01"]}}""",
             await BodyFor(OpusRow, "xhigh"), "opus 4.8 xhigh");
-        JsonEqual("""{"additionalModelRequestFields":{"thinking":{"type":"adaptive","display":"omitted","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"output_config":{"effort":"low"},"anthropic_beta":["thinking-binding-controls-2026-08-01"]},"inferenceConfig":{"maxTokens":128000},"messages":[{"content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}],"role":"user"}]}""",
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}]}],"inferenceConfig":{"maxTokens":128000},"additionalModelRequestFields":{"thinking":{"type":"adaptive","display":"omitted","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"output_config":{"effort":"low"},"anthropic_beta":["thinking-binding-controls-2026-08-01"]}}""",
             await BodyFor(OpusRow, "minimal", options: new() { ThinkingDisplay = "omitted" }), "opus 4.8 minimal omitted display");
         // GovCloud: no display and no block binding; budget thinking keeps the interleaved beta.
         var gov = new Dictionary<string, string?> { ["AWS_ACCESS_KEY_ID"] = "AKIDEXAMPLE", ["AWS_SECRET_ACCESS_KEY"] = "secret-example", ["AWS_REGION"] = "us-gov-west-1" };
-        JsonEqual("""{"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":16384},"anthropic_beta":["interleaved-thinking-2025-05-14"]},"inferenceConfig":{"maxTokens":64000},"messages":[{"content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}],"role":"user"}]}""",
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}]}],"inferenceConfig":{"maxTokens":64000},"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":16384},"anthropic_beta":["interleaved-thinking-2025-05-14"]}}""",
             await BodyFor(SonnetRow, "high", gov), "govcloud sonnet high");
         // An explicit output cap: the thinking budget is added to it (adjustMaxTokensForThinking).
-        JsonEqual("""{"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":2048,"display":"summarized"},"anthropic_beta":["interleaved-thinking-2025-05-14"]},"inferenceConfig":{"maxTokens":4120},"messages":[{"content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}],"role":"user"}]}""",
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}]}],"inferenceConfig":{"maxTokens":4120},"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":2048,"display":"summarized"},"anthropic_beta":["interleaved-thinking-2025-05-14"]}}""",
             await BodyFor(SonnetRow, "low", options: new() { MaxTokens = 2072 }), "sonnet low with a 2072 cap");
         // A cap below the budget: the budget leaves 1024 answer tokens.
-        JsonEqual("""{"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":976,"display":"summarized"},"anthropic_beta":["interleaved-thinking-2025-05-14"]},"inferenceConfig":{"maxTokens":2000},"messages":[{"content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}],"role":"user"}]}""",
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}]}],"inferenceConfig":{"maxTokens":2000},"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":976,"display":"summarized"},"anthropic_beta":["interleaved-thinking-2025-05-14"]}}""",
             await BodyFor(SonnetRow.Replace("\"maxTokens\":64000", "\"maxTokens\":2000", StringComparison.Ordinal), "medium"), "budget clamped to answer room");
-        JsonEqual("""{"additionalModelRequestFields":{"reasoning_effort":"high"},"inferenceConfig":{"maxTokens":126975},"messages":[{"content":[{"text":"Hi"}],"role":"user"}]}""",
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"}]}],"inferenceConfig":{"maxTokens":126975},"additionalModelRequestFields":{"reasoning_effort":"high"}}""",
             await BodyFor(GptOssRow, "high"), "gpt-oss high");
-        JsonEqual("""{"additionalModelRequestFields":{"reasoning":{"effort":"low"}},"inferenceConfig":{"maxTokens":128000},"messages":[{"content":[{"text":"Hi"}],"role":"user"}]}""",
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"}]}],"inferenceConfig":{"maxTokens":128000},"additionalModelRequestFields":{"reasoning":{"effort":"low"}}}""",
             await BodyFor(GptRow, "minimal"), "gpt minimal mapped");
-        JsonEqual("""{"inferenceConfig":{"maxTokens":64000},"messages":[{"content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}],"role":"user"}]}""",
+        JsonEqual("""{"messages":[{"role":"user","content":[{"text":"Hi"},{"cachePoint":{"type":"default"}}]}],"inferenceConfig":{"maxTokens":64000}}""",
             await BodyFor(SonnetRow, "off"), "thinking off");
         var levels = Bedrock(SonnetRow).Transport.GetSupportedThinkingLevels(new("anthropic.claude-sonnet-4-5-20250929-v1:0", "bedrock-converse-stream", "amazon-bedrock"));
         Equal("off,minimal,low,medium,high", string.Join(",", levels), "sonnet levels");
@@ -167,9 +152,22 @@ internal static partial class Program
         JsonSame("""
             {"role":"assistant","content":[{"type":"thinking","thinking":"think","thinkingSignature":"sig"},{"type":"text","text":"Hello"},{"type":"toolCall","id":"t1","name":"read","arguments":{"path":"a.txt"}}],
              "api":"bedrock-converse-stream","provider":"amazon-bedrock","model":"anthropic.claude-sonnet-4-5-20250929-v1:0",
-             "usage":{"input":100,"output":50,"cacheRead":10,"cacheWrite":20,"cacheWrite1h":20,"totalTokens":180,"cost":{"input":0.0003,"output":0.00075,"cacheRead":0.000003,"cacheWrite":0.00012,"total":0.001173}},
+             "usage":{"input":100,"output":50,"cacheRead":10,"cacheWrite":20,"cacheWrite1h":20,"totalTokens":180,"cost":{"input":0.00030000000000000003,"output":0.00075,"cacheRead":0.000003,"cacheWrite":0.00012,"total":0.0011730000000000002}},
              "stopReason":"toolUse","timestamp":77,"rawStopReason":"tool_use"}
             """, Wire(done.Message), "done message");
+        // models.ts calculateCost runs in binary64: (3 / 1000000) * 100 is 0.00030000000000000003 and the total sums those Numbers
+        // (formerly decimal arithmetic wrote 0.0003 and 0.001173). Expected costs computed by calculateCost in Node 22.
+        Check(Wire(done.Message).Contains("\"cost\":{\"input\":0.00030000000000000003,\"output\":0.00075,\"cacheRead\":0.000003,\"cacheWrite\":0.00012,\"total\":0.0011730000000000002}", StringComparison.Ordinal),
+            "binary64 cost text: " + Wire(done.Message));
+        // Fractional counts with a 1h share of the cache writes, priced in binary64 as Pi does.
+        var fraction = Bedrock(SonnetRow);
+        fraction.Http.OnUrl("https://", _ => EventStream(messages: [EventMessage("messageStart", """{"role":"assistant"}"""),
+            EventMessage("contentBlockDelta", """{"contentBlockIndex":0,"delta":{"text":"x"}}"""), EventMessage("contentBlockStop", """{"contentBlockIndex":0}"""),
+            EventMessage("messageStop", """{"stopReason":"end_turn"}"""),
+            EventMessage("metadata", """{"usage":{"inputTokens":3.5,"outputTokens":2.75,"cacheReadInputTokens":1.25,"cacheWriteInputTokens":7,"cacheDetails":[{"inputTokens":2.5,"ttl":"1h"}],"totalTokens":14.5}}""")]));
+        var fractional = (StreamDone)(await Collect(fraction.Transport, new(fraction.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 1)))[^1];
+        Check(Wire(fractional.Message).Contains("\"usage\":{\"input\":3.5,\"output\":2.75,\"cacheRead\":1.25,\"cacheWrite\":7,\"totalTokens\":14.5,\"cost\":{\"input\":0.000010500000000000001,\"output\":0.00004125,\"cacheRead\":3.75e-7,\"cacheWrite\":0.000031875,\"total\":0.00008400000000000001},\"cacheWrite1h\":2.5}", StringComparison.Ordinal),
+            "fractional binary64 cost: " + Wire(fractional.Message));
         // Stop reasons: end_turn/stop_sequence stop, max_tokens/model_context_window_exceeded length.
         foreach (var (raw, expected) in new[] { ("end_turn", StopReason.Stop), ("stop_sequence", StopReason.Stop), ("max_tokens", StopReason.Length), ("model_context_window_exceeded", StopReason.Length) })
         {
@@ -206,10 +204,10 @@ internal static partial class Program
             Entry("""{"role":"user","content":"More","timestamp":9}"""));
         using var request = await fixture.Transport.CreateRequestAsync(new(fixture.Model, replay, 10));
         var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync()).RootElement.GetProperty("messages")[1].GetRawText();
-        JsonEqual("""{"content":[{"reasoningContent":{"redactedContent":"AQIDBAU="}},{"text":"answer"}],"role":"assistant"}""", body, "redacted replay");
+        JsonEqual("""{"role":"assistant","content":[{"reasoningContent":{"redactedContent":"AQIDBAU="}},{"text":"answer"}]}""", body, "redacted replay");
         var other = Bedrock(GptOssRow);
         using var otherRequest = await other.Transport.CreateRequestAsync(new(other.Model, replay, 10));
-        JsonEqual("""{"content":[{"text":"answer"}],"role":"assistant"}""", JsonDocument.Parse(await otherRequest.Content!.ReadAsStringAsync()).RootElement.GetProperty("messages")[1].GetRawText(), "cross-model drop");
+        JsonEqual("""{"role":"assistant","content":[{"text":"answer"}]}""", JsonDocument.Parse(await otherRequest.Content!.ReadAsStringAsync()).RootElement.GetProperty("messages")[1].GetRawText(), "cross-model drop");
         // An unstopped tool call keeps the arguments streamed so far (parseStreamingJson of the partial JSON) and emits no toolcall_end.
         var tool = Bedrock(SonnetRow);
         tool.Http.OnUrl("https://", _ => EventStream(messages:
@@ -288,8 +286,8 @@ internal static partial class Program
             Entry("""{"role":"toolResult","toolCallId":"","toolName":"","content":[{"type":"text","text":"Tool  not found"}],"details":{},"isError":true,"timestamp":4}"""));
         using var request = await replayed.Transport.CreateRequestAsync(new(replayed.Model, history, 10));
         var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync()).RootElement.GetProperty("messages");
-        JsonEqual("""{"content":[{"toolUse":{"input":{},"name":"","toolUseId":""}}],"role":"assistant"}""", body[1].GetRawText(), "nameless replay");
-        JsonEqual("""{"content":[{"toolResult":{"content":[{"text":"Tool  not found"}],"status":"error","toolUseId":""}},{"cachePoint":{"type":"default"}}],"role":"user"}""", body[2].GetRawText(), "nameless result replay");
+        JsonEqual("""{"role":"assistant","content":[{"toolUse":{"toolUseId":"","name":"","input":{}}}]}""", body[1].GetRawText(), "nameless replay");
+        JsonEqual("""{"role":"user","content":[{"toolResult":{"toolUseId":"","content":[{"text":"Tool  not found"}],"status":"error"}},{"cachePoint":{"type":"default"}}]}""", body[2].GetRawText(), "nameless result replay");
     }
 
     private static async Task BedrockErrors()

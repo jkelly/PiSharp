@@ -238,8 +238,8 @@ internal static class SessionRuntimeConfigurationTests
         var before = await InspectBytes(files.Path);
         Equal(SessionRuntimeRegistryFailure.UnknownModel,
             (await ThrowsAsync<SessionRuntimeRegistryException>(() => session.ConfigureAsync(new(ModelA with { Id = "unknown" })))).Failure);
-        Equal(SessionRuntimeRegistryFailure.UnsupportedThinkingLevel,
-            (await ThrowsAsync<SessionRuntimeRegistryException>(() => session.ConfigureAsync(new(ThinkingLevel: "high")))).Failure);
+        // agent-session.ts setThinkingLevel clamps "high" on the off-only model to "off": no change, nothing written.
+        await session.ConfigureAsync(new(ThinkingLevel: "high")); Equal("off", session.Snapshot.Context.ThinkingLevel);
         Equal(SessionRuntimeRegistryFailure.UnknownTool,
             (await ThrowsAsync<SessionRuntimeRegistryException>(() => session.ConfigureAsync(new(SystemMessage: SystemDelta([Decl("unknown")]))))).Failure);
         var stale = JsonData.Parse("""{"name":"read","description":"stale","parameters":{"type":"object","n":1.0,"future":null}}""");
@@ -318,10 +318,10 @@ internal static class SessionRuntimeConfigurationTests
             Check(session.Snapshot.Agent.Messages.Where(entry => entry.Role == "assistant").All(entry =>
                 entry.WireBody.Value.GetProperty("thinkingLevel").GetString() == "high"), "Assistant stamp lost requested thinking.");
             var bytes = await InspectBytes(files.Path); var leaf = session.Snapshot.Context.LeafId;
-            var error = await ThrowsAsync<SessionRuntimeRegistryException>(() => session.ConfigureAsync(new(ThinkingLevel: "max")));
-            Equal(SessionRuntimeRegistryFailure.UnsupportedThinkingLevel, error.Failure);
+            // agent-session.ts setThinkingLevel: "max" clamps down to the current "high", which is no change.
+            await session.ConfigureAsync(new(ThinkingLevel: "max"));
             var afterRejectedThinking = await InspectBytes(files.Path);
-            Check(bytes.SequenceEqual(afterRejectedThinking), "Rejected thinking changed durable bytes.");
+            Check(bytes.SequenceEqual(afterRejectedThinking), "A clamped unchanged level changed durable bytes.");
             Equal(leaf, session.Snapshot.Context.LeafId); Equal("high", session.Snapshot.Context.ThinkingLevel);
         }
         await using var restored = await PersistentAgentSession.OpenWithRegistryAsync(files.Path, registry, () => 123, ids.Next);
@@ -361,20 +361,19 @@ internal static class SessionRuntimeConfigurationTests
             .WireBody.Value.GetProperty("thinkingLevel").GetString() == "low", "Activation lost admitted thinking or tool removal.");
         await RejectOff(restored);
 
+        // agent-session.ts setThinkingLevel clamps an explicit unsupported "off" up to "low" (models.ts clampThinkingLevel); only a change
+        // of the session's level is recorded. The prior level is then selected again so the session continues as before.
         async Task RejectOff(PersistentAgentSession selected)
         {
             var before = selected.Snapshot; var requests = transport.Requests.Count;
             var bytes = await ReadIdleAcknowledgedBytes(selected);
-            try
-            {
-                await selected.ConfigureAsync(new(ThinkingLevel: "off"));
-                throw new InvalidOperationException("Explicit unsupported off was admitted.");
-            }
-            catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnsupportedThinkingLevel) { }
+            await selected.ConfigureAsync(new(ThinkingLevel: "off"));
             var afterBytes = await ReadIdleAcknowledgedBytes(selected); var after = selected.Snapshot;
-            Check(bytes.SequenceEqual(afterBytes) && after.Log.Sequence == before.Log.Sequence && after.Log.LeafId == before.Log.LeafId &&
-                after.Context.ThinkingLevel == before.Context.ThinkingLevel && after.Agent.Model == before.Agent.Model &&
-                after.Fault is null && transport.Requests.Count == requests, "Rejected off changed durable or live selection, faulted, or sent.");
+            var changed = before.Context.ThinkingLevel != "low";
+            Check(bytes.SequenceEqual(afterBytes) != changed && after.Log.Entries.Length == before.Log.Entries.Length + (changed ? 1 : 0) &&
+                after.Context.ThinkingLevel == "low" && after.Agent.Model == before.Agent.Model &&
+                after.Fault is null && transport.Requests.Count == requests, "Unsupported off was not clamped to low, faulted, or sent.");
+            if (changed) await selected.ConfigureAsync(new(ThinkingLevel: before.Context.ThinkingLevel));
         }
     }
     private static async Task<byte[]> ReadIdleAcknowledgedBytes(PersistentAgentSession session)

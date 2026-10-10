@@ -164,7 +164,7 @@ internal static class ToolImageResumeTests
             await Rejected(minimal, "configured-exact-quota-minus-one", WithLimits(denied));
         await Rejected(ReplaceTool(history, "\"content\":[{\"type\":\"image\",\"data\":\"\",\"mimeType\":\"x\",\"meta\":{\"inner\":{\"n\":1}}}]"), "configured-metadata-depth", WithLimits(new(MaximumCharacters: 128, MaximumJsonDepth: 1)));
         await Rejected(ReplaceTool(history, "\"content\":" + array + ",\"details\":null"), "configured-aggregate-details-budget", WithLimits(limits with { MaximumRawCharacters = 128, MaximumRawBytes = 128 }));
-        foreach (var invalid in new[] { limits with { MaximumCharacters = 0 }, limits with { MaximumContentBlocks = 0 }, limits with { MaximumRawBytes = 0 }, limits with { MaximumJsonDepth = 65 } })
+        foreach (var invalid in new[] { limits with { MaximumCharacters = 0 }, limits with { MaximumContentBlocks = 0 }, limits with { MaximumRawBytes = 0 }, limits with { MaximumJsonDepth = 1001 } })
         {
             try { _ = new AgentLoopRunner(new TurnRunner(new ChatClient(new AcceptedTransport()), new ToolBatchScheduler([])), AcceptedTransport.Model, () => 123, WithLimits(invalid)); }
             catch (ArgumentOutOfRangeException) { continue; }

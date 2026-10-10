@@ -124,68 +124,53 @@
   },
   "carryover": [
     {
-      "from": "BURN-DOWN",
-      "item": "lone surrogates on input: RPC input and tool-call arguments become U+FFFD; session lines containing one are refused",
+      "from": "1.1.0.3",
+      "item": "/reload keeps MCP servers connected and does not re-read mcp.json unless the mcp, codemode or tool-search built-ins changed; upstream reconnects every server on every reload",
+      "owner": "open"
+    },
+    {
+      "from": "1.1.0.3",
+      "item": "/reload does not surface re-resolution diagnostics: built-in errors and replacement warnings, package resolution, resources_discover errors, skill/prompt/theme conflicts (interactive shows only Node extension load errors)",
+      "owner": "open"
+    },
+    {
+      "from": "1.1.0.3",
+      "item": "built-in replacement (omitReplacedExtensions) considers only Node extensions; a native C# extension registering codemode, tool_search or /mcp does not displace the built-in",
       "owner": "open"
     },
     {
       "from": "BURN-DOWN",
-      "item": "JSON nesting depth 64 on session records, RPC input and streamed tool-call arguments",
+      "item": "JSON nesting depth 1,000 (JsonData.MaximumDepth) where V8's JSON.stringify gives up at about 1,700",
       "owner": "open"
     },
     {
       "from": "BURN-DOWN",
-      "item": "fractional usage token counts refused (Bedrock reads them as 0)",
-      "owner": "open"
-    },
-    {
-      "from": "BURN-DOWN",
-      "item": "byte memory bounds Pi does not have: 64 MiB session line and file, 16/64 MiB stream event/total, 8 MiB tool result, 32 MiB RPC record",
-      "owner": "open"
-    },
-    {
-      "from": "BURN-DOWN",
-      "item": "extension sendMessage with triggerTurn from inside a command handler runs after the handler returns; dropped after about 30 s; untested",
-      "owner": "open"
-    },
-    {
-      "from": "BURN-DOWN",
-      "item": "user bash start failures: Windows answers \"RPC command failed.\", Unix records the shell's exit 127 output, where upstream reports Node's spawn error",
-      "owner": "open"
-    },
-    {
-      "from": "BURN-DOWN",
-      "item": "Linux X11 clipboard: no native helper, xclip or xsel required",
-      "owner": "open"
-    },
-    {
-      "from": "IMPL-F",
-      "item": "-e package sources contribute extensions but not their skills, prompts or themes (PiResourceRequest.ExtensionSources is never set)",
-      "owner": "open"
-    },
-    {
-      "from": "IMPL-F",
-      "item": "pisharp mcp is routed before PiCommand: no --offline/PI_OFFLINE, httpProxy or PI_CODING_AGENT environment setup",
-      "owner": "open"
-    },
-    {
-      "from": "IMPL-B",
-      "item": "llama.cpp router discovery and /llama (upstream extensions/llama); native C# extensions cannot register classifier or image providers",
-      "owner": "open"
-    },
-    {
-      "from": "IMPL-E",
-      "item": "ctx.ui.setTheme returns an error",
+      "item": "the explicit session and rpc verbs keep byte bounds (64 MiB session line/file, 32 MiB RPC record, 8 MiB tool result) and refuse lone surrogates; request bodies 64 MiB and request entries 16 MiB everywhere",
       "owner": "open"
     },
     {
       "from": "IMPL-G",
-      "item": "project_trust and resources_discover are not dispatched to native C# extensions; compatibility/extensions/event-catalog.v1.1.0.overlay.json still marks the agent-loop topics WireOnlyNotDispatchedToExtensions",
+      "item": "get_session_stats fails on non-finite usage where upstream yields NaN (written as null)",
+      "owner": "open"
+    },
+    {
+      "from": "IMPL-A2",
+      "item": "models.json schema errors use TypeBox's wording but not its per-branch union errors",
+      "owner": "open"
+    },
+    {
+      "from": "1.1.0.3",
+      "item": "websocketConnectTimeoutMs setting not read (Codex WebSocket keeps the 15 s default)",
+      "owner": "open"
+    },
+    {
+      "from": "1.1.0.3",
+      "item": "Azure resource names that leave credentials, a fragment or a query in the URL, or a host System.Uri cannot hold, are refused at configuration where upstream fails on the request (decision 0004 item 14)",
       "owner": "open"
     },
     {
       "from": "IMPL-I",
-      "item": "samples/extensions ship no pisharp-extension.json and target the older package loader",
+      "item": "first-time setup ported but not wired (upstream shows it only with PI_EXPERIMENTAL)",
       "owner": "open"
     }
   ],
@@ -201,18 +186,46 @@
     "burnDown": "merged 2026-10-09 (agent-loop boundaries, exact errors, caps removed, session format, Vertex ADC, highlighting, Mermaid); integrity pins refreshed",
     "reassessment": "2026-10-09: Parity page, website docs, applicability matrix (parity.* rows per package), 1.1.0.2 changelog and release notes"
   },
-  "release": {
-    "version": "1.1.0.2",
-    "kind": "patch",
-    "baseline": "v1.1.0",
-    "status": "published",
-    "ships": "everything on parity/full",
-    "notes": "docs/release-notes/1.1.0.2.md",
-    "changelog": "website/src/content/changelog/1.1.0.2.md (date 2026-10-09)",
-    "tag": "v1.1.0.2 (dcd9da4), release run 38009832864",
-    "blockers": [],
-    "dryRun": "run 38007732077 (Linux, tests) green",
-    "publishedOn": "2026-10-09"
+  "wave5": {
+    "branch": "fix/1.1.0.3",
+    "merged": "2026-10-10",
+    "followUps": "issue #5 and thinking clamps; extension/CLI close-out (triggerTurn, setTheme, -e resources, pisharp mcp routing, samples); llama.cpp and native classifier/image providers; Node spawn errors; X11 clipboard; Codex WebSocket and zstd; footer; lone surrogates, 1,000 JSON levels, fractional tokens, JavaScript-string bounds; built-in extensions on/off; auto-compaction in every mode; final leftovers",
+    "reassessment": "2026-10-10: Parity page, website docs, applicability matrix, 1.1.0.3 changelog and release notes; owner decision 14 (Azure resource name)"
+  },
+  "releases": {
+    "1.1.0.2": {
+      "version": "1.1.0.2",
+      "kind": "patch",
+      "baseline": "v1.1.0",
+      "status": "published",
+      "ships": "everything on parity/full",
+      "notes": "docs/release-notes/1.1.0.2.md",
+      "changelog": "website/src/content/changelog/1.1.0.2.md (date 2026-10-09)",
+      "tag": "v1.1.0.2 (dcd9da4), release run 38009832864",
+      "blockers": [],
+      "dryRun": "run 38007732077 (Linux, tests) green",
+      "publishedOn": "2026-10-09"
+    },
+    "1.1.0.3": {
+      "version": "1.1.0.3",
+      "kind": "patch",
+      "baseline": "v1.1.0",
+      "status": "release-candidate",
+      "branch": "fix/1.1.0.3",
+      "ships": "everything on fix/1.1.0.3 since main (v1.1.0.2)",
+      "issues": [
+        "#5 (/clear crash: thinking level clamped on open; clamping everywhere Pi clamps)"
+      ],
+      "notes": "docs/release-notes/1.1.0.3.md",
+      "changelog": "website/src/content/changelog/1.1.0.3.md (date 2026-10-10)",
+      "decisions": "docs/decisions/0004-full-parity-owner-decisions.md item 14 (Azure resource name as Pi)",
+      "highlights": [
+        "fixes: #5 and thinking clamps, RPC error messages, footer after every turn, auto-compaction in every mode, agent_settled ordering, triggerTurn timing",
+        "new: built-in extensions on/off, llama.cpp and /llama, native classifier/image providers, ctx.ui.setTheme, -e package resources, Codex WebSocket and zstd, X11 clipboard reading, Node spawn errors, lone surrogates, fractional tokens, 1,000 JSON levels, JavaScript-string-sized bounds, RPC/print setters save settings"
+      ],
+      "blockers": [],
+      "remaining": "Linux dry run, owner go-ahead, tag v1.1.0.3"
+    }
   },
   "messageCaps": {
     "status": "merged",

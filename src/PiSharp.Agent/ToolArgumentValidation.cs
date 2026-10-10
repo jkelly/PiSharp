@@ -865,7 +865,7 @@ internal static class Js
                         JsonValueKind.True => true,
                         JsonValueKind.False => false,
                         JsonValueKind.Null => null,
-                        JsonValueKind.Object or JsonValueKind.Array => FromNode(JsonNode.Parse(el.GetRawText())),
+                        JsonValueKind.Object or JsonValueKind.Array => FromNode(JsonNode.Parse(el.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)),
                         _ => Undefined,
                     };
                 }
@@ -879,7 +879,7 @@ internal static class Js
                 if (v.TryGetValue<float>(out var f)) return double.Parse(f.ToString("R", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
                 if (v.TryGetValue<ulong>(out var ul)) return (double)ul;
                 if (v.TryGetValue<char>(out var ch)) return ch.ToString();
-                return FromNode(JsonNode.Parse(v.ToJsonString()));
+                return FromNode(JsonNode.Parse(v.ToJsonString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions));
             }
             default:
                 return Undefined;

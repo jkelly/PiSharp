@@ -141,9 +141,10 @@ public sealed partial class PersistentAgentSession
         lock(_gate){configured=_automaticCompaction;desired=_recoveryDesiredOutput;context=_context;}
         if(configured is null||desired is null||result.Turns.IsEmpty)return RecoveryDecision.None;
         var turn=result.Turns[^1];var assistant=turn.Result.Chat.Message;var model=_configuration.Model;
+        if(AutomaticRequest(configured,model) is not { } automatic)return RecoveryDecision.None;
         if(assistant.StopReason==StopReason.Aborted||assistant.Model!=model.Id||assistant.Provider!=model.Provider||assistant.Api!=model.Api)return RecoveryDecision.None;
         var wire=PersistedWire(PiWireJson.WriteMessage(assistant)).Value;
-        var selected=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="assistant"&&JsonElement.DeepEquals(m.WireBody.Value,wire)));
+        var selected=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="assistant"&&JsonUtf16.DeepEquals(m.WireBody.Value,wire)));
         if(selected is null)return RecoveryDecision.None;
         var index=context.Ancestry.IndexOf(selected.SourceEntry);
         var later=context.Ancestry.Skip(index+1).ToArray();
@@ -151,7 +152,7 @@ public sealed partial class PersistentAgentSession
         var latestCompaction=context.Ancestry.LastOrDefault(e=>e.Kind==SessionEntryKind.Compaction);
         if(latestCompaction is not null&&assistant.Timestamp<=DateTimeOffset.Parse(latestCompaction.WireBody.Value.GetProperty("timestamp").GetString()!,System.Globalization.CultureInfo.InvariantCulture).ToUnixTimeMilliseconds())return RecoveryDecision.None;
         var explicitOverflow=assistant.StopReason==StopReason.Error&&SessionRecoveryClassifier.IsContextOverflow(assistant);
-        var overflow=explicitOverflow||!later.Any(e=>e.Kind==SessionEntryKind.ContextEdit)&&SessionRecoveryClassifier.IsContextOverflow(assistant,configured.Request.ContextWindow);
+        var overflow=explicitOverflow||!later.Any(e=>e.Kind==SessionEntryKind.ContextEdit)&&SessionRecoveryClassifier.IsContextOverflow(assistant,automatic.ContextWindow);
         var length=SessionRecoveryClassifier.IsRecoverableLength(assistant,desired.Value);
         if(!overflow&&!length)return RecoveryDecision.None;
         var retry=assistant.StopReason!=StopReason.Stop;
@@ -165,7 +166,7 @@ public sealed partial class PersistentAgentSession
             var targets=new List<string>{selected.SourceEntry.Id};
             foreach(var tool in turn.ToolResults.Where(m=>syntheticIds.Contains(m.WireBody.Value.GetProperty("toolCallId").GetString()!)))
             {
-                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonElement.DeepEquals(m.WireBody.Value,PersistedWire(tool.WireBody).Value)));
+                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonUtf16.DeepEquals(m.WireBody.Value,PersistedWire(tool.WireBody).Value)));
                 if(target is null)throw Error(PersistentAgentSessionFailure.InvalidCommit);targets.Add(target.SourceEntry.Id);
             }
             SetOperationPhase(SessionOperationPhase.RecoveryOmission);await OmitRecoveryAttemptAsync(targets,token,idle).ConfigureAwait(false);
@@ -174,7 +175,7 @@ public sealed partial class PersistentAgentSession
         SetOperationPhase(SessionOperationPhase.Compaction);
         try
         {
-            var receipt=await SummaryCoreAsync(configured.Request with { Automatic=false, Reason=SessionCompactionReason.Overflow, WillRetry=retry },null,configured.Generator,token,idle,abort,default,null,releaseReservation:false).ConfigureAwait(false);
+            var receipt=await SummaryCoreAsync(automatic with { Automatic=false, Reason=SessionCompactionReason.Overflow, WillRetry=retry },null,configured.Generator,token,idle,abort,default,null,releaseReservation:false).ConfigureAwait(false);
             var status=receipt is null?"skipped":"committed";lock(_gate)_lastAutomaticCompaction=new(status,receipt?.Entry.Id);
             await EmitOperationAsync(new SessionRecoveryEnded(operation,status,retry&&receipt is not null,receipt?.Entry.Id)).ConfigureAwait(false);
             return new(true,retry&&receipt is not null&&!token.IsCancellationRequested,retry);

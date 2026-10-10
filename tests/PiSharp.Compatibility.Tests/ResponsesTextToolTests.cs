@@ -168,7 +168,7 @@ static class ResponsesTextToolTests
         }
         Assert((await new ChatClient(new ResponsesTextToolTransport((request, token) => Sequence([sample]),
             new(MaximumEvents: 1, MaximumEventCharacters: sample.ToString().Length, MaximumInputCharacters: sample.ToString().Length))).CompleteAsync(Request())).Failure is null, "Exact raw admission boundary rejected.");
-        foreach (var options in new[] { new ResponsesTextToolOptions(MaximumEvents: 0), new(MaximumJsonDepth: 65), new(Rates: new(-1)) })
+        foreach (var options in new[] { new ResponsesTextToolOptions(MaximumEvents: 0), new(MaximumJsonDepth: 1001), new(Rates: new(-1)) })
         {
             try { _ = new ResponsesTextToolTransport((request, token) => Sequence([]), options); throw new Exception("Invalid options accepted."); }
             catch (ArgumentOutOfRangeException) { }

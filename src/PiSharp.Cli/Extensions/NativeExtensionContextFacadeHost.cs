@@ -153,7 +153,7 @@ public sealed partial class NativeExtensionContextFacadeHost : IExtensionSession
             if (step.Close) { writer.WriteEndArray(); writer.WriteEndObject(); continue; }
             var node = tree.ById[step.Id!];
             writer.WriteStartObject(); writer.WritePropertyName("entry");
-            writer.WriteRawValue(node.Entry.WireBody.ToString(), skipInputValidation: false);
+            writer.WriteRawValue(node.Entry.WireBody.ToString(), skipInputValidation: true);
             if (node.ResolvedLabel is { } label) writer.WriteString("label", label.Label);
             writer.WritePropertyName("children"); writer.WriteStartArray();
             pending.Push((null, true));
@@ -163,7 +163,7 @@ public sealed partial class NativeExtensionContextFacadeHost : IExtensionSession
         return JsonData.Parse(Encoding.UTF8.GetString(stream.ToArray()));
     }
     public Task WaitForIdleAsync(IExtensionCommandContext context, CancellationToken cancellationToken)
-        => Capture(context).Session.WaitForIdleAsync(cancellationToken);
+        => Capture(context).Session.WaitForCommandIdleAsync(cancellationToken);
     public Task CompactAsync(IExtensionCommandContext context, string? customInstructions, CancellationToken cancellationToken)
     {
         var attached = Capture(context);

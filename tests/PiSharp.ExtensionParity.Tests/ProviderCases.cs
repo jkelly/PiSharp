@@ -9,7 +9,30 @@ internal static partial class Program
     [
         ("provider.classifier-and-image-providers-registered-by-an-extension", ClassifierAndImageProviders),
         ("provider.model-registry-complete-from-extension-code", CompleteFromExtension),
+        ("provider.classifier-and-image-provider-without-api-key-needs-a-credential", KeylessClassifierAndImageProviders),
+        ("provider.list-models-lists-extension-providers", ListModelsWithExtensionProvider),
     ];
+
+    // main.ts: --list-models runs after createAgentSessionRuntime loaded the extensions, so an extension's provider is listed.
+    private static async Task ListModelsWithExtensionProvider()
+    {
+        using var sandbox = NodeSandbox("list-models");
+        sandbox.Vars["ROCKET_KEY"] = "rocket-secret";
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "rocket.ts"), """
+            export default function (pi: any) {
+              pi.registerProvider("rocketco", {
+                baseUrl: "https://rocket.invalid/v1", apiKey: "ROCKET_KEY", api: "openai-completions",
+                models: [{ id: "rocket-1", name: "Rocket 1", reasoning: false, input: ["text"], cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8000, maxTokens: 1000 }],
+              });
+            }
+            """);
+        var (code, stdout, stderr) = await sandbox.Run(["-e", extension, "--list-models", "rocket"]);
+        Equal(0, code, "exit; " + stderr);
+        Check(stdout.Contains("rocketco", StringComparison.Ordinal) && stdout.Contains("rocket-1", StringComparison.Ordinal), "the extension's model is listed: " + stdout + stderr);
+        (code, stdout, stderr) = await sandbox.Run(["--list-models", "rocket"]);
+        Equal(0, code, "exit without the extension; " + stderr);
+        Check(!stdout.Contains("rocketco", StringComparison.Ordinal), "without the extension the provider is not listed: " + stdout);
+    }
 
     // summarize.ts/qna.ts: an extension calls ctx.modelRegistry.complete() with ctx.model; the request streams through PiSharp's live route.
     private static async Task CompleteFromExtension()
@@ -79,5 +102,30 @@ internal static partial class Program
         Equal("""["classify","judge","acme",["safe"],"acme-secret"]""", classify.ToJsonString(), "classify reached the extension with the provider's resolved key");
         Check(lines.Any(record => record.ToJsonString() == """["images","painter","a cat"]"""), "generateImages reached the extension: " + string.Join("\n", LogLines(sandbox)));
         Equal("""["results","stop",0.75,null,"stop","image/png",null]""", lines.Single(record => record[0]!.GetValue<string>() == "results").ToJsonString(), "results returned to the tool");
+    }
+
+    // provider-composer.ts composeApiKeyAuth without apiKey, oauth or a built-in provider: the provider's API-key method resolves only a
+    // request key or a stored api_key credential, so without one model-runtime.ts prepareRequest fails before the implementation runs
+    // ("Provider is not configured: acme"); a credential in auth.json configures it.
+    private static async Task KeylessClassifierAndImageProviders()
+    {
+        using var sandbox = NodeSandbox("providers-keyless");
+        sandbox.Vars["ACME_KEY"] = "acme-secret";
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "acme.ts"), ProviderExtension.Replace("apiKey: \"ACME_KEY\",", "", StringComparison.Ordinal));
+        sandbox.Respond = (_, index) => index % 2 == 0 ? AnthropicToolCall("judge", new { }) : AnthropicText("done");
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "judge it"]);
+        Equal(0, code, "exit; " + stderr);
+        var lines = LogLines(sandbox);
+        Check(!lines.Any(line => line.StartsWith("[\"classify\"", StringComparison.Ordinal) || line.StartsWith("[\"images\"", StringComparison.Ordinal)),
+            "no implementation ran: " + string.Join("\n", lines));
+        Equal("""["results","error",null,"Provider is not configured: acme","error",null,"Provider is not configured: acme"]""",
+            lines.Single(line => line.StartsWith("[\"results\"", StringComparison.Ordinal)), "unconfigured results");
+        File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
+        File.WriteAllText(Path.Combine(sandbox.AgentDir, "auth.json"), """{"acme":{"type":"api_key","key":"stored-acme"}}""");
+        (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "judge it"]);
+        Equal(0, code, "stored exit; " + stderr);
+        lines = LogLines(sandbox);
+        Equal("""["classify","judge","acme",["safe"],"stored-acme"]""", lines.Single(line => line.StartsWith("[\"classify\"", StringComparison.Ordinal)), "the stored key");
+        Equal("""["results","stop",0.75,null,"stop","image/png",null]""", lines.Single(line => line.StartsWith("[\"results\"", StringComparison.Ordinal)), "configured results");
     }
 }

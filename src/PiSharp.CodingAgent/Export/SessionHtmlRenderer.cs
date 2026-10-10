@@ -110,7 +110,7 @@ public sealed class SessionHtmlRenderer
         Append("</section><section id=\"other-branches\"><h2>Other branch entries</h2>");
         foreach (var entry in snapshot.Entries) if (!selected.Contains(entry.Id)) RenderEntry(entry, false);
         Append("</section><details><summary>Complete captured JSONL archive</summary><pre id=\"session-jsonl\">");
-        var codec = new SessionEntryCodec(new(MaximumRecordCharacters: options.MaximumInputCharacters, MaximumJsonDepth: 64));
+        var codec = new SessionEntryCodec(new(MaximumRecordCharacters: options.MaximumInputCharacters, MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth));
         Text(codec.Serialize(snapshot.Header)); Append("\n");
         foreach (var entry in snapshot.Entries) { cancellationToken.ThrowIfCancellationRequested(); Text(codec.Serialize(entry)); Append("\n"); }
         Append("</pre></details></main></body></html>\n");

@@ -32,8 +32,8 @@ PiSharp uses your `npm` (or the `npmCommand` setting) and `git`.
 | `pisharp remove <source>` | Removes a package and its settings entry. `uninstall` is the same. |
 | `pisharp update --extensions` | Updates installed packages. Pinned versions stay pinned. |
 | `pisharp update <source>` | Updates one package. |
-| `pisharp config` | Opens a screen to turn single resources of a package on or off. Tab switches between your settings and the project's. |
+| `pisharp config` | Opens a screen to turn single resources of a package, or Pi's [built-in extensions](/docs/reference/configuration/#built-in-extensions), on or off. Tab switches between your settings and the project's. |
 
-To try a package without installing it, load it for one run with `-e npm:@example/pi-tools`.
+To try a package without installing it, load it for one run with `-e npm:@example/pi-tools`. Its extensions, skills, prompt templates and themes all load, as in Pi.
 
 A package can hold TypeScript extensions, C# extensions (a folder with a `pisharp-extension.json`), skills, prompt templates and themes.

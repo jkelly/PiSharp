@@ -6,6 +6,21 @@ namespace PiSharp.Contracts;
 /// <summary>An owned, immutable JSON value. Cloning severs JsonDocument lifetime and mutable input ownership.</summary>
 public sealed class JsonData
 {
+    /// <summary>
+    /// The deepest nesting an owned value holds (an object or array is one level). JSON.parse has no such limit, but Pi's own writes
+    /// recurse: V8's JSON.stringify gives up at about 1,700 nested objects on Node's default stack, so Pi cannot store or send a deeper
+    /// value. PiSharp's readers, validators and writers recurse too; 1,000 levels (System.Text.Json's own writer default) keeps every
+    /// such walk safely inside a thread's stack.
+    /// </summary>
+    public const int MaximumDepth = 1000;
+
+    /// <summary>Document options that admit <see cref="MaximumDepth"/> levels (System.Text.Json's default is 64).</summary>
+    public static JsonDocumentOptions DocumentOptions => new() { MaxDepth = MaximumDepth };
+
+    /// <summary>Serializer options whose writer admits the levels of a <see cref="MaximumDepth"/> value nested in a serialized object
+    /// (System.Text.Json's default is 64).</summary>
+    public static JsonSerializerOptions SerializerOptions { get; } = new() { MaxDepth = 2 * MaximumDepth };
+
     public JsonElement Value { get; }
 
     private JsonData(JsonElement value)
@@ -16,7 +31,7 @@ public sealed class JsonData
 
     public static JsonData Parse(string json)
     {
-        using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 64 });
+        using var document = JsonDocument.Parse(json, DocumentOptions);
         return new JsonData(document.RootElement);
     }
 
@@ -25,24 +40,31 @@ public sealed class JsonData
     public static JsonData Null { get; } = Parse("null");
     public override string ToString() => Value.GetRawText();
 
-    internal static void Validate(JsonElement value, int depth = 0)
+    // Iterative: a value of MaximumDepth levels needs no recursion here.
+    internal static void Validate(JsonElement value)
     {
-        if (depth > 64) throw new JsonException("Maximum JSON depth exceeded.");
-        if (value.ValueKind == JsonValueKind.Undefined)
-            throw new JsonException("Undefined is not a JSON value.");
-        if (value.ValueKind == JsonValueKind.Object)
+        var pending = new Stack<(JsonElement Value, int Depth)>();
+        pending.Push((value, 0));
+        while (pending.Count != 0)
         {
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var property in value.EnumerateObject())
+            var (current, depth) = pending.Pop();
+            if (current.ValueKind == JsonValueKind.Undefined)
+                throw new JsonException("Undefined is not a JSON value.");
+            if (current.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)) continue;
+            if (depth >= MaximumDepth) throw new JsonException("Maximum JSON depth exceeded.");
+            if (current.ValueKind == JsonValueKind.Object)
             {
-                if (!names.Add(property.Name))
-                    throw new JsonException($"Duplicate JSON property: {property.Name}");
-                Validate(property.Value, depth + 1);
+                var names = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var property in current.EnumerateObject())
+                {
+                    // A name may hold a lone surrogate, as a JavaScript property key does (JSON.parse keeps it).
+                    var name = JsonUtf16.GetName(property);
+                    if (!names.Add(name))
+                        throw new JsonException($"Duplicate JSON property: {JsonUtf16.ToWellFormed(name)}");
+                    pending.Push((property.Value, depth + 1));
+                }
             }
-        }
-        else if (value.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in value.EnumerateArray()) Validate(item, depth + 1);
+            else foreach (var item in current.EnumerateArray()) pending.Push((item, depth + 1));
         }
     }
 }
@@ -71,7 +93,10 @@ public sealed class JsonFields
         var builder = ImmutableDictionary.CreateBuilder<string, JsonData>(StringComparer.Ordinal);
         var order = ImmutableList.CreateBuilder<string>();
         foreach (var property in value.EnumerateObject())
-            if (!known.Contains(property.Name)) { builder.Add(property.Name, JsonData.FromElement(property.Value)); order.Add(property.Name); }
+        {
+            var name = JsonUtf16.GetName(property);
+            if (!known.Contains(name)) { builder.Add(name, JsonData.FromElement(property.Value)); order.Add(name); }
+        }
         return new(builder.ToImmutable(), order.ToImmutable());
     }
 }

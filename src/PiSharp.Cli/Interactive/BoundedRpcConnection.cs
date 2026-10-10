@@ -7,7 +7,7 @@ namespace PiSharp.Cli.Interactive;
 /// <summary>Bounded complete-record command bytes and the host's actual shared output lease.</summary>
 internal sealed class BoundedRpcConnection : IAsyncDisposable
 {
-    private const int MaximumFrameBytes = PiSharp.Cli.Commands.PiPayloadBudget.OutputRecordBytes;
+    private const int MaximumFrameBytes = PiSharp.Cli.Commands.PiPayloadBudget.PiOutputRecordBytes;
     private readonly Channel<byte[]> commands = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(8)
     { SingleReader = true, FullMode = BoundedChannelFullMode.Wait, AllowSynchronousContinuations = false });
     private readonly SemaphoreSlim slots = new(8, 8);
@@ -36,7 +36,7 @@ internal sealed class BoundedRpcConnection : IAsyncDisposable
         try
         {
             var raw = Encoding.UTF8.GetBytes(record.ToString() + "\n");
-            if (raw.Length > PiSharp.Cli.Commands.PiPayloadBudget.RpcCommandBytes + 1) throw new InvalidOperationException("Interactive command exceeds RPC framing.");
+            if (raw.Length > PiSharp.Cli.Commands.PiPayloadBudget.PiRpcCommandBytes + 1) throw new InvalidOperationException("Interactive command exceeds RPC framing.");
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, stop);
             try { await slots.WaitAsync(linked.Token).ConfigureAwait(false); }
             catch (OperationCanceledException error) when (OwnsAdmissionCancellation(error, linked.Token, token))

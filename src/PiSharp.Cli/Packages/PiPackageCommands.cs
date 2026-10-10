@@ -271,9 +271,11 @@ Options:
         var processes = Processes(host);
         try
         {
-            var globalResolved = await new PiPackageManager(cwd, agentDir, host.Home, globalSettings, host.GetEnvironment, processes).ResolveAsync(cancellationToken: token).ConfigureAwait(false);
+            // package-manager-cli.ts handleConfigCommand: the built-in extensions are listed (builtinExtensions).
+            var builtins = PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Names;
+            var globalResolved = await new PiPackageManager(cwd, agentDir, host.Home, globalSettings, host.GetEnvironment, processes, builtins).ResolveAsync(cancellationToken: token).ConfigureAwait(false);
             var projectResolved = settings.ProjectTrusted
-                ? await new PiPackageManager(cwd, agentDir, host.Home, settings, host.GetEnvironment, processes).ResolveAsync(cancellationToken: token).ConfigureAwait(false)
+                ? await new PiPackageManager(cwd, agentDir, host.Home, settings, host.GetEnvironment, processes, builtins).ResolveAsync(cancellationToken: token).ConfigureAwait(false)
                 : globalResolved;
             if (host.ConfigSelector is null)
             {

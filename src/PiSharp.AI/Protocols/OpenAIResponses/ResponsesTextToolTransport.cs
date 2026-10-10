@@ -48,7 +48,7 @@ public sealed record ResponsesTokenRates(decimal Input = 0, decimal Output = 0, 
 public sealed record ResponsesTextToolOptions(
     int MaximumEvents = int.MaxValue, int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue,
-    int MaximumContentCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32,
+    int MaximumContentCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     ResponsesTokenRates? Rates = null, string? ServiceTier = null)
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: selects each custom tool call's grammar input property.</summary>
@@ -74,7 +74,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         if (!ResponsesServiceTier.Supported(_options.ServiceTier))
             throw new ArgumentException("Unsupported Responses service tier.", nameof(options));
         if (_options.MaximumEvents <= 0 || _options.MaximumEventCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
-            _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Responses limits must be positive; JSON depth must be at most 64.");
         if (_rates.Input < 0 || _rates.Output < 0 || _rates.CacheRead < 0 || _rates.CacheWrite < 0 ||
             _rates.Tiers.IsDefault || _rates.Tiers.Any(tier => tier is null || tier.Input < 0 || tier.Output < 0 || tier.CacheRead < 0 || tier.CacheWrite < 0))
@@ -514,7 +514,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var encrypted = OptionalStringOrNull(item, "encrypted_content");
             if (string.IsNullOrEmpty(encrypted) || !_reasoningById.TryGetValue(id, out var slot) || slot.ReasoningItem is null) return;
             if (!string.IsNullOrEmpty(OptionalStringOrNull(slot.ReasoningItem.Value, "encrypted_content"))) return;
-            var merged = JsonNode.Parse(slot.ReasoningItem.ToString())!.AsObject();
+            var merged = JsonNode.Parse(slot.ReasoningItem.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
             merged["encrypted_content"] = encrypted;
             slot.ReasoningItem = JsonData.Parse(merged.ToJsonString());
         }
@@ -635,16 +635,16 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var input = Number(usage, "input_tokens");
             var output = Number(usage, "output_tokens");
             var total = Number(usage, "total_tokens");
-            long cached = 0, written = 0, reasoning = 0;
+            double cached = 0, written = 0, reasoning = 0;
             if (usage.TryGetProperty("input_tokens_details", out var details))
             {
                 Object(details); cached = Number(details, "cached_tokens"); written = Number(details, "cache_write_tokens");
             }
             if (usage.TryGetProperty("output_tokens_details", out var outputDetails))
                 reasoning = Number(Object(outputDetails), "reasoning_tokens");
-            var uncached = Math.Max(0, checked(input - cached - written));
+            var uncached = Math.Max(0, input - cached - written);
             // Pi abe508 models.ts calculateCost through the shared tier selection.
-            var rates = PromptLengthPricing.TrySelect(_rates.Tiers, candidate => candidate.InputTokensAbove, (decimal)uncached, cached, written, out var tier)
+            var rates = PromptLengthPricing.TrySelect(_rates.Tiers, candidate => Number(candidate.InputTokensAbove), uncached, cached, written, out var tier)
                 ? new ResponsesTokenRates(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite) : _rates;
             // models.ts calculateCost in binary64 Numbers: three divide-then-multiply terms, the cache write term multiplies
             // before dividing (no 1h writes here), and the total is left associative.
@@ -654,7 +654,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var writtenCost = (Number(rates.CacheWrite) * written + Number(rates.Input) * 2d * 0d) / 1_000_000d;
             return new(uncached, output, cached, written, total,
                 Binary64Cost(inputCost, outputCost, cachedCost, writtenCost, ((inputCost + outputCost) + cachedCost) + writtenCost),
-                JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(System.Globalization.CultureInfo.InvariantCulture)))) { ExtrasBeforeTotal = true };
+                JsonFields.Empty.Set("reasoning", JsonData.Parse(JsonNumber.Text(reasoning)))) { ExtrasBeforeTotal = true };
         }
 
         // A decimal rate as the Number JSON.parse reads from its text.
@@ -680,25 +680,18 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             {
                 if (depth >= _options.MaximumJsonDepth) throw Limit();
                 if (value.ValueKind == JsonValueKind.Object)
-                    foreach (var property in value.EnumerateObject()) { CheckString(property.Name); CheckJson(property.Value, depth + 1); }
+                    foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); CheckJson(property.Value, depth + 1); }
                 else foreach (var child in value.EnumerateArray()) CheckJson(child, depth + 1);
             }
-            else if (value.ValueKind == JsonValueKind.String) CheckString(value.GetString()!);
+            // openai-responses-shared.ts reads each event with JSON.parse: a string keeps a lone surrogate.
+            else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
         }
 
-        private static void CheckString(string value)
-        {
-            for (var index = 0; index < value.Length; index++)
-                if (char.IsSurrogate(value[index]))
-                {
-                    if (!char.IsHighSurrogate(value[index]) || index + 1 >= value.Length || !char.IsLowSurrogate(value[++index])) throw Protocol();
-                }
-        }
         private static JsonElement Object(JsonElement value) => value.ValueKind == JsonValueKind.Object ? value : throw Protocol();
         private static string String(JsonElement value, string name, bool allowEmpty = false)
         {
             if (!value.TryGetProperty(name, out var field) || field.ValueKind != JsonValueKind.String) throw Protocol();
-            var result = field.GetString()!;
+            var result = JsonUtf16.GetString(field);
             if (!allowEmpty && result.Length == 0) throw Protocol();
             return result;
         }
@@ -709,7 +702,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         private static string CallText(JsonElement value, string name) =>
             !value.TryGetProperty(name, out var field) ? "undefined" : field.ValueKind switch
             {
-                JsonValueKind.String => field.GetString()!, JsonValueKind.Null => "null", _ => throw Protocol()
+                JsonValueKind.String => JsonUtf16.GetString(field), JsonValueKind.Null => "null", _ => throw Protocol()
             };
         private static string ItemText(JsonElement item, string name, bool call) => call ? CallText(item, name) : String(item, name);
         private static int Index(JsonElement value)
@@ -717,10 +710,12 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             if (!value.TryGetProperty("output_index", out var index) || !index.TryGetInt32(out var result) || result < 0) throw Protocol();
             return result;
         }
-        private static long Number(JsonElement value, string name)
+        // openai-responses-shared.ts keeps each count as the JavaScript number the response reports (a fraction included).
+        private static double Number(JsonElement value, string name)
         {
-            if (!value.TryGetProperty(name, out var field)) return 0;
-            if (!field.TryGetInt64(out var result) || result < 0) throw Protocol();
+            if (!value.TryGetProperty(name, out var field) || field.ValueKind == JsonValueKind.Null) return 0;
+            var result = field.ValueKind == JsonValueKind.Number ? JsonNumber.Read(field) : double.NaN;
+            if (!double.IsFinite(result)) throw Protocol();
             return result;
         }
     }

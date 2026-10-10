@@ -13,6 +13,45 @@ namespace PiSharp.CodingAgent;
 public sealed partial class PersistentAgentSession
 {
     private ImmutableArray<TranscriptEntry> _nextTurnCustomMessages = [];
+    private Task<AgentLoopResult>? _inputTriggeredRun;
+
+    /// <summary>The last run an extension's custom message (sendMessage with triggerTurn) started outside any prompt (while idle, or while
+    /// an admitted input was being reduced, as in an extension command's handler), once: the caller owns its monitoring. Null when none
+    /// started since the last admitted input or the last take.</summary>
+    public Task<AgentLoopResult>? TakeInputTriggeredRun()
+    {
+        lock (_gate) { var run = _inputTriggeredRun; _inputTriggeredRun = null; return run; }
+    }
+    private ImmutableList<Task> _commandIdleBarriers = [];
+    /// <summary>agent-session.ts _emitAgentSettled: the session emits agent_settled before it resolves the idle waiters, so a command
+    /// awaiting waitForIdle resumes after it. A host that publishes the settlement of a run it took (<see cref="TakeInputTriggeredRun"/>)
+    /// holds the command's <see cref="WaitForCommandIdleAsync"/> until <paramref name="published"/> completes.</summary>
+    public void HoldCommandIdleUntil(Task published)
+    {
+        ArgumentNullException.ThrowIfNull(published);
+        lock (_gate) _commandIdleBarriers = _commandIdleBarriers.RemoveAll(barrier => barrier.IsCompleted).Add(published);
+    }
+    /// <summary>The idle of the run an admitted input triggered (a command's sendMessage with triggerTurn), without that input: the
+    /// host settles the run while the command's handler is still running, as agent-session.ts _runAgentPrompt does.</summary>
+    public Task WaitForTriggeredRunIdleAsync()
+    {
+        var agentIdle = _agent.WaitForIdleAsync();
+        Task idle; Task diagnostics; Task settings; Task[] bash;
+        lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; diagnostics = LoadoutDiagnosticIdleLocked(); settings = RetrySettingsIdleLocked(); bash = CaptureUserBashCompletionsLocked(); }
+        return Task.WhenAll(new[] { agentIdle, idle, diagnostics, settings }.Concat(bash));
+    }
+    /// <summary>agent-session.ts _runAgentPrompt: a triggered run continues with what was queued at its end (agent.continue) while the
+    /// command's handler still runs.</summary>
+    public Task<AgentLoopResult> ContinueTriggeredRunAsync(CancellationToken cancellationToken = default) =>
+        Start(_agent.ContinueAsync, cancellationToken, duringInput: true);
+    /// <summary>The default execution context (no async-local values), captured on a thread started without flowing the caller's.</summary>
+    private static readonly Lazy<ExecutionContext> CleanExecutionContext = new(() =>
+    {
+        ExecutionContext? captured = null;
+        var thread = new Thread(() => captured = ExecutionContext.Capture()) { IsBackground = true };
+        thread.UnsafeStart(); thread.Join();
+        return captured ?? throw new InvalidOperationException("No default execution context.");
+    });
     public bool HasPendingCustomMessages { get { lock (_gate) return !_nextTurnCustomMessages.IsEmpty || _agent.ContextOnlyPendingCount != 0; } }
 
     /// <summary>Actual custom_message delivery. Queued admission is not a durable commit receipt.</summary>
@@ -34,7 +73,7 @@ public sealed partial class PersistentAgentSession
             { writer.WriteStartObject(); writer.WriteString("role", "custom"); WriteCustom(writer, draft); writer.WriteNumber("timestamp", timestamp); writer.WriteEndObject(); }
             message = new("custom", JsonData.Parse(System.Text.Encoding.UTF8.GetString(bytes.ToArray())));
         }
-        TaskCompletionSource? idle = null;
+        TaskCompletionSource? idle = null; var duringInput = false;
         lock (_gate)
         {
             ThrowAvailable(); ThrowInputMutation(); cancellationToken.ThrowIfCancellationRequested();
@@ -60,10 +99,12 @@ public sealed partial class PersistentAgentSession
             if (_inputSubmission is not null)
             {
                 // agent-session.ts sendCustomMessage: while a prompt's input is admitted (input hooks, an extension command's handler)
-                // the session is not streaming, so the message is appended (and emitted) at once, ahead of anything the prompt records.
-                if (triggerTurn == true || !_agent.Snapshot.PendingInputs.IsEmpty) throw new InvalidOperationException("Input admission is already processing.");
+                // the session is not streaming, so the message is appended (and emitted) at once, ahead of anything the prompt records;
+                // a message that triggers a turn starts it at once (_runAgentPrompt), while the handler is still running.
+                if (!_agent.Snapshot.PendingInputs.IsEmpty) throw new InvalidOperationException("Input admission is already processing.");
                 // The admission owns the session reservation; the append only takes the commit gate, as other leaf entries do.
-                idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                if (triggerTurn == true) duringInput = true;
+                else idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
             }
             else if (triggerTurn != true)
             {
@@ -72,11 +113,35 @@ public sealed partial class PersistentAgentSession
             }
         }
         return idle is not null ? AppendCustomMessageCoreAsync(draft, cancellationToken, idle)
-            : TriggerCustomMessageCoreAsync(message, cancellationToken);
+            : TriggerCustomMessageCoreAsync(message, cancellationToken, duringInput);
     }
-    private async Task<SessionCustomMessageReceipt> TriggerCustomMessageCoreAsync(TranscriptEntry message, CancellationToken token)
+    private async Task<SessionCustomMessageReceipt> TriggerCustomMessageCoreAsync(TranscriptEntry message, CancellationToken token, bool duringInput)
     {
-        var original = PromptAsync(message, token);
+        Task<AgentLoopResult> original = null!;
+        Task<AgentLoopResult> StartRun() => Start(current => _agent.PromptAsync([message], current), token, [message], injectNextTurnCustom: true, duringInput: duringInput);
+        // A host that tracks runs (the RPC host answering prompts and publishing agent_settled) takes this run when it sees it start
+        // (TakeInputTriggeredRun): the turn belongs to no prompt of its own.
+        var adopted = new TaskCompletionSource<AgentLoopResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_gate) _inputTriggeredRun = adopted.Task;
+        try
+        {
+            // During a command the turn is not part of the handler's call (upstream's _runAgentPrompt outlives it): it starts now, in a
+            // clean execution context, so it carries none of the handler's ambient state (its input reservation, its callback frame).
+            if (duringInput) ExecutionContext.Run(CleanExecutionContext.Value, _ => original = StartRun(), null);
+            else original = StartRun();
+        }
+        catch (Exception error)
+        {
+            lock (_gate) if (ReferenceEquals(_inputTriggeredRun, adopted.Task)) _inputTriggeredRun = null;
+            adopted.TrySetException(error); _ = adopted.Task.Exception;
+            throw;
+        }
+        _ = original.ContinueWith(static (run, state) =>
+        {
+            var target = (TaskCompletionSource<AgentLoopResult>)state!;
+            if (run.IsCanceled) target.TrySetCanceled(); else if (run.IsFaulted) target.TrySetException(run.Exception!.InnerExceptions); else target.TrySetResult(run.Result);
+        }, adopted, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        lock (_gate) if (ReferenceEquals(_inputTriggeredRun, adopted.Task) && original.IsCompleted) _inputTriggeredRun = null;
         try { return new(SessionCustomMessageDisposition.Started, Run: await original.ConfigureAwait(false)); }
         catch (Exception error) when (original.IsFaulted) { throw new AggregateException("Custom prompt original fault.", original.Exception!, error); }
     }
@@ -146,8 +211,8 @@ public sealed partial class PersistentAgentSession
     private static void WriteCustom(Utf8JsonWriter writer, SessionCustomMessageDraft draft)
     {
         writer.WriteString("customType", draft.CustomType); writer.WritePropertyName("content");
-        writer.WriteRawValue(draft.Content?.ToString() ?? "[]"); writer.WriteBoolean("display", draft.Display);
-        if (draft.Details is not null) { writer.WritePropertyName("details"); writer.WriteRawValue(draft.Details.ToString()); }
+        writer.WriteRawValue(draft.Content?.ToString() ?? "[]", skipInputValidation: true); writer.WriteBoolean("display", draft.Display);
+        if (draft.Details is not null) { writer.WritePropertyName("details"); writer.WriteRawValue(draft.Details.ToString(), skipInputValidation: true); }
     }
     // Called only under the actual session reservation gate; nextTurn is injected after the next USER.
     private ImmutableArray<TranscriptEntry> InjectNextTurnCustomLocked(ImmutableArray<TranscriptEntry> inputs)

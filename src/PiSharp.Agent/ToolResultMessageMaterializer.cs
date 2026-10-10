@@ -43,10 +43,10 @@ public static class ToolResultMessageMaterializer
         {
             writer.WriteStartObject(); writer.WriteString("role", "toolResult");
             writer.WriteString("toolCallId", message.ToolCallId); writer.WriteString("toolName", message.ToolName);
-            writer.WritePropertyName("content"); writer.WriteRawValue(message.ContentValue.ToString());
-            if (message.HasDetails) { writer.WritePropertyName("details"); writer.WriteRawValue(message.Details.ToString()); }
-            if (message.Usage is { } usage) { writer.WritePropertyName("usage"); writer.WriteRawValue(usage.ToString()); }
-            if (message.NestedCalls is { } calls) { writer.WritePropertyName("nestedCalls"); writer.WriteRawValue(calls.ToString()); }
+            writer.WritePropertyName("content"); writer.WriteRawValue(message.ContentValue.ToString(), skipInputValidation: true);
+            if (message.HasDetails) { writer.WritePropertyName("details"); writer.WriteRawValue(message.Details.ToString(), skipInputValidation: true); }
+            if (message.Usage is { } usage) { writer.WritePropertyName("usage"); writer.WriteRawValue(usage.ToString(), skipInputValidation: true); }
+            if (message.NestedCalls is { } calls) { writer.WritePropertyName("nestedCalls"); writer.WriteRawValue(calls.ToString(), skipInputValidation: true); }
             writer.WriteBoolean("isError", message.IsError);
             if (message.DurationMs is { } duration) writer.WriteNumber("durationMs", duration);
             writer.WriteNumber("timestamp", timestamp); writer.WriteEndObject();

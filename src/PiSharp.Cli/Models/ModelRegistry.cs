@@ -2,7 +2,8 @@
 // availability snapshot, getError, getProviderAuthStatus, getAuth, registerVirtualModel, resolveModel),
 // packages/coding-agent/src/core/model-registry.ts (getApiKeyAndHeaders, getProviderDisplayName),
 // packages/coding-agent/src/core/provider-composer.ts (composeApiKeyAuth check/resolve) and packages/ai/src/models.ts
-// (getModels, getAvailable, checkProviderAuth, refresh), packages/ai/src/providers/{github-copilot,openai,radius}.ts (filters, radius catalog).
+// (getModels, getAvailable, checkProviderAuth, refresh), packages/ai/src/providers/{github-copilot,openai,radius}.ts (filters, radius catalog)
+// and packages/coding-agent/src/extensions/llama/provider.ts (the built-in llama.cpp provider: auth check/resolve and refreshModels).
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json.Nodes;
@@ -24,6 +25,11 @@ internal sealed record ModelRegistryOptions
     internal Func<string, bool>? FileExists { get; init; }
     internal string? Home { get; init; }
     internal Func<DateTimeOffset>? Now { get; init; }
+    /// <summary>The HTTP client the llama.cpp catalog refresh uses (null: a shared client).</summary>
+    internal Func<HttpMessageInvoker>? CreateLlamaHttp { get; init; }
+    /// <summary>Whether the built-in llama.cpp extension registers its provider (false: <c>-builtin:llama.cpp</c>, <c>--no-extensions</c>);
+    /// null: it does.</summary>
+    internal Func<bool>? LlamaProvider { get; init; }
 }
 
 /// <summary>Resolved request authentication of one model (getApiKeyAndHeaders).</summary>
@@ -44,6 +50,10 @@ internal sealed class ModelRegistry
     private readonly Dictionary<string, Dictionary<string, Registered>> virtualModels = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string?> authChecks = new(StringComparer.Ordinal);
     private ImmutableArray<RegistryModel>? radiusDynamic;
+    private const string LlamaProviderId = PiSharp.Cli.Llama.LlamaCatalog.ProviderId;
+    private readonly PiSharp.Cli.Llama.LlamaCatalog llama;
+    /// <summary>The llama.cpp catalog this registry's models store shares (provider.ts createLlamaProvider's state).</summary>
+    internal PiSharp.Cli.Llama.LlamaCatalog Llama => llama;
     private ModelsJsonConfig config;
     private List<Composed> providers = [];
     internal ConfigValueResolver Values { get; }
@@ -54,6 +64,7 @@ internal sealed class ModelRegistry
         Values = new(options.Environment, options.RunCommand);
         config = ModelsJsonConfig.Load(options.ModelsPath);
         var client = options.CreateCatalogClient ?? (() => new HttpClient());
+        llama = PiSharp.Cli.Llama.LlamaCatalog.For(options.ModelsStore is FileModelsStore file ? file.Path : null);
         foreach (var provider in BuiltinProviders.All.Where(provider => provider.Id != "radius"))
             overlays[provider.Id] = new(provider.Id, client, options.CatalogBaseUrl, BuiltinModelCatalog.GeneratedAtUnixMilliseconds, options.Now);
         Rebuild();
@@ -75,7 +86,9 @@ internal sealed class ModelRegistry
     private static IReadOnlyList<RegistryModel> BuiltinModels(string provider) => !BuiltinModelCatalog.Has(provider) ? [] :
         Builtins.GetOrAdd(provider, id => [.. BuiltinModelCatalog.Get(id).Models.Select(RegistryModel.FromCatalog)]);
 
-    private IEnumerable<string> ProviderIds() => BuiltinProviders.All.Select(provider => provider.Id)
+    // The built-in llama.cpp extension registers its provider after the pi-ai built-ins (extensions/index.ts builtInExtensions).
+    private bool LlamaLoaded => options.LlamaProvider?.Invoke() != false;
+    private IEnumerable<string> ProviderIds() => BuiltinProviders.All.Select(provider => provider.Id).Concat(LlamaLoaded ? [LlamaProviderId] : [])
         .Concat(config.ProviderIds).Concat(extensionProviders.Keys).Concat(virtualModels.Keys).Distinct(StringComparer.Ordinal);
 
     // model-runtime.ts registerProvider/unregisterProvider: an extension's provider layer over the built-in and models.json layers.
@@ -115,9 +128,10 @@ internal sealed class ModelRegistry
     private void Rebuild()
     {
         var next = new List<Composed>();
+        var llamaLoaded = LlamaLoaded;
         foreach (var id in ProviderIds())
         {
-            IReadOnlyList<RegistryModel> baseModels = id == "radius" && radiusDynamic is { } dynamic ? dynamic :
+            IReadOnlyList<RegistryModel> baseModels = id == "radius" && radiusDynamic is { } dynamic ? dynamic : id == LlamaProviderId && llamaLoaded ? llama.AllModels :
                 overlays.TryGetValue(id, out var overlay) ? overlay.Apply(BuiltinModels(id)) : BuiltinModels(id);
             var providerConfig = config.GetProvider(id);
             var extension = extensionProviders.GetValueOrDefault(id);
@@ -170,6 +184,16 @@ internal sealed class ModelRegistry
                 }
                 catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors[id] = error; }
             }
+            if ((providers is null || providers.Contains(LlamaProviderId)) && LlamaLoaded)
+            {
+                try
+                {
+                    var stored = await store.ReadAsync(LlamaProviderId, cancellationToken).ConfigureAwait(false);
+                    stored = stored is null ? null : stored with { Models = new([.. stored.Models.OfType<JsonObject>().Where(KnownType).Select(model => (JsonNode?)model.DeepClone())]) };
+                    await RefreshLlamaAsync(stored, allowNetwork, store, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors[LlamaProviderId] = error; }
+            }
             if (providers is null || providers.Contains("radius"))
             {
                 // radius.ts refreshModels: a stored gateway catalog replaces the shipped baseline. The gateway fetch belongs to the Radius
@@ -183,10 +207,40 @@ internal sealed class ModelRegistry
                 catch (Exception error) when (error is not OperationCanceledException) { errors["radius"] = error; }
             }
         }
+        else if ((providers is null || providers.Contains(LlamaProviderId)) && LlamaLoaded)
+        {
+            try { await RefreshLlamaAsync(null, allowNetwork, null, cancellationToken).ConfigureAwait(false); }
+            catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors[LlamaProviderId] = error; }
+        }
         Rebuild();
         return errors;
         static bool KnownType(JsonObject model) => JsonTree.String(model, "type") is null or "chat" or "image" or "classifier";
     }
+
+    /// <summary>provider.ts refreshModels with the stored api_key credential of llama.cpp (its key resolved as a config value).</summary>
+    private Task RefreshLlamaAsync(ModelsStoreEntry? stored, bool allowNetwork, IModelsStore? store, CancellationToken cancellationToken) =>
+        llama.RefreshAsync(new(stored, LlamaCredential(), allowNetwork, async publication =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (store is not null)
+            {
+                if (publication.Delete) await store.DeleteAsync(LlamaProviderId, cancellationToken).ConfigureAwait(false);
+                else if (publication.Persist is { } persist) await store.WriteAsync(LlamaProviderId, persist, cancellationToken).ConfigureAwait(false);
+            }
+            publication.Update?.Invoke();
+            return true;
+        }, cancellationToken, options.CreateLlamaHttp?.Invoke()));
+
+    private PiSharp.Cli.Llama.ProviderStoredCredentialView? LlamaCredential() =>
+        Stored(LlamaProviderId) is { } stored ? new(stored.Type, stored.Key, stored.Environment) : null;
+
+    /// <summary>Whether llama.cpp is the built-in extension's provider here (models.json and extensions did not configure it).</summary>
+    private bool IsBuiltinLlama(string provider) => provider == LlamaProviderId && LlamaLoaded && config.GetProvider(provider) is null && !extensionProviders.ContainsKey(provider);
+
+    /// <summary>provider.ts auth.apiKey.resolve for llama.cpp (the /llama command's <c>getProviderAuth</c>): the server URL and key, or
+    /// null when no server URL is configured. An invalid configured URL throws.</summary>
+    internal PiSharp.Cli.Llama.LlamaAuth? ResolveLlamaAuth() =>
+        PiSharp.Cli.Llama.LlamaCatalog.Resolve(LlamaCredential(), name => ProviderEnvironmentKeys.Value(options.Environment, name));
 
     /// <summary>Source getError: models.json load errors, then every provider composition error.</summary>
     internal string? GetError()
@@ -245,6 +299,12 @@ internal sealed class ModelRegistry
     {
         var composed = providers.FirstOrDefault(provider => provider.Id == providerId);
         if (composed is null) return null;
+        if (IsBuiltinLlama(providerId))
+        {
+            // provider.ts auth.apiKey.check: configured once a server URL is known (credential env, then LLAMA_BASE_URL).
+            try { return PiSharp.Cli.Llama.LlamaCatalog.Check(LlamaCredential(), name => ProviderEnvironmentKeys.Value(options.Environment, name)); }
+            catch (InvalidOperationException) { return null; }
+        }
         var stored = Stored(providerId);
         BuiltinProviders.TryGet(providerId, out var builtin);
         if (builtin is null && !composed.Overlaid)
@@ -314,6 +374,14 @@ internal sealed class ModelRegistry
     {
         error = null;
         var providerId = model.Provider;
+        if (IsBuiltinLlama(providerId))
+        {
+            PiSharp.Cli.Llama.LlamaAuth? resolved;
+            try { resolved = ResolveLlamaAuth(); }
+            catch (InvalidOperationException failure) { error = failure.Message; return null; }
+            if (resolved is null) { error = $"No API key found for \"{providerId}\""; return null; }
+            return new(resolved.ApiKey, null, new Dictionary<string, string>(StringComparer.Ordinal) { ["LLAMA_BASE_URL"] = resolved.ServerUrl }, resolved.Source);
+        }
         var providerConfig = ProviderConfig(providerId);
         var stored = Stored(providerId);
         BuiltinProviders.TryGet(providerId, out var builtin);

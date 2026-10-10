@@ -1,6 +1,21 @@
 # Session checkpoint native sample
 
-This ordinary compiled C# sample registers `/checkpoint`, a `session_start` observer and a typed pre-switch handler. Its owner is `sample.checkpoint`, assembly `SessionCheckpoint.dll`, and entry type `SessionCheckpoint.SessionCheckpointExtension`. It uses the shared JSON/extension contracts without retaining a session store, provider, mutable branch history or external service.
+This ordinary compiled C# sample registers `/checkpoint`, a `session_start` observer and a typed pre-switch handler. Its assembly is `SessionCheckpoint.dll` and its entry type `SessionCheckpoint.SessionCheckpointExtension`. It uses the shared JSON/extension contracts without retaining a session store, provider, mutable branch history or external service.
+
+## Use it with pisharp
+
+The project ships the `pisharp-extension.json` manifest the Pi entry (plain `pisharp`, `-p`, `--mode json|rpc`) loads native extensions from; the build copies it next to the assembly:
+
+```powershell
+dotnet build samples/extensions/SessionCheckpoint/SessionCheckpoint.csproj -c Release
+pisharp -e samples/extensions/SessionCheckpoint/bin/Release/net10.0/pisharp-extension.json
+```
+
+Or copy the `bin/Release/net10.0` folder to `~/.pi/agent/extensions/session-checkpoint/` (or, in a trusted project, `.pi/extensions/session-checkpoint/`), where it loads like a Pi extension; the Pi entry gives native extensions the durable session entries and session replacement `/checkpoint` needs. `closeout.sample-session-checkpoint-loads-with-dash-e` in `tests/PiSharp.ExtensionParity.Tests` loads it with `-e`, saves a checkpoint and switches to another session with `{"target":…,"confirmSwitch":false}`.
+
+## The `session …` package loader
+
+The rest of this page describes the older native package loader of the `pisharp session …` commands, where the sample's owner is `sample.checkpoint` (the manifest above is one more published file there).
 
 The command durably saves a namespaced custom entry in A, optionally switches to an existing B, reconstructs state from B's captured selected ancestry and saves through the returned fresh context. It then attempts an append through the still-active A context and requires rejection. The JSON round-trip option switches back to A, saves through generation 3 and proves that the original generation 1 context remains stale. Opaque records and siblings remain in the physical file; selected branch reconstruction excludes unrelated siblings.
 

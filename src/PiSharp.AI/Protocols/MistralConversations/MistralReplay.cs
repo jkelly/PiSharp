@@ -32,7 +32,7 @@ public sealed partial class MistralTextHttpSseTransport
         var transformed = new List<TranscriptEntry>(); var normalized = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var entry in resolved)
         {
-            var body = JsonNode.Parse(entry.WireBody.ToString())!.AsObject();
+            var body = JsonUtf16.MutableNode(entry.WireBody)!.AsObject(); // a tool call's arguments may hold lone surrogates
             body["content"] ??= new JsonArray();
             if ((entry.Role is "assistant" or "toolResult") && body["content"] is not JsonArray)
                 throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral replay requires content blocks.");
@@ -70,7 +70,7 @@ public sealed partial class MistralTextHttpSseTransport
                 body["content"] = parts;
             }
             else if (entry.Role == "toolResult" && normalized.TryGetValue(body["toolCallId"]!.GetValue<string>(), out var mapped)) body["toolCallId"] = mapped;
-            transformed.Add(new(entry.Role, JsonData.Parse(body.ToJsonString())));
+            transformed.Add(new(entry.Role, JsonData.Parse(JsonUtf16.ToJsonString(body))));
         }
         var result = ImmutableArray.CreateBuilder<TranscriptEntry>(); var pending = new List<JsonObject>();
         var existing = new HashSet<string>(StringComparer.Ordinal); var held = new List<TranscriptEntry>();
@@ -97,7 +97,7 @@ public sealed partial class MistralTextHttpSseTransport
             {
                 Close();
                 if (body.TryGetProperty("stopReason", out var stop) && stop.GetString() is "error" or "aborted") continue;
-                pending.AddRange(JsonNode.Parse(body.GetProperty("content").GetRawText())!.AsArray()
+                pending.AddRange(JsonNode.Parse(body.GetProperty("content").GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsArray()
                     .Where(block => block!["type"]!.GetValue<string>() == "toolCall").Select(block => block!.AsObject()));
                 result.Add(entry);
             }

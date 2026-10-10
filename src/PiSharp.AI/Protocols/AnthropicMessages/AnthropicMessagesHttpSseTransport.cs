@@ -10,7 +10,7 @@ namespace PiSharp.AI.Protocols.AnthropicMessages;
 /// <summary>The SDK reads every event of a stream, of any size: no event count; one event keeps the per-content memory bound and the
 /// whole stream the total one.</summary>
 public sealed record AnthropicMessagesHttpSseOptions(int MaximumDataEvents = int.MaxValue, int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
-    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null);
+    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, SseDecoderOptions? Framing = null);
 
 /// <summary>One configured HTTP/SSE send per enumeration, composed with the accepted Anthropic DTO mapper. Borrows the client.</summary>
 public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
@@ -58,7 +58,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         _preparedFactory = preparedFactory;
         _requestFactory = requestFactory; _options = options ?? new();
         if (_options.MaximumDataEvents <= 0 || _options.MaximumDataCharacters <= 0 || _options.MaximumTotalDataCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic HTTP/SSE limits.");
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic HTTP/SSE limits.");
         var framing = _options.Framing ?? new(RejectInvalidUtf8: true, EofBehavior: SseEofBehavior.DispatchPendingEvent);
         if (!framing.RejectInvalidUtf8 || framing.EofBehavior != SseEofBehavior.DispatchPendingEvent)
             throw new ArgumentException("Anthropic SSE requires strict UTF-8 and pending-event dispatch at EOF.", nameof(options));
@@ -309,7 +309,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
     {
         try
         {
-            using var document = JsonDocument.Parse(data, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(data, PiSharp.Contracts.JsonData.DocumentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object) throw Protocol();
             Check(document.RootElement, 0);
             return JsonData.FromElement(document.RootElement); // Clones and rejects decoded duplicate property names.
@@ -325,7 +325,8 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                 foreach (var property in value.EnumerateObject()) { Unicode(property.Name); Check(property.Value, depth); }
             else foreach (var item in value.EnumerateArray()) Check(item, depth);
         }
-        else if (value.ValueKind == JsonValueKind.String) Unicode(value.GetString()!);
+        // The SDK JSON.parse's each event: a string value keeps a lone surrogate (as its escape in the owned value).
+        else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
     }
     private static void Unicode(string value)
     {

@@ -82,7 +82,7 @@ internal static class PiPrintMode
                         var stop = last.TryGetProperty("stopReason", out var reason) ? reason.GetString() : null;
                         if (stop is "error" or "aborted")
                         {
-                            var error = last.TryGetProperty("errorMessage", out var text) && text.ValueKind == JsonValueKind.String && text.GetString() is { Length: > 0 } value ? value : $"Request {stop}";
+                            var error = last.TryGetProperty("errorMessage", out var text) && text.ValueKind == JsonValueKind.String && PiSharp.Contracts.JsonUtf16.GetString(text) is { Length: > 0 } value ? value : $"Request {stop}";
                             await PiCommand.Line(stderr, error).ConfigureAwait(false);
                             exitCode = 1;
                         }
@@ -90,7 +90,7 @@ internal static class PiPrintMode
                         {
                             foreach (var block in content.EnumerateArray())
                                 if (block.TryGetProperty("type", out var blockType) && blockType.GetString() == "text" && block.TryGetProperty("text", out var blockText))
-                                    await stdout.WriteAsync((blockText.GetString() + "\n").AsMemory(), token).ConfigureAwait(false);
+                                    await stdout.WriteAsync((PiSharp.Contracts.JsonUtf16.GetString(blockText) + "\n").AsMemory(), token).ConfigureAwait(false);
                             await stdout.FlushAsync(token).ConfigureAwait(false);
                         }
                     }
@@ -113,7 +113,7 @@ internal static class PiPrintMode
         async Task<int> PromptAsync(string message, System.Collections.Immutable.ImmutableArray<JsonData>? images)
         {
             var command = new JsonObject { ["type"] = "prompt", ["message"] = message };
-            if (images is { } attached) command["images"] = new JsonArray([.. attached.Select(image => JsonNode.Parse(image.ToString()))]);
+            if (images is { } attached) command["images"] = new JsonArray([.. attached.Select(image => JsonNode.Parse(image.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions))]);
             var id = "pi-print-" + ++sequence; command["id"] = id;
             await connection.SendAsync(JsonData.Parse(command.ToJsonString()), token).ConfigureAwait(false);
             var responded = false; var waitSettled = true;
@@ -143,7 +143,7 @@ internal static class PiPrintMode
                 if (record.Value.GetProperty("type").GetString() != "response" || !record.Value.TryGetProperty("id", out var responseId) || responseId.GetString() != id) continue;
                 if (!record.Value.GetProperty("success").GetBoolean())
                     return (null, record.Value.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String ? error.GetString()! : "Request failed");
-                return (record.Value.TryGetProperty("data", out var data) ? data.Clone() : JsonDocument.Parse("{}").RootElement.Clone(), "");
+                return (record.Value.TryGetProperty("data", out var data) ? data.Clone() : JsonDocument.Parse("{}", PiSharp.Contracts.JsonData.DocumentOptions).RootElement.Clone(), "");
             }
         }
         async Task<JsonData> NextAsync()

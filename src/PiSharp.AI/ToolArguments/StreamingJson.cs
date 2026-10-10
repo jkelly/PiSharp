@@ -12,24 +12,24 @@ namespace PiSharp.AI;
 /// when the repair changed the text, then partial-json's <c>parse</c> of the text and of its repair, then <c>{}</c>. It never throws for
 /// malformed input. The result is any JSON value (an array, string, number, boolean or null passes through as upstream returns it) and is
 /// owned as its <c>JSON.stringify</c> text: duplicate names keep the last value at the first position, array-index names come first in
-/// ascending order, and numbers are binary64 (non-finite ones become null). Two representation limits remain, since a
-/// <see cref="JsonData"/> and System.Text.Json cannot carry them: a lone surrogate becomes U+FFFD (toWellFormed) in the owned value, and
-/// a value nested deeper than 64 levels is a <see cref="JsonException"/>.
+/// ascending order, and numbers are binary64 (non-finite ones become null). A name or string value keeps every code unit, a lone
+/// surrogate as its escape (see <see cref="JsonUtf16"/>). One representation limit remains: a value nested deeper than
+/// <see cref="JsonData.MaximumDepth"/> levels is a <see cref="JsonException"/>.
 /// </summary>
 public static class StreamingJson
 {
-    private const int MaximumDepth = 64;
+    private const int MaximumDepth = JsonData.MaximumDepth;
 
     public static JsonData Parse(string? partialJson)
     {
-        var text = Stringify(ParseValue(partialJson), wellFormed: true);
+        var text = Stringify(ParseValue(partialJson));
         try { return JsonData.Parse(text); }
         catch (JsonException) { throw TooDeep(); }
     }
 
     /// <summary>
     /// <c>JSON.parse(text)</c> with the same ownership as <see cref="Parse"/>: any JSON value, duplicate names keep the last value,
-    /// lone surrogates become U+FFFD. A text JSON.parse rejects is a <see cref="JsonException"/> carrying V8's SyntaxError message.
+    /// lone surrogates of string values are kept. A text JSON.parse rejects is a <see cref="JsonException"/> carrying V8's SyntaxError message.
     /// </summary>
     public static JsonData JsonParse(string text) => JsonParse(text, out _, out _);
 
@@ -48,20 +48,20 @@ public static class StreamingJson
             foreach (var key in obj.Order)
             {
                 if (obj.Properties[key] is StringValue member && !ReferenceEquals(ToWellFormed(member.Text), member.Text))
-                    (members ??= new(StringComparer.Ordinal))[ToWellFormed(key)] = member.Text;
+                    (members ??= new(StringComparer.Ordinal))[key] = member.Text;
                 else if (obj.Properties[key] is NumberValue number && !double.IsFinite(number.Number))
-                    (numbers ??= new(StringComparer.Ordinal))[ToWellFormed(key)] = number.Number;
+                    (numbers ??= new(StringComparer.Ordinal))[key] = number.Number;
             }
             loneSurrogateMembers = members; nonFiniteMembers = numbers;
         }
-        var owned = Stringify(value, wellFormed: true);
+        var owned = Stringify(value);
         try { return JsonData.Parse(owned); }
         catch (JsonException) { throw TooDeep(); }
     }
 
     /// <summary><c>JSON.stringify(JSON.parse(text))</c> exactly, lone surrogates escaped as JavaScript writes them. A text JSON.parse
     /// rejects is a <see cref="JsonException"/>.</summary>
-    public static string JsonReformat(string text) => Stringify(Syntax(text), wellFormed: false);
+    public static string JsonReformat(string text) => Stringify(Syntax(text));
 
     /// <summary>JSON.stringify of a string: only <c>"</c>, <c>\</c>, control characters and lone surrogates are escaped.</summary>
     public static string JsonQuote(string text)
@@ -80,7 +80,7 @@ public static class StreamingJson
     }
 
     /// <summary><c>JSON.stringify(parseStreamingJson(partialJson))</c>, lone surrogates escaped as JavaScript writes them.</summary>
-    public static string ParseToJson(string? partialJson) => Stringify(ParseValue(partialJson), wellFormed: false);
+    public static string ParseToJson(string? partialJson) => Stringify(ParseValue(partialJson));
 
     /// <summary>json-parse.ts <c>repairJson</c>: escapes raw control characters in strings and doubles backslashes before invalid escapes.</summary>
     public static string RepairJson(string json)
@@ -486,48 +486,41 @@ public static class StreamingJson
 
     // --- JSON.stringify -------------------------------------------------------------------------------------------------------------
 
-    // wellFormed: String.prototype.toWellFormed on every name and string (a lone surrogate becomes U+FFFD; names that then collide
-    // keep the first position and the last value), the only form a JsonData can hold and System.Text.Json can write.
-    private static string Stringify(Value value, bool wellFormed)
+    // Names and string values keep every code unit: a lone surrogate is written as its JSON.stringify escape, which a JsonData carries
+    // (see JsonUtf16).
+    private static string Stringify(Value value)
     {
         var builder = new StringBuilder();
-        Write(builder, value, wellFormed);
+        Write(builder, value);
         return builder.ToString();
     }
 
-    private static void Write(StringBuilder builder, Value value, bool wellFormed)
+    private static void Write(StringBuilder builder, Value value)
     {
         switch (value)
         {
             case NullValue: builder.Append("null"); break;
             case BoolValue flag: builder.Append(flag.Bool ? "true" : "false"); break;
             case NumberValue number: builder.Append(NumberText(number.Number)); break;
-            case StringValue text: Quote(builder, wellFormed ? ToWellFormed(text.Text) : text.Text); break;
+            case StringValue text: Quote(builder, text.Text); break;
             case ArrayValue array:
                 builder.Append('[');
                 for (var index = 0; index < array.Items.Count; index++)
                 {
                     if (index > 0) builder.Append(',');
-                    Write(builder, array.Items[index], wellFormed);
+                    Write(builder, array.Items[index]);
                 }
                 builder.Append(']');
                 break;
             case ObjectValue obj:
-                var members = new List<(string Key, Value Value)>();
-                var positions = new Dictionary<string, int>(StringComparer.Ordinal);
-                foreach (var key in obj.Order.Select((key, position) => (key, position, arrayIndex: ArrayIndex(key)))
+                var members = obj.Order.Select((key, position) => (key, position, arrayIndex: ArrayIndex(key)))
                     .OrderBy(item => item.arrayIndex is null ? 1 : 0).ThenBy(item => item.arrayIndex ?? 0).ThenBy(item => item.position)
-                    .Select(item => item.key))
-                {
-                    var name = wellFormed ? ToWellFormed(key) : key;
-                    if (positions.TryGetValue(name, out var position)) members[position] = (name, obj.Properties[key]);
-                    else { positions.Add(name, members.Count); members.Add((name, obj.Properties[key])); }
-                }
+                    .Select(item => item.key).ToList();
                 builder.Append('{');
                 for (var index = 0; index < members.Count; index++)
                 {
                     if (index > 0) builder.Append(',');
-                    Quote(builder, members[index].Key); builder.Append(':'); Write(builder, members[index].Value, wellFormed);
+                    Quote(builder, members[index]); builder.Append(':'); Write(builder, obj.Properties[members[index]]);
                 }
                 builder.Append('}');
                 break;
@@ -591,39 +584,7 @@ public static class StreamingJson
     }
 
     /// <summary>JSON.stringify of a binary64: Number::toString for finite values, <c>null</c> otherwise.</summary>
-    private static string NumberText(double value)
-    {
-        if (!double.IsFinite(value)) return "null";
-        if (value == 0) return "0";
-        // .NET Core 3.0+ "R" is the shortest round-tripping digit string, the digits Number::toString chooses.
-        var shortest = Math.Abs(value).ToString("R", CultureInfo.InvariantCulture);
-        var exponent = 0;
-        var mantissa = shortest;
-        var marker = shortest.IndexOfAny(['E', 'e']);
-        if (marker >= 0)
-        {
-            exponent = int.Parse(shortest.AsSpan(marker + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
-            mantissa = shortest[..marker];
-        }
-        var point = mantissa.IndexOf('.');
-        var digits = point >= 0 ? mantissa.Remove(point, 1) : mantissa;
-        var n = (point >= 0 ? point : mantissa.Length) + exponent;
-        var leading = 0;
-        while (leading < digits.Length - 1 && digits[leading] == '0') leading++;
-        digits = digits[leading..].TrimEnd('0');
-        n -= leading;
-        var k = digits.Length;
-        string text;
-        if (k <= n && n <= 21) text = digits + new string('0', n - k);
-        else if (0 < n && n <= 21) text = digits[..n] + "." + digits[n..];
-        else if (-6 < n && n <= 0) text = "0." + new string('0', -n) + digits;
-        else
-        {
-            var e = n - 1;
-            text = digits[..1] + (k == 1 ? "" : "." + digits[1..]) + "e" + (e < 0 ? "-" : "+") + Math.Abs(e).ToString(CultureInfo.InvariantCulture);
-        }
-        return value < 0 ? "-" + text : text;
-    }
+    private static string NumberText(double value) => JsonNumber.Text(value);
 
     // --- String.prototype helpers ----------------------------------------------------------------------------------------------------
 

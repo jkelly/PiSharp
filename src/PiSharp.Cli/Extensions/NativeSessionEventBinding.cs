@@ -92,7 +92,7 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
         JsonData Event() => Json(writer =>
         {
             writeBase(writer);
-            writer.WritePropertyName("entries"); writer.WriteStartArray(); foreach (var entry in entries) writer.WriteRawValue(entry.ToString()); writer.WriteEndArray();
+            writer.WritePropertyName("entries"); writer.WriteStartArray(); foreach (var entry in entries) writer.WriteRawValue(entry.ToString(), skipInputValidation: true); writer.WriteEndArray();
             writer.WriteBoolean("continue", shouldContinue); writer.WritePropertyName("context"); WriteContext(writer, context);
         });
         await registry.ReduceEventAsync(captured, topic, Event(), (_, result) =>
@@ -134,7 +134,7 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
                 role.GetString() != message.Role)
             { invalid++; return null; }
             // Untyped handlers can return null or missing content; it never enters session history.
-            var node = System.Text.Json.Nodes.JsonNode.Parse(replacement.GetRawText())!.AsObject();
+            var node = PiSharp.Contracts.JsonUtf16.MutableNode(replacement.GetRawText())!.AsObject();
             if (message.Role is "user" or "assistant" or "toolResult" or "custom" && node["content"] is null) node["content"] = new System.Text.Json.Nodes.JsonArray();
             current = JsonData.Parse(node.ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
             modified = true; return Event();
@@ -197,7 +197,7 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
             {
                 writer.WriteString("role", "assistant"); writer.WritePropertyName("content"); writer.WriteStartArray(); writer.WriteEndArray();
                 writer.WriteString("api", "summary"); writer.WriteString("provider", "summary"); writer.WriteString("model", "summary");
-                writer.WritePropertyName("usage"); writer.WriteRawValue(usageValue.GetRawText());
+                writer.WritePropertyName("usage"); writer.WriteRawValue(usageValue.GetRawText(), skipInputValidation: true);
                 writer.WriteString("stopReason", "stop"); writer.WriteNumber("timestamp", 0);
             }).Value).Usage;
         JsonData? details = value.TryGetProperty("details", out var detailsValue) && detailsValue.ValueKind != JsonValueKind.Undefined
@@ -221,9 +221,9 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
         { writer.WriteStartObject(); write(writer); writer.WriteEndObject(); }
         return JsonData.Parse(Encoding.UTF8.GetString(bytes.ToArray()));
     }
-    private static void Raw(Utf8JsonWriter writer, string name, JsonData value) { writer.WritePropertyName(name); writer.WriteRawValue(value.ToString()); }
+    private static void Raw(Utf8JsonWriter writer, string name, JsonData value) { writer.WritePropertyName(name); writer.WriteRawValue(value.ToString(), skipInputValidation: true); }
     private static void Array(Utf8JsonWriter writer, string name, IEnumerable<JsonData> values)
-    { writer.WritePropertyName(name); writer.WriteStartArray(); foreach (var value in values) writer.WriteRawValue(value.ToString()); writer.WriteEndArray(); }
+    { writer.WritePropertyName(name); writer.WriteStartArray(); foreach (var value in values) writer.WriteRawValue(value.ToString(), skipInputValidation: true); writer.WriteEndArray(); }
 
     /// <summary>Per-attachment state: the run's turn index and history start, and the streamed assistant partial.</summary>
     private sealed class Sink(NativeSessionEventBinding binding, ReplaceableAgentSession owner, AgentSessionAttachment attached)
@@ -350,7 +350,8 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
             if (messages.IsEmpty || messages[^1].Role != role) throw new InvalidOperationException("The acknowledged message is not the last context message.");
             return messages[^1].WireBody;
         }
-        private static JsonData Result(ToolResult result) => Json(writer => ToolResultValueCodec.WriteProperties(writer, result));
+        // The result was admitted by the invoker; its projection keeps what that admitted (Pi-sized, lone surrogates, any depth Pi holds).
+        private static JsonData Result(ToolResult result) => Json(writer => ToolResultValueCodec.WriteProperties(writer, result, PiSharp.Cli.Commands.PiPayloadBudget.PiToolResults));
 
         /// <summary>The turn_end fields before the boundary state: the persisted assistant message and tool results and their entry ids.
         /// Null when the assistant entry cannot be resolved.</summary>
@@ -362,7 +363,7 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
             var assistant = Session.PersistedWire(turn.Transcript[assistantIndex].WireBody);
             var toolResults = turn.ToolResults.Select(message => Session.PersistedWire(message.WireBody)).ToImmutableArray();
             string? EntryId(JsonData message) => context.ContextEntries.IsDefault ? null : context.ContextEntries.LastOrDefault(entry =>
-                entry.Messages.Any(candidate => JsonElement.DeepEquals(candidate.WireBody.Value, message.Value)))?.SourceEntry.Id;
+                entry.Messages.Any(candidate => JsonUtf16.DeepEquals(candidate.WireBody.Value, message.Value)))?.SourceEntry.Id;
             var messageEntryId = EntryId(assistant);
             if (messageEntryId is null) return null;
             var turnIndex = _turnIndex;

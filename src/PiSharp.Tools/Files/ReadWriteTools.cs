@@ -182,7 +182,8 @@ public sealed class ReadWriteTools
         }
         else
         {
-            content = String(value, "content", empty: true, allowNulData: true);
+            // write.ts writeFile(path, content, "utf-8"): Node encodes a lone surrogate of the content as U+FFFD.
+            content = String(value, "content", empty: true, allowNulData: true, toWellFormed: true);
             if (Utf8.GetByteCount(content) > _options.MaximumWriteBytes) throw new FileToolException(FileToolFailure.ResourceLimit);
         }
         return new(path, display, offset, limit, content);
@@ -211,11 +212,11 @@ public sealed class ReadWriteTools
         return (from, Math.Max(Bound(end) - from, 0));
     }
 
-    private static string String(JsonElement value, string name, bool empty, bool allowNulData = false)
+    private static string String(JsonElement value, string name, bool empty, bool allowNulData = false, bool toWellFormed = false)
     {
         if (!value.TryGetProperty(name, out var item) || item.ValueKind != JsonValueKind.String)
             throw new ArgumentException("Required string file argument is absent.");
-        var text = item.GetString()!;
+        var text = toWellFormed ? JsonUtf16.ToWellFormed(JsonUtf16.GetString(item)) : item.GetString()!;
         if ((!empty && text.Length == 0) || (!allowNulData && text.Contains('\0'))) throw new ArgumentException("Unsupported file argument text.");
         _ = Utf8.GetByteCount(text); // Strict encoder validates UTF-16 without replacing malformed input.
         return text;

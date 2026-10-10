@@ -62,6 +62,7 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
         var registry = await PiSharp.Cli.Models.ModelRegistry.CreateAsync(new()
         {
             ModelsPath = ModelsPath, Environment = environment.Get, StoredCredentials = stored, CatalogBaseUrl = CatalogBaseUrl, CreateCatalogClient = CreateCatalogClient,
+            LlamaProvider = LlamaProvider,
             ModelsStore = ModelsPath is null ? null : new PiSharp.Cli.Models.FileModelsStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ModelsPath))!, "models-store.json"))
         }, cancellationToken).ConfigureAwait(false);
         ConfigureRegistry?.Invoke(registry);
@@ -70,6 +71,11 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
 
     /// <summary>Extension registrations applied to every registry this runtime creates (pi.registerVirtualModel, IMPL-E).</summary>
     internal Action<PiSharp.Cli.Models.ModelRegistry>? ConfigureRegistry { get; init; }
+    /// <summary>StreamOptions.transport for providers with a WebSocket transport (OpenAI Codex), read per request; null is "auto".</summary>
+    internal Func<string?>? Transport { get; init; }
+    /// <summary>Whether the built-in llama.cpp extension (and so its provider) is loaded, read when a registry composes its providers;
+    /// null: loaded.</summary>
+    internal Func<bool>? LlamaProvider { get; init; }
 
     /// <summary>The session's environment, built once from <see cref="ReadEnvironment"/>.</summary>
     internal PiSharp.Cli.Authentication.LiveProcessEnvironment CreateEnvironment() => new(ReadEnvironment, ProviderVariables);

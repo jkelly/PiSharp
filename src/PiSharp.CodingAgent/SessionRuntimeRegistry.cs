@@ -30,7 +30,7 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumDeclarations = PiRequestBudget.RequestItems, int MaximumCharacters = 1_048_576,
-    int MaximumJsonDepth = 32, ToolInvokerOptions? ToolInvokerOptions = null)
+    int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, ToolInvokerOptions? ToolInvokerOptions = null)
 {
     /// <summary>Borrowed prepared hooks for all active native and extension adapters in the single final-action invoker.</summary>
     public IPreparedToolHooks? PreparedToolHooks { get; init; }
@@ -109,7 +109,7 @@ public sealed partial class SessionRuntimeRegistry
         ArgumentNullException.ThrowIfNull(policy);
         _options = options ?? new();
         if (_options.MaximumModels <= 0 || _options.MaximumTools <= 0 || _options.MaximumMessages <= 0 ||
-            _options.MaximumDeclarations <= 0 || _options.MaximumCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumDeclarations <= 0 || _options.MaximumCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid session runtime binding limits.");
         if (models.IsDefaultOrEmpty || tools.IsDefault) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
         if (models.Length > _options.MaximumModels || tools.Length > _options.MaximumTools)
@@ -266,7 +266,7 @@ public sealed partial class SessionRuntimeRegistry
             if (added.Length > 0)
             {
                 writer.WritePropertyName("toolsAdded"); writer.WriteStartArray();
-                foreach (var name in added) writer.WriteRawValue(Declared(name).GetRawText());
+                foreach (var name in added) writer.WriteRawValue(Declared(name).GetRawText(), skipInputValidation: true);
                 writer.WriteEndArray();
             }
             if (removed.Length > 0)
@@ -305,7 +305,7 @@ public sealed partial class SessionRuntimeRegistry
         if (!replaceDeclarations && previous.SequenceEqual(selected, StringComparer.Ordinal)) return null;
         var body = JsonData.Parse(JsonSerializer.Serialize(new { role = "system", content = "", timestamp,
             toolsRemoved = previous.Select(name => new { name }),
-            toolsAdded = selected.Select(name => _tools[name].Declaration.Value) }));
+            toolsAdded = selected.Select(name => _tools[name].Declaration.Value) }, JsonData.SerializerOptions));
         long characters = 0; Charge(body.Value, ref characters, cancellationToken);
         return new("system", body);
     }
@@ -377,7 +377,9 @@ public sealed partial class SessionRuntimeRegistry
         }
         else model = Model(fallbackModel, catalog);
         var restore = new RestoreLog();
-        var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, thinkingLevel ?? context.ThinkingLevel, cancellationToken,
+        // sdk.ts createAgentSession: the restored (or default) level is clamped to the model's capabilities, never refused.
+        var level = ThinkingLevels.Clamp(catalog.Thinking[(model.Model.Provider, model.Model.Id)], thinkingLevel ?? context.ThinkingLevel);
+        var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, level, cancellationToken,
             initialActiveToolNames: initialActiveToolNames, restore: restore);
         // Source _isAllowedTool: names that --tools/--exclude-tools keep out of the catalog never become pending.
         return new(selection, [.. restore.Skipped.Where(name => _options.LifetimeToolSelection?.IsAllowed(name) != false)],
@@ -550,15 +552,11 @@ public sealed partial class SessionRuntimeRegistry
         {
             if (++depth > _options.MaximumJsonDepth) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
             if (value.ValueKind == JsonValueKind.Object)
-                foreach (var property in value.EnumerateObject())
-                { if (!Unicode(property.Name)) throw Error(SessionRuntimeRegistryFailure.InvalidTranscript); CheckJson(property.Value, depth, token); }
+                foreach (var property in value.EnumerateObject()) CheckJson(property.Value, depth, token);
             else foreach (var child in value.EnumerateArray()) CheckJson(child, depth, token);
         }
-        else if (value.ValueKind == JsonValueKind.String)
-        {
-            try { if (!Unicode(value.GetString()!)) throw Error(SessionRuntimeRegistryFailure.InvalidTranscript); }
-            catch (InvalidOperationException) { throw Error(SessionRuntimeRegistryFailure.InvalidTranscript); }
-        }
+        // A name or string value may hold a lone surrogate, as a JavaScript string does; each provider drops it from request text as
+        // Pi's sanitizeSurrogates does (or keeps it, escaped, where Pi stringifies the value).
     }
     private static string Declaration(JsonElement value)
     {

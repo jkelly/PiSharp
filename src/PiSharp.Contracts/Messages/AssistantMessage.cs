@@ -13,7 +13,8 @@ public sealed record ToolCallContent(string Id, string Name, JsonData Arguments,
 
 public sealed record UsageCost(decimal Input, decimal Output, decimal CacheRead, decimal CacheWrite, decimal Total,
     JsonFields? ExtraProperties = null, JsonData? SourceBinary64Cost = null);
-public sealed record TokenUsage(long Input, long Output, long CacheRead, long CacheWrite, long TotalTokens,
+/// <summary>Pi's Usage: every count is a JavaScript number (a provider may report a fraction), kept as that binary64.</summary>
+public sealed record TokenUsage(double Input, double Output, double CacheRead, double CacheWrite, double TotalTokens,
     UsageCost Cost, JsonFields? ExtraProperties = null)
 {
     public static TokenUsage Zero { get; } = new(0, 0, 0, 0, 0, new(0, 0, 0, 0, 0));

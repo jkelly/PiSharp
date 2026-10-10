@@ -18,7 +18,8 @@ Some providers need more than a key:
 - **Amazon Bedrock** uses the AWS credential chain: `AWS_PROFILE`, access keys, SSO, `credential_process` or a Bedrock API key in `AWS_BEARER_TOKEN_BEDROCK`. Set `AWS_REGION`.
 - **Google Vertex** takes an API key or Application Default Credentials (user, service account, impersonated service account and workload identity federation).
 - **Cloudflare** needs `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_GATEWAY_ID` for AI Gateway.
-- **Azure OpenAI** reads the `AZURE_OPENAI_*` variables.
+- **Azure OpenAI** reads the `AZURE_OPENAI_*` variables. `AZURE_OPENAI_BASE_URL` wins; otherwise `AZURE_OPENAI_RESOURCE_NAME` becomes `https://<name>.openai.azure.com/openai/v1`. As in Pi, the name is taken as given and read as a URL, so names with dots or upper case work.
+- **llama.cpp** connects to a local router server. See [Local models with llama.cpp](/docs/guides/llama-cpp/).
 
 ## Choose a model
 
@@ -35,12 +36,24 @@ At startup, interactive mode refreshes the model catalogs from pi.dev, as Pi doe
 
 ## Classifier and image models
 
-Pi's classifier APIs (OpenAI decisions, TypeSafe and Cloudflare system-one, llama.cpp) and OpenRouter image generation work. Codemode scripts reach them through `models.classify()` and `models.generateImages()`, and extensions through `ctx.modelRegistry`.
+Pi's classifier APIs (OpenAI decisions, TypeSafe and Cloudflare system-one, llama.cpp) and OpenRouter image generation work. Codemode scripts reach them through `models.classify()` and `models.generateImages()`, and extensions through `ctx.modelRegistry`. TypeScript and C# extensions can register their own classifier and image providers.
+
+## OpenAI Codex transport
+
+As in Pi, Codex requests go over a WebSocket first. If the WebSocket fails before the first event, PiSharp falls back to server-sent events and stays on them for the rest of the session. Request bodies sent over server-sent events are compressed with zstd. The `transport` setting (also in `/settings`) chooses:
+
+| Value | Behaviour |
+| --- | --- |
+| `auto` (default) | WebSocket. Later turns reuse the open connection and send only the new input. |
+| `websocket-cached` | The same as `auto`. |
+| `websocket` | WebSocket, sending the whole request every turn. |
+| `sse` | Server-sent events only. |
+
+The WebSocket connection gets 15 seconds to open. PiSharp doesn't read Pi's `websocketConnectTimeoutMs` setting yet.
 
 ## Differences from Pi
 
 - Requests to Anthropic, Azure, Bedrock, Mistral and OpenAI-compatible endpoints carry a `PiSharp` user agent instead of the SDK's.
-- OpenAI Codex uses server-sent events only. Pi can also use a WebSocket, and compresses Codex requests with zstd; PiSharp sends them uncompressed.
-- PiSharp doesn't discover models on a llama.cpp server. Add them in `models.json`.
+- PiSharp's zstd frames are valid zstd but not byte for byte what Node's zstd writes.
 
 The [Parity](/parity/) page lists the smaller differences.

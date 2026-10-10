@@ -17,6 +17,7 @@ internal static class RpcUpstreamCompactionTests
     internal const string Prefix = "rpc.upstream-compaction.";
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(10);
     private static readonly ModelDescriptor Model = new("alias-summary", "openai-responses", "fixture");
+    private static readonly ModelDescriptor Large = new("alias-large", "openai-responses", "fixture");
     internal static IEnumerable<(string Name, Func<Task> Run)> Cases() =>
     [
         (Prefix + "manual-result-events-durable-append-and-focus", Manual),
@@ -26,7 +27,9 @@ internal static class RpcUpstreamCompactionTests
         (Prefix + "abort-joins-original-summary-and-emits-aborted-end", Abort),
         (Prefix + "admitted-checkpoint-wins-late-abort-and-end-observes-idle", Checkpoint),
         (Prefix + "EOF-joins-original-summary-and-borrowed-owner-survives", Eof),
-        (Prefix + "active-run-is-aborted-before-manual-compaction", Active)
+        (Prefix + "active-run-is-aborted-before-manual-compaction", Active),
+        (Prefix + "throwing-summarizer-reports-its-own-message", ThrowingSummarizer),
+        (Prefix + "setting-bound-threshold-follows-the-current-model-and-carries-to-replacements", SettingBound)
     ];
     private static void Check(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
     private static void Success(JsonElement value) => Check(value.GetProperty("success").GetBoolean(), value.GetRawText());
@@ -58,6 +61,19 @@ internal static class RpcUpstreamCompactionTests
         Check(!again.GetProperty("success").GetBoolean() && again.GetProperty("error").GetString() == "Already compacted" && f.Summary.Calls == 1,
             "Already compacted returned a fabricated skipped success or invoked summary again.");
         var repeated = await Bytes(f); Check(after.SequenceEqual(repeated) && f.Transport.Calls == 0, "Repeated manual command wrote or ran a normal provider.");
+    }
+    // agent-session.ts compact(): the summarizer's thrown error answers the command with its message, and compaction_end carries
+    // "Compaction failed: <message>"; nothing is appended and the thrown error is not retried.
+    private static async Task ThrowingSummarizer()
+    {
+        await using var f = await Fixture.Create(); var before = await Bytes(f);
+        f.Summary.Throw = new InvalidOperationException("summarizer exploded");
+        var response = await f.Send(new { id = "manual", type = "compact" });
+        Check(!response.GetProperty("success").GetBoolean() && response.GetProperty("error").GetString() == "summarizer exploded", response.GetRawText());
+        var end = f.Records.Single(value => value.GetProperty("type").GetString() == "compaction_end");
+        Check(!end.GetProperty("aborted").GetBoolean() && !end.TryGetProperty("result", out _) &&
+            end.GetProperty("errorMessage").GetString() == "Compaction failed: summarizer exploded", end.GetRawText());
+        Check((await Bytes(f)).SequenceEqual(before) && f.Summary.Calls == 1, "A failed summary appended or retried.");
     }
     private static async Task Grammar()
     {
@@ -101,6 +117,32 @@ internal static class RpcUpstreamCompactionTests
         Success(await f.Send(new { id = "on-again", type = "set_auto_compaction", enabled = true }));
         Success(await f.Send(new { id = "switch", type = "switch_session", sessionPath = f.Other }));
         Check(!f.Session.Snapshot.AutoCompactionEnabled, "Runtime toggle was falsely persisted across replacement.");
+    }
+    // agent-session.ts: autoCompactionEnabled is the compaction.enabled setting (a host applies it at startup, and it holds for every
+    // session the host runs); _checkCompaction reads getCompactionSettings(this.model) and this.model.contextWindow when it checks.
+    private static async Task SettingBound()
+    {
+        await using var f = await Fixture.Create(settingBound: true);
+        await f.Dispatcher.ConfigureAutoCompactionAsync(true).WaitAsync(Bound);
+        var state = await f.Send(new { id = "state", type = "get_state" }); Success(state);
+        Check(state.GetProperty("data").GetProperty("autoCompactionEnabled").GetBoolean() && f.Summary.Calls == 0, "Startup setting was not applied.");
+        Success(await f.Send(new { id = "large", type = "set_model", provider = Large.Provider, modelId = Large.Id }));
+        Success(await f.Send(new { id = "on-large", type = "prompt", message = "large" }));
+        await f.Session.WaitForIdleAsync().WaitAsync(Bound); await f.JoinRun();
+        Check(f.Transport.Calls == 1 && f.Summary.Calls == 0 && f.Session.Snapshot.Log.Entries[^1].Kind != SessionEntryKind.Compaction,
+            "40,000 context tokens compacted against the large model's 1,000,000-token window.");
+        Success(await f.Send(new { id = "small", type = "set_model", provider = Model.Provider, modelId = Model.Id }));
+        Success(await f.Send(new { id = "on-small", type = "prompt", message = "small" }));
+        await f.Session.WaitForIdleAsync().WaitAsync(Bound); await f.JoinRun();
+        Check(f.Transport.Calls == 2 && f.Summary.Calls == 1 && f.Session.Snapshot.Log.Entries[^1].Kind == SessionEntryKind.Compaction &&
+            f.Observed.Single().Reason == SessionCompactionReason.Threshold, "The threshold did not follow the switch to the 32,768-token model.");
+        Success(await f.Send(new { id = "switch", type = "switch_session", sessionPath = f.Other }));
+        Check(f.Session.Snapshot.AutoCompactionEnabled, "The setting did not hold for the replacement session.");
+        Success(await f.Send(new { id = "off", type = "set_auto_compaction", enabled = false }));
+        Success(await f.Send(new { id = "back", type = "switch_session", sessionPath = f.Source }));
+        state = await f.Send(new { id = "state-off", type = "get_state" }); Success(state);
+        Check(!f.Session.Snapshot.AutoCompactionEnabled && !state.GetProperty("data").GetProperty("autoCompactionEnabled").GetBoolean(),
+            "Disabling did not hold for the next session.");
     }
     private static async Task Budget()
     {
@@ -189,7 +231,7 @@ internal static class RpcUpstreamCompactionTests
         internal string Source => Path.Combine(Root, "source.jsonl"); internal string Other => Path.Combine(Root, "other.jsonl");
         internal readonly Summary Summary = new(); internal readonly Transport Transport = new(); internal readonly StorageFactory Storage = new();
         internal readonly List<SessionCompactionObservation> Observed = []; internal readonly List<bool> StartActive = [], EndIdle = [];
-        private readonly Capture output = new(); private SessionRuntimeRegistry registry = null!; private int ids;
+        private readonly Capture output = new(); private SessionRuntimeRegistry registry = null!; private int ids, joins;
         internal ReplaceableAgentSession Owner = null!; internal RpcSessionDispatcher Dispatcher = null!; internal PersistentAgentSession Session => Owner.Current.Session;
         internal JsonElement[] Records => Encoding.UTF8.GetString(output.Bytes()).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => JsonData.Parse(line).Value).ToArray();
         private async Task<PersistentAgentSession> Open(string path)
@@ -199,9 +241,10 @@ internal static class RpcUpstreamCompactionTests
             session.ConfigureCompactionObservation(value => { Check(session.Snapshot.Log.ById.ContainsKey(value.CompactionEntry.Id), "Native observation preceded checkpoint."); Observed.Add(value); return ValueTask.CompletedTask; });
             return session;
         }
-        internal static async Task<Fixture> Create(bool compactable = true, bool hasGenerator = true, RpcDispatchOptions? options = null)
+        internal static async Task<Fixture> Create(bool compactable = true, bool hasGenerator = true, RpcDispatchOptions? options = null, bool settingBound = false)
         {
-            var f = new Fixture(); Directory.CreateDirectory(f.Root); f.registry = new([new(Model, f.Transport)], [], new DenyPolicy());
+            var f = new Fixture(); Directory.CreateDirectory(f.Root);
+            f.registry = new(settingBound ? [new(Model, f.Transport), new(Large, f.Transport)] : [new(Model, f.Transport)], [], new DenyPolicy());
             foreach (var path in new[] { f.Source, f.Other })
             {
                 var header = new SessionEntryCodec().Parse(JsonSerializer.Serialize(new { type = "session", version = 3, id = Path.GetFileNameWithoutExtension(path), timestamp = "2026-10-01T00:00:00.000Z", cwd = f.Root }));
@@ -211,10 +254,13 @@ internal static class RpcUpstreamCompactionTests
             var session = await f.Open(f.Source); f.Owner = new(session, (request, _) => f.Open(request.Path));
             f.output.BeforeWrite = record => { if (record.GetProperty("type").GetString() == "compaction_start") f.StartActive.Add(f.Session.Snapshot.IsCompacting);
                 if (record.GetProperty("type").GetString() == "compaction_end") f.EndIdle.Add(!f.Session.Snapshot.IsCompacting); };
-            var wire = JsonData.Parse(JsonSerializer.Serialize(new { id = Model.Id, api = Model.Api, provider = Model.Provider, name = Model.Id, baseUrl = "https://offline.invalid", reasoning = false,
-                input = new[] { "text" }, contextWindow = 32768, maxTokens = 16384, cost = new { input = 0, output = 0, cacheRead = 0, cacheWrite = 0 } }));
-            try { f.Dispatcher = new(session, new JsonlWriter(f.output, ownership: JsonlStreamOwnership.Borrowed), () => 123, [new(Model, wire)], options,
-                RpcSessionOwnership.Borrowed, sessionOwner: f.Owner, summaryGenerator: hasGenerator ? f.Summary : null); return f; }
+            JsonData Wire(ModelDescriptor model, int window) => JsonData.Parse(JsonSerializer.Serialize(new { id = model.Id, api = model.Api, provider = model.Provider, name = model.Id,
+                baseUrl = "https://offline.invalid", reasoning = false, input = new[] { "text" }, contextWindow = window, maxTokens = 16384,
+                cost = new { input = 0, output = 0, cacheRead = 0, cacheWrite = 0 } }));
+            ImmutableArray<RpcModelDefinition> models = settingBound ? [new(Model, Wire(Model, 32768)), new(Large, Wire(Large, 1_000_000))] : [new(Model, Wire(Model, 32768))];
+            try { f.Dispatcher = new(session, new JsonlWriter(f.output, ownership: JsonlStreamOwnership.Borrowed), () => 123, models, options,
+                RpcSessionOwnership.Borrowed, sessionOwner: f.Owner, summaryGenerator: hasGenerator ? f.Summary : null,
+                compactionSettings: settingBound ? _ => new SessionCompactionSettings() : null); return f; }
             catch { await f.Owner.DisposeAsync(); f.output.Dispose(); throw; }
         }
         internal async Task<JsonElement> Send(object command)
@@ -225,7 +271,7 @@ internal static class RpcUpstreamCompactionTests
         internal async Task JoinRun()
         {
             using var deadline = new CancellationTokenSource(Bound);
-            for (var attempt = 0; ; attempt++) { deadline.Token.ThrowIfCancellationRequested(); var state = await Send(new { id = "join-" + attempt, type = "get_state" }); Success(state);
+            for (var attempt = 0; ; attempt++) { deadline.Token.ThrowIfCancellationRequested(); var state = await Send(new { id = "join-" + Interlocked.Increment(ref joins) + "-" + attempt, type = "get_state" }); Success(state);
                 if (state.GetProperty("data").GetProperty("pisharpRunOwnerSettled").GetBoolean()) return; await Task.Delay(1, deadline.Token); }
         }
         public async ValueTask DisposeAsync()
@@ -244,7 +290,7 @@ internal static class RpcUpstreamCompactionTests
     }
     private sealed class Summary : ISessionSummaryGenerator
     {
-        internal bool Hold; internal string Text = "offline summary"; internal int Calls, Active; internal SessionSummaryRequest? LastRequest;
+        internal bool Hold; internal string Text = "offline summary"; internal int Calls, Active; internal SessionSummaryRequest? LastRequest; internal Exception? Throw;
         internal readonly TaskCompletionSource Entered = new(TaskCreationOptions.RunContinuationsAsynchronously), Canceled = new(TaskCreationOptions.RunContinuationsAsynchronously),
             Release = new(TaskCreationOptions.RunContinuationsAsynchronously), Joined = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public async ValueTask<SessionGeneratedSummary> GenerateAsync(SessionSummaryRequest request, CancellationToken token = default)
@@ -252,7 +298,7 @@ internal static class RpcUpstreamCompactionTests
             Calls++; Active++; LastRequest = request;
             try { Check(request.Kind == SessionSummaryKind.History && request.Model == Model, "Unexpected native summary request.");
                 if (Hold) { using var cancellation = token.UnsafeRegister(_ => Canceled.TrySetResult(), null); Entered.TrySetResult(); await Release.Task; }
-                token.ThrowIfCancellationRequested(); return new(Text, new(4, 3, 0, 0, 7, new(0, 0, 0, 0, 0))); }
+                token.ThrowIfCancellationRequested(); if (Throw is not null) throw Throw; return new(Text, new(4, 3, 0, 0, 7, new(0, 0, 0, 0, 0))); }
             finally { Active--; Joined.TrySetResult(); }
         }
     }
@@ -261,7 +307,7 @@ internal static class RpcUpstreamCompactionTests
         internal bool Hold; internal int Calls, Active; internal CancellationToken LastToken; internal readonly TaskCompletionSource Entered = new(TaskCreationOptions.RunContinuationsAsynchronously), Release = new(TaskCreationOptions.RunContinuationsAsynchronously), Joined = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
         {
-            Calls++; Active++; LastToken = token; var final = new AssistantMessage(Model.Api, Model.Provider, Model.Id, 123, [], new(40000, 0, 0, 0, 40000, new(0, 0, 0, 0, 0)), StopReason.Stop);
+            Calls++; Active++; LastToken = token; var final = new AssistantMessage(request.Model.Api, request.Model.Provider, request.Model.Id, 123, [], new(40000, 0, 0, 0, 40000, new(0, 0, 0, 0, 0)), StopReason.Stop);
             try { yield return new StreamStarted(final with { StopReason = StopReason.Pending }); Entered.TrySetResult(); if (Hold) await Release.Task; token.ThrowIfCancellationRequested(); yield return new StreamDone(StopReason.Stop, final); }
             finally { Active--; Joined.TrySetResult(); }
         }

@@ -9,7 +9,12 @@ namespace PiSharp.Extensions.Runtime.Dispatch;
 public sealed record ExtensionEventDispatchOptions(int MaximumTextCharacters = 65_536,
     int MaximumJsonCharacters = 8 * 1024 * 1024, int MaximumJsonBytes = 32 * 1024 * 1024,
     int MaximumJsonDepth = 32, int MaximumImages = 128, int MaximumConcurrentDispatches = 32,
-    int MaximumDispatchDepth = 8, int MaximumContextMessages = 1_000_000); // PiRequestBudget.RequestMessages: runner.ts emits the whole context.
+    int MaximumDispatchDepth = 8, int MaximumContextMessages = 1_000_000) // PiRequestBudget.RequestMessages: runner.ts emits the whole context.
+{
+    /// <summary>Event text and JSON (names and strings) may hold lone surrogates, as JavaScript values do (the Pi entry: runner.ts
+    /// emits whatever the session holds); otherwise they are refused.</summary>
+    public bool KeepsLoneSurrogates { get; init; }
+}
 
 /// <summary>Typed event reducers. Complete tool-result admission is supplied by the host's pure codec.
 /// This standalone dispatcher does not activate extensions, invoke tools, authorize calls, or persist entries.</summary>
@@ -37,7 +42,7 @@ public sealed class ExtensionEventDispatcher
         this.restoreSystemMessage = restoreSystemMessage;
         this.options = options ?? new();
         if (this.options.MaximumTextCharacters <= 0 || this.options.MaximumJsonCharacters <= 0 ||
-            this.options.MaximumJsonBytes <= 0 || this.options.MaximumJsonDepth is < 1 or > 64 ||
+            this.options.MaximumJsonBytes <= 0 || this.options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             this.options.MaximumImages <= 0 || this.options.MaximumConcurrentDispatches <= 0 ||
             this.options.MaximumDispatchDepth <= 0 || this.options.MaximumContextMessages <= 0)
             throw new ArgumentOutOfRangeException(nameof(options));
@@ -345,10 +350,10 @@ public sealed class ExtensionEventDispatcher
             {
                 if (clearStructured && property.Name == "structuredContent") continue;
                 writer.WritePropertyName(property.Name);
-                writer.WriteRawValue(replacements.Remove(property.Name, out var replacement) ? replacement.GetRawText() : property.Value.GetRawText());
+                writer.WriteRawValue(replacements.Remove(property.Name, out var replacement) ? replacement.GetRawText() : property.Value.GetRawText(), skipInputValidation: true);
             }
             foreach (var name in consumed) if (replacements.TryGetValue(name, out var value))
-            { writer.WritePropertyName(name); writer.WriteRawValue(value.GetRawText()); }
+            { writer.WritePropertyName(name); writer.WriteRawValue(value.GetRawText(), skipInputValidation: true); }
             writer.WriteEndObject();
         }
         return Strict(JsonData.Parse(Encoding.UTF8.GetString(buffer.ToArray())), requireObject: true);
@@ -388,15 +393,16 @@ public sealed class ExtensionEventDispatcher
             throw new ArgumentException("Invalid JSON value.");
         return result;
     }
-    private static bool JsonScalars(JsonElement value) => value.ValueKind switch
+    private bool JsonScalars(JsonElement value) => value.ValueKind switch
     {
-        JsonValueKind.Object => value.EnumerateObject().All(property => Scalars(property.Name) && JsonScalars(property.Value)),
+        JsonValueKind.Object => value.EnumerateObject().All(property => Unicode(JsonUtf16.GetName(property)) && JsonScalars(property.Value)),
         JsonValueKind.Array => value.EnumerateArray().All(JsonScalars),
-        JsonValueKind.String => Scalars(value.GetString()),
+        JsonValueKind.String => Unicode(JsonUtf16.GetString(value)),
         JsonValueKind.Number => value.TryGetDouble(out var number) && double.IsFinite(number),
         _ => value.ValueKind is JsonValueKind.True or JsonValueKind.False or JsonValueKind.Null
     };
-    private bool Text(string? value) => value is not null && value.Length <= options.MaximumTextCharacters && Scalars(value);
+    private bool Unicode(string? value) => value is not null && (options.KeepsLoneSurrogates || Scalars(value));
+    private bool Text(string? value) => value is not null && value.Length <= options.MaximumTextCharacters && Unicode(value);
     private static bool Scalars(string? value)
     {
         if (value is null) return false;

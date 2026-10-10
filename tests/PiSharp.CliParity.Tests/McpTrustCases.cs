@@ -9,7 +9,7 @@ using PiSharp.Extensions.Mcp.Runtime;
 internal static partial class Program
 {
     /// <summary>A fake MCP server behind a channel with one tool.</summary>
-    private sealed class FakeMcpChannel(string tool) : IMcpAdmittedRequestChannel
+    private sealed class FakeMcpChannel(string tool, string? callResult = null) : IMcpAdmittedRequestChannel
     {
         public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask ConfigureRootsAsync(JsonData roots, CancellationToken token) => ValueTask.CompletedTask;
@@ -20,6 +20,7 @@ internal static partial class Program
                 return ValueTask.FromResult(JsonData.Parse("{\"protocolVersion\":\"2025-11-25\",\"serverInfo\":{\"name\":\"fixture\",\"version\":\"1\"},\"capabilities\":{\"tools\":{}}}"));
             if (method == "tools/list")
                 return ValueTask.FromResult(JsonData.Parse("{\"tools\":[{\"name\":\"" + tool + "\",\"description\":\"Fixture tool.\",\"inputSchema\":{\"type\":\"object\"}}]}"));
+            if (method == "tools/call" && callResult is not null) return ValueTask.FromResult(JsonData.Parse(callResult));
             return ValueTask.FromException<JsonData>(new IOException("No tool execution admitted."));
         }
         public Task CloseAsync() => Task.CompletedTask;

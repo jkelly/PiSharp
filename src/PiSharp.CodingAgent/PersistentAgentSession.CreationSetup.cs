@@ -19,7 +19,8 @@ public sealed partial class PersistentAgentSession
             lock (_gate) { reservation.ValidateCatalogAuthority(this); if (_setupAppending) throw new InvalidOperationException("Setup selection cannot overlap an append."); log = _acknowledgedLog; previous = _context; }
             var projected = _projector.Project(log.Entries, leaf, token);
             var current = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-            var configuration = _registry?.Resolve(WithUnrecordedLoadout(projected, current, token), _configuration.Model, token, activeOrder: current).Configuration ?? _configuration;
+            var configuration = _registry?.Resolve(WithUnrecordedLoadout(projected, current, token), _configuration.Model, token, tolerated: _toleratedSelection,
+                thinkingLevel: KeptThinking(_configuration), activeOrder: current).Configuration ?? _configuration;
             ValidateRuntimeContext(projected, configuration, _toleratedSelection, _toleratedThinking);
             lock (_gate)
             {
@@ -54,7 +55,7 @@ public sealed partial class PersistentAgentSession
                 foreach (var property in draft.Fields.Value.EnumerateObject())
                 {
                     if (property.Name is "type" or "id" or "parentId" or "timestamp") throw new ArgumentException("Setup cannot supply record identity.");
-                    writer.WritePropertyName(property.Name); writer.WriteRawValue(property.Value.GetRawText());
+                    writer.WritePropertyName(property.Name); writer.WriteRawValue(property.Value.GetRawText(), skipInputValidation: true);
                 }
             });
             var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, token);

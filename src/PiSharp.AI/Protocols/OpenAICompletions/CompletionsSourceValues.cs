@@ -47,7 +47,7 @@ public sealed class CompletionsSourceSnapshot
             .Select(path => path.GetString()!).ToImmutableArray();
         SerializedJson = EcmaScriptJsonProjection.Project(JsonData.Parse(Raw.Value.GetProperty("value").GetRawText()), new(MaximumInputCharacters: maximumCharacters,
             MaximumInputBytes: maximumBytes, MaximumOutputCharacters: maximumCharacters,
-            MaximumOutputBytes: maximumBytes, MaximumDepth: 64, MaximumStringCharacters: maximumCharacters));
+            MaximumOutputBytes: maximumBytes, MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumStringCharacters: maximumCharacters));
     }
 }
 
@@ -78,8 +78,8 @@ public sealed class CompletionsSourceEvent
     {
         Type = emission.Value.GetProperty("value").GetProperty("type").GetString()!;
         _member = Type == "done" ? "message" : Type == "error" ? "error" : "partial";
-        var descriptor = JsonNode.Parse(emission.Value.GetProperty("value").GetRawText())!.AsObject();
-        descriptor.Remove(_member); _descriptor = JsonData.Parse(descriptor.ToJsonString());
+        var descriptor = PiSharp.Contracts.JsonUtf16.MutableNode(emission.Value.GetProperty("value"))!.AsObject();
+        descriptor.Remove(_member); _descriptor = JsonData.Parse(PiSharp.Contracts.JsonUtf16.ToJsonString(descriptor));
         Message = message; _characters = characters; _bytes = bytes;
         Emission = new(emission, characters, bytes);
     }
@@ -88,11 +88,11 @@ public sealed class CompletionsSourceEvent
         get
         {
             var message = Message.Snapshot.Raw.Value;
-            var value = JsonNode.Parse(_descriptor.ToString())!.AsObject();
-            value[_member] = JsonNode.Parse(message.GetProperty("value").GetRawText());
+            var value = PiSharp.Contracts.JsonUtf16.MutableNode(_descriptor)!.AsObject();
+            value[_member] = PiSharp.Contracts.JsonUtf16.MutableNode(message.GetProperty("value"));
             var paths = message.GetProperty("ownUndefinedPaths").EnumerateArray()
                 .Select(path => "/" + _member + path.GetString()).ToArray();
-            return new(JsonData.Parse("{\"value\":" + value.ToJsonString() + ",\"ownUndefinedPaths\":" +
+            return new(JsonData.Parse("{\"value\":" + PiSharp.Contracts.JsonUtf16.ToJsonString(value) + ",\"ownUndefinedPaths\":" +
                 JsonSerializer.Serialize(paths) + "}"), _characters, _bytes);
         }
     }

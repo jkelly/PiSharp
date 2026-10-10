@@ -51,10 +51,10 @@ public static class SessionWireUsage
         {
             writer.WriteStartObject(); writer.WriteString("role", "assistant"); writer.WriteStartArray("content"); writer.WriteEndArray();
             writer.WriteString("api", "usage"); writer.WriteString("provider", "usage"); writer.WriteString("model", "usage");
-            writer.WritePropertyName("usage"); writer.WriteRawValue(usage.GetRawText());
+            writer.WritePropertyName("usage"); writer.WriteRawValue(usage.GetRawText(), skipInputValidation: true);
             writer.WriteString("stopReason", "stop"); writer.WriteNumber("timestamp", 0); writer.WriteEndObject();
         }
-        using var document = JsonDocument.Parse(bytes.ToArray());
+        using var document = JsonDocument.Parse(bytes.ToArray(), PiSharp.Contracts.JsonData.DocumentOptions);
         return PiWireJson.ReadMessage(document.RootElement).Usage;
     }
 }
@@ -225,16 +225,16 @@ public sealed partial class PersistentAgentSession
                 "custom" => Record(_codec, "custom", id, entryParent, clock, writer =>
                 {
                     writer.WriteString("customType", Text(value, "customType"));
-                    if (value.TryGetProperty("data", out var data)) { writer.WritePropertyName("data"); writer.WriteRawValue(data.GetRawText()); }
+                    if (value.TryGetProperty("data", out var data)) { writer.WritePropertyName("data"); writer.WriteRawValue(data.GetRawText(), skipInputValidation: true); }
                 }),
                 "custom_message" => Record(_codec, "custom_message", id, entryParent, clock, writer =>
                 {
                     writer.WriteString("customType", Text(value, "customType"));
                     if (!value.TryGetProperty("content", out var content) || content.ValueKind is not (JsonValueKind.String or JsonValueKind.Array))
                         throw new InvalidDataException("A custom_message entry needs content.");
-                    writer.WritePropertyName("content"); writer.WriteRawValue(content.GetRawText());
+                    writer.WritePropertyName("content"); writer.WriteRawValue(content.GetRawText(), skipInputValidation: true);
                     writer.WriteBoolean("display", value.TryGetProperty("display", out var display) && display.ValueKind == JsonValueKind.True);
-                    if (value.TryGetProperty("details", out var details)) { writer.WritePropertyName("details"); writer.WriteRawValue(details.GetRawText()); }
+                    if (value.TryGetProperty("details", out var details)) { writer.WritePropertyName("details"); writer.WriteRawValue(details.GetRawText(), skipInputValidation: true); }
                 }),
                 "context_edit" => ContextEditRecord(Text(value, "targetId"), SessionContextEditValidator.Normalize(current,
                     new(Text(value, "targetId"), value.TryGetProperty("replacement", out var replacement) ? JsonData.Parse(replacement.GetRawText()) : null), token),

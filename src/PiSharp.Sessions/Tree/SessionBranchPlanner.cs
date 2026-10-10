@@ -13,8 +13,8 @@ public sealed class SessionBranchPlanException : Exception
     public SessionBranchPlanFailure Failure { get; }
     internal SessionBranchPlanException(SessionBranchPlanFailure failure) : base(failure switch
     {
-        SessionBranchPlanFailure.MissingEntry => "Session fork entry does not exist.",
-        SessionBranchPlanFailure.RequiresUserMessage => "Fork before requires a user message.",
+        // agent-session-runtime.ts fork(): a missing entry, and a "before" fork of anything but a user message, both throw this.
+        SessionBranchPlanFailure.MissingEntry or SessionBranchPlanFailure.RequiresUserMessage => "Invalid entry ID for forking",
         SessionBranchPlanFailure.MetadataUnavailable => "Session labels cannot be copied under the supported profile.",
         SessionBranchPlanFailure.ResourceLimit => "Session branch exceeds configured limits.",
         SessionBranchPlanFailure.InvalidGraph => "Session fork requires a complete valid source tree.",
@@ -42,8 +42,8 @@ public sealed class SessionBranchPlanner
     public SessionBranchPlanner(SessionBranchPlanOptions? options = null)
     {
         this.options = options ?? new();
-        if (this.options.MaximumEntries is < 1 or > 100_000 || this.options.MaximumOutputBytes is < 1 or > 67_108_864 ||
-            this.options.MaximumInputCharacters is < 1 or > 67_108_864)
+        if (this.options.MaximumEntries is < 1 or > 100_000 || this.options.MaximumOutputBytes is < 1 or > PiSharp.Sessions.Storage.SessionBranchPublisher.MaximumInputBytes ||
+            this.options.MaximumInputCharacters is < 1 or > PiSharp.Sessions.Storage.SessionBranchPublisher.MaximumInputBytes)
             throw new ArgumentOutOfRangeException(nameof(options));
         codec = new(this.options.CodecOptions);
     }
@@ -199,7 +199,7 @@ public sealed class SessionBranchPlanner
             writer.WritePropertyName(property.Name);
             if (property.Name == "parentId") { if (parent is null) writer.WriteNullValue(); else writer.WriteStringValue(parent); }
             else if (property.Name == "firstKeptEntryId" && firstKept is not null) writer.WriteStringValue(firstKept);
-            else writer.WriteRawValue(property.Value.GetRawText(), skipInputValidation: false);
+            else writer.WriteRawValue(property.Value.GetRawText(), skipInputValidation: true);
         }
     });
     private SessionEntry Encode(Action<Utf8JsonWriter> fields)

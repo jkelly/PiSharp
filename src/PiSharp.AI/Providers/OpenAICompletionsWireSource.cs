@@ -17,7 +17,7 @@ public sealed record OpenAICompletionsTokenRates(decimal Input = 0, decimal Outp
 
 public sealed record OpenAICompletionsWireOptions(int MaximumChunks = 4096, int MaximumChunkCharacters = 65_536,
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
-    int MaximumJsonDepth = 32, bool SupportsFinishReason = true, OpenAICompletionsTokenRates? Rates = null)
+    int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, bool SupportsFinishReason = true, OpenAICompletionsTokenRates? Rates = null)
 {
     /// <summary>Explicit bounded source-view capture; ordinary native progress remains compact.</summary>
     public bool CaptureSourceEmissionSnapshots { get; init; }
@@ -45,7 +45,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         _source = source; _options = options ?? new();
         if (_options.MaximumChunks <= 0 || _options.MaximumChunkCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
             _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Completions stream limits.");
         var rates = _options.Rates ?? new();
         if (rates.Input < 0 || rates.Output < 0 || rates.CacheRead < 0 || rates.CacheWrite < 0 || !PromptLengthPricing.Valid(rates.Tiers))
@@ -635,7 +635,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
 
         private void AppendDetail(JsonElement detail)
         {
-            var next = JsonNode.Parse(detail.GetRawText())!.AsObject();
+            var next = JsonNode.Parse(detail.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
             var type = next["type"]!.GetValue<string>();
             var last = _reasoningDetails.Count > 0 ? _reasoningDetails[^1]!.AsObject() : null;
             if (last is not null && last["type"]!.GetValue<string>() == type && (type is "reasoning.summary" or "reasoning.text"))
@@ -659,8 +659,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private void ReadUsage(JsonElement usage)
         {
             var prompt = Count(usage, "prompt_tokens"); var output = Count(usage, "completion_tokens");
-            long? read = null;
-            var write = 0L; var reasoning = 0L;
+            double? read = null;
+            var write = 0d; var reasoning = 0d;
             if (usage.TryGetProperty("prompt_tokens_details", out var promptDetails) && promptDetails.ValueKind != JsonValueKind.Null)
             {
                 Object(promptDetails);
@@ -671,8 +671,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             if (usage.TryGetProperty("completion_tokens_details", out var outputDetails) && outputDetails.ValueKind != JsonValueKind.Null)
                 reasoning = Count(Object(outputDetails), "reasoning_tokens");
             if (reasoning > output) throw Protocol();
-            var input = Math.Max(0, checked(prompt - cacheRead - write));
-            var extras = JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(CultureInfo.InvariantCulture)));
+            var input = Math.Max(0, prompt - cacheRead - write);
+            var extras = JsonFields.Empty.Set("reasoning", JsonData.Parse(JsonNumber.Text(reasoning)));
             var extraCharacters = "reasoning".Length + extras.Values["reasoning"].ToString().Length;
             Charge(extraCharacters - _usageCharacters); _usageCharacters = extraCharacters;
             // Pinned models.ts: three divide-then-multiply terms, cache write
@@ -695,7 +695,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             var source = sourceCost.Value;
             var costCharacters = sourceCost.ToString().Length;
             Charge(costCharacters - _costCharacters); _costCharacters = costCharacters;
-            _usage = new(input, output, cacheRead, write, checked(input + output + cacheRead + write),
+            _usage = new(input, output, cacheRead, write, input + output + cacheRead + write,
                 new(source.GetProperty("input").GetDecimal(), source.GetProperty("output").GetDecimal(),
                     source.GetProperty("cacheRead").GetDecimal(), source.GetProperty("cacheWrite").GetDecimal(),
                     source.GetProperty("total").GetDecimal(), SourceBinary64Cost: sourceCost), extras) { ExtrasBeforeTotal = true };
@@ -718,10 +718,11 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             {
                 if (++depth > _options.MaximumJsonDepth) throw Limit();
                 if (value.ValueKind == JsonValueKind.Object)
-                    foreach (var property in value.EnumerateObject()) { Unicode(property.Name); CheckJson(property.Value, depth); }
+                    foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); CheckJson(property.Value, depth); }
                 else foreach (var item in value.EnumerateArray()) CheckJson(item, depth);
             }
-            else if (value.ValueKind == JsonValueKind.String) Unicode(value.GetString()!);
+            // openai-completions.ts reads each chunk with the SDK's JSON.parse: a string keeps a lone surrogate.
+            else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
             else if (value.ValueKind == JsonValueKind.Number &&
                 (!value.TryGetDouble(out var number) || !double.IsFinite(number))) throw Protocol();
         }
@@ -745,7 +746,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private static string? OptionalString(JsonElement value, string name)
         {
             if (!value.TryGetProperty(name, out var item) || item.ValueKind == JsonValueKind.Null) return null;
-            return item.ValueKind == JsonValueKind.String ? item.GetString() : throw Protocol();
+            return item.ValueKind == JsonValueKind.String ? JsonUtf16.GetString(item) : throw Protocol();
         }
         private static long Number(JsonElement value)
         {
@@ -753,8 +754,11 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 number < 0 || number > 9_007_199_254_740_991) throw Protocol();
             return number;
         }
-        private static long? OptionalCount(JsonElement value, string name) =>
-            value.TryGetProperty(name, out var item) && item.ValueKind != JsonValueKind.Null ? Number(item) : null;
-        private static long Count(JsonElement value, string name) => OptionalCount(value, name) ?? 0;
+        // parseChunkUsage keeps each count as the JavaScript number the chunk reports (a fraction included).
+        private static double? OptionalCount(JsonElement value, string name) =>
+            value.TryGetProperty(name, out var item) && item.ValueKind != JsonValueKind.Null ? Tokens(item) : null;
+        private static double Tokens(JsonElement value)
+        { var number = value.ValueKind == JsonValueKind.Number ? JsonNumber.Read(value) : double.NaN; return double.IsFinite(number) ? number : throw Protocol(); }
+        private static double Count(JsonElement value, string name) => OptionalCount(value, name) ?? 0;
     }
 }

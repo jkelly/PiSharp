@@ -40,14 +40,14 @@ internal static class RpcCommandCodec
         try { Strict(input, options.MaximumCommandBytes, options.MaximumJsonDepth); }
         catch (JsonlTransportException) { throw new RpcCommandException(null, "parse", "Failed to parse command: invalid strict JSON object."); }
         var body = input.Value; string? id = null;
-        // An id or type with a lone surrogate is echoed exactly (the owned record holds U+FFFD there).
+        // An id or type with a lone surrogate is echoed exactly.
         JsonlRecordCodec.ExactMembers.TryGetValue(input, out var exact);
-        string Exact(string field, JsonElement value) => exact is not null && exact.TryGetValue(field, out var text) ? text : value.GetString()!;
+        string Exact(string field, JsonElement value) => exact is not null && exact.TryGetValue(field, out var text) ? text : JsonUtf16.GetString(value);
         if (body.TryGetProperty("id", out var identity))
         {
             // rpc-mode.ts echoes command.id as it came: a non-string id is written back as that JSON value.
             if (identity.ValueKind != JsonValueKind.String) id = RawJson(identity);
-            else if (identity.GetString()!.Length > options.MaximumIdCharacters)
+            else if (JsonUtf16.GetString(identity).Length > options.MaximumIdCharacters)
                 throw new RpcCommandException(null, "parse", "Command id must be a bounded string when present.");
             else id = Exact("id", identity);
         }
@@ -61,7 +61,7 @@ internal static class RpcCommandCodec
                 ? double.IsPositiveInfinity(number) ? "Infinity" : "-Infinity" : JsString(type);
             throw new RpcCommandException(id, RawJson(type), "Unknown command: " + text);
         }
-        if (type.GetString()!.Length > options.MaximumCommandTypeCharacters)
+        if (JsonUtf16.GetString(type).Length > options.MaximumCommandTypeCharacters)
             throw new RpcCommandException(id, "parse", "Command type must be a bounded string.");
         var name = Exact("type", type);
         try { _ = ErrorCore(id, name, "RPC command failed.", options); }
@@ -70,7 +70,7 @@ internal static class RpcCommandCodec
         {
             if (!body.TryGetProperty(field, out var value) || value.ValueKind != JsonValueKind.String)
                 throw new RpcCommandException(id, name, "Command requires a string " + field + ".");
-            var text = value.GetString()!;
+            var text = JsonUtf16.GetString(value);
             if (text.Length > maximum) throw new RpcCommandException(id, name, "Command " + field + " exceeds configured limits.");
             return text;
         }
@@ -165,7 +165,7 @@ internal static class RpcCommandCodec
                     throw new RpcCommandException(id, name, "Command images must be a bounded array.");
                 foreach (var image in value.EnumerateArray())
                     if (image.ValueKind != JsonValueKind.Object || !image.TryGetProperty("type", out var kind) ||
-                        kind.ValueKind != JsonValueKind.String || kind.GetString() != "image" ||
+                        kind.ValueKind != JsonValueKind.String || !kind.ValueEquals("image") ||
                         !image.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.String ||
                         !image.TryGetProperty("mimeType", out var mime) || mime.ValueKind != JsonValueKind.String)
                         throw new RpcCommandException(id, name, "Command image requires type, data and mimeType strings.");
@@ -224,10 +224,9 @@ internal static class RpcCommandCodec
         }
         if (name == "set_thinking_level")
         {
-            var level = Required("level", 16);
-            if (level is not ("off" or "minimal" or "low" or "medium" or "high" or "xhigh" or "max"))
-                throw new RpcCommandException(id, name, "Thinking level is invalid.");
-            return new(id, name, ThinkingLevel: level);
+            // rpc-mode.ts set_thinking_level passes the level to setThinkingLevel, which clamps a level the model does not list (an
+            // unknown one to the model's first level, models.ts clampThinkingLevel) instead of refusing it.
+            return new(id, name, ThinkingLevel: Required("level", 16));
         }
         if (name == "new_session") return new(id, name, Message: Optional("parentSession", 4096));
         if (name == "fork")
@@ -245,15 +244,15 @@ internal static class RpcCommandCodec
         new("user", Build(writer =>
         {
             writer.WriteString("role", "user"); writer.WritePropertyName("content"); writer.WriteStartArray();
-            writer.WriteStartObject(); writer.WriteString("type", "text"); writer.WriteString("text", command.Message); writer.WriteEndObject();
-            if (command.Images is { } images) foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText());
+            writer.WriteStartObject(); writer.WriteString("type", "text"); JsonUtf16.WriteString(writer, "text", command.Message!); writer.WriteEndObject();
+            if (command.Images is { } images) foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText(), skipInputValidation: true);
             writer.WriteEndArray(); writer.WriteNumber("timestamp", timestamp);
         }, options.MaximumCommandBytes));
 
     internal static JsonData Success(RpcCommandEnvelope command, JsonData? data, RpcDispatchOptions options) => Build(writer =>
     {
         Header(writer, command.Id, command.Type); writer.WriteBoolean("success", true);
-        if (data is not null) { writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString()); }
+        if (data is not null) { writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString(), skipInputValidation: true); }
     }, options.MaximumOutputBytes);
     internal static JsonData Error(string? id, string? command, string error, RpcDispatchOptions options)
     {
@@ -276,7 +275,7 @@ internal static class RpcCommandCodec
     private static string RawJson(JsonElement value) => RawPrefix + value.GetRawText();
     private static void WriteEchoed(Utf8JsonWriter writer, string value)
     {
-        if (value.StartsWith(RawPrefix, StringComparison.Ordinal)) writer.WriteRawValue(value[RawPrefix.Length..]);
+        if (value.StartsWith(RawPrefix, StringComparison.Ordinal)) writer.WriteRawValue(value[RawPrefix.Length..], skipInputValidation: true);
         // Utf8JsonWriter refuses a lone surrogate; JSON.stringify writes it as an escape.
         else if (HasLoneSurrogate(value)) writer.WriteRawValue(PiSharp.AI.StreamingJson.JsonQuote(value), skipInputValidation: true);
         else writer.WriteStringValue(value);
@@ -293,7 +292,7 @@ internal static class RpcCommandCodec
     // String(value) for a JSON value, as a template literal converts it.
     private static string JsString(JsonElement value) => value.ValueKind switch
     {
-        JsonValueKind.String => value.GetString()!,
+        JsonValueKind.String => JsonUtf16.GetString(value),
         JsonValueKind.Null => "null", JsonValueKind.True => "true", JsonValueKind.False => "false",
         JsonValueKind.Number => PiSharp.AI.StreamingJson.ParseToJson(value.GetRawText()),
         JsonValueKind.Array => string.Join(",", value.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.Null ? "" : JsString(item))),
@@ -316,28 +315,28 @@ internal static class RpcCommandCodec
         return JsonData.Parse(Encoding.UTF8.GetString(bytes.WrittenSpan));
     }
     internal static void Raw(Utf8JsonWriter writer, string field, JsonData value)
-    { writer.WritePropertyName(field); writer.WriteRawValue(value.ToString()); }
+    { writer.WritePropertyName(field); writer.WriteRawValue(value.ToString(), skipInputValidation: true); }
     internal static void Messages(Utf8JsonWriter writer, string field, ImmutableArray<TranscriptEntry> messages, int maximum, int start = 0)
     {
         if (start < 0 || start > messages.Length || messages.Length - start > maximum) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
         writer.WritePropertyName(field); writer.WriteStartArray();
-        for (var index = start; index < messages.Length; index++) writer.WriteRawValue(messages[index].WireBody.ToString());
+        for (var index = start; index < messages.Length; index++) writer.WriteRawValue(messages[index].WireBody.ToString(), skipInputValidation: true);
         writer.WriteEndArray();
     }
     internal static string Text(TranscriptEntry message)
     {
         if (!message.WireBody.Value.TryGetProperty("content", out var content)) return "";
-        if (content.ValueKind == JsonValueKind.String) return content.GetString()!;
+        if (content.ValueKind == JsonValueKind.String) return JsonUtf16.GetString(content);
         if (content.ValueKind != JsonValueKind.Array) return "";
         return string.Concat(content.EnumerateArray().Where(part => part.ValueKind == JsonValueKind.Object &&
-            part.TryGetProperty("type", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() == "text")
-            .Select(part => part.GetProperty("text").GetString()));
+            part.TryGetProperty("type", out var kind) && kind.ValueKind == JsonValueKind.String && kind.ValueEquals("text"))
+            .Select(part => JsonUtf16.GetString(part.GetProperty("text"))));
     }
     internal static void Queue(Utf8JsonWriter writer, AgentPendingInputQueueSnapshot queue)
     {
         Write("steering", queue.SteeringMessages); Write("followUp", queue.FollowUpMessages);
         void Write(string name, ImmutableArray<TranscriptEntry> messages)
-        { writer.WritePropertyName(name); writer.WriteStartArray(); foreach (var message in messages) writer.WriteStringValue(Text(message)); writer.WriteEndArray(); }
+        { writer.WritePropertyName(name); writer.WriteStartArray(); foreach (var message in messages) JsonUtf16.WriteStringValue(writer, Text(message)); writer.WriteEndArray(); }
     }
     internal static string Mode(AgentPendingInputMode mode) => mode == AgentPendingInputMode.All ? "all" : "one-at-a-time";
     internal static string TrimSource(string value)
@@ -350,7 +349,7 @@ internal static class RpcCommandCodec
             >= '\u2000' and <= '\u200A' or '\u2028' or '\u2029' or '\u202F' or '\u205F' or '\u3000' or '\uFEFF';
     }
     internal static void Strict(JsonData data, int maximumBytes, int maximumDepth) =>
-        _ = JsonlRecordCodec.Encode(data, new(MaximumFrameBytes: maximumBytes, MaximumJsonDepth: maximumDepth));
+        _ = JsonlRecordCodec.Encode(data, new(MaximumFrameBytes: maximumBytes, MaximumJsonDepth: maximumDepth, JavaScriptOutput: true));
 
     internal static ImmutableDictionary<ModelDescriptor, JsonData> Models(ImmutableArray<RpcModelDefinition> definitions,
         RpcDispatchOptions options)

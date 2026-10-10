@@ -22,7 +22,7 @@ public sealed class TerminalNavigationSettings
 
 public static class TerminalNavigationSettingsLoader
 {
-    public const int MaximumCharacters = 1_048_576, MaximumDepth = 64;
+    public const int MaximumCharacters = 1_048_576, MaximumDepth = PiSharp.Contracts.JsonData.MaximumDepth;
     public static TerminalNavigationSettings Load(string agentDirectory, string workspace,
         Func<string, string?>? readText = null)
     {

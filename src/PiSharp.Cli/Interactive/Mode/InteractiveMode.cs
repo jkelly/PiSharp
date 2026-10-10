@@ -196,6 +196,7 @@ internal sealed partial class InteractiveMode
         programStatus = new InteractiveProgramStatus(() => ui.Terminal, () => state.SessionName, AppName);
         themeController = new InteractiveThemeController(ui, () => settings, ShowError, UpdateEditorBorderColor, options.InitialThemeSetting);
         ConnectExtensionHost();
+        ConnectExtensionSessionActions();
     }
 
     private TuiBase CreateRenderer(string tuiMode, bool showHardwareCursor, ITerminal terminal) => InteractiveTui.Create(new InteractiveTuiOptions(
