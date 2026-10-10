@@ -58,6 +58,8 @@ jobs:
       # macOS's TMPDIR (/var/folders/…) is a symlink to /private/var/folders/…. A Mac process's working directory is always the
       # resolved path (getcwd), in Pi and PiSharp alike, so the suites' temp workspaces use it too.
       - name: Run ${{ matrix.suite }}
+        env:
+          PISHARP_DEBUG: ${{ matrix.suite == 'PiSharp.CliParity.Tests' && '1' || '' }}
         run: |
           uname -m
           export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"
