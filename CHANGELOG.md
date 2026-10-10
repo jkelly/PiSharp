@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0.3]
+## [1.1.0.3] - 2026-10-10
 
 A C#-only patch on the Pi v1.1.0 baseline that fixes the `/clear` crash ([#5](https://github.com/jkelly/PiSharp/issues/5)) and closes most of the differences 1.1.0.2 left open. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.3.md).
 

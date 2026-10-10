@@ -177,7 +177,7 @@ function Get-NativeAnthropicSimpleSourcePins {
         @{ relative = 'src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleOptions.cs'; bytes = 1937; sha256 = 'b1ca92bc83c58ddac42ee2114da84f63ab2d5d238c6d017fa8547c0e99037dd8' },
         @{ relative = 'src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleRequestFactory.cs'; bytes = 9024; sha256 = 'd699c33da5236b1295033f1652f0b61283a7097ea8d76677d1a3c23f58b761d0' },
         @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/PiSharp.AnthropicSimple.Tests.csproj'; bytes = 208; sha256 = 'dd80069b3545d6291634e031ed2740773ad0af1535420f5ac44ef6451c0218c2' },
-        @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/Program.cs'; bytes = 30049; sha256 = '69ef753929e575064df63ae432d2b5458142e0e7bfeb50052d18f94308e02220' },
+        @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/Program.cs'; bytes = 31685; sha256 = 'ef417e8cb95a4bf67c14c1ccc07c1c805d0ca99a29a971ea06b20fc2186540d1' },
         @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/packages.lock.json'; bytes = 443; sha256 = '2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9' },
         @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/source-inventory.json'; bytes = 1338; sha256 = 'bfa6cb9280c250b76cb5ef9db97fb50737e62f14517d83ed614238cd6d81634c' }
     )
@@ -204,7 +204,7 @@ function Get-NativeAzureResponsesSourcePins {
     # Exact independently reviewed source be0ae03455f37aca0252d2bdda48c356f381c08c; includes the composed shared Mistral routing where applicable.
     return @(
         @{ relative = 'compatibility/azure-responses-explicit-adapter.json'; bytes = 827; sha256 = '7b7928753e6281069bb493c286237ff59a46a039560c6e415324bfd6ba50e950' },
-        @{ relative = 'docs/contracts/azure-responses-explicit-adapter.md'; bytes = 10693; sha256 = '730ed61331a599a554fef00e0bafefb21bf88022fc6a4c09557c11c79d74bf17' },
+        @{ relative = 'docs/contracts/azure-responses-explicit-adapter.md'; bytes = 10898; sha256 = '9a7af5726796d3b5180ff2d3dba0e08f4139c90e4f7c7d906ab38cf1cb91d3cd' },
         @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesOptions.cs'; bytes = 3237; sha256 = '5743cb3b31a9d33c84f8cab77f70721811dd4aa56ab7450bed8418760a4cb23a' },
         @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs'; bytes = 17443; sha256 = 'd3606f53f331156bcd88da2fcb7c1de00c51cbb7f4c8943d70942b8c6faaf06f' },
         @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesTransport.cs'; bytes = 14136; sha256 = '78986051ee53abcfb5758ecb22e157750464f3f532a74b00b8d5bcce83ca0b1d' },

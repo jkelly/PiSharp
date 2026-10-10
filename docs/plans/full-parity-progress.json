@@ -210,21 +210,21 @@
       "version": "1.1.0.3",
       "kind": "patch",
       "baseline": "v1.1.0",
-      "status": "in-progress",
+      "status": "release-candidate",
       "branch": "fix/1.1.0.3",
       "ships": "everything on fix/1.1.0.3 since main (v1.1.0.2)",
       "issues": [
         "#5 (/clear crash: thinking level clamped on open; clamping everywhere Pi clamps)"
       ],
       "notes": "docs/release-notes/1.1.0.3.md",
-      "changelog": "website/src/content/changelog/1.1.0.3.md (status in-progress, no date)",
+      "changelog": "website/src/content/changelog/1.1.0.3.md (date 2026-10-10)",
       "decisions": "docs/decisions/0004-full-parity-owner-decisions.md item 14 (Azure resource name as Pi)",
       "highlights": [
         "fixes: #5 and thinking clamps, RPC error messages, footer after every turn, auto-compaction in every mode, agent_settled ordering, triggerTurn timing",
         "new: built-in extensions on/off, llama.cpp and /llama, native classifier/image providers, ctx.ui.setTheme, -e package resources, Codex WebSocket and zstd, X11 clipboard reading, Node spawn errors, lone surrogates, fractional tokens, 1,000 JSON levels, JavaScript-string-sized bounds, RPC/print setters save settings"
       ],
       "blockers": [],
-      "remaining": "version bump (Directory.Build.props), integrity pins, changelog date, tag"
+      "remaining": "Linux dry run, owner go-ahead, tag v1.1.0.3"
     }
   },
   "messageCaps": {
