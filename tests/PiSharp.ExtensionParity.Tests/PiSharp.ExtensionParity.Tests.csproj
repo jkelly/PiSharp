@@ -2,5 +2,8 @@
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <!-- The sample extensions are built first; the cases load them from their own build output (samples/extensions/*/bin). -->
+    <ProjectReference Include="../../samples/extensions/StatefulTodo/StatefulTodo.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="../../samples/extensions/SessionCheckpoint/SessionCheckpoint.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 </Project>

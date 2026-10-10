@@ -39,7 +39,21 @@ internal sealed partial class InteractiveMode
                 ui.RequestRender();
             }),
             new(() => editorTextSnapshot, () => terminalSizeSnapshot, () => toolOutputExpanded, footerDataProvider.GetGitBranch,
-                footerDataProvider.GetAvailableProviderCount));
+                footerDataProvider.GetAvailableProviderCount) { SetTheme = SetExtensionTheme });
+    }
+
+    /// <summary>interactive-mode.ts createExtensionUIContext setTheme(name): the theme controller applies the theme (one that fails to
+    /// load falls back to the system theme) and a theme that applied becomes the theme setting. The extension host asks from its own
+    /// thread: the result is whether the theme loads, and the switch itself runs on the mode's loop.</summary>
+    private (bool Success, string? Error) SetExtensionTheme(string name)
+    {
+        var error = Themes.LoadError(name);
+        context.Loop.Post(() =>
+        {
+            var result = themeController.SetThemeName(name);
+            if (result.Success && settings.ThemeSetting != name) settings.SetTheme(name);
+        });
+        return error is null ? (true, null) : (false, error);
     }
 
     /// <summary>Starts applying extension publications (on the loop, once the editor and its handlers exist).</summary>

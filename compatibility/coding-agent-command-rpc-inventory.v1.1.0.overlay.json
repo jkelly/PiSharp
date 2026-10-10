@@ -1,7 +1,7 @@
 {
-  "$comment": "Authored native status for the v1.1.0 command/RPC inventory, applied by tools/SurfaceInventory/build-command-rpc-inventory.mjs --overlay. Assessed against PiSharp sources at 95e3c29a7db9434704819f856f20e0bf30f1938f. A row counts as Implemented only when an authored test case exercises it; tests are authored and registered, not executed by the refresh.",
+  "$comment": "Authored native status for the v1.1.0 command/RPC inventory, applied by tools/SurfaceInventory/build-command-rpc-inventory.mjs --overlay. Rows changed in this pass were assessed against PiSharp sources at b831158a9379e8a7f454a069ee18551c90bd7eac (with the 1.1.0.3 close-out cases in tests/PiSharp.CliParity.Tests/CloseoutCases.cs); unchanged rows keep their earlier assessedAt. The Pi entry (pisharp [options], PiArgs/PiCommand) carries the upstream CLI flags; the session verbs keep their own options. A row counts as Implemented only when an authored test case exercises it; tests are authored and registered, not executed by the refresh.",
   "nativeStatusPolicy": {
-    "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+    "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
     "vocabulary": {
       "Implemented": "PiSharp implements the surface and at least one authored test case exercises it.",
       "Partial": "Implemented with a narrower scope or only partly tested; see note.",
@@ -12,11 +12,10 @@
     "unassessedRows": "SDK root and module export rows are TypeScript declarations; their native C# mapping needs a reviewed mapping record, so they carry no nativeStatus and stay Deferred/Unverified.",
     "implementationEvidenceState": "AuthoredTests marks rows whose nativeStatus cites authored test cases; implementationAcceptance stays Deferred until an upstream/native differential or independent acceptance exists.",
     "counts": {
-      "Implemented": 119,
-      "Partial": 11,
-      "DifferentSurface": 9,
-      "ImplementedNoTest": 5,
-      "NotImplemented": 61
+      "Implemented": 191,
+      "Partial": 9,
+      "ImplementedNoTest": 3,
+      "NotImplemented": 3
     }
   },
   "nativeOnlySurfaces": [
@@ -224,11 +223,13 @@
     },
     "cli.flag.provider": {
       "nativeStatus": {
-        "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
           "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
-          "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs"
+          "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs",
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
         ],
         "tests": [
           {
@@ -243,19 +244,36 @@
             "case": "settings model startup actual RPC startup CLI overrides settings model and thinking",
             "sourcePrefix": "settings model startup ",
             "sourceSuffix": "actual RPC startup CLI overrides settings model and thinking"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "main.version-help-and-diagnostic-output"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ResumeModelCases.cs",
+            "case": "resume.cli-model-is-the-model-of-every-session-the-run-opens"
           }
         ],
-        "note": "Only with session rpc/terminal --live; provider limited to openai, openrouter, anthropic, mistral and azure. --provider without --model fails as in v1.1.0 main.ts."
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Any provider of the model registry; --provider without --model fails as in v1.1.0 main.ts. The session rpc/terminal verbs keep their own --provider."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.model": {
       "nativeStatus": {
-        "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
           "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
-          "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs"
+          "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs",
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
         ],
         "tests": [
           {
@@ -270,18 +288,35 @@
             "case": "settings model startup actual RPC startup CLI overrides settings model and thinking",
             "sourcePrefix": "settings model startup ",
             "sourceSuffix": "actual RPC startup CLI overrides settings model and thinking"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ResumeModelCases.cs",
+            "case": "resume.cli-model-is-the-model-of-every-session-the-run-opens"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.rpc-mode-switches-among-available-models"
           }
         ],
-        "note": "Only with session rpc/terminal --live; provider limited to openai, openrouter, anthropic, mistral and azure. --provider without --model fails as in v1.1.0 main.ts."
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). The session rpc/terminal verbs keep their own --model."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.thinking": {
       "nativeStatus": {
-        "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs"
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
         ],
         "tests": [
           {
@@ -297,18 +332,35 @@
             "case": "settings model startup durable resume preserves recorded thinking until explicit CLI override",
             "sourcePrefix": "settings model startup ",
             "sourceSuffix": "durable resume preserves recorded thinking until explicit CLI override"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.thinking-warning-and-tool-policy"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/NavigationModelCases.cs",
+            "case": "navigation.tree-keeps-the-model-and-thinking-level"
           }
         ],
-        "note": "session rpc/terminal only."
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Also on the session rpc/terminal verbs."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.skill": {
       "nativeStatus": {
-        "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Skills/SkillCliConfiguration.cs"
+          "src/PiSharp.Cli/Skills/SkillCliConfiguration.cs",
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs"
         ],
         "tests": [
           {
@@ -317,18 +369,30 @@
             "case": "skill CLI host actual one-shot selected content reaches model and repeat resume does not duplicate descriptions",
             "sourcePrefix": "skill CLI host ",
             "sourceSuffix": "actual one-shot selected content reaches model and repeat resume does not duplicate descriptions"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ResourceCases.cs",
+            "case": "resources.skill-prompt-theme-locations-and-precedence"
           }
         ],
-        "note": "Absolute approved paths only; repeatable."
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Repeatable; a missing path is reported. The session verbs keep their absolute-path --skill."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.prompt-template": {
       "nativeStatus": {
         "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Prompts/PromptTemplateCliConfiguration.cs"
+          "src/PiSharp.Cli/Prompts/PromptTemplateCliConfiguration.cs",
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs"
         ],
         "tests": [
           {
@@ -344,384 +408,921 @@
             "case": "prompt template CLI adapter reject missing and relative flag values",
             "sourcePrefix": "prompt template CLI adapter ",
             "sourceSuffix": "reject missing and relative flag values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
           }
         ],
-        "note": "Absolute paths only; repeatable."
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Paths reach PiResources (CliPromptTemplates); on the Pi entry only parsing is asserted. The session verbs' absolute-path form keeps its authored tests."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.session": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiSessionPlanner.cs"
         ],
-        "tests": [],
-        "note": "PiSharp --session is a required absolute JSONL path on every session verb, not an upstream session selector."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/SessionCases.cs",
+            "case": "sessions.session-by-path-prefix-fork-and-errors"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). A path or id prefix; the session verbs keep their required absolute --session path."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.print": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/SessionCommands.cs",
-          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs",
+          "src/PiSharp.Cli/Pi/PiPrintMode.cs"
         ],
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/SessionPrintCommandTests.cs",
-            "case": "Print CLI rejects malformed output modes before durable acquisition and preserves default report"
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.print-consumes-next-prompt-unless-option"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.print-text-final-assistant-text-and-session-layout"
           }
         ],
-        "note": "Print/JSON are `session prompt|resume --output report|print|json`; RPC is the `session rpc` verb."
-      }
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). The session verbs keep --output report|print|json."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.mode": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/SessionCommands.cs",
-          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs",
+          "src/PiSharp.Cli/Pi/PiPrintMode.cs"
         ],
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/SessionPrintCommandTests.cs",
-            "case": "Print CLI rejects malformed output modes before durable acquisition and preserves default report"
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.mode-values-and-errors"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.json-mode-header-then-event-lines"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.rpc-mode-dispatches-on-standard-streams"
           }
         ],
-        "note": "Print/JSON are `session prompt|resume --output report|print|json`; RPC is the `session rpc` verb."
-      }
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). text, json and rpc with the upstream diagnostics."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.extension": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Extensions/NativeExtensionConfiguration.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Extensions/Pi/PiExtensionRun.cs",
+          "src/PiSharp.Cli/Extensions/Pi/PiExtensionLoading.cs"
         ],
-        "tests": [],
-        "note": "Native packages use --extension-package/--extension-manifest/--extension-approval and related flags."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/NativeCases.cs",
+            "case": "native.cli-extension-runs-without-node"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.typescript-extension-tool-called-by-the-model"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/CloseoutCases.cs",
+            "case": "closeout.e-package-contributes-skills-prompts-and-themes"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/CloseoutCases.cs",
+            "case": "closeout.sample-session-checkpoint-loads-with-dash-e"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). TypeScript/JavaScript extensions through the Node host, native C# extensions (pisharp-extension.json) and package sources. Node-backed ExtensionParity cases need Node.js and report SKIP_NO_NODE without it. The native package flags (--extension-package and related) remain on the session verbs."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.no-session": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiSessionPlanner.cs"
         ],
-        "tests": [],
-        "note": "Closest equivalent: --session-mode new-memory|new-lazy|open."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.no-session-and-session-id-preserved"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/SessionCases.cs",
+            "case": "sessions.continue-reuses-the-latest-session-and-no-session-writes-nothing"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). The session verbs keep --session-mode."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.resume": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiSessionPlanner.cs"
         ],
-        "tests": [],
-        "note": "The `session resume` verb with --leaf/--root; no -r/-c."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.continue-resume"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/SessionCases.cs",
+            "case": "sessions.resume-without-a-picker-and-console-output-goes-to-stderr"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Interactive runs open the session picker."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.continue": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiSessionPlanner.cs"
         ],
-        "tests": [],
-        "note": "The `session resume` verb with --leaf/--root; no -r/-c."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.continue-resume"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/SessionCases.cs",
+            "case": "sessions.continue-reuses-the-latest-session-and-no-session-writes-nothing"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.help": {
       "nativeStatus": {
-        "status": "ImplementedNoTest",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Program.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiHelp.cs"
         ],
-        "tests": [],
-        "note": "Only the bare `--help` form; no -h; untested."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.version-and-help"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "main.version-help-and-diagnostic-output"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). --help and -h print the help text."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.version": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.version-and-help"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "main.version-help-and-diagnostic-output"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.api-key": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Partial",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Applied as the selected provider's runtime key (PiCommand.WithRuntimeApiKey), with the upstream error when no model is given; only parsing is asserted."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.system-prompt": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs",
+          "src/PiSharp.Cli/Pi/PiSystemPrompt.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ResourceCases.cs",
+            "case": "resources.system-and-append-prompt-discovery-trust-and-cli"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). A value naming a file is read."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.append-system-prompt": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ResourceCases.cs",
+            "case": "resources.system-and-append-prompt-discovery-trust-and-cli"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ResourceCases.cs",
+            "case": "resources.prompt-carries-context-append-and-skills-through-the-cli"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Repeatable; replaces APPEND_SYSTEM.md discovery."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.name": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiSessionPlanner.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.name-and-normalization"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/SessionCases.cs",
+            "case": "sessions.session-id-open-or-create-name-and-session-dir"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.session-id": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiSessionPlanner.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.no-session-and-session-id-preserved"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/SessionCases.cs",
+            "case": "sessions.session-id-open-or-create-name-and-session-dir"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "main.version-help-and-diagnostic-output"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.fork": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiSessionPlanner.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/SessionCases.cs",
+            "case": "sessions.session-by-path-prefix-fork-and-errors"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "main.version-help-and-diagnostic-output"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.session-dir": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiSessionPlanner.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/SessionCases.cs",
+            "case": "sessions.session-id-open-or-create-name-and-session-dir"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.models": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.rpc-mode-switches-among-available-models"
+          },
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.models.ctrl-p-cycles-scope"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). InteractiveParity e2e cases drive the interactive mode in a terminal harness."
       },
       "observed": {
         "statement": "Splits comma-separated values, trims and removes empty patterns (v1.1.0; v0.99.1 retained empty elements)."
-      }
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.export": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiExport.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.flags-with-values"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.export-writes-html-and-reports-the-path"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.no-extensions": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Extensions/Pi/PiExtensionRun.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.project-extensions-need-project-trust"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). -e paths still load. Node-backed ExtensionParity cases need Node.js and report SKIP_NO_NODE without it."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.theme": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Partial",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Theme paths reach PiResources (CliThemes); only parsing is asserted."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.use-theme": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.interactive-mode-hands-the-session-to-the-frontend"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Applies to interactive runs."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.no-skills": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ResourceCases.cs",
+            "case": "resources.skill-prompt-theme-locations-and-precedence"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Explicit --skill paths are kept."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.no-prompt-templates": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ResourceCases.cs",
+            "case": "resources.skill-prompt-theme-locations-and-precedence"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.no-themes": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Partial",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/CloseoutCases.cs",
+            "case": "closeout.e-package-contributes-skills-prompts-and-themes"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Passed to PiResources (NoThemes); the cases assert parsing and that -e package themes survive it, not that discovered themes are dropped."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.no-context-files": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Partial",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiResources.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.extensions-mcp-resources-themes"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Passed to PiResources (NoContextFiles); no case asserts that AGENTS.md/CLAUDE.md are skipped."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.list-models": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/AuthCases.cs",
+            "case": "main.list-models-and-migrations"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.no-session-and-session-id-preserved"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.tui-mode": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.cs",
+          "src/PiSharp.Cli/Interactive/Mode/TuiRenderer.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.approval-verbose-offline-tui-mode"
+          },
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.regular.startup-prompt-quit"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). regular and fullscreen. InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.verbose": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Partial",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.approval-verbose-offline-tui-mode"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Shows the interactive startup header and details; only parsing is asserted."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.approve": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiProjectTrust.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.approval-verbose-offline-tui-mode"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/TrustCases.cs",
+            "case": "trust.resolution-override-store-default-and-prompt"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.project-extensions-need-project-trust"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Node-backed ExtensionParity cases need Node.js and report SKIP_NO_NODE without it."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.no-approve": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiProjectTrust.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.approval-verbose-offline-tui-mode"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/TrustCases.cs",
+            "case": "trust.resolution-override-store-default-and-prompt"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.project-extensions-need-project-trust"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Node-backed ExtensionParity cases need Node.js and report SKIP_NO_NODE without it."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.offline": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs",
+          "src/PiSharp.Cli/Program.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.approval-verbose-offline-tui-mode"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.environment-variables-and-proxy-setting"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/GapCases.cs",
+            "case": "rpc.background-catalog-refresh-unless-offline"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/CloseoutCases.cs",
+            "case": "closeout.mcp-command-runs-after-the-main-setup"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Sets PI_OFFLINE and PI_SKIP_VERSION_CHECK, also before `pisharp mcp`."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.flag.delimiter": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiArgs.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.messages-files-unknown-flags-and-separator"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Options end at --; later arguments are messages or @files."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.grammar.file": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Program.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiInitialMessage.cs"
         ],
-        "tests": [],
-        "note": "Unknown keys fail as InvalidArguments; messages go through --message."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.messages-files-unknown-flags-and-separator"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.file-arguments-stdin-and-images"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Text and image files; @file is refused in RPC mode."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.grammar.extension-long-option": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Program.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
         ],
-        "tests": [],
-        "note": "Unknown keys fail as InvalidArguments; messages go through --message."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.messages-files-unknown-flags-and-separator"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.flags-in-help-values-and-unknown-options"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). Unknown long options are kept for extension flags; an option no extension declares is an error. Node-backed ExtensionParity cases need Node.js and report SKIP_NO_NODE without it."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.grammar.unknown-short-option": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Program.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs"
         ],
-        "tests": [],
-        "note": "Unknown keys fail as InvalidArguments; messages go through --message."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.messages-files-unknown-flags-and-separator"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages]). \"Unknown option: -x\"."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.grammar.message": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Program.cs"
+          "src/PiSharp.Cli/Pi/PiArgs.cs",
+          "src/PiSharp.Cli/Pi/PiInitialMessage.cs"
         ],
-        "tests": [],
-        "note": "Unknown keys fail as InvalidArguments; messages go through --message."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/ArgsCases.cs",
+            "case": "args.messages-files-unknown-flags-and-separator"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.initial-message-merge-and-remaining-messages"
+          }
+        ],
+        "note": "On the Pi entry (pisharp [options] [@files] [messages])."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.command.mcp": {
       "nativeStatus": {
         "status": "Implemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
           "src/PiSharp.Cli/Commands/McpCommand.cs",
-          "src/PiSharp.Cli/Mcp/Authentication/McpSignIn.cs"
+          "src/PiSharp.Cli/Mcp/Authentication/McpSignIn.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
         ],
         "tests": [
           {
@@ -768,18 +1369,24 @@
             "suite": "tests/PiSharp.McpSync.Tests",
             "file": "tests/PiSharp.McpSync.Tests/CompletionCases.cs",
             "case": "cli.mcp-help-usage-and-errors"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/CloseoutCases.cs",
+            "case": "closeout.mcp-command-runs-after-the-main-setup"
           }
         ],
-        "note": "mcp add|remove|list|login|logout with upstream texts (sync row mcp.oauth)."
+        "note": "mcp add|remove|list|login|logout with upstream texts (sync row mcp.oauth); runs after the main setup (PI_CODING_AGENT, --offline/PI_OFFLINE, the global httpProxy)."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.flag.local": {
       "nativeStatus": {
-        "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/McpCommand.cs"
+          "src/PiSharp.Cli/Commands/McpCommand.cs",
+          "src/PiSharp.Cli/Packages/PiPackageCommands.cs"
         ],
         "tests": [
           {
@@ -791,92 +1398,212 @@
             "suite": "tests/PiSharp.McpSync.Tests",
             "file": "tests/PiSharp.McpSync.Tests/CommandCases.cs",
             "case": "cli.mcp-remove-global-local-and-hints"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.trust"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.config"
           }
         ],
-        "note": "Only on mcp add/remove; package install/remove do not exist."
+        "note": "On mcp add/remove and the package commands (install, remove, update, list, config)."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.command.install": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Packages/PiPackageCommands.cs",
+          "src/PiSharp.Cli/Packages/PiPackageManager.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.parse-and-help"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.local-directory"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.trust"
+          }
+        ],
+        "note": "pisharp install with the upstream usage, -l and --approve/--no-approve."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.command.remove": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Packages/PiPackageCommands.cs",
+          "src/PiSharp.Cli/Packages/PiPackageManager.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.local-directory"
+          }
+        ],
+        "note": "pisharp remove."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.command.uninstall": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Packages/PiPackageCommands.cs",
+          "src/PiSharp.Cli/Packages/PiPackageManager.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.parse-and-help"
+          }
+        ],
+        "note": "pisharp uninstall (alias of remove)."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.command.update": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Packages/PiPackageCommands.cs",
+          "src/PiSharp.Cli/Packages/PiPackageManager.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.update-trust"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.commands.offline-and-updates"
+          }
+        ],
+        "note": "pisharp update."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.command.list": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Packages/PiPackageCommands.cs",
+          "src/PiSharp.Cli/Packages/PiPackageManager.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.local-directory"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.trust"
+          }
+        ],
+        "note": "pisharp list."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.command.config": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Packages/PiPackageCommands.cs",
+          "src/PiSharp.Cli/Packages/PiPackageManager.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/PackageCases.cs",
+            "case": "package.cli.config"
+          }
+        ],
+        "note": "pisharp config."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.command.auth": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiAuthCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/AuthCases.cs",
+            "case": "auth.help-errors-check-and-print-api-key"
+          }
+        ],
+        "note": "pisharp auth print-api-key|print-bearer-token|check with the upstream usage and errors."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.auth-example.print-api-key": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiAuthCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/AuthCases.cs",
+            "case": "auth.help-errors-check-and-print-api-key"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.help.auth-example.print-bearer-token": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "No PiSharp CLI counterpart."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Pi/PiAuthCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/GapCases.cs",
+            "case": "auth.print-bearer-token-refreshes-an-expiring-oauth-token"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/AuthCases.cs",
+            "case": "auth.help-errors-check-and-print-api-key"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.login": {
       "nativeStatus": {
@@ -976,19 +1703,20 @@
     },
     "cli.slash.fork": {
       "nativeStatus": {
-        "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Selectors.cs"
         ],
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
-            "case": "native session checkpoint lifecycle cooked frontend restores fork draft and routes new clone tree"
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.selector.tree-and-fork"
           }
         ],
-        "note": "/fork needs an entry id; /fork-at is PiSharp-specific."
+        "note": "The user-message selector; the cooked session frontend keeps /fork <entry> and /fork-at. InteractiveParity e2e cases drive the interactive mode in a terminal harness."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
@@ -1011,20 +1739,22 @@
     },
     "cli.slash.resume": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Selectors.cs"
         ],
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/SessionCatalogFrontendTests.cs",
-            "case": "catalog-frontend.numbered-resume-root-leaf-and-safe-display"
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.selector.resume"
           }
         ],
-        "note": "/resume <n|key> [leaf|@root] after /sessions."
-      }
+        "note": "The session selector; the cooked session frontend keeps /resume <n|key> after /sessions. InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.quit": {
       "nativeStatus": {
@@ -1045,175 +1775,297 @@
     },
     "cli.slash.reload": {
       "nativeStatus": {
-        "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Commands/OfflineSessionProfile.Reload.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
         "tests": [
           {
-            "suite": "tests/PiSharp.CodingAgent.Tests",
-            "file": "tests/PiSharp.CodingAgent.Tests/CliReloadRoutingTests.cs",
-            "case": "CLI actual RPC caller routes reload through attached owner and closes candidate runtime"
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.reload"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/GapCases.cs",
+            "case": "gap.reload-reloads-extensions-and-resources"
           }
         ],
-        "note": "Handled as the RPC prompt /reload; the cooked frontend has no dedicated branch."
+        "note": "Reloads extensions and resources. Node-backed ExtensionParity cases need Node.js and report SKIP_NO_NODE without it. InteractiveParity e2e cases drive the interactive mode in a terminal harness."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.settings": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Selectors.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.selector.settings-escape"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.model": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Selectors.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.selector.model-escape"
+          },
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.models.switch-with-model-command"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.thinking": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Selectors.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.thinking"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.scoped-models": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Selectors.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.selector.scoped-models"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.export": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.export-html-and-jsonl"
+          }
+        ],
+        "note": "HTML and JSONL. InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.import": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "ImplementedNoTest",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
         "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
+        "note": "InteractiveMode HandleImportCommandAsync; switching to a file outside the session directory is tested through switch_session (e2e.sessions.switch-to-a-session-file-outside-the-session-directory), not through /import."
       }
     },
     "cli.slash.share": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Partial",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Session.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ExportShareCases.cs",
+            "case": "export-share.share.radius-upload-request-and-errors"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ExportShareCases.cs",
+            "case": "export-share.share.gist-fallback-auth-install-and-output"
+          }
+        ],
+        "note": "SessionShare (Radius upload, gist fallback) is tested directly; the /share command routing is not."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.bug": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.bug-cancel"
+          },
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.bug-summary-zip"
+          },
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.bug-github-issue"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.copy": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.copy"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.name": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.name"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.session": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.session-info"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.changelog": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.changelog-empty"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.hotkeys": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.slash.hotkeys"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "cli.slash.trust": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Commands.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Selectors.cs"
         ],
-        "tests": [],
-        "note": "Falls through to \"[command] unavailable\"."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/InteractiveModeCases.cs",
+            "case": "e2e.selector.trust"
+          }
+        ],
+        "note": "InteractiveParity e2e cases drive the interactive mode in a terminal harness."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.command.prompt": {
       "nativeStatus": {
@@ -3071,19 +3923,30 @@
     },
     "rpc.event.agent_end": {
       "nativeStatus": {
-        "status": "Partial",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs",
+          "src/PiSharp.CodingAgent/PersistentAgentSession.cs"
         ],
         "tests": [
           {
             "suite": "tests/PiSharp.Rpc.Tests",
             "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
             "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.agent-end-will-retry-then-auto-retry-records-exact"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.agent-end-will-retry-false-without-retry-and-at-exhausted-budget"
           }
         ],
-        "note": "willRetry is always false."
+        "note": "willRetry is decided by the session (WillRetryAfterAgentEnd)."
       },
       "implementationEvidenceState": "AuthoredTests"
     },
@@ -3230,14 +4093,21 @@
     },
     "rpc.event.auto_retry_start": {
       "nativeStatus": {
-        "status": "ImplementedNoTest",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionEventProjector.cs",
           "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Retry.cs"
         ],
-        "tests": [],
-        "note": "Emitted; no wire-level assertion."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.agent-end-will-retry-then-auto-retry-records-exact"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.event.bash_execution_update": {
       "nativeStatus": {
@@ -3270,66 +4140,138 @@
     },
     "rpc.event.entry_appended": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "Not emitted by PiSharp."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.entry-appended-extension-custom-entry-exact"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/ProviderHookCases.cs",
+            "case": "events.usage-entry-shape-and-entry-appended"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.event.thinking_level_changed": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "Not emitted by PiSharp."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionEventProjector.cs",
+          "src/PiSharp.CodingAgent/PersistentAgentSession.SessionEvents.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.thinking-level-changed-exact-before-response-only-on-change"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.event.summarization_retry_scheduled": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "Not emitted by PiSharp."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionEventProjector.cs",
+          "src/PiSharp.CodingAgent/PersistentAgentSession.SessionEvents.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.summarization-retry-scheduled-attempt-finished-exact-for-compaction"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.event.summarization_retry_attempt_start.branchSummary": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "Not emitted by PiSharp."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionEventProjector.cs",
+          "src/PiSharp.CodingAgent/PersistentAgentSession.SessionEvents.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.summarization-retry-branch-summary-source-and-non-retryable-failure"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.event.summarization_retry_attempt_start.compaction": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "Not emitted by PiSharp."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionEventProjector.cs",
+          "src/PiSharp.CodingAgent/PersistentAgentSession.SessionEvents.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.summarization-retry-scheduled-attempt-finished-exact-for-compaction"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.event.summarization_retry_finished": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "Not emitted by PiSharp."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.summarization-retry-scheduled-attempt-finished-exact-for-compaction"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.summarization-retry-branch-summary-source-and-non-retryable-failure"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.event.extension_error": {
       "nativeStatus": {
-        "status": "NotImplemented",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
-        "sources": [],
-        "tests": [],
-        "note": "Not emitted by PiSharp."
-      }
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionEventProjector.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.SessionEvents.cs",
+          "src/PiSharp.Cli/Pi/PiPrintMode.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/EventCases.cs",
+            "case": "events.rpc.extension-error-record-exact"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.event.message_update.assistant.thinking_start": {
       "nativeStatus": {
@@ -3637,27 +4579,79 @@
     },
     "rpc.wiring.shutdown-signals": {
       "nativeStatus": {
-        "status": "ImplementedNoTest",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Program.cs"
+          "src/PiSharp.Cli/ShutdownSignals.cs",
+          "src/PiSharp.Cli/Program.cs",
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
         ],
-        "tests": [],
-        "note": "Console.CancelKeyPress only; no SIGTERM/SIGHUP handling; no signal test."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/SignalCases.cs",
+            "case": "signals.exit-codes-first-signal-wins-and-cancellation"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/SignalCases.cs",
+            "case": "signals.sigterm-shuts-the-rpc-host-down-gracefully-with-143"
+          }
+        ],
+        "note": "SIGTERM everywhere and SIGHUP off Windows; exit 143 or 129 after a graceful shutdown."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     },
     "rpc.wiring.mode-selection": {
       "nativeStatus": {
-        "status": "DifferentSurface",
-        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
         "sources": [
-          "src/PiSharp.Cli/Program.cs",
-          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
-          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+          "src/PiSharp.Cli/Pi/PiCommand.cs"
         ],
-        "tests": [],
-        "note": "Modes are explicit verbs/options (session rpc, session chat/terminal, --output report|print|json); no TTY-based selection."
-      }
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.rpc-mode-dispatches-on-standard-streams"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.interactive-mode-hands-the-session-to-the-frontend"
+          },
+          {
+            "suite": "tests/PiSharp.CliParity.Tests",
+            "file": "tests/PiSharp.CliParity.Tests/EntryCases.cs",
+            "case": "entry.print-text-final-assistant-text-and-session-layout"
+          }
+        ],
+        "note": "PiCommand.ResolveAppMode (--mode, -p and TTY detection) on the Pi entry; the session verbs keep their explicit modes."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.adapter.setTheme": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "b831158a9379e8a7f454a069ee18551c90bd7eac",
+        "sources": [
+          "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.Requests.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/CloseoutCases.cs",
+            "case": "closeout.set-theme-outside-interactive-mode"
+          },
+          {
+            "suite": "tests/PiSharp.InteractiveParity.Tests",
+            "file": "tests/PiSharp.InteractiveParity.Tests/CloseoutCases.cs",
+            "case": "e2e.extensions.set-theme-switches-and-saves-the-theme"
+          }
+        ],
+        "note": "RPC mode answers { success: false, error: \"Theme switching not supported in RPC mode\" }; print and JSON modes have no UI; interactive mode switches and saves the theme. Both cases need Node.js."
+      },
+      "implementationEvidenceState": "AuthoredTests"
     }
   }
 }
