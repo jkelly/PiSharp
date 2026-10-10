@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0.4] - 2026-10-10
+
+A C#-only patch on the Pi v1.1.0 baseline. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.4.md).
+
+### Fixed
+
+- The interactive startup header says PiSharp and shows PiSharp's own version (for example `v1.1.0.4`) instead of Pi's package version, and the onboarding line names PiSharp
+
 ## [1.1.0.3] - 2026-10-10
 
 A C#-only patch on the Pi v1.1.0 baseline that fixes the `/clear` crash ([#5](https://github.com/jkelly/PiSharp/issues/5)) and closes most of the differences 1.1.0.2 left open. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.3.md).

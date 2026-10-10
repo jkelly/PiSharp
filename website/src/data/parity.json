@@ -269,7 +269,7 @@
     {
       "title": "1.1.0.x gap releases",
       "status": "partial",
-      "notes": "tool_search shipped in 1.1.0.1 and the rest of Pi v1.1.0 in 1.1.0.2. 1.1.0.3 fixes issue #5 and closes most of the differences 1.1.0.2 left open."
+      "notes": "tool_search shipped in 1.1.0.1 and the rest of Pi v1.1.0 in 1.1.0.2. 1.1.0.3 fixes issue #5 and closes most of the differences 1.1.0.2 left open; 1.1.0.4 names PiSharp in the startup header."
     }
   ]
 }

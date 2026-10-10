@@ -1014,7 +1014,7 @@
       "originalSha256": "2551376cd09efe8406c1558c4e98f334f34756d1fa900e8e30a5a5dcf400421c"
     },
     {
-      "currentSha256": "bfe6cb126e10f325c7b8d8c74820b9d151d330279d48ba8dc964f0fbb28c661f",
+      "currentSha256": "759cf7c756c6b1950c4c0d68184d31490e470acf77d9c183b02e3e88f3bbf717",
       "currentBytes": 764,
       "originalBytes": 380,
       "path": "Directory.Build.props",
@@ -5872,7 +5872,7 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "d874c9d33ce5a486ec7a993a56a8c699bf3382251683a112f24c32780ed8c2df",
+      "currentSha256": "60e5a7198fb3443576a3edaf6420a899e7a6492fd571878f94734c95906c6404",
       "currentBytes": 4972,
       "originalBytes": 3622,
       "path": "README.md",
