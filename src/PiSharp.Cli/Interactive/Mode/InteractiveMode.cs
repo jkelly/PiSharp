@@ -322,11 +322,13 @@ internal sealed partial class InteractiveMode
         {
             var showDetails = ShouldShowStartupDetails();
             var showLogo = PiLogo.SupportsPiLogo();
+            // PiSharp names itself and shows its own product version (e.g. 1.1.0.3) where Pi shows its package version.
+            var title = $"{theme.Bold("PiSharp")} {theme.Fg("dim", "v" + context.ProductVersion)}";
             string WithLogo(string hints)
             {
-                if (!showLogo) return $"{PiLogo.PiWordmark()} {theme.Fg("dim", "v" + version)}\n{hints}";
+                if (!showLogo) return $"{title}\n{hints}";
                 var lines = PiLogo.PiLogoLines();
-                return $"{lines[0]} {theme.Fg("dim", "v" + version)}\n{lines[1]} {hints}";
+                return $"{lines[0]} {title}\n{lines[1]} {hints}";
             }
             string Hint(string id, string description) => KeybindingHints.KeyHint(id, description);
             string ExpandedInstructions() => string.Join("\n",
@@ -356,7 +358,7 @@ internal sealed partial class InteractiveMode
                 KeybindingHints.RawKeyHint("!", "bash"),
                 Hint("app.tools.expand", "more"));
             string CompactOnboarding() => theme.Fg("dim", $"Press {KeybindingHints.KeyText("app.tools.expand")} to show full startup help{(showDetails ? " and loaded resources" : "")}.");
-            string Onboarding() => theme.Fg("dim", "Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.");
+            string Onboarding() => theme.Fg("dim", "PiSharp can explain its own features and look up its docs. Ask it how to use or extend PiSharp.");
             var header = new BuiltInHeader(() => $"{WithLogo(CompactInstructions())}\n{CompactOnboarding()}\n\n{Onboarding()}",
                 () => $"{WithLogo(ExpandedInstructions())}\n\n{Onboarding()}", GetStartupExpansionState(), 1, 0);
             if (showLogo) header.OnLogoClick = (column, row) => EasterEgg3dLazy.PlayPiLogo3d(renderer, column, row);

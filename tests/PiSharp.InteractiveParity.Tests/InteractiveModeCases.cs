@@ -38,6 +38,18 @@ internal static class InteractiveModeCases
             Equal(1, pi.SessionFiles().Length, "one session file");
         });
 
+        // PiSharp names itself in the startup header, with its product version (Pi shows its package version).
+        yield return ("e2e.regular.startup-header-names-pisharp-and-its-version", Case("header", async pi =>
+        {
+            Check(pi.Terminal.Lines.Any(line => line.Contains("PiSharp v9.8.7.6", StringComparison.Ordinal)), "PiSharp and its version:\n" + pi.Terminal.Text);
+            Check(!pi.Terminal.Text.Contains("v1.1.0\n", StringComparison.Ordinal), "not Pi's package version");
+            Contains(pi.Terminal.Text, "PiSharp can explain its own features", "onboarding");
+            // The product version the context defaults to is the assembly's four-part version (Directory.Build.props).
+            var version = PiSharp.Cli.Pi.PiConfig.Version;
+            Check(version.Split('.').Length == 4, "four-part product version: " + version);
+            await Task.CompletedTask;
+        }, harness => harness.ProductVersion = "9.8.7.6"));
+
         yield return ("e2e.fullscreen.startup-prompt-transcript", async () =>
         {
             await using var pi = new InteractiveHarness("fullscreen");

@@ -200,6 +200,7 @@
       "blurb": "Differences kept on purpose.",
       "items": [
         { "title": "No telemetry", "notes": "PiSharp doesn't report installs to Pi's servers. PI_TELEMETRY and enableInstallTelemetry are accepted and ignored." },
+        { "title": "Startup header", "notes": "The header says PiSharp with PiSharp's own version (for example v1.1.0.3), where Pi shows its package version." },
         { "title": "User agents", "notes": "Requests to Anthropic, Azure, Bedrock, Mistral, OpenAI-compatible endpoints and OpenRouter images send a PiSharp user agent where Pi's SDKs send their own." },
         { "title": "Codemode worker", "notes": "Each script runs in its own worker process, so one script can't take PiSharp down. That costs about 100 to 300 ms per script. The deadline starts when the script starts running, not when the worker launches." },
         { "title": "Jint limits", "notes": "Codemode runs on Jint, not QuickJS. Memory and recursion overruns end the script instead of throwing a catchable error, and the engine's own error messages differ." },
