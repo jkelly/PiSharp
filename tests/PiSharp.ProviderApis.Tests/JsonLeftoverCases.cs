@@ -24,9 +24,10 @@ internal static partial class Program
             Entry("""{"role":"toolResult","toolCallId":"toolu_1","toolName":"read","content":[{"type":"text","text":"ok"}],"isError":false,"timestamp":3}"""));
         var nova = Bedrock(NovaRow);
         using var request = await nova.Transport.CreateRequestAsync(new(nova.Model, transcript, 4));
-        Equal("{\"inferenceConfig\":{\"maxTokens\":10000},\"messages\":[{\"content\":[{\"text\":\"Go\"}],\"role\":\"user\"}," +
-            "{\"content\":[{\"toolUse\":{\"input\":{\"path\":\"a\\ud800\",\"k\\udc00\":[\"\\udfff\",{\"n\":2}],\"deep\":" + deep + "},\"name\":\"read\",\"toolUseId\":\"toolu_1\"}}],\"role\":\"assistant\"}," +
-            "{\"content\":[{\"toolResult\":{\"content\":[{\"text\":\"ok\"}],\"status\":\"success\",\"toolUseId\":\"toolu_1\"}}],\"role\":\"user\"}]}",
+        // Members in the SDK's schema order (messages, then inferenceConfig; role, then content; toolUseId, name, input).
+        Equal("{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"Go\"}]}," +
+            "{\"role\":\"assistant\",\"content\":[{\"toolUse\":{\"toolUseId\":\"toolu_1\",\"name\":\"read\",\"input\":{\"path\":\"a\\ud800\",\"k\\udc00\":[\"\\udfff\",{\"n\":2}],\"deep\":" + deep + "}}}]}," +
+            "{\"role\":\"user\",\"content\":[{\"toolResult\":{\"toolUseId\":\"toolu_1\",\"content\":[{\"text\":\"ok\"}],\"status\":\"success\"}}]}],\"inferenceConfig\":{\"maxTokens\":10000}}",
             await request.Content!.ReadAsStringAsync(), "bedrock body with lone surrogates and deep arguments");
     }
 
