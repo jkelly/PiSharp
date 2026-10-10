@@ -110,7 +110,7 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
             return new StoredApiKeyCredential(entry.Key is null ? null : ConfigValueTemplate.Resolve(entry.Key, entry.Environment, readEnvironment),
                 entry.Environment is null ? null : new ProviderEnvironmentSnapshot(scoped: entry.Environment.Select(pair => KeyValuePair.Create(pair.Key, (string?)pair.Value))));
         });
-        return ModelOperationsRegistry.CreateBuiltin(catalogs, async (request, token) =>
+        var registry = ModelOperationsRegistry.CreateBuiltin(catalogs, async (request, token) =>
         {
             // auth/resolve.ts: an explicit key bypasses the store; otherwise a stored credential owns the provider.
             if (store is not null && request.ApiKey is null && await store.ReadEntryAsync(request.Provider, token).ConfigureAwait(false) is { } entry)
@@ -138,6 +138,17 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
             }
             return await standard(request, token).ConfigureAwait(false);
         });
+        // The built-in llama.cpp extension's provider (extensions/llama/provider.ts getAllModels): the classifier models of the catalog
+        // the models store next to auth.json holds, as the latest refresh or /llama left them.
+        var llama = PiSharp.Cli.Llama.LlamaCatalog.For(authPath is null ? null : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(authPath))!, "models-store.json"));
+        registry.SetProvider(BuiltinModelOperationProviders.LlamaCpp([], () =>
+        {
+            var models = ImmutableArray.CreateBuilder<OperationModel>();
+            foreach (var model in llama.LoadedClassifierJson())
+                try { models.Add(OperationModel.FromJson(JsonData.Parse(model.ToJsonString()))); } catch (FormatException) { }
+            return models.ToImmutable();
+        }));
+        return registry;
     }
 
     /// <summary>models-error.ts <c>withCauseDetail</c>: the underlying reason joins the message unless it is already in it.</summary>

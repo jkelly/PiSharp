@@ -37,6 +37,9 @@ internal sealed partial class NativeExtensionActivation
         var registry = new ExtensionRegistry(PiExtensionHost.RegistryOptions, uiPrompts ?? (IExtensionUiProvider)new UnavailableExtensionUiProvider(),
             sessionViews, facadeCapabilities);
         if (mcpServers is not null) { registry.McpServerHost = mcpServers; mcpServers.OwnerPath = pi.PathOfOwner; }
+        // registerProvider with classifiers or images from native extensions; the run's model registry follows them.
+        registry.ModelOperationProviderHost = pi.NativeModelProviders;
+        if (pi.RunModelOperations is { } runModels) facadeHost.BindRunModelOperations(runModels);
         try
         {
             await pi.ActivateAsync(registry, token, session: true).ConfigureAwait(false);

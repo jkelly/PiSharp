@@ -231,7 +231,12 @@ public static class RpcSessionCommand
                 deferMissingCredentials: pi is not null, piEntry: pi is not null).ConfigureAwait(false);
             // A virtual selection's router reads this profile's session branch and records its state there.
             if (liveSelection is { IsVirtual: true } virtualSelection) virtualSelection.VirtualSession = profile.CurrentVirtualModelSession;
-            if (pi?.Extensions is { } modelsHost) await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
+            if (pi?.Extensions is { } modelsHost)
+            {
+                var runModels = await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
+                // Codemode scripts reach the same registry as ctx.modelRegistry (the extensions' classifier and image providers included).
+                if (mcpHost is not null) mcpHost.RunModelOperations = runModels.Operations;
+            }
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();
