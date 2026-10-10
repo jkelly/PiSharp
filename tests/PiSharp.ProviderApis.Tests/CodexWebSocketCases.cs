@@ -410,7 +410,7 @@ internal static partial class Program
             if (headers.TryGetValue("content-length", out var length) && int.Parse(length) is var count and > 0)
             {
                 var buffer = new byte[count]; await stream.ReadExactlyAsync(buffer, token);
-                body = Encoding.UTF8.GetString(buffer);
+                body = Encoding.UTF8.GetString(headers.GetValueOrDefault("content-encoding") == "zstd" ? PiSharp.AI.Compression.ZstdDecoder.Decompress(buffer) : buffer);
             }
             return new(lines[0], headers, body);
         }

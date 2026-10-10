@@ -101,7 +101,9 @@ internal static partial class Program
             Check((await bedrockRequest.Content!.ReadAsByteArrayAsync()).Length > 6_000_000, "bedrock carries the image");
         var codex = Codex();
         codex.Http.OnUrl("https://", _ => Sse("""{"type":"response.completed","response":{"status":"completed","output":[]}}"""));
-        Check((await Collect(codex.Transport, new(codex.Model, Big(), 1)))[^1] is StreamDone && codex.Http.All.Single().BodyBytes.Length > 6_000_000, "codex carries the image");
+        // The Codex SSE body is a zstd frame; the recorded Body is the decoded JSON.
+        Check((await Collect(codex.Transport, new(codex.Model, Big(), 1)))[^1] is StreamDone && codex.Http.All.Single().Body.Length > 6_000_000 &&
+            codex.Http.All.Single().Body.Contains(image[..64], StringComparison.Ordinal), "codex carries the image");
         var vertexRow = CatalogRow("google-vertex", "gemini-2.5-flash"); var vertexHttp = new FakeHttp();
         vertexHttp.OnUrl("https://", _ => Json("""{"error":{"message":"fake peer refuses"}}""", HttpStatusCode.BadRequest));
         using (var vertex = NativeProviderFactory.CreateGoogleVertexRoute(Descriptor(vertexRow), vertexRow.Raw, _ => ValueTask.FromResult(new GoogleVertexRequestAuth(

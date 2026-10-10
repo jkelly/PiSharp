@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE, streamSimple,
-// buildRequestBody, resolveCodexUrl, mapCodexEvents, normalizeCodexStatus, parseErrorResponse, extractAccountId, buildSSEHeaders,
-// the retry helpers and service tier pricing) and providers/openai-codex.ts. Event processing reuses the native Responses state
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE with the zstd
+// request body, streamSimple, buildRequestBody, resolveCodexUrl, mapCodexEvents, normalizeCodexStatus, parseErrorResponse,
+// extractAccountId, buildSSEHeaders, the retry helpers and service tier pricing; the WebSocket transport is in the .WebSocket part) and
+// providers/openai-codex.ts. Event processing reuses the native Responses state
 // machine (openai-responses-shared.ts processResponsesStream).
 using System.Collections.Immutable;
 using System.Globalization;
@@ -352,9 +353,9 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             else if (await TryWebSocketAsync(body, token0, accountId, cacheSessionId, transport, invocation, token).ConfigureAwait(false) is { } events)
                 return events;
         }
-        // The Codex backend accepts zstd bodies; .NET 10 ships no zstd encoder, so the uncompressed JSON is sent (upstream's
-        // fallback when compression is unavailable).
+        // compressRequestBodyZstd: the SSE body is a zstd frame (Content-Encoding: zstd); the WebSocket frame above stays plain JSON.
         var bytes = Encoding.UTF8.GetBytes(bodyJson);
+        if (CompressBody(bytes) is { } compressed) { bytes = compressed; headers.Add(new("content-encoding", "zstd")); }
         var response = await SendAsync(headers, bytes, token).ConfigureAwait(false);
         try
         {
@@ -363,6 +364,18 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             return new OwnedEnumerator(ReadEventsAsync(stream, invocation, token), response, stream);
         }
         catch { response.Dispose(); throw; }
+    }
+
+    /// <summary>The zstd frame of the body (upstream: zstdCompressSync at level 3), checked by decoding it again; null sends the plain
+    /// JSON, as upstream does when compression is unavailable or throws.</summary>
+    internal static byte[]? CompressBody(byte[] body)
+    {
+        try
+        {
+            var frame = PiSharp.AI.Compression.Zstd.Compress(body);
+            return PiSharp.AI.Compression.ZstdDecoder.Decompress(frame, body.Length).AsSpan().SequenceEqual(body) ? frame : null;
+        }
+        catch (Exception error) when (error is InvalidDataException or IndexOutOfRangeException or ArgumentException or OverflowException) { return null; }
     }
 
     private sealed class OwnedEnumerator(IAsyncEnumerable<JsonData> source, HttpResponseMessage response, Stream stream) : IAsyncEnumerator<JsonData>
@@ -390,7 +403,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = new ByteArrayContent(body), Version = HttpVersion.Version11 };
                 foreach (var (name, value) in headers)
-                    if (name == "content-type") request.Content.Headers.TryAddWithoutValidation("Content-Type", value);
+                    if (name is "content-type" or "content-encoding") request.Content.Headers.TryAddWithoutValidation(name, value);
                     else request.Headers.TryAddWithoutValidation(name, value);
                 using var timeout = _options.Timeout is { } limit && limit > TimeSpan.Zero ? new CancellationTokenSource(limit, _options.Time ?? TimeProvider.System) : null;
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, timeout?.Token ?? CancellationToken.None);
@@ -508,44 +521,42 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     /// without a type are dropped.</summary>
     private async ValueTask<(JsonData? Event, bool Completed)> MapEventAsync(JsonObject value, Invocation invocation, CancellationToken token)
     {
+        if (_options.OnProviderStreamEvent is { } hook)
         {
-            if (_options.OnProviderStreamEvent is { } hook)
-            {
-                try { await hook(JsonData.Parse(value.ToJsonString()), _model, token).ConfigureAwait(false); }
-                catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
-                { throw new ProviderStreamEventCallbackException(error); }
-            }
-            if (value["type"] is not JsonValue typeValue || !typeValue.TryGetValue<string>(out var type)) return (null, false);
-            if (type == "error")
-            {
-                var nested = value["error"] as JsonObject;
-                string? Field(string name) => value[name] is JsonValue own && own.TryGetValue<string>(out var text) ? text
-                    : nested?[name] is JsonValue inner && inner.TryGetValue<string>(out var innerText) ? innerText : null;
-                var code = Field("code"); var message = Field("message");
-                throw new CodexApiException("Codex error: " + (!string.IsNullOrEmpty(message) ? message : !string.IsNullOrEmpty(code) ? code : value.ToJsonString()), code);
-            }
-            if (type == "response.failed")
-            {
-                var error = value["response"]?["error"] as JsonObject;
-                var message = error?["message"] is JsonValue text && text.TryGetValue<string>(out var failure) && failure.Length != 0 ? failure : "Codex response failed";
-                throw new CodexApiException(message, error?["code"] is JsonValue codeValue && codeValue.TryGetValue<string>(out var errorCode) ? errorCode : null);
-            }
-            if (type is "response.done" or "response.completed" or "response.incomplete")
-            {
-                var response = value["response"] as JsonObject ?? new JsonObject();
-                if (response["end_turn"] is JsonValue end && end.TryGetValue<bool>(out var endTurn)) invocation.EndTurn = endTurn;
-                var status = response["status"] is JsonValue statusValue && statusValue.TryGetValue<string>(out var raw) && Statuses.Contains(raw) ? raw : null;
-                // mapStopReason: failed/cancelled carry no message ("An unknown error occurred"); queued/in_progress/absent settle as stop.
-                if (status is "failed" or "cancelled") throw new InvalidOperationException("An unknown error occurred");
-                response["status"] = status == "incomplete" ? "incomplete" : "completed";
-                // resolveCodexServiceTier and Codex pricing: "default" defers to a requested flex/priority tier; "fast" is unpriced.
-                var responseTier = response["service_tier"] is JsonValue tierValue && tierValue.TryGetValue<string>(out var tier) ? tier : null;
-                var resolvedTier = responseTier == "default" && _options.ServiceTier is "flex" or "priority" ? _options.ServiceTier : responseTier ?? _options.ServiceTier;
-                response["service_tier"] = resolvedTier is "flex" or "priority" ? resolvedTier : "default";
-                return (JsonData.Parse(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = response.DeepClone() }.ToJsonString()), true);
-            }
-            return (JsonData.Parse(value.ToJsonString()), false);
+            try { await hook(JsonData.Parse(value.ToJsonString()), _model, token).ConfigureAwait(false); }
+            catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
+            { throw new ProviderStreamEventCallbackException(error); }
         }
+        if (value["type"] is not JsonValue typeValue || !typeValue.TryGetValue<string>(out var type)) return (null, false);
+        if (type == "error")
+        {
+            var nested = value["error"] as JsonObject;
+            string? Field(string name) => value[name] is JsonValue own && own.TryGetValue<string>(out var text) ? text
+                : nested?[name] is JsonValue inner && inner.TryGetValue<string>(out var innerText) ? innerText : null;
+            var code = Field("code"); var message = Field("message");
+            throw new CodexApiException("Codex error: " + (!string.IsNullOrEmpty(message) ? message : !string.IsNullOrEmpty(code) ? code : value.ToJsonString()), code);
+        }
+        if (type == "response.failed")
+        {
+            var error = value["response"]?["error"] as JsonObject;
+            var message = error?["message"] is JsonValue text && text.TryGetValue<string>(out var failure) && failure.Length != 0 ? failure : "Codex response failed";
+            throw new CodexApiException(message, error?["code"] is JsonValue codeValue && codeValue.TryGetValue<string>(out var errorCode) ? errorCode : null);
+        }
+        if (type is "response.done" or "response.completed" or "response.incomplete")
+        {
+            var response = value["response"] as JsonObject ?? new JsonObject();
+            if (response["end_turn"] is JsonValue end && end.TryGetValue<bool>(out var endTurn)) invocation.EndTurn = endTurn;
+            var status = response["status"] is JsonValue statusValue && statusValue.TryGetValue<string>(out var raw) && Statuses.Contains(raw) ? raw : null;
+            // mapStopReason: failed/cancelled carry no message ("An unknown error occurred"); queued/in_progress/absent settle as stop.
+            if (status is "failed" or "cancelled") throw new InvalidOperationException("An unknown error occurred");
+            response["status"] = status == "incomplete" ? "incomplete" : "completed";
+            // resolveCodexServiceTier and Codex pricing: "default" defers to a requested flex/priority tier; "fast" is unpriced.
+            var responseTier = response["service_tier"] is JsonValue tierValue && tierValue.TryGetValue<string>(out var tier) ? tier : null;
+            var resolvedTier = responseTier == "default" && _options.ServiceTier is "flex" or "priority" ? _options.ServiceTier : responseTier ?? _options.ServiceTier;
+            response["service_tier"] = resolvedTier is "flex" or "priority" ? resolvedTier : "default";
+            return (JsonData.Parse(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = response.DeepClone() }.ToJsonString()), true);
+        }
+        return (JsonData.Parse(value.ToJsonString()), false);
     }
 
     private static JsonData Observation(HttpResponseMessage response)

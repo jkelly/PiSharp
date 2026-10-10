@@ -60,7 +60,10 @@ internal static partial class Program
             request.Header("openai-beta") == "responses=experimental" && request.Header("accept") == "text/event-stream" &&
             request.Header("content-type")!.StartsWith("application/json", StringComparison.Ordinal) && request.Header("session-id") == "sess-1" &&
             request.Header("x-client-request-id") == "sess-1" && request.Header("user-agent") == "pi/1.1.0" && request.Header("x-model") == "m" &&
-            request.Header("x-extra") == "e" && request.Header("originator") is null && request.Header("content-encoding") is null, "codex headers");
+            request.Header("x-extra") == "e" && request.Header("originator") is null, "codex headers");
+        // compressRequestBodyZstd: the SSE body travels as one zstd frame (the body compared above is the decoded frame).
+        Equal("zstd", request.Header("content-encoding"), "content-encoding");
+        Check(BitConverter.ToUInt32(request.BodyBytes, 0) == 0xFD2FB528 && request.BodyBytes.Length < Encoding.UTF8.GetByteCount(request.Body), "zstd frame body");
         // Off: reasoning effort none; no session: no cache key; a "required" tool choice and service tier travel as given.
         var off = Codex(new() { ToolChoice = "required", ServiceTier = "flex", TextVerbosity = "high", Temperature = 0.2 });
         Check(off.Transport.BuildBody(new(off.Model, CodexTranscript(), 3) { ThinkingLevel = "off" }).ToJsonString() ==
