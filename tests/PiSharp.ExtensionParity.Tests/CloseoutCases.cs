@@ -17,7 +17,30 @@ internal static partial class Program
         ("closeout.native-resources-discover-adds-paths", NativeResourcesDiscover),
         ("closeout.sample-stateful-todo-loads-from-an-extension-folder", SampleStatefulTodo),
         ("closeout.sample-session-checkpoint-loads-with-dash-e", SampleSessionCheckpoint),
+        ("closeout.trigger-turn-while-idle-runs-a-turn", TriggerTurnWhileIdle),
     ];
+
+    // agent-session.ts sendCustomMessage: an idle session with triggerTurn starts a turn (_runAgentPrompt) outside any prompt, e.g. from a
+    // timer an event handler set; rpc-mode.ts streams its events and agent_settled.
+    private static async Task TriggerTurnWhileIdle()
+    {
+        using var sandbox = NodeSandbox("trigger-turn-idle");
+        sandbox.Respond = (_, _) => AnthropicText("idle answer");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "idle.ts"), Probe + """
+            export default function (pi: any) {
+              pi.registerCommand("later", { description: "Later", handler: async () => {
+                setTimeout(() => pi.sendMessage({ customType: "later", content: "wake up", display: true }, { triggerTurn: true }), 300);
+              } });
+            }
+            """);
+        var (code, records, stderr) = await RunRpc(sandbox, [.. Model, "-e", extension], ["""{"id":"l","type":"prompt","message":"/later"}"""],
+            (record, _) => record["type"]?.GetValue<string>() == "agent_settled", TimeSpan.FromSeconds(60));
+        var types = records.Select(record => record["type"]?.GetValue<string>() == "response" ? "response:" + record["data"]?["disposition"]?.GetValue<string>() : record["type"]?.GetValue<string>()).ToList();
+        Equal(0, code, "rpc exit; " + stderr + " " + string.Join(",", types));
+        Check(types.IndexOf("response:handled") >= 0 && types.IndexOf("agent_start") > types.IndexOf("response:handled") && types.Contains("agent_settled"),
+            "record order: " + string.Join(",", types));
+        Equal(1, sandbox.Requests.Count, "the idle turn made a request");
+    }
 
     /// <summary>A sample's build output (samples/extensions/&lt;name&gt;/bin/&lt;configuration&gt;/net10.0, built before this suite):
     /// its assembly next to the pisharp-extension.json manifest the build copies there.</summary>

@@ -15,8 +15,9 @@ public sealed partial class PersistentAgentSession
     private ImmutableArray<TranscriptEntry> _nextTurnCustomMessages = [];
     private Task<AgentLoopResult>? _inputTriggeredRun;
 
-    /// <summary>The run an extension's custom message (sendMessage with triggerTurn) started while the current or last admitted input
-    /// was being reduced (an extension command's handler), once: the caller owns its monitoring. Null when none started.</summary>
+    /// <summary>The last run an extension's custom message (sendMessage with triggerTurn) started outside any prompt (while idle, or while
+    /// an admitted input was being reduced, as in an extension command's handler), once: the caller owns its monitoring. Null when none
+    /// started since the last admitted input or the last take.</summary>
     public Task<AgentLoopResult>? TakeInputTriggeredRun()
     {
         lock (_gate) { var run = _inputTriggeredRun; _inputTriggeredRun = null; return run; }
@@ -96,27 +97,29 @@ public sealed partial class PersistentAgentSession
     {
         Task<AgentLoopResult> original = null!;
         Task<AgentLoopResult> StartRun() => Start(current => _agent.PromptAsync([message], current), token, [message], injectNextTurnCustom: true, duringInput: duringInput);
-        if (duringInput)
+        // A host that tracks runs (the RPC host answering prompts and publishing agent_settled) takes this run when it sees it start
+        // (TakeInputTriggeredRun): the turn belongs to no prompt of its own.
+        var adopted = new TaskCompletionSource<AgentLoopResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_gate) _inputTriggeredRun = adopted.Task;
+        try
         {
-            // The turn is not part of the handler's call (upstream's _runAgentPrompt outlives it): it starts now, in a clean execution
-            // context, so it carries none of the handler's ambient state (its input reservation, its extension callback frame). A host
-            // that answers the prompt once its input is handled takes the run (TakeInputTriggeredRun) when it sees it start.
-            var adopted = new TaskCompletionSource<AgentLoopResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            lock (_gate) _inputTriggeredRun = adopted.Task;
-            try { ExecutionContext.Run(CleanExecutionContext.Value, _ => original = StartRun(), null); }
-            catch (Exception error)
-            {
-                lock (_gate) if (ReferenceEquals(_inputTriggeredRun, adopted.Task)) _inputTriggeredRun = null;
-                adopted.TrySetException(error); _ = adopted.Task.Exception;
-                throw;
-            }
-            _ = original.ContinueWith(static (run, state) =>
-            {
-                var target = (TaskCompletionSource<AgentLoopResult>)state!;
-                if (run.IsCanceled) target.TrySetCanceled(); else if (run.IsFaulted) target.TrySetException(run.Exception!.InnerExceptions); else target.TrySetResult(run.Result);
-            }, adopted, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            // During a command the turn is not part of the handler's call (upstream's _runAgentPrompt outlives it): it starts now, in a
+            // clean execution context, so it carries none of the handler's ambient state (its input reservation, its callback frame).
+            if (duringInput) ExecutionContext.Run(CleanExecutionContext.Value, _ => original = StartRun(), null);
+            else original = StartRun();
         }
-        else original = StartRun();
+        catch (Exception error)
+        {
+            lock (_gate) if (ReferenceEquals(_inputTriggeredRun, adopted.Task)) _inputTriggeredRun = null;
+            adopted.TrySetException(error); _ = adopted.Task.Exception;
+            throw;
+        }
+        _ = original.ContinueWith(static (run, state) =>
+        {
+            var target = (TaskCompletionSource<AgentLoopResult>)state!;
+            if (run.IsCanceled) target.TrySetCanceled(); else if (run.IsFaulted) target.TrySetException(run.Exception!.InnerExceptions); else target.TrySetResult(run.Result);
+        }, adopted, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        lock (_gate) if (ReferenceEquals(_inputTriggeredRun, adopted.Task) && original.IsCompleted) _inputTriggeredRun = null;
         try { return new(SessionCustomMessageDisposition.Started, Run: await original.ConfigureAwait(false)); }
         catch (Exception error) when (original.IsFaulted) { throw new AggregateException("Custom prompt original fault.", original.Exception!, error); }
     }

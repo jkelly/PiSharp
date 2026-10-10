@@ -1129,6 +1129,16 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         try
         {
             RunState? run;
+            // agent-session.ts sendCustomMessage: an extension's sendMessage({ triggerTurn }) on an idle session runs a turn of its own
+            // (a timer, an event handler); the host adopts it, streams its events and settles it as any run.
+            bool unowned; lock (_gate) unowned = observation is AgentLoopStarted && _run is null && _startingInput is null;
+            if (unowned && _session.TakeInputTriggeredRun() is { } triggered)
+            {
+                var adopted = new RunState(_session.Snapshot.Agent.Messages.Length);
+                bool owns; lock (_gate) { owns = _run is null && !_closed; if (owns) _run = adopted; }
+                adopted.Ready.TrySetResult();
+                if (owns) _ = MonitorAsync(adopted, triggered, _session);
+            }
             lock (_gate)
             {
                 if (observation is AgentLoopStarted && _startingInput is { } starting)
