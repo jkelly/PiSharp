@@ -115,6 +115,7 @@ internal static class SessionRecoveryOriginalCriteriaTests
         var wire=new Wire(tool:true);var generator=new TransportSessionSummaryGenerator(_=>wire.Transport,()=>123);
         var error=await ThrowsAsync<SessionCompactionException>(()=>generator.GenerateAsync(Request()).AsTask());
         Equal(SessionCompactionFailure.SummaryFailed,error.Failure);Equal(1,wire.Cleanups);Equal(1,wire.Requests);
+        Equal("Summarization attempted to call a tool",error.Message); // compaction.ts generateSummaryWithUsage
         Equal(2,wire.Chunks); // Actual tool-call completion is data; the summary generator owns no executor.
     }
 

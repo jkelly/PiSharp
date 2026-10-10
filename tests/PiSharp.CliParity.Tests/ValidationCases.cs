@@ -219,6 +219,35 @@ internal static partial class Program
             }
             finally { try { Directory.Delete(root, true); } catch (IOException) { } }
         }),
+        // bash.ts createLocalBashOperations: getShellConfig runs inside exec, so with no shell the model's bash tool is still offered (tool
+        // list and system prompt) and its command fails with the discovery error; a directory shellPath fails with Node's spawn error.
+        ("validation.model-bash-without-a-shell-stays-registered", async () =>
+        {
+            var root = Directory.CreateTempSubdirectory("pisharp-model-shells-").FullName;
+            try
+            {
+                async Task<(JsonElement First, JsonElement Result)> Run(string shellPath, string name)
+                {
+                    using var model = new Sandbox("validation-model-shell-" + name);
+                    model.Write(Path.Combine(model.AgentDir, "settings.json"), System.Text.Json.JsonSerializer.Serialize(new { shellPath }));
+                    model.Respond = (_, index) => index == 0 ? AnthropicToolCall("bash", new { command = "echo hi" }, "toolu_shell") : AnthropicText("done");
+                    var (code, _, error) = await model.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "run it");
+                    Equal(0, code, name + " run; " + error);
+                    var messages = model.Requests[1].Json.GetProperty("messages");
+                    return (model.Requests[0].Json.Clone(), messages[messages.GetArrayLength() - 1].GetProperty("content")[0].Clone());
+                }
+                var missing = Path.Combine(root, "no-shell");
+                var (first, result) = await Run(missing, "missing");
+                Check(first.GetProperty("tools").EnumerateArray().Any(tool => tool.GetProperty("name").GetString() == "bash"), "bash is offered without a shell");
+                Check(first.GetProperty("system").GetRawText().Contains("- bash: ", StringComparison.Ordinal), "the system prompt lists bash");
+                Check(result.GetProperty("is_error").GetBoolean(), "the command is an error result");
+                Equal("Custom shell path not found: " + missing, result.GetProperty("content").GetString(), "getShellConfig error");
+                var directory = Directory.CreateDirectory(Path.Combine(root, "shell-dir")).FullName;
+                var (_, spawn) = await Run(directory, "directory");
+                Equal($"spawn {directory} {(OperatingSystem.IsWindows() ? "ENOENT" : "EACCES")}", spawn.GetProperty("content").GetString(), "directory shell");
+            }
+            finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+        }),
         // bash.ts execute: an empty command runs, resolveTimeoutMs rejects a non-positive timeout and accepts a fractional one, and only
         // the operating system bounds the command length (captured from the installed Pi 1.1.0 bash tool on Windows).
         ("validation.bash-admits-what-the-source-schema-admits", async () =>

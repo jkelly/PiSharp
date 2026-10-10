@@ -28,7 +28,7 @@ public sealed record ShellHost(bool IsWindows, Func<string, string?> GetEnvironm
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     /// <summary>Source existsSync also accepts a directory as the custom shell path (spawn then refuses it). Null (the default, also for
-    /// <see cref="Current"/>): a directory is not found, so the model bash tool stays unregistered.</summary>
+    /// <see cref="Current"/>): a directory is not found; the pi policy then retries with it set and spawns the directory, as upstream does.</summary>
     public Func<string, bool>? DirectoryExists { get; init; }
 }
 
