@@ -21,6 +21,8 @@ internal static partial class Program
         ("codex-ws.sse-fallback-before-the-first-event-and-for-the-session", CodexWebSocketFallback),
         ("codex-ws.failures-after-start-retries-and-codex-errors", CodexWebSocketFailures),
         ("codex-ws.connect-and-idle-timeouts-and-connection-age-limit", CodexWebSocketTimeouts),
+        ("codex-ws.previous-response-not-found-after-events-retries-the-full-context", CodexWebSocketMissingContinuationAfterStart),
+        ("codex-ws.session-dispose-closes-the-session-connections", CodexWebSocketSessionDispose),
     ];
 
     private static readonly string[] CodexCompleted =
@@ -269,6 +271,87 @@ internal static partial class Program
             Check(await server.WaitAsync(() => server.Closes.Contains("1000 debug_close")), "session cleanup closes with debug_close");
         }
         finally { OpenAICodexWebSockets.CloseSessions(session); OpenAICodexWebSockets.ResetDebugStats(session); }
+    }
+
+    private static async Task CodexWebSocketMissingContinuationAfterStart()
+    {
+        // stream: previous_response_not_found retries once even after events (response.created) arrived; the failed attempt dropped the
+        // continuation and closed its connection, so the retry sends the full context (no previous_response_id) on a new connection.
+        await using var server = new CodexServer();
+        const string gone = """{"type":"error","error":{"code":"previous_response_not_found","message":"gone"}}""";
+        var forget = 1;
+        server.OnFrame = (connection, frame) => frame.Contains("previous_response_id", StringComparison.Ordinal) || Volatile.Read(ref forget) > 1
+            ? connection.SendAllAsync([CodexCompleted[0], gone])
+            : connection.SendAllAsync(CodexCompleted);
+        server.OnPost = _ => CodexCompleted;
+        const string session = "sess-ws-forgotten-after-start";
+        var (transport, model, _) = CodexOver(server, "websocket-cached", session);
+        try
+        {
+            var first = (StreamDone)(await Collect(transport, Hi(model)))[^1];
+            var next = new ChatRequest(model, [Entry("""{"role":"user","content":"Hi","timestamp":2}"""),
+                new TranscriptEntry("assistant", PiWireJson.WriteMessage(first.Message)), Entry("""{"role":"user","content":"More","timestamp":4}""")], 5);
+            var events = await Collect(transport, next);
+            var done = events[^1] as StreamDone ?? throw new CheckException("done: " + ErrorMessage(events[^1]));
+            Check(done.Message.Content.Single() is TextContent { Text: "Hello" } && Diagnostics(done) is null, "the retried response is the message");
+            Equal(1, events.Count(item => item is StreamStarted), "one start");
+            Equal(3, server.Frames.Count, "first, delta, full retry");
+            var delta = JsonNode.Parse(server.Frames[1].Text)!; var retried = JsonNode.Parse(server.Frames[2].Text)!;
+            Equal("resp-1", delta["previous_response_id"]?.GetValue<string>(), "the delta named the previous response");
+            Check(retried["previous_response_id"] is null, "the retry names no previous response");
+            var expected = new JsonObject { ["type"] = "response.create" };
+            foreach (var (name, value) in transport.BuildBody(next with { SessionId = null })) expected[name] = value?.DeepClone();
+            expected["prompt_cache_key"] = session;
+            JsonSame(expected.ToJsonString(), server.Frames[2].Text, "full response.create frame of the retry");
+            Check(server.Upgrades.Count == 2 && server.Frames[2].Connection != server.Frames[1].Connection && server.Posts.IsEmpty, "a new connection, no SSE");
+            Check(await server.WaitAsync(() => server.Closes.Contains("1000 done")), "the failed connection closed");
+            Check(OpenAICodexWebSockets.GetDebugStats(session) is { Requests: 3, DeltaRequests: 1, FullContextRequests: 2, WebSocketFailures: 0 }, "stats");
+            // Only once per stream: a second previous_response_not_found after events is the stream's error.
+            Volatile.Write(ref forget, 2);
+            var frames = server.Frames.Count;
+            var failed = (await Collect(transport, Hi(model)))[^1];
+            Check(failed is StreamError && ErrorMessage(failed) == "Codex error: gone" && Diagnostics(failed) is null && server.Posts.IsEmpty, "retried once: " + ErrorMessage(failed));
+            Equal(frames + 2, server.Frames.Count, "two attempts");
+        }
+        finally { OpenAICodexWebSockets.CloseSessions(session); OpenAICodexWebSockets.ResetDebugStats(session); }
+    }
+
+    private static async Task CodexWebSocketSessionDispose()
+    {
+        // agent-session.ts dispose: cleanupSessionResources(sessionId) closes the session's cached Codex connections (1000 debug_close).
+        await using var server = new CodexServer();
+        server.OnFrame = (connection, _) => connection.SendAllAsync(CodexCompleted);
+        var directory = Temp("codex-ws-dispose");
+        const string session = "019a0000-0000-7000-8000-00000000c0de";
+        var (transport, model, _) = CodexOver(server, "auto");
+        var cleaned = new ConcurrentQueue<string?>();
+        var unregister = SessionResources.RegisterCleanup(cleaned.Enqueue);
+        try
+        {
+            var header = new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new { type = "session", version = 3, id = session,
+                timestamp = "2026-10-09T00:00:00.000Z", cwd = directory }));
+            var ids = 0;
+            var owner = await PiSharp.CodingAgent.PersistentAgentSession.CreateAsync(Path.Combine(directory, "session.jsonl"), header,
+                new PiSharp.Agent.AgentConfiguration(model, transport, []), () => 7, () => "entry-" + Interlocked.Increment(ref ids));
+            // The session's requests carry its id: the connection is cached under it.
+            Check((await Collect(transport, Hi(model) with { SessionId = session }))[^1] is StreamDone, "request");
+            Check(OpenAICodexWebSockets.GetDebugStats(session) is { ConnectionsCreated: 1 } && server.Closes.IsEmpty, "a cached connection stays open");
+            await owner.DisposeAsync();
+            Check(await server.WaitAsync(() => server.Closes.Contains("1000 debug_close")), "dispose closed the connection with debug_close");
+            Check(cleaned.SequenceEqual([session]), "cleanup ran for the session id: " + string.Join(",", cleaned));
+            // The next request of that session opens a new connection.
+            Check((await Collect(transport, Hi(model) with { SessionId = session }))[^1] is StreamDone && server.Upgrades.Count == 2, "a new connection afterwards");
+            // cleanupSessionResources runs every cleanup and throws their failures together.
+            var unregisterFailing = SessionResources.RegisterCleanup(_ => throw new InvalidOperationException("broken"));
+            try
+            {
+                var failure = await Throws<AggregateException>(() => { SessionResources.Cleanup("no-such-session"); return Task.CompletedTask; });
+                Check(failure.InnerExceptions.Single().Message == "broken" && failure.Message.StartsWith("Failed to cleanup session resources", StringComparison.Ordinal) &&
+                    cleaned.Last() == "no-such-session", "aggregate failure after every cleanup");
+            }
+            finally { unregisterFailing(); }
+        }
+        finally { unregister(); OpenAICodexWebSockets.CloseSessions(session); OpenAICodexWebSockets.ResetDebugStats(session); }
     }
 
     private static T Also<T>(this T value, Action<T> change) { change(value); return value; }

@@ -107,6 +107,8 @@ Native shell output sanitizing (`src/PiSharp.Tools/Processes/ShellAnsiText.cs`) 
 
 Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
 
+The CLI ships Pi v1.1.0 `packages/coding-agent/docs/llama-cpp.md` unchanged as `docs/llama-cpp.md` (source `src/PiSharp.Cli/docs/llama-cpp.md`), under the Pi MIT notice above.
+
 ## Anthropic SDK reviewed development oracle
 
 The eight exact upstream-locked packages in [the actual scoped restore receipt](compatibility/anthropic-oracle-setup.json) are development-oracle dependencies only. The receipt retains every observed packaged LICENSE/NOTICE text verbatim and its byte hash, including the SDK's root MIT license and internal qs BSD-3-Clause notice. Packages are @anthropic-ai/sdk0.124.0, @babel/runtime7.29.2, @stablelib/base641.0.1, fast-sha2561.3.0, json-schema-to-ts3.1.1, partial-json0.1.7, standardwebhooks1.1.1 and ts-algebra2.0.0. No package is bundled into the native product.

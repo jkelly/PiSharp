@@ -33,6 +33,7 @@ internal static partial class Program
         ("llama.registry-provider-auth-availability-and-request-auth", LlamaRegistry),
         ("llama.print-mode-streams-a-restored-model-through-v1", LlamaPrintMode),
         ("llama.command-outside-interactive-mode-only-warns", LlamaOutsideInteractive),
+        ("llama.guide-ships-next-to-the-cli-as-docs-llama-cpp-md", Sync(LlamaGuide)),
     ];
 
     private const string LlamaFree = """{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}""";
@@ -475,6 +476,22 @@ internal static partial class Program
         Equal("""{"model":"qwen","messages":[{"role":"system","content":"<system prompt>"},{"role":"user","content":[{"type":"text","text":"hi"}]}],"stream":true,"stream_options":{"include_usage":true},"max_tokens":4096,"tools":[""" +
             string.Join(",", new[] { "read", "bash", "edit", "write" }.Select(Tool)) + "]}",
             pinned.ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }), "chat request body");
+    }
+
+    // packages/coding-agent/docs/llama-cpp.md ships with the CLI as docs/llama-cpp.md (as docs/codemode.md does): the attribution comment,
+    // then upstream's file byte for byte (its git blob ea51675e00cf54323dde894ab4cfbb7b25cabce2 at v1.1.0).
+    private static void LlamaGuide()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "docs", "llama-cpp.md");
+        Check(File.Exists(path), "docs/llama-cpp.md next to the CLI: " + path);
+        var bytes = File.ReadAllBytes(path);
+        var newline = Array.IndexOf(bytes, (byte)'\n');
+        Equal("<!-- Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->",
+            System.Text.Encoding.UTF8.GetString(bytes, 0, newline), "attribution line");
+        var upstream = bytes[(newline + 1)..];
+        var blob = Convert.ToHexStringLower(System.Security.Cryptography.SHA1.HashData([.. System.Text.Encoding.ASCII.GetBytes($"blob {upstream.Length}\0"), .. upstream]));
+        Equal("ea51675e00cf54323dde894ab4cfbb7b25cabce2", blob, "the rest is upstream's v1.1.0 blob");
+        Check(File.Exists(Path.Combine(AppContext.BaseDirectory, "docs", "codemode.md")), "next to docs/codemode.md");
     }
 
     // index.ts: outside interactive mode /llama only warns ("/llama is available in interactive mode"); nothing reaches the model.

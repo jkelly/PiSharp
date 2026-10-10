@@ -1524,6 +1524,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         {
             try { await idle.ConfigureAwait(false); await _agent.DisposeAsync().ConfigureAwait(false); }
             catch (Exception error) { AddDistinctFailure(failures, error); }
+            // agent-session.ts dispose: cleanupSessionResources(this.sessionId) releases the session's provider resources (the cached
+            // Codex WebSockets) under the id its requests carried.
+            try { string sessionId; lock (_gate) sessionId = _configuration.SessionId ?? _store.Snapshot.Header.Id; SessionResources.Cleanup(sessionId); }
+            catch (Exception error) { AddDistinctFailure(failures, error); }
             try { await _store.DisposeAsync().ConfigureAwait(false); }
             catch (Exception error) { AddDistinctFailure(failures, error); }
             try { if (_runtimeLease is not null) await _runtimeLease.DisposeAsync().ConfigureAwait(false); }

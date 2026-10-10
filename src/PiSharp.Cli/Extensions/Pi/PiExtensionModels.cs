@@ -37,9 +37,17 @@ internal sealed class PiExtensionModels
         _chat = chat; _builtin = builtin;
         Operations = new ModelOperationsRegistry(async (request, token) =>
         {
+            bool keyless;
             lock (_extensionKeys)
-                if (_extensionKeys.TryGetValue(request.Provider, out var key)) return new ProviderAuthResult(request.ApiKey ?? key);
-            return await _builtin.GetAuthAsync(request.Provider, request.ApiKey, request.Env, token).ConfigureAwait(false);
+            {
+                if (!_extensionKeys.TryGetValue(request.Provider, out var key)) keyless = false;
+                else if (key is not null) return new ProviderAuthResult(request.ApiKey ?? key);
+                else keyless = true;
+            }
+            // composeApiKeyAuth without a key or an inherited method: an explicit request key or a stored api_key credential, else the
+            // provider is not configured (model-runtime.ts prepareRequest: "Provider is not configured: <id>").
+            return keyless ? await _builtin.ResolveAuthAsync(request, token).ConfigureAwait(false)
+                : await _builtin.GetAuthAsync(request.Provider, request.ApiKey, request.Env, token).ConfigureAwait(false);
         });
         foreach (var provider in builtin.GetProviders()) Operations.SetProvider(provider);
     }
@@ -129,7 +137,8 @@ internal sealed class PiExtensionModels
                 var builtin = _builtin.GetProvider(provider.Name);
                 lock (_extensionKeys)
                 {
-                    // composeApiKeyAuth: the extension's apiKey (an environment variable name or a literal), else the built-in auth.
+                    // composeApiKeyAuth: the extension's apiKey (an environment variable name or a literal), else the built-in auth; a
+                    // provider with neither (null) has only a request key or a stored credential.
                     if (provider.ApiKey is { } apiKey) _extensionKeys[provider.Name] = _environment(apiKey) ?? apiKey;
                     else if (builtin is null) _extensionKeys[provider.Name] = null;
                     else _extensionKeys.Remove(provider.Name);
