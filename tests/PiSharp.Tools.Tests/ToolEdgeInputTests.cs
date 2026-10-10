@@ -138,6 +138,55 @@ internal static class ToolEdgeInputTests
             await Failure(() => shell.ExecuteAsync("echo hi", missingDirectory, _ => ValueTask.CompletedTask, default).AsTask()), "missing cwd");
         Equal($"spawn {missingShell} ENOENT", await Failure(() => shell.ExecuteAsync("echo hi", temp.Root, _ => ValueTask.CompletedTask, default).AsTask()), "missing shell");
 
+        // Node's spawn errors for a shell libuv cannot start (Node 22.18 on Windows: a directory or a missing file is the async
+        // "spawn <file> ENOENT", an empty .exe is ERROR_BAD_EXE_FORMAT thrown as "spawn EFTYPE", a text .exe ERROR_EXE_MACHINE_TYPE_MISMATCH
+        // as "spawn UNKNOWN", a working directory that is a file ENOENT; on Linux and macOS libuv's chdir and execve errnos).
+        var directoryShell = Directory.CreateDirectory(Path.Combine(temp.Root, "shell-dir" + (OperatingSystem.IsWindows() ? ".exe" : ""))).FullName;
+        var emptyShell = temp.File("empty" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+        await File.WriteAllBytesAsync(emptyShell, []);
+        var textShell = temp.File("text" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+        await File.WriteAllTextAsync(textShell, "hello");
+        var fileCwd = temp.File("not-a-directory.txt");
+        await File.WriteAllTextAsync(fileCwd, "x");
+        async Task<string> Run(string shellPath, string? cwd = null) => await Failure(() => new NativeShellOperations(shellPath,
+            ImmutableDictionary<string, string>.Empty, temp.Root).ExecuteAsync("echo hi", cwd ?? temp.Root, _ => ValueTask.CompletedTask, default).AsTask());
+        if (OperatingSystem.IsWindows())
+        {
+            Equal($"spawn {directoryShell} ENOENT", await Run(directoryShell), "directory shell");
+            Equal("spawn EFTYPE", await Run(emptyShell), "empty executable");
+            Equal("spawn UNKNOWN", await Run(textShell), "text executable");
+            var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+            Equal($"spawn {cmd} ENOENT", await Run(cmd, fileCwd), "file working directory");
+            // libuv's search appends .com and .exe: an existing file without an extension is not run, the .exe beside it is.
+            var bare = temp.File("noext"); await File.WriteAllTextAsync(bare, "x");
+            Equal($"spawn {bare} ENOENT", await Run(bare), "extensionless file");
+            Equal("<no error>", await Run(CopyCmd(temp.File("cmdcopy.exe"))[..^4]), "appended .exe runs");
+        }
+        else
+        {
+            Equal($"spawn {directoryShell} EACCES", await Run(directoryShell), "directory shell");
+            Equal($"spawn {textShell} EACCES", await Run(textShell), "not executable");
+            File.SetUnixFileMode(textShell, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            if (OperatingSystem.IsMacOS()) Equal("spawn ENOEXEC", await Run(textShell), "neither a binary nor a script");
+            else
+            {
+                // glibc execvp (Linux libuv) runs it as a /bin/sh script: "hello" is not found (Node 18 and 22: exit 127).
+                var exit = await new PiSharp.Tools.Processes.Unix.PosixShellOperations(ShellDiscovery.ForBash(textShell),
+                    ImmutableDictionary<string, string>.Empty.Add("PATH", "/usr/bin:/bin"), temp.Root)
+                    .ExecuteAsync("echo hi", temp.Root, _ => ValueTask.CompletedTask, default);
+                Equal(127, exit ?? -1, "text file runs as a script");
+            }
+            Equal("spawn ENOTDIR", await Run("/bin/sh", fileCwd), "file working directory");
+            Equal("spawn ENOTDIR", await Run(Path.Combine(fileCwd, "sh")), "file in the shell path");
+        }
+        // libuv's Win32 translation and Node's split between emitted and thrown spawn errors.
+        Equal("EPERM", PiSharp.Tools.NodeArgumentErrors.WindowsErrorCode(5), "ERROR_ACCESS_DENIED");
+        Equal("EACCES", PiSharp.Tools.NodeArgumentErrors.WindowsErrorCode(740), "ERROR_ELEVATION_REQUIRED");
+        Equal("ENOENT", PiSharp.Tools.NodeArgumentErrors.WindowsErrorCode(267), "ERROR_DIRECTORY");
+        Equal("spawn /x EACCES", PiSharp.Tools.NodeArgumentErrors.SpawnFailure("/x", "EACCES"), "emitted");
+        Equal("spawn EPERM", PiSharp.Tools.NodeArgumentErrors.SpawnFailure("/x", "EPERM"), "thrown");
+
+        static string CopyCmd(string target) { File.Copy(Path.Combine(Environment.SystemDirectory, "cmd.exe"), target); return target; }
         static async Task<string> Failure(Func<Task> run)
         {
             try { await run(); return "<no error>"; }
