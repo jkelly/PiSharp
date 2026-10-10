@@ -48,9 +48,10 @@ internal static partial class Program
         using var sandbox = NodeSandbox("lone-surrogate-provider");
         sandbox.Vars["ACME_KEY"] = "acme-secret";
         var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "acme.ts"), ChatProviderExtension);
+        // Input closes after agent_settled, the end of the run, like the other RPC cases (closing at agent_end raced the shutdown).
         var (code, records, stderr) = await RunRpc(sandbox, ["--provider", "acme-chat", "--model", "m1", "-e", extension],
             ["{\"id\":\"p\",\"type\":\"prompt\",\"message\":\"hi \\ud800 there\"}"],
-            (record, _) => record["type"]?.GetValue<string>() == "agent_end" || IsResponse(record, "p") && record["success"]?.GetValue<bool>() == false);
+            (record, _) => record["type"]?.GetValue<string>() == "agent_settled" || IsResponse(record, "p") && record["success"]?.GetValue<bool>() == false);
         Equal(0, code, "rpc exit; " + stderr);
         Check(records.Any(record => record["type"]?.GetValue<string>() == "agent_end"), "the prompt ran: " + records.Count + " records");
         // The probe logs JSON.stringify of what streamSimple received.

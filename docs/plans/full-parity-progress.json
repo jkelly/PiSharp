@@ -210,7 +210,7 @@
       "version": "1.1.0.3",
       "kind": "patch",
       "baseline": "v1.1.0",
-      "status": "release-candidate",
+      "status": "published",
       "branch": "fix/1.1.0.3",
       "ships": "everything on fix/1.1.0.3 since main (v1.1.0.2)",
       "issues": [
@@ -224,7 +224,19 @@
         "new: built-in extensions on/off, llama.cpp and /llama, native classifier/image providers, ctx.ui.setTheme, -e package resources, Codex WebSocket and zstd, X11 clipboard reading, Node spawn errors, lone surrogates, fractional tokens, 1,000 JSON levels, JavaScript-string-sized bounds, RPC/print setters save settings"
       ],
       "blockers": [],
-      "remaining": "Linux dry run, owner go-ahead, tag v1.1.0.3"
+      "tag": "v1.1.0.3 (f46bd6e), release run 38069689117",
+      "publishedOn": "2026-10-10"
+    },
+    "1.1.0.4": {
+      "version": "1.1.0.4",
+      "kind": "patch",
+      "baseline": "v1.1.0",
+      "status": "release-candidate",
+      "branch": "release/1.1.0.4",
+      "ships": "startup header names PiSharp and its own version (PR #7)",
+      "notes": "docs/release-notes/1.1.0.4.md",
+      "changelog": "website/src/content/changelog/1.1.0.4.md (date 2026-10-10)",
+      "blockers": []
     }
   },
   "messageCaps": {

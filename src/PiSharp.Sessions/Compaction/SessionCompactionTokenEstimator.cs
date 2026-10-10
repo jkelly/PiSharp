@@ -19,7 +19,7 @@ public static class SessionCompactionTokenEstimator
             {
                 if (body.TryGetProperty("sections", out var sections) && sections.ValueKind == JsonValueKind.Object)
                     foreach (var section in sections.EnumerateObject())
-                        if (section.Value.ValueKind == JsonValueKind.String) chars += section.Value.GetString()!.Length;
+                        if (section.Value.ValueKind == JsonValueKind.String) chars += Length(section.Value);
                 if (body.TryGetProperty("toolsAdded", out var tools) && tools.ValueKind != JsonValueKind.Null) chars += SessionSummaryJson.Stringify(tools).Length;
             }
         }
@@ -28,14 +28,14 @@ public static class SessionCompactionTokenEstimator
             foreach (var block in body.GetProperty("content").EnumerateArray())
                 chars += block.GetProperty("type").GetString() switch
                 {
-                    "text" => block.GetProperty("text").GetString()!.Length,
-                    "thinking" => block.GetProperty("thinking").GetString()!.Length,
-                    "toolCall" => block.GetProperty("name").GetString()!.Length + SessionSummaryJson.Stringify(block.GetProperty("arguments")).Length,
+                    "text" => Length(block.GetProperty("text")),
+                    "thinking" => Length(block.GetProperty("thinking")),
+                    "toolCall" => Length(block.GetProperty("name")) + SessionSummaryJson.Stringify(block.GetProperty("arguments")).Length,
                     _ => 0
                 };
         }
-        else if (message.Role == "bashExecution") chars = body.GetProperty("command").GetString()!.Length + body.GetProperty("output").GetString()!.Length;
-        else if (message.Role is "branchSummary" or "compactionSummary") chars = body.GetProperty("summary").GetString()!.Length;
+        else if (message.Role == "bashExecution") chars = Length(body.GetProperty("command")) + Length(body.GetProperty("output"));
+        else if (message.Role is "branchSummary" or "compactionSummary") chars = Length(body.GetProperty("summary"));
         return Math.Ceiling(chars / 4);
     }
     public static SessionContextUsageEstimate EstimateContextTokens(ImmutableArray<TranscriptEntry> messages)
@@ -86,13 +86,22 @@ public static class SessionCompactionTokenEstimator
     }
     private static double Content(JsonElement content)
     {
-        if (content.ValueKind == JsonValueKind.String) return content.GetString()!.Length;
+        if (content.ValueKind == JsonValueKind.String) return Length(content);
         if (content.ValueKind != JsonValueKind.Array) throw new SessionCompactionException(SessionCompactionFailure.InvalidMessage);
         double chars = 0;
         foreach (var block in content.EnumerateArray())
             if (block.GetProperty("type").GetString() == "image") chars += 4800;
-            else if (block.GetProperty("type").GetString() == "text" && block.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String) chars += text.GetString()!.Length;
+            else if (block.GetProperty("type").GetString() == "text" && block.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String) chars += Length(text);
         return chars;
+    }
+    // A JavaScript string's length in UTF-16 code units, as the source heuristic counts it. JsonElement.GetString rejects an escaped
+    // lone surrogate, which JSON.parse keeps (a prompt or tool result may hold one), so the length is counted from the raw JSON text.
+    private static int Length(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.String) return value.GetString()!.Length;
+        var raw = value.GetRawText(); var length = 0;
+        for (var index = 1; index < raw.Length - 1; index++) { if (raw[index] == '\\') index += raw[index + 1] == 'u' ? 5 : 1; length++; }
+        return length;
     }
     private static double Number(JsonElement body, string key)
     {

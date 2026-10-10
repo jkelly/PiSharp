@@ -19,7 +19,23 @@ internal static partial class Program
         Case("requests.carry-the-session-id", RequestsCarrySessionId),
         Case("diagnostics.rpc-host.mistral-failure-is-recorded-and-the-host-survives", MistralFailureThroughRpc),
         Case("mistral.replay-ignores-extra-system-and-user-fields", MistralExtraFields),
+        Case("compaction.estimate-counts-lone-surrogates-as-javascript-does", LoneSurrogateEstimate),
     ];
+
+    // compaction.ts estimateTokens counts text.length, in UTF-16 code units: a lone surrogate JSON.parse keeps counts as one (formerly
+    // the estimator threw on it, failing every run of a session that held one once auto-compaction checked its threshold).
+    private static Task LoneSurrogateEstimate()
+    {
+        static TranscriptEntry Message(string json) => new(JsonDocument.Parse(json).RootElement.GetProperty("role").GetString()!, JsonData.Parse(json));
+        static double Estimate(string json) => PiSharp.Sessions.Compaction.SessionCompactionTokenEstimator.EstimateTokens(Message(json));
+        Equal(3d, Estimate("""{"role":"user","content":"hi \ud800 there","timestamp":1}"""), "user string content (10 units)");
+        Equal(1d, Estimate("""{"role":"toolResult","toolCallId":"t","toolName":"x","content":[{"type":"text","text":"x\udc00y"}],"isError":false,"timestamp":1}"""), "tool result block (3 units)");
+        Equal(3d, Estimate("""{"role":"bashExecution","command":"echo \ud800","output":"\udc00 ok","exitCode":0,"cancelled":false,"truncated":false,"timestamp":1}"""), "bash command and output (10 units)");
+        Equal(2d, Estimate("""{"role":"user","content":"😀abcdef","timestamp":1}"""), "escaped pair is two units (8 units)");
+        Equal(2d, Estimate("{\"role\":\"user\",\"content\":\"\U0001F600abcdef\",\"timestamp\":1}"), "literal pair is two units (8 units)");
+        Equal(3d, Estimate("""{"role":"user","content":"a\\b\"c\n12345","timestamp":1}"""), "simple escapes are one unit each (10 units)");
+        return Task.CompletedTask;
+    }
 
     // agent-session.ts _refreshToolRegistry applies a catalog change during a run at once. A publication that loses to concurrent
     // changes is prepared again on top of them for as long as the run is in its provider phase (formerly 16 tries, then idle).
