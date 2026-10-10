@@ -377,7 +377,9 @@ public sealed partial class SessionRuntimeRegistry
         }
         else model = Model(fallbackModel, catalog);
         var restore = new RestoreLog();
-        var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, thinkingLevel ?? context.ThinkingLevel, cancellationToken,
+        // sdk.ts createAgentSession: the restored (or default) level is clamped to the model's capabilities, never refused.
+        var level = ThinkingLevels.Clamp(catalog.Thinking[(model.Model.Provider, model.Model.Id)], thinkingLevel ?? context.ThinkingLevel);
+        var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, level, cancellationToken,
             initialActiveToolNames: initialActiveToolNames, restore: restore);
         // Source _isAllowedTool: names that --tools/--exclude-tools keep out of the catalog never become pending.
         return new(selection, [.. restore.Skipped.Where(name => _options.LifetimeToolSelection?.IsAllowed(name) != false)],

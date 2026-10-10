@@ -455,6 +455,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 OperationCanceledException => "Command canceled before acceptance.",
                 _ => "RPC command failed."
             };
+            // The wire keeps Pi's fixed text; PISHARP_DEBUG=1 names the cause on stderr for bug reports.
+            if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1")
+                Console.Error.WriteLine($"pisharp: {command?.Type ?? "parse"} failed: {error}");
             await WriteAsync(RpcCommandCodec.Error(command?.Id, command?.Type ?? "parse", message, _options)).ConfigureAwait(false);
         }
         finally
