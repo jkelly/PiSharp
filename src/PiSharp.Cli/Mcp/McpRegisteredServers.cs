@@ -124,15 +124,13 @@ public sealed class McpRegisteredServers : IExtensionMcpServerHost
         Action[] current; Func<JsonData, Task>? observe;
         lock (gate) { current = [.. listeners]; observe = dispatch; }
         foreach (var listener in current) try { listener(); } catch (Exception) { /* The host reports its own failures. */ }
-        if (observe is not null) _ = DispatchAsync(observe, ChangeEvent(List()));
+        // runner.emit: handler failures are reported by the dispatch; the registration itself never fails. Successive changes reach
+        // every observer in the order they happened.
+        if (observe is not null) { var value = ChangeEvent(List()); _ = changes.Enqueue(() => observe(value)); }
         ReportUnhandled();
     }
 
-    private static async Task DispatchAsync(Func<JsonData, Task> observe, JsonData value)
-    {
-        // runner.emit: handler failures are reported by the dispatch; the registration itself never fails.
-        try { await observe(value).ConfigureAwait(false); } catch (Exception) { }
-    }
+    private readonly PiSharp.Cli.Extensions.OrderedObservationQueue changes = new();
 
     private string PathOf(string ownerId) => OwnerPath?.Invoke(ownerId) ?? ownerId;
 
