@@ -25,7 +25,7 @@ public sealed partial class RpcSessionDispatcher
                 return RpcCommandCodec.Build(writer =>
                 {
                     writer.WritePropertyName("models"); writer.WriteStartArray();
-                    foreach (var model in modelOrder) writer.WriteRawValue(models[model].Value.GetRawText());
+                    foreach (var model in modelOrder) writer.WriteRawValue(models[model].Value.GetRawText(), skipInputValidation: true);
                     writer.WriteEndArray();
                 }, _options.MaximumOutputBytes);
             var levels = _session.GetSupportedThinkingLevels(current.Agent.Model);

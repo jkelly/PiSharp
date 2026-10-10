@@ -71,7 +71,7 @@ public sealed class SessionEntryMigration
         // Reparse the entire retained syntax; an externally created JsonElement may have allowed comments/commas.
         try
         {
-            using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(raw, PiSharp.Contracts.JsonData.DocumentOptions);
             var owned = document.RootElement.EnumerateArray().Select(JsonData.FromElement).ToImmutableArray();
             return Migrate(owned, v1EntryIds) with { SourceArray = array };
         }
@@ -96,7 +96,7 @@ public sealed class SessionEntryMigration
                 return Block(records, null, false, SessionEntryMigrationCode.ResourceLimit, index);
             try
             {
-                using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 });
+                using var document = JsonDocument.Parse(raw, PiSharp.Contracts.JsonData.DocumentOptions);
                 ValidateJson(document.RootElement, 0);
                 if (document.RootElement.ValueKind != JsonValueKind.Object || !TryString(document.RootElement, "type", out var type) || type.Length == 0)
                     return Block(records, null, false, SessionEntryMigrationCode.InvalidJson, index);

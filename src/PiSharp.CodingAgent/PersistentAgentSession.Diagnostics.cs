@@ -44,7 +44,7 @@ public sealed partial class PersistentAgentSession
             var entry=Record(_codec,"custom",Identity(_nextEntryId,log.Header.Id,log.Entries),previous.LeafId,_clock,writer=>
             {
                 writer.WriteString("customType",NativeSessionDiagnosticProjector.CustomType);
-                writer.WritePropertyName("data");writer.WriteRawValue(data.Value.GetRawText());
+                writer.WritePropertyName("data");writer.WriteRawValue(data.Value.GetRawText(), skipInputValidation: true);
             });
             var nextContext=_projector.Project(log.Entries.Add(entry),entry.Id);
             if(previous.LlmMessages.Length!=nextContext.LlmMessages.Length||!previous.LlmMessages.Zip(nextContext.LlmMessages).All(pair=>

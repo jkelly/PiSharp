@@ -29,6 +29,25 @@ internal static class PiPayloadBudget
     /// <summary>One RPC input command (a prompt carrying Pi-sized images).</summary>
     public const int RpcCommandBytes = 32 * 1024 * 1024;
 
+    // The Pi entry (plain pisharp, -p, --mode json|rpc) follows what Pi can actually process. Pi bounds none of these records itself; each
+    // is one JavaScript string, so V8's longest string (PiRequestBudget.JavaScriptStringLength, 536,870,888 UTF-16 code units) is its
+    // real bound: session-manager.ts reads a whole session file into one string, rpc-mode.ts reads and writes one line per string, and a
+    // tool result's text is one string. PiSharp admits that many UTF-8 bytes where it counts bytes (every ASCII record Pi can process
+    // fits; a non-ASCII one of more bytes is refused), and that many UTF-16 code units where it counts characters. The explicit
+    // `session ...` and `rpc` verbs keep the bounds above.
+
+    /// <summary>One persisted session record of the Pi entry (formerly 64 MiB).</summary>
+    public const int PiSessionLineBytes = PiSharp.AI.PiRequestBudget.JavaScriptStringLength;
+    /// <summary>A whole session file of the Pi entry and its projected context (formerly 64 MiB). Read whole, as Pi reads it; this is
+    /// also the out-of-memory ceiling the reader needs.</summary>
+    public const int PiSessionFileBytes = PiSharp.AI.PiRequestBudget.JavaScriptStringLength;
+    /// <summary>One RPC input line of the Pi entry (formerly 32 MiB).</summary>
+    public const int PiRpcCommandBytes = PiSharp.AI.PiRequestBudget.JavaScriptStringLength;
+    /// <summary>One RPC or JSON-mode output line of the Pi entry (formerly 32 MiB).</summary>
+    public const int PiOutputRecordBytes = PiSharp.AI.PiRequestBudget.JavaScriptStringLength;
+    /// <summary>One tool result's text of the Pi entry (formerly 8 MiB).</summary>
+    public const int PiToolResultCharacters = PiSharp.AI.PiRequestBudget.JavaScriptStringLength;
+
     /// <summary>Tool result admission for the agent loop and its canonical retained values.</summary>
     public static ToolResultValueOptions ToolResults { get; } = ToolResultValueOptions.ExecutionBoundary with
     {
@@ -43,13 +62,18 @@ internal static class PiPayloadBudget
         return options with { Loop = (options.Loop ?? new()) with { CanonicalToolResultLimits = ToolResults }, ResultValues = ToolResults };
     }
 
-    /// <summary>Pi entry tool results: agent-loop.ts keeps every content block of a result (the 128-block profile bound is lifted);
-    /// the character and byte bounds stay the memory bounds above.</summary>
-    public static ToolResultValueOptions PiToolResults { get; } = ToolResults with { MaximumContentBlocks = int.MaxValue, KeepsLoneSurrogates = true };
+    /// <summary>Pi entry tool results: agent-loop.ts keeps every content block of a result (the 128-block profile bound is lifted) and
+    /// text of any length a string holds; the raw JSON of a result stays within twice that (its UTF-8 bytes within an int).</summary>
+    public static ToolResultValueOptions PiToolResults { get; } = ToolResults with
+    {
+        MaximumContentBlocks = int.MaxValue, KeepsLoneSurrogates = true, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
+        MaximumCharacters = PiToolResultCharacters, MaximumStructuredContentCharacters = PiToolResultCharacters,
+        MaximumRawCharacters = 2 * PiToolResultCharacters, MaximumRawBytes = int.MaxValue
+    };
 
     /// <summary>agent.ts steer/followUp push onto plain arrays: the Pi entry's queues have no message-count or size bound.</summary>
     public static AgentPendingInputQueueOptions PiQueue { get; } = new(MaximumMessagesPerQueue: int.MaxValue,
-        MaximumMessageCharacters: int.MaxValue, MaximumCharactersPerQueue: long.MaxValue, MaximumJsonDepth: 64);
+        MaximumMessageCharacters: int.MaxValue, MaximumCharactersPerQueue: long.MaxValue, MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth);
 
     /// <summary>agent-loop.ts emits every tool_execution_update an onUpdate reports: no count bound per batch, per pending delivery or
     /// per update's content blocks. The retained characters of not-yet-delivered updates stay a memory bound.</summary>
@@ -59,7 +83,7 @@ internal static class PiPayloadBudget
     /// <summary>agent-session.ts prompt/sendUserMessage: an extension's user message has no text or image-count bound; the message keeps
     /// the request-entry and payload memory bounds every prompt has (the record's other defaults).</summary>
     public static PromptInputAdmissionOptions PiExtensionInput { get; } = new(
-        MaximumTextCharacters: PiSharp.AI.PiRequestBudget.RequestEntryCharacters, MaximumImages: int.MaxValue, MaximumJsonDepth: 64) { KeepsLoneSurrogates = true };
+        MaximumTextCharacters: PiSharp.AI.PiRequestBudget.RequestEntryCharacters, MaximumImages: int.MaxValue, MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth) { KeepsLoneSurrogates = true };
 
     /// <summary>The agent options of the Pi entry: no tool, subscriber, queue, progress or result-block count bound (agent.ts has none).</summary>
     public static AgentOptions PiAgent(AgentOptions options)
@@ -79,14 +103,16 @@ internal static class PiPayloadBudget
         return options with
         {
             MaximumTools = int.MaxValue, MaximumTransforms = int.MaxValue, MaximumAssistantContentBlocks = int.MaxValue,
-            MaximumResultContentBlocks = int.MaxValue, KeepsLoneSurrogatesInArguments = true
+            MaximumResultContentBlocks = int.MaxValue, KeepsLoneSurrogatesInArguments = true, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
+            MaximumResultCharacters = PiToolResultCharacters, MaximumStructuredContentCharacters = PiToolResultCharacters,
+            MaximumResultRawCharacters = 2 * PiToolResultCharacters, MaximumResultRawBytes = int.MaxValue
         };
     }
 
     /// <summary>runner.ts emits input, before_agent_start, context and tool events with whatever the session holds: no text, JSON,
     /// image, concurrency or context-message bound. The reentrant dispatch depth stays a recursion guard.</summary>
     public static PiSharp.Extensions.Runtime.Dispatch.ExtensionEventDispatchOptions PiEventDispatch { get; } = new(
-        MaximumTextCharacters: int.MaxValue, MaximumJsonCharacters: int.MaxValue, MaximumJsonBytes: int.MaxValue, MaximumJsonDepth: 64,
+        MaximumTextCharacters: int.MaxValue, MaximumJsonCharacters: int.MaxValue, MaximumJsonBytes: int.MaxValue, MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth,
         MaximumImages: int.MaxValue, MaximumConcurrentDispatches: int.MaxValue, MaximumContextMessages: int.MaxValue);
 
     /// <summary>An extension or MCP tool binding of the Pi entry: every registered tool (formerly 128), Pi-sized tool results (formerly
@@ -110,6 +136,22 @@ internal static class PiPayloadBudget
     public static SessionContextProjectionOptions Context { get; } =
         new(MaximumInputCharacters: SessionFileBytes, MaximumOutputCharacters: SessionFileBytes);
 
+    /// <summary>The Pi entry's session context projection: a whole session file.</summary>
+    public static SessionContextProjectionOptions PiContext { get; } =
+        new(MaximumInputCharacters: PiSessionFileBytes, MaximumOutputCharacters: PiSessionFileBytes);
+
+    /// <summary>The Pi entry's session reader/writer bounds: a file and a line as long as a JavaScript string, keeping the given line
+    /// and record counts.</summary>
+    public static SessionLogReaderOptions PiSessionReader(SessionLogReaderOptions bounds)
+    {
+        var reader = SessionReader(bounds);
+        return reader with
+        {
+            MaximumInputBytes = PiSessionFileBytes, MaximumLineBytes = PiSessionLineBytes,
+            CodecOptions = reader.CodecOptions! with { MaximumRecordCharacters = PiSessionLineBytes, MaximumUtf8Bytes = PiSessionLineBytes }
+        };
+    }
+
     /// <summary>Session reader/writer bounds with Pi-sized records, keeping the given line and record counts.</summary>
     public static SessionLogReaderOptions SessionReader(SessionLogReaderOptions bounds)
     {
@@ -118,8 +160,8 @@ internal static class PiPayloadBudget
         {
             MaximumInputBytes = SessionFileBytes, MaximumLineBytes = SessionLineBytes,
             // session-manager.ts writes and reads JSON.stringify lines of any size or depth: one record keeps only the line's memory bound
-            // (characters never exceed its UTF-8 bytes) and the 64 levels an owned JSON value holds.
-            CodecOptions = (bounds.CodecOptions ?? new()) with { MaximumRecordCharacters = SessionLineBytes, MaximumUtf8Bytes = SessionLineBytes, MaximumJsonDepth = 64 }
+            // (characters never exceed its UTF-8 bytes) and the JsonData.MaximumDepth levels an owned JSON value holds.
+            CodecOptions = (bounds.CodecOptions ?? new()) with { MaximumRecordCharacters = SessionLineBytes, MaximumUtf8Bytes = SessionLineBytes, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth }
         };
     }
 }

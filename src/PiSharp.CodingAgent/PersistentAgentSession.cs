@@ -509,7 +509,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
                 Add("message", writer =>
                 {
-                    writer.WritePropertyName("message"); writer.WriteRawValue(system.WireBody.Value.GetRawText());
+                    writer.WritePropertyName("message"); writer.WriteRawValue(system.WireBody.Value.GetRawText(), skipInputValidation: true);
                 });
             }
             var prospective = _projector.Project(log.Entries.AddRange(entries), parent, work);
@@ -868,7 +868,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             return Record(_codec, "context_edit", id, parent, clock, writer =>
             {
                 writer.WriteString("targetId", targetId); writer.WritePropertyName("replacement");
-                writer.WriteRawValue(replacement.ToString());
+                writer.WriteRawValue(replacement.ToString(), skipInputValidation: true);
             }, "yyyy-MM-dd'T'HH:mm:ss.fff'Z'");
         }
         catch (SessionEntryCodecException error)
@@ -902,7 +902,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 writer.WriteString("customType", SessionExtensionEntryLimits.CustomType);
                 writer.WriteStartObject("data"); writer.WriteString("extensionId", draft.ExtensionId);
                 writer.WriteString("entryKind", draft.EntryKind); writer.WriteNumber("schemaVersion", draft.SchemaVersion);
-                writer.WritePropertyName("data"); writer.WriteRawValue(draft.Data.ToString()); writer.WriteEndObject();
+                writer.WritePropertyName("data"); writer.WriteRawValue(draft.Data.ToString(), skipInputValidation: true); writer.WriteEndObject();
             });
         }
         catch (SessionEntryCodecException error)
@@ -1422,7 +1422,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     else
                     {
                         writer.WritePropertyName("message");
-                        writer.WriteRawValue(message.WireBody.Value.GetRawText());
+                        writer.WriteRawValue(message.WireBody.Value.GetRawText(), skipInputValidation: true);
                     }
                 });
             // Reject unsupported selected influences/bounds before writing, without rewriting history.

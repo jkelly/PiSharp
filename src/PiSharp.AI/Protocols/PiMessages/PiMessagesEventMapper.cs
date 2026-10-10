@@ -25,7 +25,7 @@ public sealed class PiMessagesEventMapper
         _request = request; _options = options;
         var initial = new AssistantMessage(request.Model.Api, request.Model.Provider, request.Model.Id, request.Timestamp, [], TokenUsage.Zero, StopReason.Pending);
         _partial = new JsonObject { ["role"] = "assistant", ["content"] = _content, ["api"] = request.Model.Api, ["provider"] = request.Model.Provider,
-            ["model"] = request.Model.Id, ["usage"] = JsonNode.Parse(PiWireJson.WriteMessage(initial).ToString())!["usage"]!.DeepClone(),
+            ["model"] = request.Model.Id, ["usage"] = JsonNode.Parse(PiWireJson.WriteMessage(initial).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!["usage"]!.DeepClone(),
             ["stopReason"] = "pending", ["timestamp"] = request.Timestamp };
         _reducer = new(initial, new(options.MaximumContentSlots, options.MaximumContentCharacters), allowPiMessagesIdentityReplacement: true);
     }
@@ -85,7 +85,7 @@ public sealed class PiMessagesEventMapper
                     frame = new ThinkingDelta(index, thinkingDelta); break;
                 case "toolcall_delta":
                     var delta = PiMessagesData.String(value, "delta"); var call = Block(index, "toolCall"); var raw = _toolJson[index] + delta;
-                    call["arguments"] = JsonNode.Parse(StreamingJson.Parse(raw).ToString()); _toolJson[index] = raw; frame = new ToolCallDelta(index, delta); break;
+                    call["arguments"] = JsonNode.Parse(StreamingJson.Parse(raw).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions); _toolJson[index] = raw; frame = new ToolCallDelta(index, delta); break;
                 case "text_end":
                     var endedText = Block(index, "text"); endedText["text"] = PiMessagesData.String(value, "content");
                     Optional(endedText, value, "contentSignature", "textSignature", "/content/" + index + "/textSignature");
@@ -128,7 +128,7 @@ public sealed class PiMessagesEventMapper
             var diagnosticError = new JsonObject { ["name"] = "PiMessagesResponseError", ["message"] = error.Message };
             if (responseError.Code is { } code) diagnosticError["code"] = code;
             var diagnostics = new JsonArray(new JsonObject { ["type"] = "pi_messages_response_failure", ["timestamp"] = _request.Timestamp,
-                ["error"] = diagnosticError, ["details"] = JsonNode.Parse(details.ToString()) });
+                ["error"] = diagnosticError, ["details"] = JsonNode.Parse(details.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) });
             message = message with { ExtraProperties = properties.Set("diagnostics", Own(diagnostics)) };
         }
         var diagnostic = nativeCode is { } failureCode ? new NativeChatDiagnostic(NativeChatAdapter.PiMessages, failureCode) :
@@ -156,7 +156,7 @@ public sealed class PiMessagesEventMapper
         return frame with { SourceEmissionSnapshot = Own(new JsonObject { ["value"] = value, ["ownUndefinedPaths"] = JsonSerializer.SerializeToNode(paths) }) };
     }
     private StreamEvent CaptureError(StreamError frame) => !_options.CaptureSourceSnapshots ? frame : frame with
-    { SourceEmissionSnapshot = Own(new JsonObject { ["value"] = new JsonObject { ["type"] = "error", ["reason"] = PiWireJson.StopReasonName(frame.Reason), ["error"] = JsonNode.Parse(PiWireJson.WriteMessage(frame.Message).ToString()) }, ["ownUndefinedPaths"] = new JsonArray() }) };
+    { SourceEmissionSnapshot = Own(new JsonObject { ["value"] = new JsonObject { ["type"] = "error", ["reason"] = PiWireJson.StopReasonName(frame.Reason), ["error"] = JsonNode.Parse(PiWireJson.WriteMessage(frame.Message).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) }, ["ownUndefinedPaths"] = new JsonArray() }) };
     private void Add(int index, JsonObject block) { if (index != _content.Count) throw PiMessagesData.Fail(PiMessagesFailure.UnsupportedContent); _content.Add(block); }
     private JsonObject Block(int index, string type)
     { if (index >= _content.Count || _content[index] is not JsonObject block || block["type"]?.GetValue<string>() != type) throw PiMessagesData.Fail(PiMessagesFailure.MalformedStream); return block; }
@@ -164,6 +164,7 @@ public sealed class PiMessagesEventMapper
     { if (source.TryGetProperty(from, out var field)) { target[to] = Node(field); _undefined.Remove(path); } else { target.Remove(to); _undefined.Add(path); } }
     private void Diagnostic(JsonObject diagnostic) { if (_partial["diagnostics"] is not JsonArray values) { values = new(); _partial["diagnostics"] = values; } values.Add(diagnostic); }
     private AssistantMessage Message() => PiWireJson.ReadMessage(Own(_partial).Value);
-    private static JsonNode? Node(JsonElement value) => JsonNode.Parse(value.GetRawText());
-    private JsonData Own(JsonNode value) => PiMessagesData.Admit(JsonData.Parse(value.ToJsonString()), _options);
+    private static JsonNode? Node(JsonElement value) => JsonNode.Parse(value.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
+    // A node may hold a value with a lone surrogate (a tool call's arguments), which only JsonUtf16 writes.
+    private JsonData Own(JsonNode value) => PiMessagesData.Admit(JsonData.Parse(JsonUtf16.ToJsonString(value)), _options);
 }

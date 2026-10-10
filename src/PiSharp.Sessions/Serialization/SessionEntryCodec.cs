@@ -69,7 +69,7 @@ public sealed class SessionEntryCodec
     {
         _options = options ?? new();
         if (_options.MaximumRecordCharacters <= 0 || _options.MaximumUtf8Bytes <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid session record codec limits.");
     }
 
@@ -79,7 +79,7 @@ public sealed class SessionEntryCodec
         CheckInput(json);
         try
         {
-            using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(json, PiSharp.Contracts.JsonData.DocumentOptions);
             return ReadValidated(document.RootElement);
         }
         catch (JsonException) { throw Failure(SessionEntryCodecFailure.MalformedJson); }

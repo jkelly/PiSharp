@@ -211,7 +211,7 @@ public static partial class PiWireJson
                 };
                 if (!number.TryGetDecimal(out var owned) || owned != typed)
                     throw new JsonException("Source cost differs from its typed decimal value.");
-                cost[name] = JsonNode.Parse(number.GetRawText());
+                cost[name] = JsonNode.Parse(number.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             }
         }
         foreach (var item in (value.Cost.ExtraProperties ?? JsonFields.Empty).Ordered)
@@ -249,7 +249,7 @@ public static partial class PiWireJson
         return node;
     }
 
-    private static JsonData Own(JsonNode node) => JsonData.Parse(node.ToJsonString());
+    private static JsonData Own(JsonNode node) => JsonData.Parse(JsonUtf16.ToJsonString(node));
     private static string String(JsonElement value, string name) => (value.GetProperty(name) is { ValueKind: JsonValueKind.String } text ? JsonUtf16.GetString(text) : value.GetProperty(name).GetString())
         ?? throw new JsonException($"{name} cannot be null.");
     private static void RequireString(JsonElement value, string name, string expected)

@@ -79,7 +79,7 @@ internal static class RegistrationPolicy
         if (options.MaximumOwners <= 0 || options.MaximumRegistrations <= 0 ||
             options.MaximumRegistrationsPerOwner <= 0 || options.MaximumMetadataCharacters <= 0 ||
             options.MaximumIdentifierCharacters <= 0 || options.MaximumDescriptionCharacters < 0 ||
-            options.MaximumJsonCharacters <= 0 || options.MaximumJsonDepth is < 1 or > 64 ||
+            options.MaximumJsonCharacters <= 0 || options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             options.MaximumConcurrentDispatches <= 0 || options.MaximumSessionBranchEntries <= 0 || options.MaximumSessionCharacters <= 0 ||
             options.MaximumSessionUtf8Bytes <= 0 || options.ReservedToolNames.IsDefault ||
             options.ReservedCommandNames.IsDefault || options.ReservedToolNames.Length > 256 ||

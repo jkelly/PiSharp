@@ -246,14 +246,14 @@ internal static class RpcCommandCodec
         {
             writer.WriteString("role", "user"); writer.WritePropertyName("content"); writer.WriteStartArray();
             writer.WriteStartObject(); writer.WriteString("type", "text"); JsonUtf16.WriteString(writer, "text", command.Message!); writer.WriteEndObject();
-            if (command.Images is { } images) foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText());
+            if (command.Images is { } images) foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText(), skipInputValidation: true);
             writer.WriteEndArray(); writer.WriteNumber("timestamp", timestamp);
         }, options.MaximumCommandBytes));
 
     internal static JsonData Success(RpcCommandEnvelope command, JsonData? data, RpcDispatchOptions options) => Build(writer =>
     {
         Header(writer, command.Id, command.Type); writer.WriteBoolean("success", true);
-        if (data is not null) { writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString()); }
+        if (data is not null) { writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString(), skipInputValidation: true); }
     }, options.MaximumOutputBytes);
     internal static JsonData Error(string? id, string? command, string error, RpcDispatchOptions options)
     {
@@ -276,7 +276,7 @@ internal static class RpcCommandCodec
     private static string RawJson(JsonElement value) => RawPrefix + value.GetRawText();
     private static void WriteEchoed(Utf8JsonWriter writer, string value)
     {
-        if (value.StartsWith(RawPrefix, StringComparison.Ordinal)) writer.WriteRawValue(value[RawPrefix.Length..]);
+        if (value.StartsWith(RawPrefix, StringComparison.Ordinal)) writer.WriteRawValue(value[RawPrefix.Length..], skipInputValidation: true);
         // Utf8JsonWriter refuses a lone surrogate; JSON.stringify writes it as an escape.
         else if (HasLoneSurrogate(value)) writer.WriteRawValue(PiSharp.AI.StreamingJson.JsonQuote(value), skipInputValidation: true);
         else writer.WriteStringValue(value);
@@ -316,12 +316,12 @@ internal static class RpcCommandCodec
         return JsonData.Parse(Encoding.UTF8.GetString(bytes.WrittenSpan));
     }
     internal static void Raw(Utf8JsonWriter writer, string field, JsonData value)
-    { writer.WritePropertyName(field); writer.WriteRawValue(value.ToString()); }
+    { writer.WritePropertyName(field); writer.WriteRawValue(value.ToString(), skipInputValidation: true); }
     internal static void Messages(Utf8JsonWriter writer, string field, ImmutableArray<TranscriptEntry> messages, int maximum, int start = 0)
     {
         if (start < 0 || start > messages.Length || messages.Length - start > maximum) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
         writer.WritePropertyName(field); writer.WriteStartArray();
-        for (var index = start; index < messages.Length; index++) writer.WriteRawValue(messages[index].WireBody.ToString());
+        for (var index = start; index < messages.Length; index++) writer.WriteRawValue(messages[index].WireBody.ToString(), skipInputValidation: true);
         writer.WriteEndArray();
     }
     internal static string Text(TranscriptEntry message)

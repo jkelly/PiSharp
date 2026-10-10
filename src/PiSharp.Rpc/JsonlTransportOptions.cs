@@ -21,7 +21,7 @@ public sealed record JsonlTransportOptions(int ReadBufferBytes = 4096, int Maxim
     internal void Validate(JsonlStreamOwnership ownership)
     {
         if (ReadBufferBytes is < 1 or > 65_536 || MaximumFrameBytes is < 1 or > int.MaxValue - 1 ||
-            MaximumJsonDepth is < 1 or > 64 || MaximumPendingWrites <= 0 || !Enum.IsDefined(ownership))
+            MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || MaximumPendingWrites <= 0 || !Enum.IsDefined(ownership))
             throw new ArgumentOutOfRangeException(nameof(JsonlTransportOptions), "Invalid JSONL transport limits or ownership.");
     }
 }
@@ -59,7 +59,14 @@ internal static class JsonlRecordCodec
         if (options.JavaScriptInput)
         {
             var text = ReplacingUtf8.GetString(bytes);
-            CheckDepth(text, options.MaximumJsonDepth);
+            // JSON.parse has no depth limit; a frame nested deeper than an owned value holds is answered as a parse failure (the stream
+            // goes on) rather than ending the stream.
+            try { CheckDepth(text, options.MaximumJsonDepth); }
+            catch (JsonlTransportException)
+            {
+                throw new JsonlTransportException(final ? JsonlTransportFailure.PartialFinalFrame : JsonlTransportFailure.MalformedJson,
+                    $"JSON nests deeper than {options.MaximumJsonDepth} levels");
+            }
             try
             {
                 var record = PiSharp.AI.StreamingJson.JsonParse(text, out var exact, out var nonFinite);
@@ -81,7 +88,7 @@ internal static class JsonlRecordCodec
         CheckDepth(raw, options.MaximumJsonDepth);
         try
         {
-            using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(raw, PiSharp.Contracts.JsonData.DocumentOptions);
             Validate(document.RootElement, raw, options.KeepsLoneSurrogates);
             return JsonData.FromElement(document.RootElement);
         }
@@ -138,7 +145,7 @@ internal static class JsonlRecordCodec
 
     private static JsonDocument ReparseStrict(string raw)
     {
-        try { return JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 }); }
+        try { return JsonDocument.Parse(raw, PiSharp.Contracts.JsonData.DocumentOptions); }
         catch (JsonException) { throw Failure(JsonlTransportFailure.MalformedJson); }
     }
 

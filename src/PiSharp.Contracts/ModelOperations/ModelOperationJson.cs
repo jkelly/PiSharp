@@ -12,7 +12,7 @@ namespace PiSharp.Contracts.ModelOperations;
 /// ascending order, then the rest in source order; a repeated key keeps its first position and its last value.</summary>
 public static class ModelOperationJson
 {
-    private static readonly JsonWriterOptions Writer = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonWriterOptions Writer = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, MaxDepth = 2 * JsonData.MaximumDepth };
 
     /// <summary>Parses <c>{ state, images?, questions }</c>. Throws <see cref="FormatException"/> for another shape.</summary>
     public static ClassifierContext ParseClassifierContext(JsonElement value)
@@ -333,7 +333,7 @@ public static class ModelOperationJson
     private static readonly Compatibility.EcmaScriptJsonProjectionOptions Projection = new(MaximumInputCharacters: int.MaxValue,
         MaximumInputBytes: int.MaxValue, MaximumOutputCharacters: int.MaxValue, MaximumOutputBytes: int.MaxValue, MaximumNodes: int.MaxValue,
         MaximumPropertiesPerObject: int.MaxValue, MaximumNumbers: int.MaxValue, MaximumTotalNumberCharacters: int.MaxValue,
-        MaximumStringCharacters: int.MaxValue, MaximumDepth: 64);
+        MaximumStringCharacters: int.MaxValue, MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth);
 
     private static JsonData Write(Action<Utf8JsonWriter> write)
     {

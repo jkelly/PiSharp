@@ -146,8 +146,8 @@ public sealed partial class PersistentAgentSession
     private static void WriteCustom(Utf8JsonWriter writer, SessionCustomMessageDraft draft)
     {
         writer.WriteString("customType", draft.CustomType); writer.WritePropertyName("content");
-        writer.WriteRawValue(draft.Content?.ToString() ?? "[]"); writer.WriteBoolean("display", draft.Display);
-        if (draft.Details is not null) { writer.WritePropertyName("details"); writer.WriteRawValue(draft.Details.ToString()); }
+        writer.WriteRawValue(draft.Content?.ToString() ?? "[]", skipInputValidation: true); writer.WriteBoolean("display", draft.Display);
+        if (draft.Details is not null) { writer.WritePropertyName("details"); writer.WriteRawValue(draft.Details.ToString(), skipInputValidation: true); }
     }
     // Called only under the actual session reservation gate; nextTurn is injected after the next USER.
     private ImmutableArray<TranscriptEntry> InjectNextTurnCustomLocked(ImmutableArray<TranscriptEntry> inputs)

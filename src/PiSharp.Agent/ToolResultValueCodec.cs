@@ -120,7 +120,7 @@ public static class ToolResultValueCodec
     private static void WriteAdmittedProperties(Utf8JsonWriter writer, ToolResult result)
     {
         foreach (var (name, _) in result.OwnedProperties)
-        { writer.WritePropertyName(name); writer.WriteRawValue(result.Property(name)!.ToString()); }
+        { writer.WritePropertyName(name); writer.WriteRawValue(result.Property(name)!.ToString(), skipInputValidation: true); }
     }
 
     internal static long AdditionalCharacters(ToolResult result)
@@ -161,7 +161,7 @@ public static class ToolResultValueCodec
             foreach (var block in content)
             {
                 if (block?.Text is null || !Text(block.Text, loneSurrogates)) throw Invalid();
-                writer.WriteRawValue(PiWireJson.WriteContent(block).ToString());
+                writer.WriteRawValue(PiWireJson.WriteContent(block).ToString(), skipInputValidation: true);
             }
             writer.WriteEndArray();
         }
@@ -198,7 +198,7 @@ public static class ToolResultValueCodec
     {
         var result = options ?? new();
         if (result.MaximumCharacters <= 0 || result.MaximumStructuredContentCharacters <= 0 || result.MaximumContentBlocks <= 0 ||
-            result.MaximumJsonDepth is < 1 or > 64 || result.MaximumRawCharacters <= 0 || result.MaximumRawBytes <= 0)
+            result.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || result.MaximumRawCharacters <= 0 || result.MaximumRawBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(options));
         return result;
     }

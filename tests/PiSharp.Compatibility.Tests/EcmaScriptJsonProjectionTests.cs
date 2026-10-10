@@ -180,7 +180,7 @@ internal static class EcmaScriptJsonProjectionTests
         Failure(EcmaScriptJsonProjectionFailure.ResourceLimit, () => EcmaScriptJsonProjection.Project("1e400", new(MaximumOutputCharacters: 3)));
         Failure(EcmaScriptJsonProjectionFailure.ResourceLimit, () => EcmaScriptJsonProjection.Project("\"\\u0000\"", new(MaximumOutputCharacters: 7)));
         Failure(EcmaScriptJsonProjectionFailure.ResourceLimit, () => EcmaScriptJsonProjection.Project("\"ab\"", new(MaximumStringCharacters: 1)));
-        Throws<ArgumentOutOfRangeException>(() => EcmaScriptJsonProjection.Project("{}", new(MaximumDepth: 65)));
+        Throws<ArgumentOutOfRangeException>(() => EcmaScriptJsonProjection.Project("{}", new(MaximumDepth: 1001)));
         Throws<ArgumentOutOfRangeException>(() => EcmaScriptJsonProjection.Project("{}", new(MaximumNumberCharacters: 16_385)));
         using var canceled = new CancellationTokenSource(); canceled.Cancel(); var owned = JsonData.Parse("{\"wide\":9007199254740993}");
         Throws<OperationCanceledException>(() => EcmaScriptJsonProjection.Project(owned, cancellationToken: canceled.Token));

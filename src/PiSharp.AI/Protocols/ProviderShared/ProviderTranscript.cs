@@ -33,7 +33,7 @@ internal static class ProviderTranscript
         var result = new List<JsonObject>(messages.Length);
         foreach (var entry in messages)
         {
-            if (entry?.WireBody is null || JsonNode.Parse(entry.WireBody.ToString()) is not JsonObject body)
+            if (entry?.WireBody is null || JsonNode.Parse(entry.WireBody.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) is not JsonObject body)
                 throw new ProviderTranscriptException("Invalid transcript entry.");
             if (body["role"] is JsonValue role && role.TryGetValue<string>(out var name) && name != entry.Role)
                 throw new ProviderTranscriptException("Transcript role mismatch.");

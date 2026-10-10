@@ -13,7 +13,7 @@ public sealed record ResponsesHttpSseOptions(
     int MaximumDataEvents = int.MaxValue,
     int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
     long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters,
-    int MaximumJsonDepth = 32,
+    int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     SseDecoderOptions? Framing = null);
 
 /// <summary>
@@ -60,7 +60,7 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
         _requestedServiceTier = responsesOptions?.ServiceTier;
         _options = options ?? new();
         if (_options.MaximumDataEvents <= 0 || _options.MaximumDataCharacters <= 0 ||
-            _options.MaximumTotalDataCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumTotalDataCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Responses SSE limits must be positive; JSON depth must be at most 64.");
         var framing = _options.Framing ?? new(RejectInvalidUtf8: true);
         if (!framing.RejectInvalidUtf8)
@@ -226,7 +226,7 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
         try
         {
             // The parser has its own hard cap. Configured admission depth is checked before cloning.
-            using var document = JsonDocument.Parse(data, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(data, PiSharp.Contracts.JsonData.DocumentOptions);
             if (document.RootElement.ValueKind != JsonValueKind.Object) throw Protocol();
             Validate(document.RootElement, 0);
             // The owned value also rejects duplicate decoded property names at every object depth.

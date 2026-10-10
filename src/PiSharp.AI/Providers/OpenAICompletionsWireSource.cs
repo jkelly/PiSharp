@@ -17,7 +17,7 @@ public sealed record OpenAICompletionsTokenRates(decimal Input = 0, decimal Outp
 
 public sealed record OpenAICompletionsWireOptions(int MaximumChunks = 4096, int MaximumChunkCharacters = 65_536,
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
-    int MaximumJsonDepth = 32, bool SupportsFinishReason = true, OpenAICompletionsTokenRates? Rates = null)
+    int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, bool SupportsFinishReason = true, OpenAICompletionsTokenRates? Rates = null)
 {
     /// <summary>Explicit bounded source-view capture; ordinary native progress remains compact.</summary>
     public bool CaptureSourceEmissionSnapshots { get; init; }
@@ -45,7 +45,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         _source = source; _options = options ?? new();
         if (_options.MaximumChunks <= 0 || _options.MaximumChunkCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
             _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Completions stream limits.");
         var rates = _options.Rates ?? new();
         if (rates.Input < 0 || rates.Output < 0 || rates.CacheRead < 0 || rates.CacheWrite < 0 || !PromptLengthPricing.Valid(rates.Tiers))
@@ -635,7 +635,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
 
         private void AppendDetail(JsonElement detail)
         {
-            var next = JsonNode.Parse(detail.GetRawText())!.AsObject();
+            var next = JsonNode.Parse(detail.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
             var type = next["type"]!.GetValue<string>();
             var last = _reasoningDetails.Count > 0 ? _reasoningDetails[^1]!.AsObject() : null;
             if (last is not null && last["type"]!.GetValue<string>() == type && (type is "reasoning.summary" or "reasoning.text"))

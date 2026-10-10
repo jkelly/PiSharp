@@ -3,6 +3,7 @@
 // packages/coding-agent/src/core/tools/write.ts.
 using System.Text;
 using System.Text.Json;
+using PiSharp.Cli.Commands;
 using PiSharp.Cli.Pi;
 
 // JSON values travel through Pi as JavaScript values: JSON.parse keeps an escaped lone surrogate as that UTF-16 code unit and JSON.stringify
@@ -155,6 +156,110 @@ internal static partial class Program
                 var (again, _, againError) = await sandbox.Run(["-p", "--provider", api, "--model", "m", "--session", file, "more"]);
                 Equal(0, again, api + " reopen; " + againError);
             }
+        }),
+        // JSON.parse has no depth limit and V8's JSON.stringify recurses about 1,700 objects deep, so Pi reads, stores and replays values far
+        // deeper than the former 64 levels. PiSharp now holds JsonData.MaximumDepth (1,000) levels: an RPC command, a streamed tool call's
+        // arguments and the session line keep a value 900 levels deep; a command deeper than 1,000 levels is answered as a parse failure and
+        // the stream goes on (formerly 65 levels ended the stream).
+        ("json-fidelity.deep-values-pass-rpc-tool-arguments-and-sessions", async () =>
+        {
+            using var sandbox = new Sandbox("json-fidelity-deep");
+            static string Deep(int levels) => new string('[', levels - 1) + "{\"leaf\":1}" + new string(']', levels - 1);
+            var deep = Deep(900);
+            var partial = "{\"path\":\"deep.txt\",\"content\":\"ok\",\"deep\":" + deep + "}";
+            sandbox.Respond = (_, index) => index == 0 ? AnthropicStream(ToolUseBlock(0, "toolu_d", partial), "tool_use") : AnthropicText("done");
+            var input = new ScriptedInput();
+            input.Send("{\"id\":\"b\",\"type\":\"bogus\",\"x\":" + Deep(990) + "}");
+            input.Send("{\"id\":\"t\",\"type\":\"bogus\",\"x\":" + Deep(1001) + "}");
+            input.Send("{\"id\":\"p\",\"type\":\"prompt\",\"message\":\"go\"}");
+            using var output = new LineOutput(frame => { if (frame["type"]?.GetValue<string>() == "agent_end" || frame["command"]?.GetValue<string>() == "prompt" && frame["success"]?.GetValue<bool>() == false) input.Complete(); });
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            using var registration = deadline.Token.Register(input.Complete);
+            var host = sandbox.Host(stdout, stderr, null, rpcInput: input, rpcOutput: output) with { StdoutIsTty = false };
+            var exit = await PiCommand.RunAsync(["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tools", "write"], host, CancellationToken.None);
+            var frames = Encoding.UTF8.GetString(output.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            Equal(0, exit, "rpc exit; " + stderr);
+            Check(frames.Contains("""{"id":"b","type":"response","command":"bogus","success":false,"error":"Unknown command: bogus"}"""), "990 levels: " + string.Join("\n", frames.Take(3)));
+            Check(frames.Contains("""{"type":"response","command":"parse","success":false,"error":"Failed to parse command: JSON nests deeper than 1000 levels"}"""),
+                "1,001 levels: " + string.Join("\n", frames.Take(3)));
+            Equal(2, sandbox.Requests.Count, "requests; " + string.Join("\n", frames.Where(frame => frame.Length < 2000)));
+            Equal("ok", File.ReadAllText(Path.Combine(sandbox.Cwd, "deep.txt")), "written");
+            Check(sandbox.Requests[1].Body!.Contains("\"input\":{\"path\":\"deep.txt\",\"content\":\"ok\",\"deep\":" + deep + "}", StringComparison.Ordinal), "replayed deep input");
+            var session = File.ReadAllText(sandbox.SessionFiles().Single());
+            Check(session.Contains("\"arguments\":{\"path\":\"deep.txt\",\"content\":\"ok\",\"deep\":" + deep + "}", StringComparison.Ordinal), "stored deep arguments");
+            lock (sandbox.Requests) sandbox.Requests.Clear();
+            sandbox.Respond = (_, _) => AnthropicText("again");
+            var (code, again, error) = await sandbox.Run(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tools", "write", "--session", sandbox.SessionFiles().Single(), "more"]);
+            Equal(0, code, "reopen exit; " + error);
+            Equal("again\n", again, "reopened answer");
+            Check(sandbox.Requests.Single().Body!.Contains(deep, StringComparison.Ordinal), "reopened replay keeps the deep input");
+        }),
+        // Every API replays a stored tool call whose arguments nest 900 levels (Pi's converters pass the object to JSON.stringify).
+        ("json-fidelity.each-api-replays-deep-arguments", async () =>
+        {
+            using var sandbox = new Sandbox("json-fidelity-deep-replay");
+            string[] apis = ["openai-completions", "openai-responses", "google-generative-ai", "mistral-conversations", "anthropic-messages"];
+            sandbox.Write(Path.Combine(sandbox.AgentDir, "models.json"), "{\"providers\":{" + string.Join(",", apis.Select(api =>
+                "\"" + Provider(api) + "\":{\"baseUrl\":\"https://replay.test\",\"api\":\"" + api + "\",\"apiKey\":\"k\",\"models\":[{\"id\":\"m\"}]}")) + "}}");
+            sandbox.Respond = (_, _) => new(System.Net.HttpStatusCode.BadRequest) { Content = new StringContent("{\"error\":{\"message\":\"fixture\"}}", Encoding.UTF8, "application/json") };
+            const string usage = "{\"input\":1,\"output\":1,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":2,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}}";
+            var deep = new string('[', 899) + "1" + new string(']', 899);
+            foreach (var api in apis)
+            {
+                var file = sandbox.Write("deep-" + api + ".jsonl", string.Join("\n",
+                    "{\"type\":\"session\",\"version\":3,\"id\":\"seed\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"cwd\":" + JsonSerializer.Serialize(sandbox.Cwd) + "}",
+                    "{\"type\":\"message\",\"id\":\"u1\",\"parentId\":null,\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hi\"}],\"timestamp\":1}}",
+                    "{\"type\":\"message\",\"id\":\"a1\",\"parentId\":\"u1\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"toolCall\",\"id\":\"call_1\",\"name\":\"write\",\"arguments\":{\"path\":\"a.txt\",\"deep\":" + deep + "}}],\"api\":\"" + api + "\",\"provider\":\"" + Provider(api) + "\",\"model\":\"m\",\"usage\":" + usage + ",\"stopReason\":\"toolUse\",\"timestamp\":2}}",
+                    "{\"type\":\"message\",\"id\":\"r1\",\"parentId\":\"a1\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"message\":{\"role\":\"toolResult\",\"toolCallId\":\"call_1\",\"toolName\":\"write\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}],\"isError\":false,\"timestamp\":3}}") + "\n");
+                lock (sandbox.Requests) sandbox.Requests.Clear();
+                var (_, _, stderr) = await sandbox.Run(["-p", "--provider", Provider(api), "--model", "m", "--tools", "write", "--session", file, "more"]);
+                Check(sandbox.Requests.Count >= 1, api + ": no request; " + stderr);
+                Check(sandbox.Requests[0].Body!.Contains(deep, StringComparison.Ordinal), api + ": the request lacks the deep arguments");
+            }
+        }),
+        // Pi bounds no record itself; each is one JavaScript string, so V8's longest string (536,870,888 UTF-16 code units) is what it can
+        // process. The Pi entry now admits that much per session line and file, RPC line, output line, streamed event and tool result
+        // (formerly 64, 64, 32, 32, 16 MiB and 8 MiB); a response keeps a 2 GiB ceiling; the explicit verbs keep their bounds.
+        ("json-fidelity.pi-entry-bounds-follow-the-javascript-string-limit", Sync(() =>
+        {
+            const int js = 536_870_888;
+            Equal(js, PiSharp.AI.PiRequestBudget.JavaScriptStringLength, "V8 string limit");
+            Equal(js, PiSharp.AI.PiRequestBudget.StreamCharacters, "streamed event");
+            Equal(2 * js, PiSharp.AI.PiRequestBudget.StreamTotalCharacters, "response ceiling");
+            var pi = RpcSessionCommand.ReaderOptions(pi: true);
+            Equal(js, pi.MaximumInputBytes, "Pi session file"); Equal(js, pi.MaximumLineBytes, "Pi session line");
+            Equal(js, pi.CodecOptions!.MaximumUtf8Bytes, "Pi session record");
+            var explicitVerb = RpcSessionCommand.ReaderOptions(pi: false);
+            Equal(64 * 1024 * 1024, explicitVerb.MaximumInputBytes, "explicit session file"); Equal(64 * 1024 * 1024, explicitVerb.MaximumLineBytes, "explicit line");
+            var results = RpcSessionCommand.AgentOptions(pi: true).ResultValues;
+            Equal(js, results.MaximumCharacters, "Pi tool result");
+            Equal(8 * 1024 * 1024, RpcSessionCommand.AgentOptions(pi: false).ResultValues.MaximumCharacters, "explicit tool result");
+            Equal(PiSharp.Contracts.JsonData.MaximumDepth, pi.CodecOptions.MaximumJsonDepth, "session record depth");
+        })),
+        // A 66 MiB session record (a custom entry) opens and is returned whole over RPC (formerly over the 64 MiB line and file bounds and
+        // the 32 MiB output line bound), and a 40 MiB RPC line is read (formerly over the 32 MiB input bound).
+        ("json-fidelity.session-and-rpc-records-beyond-the-former-mib-bounds", async () =>
+        {
+            using var sandbox = new Sandbox("json-fidelity-bounds");
+            var big = new string('x', 66 * 1024 * 1024);
+            var file = sandbox.Write("big.jsonl", string.Join("\n",
+                "{\"type\":\"session\",\"version\":3,\"id\":\"big\",\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"cwd\":" + JsonSerializer.Serialize(sandbox.Cwd) + "}",
+                "{\"type\":\"custom\",\"id\":\"c1\",\"parentId\":null,\"timestamp\":\"2026-01-01T00:00:00.000Z\",\"customType\":\"blob\",\"data\":\"" + big + "\"}") + "\n");
+            var input = new ScriptedInput();
+            input.Send("{\"id\":\"b\",\"type\":\"bogus\",\"pad\":\"" + new string('y', 40 * 1024 * 1024) + "\"}");
+            input.Send("{\"id\":\"e\",\"type\":\"get_entries\"}");
+            using var output = new LineOutput(frame => { if (frame["id"]?.GetValue<string>() == "e") input.Complete(); });
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(150));
+            using var registration = deadline.Token.Register(input.Complete);
+            var host = sandbox.Host(stdout, stderr, null, rpcInput: input, rpcOutput: output) with { StdoutIsTty = false };
+            var exit = await PiCommand.RunAsync(["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--session", file], host, CancellationToken.None);
+            var frames = Encoding.UTF8.GetString(output.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            Equal(0, exit, "rpc exit; " + stderr);
+            Check(frames.Contains("""{"id":"b","type":"response","command":"bogus","success":false,"error":"Unknown command: bogus"}"""), "40 MiB command answered");
+            var reply = frames.Single(frame => frame.StartsWith("{\"id\":\"e\",", StringComparison.Ordinal));
+            Check(reply.Length > big.Length && reply.Contains("\"success\":true", StringComparison.Ordinal) && reply.Contains(big, StringComparison.Ordinal), "entries returned whole: " + reply.Length);
         }),
     ];
 

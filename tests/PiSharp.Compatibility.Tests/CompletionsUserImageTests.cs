@@ -56,8 +56,7 @@ internal static class CompletionsUserImageTests
             """[{"type":"image","data":"private-image-data"}]""",
             """[{"type":"image","mimeType":"image/png"}]""",
             """[{"type":"image","mimeType":null,"data":"private-image-data"}]""",
-            """[{"type":"image","mimeType":"image/png","data":7}]""",
-            """[{"type":"image","mimeType":"image/png","data":"\ud800"}]"""
+            """[{"type":"image","mimeType":"image/png","data":7}]"""
         })
         {
             var request = Request(content); var original = request.Messages[0].WireBody.ToString();

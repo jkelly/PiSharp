@@ -59,7 +59,7 @@ internal static class AnthropicMessagesSimpleContextEstimator
             if (message.TryGetProperty("sections", out var sections) && sections.ValueKind != JsonValueKind.Null)
             {
                 // Object.values follows ECMAScript integer-key ordering.
-                using var ordered = JsonDocument.Parse(JsonText(sections, options));
+                using var ordered = JsonDocument.Parse(JsonText(sections, options), PiSharp.Contracts.JsonData.DocumentOptions);
                 foreach (var section in ordered.RootElement.EnumerateObject())
                     if (section.Value.ValueKind != JsonValueKind.Null) parts.Add(section.Value.GetString()!);
             }
@@ -97,6 +97,6 @@ internal static class AnthropicMessagesSimpleContextEstimator
     private static string JsonText(JsonElement value, AnthropicMessagesSimpleOptions options) => EcmaScriptJsonProjection.Project(JsonData.FromElement(value), new(
         MaximumInputCharacters: options.MaximumContextCharacters, MaximumInputBytes: options.MaximumContextCharacters * 4,
         MaximumOutputCharacters: options.MaximumContextCharacters, MaximumOutputBytes: options.MaximumContextCharacters * 4,
-        MaximumDepth: 64, MaximumStringCharacters: options.MaximumContextCharacters));
+        MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumStringCharacters: options.MaximumContextCharacters));
     private static AnthropicMessagesSimpleException Fail(AnthropicMessagesSimpleFailure failure) => new(failure);
 }

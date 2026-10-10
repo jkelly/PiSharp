@@ -54,7 +54,7 @@ public sealed partial class PersistentAgentSession
                 foreach (var property in draft.Fields.Value.EnumerateObject())
                 {
                     if (property.Name is "type" or "id" or "parentId" or "timestamp") throw new ArgumentException("Setup cannot supply record identity.");
-                    writer.WritePropertyName(property.Name); writer.WriteRawValue(property.Value.GetRawText());
+                    writer.WritePropertyName(property.Name); writer.WriteRawValue(property.Value.GetRawText(), skipInputValidation: true);
                 }
             });
             var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, token);

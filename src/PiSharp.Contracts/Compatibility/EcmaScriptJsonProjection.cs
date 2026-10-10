@@ -6,7 +6,7 @@ namespace PiSharp.Contracts.Compatibility;
 
 public sealed record EcmaScriptJsonProjectionOptions(int MaximumInputCharacters = 1_048_576,
     int MaximumInputBytes = 4_194_304, int MaximumOutputCharacters = 1_048_576,
-    int MaximumOutputBytes = 4_194_304, int MaximumDepth = 32, int MaximumNodes = 65_536,
+    int MaximumOutputBytes = 4_194_304, int MaximumDepth = JsonData.MaximumDepth, int MaximumNodes = 65_536,
     int MaximumPropertiesPerObject = 4_096, int MaximumNumbers = 4_096,
     int MaximumNumberCharacters = 4_096, int MaximumTotalNumberCharacters = 65_536,
     int MaximumStringCharacters = 1_048_576);
@@ -38,7 +38,7 @@ public static class EcmaScriptJsonProjection
         ArgumentNullException.ThrowIfNull(json);
         var limits = options ?? new();
         if (limits.MaximumInputCharacters <= 0 || limits.MaximumInputBytes <= 0 || limits.MaximumOutputCharacters <= 0 ||
-            limits.MaximumOutputBytes <= 0 || limits.MaximumDepth is < 1 or > 64 || limits.MaximumNodes <= 0 ||
+            limits.MaximumOutputBytes <= 0 || limits.MaximumDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || limits.MaximumNodes <= 0 ||
             limits.MaximumPropertiesPerObject <= 0 || limits.MaximumNumbers <= 0 || limits.MaximumNumberCharacters <= 0 ||
             limits.MaximumNumberCharacters > 16_384 || limits.MaximumTotalNumberCharacters <= 0 || limits.MaximumStringCharacters <= 0)
             throw new ArgumentOutOfRangeException(nameof(options));

@@ -38,7 +38,7 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
             RetryTimeProvider is null || RetryJitterSample is null || NoRetryStatuses.IsDefault || NoRetryStatuses.Length > 4096 ||
             ReadBufferBytes is < 1 or > 65536 ||
             MaximumFrameCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumPayloadBytes is < 1 or > PiRequestBudget.MaximumBound ||
-            MaximumEvents < 1 || MaximumStreamCharacters is < 1 or > 67108864 ||
+            MaximumEvents < 1 || MaximumStreamCharacters is < 1 or > PiRequestBudget.MaximumBound ||
             MaximumContentSlots < 1 || MaximumContentCharacters is < 1 or > PiRequestBudget.MaximumBound ||
             MaximumHeaders is < 1 or > 4096 || MaximumHeaderCharacters is < 1 or > 65536 ||
             MaximumErrorBytes is < 1 or > 8388608)

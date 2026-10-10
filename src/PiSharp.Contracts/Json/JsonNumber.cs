@@ -43,7 +43,7 @@ public static class JsonNumber
     }
 
     /// <summary>A node holding <see cref="Text"/> of the value (a null node for a non-finite value, as JSON.stringify writes it).</summary>
-    public static JsonNode? Node(double value) => double.IsFinite(value) ? JsonNode.Parse(Text(value)) : null;
+    public static JsonNode? Node(double value) => double.IsFinite(value) ? JsonNode.Parse(Text(value), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) : null;
 
     /// <summary>Writes <see cref="Text"/> of the value.</summary>
     public static void Write(Utf8JsonWriter writer, string name, double value)

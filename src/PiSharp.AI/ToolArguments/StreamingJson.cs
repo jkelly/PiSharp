@@ -12,13 +12,13 @@ namespace PiSharp.AI;
 /// when the repair changed the text, then partial-json's <c>parse</c> of the text and of its repair, then <c>{}</c>. It never throws for
 /// malformed input. The result is any JSON value (an array, string, number, boolean or null passes through as upstream returns it) and is
 /// owned as its <c>JSON.stringify</c> text: duplicate names keep the last value at the first position, array-index names come first in
-/// ascending order, and numbers are binary64 (non-finite ones become null). Two representation limits remain, since a
-/// <see cref="JsonData"/> and System.Text.Json cannot carry them: a lone surrogate becomes U+FFFD (toWellFormed) in the owned value, and
-/// a value nested deeper than 64 levels is a <see cref="JsonException"/>.
+/// ascending order, and numbers are binary64 (non-finite ones become null). A string value keeps every code unit, a lone surrogate as its
+/// escape (see <see cref="JsonUtf16"/>). Two representation limits remain: a lone surrogate of a name becomes U+FFFD (toWellFormed), and a
+/// value nested deeper than <see cref="JsonData.MaximumDepth"/> levels is a <see cref="JsonException"/>.
 /// </summary>
 public static class StreamingJson
 {
-    private const int MaximumDepth = 64;
+    private const int MaximumDepth = JsonData.MaximumDepth;
 
     public static JsonData Parse(string? partialJson)
     {
@@ -29,7 +29,7 @@ public static class StreamingJson
 
     /// <summary>
     /// <c>JSON.parse(text)</c> with the same ownership as <see cref="Parse"/>: any JSON value, duplicate names keep the last value,
-    /// lone surrogates become U+FFFD. A text JSON.parse rejects is a <see cref="JsonException"/> carrying V8's SyntaxError message.
+    /// lone surrogates of string values are kept. A text JSON.parse rejects is a <see cref="JsonException"/> carrying V8's SyntaxError message.
     /// </summary>
     public static JsonData JsonParse(string text) => JsonParse(text, out _, out _);
 

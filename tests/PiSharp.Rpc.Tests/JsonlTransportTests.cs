@@ -69,7 +69,7 @@ internal static class JsonlTransportTests
         Check(await prefix.MoveNextAsync(), "Valid prefix must survive a later invalid frame in the same read.");
         await Fails(JsonlTransportFailure.InvalidUtf8, async () => { await prefix.MoveNextAsync(); });
         foreach (var options in new[] { new JsonlTransportOptions(ReadBufferBytes: 0), new(ReadBufferBytes: 65_537),
-            new(MaximumFrameBytes: 0), new(MaximumFrameBytes: int.MaxValue), new(MaximumJsonDepth: 0), new(MaximumJsonDepth: 65), new(MaximumPendingWrites: 0) })
+            new(MaximumFrameBytes: 0), new(MaximumFrameBytes: int.MaxValue), new(MaximumJsonDepth: 0), new(MaximumJsonDepth: 1001), new(MaximumPendingWrites: 0) })
         {
             Throws<ArgumentOutOfRangeException>(() => new JsonlReader(new MemoryStream(), options));
             Throws<ArgumentOutOfRangeException>(() => new JsonlWriter(new MemoryStream(), options));

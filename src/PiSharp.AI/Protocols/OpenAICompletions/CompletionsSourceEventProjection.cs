@@ -62,14 +62,14 @@ public static class CompletionsSourceEventProjection
         {
             if (tool.Ended) continue;
             var node = content[tool.ContentIndex]!.AsObject();
-            node["arguments"] = JsonNode.Parse(tool.DisplayArguments.ToString());
+            node["arguments"] = JsonNode.Parse(tool.DisplayArguments.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             // Pi's catch removes parsing buffers before its error publication.
             // Retain the real parsed preview, without reconstructing scratch fields on a terminal.
             if (frame is StreamTerminalEvent) continue;
             if (tool.CustomInput is { } custom)
             {
                 node.Remove("partialArgs");
-                node["customInput"] = JsonNode.Parse(custom.ToString());
+                node["customInput"] = JsonNode.Parse(custom.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
                 if (tool.UndefinedPartialArguments) undefined.Add($"/partial/content/{tool.ContentIndex}/partialArgs");
             }
             else
@@ -120,7 +120,7 @@ public static class CompletionsSourceEventProjection
     private static JsonObject SourceMessage(AssistantMessage snapshot, bool responseIdAssigned, JsonData? responseId,
         IReadOnlyList<string>? addedPropertyOrder)
     {
-        var native = JsonNode.Parse(PiWireJson.WriteMessage(snapshot).ToString())!.AsObject();
+        var native = JsonNode.Parse(PiWireJson.WriteMessage(snapshot).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
         native["content"] = new JsonArray(snapshot.Content.Select(block => (JsonNode)SourceContent(block)).ToArray());
         var usage = native["usage"]!.AsObject();
         usage["cost"] = InOrder(usage["cost"]!.AsObject(), ["input", "output", "cacheRead", "cacheWrite", "total"]);
@@ -128,7 +128,7 @@ public static class CompletionsSourceEventProjection
         if (responseIdAssigned)
         {
             if (responseId is null) native.Remove("responseId");
-            else native["responseId"] = JsonNode.Parse(responseId.ToString());
+            else native["responseId"] = JsonNode.Parse(responseId.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
         }
         return InOrder(native, new[] { "role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp" }
             .Concat(addedPropertyOrder ?? []).Concat(["responseId", "responseModel", "rawStopReason", "errorMessage"]));
@@ -136,7 +136,7 @@ public static class CompletionsSourceEventProjection
 
     private static JsonObject SourceContent(AssistantContent content)
     {
-        var native = JsonNode.Parse(PiWireJson.WriteContent(content).ToString())!.AsObject();
+        var native = JsonNode.Parse(PiWireJson.WriteContent(content).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
         return InOrder(native, content switch
         {
             TextContent => ["type", "text"],

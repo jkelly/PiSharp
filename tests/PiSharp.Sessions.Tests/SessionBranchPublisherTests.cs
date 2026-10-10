@@ -193,8 +193,8 @@ internal static class SessionBranchPublisherTests
             await Fails(() => new SessionBranchPublisher(options, rejectedIo).PrepareAsync(plan, files.Destination), SessionBranchPublishFailure.InvalidPlan);
             NoEffects(rejectedIo); Check(!File.Exists(files.Destination), "Budget rejection published a file."); NoTemps(files);
         }
-        _ = new SessionBranchPublisher(new(new(MaximumInputBytes: 67_108_864)));
-        Throws<ArgumentOutOfRangeException>(() => new SessionBranchPublisher(new(new(MaximumInputBytes: 67_108_865))));
+        _ = new SessionBranchPublisher(new(new(MaximumInputBytes: 536_870_888)));
+        Throws<ArgumentOutOfRangeException>(() => new SessionBranchPublisher(new(new(MaximumInputBytes: 536_870_889))));
         Throws<ArgumentOutOfRangeException>(() => new SessionBranchPublisher(new(new(ReadBufferBytes: 0))));
         Throws<ArgumentOutOfRangeException>(() => new SessionBranchPublisher(new(GraphOptions: new(MaximumEntries: 0))));
     }

@@ -11,7 +11,7 @@ public sealed record ResponsesToolDeclarationProjectionOptions(
     bool SupportsStrictMode = false, bool? Strict = false,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
     // openai-responses-shared.ts convertResponsesTools declares every tool: no tool or declaration count bound.
-    int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue, int MaximumJsonDepth = 32,
+    int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: grammar tools become custom tools and replay as custom tool calls.</summary>
@@ -22,7 +22,7 @@ public sealed record ResponsesToolDeclarationProjectionOptions(
 public sealed class ResponsesToolDeclarationProjector
 {
     private readonly ResponsesToolDeclarationProjectionOptions _options;
-    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, MaxDepth = 2 * JsonData.MaximumDepth };
     private static readonly string[] UnsupportedStrictKeys = ["$ref", "$defs", "definitions", "allOf", "oneOf",
         "patternProperties", "dependentSchemas", "dependencies", "unevaluatedProperties", "propertyNames", "contains",
         "prefixItems", "not", "if", "then", "else"];
@@ -31,7 +31,7 @@ public sealed class ResponsesToolDeclarationProjector
     {
         _options = options ?? new();
         if (_options.MaximumMessages <= 0 || _options.MaximumEntryCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
-            _options.MaximumDeclarations <= 0 || _options.MaximumActiveTools <= 0 || _options.MaximumJsonDepth is < 1 or > 64 ||
+            _options.MaximumDeclarations <= 0 || _options.MaximumActiveTools <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             _options.MaximumOutputCharacters < 2 || _options.MaximumOutputBytes < 2)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Responses tool declaration limits.");
     }
@@ -91,7 +91,7 @@ public sealed class ResponsesToolDeclarationProjector
                 characters += raw.Length + separator; bytes += Encoding.UTF8.GetByteCount(raw) + separator;
                 if (characters > _options.MaximumOutputCharacters || bytes > _options.MaximumOutputBytes)
                     throw Failure(ResponsesProjectionFailure.ResourceLimit);
-                using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 });
+                using var document = JsonDocument.Parse(raw, PiSharp.Contracts.JsonData.DocumentOptions);
                 CheckJson(document.RootElement, 1, cancellationToken);
                 output.Add(item);
             }
@@ -147,14 +147,14 @@ public sealed class ResponsesToolDeclarationProjector
             catch (StrictSchemaException) { throw Failure(ResponsesProjectionFailure.UnsupportedContent); }
         }
         var result = new JsonObject { ["type"] = "function", ["name"] = name, ["description"] = description,
-            ["parameters"] = strictParameters ?? JsonNode.Parse(parameters.GetRawText()) };
+            ["parameters"] = strictParameters ?? JsonNode.Parse(parameters.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) };
         if (_options.SupportsStrictMode) result["strict"] = strict is null ? null : JsonValue.Create(strict.Value);
         return result;
     }
 
     private static JsonObject MakeStrict(JsonElement parameters, CancellationToken token)
     {
-        var root = JsonNode.Parse(parameters.GetRawText())!.AsObject();
+        var root = JsonNode.Parse(parameters.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
         MakeNodeStrict(root, token);
         if (!IsType(root, "object")) throw new StrictSchemaException();
         return root;

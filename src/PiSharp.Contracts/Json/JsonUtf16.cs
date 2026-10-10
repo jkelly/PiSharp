@@ -145,12 +145,12 @@ public static class JsonUtf16
     /// <c>JSON.stringify</c> escape. The latter is for writing only.</summary>
     public static JsonNode StringNode(string text) => IsWellFormed(text) ? JsonValue.Create(text) : Raw(Quote(text));
 
-    /// <summary><c>JsonNode.Parse(json)</c>, except that a value whose strings hold a lone surrogate becomes a node that writes the JSON
+    /// <summary><c>JsonNode.Parse(json, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)</c>, except that a value whose strings hold a lone surrogate becomes a node that writes the JSON
     /// text as it is. The latter is for writing only.</summary>
     public static JsonNode? Node(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
-        return HasEscapedSurrogate(json) ? Raw(json) : JsonNode.Parse(json);
+        return HasEscapedSurrogate(json) ? Raw(json) : JsonNode.Parse(json, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
     }
 
     /// <summary><see cref="Node(string)"/> of a value.</summary>
@@ -165,7 +165,7 @@ public static class JsonUtf16
     public static string ToJsonString(JsonNode? node, System.Text.Encodings.Web.JavaScriptEncoder? encoder = null)
     {
         using var buffer = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Encoder = encoder, SkipValidation = true })) Write(writer, node);
+        using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Encoder = encoder, SkipValidation = true, MaxDepth = 2 * JsonData.MaximumDepth })) Write(writer, node);
         return Encoding.UTF8.GetString(buffer.GetBuffer(), 0, checked((int)buffer.Length));
     }
 

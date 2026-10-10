@@ -48,7 +48,7 @@ public sealed record ResponsesTokenRates(decimal Input = 0, decimal Output = 0, 
 public sealed record ResponsesTextToolOptions(
     int MaximumEvents = int.MaxValue, int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue,
-    int MaximumContentCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32,
+    int MaximumContentCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     ResponsesTokenRates? Rates = null, string? ServiceTier = null)
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: selects each custom tool call's grammar input property.</summary>
@@ -74,7 +74,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         if (!ResponsesServiceTier.Supported(_options.ServiceTier))
             throw new ArgumentException("Unsupported Responses service tier.", nameof(options));
         if (_options.MaximumEvents <= 0 || _options.MaximumEventCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
-            _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Responses limits must be positive; JSON depth must be at most 64.");
         if (_rates.Input < 0 || _rates.Output < 0 || _rates.CacheRead < 0 || _rates.CacheWrite < 0 ||
             _rates.Tiers.IsDefault || _rates.Tiers.Any(tier => tier is null || tier.Input < 0 || tier.Output < 0 || tier.CacheRead < 0 || tier.CacheWrite < 0))
@@ -514,7 +514,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var encrypted = OptionalStringOrNull(item, "encrypted_content");
             if (string.IsNullOrEmpty(encrypted) || !_reasoningById.TryGetValue(id, out var slot) || slot.ReasoningItem is null) return;
             if (!string.IsNullOrEmpty(OptionalStringOrNull(slot.ReasoningItem.Value, "encrypted_content"))) return;
-            var merged = JsonNode.Parse(slot.ReasoningItem.ToString())!.AsObject();
+            var merged = JsonNode.Parse(slot.ReasoningItem.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
             merged["encrypted_content"] = encrypted;
             slot.ReasoningItem = JsonData.Parse(merged.ToJsonString());
         }

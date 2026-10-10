@@ -259,7 +259,7 @@ public sealed class SessionLogReader
         try
         {
             var reader = new Utf8JsonReader(bytes, isFinalBlock: false,
-                new JsonReaderState(new JsonReaderOptions { MaxDepth = 64 }));
+                new JsonReaderState(new JsonReaderOptions { MaxDepth = PiSharp.Contracts.JsonData.MaximumDepth }));
             var containers = 0;
             while (reader.Read())
             {

@@ -28,7 +28,7 @@ public static class GoogleRequestProjector
         var tools = new List<JsonObject>(); var conversation = new List<JsonObject>();
         foreach (var message in request.Messages)
         {
-            var body = JsonNode.Parse(message.WireBody.ToString()) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+            var body = JsonNode.Parse(message.WireBody.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
             if (Text(body, "role") != message.Role) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
             if (message.Role != "system") { conversation.Add(body); continue; }
             var text = ContentText(body["content"]); if (text.Length > 0) prompts.Add(text);
@@ -138,7 +138,7 @@ public static class GoogleRequestProjector
     /// </summary>
     internal static JsonObject WireBody(JsonData parameters, bool vertex = false)
     {
-        var root = JsonNode.Parse(parameters.ToString()) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        var root = JsonNode.Parse(parameters.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         var config = root["config"] as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         // tContents: an array of Content objects (a parts array each); no other shape is projected here.
         if (root["contents"] is not JsonArray { Count: > 0 } contents) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

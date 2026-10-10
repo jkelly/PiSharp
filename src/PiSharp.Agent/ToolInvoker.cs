@@ -146,7 +146,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             AllowedNestedTools = options?.AllowedNestedTools?.ToImmutableHashSet(StringComparer.Ordinal) };
         if (_options.MaximumTools <= 0 || _options.MaximumTransforms < 0 || _options.MaximumAssistantContentBlocks <= 0 ||
             _options.MaximumArgumentCharacters <= 0 || _options.MaximumActionCharacters <= 0 ||
-            _options.MaximumResultCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > 64 ||
+            _options.MaximumResultCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             _options.MaximumActionEntries <= 0 || _options.MaximumResultContentBlocks <= 0 ||
             _options.MaximumStructuredContentCharacters <= 0 || _options.MaximumResultRawCharacters <= 0 || _options.MaximumResultRawBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid tool invoker limits.");

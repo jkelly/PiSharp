@@ -197,12 +197,13 @@ internal static class SessionEntryCodecTests
         Equal(raw, new SessionEntryCodec().Serialize(new SessionEntryCodec().Parse(whitespace)));
         var quoted = Entry("custom", Fields("""{"customType":"x","data":"[[[[ { \\\" }"}"""));
         new SessionEntryCodec(new(MaximumJsonDepth: 1)).Parse(quoted);
-        var deepest = Entry("custom", "\"customType\":\"x\",\"data\":" + new string('[', 63) + "0" + new string(']', 63));
-        var maximumDepth = new SessionEntryCodec(new(MaximumJsonDepth: 64));
+        // JsonData.MaximumDepth (1,000) levels: JSON.parse has no limit and V8's JSON.stringify gives up at about 1,700.
+        var deepest = Entry("custom", "\"customType\":\"x\",\"data\":" + new string('[', 999) + "0" + new string(']', 999));
+        var maximumDepth = new SessionEntryCodec(new(MaximumRecordCharacters: 1_048_576, MaximumJsonDepth: 1000));
         RoundTrip(maximumDepth, maximumDepth.Parse(deepest));
-        Fails(SessionEntryCodecFailure.DepthLimit, () => maximumDepth.Parse(Entry("custom", "\"customType\":\"x\",\"data\":" + new string('[', 64) + "0" + new string(']', 64))));
+        Fails(SessionEntryCodecFailure.DepthLimit, () => maximumDepth.Parse(Entry("custom", "\"customType\":\"x\",\"data\":" + new string('[', 1000) + "0" + new string(']', 1000))));
         foreach (var options in new[] { new SessionEntryCodecOptions(0), new SessionEntryCodecOptions(MaximumUtf8Bytes: 0),
-            new SessionEntryCodecOptions(MaximumJsonDepth: 0), new SessionEntryCodecOptions(MaximumJsonDepth: 65) })
+            new SessionEntryCodecOptions(MaximumJsonDepth: 0), new SessionEntryCodecOptions(MaximumJsonDepth: 1001) })
             Throws<ArgumentOutOfRangeException>(() => new SessionEntryCodec(options));
         return Task.CompletedTask;
     }

@@ -37,7 +37,7 @@ public sealed class PiMessagesKeyAuthRequestFactory
             cancellationToken.ThrowIfCancellationRequested();
             if (entry is null || entry.WireBody is null || entry.WireBody.Value.ValueKind != JsonValueKind.Object ||
                 PiMessagesData.String(entry.WireBody.Value, "role") != entry.Role) throw PiMessagesData.Fail(PiMessagesFailure.InvalidRequest);
-            messages.Add(JsonNode.Parse(PiMessagesData.Admit(entry.WireBody, _options).ToString()));
+            messages.Add(JsonNode.Parse(PiMessagesData.Admit(entry.WireBody, _options).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions));
         }
         var values = new JsonObject(); var undefined = ImmutableArray.CreateBuilder<string>();
         void Field(string name, JsonNode? value) { if (value is null) undefined.Add("/options/" + name); else values[name] = value; }
@@ -46,7 +46,7 @@ public sealed class PiMessagesKeyAuthRequestFactory
         Field("reasoning", _options.Reasoning is { } reasoning ? JsonValue.Create(reasoning) : null);
         Field("cacheRetention", ResolveCache() is { } cache ? JsonValue.Create(cache) : null);
         Field("sessionId", (_options.SessionId ?? request.SessionId) is { } session ? JsonValue.Create(session) : null);
-        if (_options.ToolChoice is { } toolChoice) values["toolChoice"] = JsonNode.Parse(PiMessagesData.Admit(toolChoice, _options).ToString());
+        if (_options.ToolChoice is { } toolChoice) values["toolChoice"] = JsonNode.Parse(PiMessagesData.Admit(toolChoice, _options).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
         else undefined.Add("/options/toolChoice");
         var payload = PiMessagesData.Admit(JsonData.Parse(new JsonObject { ["model"] = _model.Id, ["context"] = new JsonObject { ["messages"] = messages }, ["options"] = values }.ToJsonString()), _options);
         if (_options.Hooks.OnPayload is { } callback)

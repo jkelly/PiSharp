@@ -31,8 +31,9 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory) || directory.Length > 4096 ||
             !Enum.IsDefined(mode)) throw new ArgumentException("An absolute explicit session namespace is required.");
         this.options = options ?? new();
-        if (this.options.MaximumFiles is < 1 or > 100_000 || this.options.MaximumFileBytes is < 1 or > 67_108_864 ||
-            this.options.MaximumResidentBytes < this.options.MaximumFileBytes || this.options.MaximumResidentBytes > 268_435_456)
+        // A file is read whole (as session-manager.ts reads it); the Pi entry admits a file as long as a JavaScript string.
+        if (this.options.MaximumFiles is < 1 or > 100_000 || this.options.MaximumFileBytes < 1 ||
+            this.options.MaximumResidentBytes < this.options.MaximumFileBytes)
             throw new ArgumentOutOfRangeException(nameof(options));
         Directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)); Mode = mode;
         files = new(paths); writers = new(paths); writerBuffers = new(paths);

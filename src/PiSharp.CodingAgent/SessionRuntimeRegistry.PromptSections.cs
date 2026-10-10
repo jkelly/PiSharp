@@ -68,10 +68,10 @@ public sealed partial class SessionRuntimeRegistry
             writer.WritePropertyName("sections"); writer.WriteStartObject();
             foreach (var pair in diff) { if (pair.Value is null) writer.WriteNull(pair.Key); else writer.WriteString(pair.Key, (string)pair.Value); }
             writer.WriteEndObject();
-            if (toolDelta?.WireBody.Value.TryGetProperty("timestamp", out var time) == true) { writer.WritePropertyName("timestamp"); writer.WriteRawValue(time.GetRawText()); }
+            if (toolDelta?.WireBody.Value.TryGetProperty("timestamp", out var time) == true) { writer.WritePropertyName("timestamp"); writer.WriteRawValue(time.GetRawText(), skipInputValidation: true); }
             else writer.WriteNumber("timestamp", timestamp);
             foreach (var field in new[] { "toolsAdded", "toolsRemoved" })
-                if (toolDelta?.WireBody.Value.TryGetProperty(field, out var tools) == true) { writer.WritePropertyName(field); writer.WriteRawValue(tools.GetRawText()); }
+                if (toolDelta?.WireBody.Value.TryGetProperty(field, out var tools) == true) { writer.WritePropertyName(field); writer.WriteRawValue(tools.GetRawText(), skipInputValidation: true); }
             writer.WriteEndObject();
         }
         var result = new TranscriptEntry("system", JsonData.Parse(System.Text.Encoding.UTF8.GetString(output.ToArray())));

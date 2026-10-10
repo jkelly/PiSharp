@@ -14,7 +14,7 @@ public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, 
 public sealed record AnthropicFallbackModel(string Provider, string Model, AnthropicTokenRates Rates);
 public sealed record AnthropicMessagesOptions(int MaximumEvents = int.MaxValue, int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
-    int MaximumSignatureCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32, AnthropicTokenRates? Rates = null,
+    int MaximumSignatureCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, AnthropicTokenRates? Rates = null,
     ImmutableArray<AnthropicFallbackModel> AllowedFallbackModels = default, bool OAuthToolNames = false,
     int MaximumToolDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue)
 {
@@ -37,7 +37,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         ArgumentNullException.ThrowIfNull(source); _source = source; _options = options ?? new();
         if (_options.MaximumEvents <= 0 || _options.MaximumEventCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
             _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumSignatureCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64 || _options.MaximumToolDeclarations <= 0 || _options.MaximumActiveTools <= 0 || _options.Clock is null) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
+            _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || _options.MaximumToolDeclarations <= 0 || _options.MaximumActiveTools <= 0 || _options.Clock is null) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
         if (_options.ProviderThinkingLevel is not (null or "low" or "medium" or "high" or "xhigh" or "max"))
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic provider thinking level.");
         ValidateRates(_options.Rates ?? new());
@@ -377,7 +377,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                     if (item.ValueKind == JsonValueKind.Object)
                         foreach (var name in new[] { "type", "path", "reason" })
                             if (item.TryGetProperty(name, out var field) && field.ValueKind != JsonValueKind.Null)
-                                projected[name] = System.Text.Json.Nodes.JsonNode.Parse(field.GetRawText());
+                                projected[name] = System.Text.Json.Nodes.JsonNode.Parse(field.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
                     transformations.Add(projected);
                 }
                 if (failure is null)

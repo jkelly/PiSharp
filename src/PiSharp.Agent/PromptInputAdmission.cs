@@ -116,7 +116,7 @@ public static class PromptInputValue
             writer.WriteStartObject(); writer.WriteString("role", "user"); writer.WriteStartArray("content");
             writer.WriteStartObject(); writer.WriteString("type", "text"); JsonUtf16.WriteString(writer, "text", input.Text); writer.WriteEndObject();
             if (input.Images is { Value.ValueKind: JsonValueKind.Array } images)
-                foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText());
+                foreach (var image in images.Value.EnumerateArray()) writer.WriteRawValue(image.GetRawText(), skipInputValidation: true);
             writer.WriteEndArray(); writer.WriteNumber("timestamp", timestamp); writer.WriteEndObject();
         }
         if (output.Length > limits.MaximumMessageBytes) throw Bound();
@@ -134,7 +134,7 @@ public static class PromptInputValue
     {
         var value = options ?? PromptInputAdmissionOptions.Default;
         if (value.MaximumTextCharacters <= 0 || value.MaximumImages < 0 || value.MaximumImageCharacters <= 0 ||
-            value.MaximumImageBytes <= 0 || value.MaximumJsonDepth is < 1 or > 64 ||
+            value.MaximumImageBytes <= 0 || value.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             value.MaximumMessageCharacters <= 0 || value.MaximumMessageBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid prompt input limits.");
         return value;

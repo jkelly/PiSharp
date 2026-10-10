@@ -76,9 +76,9 @@ public sealed partial class AnthropicMessagesTransport
             // cache split committed with this exact usage, including failure terminals.
             var cacheWrite1h = usage.ExtraProperties is { } properties && properties.TryGet("cacheWrite1h", out var count)
                 ? count!.Value.GetInt64() : 0;
-            var node = JsonNode.Parse(sourceEvent.ToString())!;
+            var node = JsonNode.Parse(sourceEvent.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
             node[messageField]!["usage"]!["cost"] = JsonNode.Parse(
-                OriginalAnthropicUsageCostProjection.Create(_rates, usage, cacheWrite1h).ToString());
+                OriginalAnthropicUsageCostProjection.Create(_rates, usage, cacheWrite1h).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             return JsonData.Parse(node.ToJsonString());
         }
     }

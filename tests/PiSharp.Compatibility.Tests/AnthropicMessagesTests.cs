@@ -168,17 +168,17 @@ static class AnthropicMessagesTests
         Assert(empty is StreamDone, "Empty source scratch failed."); Equal("{}", ((ToolCallContent)empty.Message.Content[0]).Arguments.ToString());
         // Pi abe508 anthropic-messages.ts:803 finalizes with parseStreamingJson (json-parse.ts:104-124: JSON.parse, repairJson,
         // partial-json, then {}), so malformed, duplicate and non-object arguments complete the turn. Expected values are the installed
-        // pi-ai 1.1.0 parseStreamingJson results; a lone surrogate is owned as U+FFFD (StreamingJson's documented representation limit).
+        // pi-ai 1.1.0 parseStreamingJson results; a lone surrogate is kept, as its JSON.stringify escape (see JsonUtf16).
         foreach (var (raw, expected) in new[]
         {
             ("{\"secret\":\"unfinished", "{\"secret\":\"unfinished\"}"), ("{\"n\":1,\"n\":2}", "{\"n\":2}"), ("[]", "[]"), ("null", "null"),
-            ("{\"n\":1,}", "{\"n\":1}"), ("{\"x\":\"\\uD800\"}", "{\"x\":\"\\uFFFD\"}"), ("{\"x\":\"C:\\q\"}", "{\"x\":\"C:\\\\q\"}")
+            ("{\"n\":1,}", "{\"n\":1}"), ("{\"x\":\"\\uD800\"}", "{\"x\":\"\\ud800\"}"), ("{\"x\":\"C:\\q\"}", "{\"x\":\"C:\\\\q\"}")
         })
         {
             var events = await Collect([Start, ToolStart, Delta(99, "input_json_delta", raw), BlockStop(99), End, Stop]);
             var end = Terminal(events); Assert(end is StreamDone, "parseStreamingJson final failed the turn: " + raw);
             Equal(1, events.OfType<ToolCallEnded>().Count());
-            Assert(JsonElement.DeepEquals(JsonData.Parse(expected).Value, ((ToolCallContent)end.Message.Content[0]).Arguments.Value),
+            Assert(JsonUtf16.DeepEquals(JsonData.Parse(expected).Value, ((ToolCallContent)end.Message.Content[0]).Arguments.Value),
                 "Final arguments differ from parseStreamingJson: " + raw);
         }
         var complete = Terminal(await Collect([Start, ToolStart, Delta(99, "input_json_delta", "{\"x\":null,\"u\":\"\\u03C0\\uD83D\\uDE00\"}"), BlockStop(99), End, Stop]));
@@ -201,11 +201,13 @@ static class AnthropicMessagesTests
         var zeros = """{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"cache_creation":{"ephemeral_1h_input_tokens":0},"output_tokens_details":{"thinking_tokens":0}}}""";
         var zero = Terminal(await Collect([Start, zeros, Stop])); Assert(zero is StreamDone, "Explicit usage zero failed.");
         Equal(0L, zero.Message.Usage.TotalTokens); Equal("0", Property(zero.Message.Usage.ExtraProperties, "reasoning")); Equal(0m, zero.Message.Usage.Cost.Total);
-        foreach (var token in new[] { "-1", "1.0", "1e0", "9223372036854775808", "\"1\"" })
+        // anthropic-messages.ts keeps every count as the JavaScript number the stream reports (a fraction or a wide one).
+        foreach (var (token, value) in new[] { ("1.5", 1.5), ("1e0", 1d), ("9223372036854775808", 9223372036854775808d) })
         {
-            var bad = Start.Replace("\"input_tokens\":11", "\"input_tokens\":" + token);
-            Failure(Terminal(await Collect([bad, End, Stop])), AnthropicMessagesFailure.MalformedStream);
+            var counted = Terminal(await Collect([Start.Replace("\"input_tokens\":11", "\"input_tokens\":" + token), End, Stop]));
+            Assert(counted is StreamDone && counted.Message.Usage.Input == value, "Number count " + token + " was not kept.");
         }
+        Failure(Terminal(await Collect([Start.Replace("\"input_tokens\":11", "\"input_tokens\":\"1\""), End, Stop])), AnthropicMessagesFailure.MalformedStream);
         var mismatch = End.Replace("\"thinking_tokens\":3", "\"thinking_tokens\":8");
         Failure(Terminal(await Collect([Start, mismatch, Stop])), AnthropicMessagesFailure.MalformedStream);
         Failure(Terminal(await Collect([Start.Replace("\"ephemeral_1h_input_tokens\":2", "\"ephemeral_1h_input_tokens\":6"), End, Stop])), AnthropicMessagesFailure.MalformedStream);
@@ -257,8 +259,9 @@ static class AnthropicMessagesTests
         foreach (var (options, trace) in cases) Failure(Terminal(await Collect(trace, options)), AnthropicMessagesFailure.ResourceLimit);
         var exact = Terminal(await Collect([Start, End, Stop], new(MaximumEvents: 3, MaximumEventCharacters: Start.Length, MaximumInputCharacters: Start.Length + End.Length + Stop.Length)));
         Assert(exact is StreamDone, "Exact raw DTO bounds rejected.");
-        foreach (var invalid in new[] { "{\"type\":\"ping\",\"opaque\":\"\\uD800\"}", "[]" })
-            Failure(Terminal(await Collect([invalid])), AnthropicMessagesFailure.MalformedStream);
+        // The SDK's JSON.parse keeps a lone surrogate of a string value: such a ping is ignored like any other.
+        Failure(Terminal(await Collect(["{\"type\":\"ping\",\"opaque\":\"\\uD800\"}"])), AnthropicMessagesFailure.UnexpectedEof);
+        Failure(Terminal(await Collect(["[]"])), AnthropicMessagesFailure.MalformedStream);
         // JsonData itself rejects this decoded property name while the source factory
         // constructs its owned DTO. No malformed DTO reaches the mapper's Process boundary.
         Failure(Terminal(await Collect(["{\"type\":\"ping\",\"\\uDC00\":null}"])), AnthropicMessagesFailure.SourceFailed);
@@ -269,7 +272,7 @@ static class AnthropicMessagesTests
             await foreach (var item in new AnthropicMessagesTransport((request, token) => Sequence([source])).StreamAsync(Request())) events.Add(item);
             Failure(Terminal(events), AnthropicMessagesFailure.MalformedStream);
         }
-        foreach (var options in new[] { new AnthropicMessagesOptions(MaximumEvents: 0), new(MaximumJsonDepth: 65), new(Rates: new(-1)) })
+        foreach (var options in new[] { new AnthropicMessagesOptions(MaximumEvents: 0), new(MaximumJsonDepth: 1001), new(Rates: new(-1)) })
             await Throws<ArgumentOutOfRangeException>(() => { _ = new AnthropicMessagesTransport((request, token) => Sequence([]), options); return Task.CompletedTask; });
     }
 

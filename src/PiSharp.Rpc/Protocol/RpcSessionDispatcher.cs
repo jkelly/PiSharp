@@ -1304,7 +1304,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         return RpcCommandCodec.Build(writer =>
         {
             writer.WritePropertyName("entries"); writer.WriteStartArray();
-            for (var index = start; index < snapshot.Log.Entries.Length; index++) writer.WriteRawValue(snapshot.Log.Entries[index].WireBody.ToString());
+            for (var index = start; index < snapshot.Log.Entries.Length; index++) writer.WriteRawValue(snapshot.Log.Entries[index].WireBody.ToString(), skipInputValidation: true);
             writer.WriteEndArray(); writer.WriteString("leafId", snapshot.Context.LeafId);
         }, _options.MaximumOutputBytes);
     }

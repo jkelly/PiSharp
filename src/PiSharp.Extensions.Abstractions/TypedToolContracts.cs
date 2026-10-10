@@ -28,7 +28,7 @@ public sealed record ExtensionTypedToolResult<TDetails>(JsonData Content, TDetai
         if (Content.Value.ValueKind != JsonValueKind.Array)
             throw new JsonException("Typed tool content must be an array.");
         var limits = options ?? new();
-        if (limits.MaximumUtf8Bytes is < 512 or > 16 * 1024 * 1024 || limits.MaximumJsonDepth is < 1 or > 64)
+        if (limits.MaximumUtf8Bytes is < 512 or > 16 * 1024 * 1024 || limits.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options));
         var buffer = new TypedToolJsonBuffer(limits.MaximumUtf8Bytes);
         using (var writer = new Utf8JsonWriter(buffer, new() { MaxDepth = limits.MaximumJsonDepth }))
