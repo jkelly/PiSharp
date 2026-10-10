@@ -201,6 +201,12 @@ internal static class Themes
         try { return LoadTheme(name); } catch { return null; }
     }
 
+    /// <summary>The error <see cref="SetTheme"/> reports for a theme name (its load error), or null when the theme loads.</summary>
+    public static string? LoadError(string name)
+    {
+        try { _ = LoadTheme(name); return null; } catch (Exception error) { return error.Message; }
+    }
+
     public static void SetRegisteredThemes(IEnumerable<Theme> themes)
     {
         lock (Gate)

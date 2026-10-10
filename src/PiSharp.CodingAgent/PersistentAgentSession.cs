@@ -998,7 +998,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 if (_active is null) ThrowUserBashMutationLocked();
                 if (_configuring || _inputSubmission is not null) throw new InvalidOperationException("Session input admission is already processing.");
                 cancellationToken.ThrowIfCancellationRequested();
-                _inputSubmission = reservation;
+                _inputSubmission = reservation; _inputTriggeredRun = null;
                 // Like source prompt(), idle handlers see no streaming behavior.
                 if (_active is null && options?.QueueOnly != true) input = input with { StreamingBehavior = null };
             }
@@ -1175,14 +1175,15 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
 
     private Task<AgentLoopResult> Start(Func<CancellationToken, Task<AgentLoopResult>> start, CancellationToken token,
-        ImmutableArray<TranscriptEntry> inputs = default, bool injectNextTurnCustom = false)
+        ImmutableArray<TranscriptEntry> inputs = default, bool injectNextTurnCustom = false, bool duringInput = false)
     {
         TaskCompletionSource idle;
         lock (_gate)
         {
             ThrowAvailable();
             ThrowUserBashMutationLocked();
-            if (_active is not null || _inputSubmission is not null) throw new InvalidOperationException("Session is already processing.");
+            // A custom message's turn (sendCustomMessage triggerTurn) may start while a prompt's input is admitted (a command's handler).
+            if (_active is not null || _inputSubmission is not null && !duringInput) throw new InvalidOperationException("Session is already processing.");
             token.ThrowIfCancellationRequested();
             if (injectNextTurnCustom) inputs = InjectNextTurnCustomLocked(inputs);
             _operationGeneration = checked(_operationGeneration + 1);
@@ -1368,6 +1369,21 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         Task idle; Task input; Task diagnostics; Task settings; Task[] bash;
         lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; input = _inputSubmission?.Idle.Task ?? Task.CompletedTask; diagnostics = LoadoutDiagnosticIdleLocked(); settings = RetrySettingsIdleLocked(); bash = CaptureUserBashCompletionsLocked(); }
         var settled = Task.WhenAll(new[] { agentIdle, idle, input, diagnostics, settings }.Concat(bash));
+        return cancellationToken.CanBeCanceled ? settled.WaitAsync(cancellationToken) : settled;
+    }
+
+    /// <summary>Source <c>ctx.waitForIdle()</c> (agent-session.ts <c>waitForIdle</c>: no agent run and no compaction): called from the
+    /// admitted input's own callback (an extension command's handler), the command's input does not count, so the handler waits for the
+    /// turn its <c>sendMessage</c> started. Elsewhere it is <see cref="WaitForIdleAsync"/>.</summary>
+    public Task WaitForCommandIdleAsync(CancellationToken cancellationToken = default)
+    {
+        bool own; lock (_gate) own = _inputSubmission is { Releasing: false } current && ReferenceEquals(_inputCallback.Value, current);
+        if (!own) return WaitForIdleAsync(cancellationToken);
+        ThrowRetrySelfWait(); ThrowUserBashSelfWait();
+        var agentIdle = _agent.WaitForIdleAsync();
+        Task idle; Task diagnostics; Task settings; Task[] bash;
+        lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; diagnostics = LoadoutDiagnosticIdleLocked(); settings = RetrySettingsIdleLocked(); bash = CaptureUserBashCompletionsLocked(); }
+        var settled = Task.WhenAll(new[] { agentIdle, idle, diagnostics, settings }.Concat(bash));
         return cancellationToken.CanBeCanceled ? settled.WaitAsync(cancellationToken) : settled;
     }
 

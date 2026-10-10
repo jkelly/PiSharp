@@ -25,8 +25,7 @@ internal static class Program
         if (args.Length > 0 && args[0] == "session")
             return args is ["session", "terminal", ..] ? await RunSessionAsync(args).ConfigureAwait(false)
                 : ShutdownSignals.Process.Exit(await RunSessionAsync(args).ConfigureAwait(false));
-        if (args.Length > 0 && args[0] == "mcp") return await RunMcpAsync(args[1..]).ConfigureAwait(false);
-        // Pi's own command line (plain pisharp, -p, --mode json|rpc, --help, --list-models, ...); the offline demo keeps its form.
+        // Pi's own command line (plain pisharp, -p, --mode json|rpc, --help, --list-models, mcp, ...); the offline demo keeps its form.
         if (args is not ["--offline-demo", ..]) return await RunPiAsync(args).ConfigureAwait(false);
         Stream standardOutput;
         try { standardOutput = StandardOutputStream.Open(); }
@@ -126,25 +125,6 @@ internal static class Program
         var mcpHost = Mcp.McpSessionHost.CreateDefault() with { ObserveManager = manager => binding.Manager = manager, IsProjectTrusted = options.ProjectTrusted };
         return await Interactive.Mode.InteractiveModeHost.RunAsync(terminalArgs, options, mcpHost, binding, output, Console.Error, token).ConfigureAwait(false);
     }
-    private static async Task<int> RunMcpAsync(string[] args)
-    {
-        Stream standardOutput;
-        try { standardOutput = StandardOutputStream.Open(); }
-        catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
-        await using var ownedOutput = standardOutput;
-        await using var output = new Utf8StreamTextWriter(standardOutput);
-        using var cancellation = new CancellationTokenSource();
-        ConsoleCancelEventHandler cancel = (_, observation) => { observation.Cancel = true; cancellation.Cancel(); };
-        Console.CancelKeyPress += cancel;
-        try
-        {
-            var result = await Commands.McpCommand.RunAsync(args, output, Console.Error, Commands.McpCommand.DefaultOptions(), cancellation.Token).ConfigureAwait(false);
-            await output.FlushAsync().ConfigureAwait(false);
-            return result;
-        }
-        finally { Console.CancelKeyPress -= cancel; }
-    }
-
     private static int Fail(string code, string message, int exitCode)
     {
         Console.Error.WriteLine(JsonSerializer.Serialize(new { schemaVersion = 1, status = "failed", code, message }));

@@ -163,7 +163,7 @@ public sealed partial class NativeExtensionContextFacadeHost : IExtensionSession
         return JsonData.Parse(Encoding.UTF8.GetString(stream.ToArray()));
     }
     public Task WaitForIdleAsync(IExtensionCommandContext context, CancellationToken cancellationToken)
-        => Capture(context).Session.WaitForIdleAsync(cancellationToken);
+        => Capture(context).Session.WaitForCommandIdleAsync(cancellationToken);
     public Task CompactAsync(IExtensionCommandContext context, string? customInstructions, CancellationToken cancellationToken)
     {
         var attached = Capture(context);

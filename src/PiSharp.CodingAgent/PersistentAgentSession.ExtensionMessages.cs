@@ -13,6 +13,22 @@ namespace PiSharp.CodingAgent;
 public sealed partial class PersistentAgentSession
 {
     private ImmutableArray<TranscriptEntry> _nextTurnCustomMessages = [];
+    private Task<AgentLoopResult>? _inputTriggeredRun;
+
+    /// <summary>The run an extension's custom message (sendMessage with triggerTurn) started while the current or last admitted input
+    /// was being reduced (an extension command's handler), once: the caller owns its monitoring. Null when none started.</summary>
+    public Task<AgentLoopResult>? TakeInputTriggeredRun()
+    {
+        lock (_gate) { var run = _inputTriggeredRun; _inputTriggeredRun = null; return run; }
+    }
+    /// <summary>The default execution context (no async-local values), captured on a thread started without flowing the caller's.</summary>
+    private static readonly Lazy<ExecutionContext> CleanExecutionContext = new(() =>
+    {
+        ExecutionContext? captured = null;
+        var thread = new Thread(() => captured = ExecutionContext.Capture()) { IsBackground = true };
+        thread.UnsafeStart(); thread.Join();
+        return captured ?? throw new InvalidOperationException("No default execution context.");
+    });
     public bool HasPendingCustomMessages { get { lock (_gate) return !_nextTurnCustomMessages.IsEmpty || _agent.ContextOnlyPendingCount != 0; } }
 
     /// <summary>Actual custom_message delivery. Queued admission is not a durable commit receipt.</summary>
@@ -34,7 +50,7 @@ public sealed partial class PersistentAgentSession
             { writer.WriteStartObject(); writer.WriteString("role", "custom"); WriteCustom(writer, draft); writer.WriteNumber("timestamp", timestamp); writer.WriteEndObject(); }
             message = new("custom", JsonData.Parse(System.Text.Encoding.UTF8.GetString(bytes.ToArray())));
         }
-        TaskCompletionSource? idle = null;
+        TaskCompletionSource? idle = null; var duringInput = false;
         lock (_gate)
         {
             ThrowAvailable(); ThrowInputMutation(); cancellationToken.ThrowIfCancellationRequested();
@@ -60,10 +76,12 @@ public sealed partial class PersistentAgentSession
             if (_inputSubmission is not null)
             {
                 // agent-session.ts sendCustomMessage: while a prompt's input is admitted (input hooks, an extension command's handler)
-                // the session is not streaming, so the message is appended (and emitted) at once, ahead of anything the prompt records.
-                if (triggerTurn == true || !_agent.Snapshot.PendingInputs.IsEmpty) throw new InvalidOperationException("Input admission is already processing.");
+                // the session is not streaming, so the message is appended (and emitted) at once, ahead of anything the prompt records;
+                // a message that triggers a turn starts it at once (_runAgentPrompt), while the handler is still running.
+                if (!_agent.Snapshot.PendingInputs.IsEmpty) throw new InvalidOperationException("Input admission is already processing.");
                 // The admission owns the session reservation; the append only takes the commit gate, as other leaf entries do.
-                idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                if (triggerTurn == true) duringInput = true;
+                else idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
             }
             else if (triggerTurn != true)
             {
@@ -72,11 +90,33 @@ public sealed partial class PersistentAgentSession
             }
         }
         return idle is not null ? AppendCustomMessageCoreAsync(draft, cancellationToken, idle)
-            : TriggerCustomMessageCoreAsync(message, cancellationToken);
+            : TriggerCustomMessageCoreAsync(message, cancellationToken, duringInput);
     }
-    private async Task<SessionCustomMessageReceipt> TriggerCustomMessageCoreAsync(TranscriptEntry message, CancellationToken token)
+    private async Task<SessionCustomMessageReceipt> TriggerCustomMessageCoreAsync(TranscriptEntry message, CancellationToken token, bool duringInput)
     {
-        var original = PromptAsync(message, token);
+        Task<AgentLoopResult> original = null!;
+        Task<AgentLoopResult> StartRun() => Start(current => _agent.PromptAsync([message], current), token, [message], injectNextTurnCustom: true, duringInput: duringInput);
+        if (duringInput)
+        {
+            // The turn is not part of the handler's call (upstream's _runAgentPrompt outlives it): it starts now, in a clean execution
+            // context, so it carries none of the handler's ambient state (its input reservation, its extension callback frame). A host
+            // that answers the prompt once its input is handled takes the run (TakeInputTriggeredRun) when it sees it start.
+            var adopted = new TaskCompletionSource<AgentLoopResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (_gate) _inputTriggeredRun = adopted.Task;
+            try { ExecutionContext.Run(CleanExecutionContext.Value, _ => original = StartRun(), null); }
+            catch (Exception error)
+            {
+                lock (_gate) if (ReferenceEquals(_inputTriggeredRun, adopted.Task)) _inputTriggeredRun = null;
+                adopted.TrySetException(error); _ = adopted.Task.Exception;
+                throw;
+            }
+            _ = original.ContinueWith(static (run, state) =>
+            {
+                var target = (TaskCompletionSource<AgentLoopResult>)state!;
+                if (run.IsCanceled) target.TrySetCanceled(); else if (run.IsFaulted) target.TrySetException(run.Exception!.InnerExceptions); else target.TrySetResult(run.Result);
+            }, adopted, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
+        else original = StartRun();
         try { return new(SessionCustomMessageDisposition.Started, Run: await original.ConfigureAwait(false)); }
         catch (Exception error) when (original.IsFaulted) { throw new AggregateException("Custom prompt original fault.", original.Exception!, error); }
     }
