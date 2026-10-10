@@ -78,12 +78,12 @@ internal sealed class RegisteredExtensionToolHooks : IPreparedToolHooks
                     // Apply this after every callback, so later callbacks still observe Runner's null.
                     var content = present && value.ValueKind != JsonValueKind.Null ? JsonData.FromElement(value) :
                         result.ContentValue;
-                    writer.WritePropertyName(name); writer.WriteRawValue(content.ToString());
+                    writer.WritePropertyName(name); writer.WriteRawValue(content.ToString(), skipInputValidation: true);
                 }
                 else if (name == "isError")
                 { writer.WriteBoolean(name, present && value.ValueKind != JsonValueKind.Null ? value.GetBoolean() : isError); }
                 else if (present)
-                { writer.WritePropertyName(name); writer.WriteRawValue(value.GetRawText()); }
+                { writer.WritePropertyName(name); writer.WriteRawValue(value.GetRawText(), skipInputValidation: true); }
             }
             writer.WriteEndObject();
         }

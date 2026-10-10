@@ -63,13 +63,15 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         MaximumConcurrentDispatches = int.MaxValue, MaximumMetadataCharacters = 64 * 1024 * 1024,
         // runner.ts createContext: every handler reads the whole session, whatever its length.
         MaximumSessionBranchEntries = int.MaxValue, MaximumSessionCharacters = long.MaxValue, MaximumSessionUtf8Bytes = long.MaxValue,
-        MaximumDescriptionCharacters = 1024 * 1024, MaximumJsonCharacters = 64 * 1024 * 1024, MaximumJsonDepth = 64,
+        MaximumDescriptionCharacters = 1024 * 1024, MaximumJsonCharacters = 64 * 1024 * 1024, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
         // Pi extensions may replace built-in tools (registerTool with a built-in name) and register any command name.
         ReservedToolNames = [], ReservedCommandNames = [], AllowAnyCommandName = true,
         // runner.ts resolveRegisteredCommands: a command name registered by several extensions (Node or native) is invoked as name:N.
         SuffixDuplicateCommandNames = true,
         // runner.ts reads the extensions' live handler maps: owners and handlers added after the session bound take part at once.
-        FollowCurrentSnapshot = true
+        FollowCurrentSnapshot = true,
+        // Tool results, session entries and events are JavaScript values: a lone surrogate is kept (written as its escape).
+        KeepsLoneSurrogates = true
     };
 
     private readonly PiExtensionHostOptions _options;
@@ -178,10 +180,10 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
             {
                 var path = item.GetProperty("path").GetString()!;
                 if (item.TryGetProperty("error", out var error)) { _errors.Add(new(path, error.GetString() ?? "Failed to load extension")); continue; }
-                var descriptor = JsonNode.Parse(item.GetProperty("extension").GetRawText())!.AsObject();
+                var descriptor = PiSharp.Contracts.JsonUtf16.MutableNode(item.GetProperty("extension").GetRawText())!.AsObject();
                 _extensions.Add(new(descriptor["index"]!.GetValue<int>(), path, descriptor["resolvedPath"]!.GetValue<string>()) { Descriptor = descriptor });
             }
-            foreach (var flag in result.GetProperty("flagValues").EnumerateObject()) _flagValues[flag.Name] = JsonNode.Parse(flag.Value.GetRawText());
+            foreach (var flag in result.GetProperty("flagValues").EnumerateObject()) _flagValues[flag.Name] = PiSharp.Contracts.JsonUtf16.MutableNode(flag.Value.GetRawText());
         }
     }
 

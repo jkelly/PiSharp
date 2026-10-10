@@ -60,7 +60,7 @@ internal static class Program
         {
             ("tool output head/tail matches248 genuine results with exact metadata", ToolOutputTruncatorTests.FrozenReferenceCorpus),
             ("tool output native budgets and lossless UTF16 policy", ToolOutputTruncatorTests.NativeInputPolicy)
-        }).Concat(ToolInvokerTests.Cases()).Concat(ToolArgumentDataNulTests.Cases()).Concat(FileMutationQueueTests.Cases()).Concat(AgentTests.Cases()).Concat(AbortLifecycleTests.Cases()).Concat(StructuredToolResultTests.Cases()).Concat(ToolProgressTests.Cases())
+        }).Concat(ToolInvokerTests.Cases()).Concat(ToolArgumentDataNulTests.Cases()).Concat(ToolLoneSurrogateTests.Cases()).Concat(FileMutationQueueTests.Cases()).Concat(AgentTests.Cases()).Concat(AbortLifecycleTests.Cases()).Concat(StructuredToolResultTests.Cases()).Concat(ToolProgressTests.Cases())
             .Concat(SourceProgressDifferentialTests.Cases()).Concat(SourceProgressOwnershipTests.Cases())
             .Concat(SourceToolResultValueTests.Cases()).Concat(BoundedToolProgressDeliveryTests.Cases())
             .Concat(CompletionsHttpTurnTests.Cases()).Concat(CompletionsImageProducingToolTests.Cases()).Concat(ToolImageContentValueTests.Cases()).Concat(ToolImageResumeTests.Cases()).Concat(FailedAssistantSettlementTests.Cases())

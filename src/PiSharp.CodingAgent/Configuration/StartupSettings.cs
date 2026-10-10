@@ -97,7 +97,7 @@ public static class StartupSettings
 
     private static JsonObject Parse(string text)
     {
-        using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = 64 });
+        using var document = JsonDocument.Parse(text, PiSharp.Contracts.JsonData.DocumentOptions);
         if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException("Settings require an object.");
         return (JsonObject)Copy(document.RootElement)!;
     }

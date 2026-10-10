@@ -52,7 +52,7 @@ public static class ToolResultValueCodec
         long ordinary = result.Failure?.Message?.Length ?? 0, rawCharacters = 2, rawBytes = 2;
         var first = true;
         if (ordinary > limits.MaximumCharacters || result.Failure is { } failure &&
-            (!Enum.IsDefined(failure.Kind) || !ScalarText(failure.Message) || failure.Message.Contains('\0'))) throw Invalid();
+            (!Enum.IsDefined(failure.Kind) || !Text(failure.Message, limits.KeepsLoneSurrogates) || failure.Message.Contains('\0'))) throw Invalid();
         if (result.OwnedContent is ImmutableArray<TextContent> typed && (typed.IsDefault || typed.Length > limits.MaximumContentBlocks)) throw Invalid();
         if (result.OwnedContent is JsonData ownedContent)
         {
@@ -181,9 +181,10 @@ public static class ToolResultValueCodec
             else throw Invalid();
             foreach (var property in block.EnumerateObject())
             {
-                if (property.Name == "type" || type == "text" && property.Name == "text" ||
-                    type == "image" && property.Name is "data" or "mimeType") continue;
-                result += property.Name.Length + (long)property.Value.GetRawText().Length;
+                var name = JsonUtf16.GetName(property);
+                if (name == "type" || type == "text" && name == "text" || type == "image" && name is "data" or "mimeType") continue;
+                if (!Text(name, loneSurrogates)) throw Invalid();
+                result += name.Length + (long)property.Value.GetRawText().Length;
             }
         }
         return result;
@@ -218,7 +219,10 @@ public static class ToolResultValueCodec
         {
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (var property in value.EnumerateObject())
-                if (!names.Add(property.Name) || !ScalarText(property.Name) || !ValidJson(property.Value, parentDepth + 1, maximumDepth, loneSurrogates)) return false;
+            {
+                var name = JsonUtf16.GetName(property);
+                if (!names.Add(name) || !Text(name, loneSurrogates) || !ValidJson(property.Value, parentDepth + 1, maximumDepth, loneSurrogates)) return false;
+            }
         }
         else foreach (var child in value.EnumerateArray()) if (!ValidJson(child, parentDepth + 1, maximumDepth, loneSurrogates)) return false;
         return true;

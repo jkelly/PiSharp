@@ -552,12 +552,11 @@ public sealed partial class SessionRuntimeRegistry
         {
             if (++depth > _options.MaximumJsonDepth) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
             if (value.ValueKind == JsonValueKind.Object)
-                foreach (var property in value.EnumerateObject())
-                { if (!Unicode(property.Name)) throw Error(SessionRuntimeRegistryFailure.InvalidTranscript); CheckJson(property.Value, depth, token); }
+                foreach (var property in value.EnumerateObject()) CheckJson(property.Value, depth, token);
             else foreach (var child in value.EnumerateArray()) CheckJson(child, depth, token);
         }
-        // A string value may hold a lone surrogate, as a JavaScript string does; each provider drops it from request text as Pi's
-        // sanitizeSurrogates does (or keeps it, escaped, where Pi stringifies the value).
+        // A name or string value may hold a lone surrogate, as a JavaScript string does; each provider drops it from request text as
+        // Pi's sanitizeSurrogates does (or keeps it, escaped, where Pi stringifies the value).
     }
     private static string Declaration(JsonElement value)
     {

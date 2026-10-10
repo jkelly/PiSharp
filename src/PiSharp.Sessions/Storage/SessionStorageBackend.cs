@@ -252,7 +252,7 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
                 var end = bytes.IndexOf((byte)'\n'); var line = end < 0 ? bytes : bytes[..end];
                 if (!IsBlank(line))
                 {
-                    using var record = JsonDocument.Parse(line.ToArray(), new JsonDocumentOptions { MaxDepth = 256 }); var root = record.RootElement;
+                    using var record = JsonDocument.Parse(line.ToArray(), PiSharp.Contracts.JsonData.DocumentOptions); var root = record.RootElement;
                     if (root.TryGetProperty("type", out var type) && type.GetString() == "message" &&
                         root.TryGetProperty("message", out var message) && message.TryGetProperty("role", out var role) &&
                         role.GetString() is "user" or "assistant") return true;

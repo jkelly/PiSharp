@@ -178,14 +178,15 @@ public sealed class PiNodeHost : IAsyncDisposable
     {
         null => null,
         JsonNode node => node.DeepClone(),
-        JsonElement element => JsonNode.Parse(element.GetRawText()),
-        PiSharp.Contracts.JsonData data => JsonNode.Parse(data.ToString()),
+        JsonElement element => PiSharp.Contracts.JsonUtf16.Node(element.GetRawText()),
+        PiSharp.Contracts.JsonData data => PiSharp.Contracts.JsonUtf16.Node(data),
         _ => JsonSerializer.SerializeToNode(value)
     };
 
     private async Task WriteAsync(JsonObject frame)
     {
-        var text = frame.ToJsonString() + "\n";
+        // JSON.stringify on the Node side: a lone surrogate (a session string or name) travels as its escape, at any depth Pi holds.
+        var text = PiSharp.Contracts.JsonUtf16.ToJsonString(frame) + "\n";
         if (Encoding.UTF8.GetByteCount(text) > MaximumFrameBytes) throw new InvalidOperationException("Node extension host frame limit exceeded.");
         await _writeGate.WaitAsync().ConfigureAwait(false);
         try
@@ -244,7 +245,7 @@ public sealed class PiNodeHost : IAsyncDisposable
 
     private void Receive(string line)
     {
-        using var document = JsonDocument.Parse(line, new JsonDocumentOptions { MaxDepth = 256 });
+        using var document = JsonDocument.Parse(line, PiSharp.Contracts.JsonData.DocumentOptions);
         var frame = document.RootElement.Clone();
         var type = frame.GetProperty("type").GetString();
         switch (type)

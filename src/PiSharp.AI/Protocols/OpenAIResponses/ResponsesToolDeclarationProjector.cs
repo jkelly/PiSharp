@@ -234,19 +234,14 @@ public sealed class ResponsesToolDeclarationProjector
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in value.EnumerateObject())
                 {
-                    if (!names.Add(property.Name)) throw Failure(ResponsesProjectionFailure.UnsupportedContent);
-                    CheckString(property.Name); CheckJson(property.Value, depth + 1, token);
+                    // A name may hold a lone surrogate only in tool call arguments (TranscriptSurrogates), which go out escaped.
+                    if (!names.Add(JsonUtf16.GetName(property))) throw Failure(ResponsesProjectionFailure.UnsupportedContent);
+                    CheckJson(property.Value, depth + 1, token);
                 }
             }
             else foreach (var child in value.EnumerateArray()) CheckJson(child, depth + 1, token);
         }
         else if (value.ValueKind == JsonValueKind.String) _ = Text(value); // a lone surrogate only in tool call arguments (TranscriptSurrogates)
-    }
-    private static void CheckString(string value)
-    {
-        for (var index = 0; index < value.Length; index++)
-            if (char.IsSurrogate(value[index]) && (!char.IsHighSurrogate(value[index]) || index + 1 == value.Length || !char.IsLowSurrogate(value[++index])))
-                throw Failure(ResponsesProjectionFailure.UnsupportedUnicode);
     }
     private static ResponsesProjectionException Failure(ResponsesProjectionFailure failure) => new(failure);
     private sealed class StrictSchemaException : Exception { }

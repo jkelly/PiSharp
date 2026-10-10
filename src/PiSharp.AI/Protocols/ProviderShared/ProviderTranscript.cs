@@ -33,7 +33,9 @@ internal static class ProviderTranscript
         var result = new List<JsonObject>(messages.Length);
         foreach (var entry in messages)
         {
-            if (entry?.WireBody is null || JsonNode.Parse(entry.WireBody.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions) is not JsonObject body)
+            // A tool call's arguments may hold lone surrogates (TranscriptSurrogates keeps them): such an entry becomes a tree that holds them.
+            if (entry?.WireBody is not { } wire || (JsonUtf16.HasEscapedSurrogate(wire.ToString()) ? JsonUtf16.MutableNode(wire.Value)
+                : JsonNode.Parse(wire.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)) is not JsonObject body)
                 throw new ProviderTranscriptException("Invalid transcript entry.");
             if (body["role"] is JsonValue role && role.TryGetValue<string>(out var name) && name != entry.Role)
                 throw new ProviderTranscriptException("Transcript role mismatch.");
@@ -290,7 +292,10 @@ internal static class ProviderTranscript
     internal static string EcmaJson(JsonNode? node)
     {
         if (node is null) return "null";
-        try { return EcmaScriptJsonProjection.Project(JsonData.Parse(node.ToJsonString())); }
+        // A lone surrogate (a tool call's arguments) is written as JSON.stringify writes it.
+        var text = JsonUtf16.ToJsonString(node);
+        if (JsonUtf16.HasEscapedSurrogate(text)) return StreamingJson.JsonReformat(text);
+        try { return EcmaScriptJsonProjection.Project(JsonData.Parse(text)); }
         catch (EcmaScriptJsonProjectionException) { return node.ToJsonString(); }
     }
 

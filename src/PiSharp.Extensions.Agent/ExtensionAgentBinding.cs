@@ -163,7 +163,7 @@ public sealed class ExtensionAgentBinding
                 bytes += Encoding.UTF8.GetByteCount(prefix) + (long)Encoding.UTF8.GetByteCount(parameters) + 1 + separator;
                 if (characters > limits.MaximumDeclarationCharacters || bytes > limits.MaximumDeclarationBytes)
                     throw new InvalidOperationException("Extension Agent declaration limit exceeded.");
-                writer.WriteRawValue(prefix + parameters + "}");
+                writer.WriteRawValue(prefix + parameters + "}", skipInputValidation: true);
             }
             writer.WriteEndArray();
         }

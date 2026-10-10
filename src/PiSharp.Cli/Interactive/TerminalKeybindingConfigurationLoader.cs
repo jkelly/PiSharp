@@ -40,7 +40,7 @@ public static class TerminalKeybindingConfigurationLoader
                 {
                     if (content.Length > MaximumConfigurationCharacters) throw new InvalidDataException("Configuration exceeds native character bound.");
                     if (content.StartsWith('\uFEFF')) content = content[1..];
-                    using var document = JsonDocument.Parse(content, new JsonDocumentOptions { MaxDepth = 64 });
+                    using var document = JsonDocument.Parse(content, PiSharp.Contracts.JsonData.DocumentOptions);
                     if (document.RootElement.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
                     {
                         var raw = new Dictionary<string, JsonElement>(StringComparer.Ordinal);

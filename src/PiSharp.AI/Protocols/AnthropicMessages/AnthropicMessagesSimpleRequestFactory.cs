@@ -71,8 +71,8 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model || request.Messages.IsDefault) throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
         var estimate = AnthropicMessagesSimpleContextEstimator.Estimate(request.Messages, _options, cancellationToken);
-        int Clamp(int maximum) => _contextWindow <= 0 ? Math.Max(1, maximum) :
-            (int)Math.Min(maximum, Math.Max(1L, (long)_contextWindow - estimate.Tokens - 4096));
+        // simple-options.ts clampMaxTokensToContext in JavaScript numbers: a fractional estimate leaves a fractional cap.
+        double Clamp(double maximum) => _contextWindow <= 0 ? Math.Max(1, maximum) : Math.Min(maximum, Math.Max(1, _contextWindow - estimate.Tokens - 4096));
         var maximum = Clamp(_options.MaxTokens ?? _modelMaxTokens);
         if (_options.Reasoning is not { } level) return new(estimate, maximum, false, 0, null);
         if (_adaptive)
@@ -82,10 +82,10 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
             return new(estimate, maximum, true, 0, effort);
         }
         var budgetLevel = level is "xhigh" or "max" ? "high" : level;
-        var budget = _options.ThinkingBudgets is { } custom && custom.Value.TryGetProperty(budgetLevel, out var value) ? value.GetInt32() :
+        double budget = _options.ThinkingBudgets is { } custom && custom.Value.TryGetProperty(budgetLevel, out var value) ? JsonNumber.Read(value) :
             budgetLevel switch { "minimal" => 1024, "low" => 2048, "medium" => 8192, _ => 16384 };
         // buildBaseOptions always supplies a context-clamped cap, even for omitted maxTokens.
-        maximum = (int)Math.Min((long)maximum + budget, _modelMaxTokens);
+        maximum = Math.Min(maximum + budget, _modelMaxTokens);
         if (maximum <= budget) budget = Math.Min(budget, Math.Max(0, maximum - 1024));
         maximum = Clamp(maximum);
         budget = Math.Min(budget, Math.Max(0, maximum - 1024));
@@ -118,7 +118,8 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
     private AnthropicMessagesKeyAuthRequestFactory Bind(AnthropicMessagesSimpleResolution resolved) => new(_baseUri, _model,
         _options.ProjectionOptions with
         {
-            MaximumTokens = resolved.MaxTokens, ModelReasoning = _reasoning, ThinkingEnabled = resolved.ThinkingEnabled,
+            // The wire max_tokens is the exact JavaScript number (KeyAuthOptions.MaxTokens); the projection only needs a positive cap.
+            MaximumTokens = (int)Math.Clamp(Math.Ceiling(resolved.MaxTokens), 1, int.MaxValue), ModelReasoning = _reasoning, ThinkingEnabled = resolved.ThinkingEnabled,
             ForceAdaptiveThinking = _adaptive, SupportsThinkingOff = _supportsOff, ThinkingBudgetTokens = resolved.ThinkingBudgetTokens,
             SupportsMidConversationEffort = _midEffort,
             Effort = resolved.Effort, ToolChoice = _options.ToolChoice ?? _options.ProjectionOptions.ToolChoice

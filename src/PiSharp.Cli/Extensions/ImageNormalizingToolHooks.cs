@@ -27,9 +27,9 @@ internal sealed class ImageNormalizingToolHooks(IPreparedToolHooks? inner, Func<
         var normalized = ImageProcessor.NormalizeToolResultImages(content, autoResizeImages(), codec: codec);
         if (ReferenceEquals(normalized, content)) return patch;
         // The normalized content replaces the result's content; structured content that a hook did not replace is retained.
-        var node = patch is null ? new JsonObject() : JsonNode.Parse(patch.Value.GetRawText())!.AsObject();
-        node["content"] = JsonNode.Parse(normalized.Value.GetRawText());
-        if (patch is null && result.StructuredContent is { } structured) node["structuredContent"] = JsonNode.Parse(structured.Value.GetRawText());
+        var node = patch is null ? new JsonObject() : PiSharp.Contracts.JsonUtf16.MutableNode(patch.Value.GetRawText())!.AsObject();
+        node["content"] = PiSharp.Contracts.JsonUtf16.MutableNode(normalized.Value.GetRawText());
+        if (patch is null && result.StructuredContent is { } structured) node["structuredContent"] = PiSharp.Contracts.JsonUtf16.MutableNode(structured.Value.GetRawText());
         return JsonData.Parse(node.ToJsonString());
     }
 }

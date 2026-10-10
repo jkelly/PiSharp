@@ -103,7 +103,7 @@ internal static class PiPayloadBudget
         return options with
         {
             MaximumTools = int.MaxValue, MaximumTransforms = int.MaxValue, MaximumAssistantContentBlocks = int.MaxValue,
-            MaximumResultContentBlocks = int.MaxValue, KeepsLoneSurrogatesInArguments = true, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
+            MaximumResultContentBlocks = int.MaxValue, KeepsLoneSurrogates = true, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
             MaximumResultCharacters = PiToolResultCharacters, MaximumStructuredContentCharacters = PiToolResultCharacters,
             MaximumResultRawCharacters = 2 * PiToolResultCharacters, MaximumResultRawBytes = int.MaxValue
         };
@@ -113,7 +113,7 @@ internal static class PiPayloadBudget
     /// image, concurrency or context-message bound. The reentrant dispatch depth stays a recursion guard.</summary>
     public static PiSharp.Extensions.Runtime.Dispatch.ExtensionEventDispatchOptions PiEventDispatch { get; } = new(
         MaximumTextCharacters: int.MaxValue, MaximumJsonCharacters: int.MaxValue, MaximumJsonBytes: int.MaxValue, MaximumJsonDepth: PiSharp.Contracts.JsonData.MaximumDepth,
-        MaximumImages: int.MaxValue, MaximumConcurrentDispatches: int.MaxValue, MaximumContextMessages: int.MaxValue);
+        MaximumImages: int.MaxValue, MaximumConcurrentDispatches: int.MaxValue, MaximumContextMessages: int.MaxValue) { KeepsLoneSurrogates = true };
 
     /// <summary>An extension or MCP tool binding of the Pi entry: every registered tool (formerly 128), Pi-sized tool results (formerly
     /// 65,536 characters and 128 blocks), every event handler, and declarations bounded only by the request payload.</summary>

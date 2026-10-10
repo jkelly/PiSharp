@@ -199,7 +199,7 @@ public sealed class SessionBranchPlanner
             writer.WritePropertyName(property.Name);
             if (property.Name == "parentId") { if (parent is null) writer.WriteNullValue(); else writer.WriteStringValue(parent); }
             else if (property.Name == "firstKeptEntryId" && firstKept is not null) writer.WriteStringValue(firstKept);
-            else writer.WriteRawValue(property.Value.GetRawText(), skipInputValidation: false);
+            else writer.WriteRawValue(property.Value.GetRawText(), skipInputValidation: true);
         }
     });
     private SessionEntry Encode(Action<Utf8JsonWriter> fields)

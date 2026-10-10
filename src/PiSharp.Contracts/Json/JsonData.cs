@@ -53,8 +53,10 @@ public sealed class JsonData
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in current.EnumerateObject())
                 {
-                    if (!names.Add(property.Name))
-                        throw new JsonException($"Duplicate JSON property: {property.Name}");
+                    // A name may hold a lone surrogate, as a JavaScript property key does (JSON.parse keeps it).
+                    var name = JsonUtf16.GetName(property);
+                    if (!names.Add(name))
+                        throw new JsonException($"Duplicate JSON property: {JsonUtf16.ToWellFormed(name)}");
                     pending.Push((property.Value, depth + 1));
                 }
             }
@@ -87,7 +89,10 @@ public sealed class JsonFields
         var builder = ImmutableDictionary.CreateBuilder<string, JsonData>(StringComparer.Ordinal);
         var order = ImmutableList.CreateBuilder<string>();
         foreach (var property in value.EnumerateObject())
-            if (!known.Contains(property.Name)) { builder.Add(property.Name, JsonData.FromElement(property.Value)); order.Add(property.Name); }
+        {
+            var name = JsonUtf16.GetName(property);
+            if (!known.Contains(name)) { builder.Add(name, JsonData.FromElement(property.Value)); order.Add(name); }
+        }
         return new(builder.ToImmutable(), order.ToImmutable());
     }
 }
