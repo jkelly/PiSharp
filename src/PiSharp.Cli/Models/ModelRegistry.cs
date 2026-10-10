@@ -27,6 +27,9 @@ internal sealed record ModelRegistryOptions
     internal Func<DateTimeOffset>? Now { get; init; }
     /// <summary>The HTTP client the llama.cpp catalog refresh uses (null: a shared client).</summary>
     internal Func<HttpMessageInvoker>? CreateLlamaHttp { get; init; }
+    /// <summary>Whether the built-in llama.cpp extension registers its provider (false: <c>-builtin:llama.cpp</c>, <c>--no-extensions</c>);
+    /// null: it does.</summary>
+    internal Func<bool>? LlamaProvider { get; init; }
 }
 
 /// <summary>Resolved request authentication of one model (getApiKeyAndHeaders).</summary>
@@ -84,7 +87,8 @@ internal sealed class ModelRegistry
         Builtins.GetOrAdd(provider, id => [.. BuiltinModelCatalog.Get(id).Models.Select(RegistryModel.FromCatalog)]);
 
     // The built-in llama.cpp extension registers its provider after the pi-ai built-ins (extensions/index.ts builtInExtensions).
-    private IEnumerable<string> ProviderIds() => BuiltinProviders.All.Select(provider => provider.Id).Append(LlamaProviderId)
+    private bool LlamaLoaded => options.LlamaProvider?.Invoke() != false;
+    private IEnumerable<string> ProviderIds() => BuiltinProviders.All.Select(provider => provider.Id).Concat(LlamaLoaded ? [LlamaProviderId] : [])
         .Concat(config.ProviderIds).Concat(extensionProviders.Keys).Concat(virtualModels.Keys).Distinct(StringComparer.Ordinal);
 
     // model-runtime.ts registerProvider/unregisterProvider: an extension's provider layer over the built-in and models.json layers.
@@ -124,9 +128,10 @@ internal sealed class ModelRegistry
     private void Rebuild()
     {
         var next = new List<Composed>();
+        var llamaLoaded = LlamaLoaded;
         foreach (var id in ProviderIds())
         {
-            IReadOnlyList<RegistryModel> baseModels = id == "radius" && radiusDynamic is { } dynamic ? dynamic : id == LlamaProviderId ? llama.AllModels :
+            IReadOnlyList<RegistryModel> baseModels = id == "radius" && radiusDynamic is { } dynamic ? dynamic : id == LlamaProviderId && llamaLoaded ? llama.AllModels :
                 overlays.TryGetValue(id, out var overlay) ? overlay.Apply(BuiltinModels(id)) : BuiltinModels(id);
             var providerConfig = config.GetProvider(id);
             var extension = extensionProviders.GetValueOrDefault(id);
@@ -179,7 +184,7 @@ internal sealed class ModelRegistry
                 }
                 catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors[id] = error; }
             }
-            if (providers is null || providers.Contains(LlamaProviderId))
+            if ((providers is null || providers.Contains(LlamaProviderId)) && LlamaLoaded)
             {
                 try
                 {
@@ -202,7 +207,7 @@ internal sealed class ModelRegistry
                 catch (Exception error) when (error is not OperationCanceledException) { errors["radius"] = error; }
             }
         }
-        else if (providers is null || providers.Contains(LlamaProviderId))
+        else if ((providers is null || providers.Contains(LlamaProviderId)) && LlamaLoaded)
         {
             try { await RefreshLlamaAsync(null, allowNetwork, null, cancellationToken).ConfigureAwait(false); }
             catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors[LlamaProviderId] = error; }
@@ -230,7 +235,7 @@ internal sealed class ModelRegistry
         Stored(LlamaProviderId) is { } stored ? new(stored.Type, stored.Key, stored.Environment) : null;
 
     /// <summary>Whether llama.cpp is the built-in extension's provider here (models.json and extensions did not configure it).</summary>
-    private bool IsBuiltinLlama(string provider) => provider == LlamaProviderId && config.GetProvider(provider) is null && !extensionProviders.ContainsKey(provider);
+    private bool IsBuiltinLlama(string provider) => provider == LlamaProviderId && LlamaLoaded && config.GetProvider(provider) is null && !extensionProviders.ContainsKey(provider);
 
     /// <summary>provider.ts auth.apiKey.resolve for llama.cpp (the /llama command's <c>getProviderAuth</c>): the server URL and key, or
     /// null when no server URL is configured. An invalid configured URL throws.</summary>

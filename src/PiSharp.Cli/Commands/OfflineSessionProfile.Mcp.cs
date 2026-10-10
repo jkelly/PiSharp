@@ -44,8 +44,16 @@ internal sealed partial class OfflineSessionProfile
     internal Task<AgentSessionAttachment> RefreshRegisteredMcpRuntimeAsync(AgentSessionAttachment expected,
         CancellationToken admissionToken = default)
     {
-        if (!registeredMcpRefreshAdmitted || mcpRuntime is not { } factory)
+        if (!registeredMcpRefreshAdmitted || mcpRuntime is null)
             throw new InvalidOperationException("Registered MCP refresh was not admitted.");
+        return RefreshMcpRuntimeAsync(expected, registeredMcpRefreshIdentity, admissionToken);
+    }
+
+    /// <summary>A new MCP runtime generation for the current session (its servers, codemode and tool_search admitted again), keeping
+    /// the native profile view: a Pi reload whose built-in extensions changed.</summary>
+    private Task<AgentSessionAttachment> RefreshMcpRuntimeAsync(AgentSessionAttachment expected, object identity, CancellationToken admissionToken)
+    {
+        var factory = mcpRuntime ?? throw new InvalidOperationException("The profile has no MCP runtime.");
         var owner = Sessions ?? throw new InvalidOperationException("MCP refresh requires an attached profile.");
         return owner.RunReloadAsync(expected, async (reservation, token) =>
         {
@@ -70,7 +78,7 @@ internal sealed partial class OfflineSessionProfile
             await publication.ConfigureAwait(false);
             var retirement = reservation.CleanupPreviousRuntimeAsync(); await retirement.ConfigureAwait(false);
             return reservation.Candidate;
-        }, admissionToken, registeredMcpRefreshIdentity);
+        }, admissionToken, identity);
     }
     internal void ConfigureMcpRuntime(McpProfileRuntimeAdmission admission)
     {

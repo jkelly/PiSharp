@@ -87,6 +87,9 @@ internal sealed record PiEntryOptions
     internal ImmutableDictionary<string, string?> ExtensionFlagValues { get; init; } = ImmutableDictionary<string, string?>.Empty;
     /// <summary>The extensions the run loaded (TypeScript/JavaScript in the Node host), bound to the session by the RPC host; null without.</summary>
     internal PiSharp.Cli.Extensions.Pi.PiExtensionHost? Extensions { get; init; }
+    /// <summary>The built-in extensions the run loads (settings, <c>-e builtin:&lt;name&gt;</c>, <c>--no-extensions</c>, <c>--no-mcp</c>);
+    /// a reload resolves them again.</summary>
+    internal PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions BuiltinExtensions { get; init; } = PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.AllEnabled();
     /// <summary>Source ExtensionMode of the run: <c>tui</c>, <c>rpc</c>, <c>json</c> or <c>print</c>.</summary>
     internal string ExtensionMode { get; init; } = "print";
     /// <summary>Interactive mode inputs (IMPL-I): directories, resources and the live host link.</summary>

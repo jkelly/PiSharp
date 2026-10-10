@@ -129,8 +129,8 @@ internal static class McpCodemode
     /// <summary>The CLI's model registry as scripts reach it (IMPL-B's facade): resolution by provider and id, headers dropped.</summary>
     internal sealed class ModelRuntime(NativeExtensionModelOperations operations) : ICodemodeModelRuntime
     {
-        public static ModelRuntime CreateDefault() => new(new(NativeExtensionModelOperations.CreateDefaultRegistry(
-            PiSharp.Cli.Commands.LiveSessionRuntime.Default.ReadEnvironment, PiSharp.Cli.Commands.LiveSessionRuntime.Default.AuthPath)));
+        public static ModelRuntime CreateDefault(Func<bool>? llamaProvider = null) => new(new(NativeExtensionModelOperations.CreateDefaultRegistry(
+            PiSharp.Cli.Commands.LiveSessionRuntime.Default.ReadEnvironment, PiSharp.Cli.Commands.LiveSessionRuntime.Default.AuthPath, llamaProvider: llamaProvider)));
         public ImmutableArray<JsonData> GetModelsOfType(ModelType type, string? provider) => operations.GetModelsOfType(type, provider);
         public Task<ImmutableArray<JsonData>> GetAvailableOfTypeAsync(ModelType type, string? provider, CancellationToken cancellationToken) =>
             operations.GetAvailableOfTypeAsync(type, provider, cancellationToken);

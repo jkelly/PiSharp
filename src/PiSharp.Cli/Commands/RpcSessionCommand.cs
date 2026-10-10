@@ -170,7 +170,7 @@ public static class RpcSessionCommand
                 parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false));
             // Production sessions read the global mcp.json once at start (--no-mcp connects nothing); every session gets the built-in codemode.
             var hostAdmission = mcpAdmission is null && mcpHost is not null;
-            if (hostAdmission) mcpAdmission = mcpHost!.CreateAdmission(parsed.Workspace, stderr, settings?.Values, parsed.Tools.NoMcp);
+            if (hostAdmission) mcpAdmission = mcpHost!.CreateAdmission(parsed.Workspace, stderr, settings?.Values, parsed.Tools.NoMcp, pi?.BuiltinExtensions);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
                 parsed.SessionMode == "new-memory" ? SessionStorageMode.InMemory : SessionStorageMode.LazyLocal,
                 pi is null ? new(MaximumFileBytes: PiPayloadBudget.SessionFileBytes, MaximumResidentBytes: PiPayloadBudget.SessionFileBytes)
@@ -243,7 +243,7 @@ public static class RpcSessionCommand
             profile.BindSettingsThinkingReads();
             if (pi?.Skills is { } piSkills) profile.AdoptOriginalPromptSkills(piSkills);
             // /reload and ctx.reload() (agent-session.ts reload): the Pi entry reloads extensions and resources in place.
-            if (pi is not null) { profile.PiReloadResources = pi.ReloadResources; if (pi.Extensions is { } reloading) { var reloader = profile; reloading.Reload = reloader.PiReloadAsync; } }
+            if (pi is not null) { profile.PiReloadResources = pi.ReloadResources; profile.BuiltinExtensions = pi.BuiltinExtensions; if (pi.Extensions is { } reloading) { var reloader = profile; reloading.Reload = reloader.PiReloadAsync; } }
             else await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);

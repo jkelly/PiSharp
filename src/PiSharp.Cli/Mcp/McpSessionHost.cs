@@ -3,7 +3,8 @@
 // ensureDiscoveryActive, reportProblems, describeState), packages/coding-agent/src/extensions/tool-search/index.ts (tool_search
 // registered inactive), packages/coding-agent/src/extensions/mcp/runtime.ts (createDefaultTransport, usesOAuth, auth.provider,
 // expandHome, roots), packages/coding-agent/src/extensions/mcp/config.ts (loadMcpConfig), packages/mcp/src/transports/stdio.ts
-// (inherited environment) and cross-spawn 7 (Windows command resolution and cmd.exe escaping).
+// (inherited environment), packages/coding-agent/src/extensions/index.ts (mcp, codemode and tool-search are built-in extensions) and
+// cross-spawn 7 (Windows command resolution and cmd.exe escaping).
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -111,15 +112,22 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         { IsProjectTrusted = cwd => PiSharp.Cli.Pi.PiEntryOptions.Current?.ProjectTrusted(cwd) ?? resolver(cwd) };
     }
 
-    /// <summary>Reads the global mcp.json and, in a trusted project, the project's (unless <paramref name="noMcp"/>) and returns the
-    /// profile admission. Every session gets the built-in codemode and tool_search tools, inactive unless MCP servers need them or
-    /// the tool selection names them, as the original registers them with every session. Configuration errors and failed servers
-    /// are written to <paramref name="diagnostics"/> once the servers settled.</summary>
-    internal McpProfileRuntimeAdmission? CreateAdmission(string cwd, TextWriter diagnostics, JsonData? settings = null, bool noMcp = false)
+    /// <summary>Reads the global mcp.json and, in a trusted project, the project's (unless <paramref name="noMcp"/> or the built-in
+    /// <c>mcp</c> extension is not loaded) and returns the profile admission. Every session gets the built-in codemode and tool_search
+    /// tools (unless <paramref name="builtins"/> leaves their extension out), inactive unless MCP servers need them or the tool
+    /// selection names them, as the original registers them with every session. Each generation reads <paramref name="builtins"/>
+    /// again (a reload changes them). Configuration errors and failed servers are written to <paramref name="diagnostics"/> once the
+    /// servers settled.</summary>
+    internal McpProfileRuntimeAdmission? CreateAdmission(string cwd, TextWriter diagnostics, JsonData? settings = null, bool noMcp = false,
+        PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions? builtins = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(cwd); ArgumentNullException.ThrowIfNull(diagnostics);
-        // `--no-mcp` leaves the built-in MCP support out: registered servers stay registered, and nothing connects them.
-        Registrations.HostConnects = !noMcp;
+        // extensions/index.ts: MCP support, codemode and tool_search are built-in extensions; one that is not loaded (`--no-mcp`,
+        // `-builtin:<name>`, `--no-extensions`) registers nothing. A reload resolves them again for the next generation.
+        bool Loaded(string name) => builtins?.IsEnabled(name) != false;
+        bool McpOff() => noMcp || !Loaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Mcp);
+        // Without the built-in MCP support registered servers stay registered, and nothing connects them.
+        Registrations.HostConnects = !McpOff();
         var reporter = new Reporter(diagnostics);
         var globalConfig = Path.Combine(AgentDirectory, "mcp.json");
         var projectConfig = Path.Combine(cwd, ".pi", "mcp.json");
@@ -128,8 +136,12 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         var configured = ImmutableArray<McpServerEntry>.Empty;
         string? trustedProject = null;
         bool? configuredAutoEnable = null;
-        if (!noMcp)
+        var configRead = false;
+        // index.ts session_start: the MCP extension reads mcp.json when it loads (at startup, or on the reload that loads it).
+        void ReadConfig()
         {
+            if (configRead) return;
+            configRead = true;
             McpConfigurationDocument? Read(string path)
             {
                 try { return File.Exists(path) ? new(path, File.ReadAllText(path)) : null; }
@@ -147,10 +159,11 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
             if (trusted) trustedProject = projectConfig;
             if (!configured.Any(entry => entry.Config.Enabled)) { reporter.Problems(problems); problems.Clear(); }
         }
+        if (!McpOff()) ReadConfig();
         // index.ts registeredServers: the servers extensions registered, except names mcp.json defines, which take precedence.
         (ImmutableArray<McpServerEntry> Servers, ImmutableArray<string> Overridden) WithRegistered()
         {
-            if (noMcp) return (configured, []);
+            if (McpOff()) return ([], []);
             var registered = new List<McpServerEntry>(); var overriddenNames = new List<string>();
             foreach (var server in Registrations.List())
             {
@@ -161,10 +174,10 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
             return ([.. configured, .. registered], [.. overriddenNames]);
         }
         var environment = InheritedEnvironment();
-        var autoEnableCodemode = configuredAutoEnable ?? true;
         var (codemodeMode, inlineBudget) = PiSharp.Codemode.CodemodeToolDefinition.ReadSettings(settings?.Value);
         var codemodeModels = CodemodeModels ?? (() => RunModelOperations is { } runModels
-            ? new McpCodemode.ModelRuntime(new PiSharp.Cli.Extensions.NativeExtensionModelOperations(runModels)) : McpCodemode.ModelRuntime.CreateDefault());
+            ? new McpCodemode.ModelRuntime(new PiSharp.Cli.Extensions.NativeExtensionModelOperations(runModels))
+            : McpCodemode.ModelRuntime.CreateDefault(() => Loaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Llama)));
         var credentials = new McpOAuthCredentialStore(Credentials ?? McpOAuthFileCredentialBackend.InAgentDirectory(AgentDirectory));
         var serverLog = new McpServerLog(Path.Combine(AgentDirectory, "mcp.log"));
         // One source for every generation: the profile admits a single servers prompt source for its lifetime.
@@ -172,7 +185,12 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         var hostStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         McpProfileRuntimeAdmission admission = async (currentCwd, generation, nativeRegistry, exactPolicy, token) =>
         {
-            var generationProblems = generation == 1 ? new List<string>(problems) : [];
+            var mcpOff = McpOff();
+            Registrations.HostConnects = !mcpOff;
+            if (!mcpOff) ReadConfig();
+            // The problems of the configuration are reported with the first generation that read it.
+            var generationProblems = new List<string>(problems); problems.Clear();
+            var autoEnableCodemode = configuredAutoEnable ?? true;
             // Registrations made while the extensions loaded connect with the configured servers; later ones are applied by the manager.
             var (generationServers, overridden) = WithRegistered();
             var admitted = generationServers.Where(entry => entry.Config.Enabled).ToImmutableArray();
@@ -229,19 +247,21 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 // The original registers codemode (inactive) with every session; the MCP extension activates it for `codemode`
                 // servers unless autoEnableCodemode is false. --tools, --exclude-tools and defaultTools select it like any tool.
                 var codemodeActivated = exposures.Contains(McpExposure.Codemode) && autoEnableCodemode;
+                var codemodeLoaded = Loaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Codemode);
                 bool codemodeReachable;
-                if (!definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode) && selection?.IsAllowed(McpCodemode.Name) != false)
+                if (codemodeLoaded && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode) && selection?.IsAllowed(McpCodemode.Name) != false)
                 {
                     definitions = definitions.Add(McpCodemode.Create(codemodeMode, inlineBudget, codemodeModels, codemodeActivated, WaitForServers));
                     codemodeReachable = codemodeActivated || Named(McpCodemode.Name);
                 }
                 else codemodeReachable = definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode);
-                var codemodeOff = exposures.Contains(McpExposure.Codemode) && !autoEnableCodemode && selection?.IsAllowed(McpCodemode.Name) != false;
+                var codemodeOff = codemodeLoaded && exposures.Contains(McpExposure.Codemode) && !autoEnableCodemode && selection?.IsAllowed(McpCodemode.Name) != false;
                 // tool-search/index.ts registers tool_search inactive with every session; ensureDiscoveryActive activates it for
                 // `deferred` servers. A tool selection that leaves it out leaves their tools unreachable.
                 var toolSearchActivated = exposures.Contains(McpExposure.Deferred);
                 bool toolSearchReachable;
-                if (!definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch) && selection?.IsAllowed(McpToolSearch.Name) != false)
+                if (Loaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.ToolSearch) && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch) &&
+                    selection?.IsAllowed(McpToolSearch.Name) != false)
                 {
                     definitions = definitions.Add(McpToolSearch.Create(toolSearchActivated, cancellation => WaitForServers(_ => true, cancellation)));
                     toolSearchReachable = toolSearchActivated || Named(McpToolSearch.Name);
@@ -307,7 +327,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                             if (gate is not null) await gate(cancellation).ConfigureAwait(false);
                         };
                         // index.ts mcp_servers_change: servers registered or unregistered during the session connect or close right away.
-                        if (!noMcp)
+                        if (!mcpOff)
                         {
                             // Applied outside the registering callback, whose ambient session state must not flow into the connection work.
                             var subscription = Registrations.Subscribe(() => { using (ExecutionContext.SuppressFlow()) _ = Task.Run(() => manager.ApplyRegistrationsAsync(WithRegistered())); });

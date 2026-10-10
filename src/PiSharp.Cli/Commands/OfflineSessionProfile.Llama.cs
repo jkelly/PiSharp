@@ -1,5 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/llama/index.ts (the /llama command outside
-// interactive mode: ctx.ui.notify("/llama is available in interactive mode", "warning")).
+// interactive mode: ctx.ui.notify("/llama is available in interactive mode", "warning")) and packages/coding-agent/src/extensions/index.ts
+// (llama.cpp is a built-in extension: not loaded, it registers no /llama).
 using System.Text.Json;
 using PiSharp.Contracts;
 using PiSharp.Extensions;
@@ -11,11 +12,16 @@ internal sealed partial class OfflineSessionProfile
     /// <summary>The session's extension UI (RPC with extensions: extension_ui_request; print and JSON modes have none).</summary>
     internal IExtensionUiProvider? BuiltinCommandUi { get; set; }
 
+    /// <summary>The Pi entry's built-in extensions (null outside it: all of them).</summary>
+    internal PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions? BuiltinExtensions { get; set; }
+
     /// <summary>Whether <paramref name="text"/> invokes the built-in llama.cpp extension's <c>/llama</c> in a Pi entry (no extension
     /// command of that name was registered; the interactive mode handles <c>/llama</c> itself).</summary>
     private bool IsLlamaCommand(string text)
     {
         if (PiReloadResources is null || !(text == "/llama" || text.StartsWith("/llama ", StringComparison.Ordinal))) return false;
+        // Without the built-in llama.cpp extension (-builtin:llama.cpp, --no-extensions) there is no /llama: the text is a prompt.
+        if (BuiltinExtensions?.IsEnabled(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Llama) == false) return false;
         try
         {
             var catalog = CommandCatalog.Value;

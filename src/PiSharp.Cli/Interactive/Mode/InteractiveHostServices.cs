@@ -78,6 +78,7 @@ internal static class InteractiveHostServices
                 catch (OperationCanceledException) { return new ModelsRefreshResult(true, []); }
             },
             GetModelsJsonError = () => registry?.GetError(),
+            IsBuiltinExtensionLoaded = options.BuiltinExtensions.IsEnabled,
             // extensions/llama/index.ts: getProviderAuth("llama.cpp"), and syncCatalog's setCatalog plus a live refresh of llama.cpp
             // (allowNetwork even with PI_OFFLINE: /llama already contacted the server), then the session's selectable models.
             Llama = new LlamaServices(async token => (await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false)).ResolveLlamaAuth(),

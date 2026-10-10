@@ -55,7 +55,8 @@ internal sealed class PiExtensionModels
     internal static async Task<PiExtensionModels> CreateAsync(PiExtensionHost host, LiveSessionRuntime runtime, CancellationToken token)
     {
         var chat = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
-        var builtin = NativeExtensionModelOperations.CreateDefaultRegistry(runtime.ReadEnvironment, runtime.AuthPath, runtime.CreateAuthHttp, runtime.Time);
+        var builtin = NativeExtensionModelOperations.CreateDefaultRegistry(runtime.ReadEnvironment, runtime.AuthPath, runtime.CreateAuthHttp, runtime.Time,
+            llamaProvider: runtime.LlamaProvider);
         var models = new PiExtensionModels(chat, builtin) { _runtime = runtime, _host = host, _environment = runtime.ReadEnvironment };
         host.Stream = models.StreamAsync;
         models.SyncProviders();
