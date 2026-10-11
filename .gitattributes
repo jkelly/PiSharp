@@ -58,3 +58,5 @@ compatibility/semantic-full-structural-openai.plan.json -text
 src/PiSharp.Codemode/Runtime/*.js text eol=lf
 # Pi v1.1.0 HTML export assets are embedded byte-for-byte (upstream blob SHAs are pinned by tests).
 src/PiSharp.CodingAgent/Export/Assets/** -text
+# Baseline diagnostic patches retain physical line endings and significant blank context lines.
+tools/PerformanceReview/memory-pass-2/restore-previous-pass.patch -text whitespace=-blank-at-eol

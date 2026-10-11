@@ -1,0 +1,278 @@
+{
+  "sampled_allocation_bytes": 551853192,
+  "samples": 4437,
+  "types": [
+    {
+      "type": "System.String",
+      "bytes": 270320976
+    },
+    {
+      "type": "System.Byte[]",
+      "bytes": 129614392
+    },
+    {
+      "type": "System.Char[]",
+      "bytes": 48686200
+    },
+    {
+      "type": "System.Text.Json.JsonDocument",
+      "bytes": 18840720
+    },
+    {
+      "type": "System.ValueTuple\u00602[System.Text.Json.JsonElement,System.Int32][]",
+      "bytes": 16532680
+    },
+    {
+      "type": "System.Text.StringBuilder",
+      "bytes": 10855936
+    },
+    {
+      "type": "CancellationPromise\u00601[System.Threading.Tasks.VoidTaskResult]",
+      "bytes": 10571616
+    },
+    {
+      "type": "\u003C\u003Ec__DisplayClass16_0",
+      "bytes": 6294656
+    },
+    {
+      "type": "PiSharp.AI.Transports.SseEvent",
+      "bytes": 6178560
+    },
+    {
+      "type": "PiSharp.Contracts.JsonData",
+      "bytes": 5008968
+    },
+    {
+      "type": "Envelope",
+      "bytes": 3839024
+    },
+    {
+      "type": "PiSharp.Contracts.TextDelta",
+      "bytes": 3515288
+    },
+    {
+      "type": "System.Collections.Generic.Stack\u00601[System.ValueTuple\u00602[System.Text.Json.JsonElement,System.Int32]]",
+      "bytes": 3402744
+    },
+    {
+      "type": "System.Threading.Tasks.Task",
+      "bytes": 3084496
+    },
+    {
+      "type": "PiSharp.AI.Transports.SseStreamState",
+      "bytes": 2132712
+    }
+  ],
+  "sites": [
+    {
+      "type": "System.Byte[]",
+      "site": "PiSharp.Contracts.JsonUtf16.Write(class System.Text.Json.Utf8JsonWriter,class System.Text.Json.Nodes.JsonNode)",
+      "bytes": 59277576,
+      "samples": 285
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.Contracts.JsonUtf16.GetString(value class System.Text.Json.JsonElement)",
+      "bytes": 43893744,
+      "samples": 382
+    },
+    {
+      "type": "System.Byte[]",
+      "site": "PiSharp.Contracts.JsonData.Parse(class System.String)",
+      "bytes": 42010744,
+      "samples": 352
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsSourceSnapshot..ctor(class PiSharp.Contracts.JsonData,int32,int32)",
+      "bytes": 38912216,
+      "samples": 243
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.Contracts.JsonUtf16.GetName(value class System.Text.Json.JsonProperty)",
+      "bytes": 36935104,
+      "samples": 347
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.Contracts.JsonUtf16.ToJsonString(class System.Text.Json.Nodes.JsonNode,class System.Text.Encodings.Web.JavaScriptEncoder)",
+      "bytes": 34726008,
+      "samples": 240
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.AI.Providers.OpenAICompletionsWireSource\u002BState.Process(class PiSharp.Contracts.JsonData,class System.Collections.Generic.List\u00601\u003Cclass PiSharp.Contracts.StreamEvent\u003E)",
+      "bytes": 23867840,
+      "samples": 224
+    },
+    {
+      "type": "System.Byte[]",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsHttpSseTransport.Parse(class System.String,value class System.Threading.CancellationToken)",
+      "bytes": 21830448,
+      "samples": 205
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.Contracts.Compatibility.EcmaScriptJsonProjection\u002BParser.Value(int32)",
+      "bytes": 19935760,
+      "samples": 157
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.Contracts.Compatibility.EcmaScriptJsonProjection.Project(class System.String,class PiSharp.Contracts.Compatibility.EcmaScriptJsonProjectionOptions,value class System.Threading.CancellationToken)",
+      "bytes": 19293552,
+      "samples": 120
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.AI.AssistantStreamReducer\u002B\u003C\u003Ec.\u003CSnapshot\u003Eb__17_0(class Block)",
+      "bytes": 19203480,
+      "samples": 150
+    },
+    {
+      "type": "System.Char[]",
+      "site": "PiSharp.Contracts.Compatibility.EcmaScriptJsonProjection\u002BParser.String()",
+      "bytes": 16845752,
+      "samples": 154
+    },
+    {
+      "type": "System.ValueTuple\u00602[System.Text.Json.JsonElement,System.Int32][]",
+      "site": "PiSharp.Contracts.JsonData.Validate(value class System.Text.Json.JsonElement)",
+      "bytes": 16532680,
+      "samples": 155
+    },
+    {
+      "type": "System.Char[]",
+      "site": "PiSharp.Contracts.Compatibility.EcmaScriptJsonProjection\u002BOutput.Quote(class System.String)",
+      "bytes": 16075784,
+      "samples": 148
+    },
+    {
+      "type": "CancellationPromise\u00601[System.Threading.Tasks.VoidTaskResult]",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsRun\u002B\u003CProduceAsync\u003Ed__48.MoveNext()",
+      "bytes": 10571616,
+      "samples": 99
+    },
+    {
+      "type": "System.Text.Json.JsonDocument",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsHttpSseTransport.Parse(class System.String,value class System.Threading.CancellationToken)",
+      "bytes": 10549752,
+      "samples": 99
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.AI.Transports.SseDecoder.Dispatch()",
+      "bytes": 9368336,
+      "samples": 88
+    },
+    {
+      "type": "System.Text.Json.JsonDocument",
+      "site": "PiSharp.Contracts.JsonData.Parse(class System.String)",
+      "bytes": 8185872,
+      "samples": 77
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsRun.PublishMessage(class PiSharp.Contracts.StreamEvent)",
+      "bytes": 7727640,
+      "samples": 60
+    },
+    {
+      "type": "System.Char[]",
+      "site": "PiSharp.AI.AssistantStreamReducer.ApplyCore(class PiSharp.Contracts.StreamEvent)",
+      "bytes": 7704456,
+      "samples": 60
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.Contracts.JsonUtf16.DeepEquals(value class System.Text.Json.JsonElement,value class System.Text.Json.JsonElement)",
+      "bytes": 7684728,
+      "samples": 60
+    },
+    {
+      "type": "\u003C\u003Ec__DisplayClass16_0",
+      "site": "PiSharp.AI.AssistantStreamReducer.ApplyCore(class PiSharp.Contracts.StreamEvent)",
+      "bytes": 6294656,
+      "samples": 59
+    },
+    {
+      "type": "PiSharp.AI.Transports.SseEvent",
+      "site": "PiSharp.AI.Transports.SseDecoder.Dispatch()",
+      "bytes": 6178560,
+      "samples": 58
+    },
+    {
+      "type": "System.Byte[]",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsBodyReader\u002B\u003CReadCoreAsync\u003Ed__21.MoveNext()",
+      "bytes": 6175152,
+      "samples": 58
+    },
+    {
+      "type": "System.Char[]",
+      "site": "PiSharp.AI.AssistantStreamReducer.Append(class System.Text.StringBuilder,class System.String)",
+      "bytes": 5864720,
+      "samples": 54
+    },
+    {
+      "type": "System.Text.StringBuilder",
+      "site": "PiSharp.Contracts.Compatibility.EcmaScriptJsonProjection\u002BParser.String()",
+      "bytes": 4559344,
+      "samples": 43
+    },
+    {
+      "type": "System.Text.StringBuilder",
+      "site": "PiSharp.Contracts.Compatibility.EcmaScriptJsonProjection\u002BOutput.Quote(class System.String)",
+      "bytes": 4067064,
+      "samples": 38
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsRun.SourceFrame(class PiSharp.Contracts.StreamEvent,class PiSharp.Contracts.JsonData)",
+      "bytes": 3970880,
+      "samples": 31
+    },
+    {
+      "type": "Envelope",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsRun\u002B\u003CProduceAsync\u003Ed__48.MoveNext()",
+      "bytes": 3839024,
+      "samples": 36
+    },
+    {
+      "type": "PiSharp.Contracts.JsonData",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsHttpSseTransport.Parse(class System.String,value class System.Threading.CancellationToken)",
+      "bytes": 3729352,
+      "samples": 35
+    },
+    {
+      "type": "System.String",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsHttpSseTransport\u002B\u003CStreamAsync\u003Ed__10.MoveNext()",
+      "bytes": 3712696,
+      "samples": 29
+    },
+    {
+      "type": "PiSharp.Contracts.TextDelta",
+      "site": "PiSharp.AI.Providers.OpenAICompletionsWireSource\u002BState.Process(class PiSharp.Contracts.JsonData,class System.Collections.Generic.List\u00601\u003Cclass PiSharp.Contracts.StreamEvent\u003E)",
+      "bytes": 3515288,
+      "samples": 33
+    },
+    {
+      "type": "System.Collections.Generic.Stack\u00601[System.ValueTuple\u00602[System.Text.Json.JsonElement,System.Int32]]",
+      "site": "PiSharp.Contracts.JsonData.Validate(value class System.Text.Json.JsonElement)",
+      "bytes": 3402744,
+      "samples": 32
+    },
+    {
+      "type": "System.Threading.Tasks.Task",
+      "site": "PiSharp.AI.Protocols.OpenAICompletions.CompletionsRun\u002B\u003CProduceAsync\u003Ed__48.MoveNext()",
+      "bytes": 2978152,
+      "samples": 28
+    },
+    {
+      "type": "System.Text.StringBuilder",
+      "site": "PiSharp.AI.AssistantStreamReducer.Append(class System.Text.StringBuilder,class System.String)",
+      "bytes": 2229528,
+      "samples": 21
+    }
+  ]
+}

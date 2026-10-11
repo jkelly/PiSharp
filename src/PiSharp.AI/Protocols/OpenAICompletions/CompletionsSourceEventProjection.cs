@@ -120,7 +120,7 @@ public static class CompletionsSourceEventProjection
     private static JsonObject SourceMessage(AssistantMessage snapshot, bool responseIdAssigned, JsonData? responseId,
         IReadOnlyList<string>? addedPropertyOrder)
     {
-        var native = PiSharp.Contracts.JsonUtf16.MutableNode(PiWireJson.WriteMessage(snapshot).ToString())!.AsObject();
+        var native = PiWireJson.MessageNode(snapshot);
         native["content"] = new JsonArray(snapshot.Content.Select(block => (JsonNode)SourceContent(block)).ToArray());
         var usage = native["usage"]!.AsObject();
         usage["cost"] = InOrder(usage["cost"]!.AsObject(), ["input", "output", "cacheRead", "cacheWrite", "total"]);
@@ -136,7 +136,7 @@ public static class CompletionsSourceEventProjection
 
     private static JsonObject SourceContent(AssistantContent content)
     {
-        var native = PiSharp.Contracts.JsonUtf16.MutableNode(PiWireJson.WriteContent(content).ToString())!.AsObject();
+        var native = PiWireJson.ContentNode(content);
         return InOrder(native, content switch
         {
             TextContent => ["type", "text"],

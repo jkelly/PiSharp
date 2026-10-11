@@ -55,8 +55,9 @@ public sealed class AssistantStreamReducer
     public void Apply(StreamEvent value)
     {
         if (_terminal is not null) throw new StreamProtocolException("An event follows stream settlement.");
-        var size = (long)(value.SourceEmissionSnapshot?.ToString().Length ?? 0) +
-            (value.SourceDrainSnapshot?.ToString().Length ?? 0);
+        var drainSize = (long)(value.SourceDrainSnapshot?.ToString().Length ?? 0);
+        var size = drainSize + (value.DeferredSourceEmissionFits(_limits.MaximumCharacters - _characters - drainSize)
+            ? 0 : value.SourceEmissionSnapshot?.ToString().Length ?? 0);
         if (size > _limits.MaximumCharacters - _characters)
             throw new StreamLimitException("Owned source emission limit exceeded.");
         _currentSourceEmissionCharacters = size;

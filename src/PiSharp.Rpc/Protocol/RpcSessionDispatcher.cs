@@ -888,7 +888,28 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         RunState? published; lock (_gate) published = _run is { SettledPublished: true } run ? run : null;
         if (published is not null) await published.Settled.Task.WaitAsync(token).ConfigureAwait(false);
     }
+    /// <summary>A prompt met a run that has finished and is settling (agent_settled not yet published).</summary>
+    private sealed class SettlingRunException(RunState run) : Exception("Session is settling.") { public RunState Run { get; } = run; }
+
+    /// <summary>agent-session.ts prompt(): a prompt that arrives while the previous run settles is deferred until it has settled
+    /// (_deferredSettledActions), never refused. The settling run is waited for, then the prompt is admitted as usual.</summary>
     private async Task PromptAsync(RpcCommandEnvelope command, CancellationToken token)
+    {
+        while (true)
+        {
+            try { await PromptCoreAsync(command, token).ConfigureAwait(false); return; }
+            catch (SettlingRunException settling) { await settling.Run.Settled.Task.WaitAsync(token).ConfigureAwait(false); }
+        }
+    }
+    private async Task SubmitInputAsync(RpcCommandEnvelope command, CancellationToken token)
+    {
+        while (true)
+        {
+            try { await SubmitInputCoreAsync(command, token).ConfigureAwait(false); return; }
+            catch (SettlingRunException settling) { await settling.Run.Settled.Task.WaitAsync(token).ConfigureAwait(false); }
+        }
+    }
+    private async Task PromptCoreAsync(RpcCommandEnvelope command, CancellationToken token)
     {
         var input = Input(command); RunState? run = null; Task<AgentLoopResult>? processing = null; var queued = false; PersistentAgentSession? originating = null;
         var startedResponse = RpcCommandCodec.Success(command, Disposition("started"), _options);
@@ -901,8 +922,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             var snapshot = _session.Snapshot;
             if (active is not null)
             {
-                if (!snapshot.Agent.IsRunning)
-                    throw new RpcCommandException(command.Id, command.Type, "Session is settling. Wait for agent_settled before prompting again.");
+                if (!snapshot.Agent.IsRunning) throw new SettlingRunException(active);
                 if (command.StreamingBehavior is null)
                     throw new RpcCommandException(command.Id, command.Type,
                         "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.");
@@ -951,7 +971,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             finally { owner._inInputCallback.Value = previous; }
         }
     }
-    private async Task SubmitInputAsync(RpcCommandEnvelope command, CancellationToken token)
+    private async Task SubmitInputCoreAsync(RpcCommandEnvelope command, CancellationToken token)
     {
         var started = RpcCommandCodec.Success(command, Disposition("started"), _options);
         var queued = RpcCommandCodec.Success(command, Disposition("queued"), _options);
@@ -972,8 +992,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 if (command.Type == "prompt")
                 {
                     RunState? active; lock (_gate) active = _run;
-                    if (active is not null && !_session.Snapshot.Agent.IsRunning)
-                        throw new RpcCommandException(command.Id, command.Type, "Session is settling. Wait for agent_settled before prompting again.");
+                    if (active is not null && !_session.Snapshot.Agent.IsRunning) throw new SettlingRunException(active);
                     if (!KnowsModel(_session.Snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
                     lock (_gate) _startingInput = candidate;
                 }

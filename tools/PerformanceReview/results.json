@@ -1,0 +1,302 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "c83a06c00f485f0540305db57b8cbc016c8d1717",
+  "measured_at_utc": "2026-10-11T04:01:24Z",
+  "runtime": "10.0.11",
+  "sdk": "10.0.400",
+  "configuration": "Release; DOTNET_TieredCompilation=0",
+  "operating_system": "Microsoft Windows NT 10.0.26300.0",
+  "methodology": [
+    "Offline synthetic workloads; no provider network latency.",
+    "Streaming: 32 characters per delta; warmup then median of three runs; process-wide cumulative allocations.",
+    "Session: 256-character user messages; compare a fresh full projection with one append to a previously projected prefix; prefix setup is outside every timed interval.",
+    "UI: 1000 updates ending in 32000 text characters plus thinking, one render at width 80; one measured run after warmup; thread-local cumulative allocations.",
+    "Extension: real Node host, stalled consumer; legacy unbounded-queue control versus a 32-frame acknowledgement window.",
+    "Allocated bytes measure allocation churn, not peak live RAM. Wall times vary with machine load.",
+    "SDK 10.0.401 pinned by global.json was unavailable. Absolute project paths were built from an external directory using installed SDK 10.0.400; repository SDK settings were unchanged."
+  ],
+  "streaming_baseline": [
+    {
+      "name": "completions-direct-mapper",
+      "size": 500,
+      "median_ms": 1.055,
+      "allocated_bytes": 1107944
+    },
+    {
+      "name": "completions-canonical-run",
+      "size": 500,
+      "median_ms": 110.1208,
+      "allocated_bytes": 529260496
+    },
+    {
+      "name": "mistral-state",
+      "size": 500,
+      "median_ms": 7.7539,
+      "allocated_bytes": 43209728
+    },
+    {
+      "name": "completions-direct-mapper",
+      "size": 1000,
+      "median_ms": 2.1168,
+      "allocated_bytes": 2208712
+    },
+    {
+      "name": "completions-canonical-run",
+      "size": 1000,
+      "median_ms": 314.3706,
+      "allocated_bytes": 1920371968
+    },
+    {
+      "name": "mistral-state",
+      "size": 1000,
+      "median_ms": 21.3674,
+      "allocated_bytes": 158317616
+    },
+    {
+      "name": "completions-direct-mapper",
+      "size": 2000,
+      "median_ms": 4.1465,
+      "allocated_bytes": 4409000
+    },
+    {
+      "name": "completions-canonical-run",
+      "size": 2000,
+      "median_ms": 1199.8098,
+      "allocated_bytes": 7275435504
+    },
+    {
+      "name": "mistral-state",
+      "size": 2000,
+      "median_ms": 73.4637,
+      "allocated_bytes": 604832160
+    },
+    {
+      "name": "session-full-projection",
+      "size": 100,
+      "median_ms": 0.1257,
+      "allocated_bytes": 330080
+    },
+    {
+      "name": "session-full-projection",
+      "size": 500,
+      "median_ms": 0.6233,
+      "allocated_bytes": 1633360
+    },
+    {
+      "name": "session-full-projection",
+      "size": 1000,
+      "median_ms": 1.3327,
+      "allocated_bytes": 3268680
+    },
+    {
+      "name": "session-full-projection",
+      "size": 2000,
+      "median_ms": 2.6536,
+      "allocated_bytes": 6550928
+    }
+  ],
+  "streaming_and_projection_candidate": [
+    {
+      "name": "completions-direct-mapper",
+      "size": 500,
+      "median_ms": 0.9839,
+      "allocated_bytes": 1116008
+    },
+    {
+      "name": "completions-canonical-run",
+      "size": 500,
+      "median_ms": 2.364,
+      "allocated_bytes": 6256880
+    },
+    {
+      "name": "mistral-state",
+      "size": 500,
+      "median_ms": 0.5968,
+      "allocated_bytes": 984096
+    },
+    {
+      "name": "completions-direct-mapper",
+      "size": 1000,
+      "median_ms": 1.9521,
+      "allocated_bytes": 2224776
+    },
+    {
+      "name": "completions-canonical-run",
+      "size": 1000,
+      "median_ms": 4.3826,
+      "allocated_bytes": 11646464
+    },
+    {
+      "name": "mistral-state",
+      "size": 1000,
+      "median_ms": 1.1923,
+      "allocated_bytes": 1964096
+    },
+    {
+      "name": "completions-direct-mapper",
+      "size": 2000,
+      "median_ms": 3.9737,
+      "allocated_bytes": 4441064
+    },
+    {
+      "name": "completions-canonical-run",
+      "size": 2000,
+      "median_ms": 8.8393,
+      "allocated_bytes": 22439552
+    },
+    {
+      "name": "mistral-state",
+      "size": 2000,
+      "median_ms": 2.5202,
+      "allocated_bytes": 3924096
+    },
+    {
+      "name": "session-full-projection",
+      "size": 100,
+      "median_ms": 0.1279,
+      "allocated_bytes": 330216
+    },
+    {
+      "name": "session-append-projection",
+      "size": 100,
+      "median_ms": 0.0115,
+      "allocated_bytes": 8192
+    },
+    {
+      "name": "session-full-projection",
+      "size": 500,
+      "median_ms": 0.5962,
+      "allocated_bytes": 1633496
+    },
+    {
+      "name": "session-append-projection",
+      "size": 500,
+      "median_ms": 0.0136,
+      "allocated_bytes": 21248
+    },
+    {
+      "name": "session-full-projection",
+      "size": 1000,
+      "median_ms": 1.2504,
+      "allocated_bytes": 3268816
+    },
+    {
+      "name": "session-append-projection",
+      "size": 1000,
+      "median_ms": 0.0088,
+      "allocated_bytes": 37184
+    },
+    {
+      "name": "session-full-projection",
+      "size": 2000,
+      "median_ms": 2.6942,
+      "allocated_bytes": 6551064
+    },
+    {
+      "name": "session-append-projection",
+      "size": 2000,
+      "median_ms": 0.0137,
+      "allocated_bytes": 69320
+    }
+  ],
+  "ui": {
+    "before_allocated_bytes": 1028200560,
+    "after_allocated_bytes": 2401344,
+    "before_ms": 39.2949,
+    "after_ms": 2.2902,
+    "same_rendered_output": true,
+    "component_coalescing_control": {
+      "benchmark": "ui-1000-updates-one-render",
+      "before_bytes": 3432312,
+      "after_bytes": 2401344,
+      "before_ms": 4.3251,
+      "after_ms": 2.2902
+    }
+  },
+  "extension": {
+    "benchmark": "extension-slow-consumer",
+    "events": 1000,
+    "before_queued_frames": 1000,
+    "maximum_queued_frames": 32,
+    "lost_frames": 0
+  },
+  "validation": {
+    "mistral": {
+      "passed": 59,
+      "failed": 0
+    },
+    "sessions": {
+      "passed": 100,
+      "failed": 0
+    },
+    "interactive_components_and_e2e": {
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    "node_bridge": {
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    "extension_provider_e2e": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "inline_lexer_baseline_comparisons": {
+      "identical": 1010,
+      "different": 0
+    },
+    "transport_baseline": {
+      "passed": 216,
+      "failed": 24
+    },
+    "transport_candidate": {
+      "passed": 218,
+      "failed": 24
+    },
+    "unchanged_transport_failures": [
+      "native-provider.responses-send-cancellation",
+      "native-thinking.per-request-provider-wire-selection",
+      "native-thinking.metadata-free-off-clears-frozen-controls",
+      "responses-http.invalid-data-termination-and-status-cannot-succeed",
+      "responses-http.admission-limits-and-options",
+      "responses-http.early-disposal-awaits-cleanup",
+      "responses-http.factory-send-source-faults-and-fresh-requests",
+      "responses-key.payload-headers-fresh-ownership-and-model-identity",
+      "responses-key.max-output-source-floor-and-explicit-capability",
+      "responses-key.byte-depth-identity-key-boundaries-and-cancellation",
+      "responses-key.session-codepoint-clamp-finite-temperature-and-budgets",
+      "responses-reasoning.bounds-malformed-and-cancellation-cleanup",
+      "responses-reasoning.preterminal-interruption-retains-done-state",
+      "responses-reasoning.pending-signature-limits-and-cleanup",
+      "responses-tier.request-admission-budget-and-malformed-response",
+      "responses-tier.split-config-rejected-before-send",
+      "responses-incomplete.tool-finality-and-reasoning-backfill",
+      "responses-incomplete.malformed-and-trailing-data",
+      "anthropic-http.named-events-eof-done-and-strict-admission",
+      "anthropic-http.request-and-stream-budgets-before-effects",
+      "completions-hooks.legacy-constructor-and-options-deconstruct-control",
+      "completions-hooks.owned-payload-replacement-strict-admission-and-inclusive-byte-budget",
+      "completions-http.exact-done-eof-named-errors-and-strict-json-admission",
+      "completions-http.lower-budgets-and-request-admission-before-send"
+    ],
+    "new_transport_failures": [],
+    "builds": "All affected projects built with zero warnings and zero errors."
+  },
+  "behavior_guards": [
+    "Completions source consumers, publication hooks, explicit snapshot capture, tools and near-limit cases retain exact source admission.",
+    "Mistral source snapshots freeze immutable fragment chains; near-limit reducer checks materialize the original snapshot. Arbitrary tool JSON retains eager structural admission.",
+    "Session append cache checks the entire prefix by entry identity and falls back to full validation for navigation, replacement, edits and non-message appends.",
+    "UI coalesces only visual component construction; ordered session events and final updates retain their original processing.",
+    "Extension acknowledgements preserve event order, bound queued progress, permit other Node requests while stalled, and release stalled producers on cancellation."
+  ],
+  "reproduce": [
+    "Build tools/PerformanceReview/PerformanceReview.csproj in Release, then execute its DLL with DOTNET_TieredCompilation=0.",
+    "Run PiSharp.Transport.Tests and PiSharp.MistralConversations.Tests for streaming regression checks.",
+    "Run PiSharp.Sessions.Tests --filter \"session \" for projection checks.",
+    "Run PiSharp.InteractiveParity.Tests with INTERACTIVEPARITY_FILTER=\"streaming-coalesces|extensions.provider-bounded\" for UI and queue measurements.",
+    "Run PiSharp.ExtensionParity.Tests with EXTPARITY_FILTER=\"gap.chat-provider\" for actual extension streaming completion."
+  ]
+}

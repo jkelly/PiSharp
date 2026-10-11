@@ -24,6 +24,7 @@ internal sealed class AssistantMessageComponent : Container
     private JsonObject? lastMessage;
     private bool hasToolCalls;
     private bool isStreaming;
+    private bool contentUpdatePending;
     private readonly Dictionary<int, bool> thinkingVisibilityOverrides = [];
 
     public AssistantMessageComponent(
@@ -74,6 +75,7 @@ internal sealed class AssistantMessageComponent : Container
 
     public override List<string> Render(int width)
     {
+        if (contentUpdatePending && lastMessage is not null) UpdateContent(lastMessage);
         var lines = base.Render(width);
         if (hasToolCalls || lines.Count == 0) return lines;
 
@@ -84,6 +86,7 @@ internal sealed class AssistantMessageComponent : Container
 
     public void UpdateContent(JsonObject message, bool? isStreaming = null)
     {
+        contentUpdatePending = false;
         lastMessage = message;
         this.isStreaming = isStreaming ?? this.isStreaming;
 
@@ -175,6 +178,15 @@ internal sealed class AssistantMessageComponent : Container
                 contentContainer.AddChild(new Text(theme.Fg("error", $"Error: {errorMsg}"), outputPad, 0));
             }
         }
+    }
+
+    /// <summary>Retain only the latest visual update until the TUI's scheduled render.
+    /// Ordered session events and authoritative final messages are still processed immediately.</summary>
+    internal void QueueStreamingContent(JsonObject message)
+    {
+        lastMessage = message;
+        isStreaming = true;
+        contentUpdatePending = true;
     }
 
     private static bool IsVisible(JsonObject? c) =>

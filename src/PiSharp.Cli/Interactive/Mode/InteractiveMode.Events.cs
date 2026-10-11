@@ -196,7 +196,7 @@ internal sealed partial class InteractiveMode
             {
                 if (streamingComponent is null || e["message"] is not JsonObject message || S(message["role"]) != "assistant") break;
                 streamingMessage = message;
-                streamingComponent.UpdateContent(streamingMessage, true);
+                streamingComponent.QueueStreamingContent(streamingMessage);
                 if (message["content"] is JsonArray content)
                     foreach (var block in content.OfType<JsonObject>())
                     {

@@ -253,16 +253,32 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
             total += count; Limit(total, options.MaximumTotalCharacters); var incoming = new string(buffer, 0, count);
             if (first) { first = false; if (incoming.StartsWith('\uFEFF')) incoming = incoming[1..]; }
             pending += incoming;
-            while (true) { var match = Boundary.Match(pending); if (!match.Success) break; var raw = pending[..match.Index]; pending = pending[(match.Index + match.Length)..]; var data = ParseFrame(raw); if (data == "[DONE]") yield break; if (data.Length > 0) yield return ParseChunk(data); }
+            // Keep one buffer per read. Slicing the entire remainder after every event
+            // copied each character repeatedly when a read contained many small deltas.
+            var consumed = 0;
+            while (true)
+            {
+                var match = Boundary.Match(pending, consumed); if (!match.Success) break;
+                var raw = pending[consumed..match.Index]; consumed = match.Index + match.Length;
+                var data = ParseFrame(raw); if (data == "[DONE]") yield break;
+                if (data.Length > 0) yield return ParseChunk(data);
+            }
+            if (consumed != 0) pending = pending[consumed..];
             Limit(pending.Length, options.MaximumFrameCharacters);
         }
         var tail = ParseFrame(pending); if (tail.Length > 0 && tail != "[DONE]") yield return ParseChunk(tail);
     }
-    private string ParseFrame(string raw) { Limit(raw.Length, options.MaximumFrameCharacters); return string.Join("\n", Regex.Split(raw, "\\r\\n|\\r|\\n").Where(x => x.StartsWith("data:", StringComparison.Ordinal)).Select(x => x[5..].TrimStart(EcmaWhitespace))).Trim(EcmaWhitespace); }
+    private string ParseFrame(string raw)
+    {
+        Limit(raw.Length, options.MaximumFrameCharacters);
+        if (raw.StartsWith("data:", StringComparison.Ordinal) && raw.AsSpan().IndexOfAny('\r', '\n') < 0)
+            return raw.AsSpan(5).Trim(EcmaWhitespace).ToString();
+        return string.Join("\n", Regex.Split(raw, "\\r\\n|\\r|\\n").Where(x => x.StartsWith("data:", StringComparison.Ordinal)).Select(x => x[5..].TrimStart(EcmaWhitespace))).Trim(EcmaWhitespace);
+    }
     private JsonData ParseChunk(string text) => Admit(() => ParseChunkCore(text));
     private JsonData ParseChunkCore(string text) { using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = options.MaximumJsonDepth }); var value = document.RootElement; if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array) throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral streaming event"); return JsonData.FromElement(value); }
     internal static string ReadTextPart(JsonElement part) { if (part.ValueKind != JsonValueKind.Object || part.GetProperty("type").GetString() != "text" || part.GetProperty("text").ValueKind != JsonValueKind.String || part.EnumerateObject().Any(x => x.Name is not ("type" or "text"))) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral text/media/reasoning chunk."); return part.GetProperty("text").GetString()!; }
-    internal static string Sanitize(string text) { var builder = new StringBuilder(text.Length); for (var i = 0; i < text.Length; i++) { if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) { builder.Append(text[i]); builder.Append(text[++i]); } else if (!char.IsSurrogate(text[i])) builder.Append(text[i]); } return builder.ToString(); }
+    internal static string Sanitize(string text) { if (JsonUtf16.IsWellFormed(text)) return text; var builder = new StringBuilder(text.Length); for (var i = 0; i < text.Length; i++) { if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) { builder.Append(text[i]); builder.Append(text[++i]); } else if (!char.IsSurrogate(text[i])) builder.Append(text[i]); } return builder.ToString(); }
     // Shape classification is scoped to owned admission, never inferred from foreign
     // callback/HTTP/read exception types. Foreign failures keep fixed SourceFailed text.
     internal static T Admit<T>(Func<T> action)

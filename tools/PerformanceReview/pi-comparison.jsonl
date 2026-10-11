@@ -1,0 +1,15 @@
+{"implementation":"@earendil-works/pi-coding-agent","version":"1.1.0","runtime":"v24.19.0","warmups":5,"repetitions":7,"package_root":"C:\\Users\\jksof\\AppData\\Roaming\\npm\\node_modules\\@earendil-works\\pi-coding-agent"}
+{"wire_size":500,"wire_bytes":53600,"sha256":"0082ef58dd14f21b174271d839c73c9d4f03d4b690a236b9774341c99a8b1aca"}
+{"name":"openai-completions-http-stream","size":500,"median_ms":2.7715999999999212,"min_ms":2.5849999999999227,"max_ms":3.123199999999997,"sampled_peak_heap_growth_bytes":3389208}
+{"name":"mistral-conversations-http-stream","size":500,"median_ms":1.3143999999999778,"min_ms":1.0691000000000486,"max_ms":1.4102000000000317,"sampled_peak_heap_growth_bytes":2078184}
+{"wire_size":1000,"wire_bytes":107100,"sha256":"47a9a257b20bf4e349fe5542301bac05ae63d0701fc8535fde728f9208dcd01f"}
+{"name":"openai-completions-http-stream","size":1000,"median_ms":4.543900000000008,"min_ms":4.309700000000021,"max_ms":5.235299999999938,"sampled_peak_heap_growth_bytes":6426280}
+{"name":"mistral-conversations-http-stream","size":1000,"median_ms":2.16700000000003,"min_ms":2.032600000000002,"max_ms":2.5335000000000036,"sampled_peak_heap_growth_bytes":4242880}
+{"wire_size":2000,"wire_bytes":214100,"sha256":"7f4b05449e66a8a8ccb43a08d7f0812b3228e508850a0d1ec27f54c67d10b8ae"}
+{"name":"openai-completions-http-stream","size":2000,"median_ms":7.638999999999896,"min_ms":7.3297000000000025,"max_ms":7.811999999999898,"sampled_peak_heap_growth_bytes":12366256}
+{"name":"mistral-conversations-http-stream","size":2000,"median_ms":3.7578000000000884,"min_ms":3.5558999999998377,"max_ms":3.940499999999929,"sampled_peak_heap_growth_bytes":8619584}
+{"name":"session-projection-existing-index","size":100,"median_ms":0.04580000000009932,"min_ms":0.030799999999999272,"max_ms":0.07920000000012806,"sampled_peak_heap_growth_bytes":60976}
+{"name":"session-projection-existing-index","size":500,"median_ms":0.06480000000010477,"min_ms":0.06310000000007676,"max_ms":0.08210000000008222,"sampled_peak_heap_growth_bytes":198840}
+{"name":"session-projection-existing-index","size":1000,"median_ms":0.12149999999996908,"min_ms":0.11940000000004147,"max_ms":0.12779999999997926,"sampled_peak_heap_growth_bytes":390832}
+{"name":"session-projection-existing-index","size":2000,"median_ms":0.2096999999998843,"min_ms":0.1851000000001477,"max_ms":0.26910000000020773,"sampled_peak_heap_growth_bytes":608584}
+{"name":"ui-1000-updates-one-render","size":1000,"median_ms":3.728700000000117,"min_ms":3.6118999999998778,"max_ms":4.740399999999909,"sampled_peak_heap_growth_bytes":9223800}

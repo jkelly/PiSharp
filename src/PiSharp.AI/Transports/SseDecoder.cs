@@ -158,8 +158,17 @@ public sealed class SseDecoder
     private SseEvent? ProcessLine()
     {
         if (_line.Length == 0) return Dispatch();
-        var line = _line.ToString();
-        _line.Clear();
+        var chunks = _line.GetChunks(); chunks.MoveNext();
+        var line = chunks.Current.Span;
+        if (chunks.MoveNext()) line = _line.ToString().AsSpan();
+        // Consume the borrowed chunk before clearing/reusing its builder. The
+        // finally also releases a rejected line when field admission throws.
+        try { return ProcessLine(line); }
+        finally { _line.Clear(); }
+    }
+
+    private SseEvent? ProcessLine(ReadOnlySpan<char> line)
+    {
         // The SDK invokes a reset TextDecoder for each completed line, stripping that line's first BOM.
         // The incremental replacement decoder has no pending UTF-8 sequence across an ASCII line ending.
         if (SdkProfile && line[0] == '\uFEFF') line = line[1..];
@@ -167,8 +176,8 @@ public sealed class SseDecoder
         if (line[0] == ':') return null;
         var delimiter = line.IndexOf(':');
         var field = delimiter < 0 ? line : line[..delimiter];
-        var value = delimiter < 0 ? "" : line[(delimiter + 1)..];
-        if (value.StartsWith(' ')) value = value[1..];
+        var value = delimiter < 0 ? ReadOnlySpan<char>.Empty : line[(delimiter + 1)..];
+        if (value.Length > 0 && value[0] == ' ') value = value[1..];
 
         switch (field)
         {
@@ -178,14 +187,15 @@ public sealed class SseDecoder
                 break;
             case "event":
                 CheckEventSize(_data.Length, value.Length, _idBuffer, _retryCharacters);
-                _eventType = value;
+                _eventType = value.ToString();
                 if (SdkProfile) _hasEventName = true;
                 break;
             case "id" when !SdkProfile && !value.Contains('\0'):
-                CheckEventSize(_data.Length, _eventType.Length, value, _retryCharacters);
-                _idBuffer = value;
+                var id = value.ToString();
+                CheckEventSize(_data.Length, _eventType.Length, id, _retryCharacters);
+                _idBuffer = id;
                 break;
-            case "retry" when !SdkProfile && value.Length > 0 && value.All(character => character is >= '0' and <= '9'):
+            case "retry" when !SdkProfile && value.Length > 0 && IsAsciiDigits(value):
                 CheckEventSize(_data.Length, _eventType.Length, _idBuffer, value.Length);
                 var retry = BigInteger.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture);
                 _retryCharacters = value.Length;
@@ -193,6 +203,12 @@ public sealed class SseDecoder
                 break;
         }
         return null;
+    }
+
+    private static bool IsAsciiDigits(ReadOnlySpan<char> value)
+    {
+        foreach (var character in value) if (character is < '0' or > '9') return false;
+        return true;
     }
 
     private SseEvent? Dispatch()

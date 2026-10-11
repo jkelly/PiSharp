@@ -29,6 +29,7 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("native-thinking.discarded-template-own-field-capability", NativeThinkingControlTests.DiscardedTemplateCapability),
     ("sse.every-byte-split-utf8-and-framing", EverySplit),
     ("sse.tiny-read-buffers", TinyBuffers),
+    ("sse.single-and-multiple-chunk-lines-keep-owned-values", LongLines),
     ("sse.lf-crlf-cr-and-mixed-boundaries", LineEndings),
     ("sse.single-leading-bom", Bom),
     ("sse.fields-comments-spaces-and-data-join", Fields),
@@ -88,6 +89,7 @@ tests.AddRange(AnthropicMessagesHttpSseTransportTests.Cases());
 tests.AddRange(CompletionsLifecycleHookTests.Cases());
 tests.AddRange(CompletionsHttpSseTransportTests.Cases());
 tests.AddRange(CompletionsSourceRunTests.Cases());
+tests.AddRange(CompletionsStreamingPerformanceTests.Cases());
 tests.AddRange(CompletionsStartDeliveryTests.Cases());
 tests.AddRange(OpenAISdkSseFramingTests.Cases());
 tests.AddRange(CompletionsLifecycleDifferentialTests.Cases());
@@ -227,6 +229,26 @@ static async Task TinyBuffers()
     {
         var messages = await Decode("data: 文😀é\n\n", new(ReadBufferBytes: size));
         Equal("文😀é", messages.Single().Data);
+    }
+}
+static async Task LongLines()
+{
+    // Exercise both GetChunks paths and later reuse of the cleared line buffer.
+    var data = new string('x', 12_000) + "文😀";
+    var name = new string('e', 9_000);
+    var id = new string('i', 9_000);
+    var wire = $"event: {name}\nid: {id}\nretry: 00012\ndata: {data}\n\ndata: tail\n\ndata: {data}\n\n";
+    foreach (var profile in new[] { SseFramingProfile.Standard, SseFramingProfile.OpenAISdk719 })
+    foreach (var buffer in new[] { 1, 4096 })
+    {
+        var sdk = profile == SseFramingProfile.OpenAISdk719;
+        var expected = new SseEvent[]
+        {
+            new(name, data, sdk ? "" : id, sdk ? null : 12) { EventName = sdk ? name : null },
+            new("message", "tail", sdk ? "" : id, sdk ? null : 12),
+            new("message", data, sdk ? "" : id, sdk ? null : 12)
+        };
+        Sequence(expected, await Decode(wire, new(ReadBufferBytes: buffer, EofBehavior: SseEofBehavior.DispatchPendingEvent) { Profile = profile }));
     }
 }
 static async Task LineEndings()

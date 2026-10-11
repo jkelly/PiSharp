@@ -36,7 +36,7 @@ public sealed class SessionContextProjectionException : Exception
 }
 
 /// <summary>Pure selected-ancestry projection. Owns no session file, provider, tool or run lifecycle.</summary>
-public sealed class SessionContextProjector
+public sealed partial class SessionContextProjector
 {
     private readonly SessionContextProjectionOptions _options;
     /// <summary>The bounds this projector admits a branch under.</summary>
@@ -63,6 +63,7 @@ public sealed class SessionContextProjector
         cancellationToken.ThrowIfCancellationRequested();
         if (entries.IsDefault) throw Failure(SessionContextProjectionFailure.InvalidEntries);
         if (entries.Length > _options.MaximumEntries) throw Failure(SessionContextProjectionFailure.ResourceLimit);
+        if (TryAppendProjection(entries, selectedLeafId, cancellationToken, out var appended)) return appended;
         var byId = ImmutableDictionary.CreateBuilder<string, SessionEntry>(StringComparer.Ordinal);
         var roots = ImmutableArray.CreateBuilder<string>(); long inputCharacters = 0;
         foreach (var entry in entries)
@@ -149,8 +150,11 @@ public sealed class SessionContextProjector
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
-        return new(selectedLeafId, ancestry.ToImmutable(), byId.ToImmutable(), roots.ToImmutable(), messages.ToImmutable(),
+        var projection = new SessionContextProjection(selectedLeafId, ancestry.ToImmutable(), byId.ToImmutable(), roots.ToImmutable(), messages.ToImmutable(),
             llmMessages.ToImmutable(), thinkingLevel, model, contributions.ToImmutable());
+        Volatile.Write(ref _cachedProjection, new(entries, projection, inputCharacters, messageCharacters, llmCharacters,
+            active.Any(entry => entry.Kind == SessionEntryKind.ContextEdit)));
+        return projection;
 
         void Add(ImmutableArray<TranscriptEntry>.Builder target, TranscriptEntry message, ref long characters)
         {
