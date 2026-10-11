@@ -31,18 +31,20 @@ jobs:
       - name: Loop
         env:
           CASE: ${{ vars.CODEMODE_CASE || 'prelude.embedded' }}
+          PISHARP_CODEMODE_TRACE: '1'
         run: |
           exe="$GITHUB_WORKSPACE/tests/PiSharp.Codemode.Tests/bin/Release/net10.0/PiSharp.Codemode.Tests"
           cd "$GITHUB_WORKSPACE/tests/PiSharp.Codemode.Tests/bin/Release/net10.0"
           hangs=0; fails=0
-          for i in $(seq 1 120); do
+          for i in $(seq 1 60); do
             "$exe" --only "$CASE" > "out-$i.txt" 2>&1 &
             pid=$!
             for t in $(seq 1 600); do kill -0 $pid 2>/dev/null || break; sleep 0.1; done
             if kill -0 $pid 2>/dev/null; then
               hangs=$((hangs+1))
               echo "::warning::iteration $i hung (pid $pid)"
-              ps -ef --forest | grep -v grep | grep -A5 -B1 "PiSharp.Codemode.Tests" || true
+              ps -o pid,ppid,stat,lstart,cmd --ppid $pid || true
+              echo "----- trace"; cat "out-$i.txt"
               for p in $pid $(pgrep -P $pid); do
                 echo "===== stacks of $p: $(tr '\0' ' ' < /proc/$p/cmdline)"
                 cat /proc/$p/status | grep -E "State|Threads" || true
@@ -50,7 +52,6 @@ jobs:
                 ls -l /proc/$p/fd | grep pipe || true
               done
               kill -9 $pid $(pgrep -P $pid) 2>/dev/null || true
-              cat "out-$i.txt" | tail -20
             else
               wait $pid; code=$?
               if [ $code -ne 0 ]; then fails=$((fails+1)); echo "::warning::iteration $i failed ($code)"; tail -20 "out-$i.txt"; fi

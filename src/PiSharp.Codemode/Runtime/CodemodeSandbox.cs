@@ -299,11 +299,13 @@ public sealed class CodemodeSandbox : IAsyncDisposable
                     ? new(true, value, [.. output], recorded, writes ?? CodemodeStoreWrites.Empty, null)
                     : new(false, null, [.. output], recorded, CodemodeStoreWrites.Empty, error);
             }
+            CodemodeTrace.Write($"finish: {error?.Kind.ToString() ?? "ok"} {error?.Message}");
             timer?.Dispose();
             abortRegistration.Dispose();
             _ = Task.Run(async () =>
             {
                 try { await worker.TerminateAsync().ConfigureAwait(false); } catch (Exception) { }
+                CodemodeTrace.Write("finish: result set");
                 result.TrySetResult(outcome);
             });
         }
