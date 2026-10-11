@@ -6985,8 +6985,8 @@
       "originalSha256": "7c9d1b6a5aabda1c987e5a4acb3504b25c3004cd168bda086bc00579352649a3"
     },
     {
-      "currentSha256": "24e584d2baf2dcabe38cda1d3aa86800a340b38f62766461c90b5be06d13636d",
-      "currentBytes": 3034,
+      "currentSha256": "627b73ccb27f6a5a22ba7ce4bbdf83923b8b2703473e9f125a5a97964ad0a882",
+      "currentBytes": 3372,
       "originalBytes": 3034,
       "path": "src/PiSharp.Cli/Commands/OwnedProcessCleanup.cs",
       "originalSha256": "24e584d2baf2dcabe38cda1d3aa86800a340b38f62766461c90b5be06d13636d"
@@ -10163,8 +10163,8 @@
       "originalSha256": "0c5434f0803dc18401270a8351f9eff9803c51ce368a4641d66ed51fdf457e56"
     },
     {
-      "currentSha256": "f2f535933eca524c11ad63693e27c8c0724e2c3feb86a14b1f2771ea0c46bf09",
-      "currentBytes": 7306,
+      "currentSha256": "455c969d1a896dae47bcebb8fdb7bb113c50beeb5682c1651324f32f90520599",
+      "currentBytes": 7633,
       "originalBytes": 7244,
       "path": "src/PiSharp.Tools/Processes/Unix/UnixProcessLease.cs",
       "originalSha256": "ed04fd5d555118d9f4d0e5676e09fa5b4a5e77be66b1bfdfee0853cd318e96ce"
