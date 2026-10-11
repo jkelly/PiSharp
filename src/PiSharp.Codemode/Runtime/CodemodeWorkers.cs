@@ -151,7 +151,12 @@ internal sealed class CodemodeThreadWorker : ICodemodeWorker
 internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : ICodemodeWorker
 {
     private static readonly ConcurrentDictionary<CodemodeWorkerLauncher, Process> Spares = new();
-    private static readonly ConcurrentDictionary<Process, byte> Live = new(ReferenceEqualityComparer.Instance);
+    /// <summary>Each live worker's single exit wait, made once at launch and shared by its reader and its retirement. Two
+    /// concurrent <see cref="Process.WaitForExitAsync"/> calls on one process can leave one of them waiting forever on Linux
+    /// after the other completes (seen as a codemode script that never settled).</summary>
+    private static readonly ConcurrentDictionary<Process, Task> Live = new(ReferenceEqualityComparer.Instance);
+    /// <summary>How long retirement waits for a killed worker's exit to be observed before it checks and disposes anyway.</summary>
+    private static readonly TimeSpan RetireLimit = TimeSpan.FromSeconds(5);
     private static int exitHooked;
 
     /// <summary>Worker processes started and not yet retired and reaped, spares included (tests).</summary>
@@ -166,7 +171,7 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
     internal static Task DiscardSparesAsync() =>
         Task.WhenAll(Spares.Keys.Select(key => Spares.TryRemove(key, out var spare) ? RetireAsync(spare) : Task.CompletedTask));
 
-    /// <summary>Kill, close its input, wait for the exit (which reaps it), then forget and dispose. Killing first means closing the
+    /// <summary>Kill, close its input, wait (bounded) for the exit (which reaps it), then forget and dispose. Killing first means closing the
     /// pipe can never wait on a worker that stopped reading.</summary>
     private static async Task RetireAsync(Process worker)
     {
@@ -176,11 +181,19 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
         CodemodeTrace.Write($"retire {id}: close stdin");
         try { worker.StandardInput.Close(); } catch (Exception error) { CodemodeTrace.Write($"retire {id}: close failed {error.GetType().Name}"); }
         CodemodeTrace.Write($"retire {id}: wait for exit");
-        try { await worker.WaitForExitAsync().ConfigureAwait(false); } catch (Exception error) { CodemodeTrace.Write($"retire {id}: wait failed {error.GetType().Name}"); }
+        try { await ExitOf(worker).WaitAsync(RetireLimit).ConfigureAwait(false); }
+        catch (Exception error)
+        {
+            // Killed, so it is gone or going: HasExited reaps it if the exit was missed.
+            CodemodeTrace.Write($"retire {id}: wait failed {error.GetType().Name}");
+            try { _ = worker.HasExited; } catch (Exception) { }
+        }
         CodemodeTrace.Write($"retire {id}: exited, disposing");
         Live.TryRemove(worker, out _);
         worker.Dispose();
     }
+
+    private static Task ExitOf(Process worker) => Live.TryGetValue(worker, out var exit) ? exit : worker.WaitForExitAsync();
 
     private static Process Launch(CodemodeWorkerLauncher launcher)
     {
@@ -200,7 +213,7 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
         foreach (var (name, value) in launcher.Environment ?? ImmutableDictionary<string, string>.Empty) info.Environment[name] = value;
         var started = new Process { StartInfo = info, EnableRaisingEvents = true };
         if (!started.Start()) { started.Dispose(); throw new InvalidOperationException("The codemode worker process did not start."); }
-        Live[started] = 0;
+        Live[started] = started.WaitForExitAsync();
         CodemodeTrace.Write($"launched {started.Id}");
         // Engine diagnostics belong to no one: drain and discard standard error, as the original discards QuickJS's.
         _ = started.StandardError.BaseStream.CopyToAsync(Stream.Null);
@@ -251,7 +264,7 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
                     received(message);
                 }
                 CodemodeTrace.Write($"read {started.Id}: EOF, waiting for exit");
-                await started.WaitForExitAsync().ConfigureAwait(false);
+                await ExitOf(started).ConfigureAwait(false);
                 CodemodeTrace.Write($"read {started.Id}: exited");
                 bool expected; lock (gate) expected = terminating;
                 if (!expected) exited(started.ExitCode);

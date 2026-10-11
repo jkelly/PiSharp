@@ -36,7 +36,7 @@ jobs:
           exe="$GITHUB_WORKSPACE/tests/PiSharp.Codemode.Tests/bin/Release/net10.0/PiSharp.Codemode.Tests"
           cd "$GITHUB_WORKSPACE/tests/PiSharp.Codemode.Tests/bin/Release/net10.0"
           hangs=0; fails=0
-          for i in $(seq 1 60); do
+          for i in $(seq 1 120); do
             "$exe" --only "$CASE" > "out-$i.txt" 2>&1 &
             pid=$!
             for t in $(seq 1 600); do kill -0 $pid 2>/dev/null || break; sleep 0.1; done
@@ -57,5 +57,6 @@ jobs:
               if [ $code -ne 0 ]; then fails=$((fails+1)); echo "::warning::iteration $i failed ($code)"; tail -20 "out-$i.txt"; fi
             fi
           done
+          echo "retire bound hit in $(grep -l "wait failed" out-*.txt | wc -l) runs; exit observed by retire in $(grep -l "exited, disposing" out-*.txt | wc -l) runs"
           echo "hangs=$hangs fails=$fails"
           [ $hangs -eq 0 ] && [ $fails -eq 0 ]

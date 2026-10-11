@@ -92,6 +92,9 @@ public sealed class CodemodeSandbox : IAsyncDisposable
     public ValueTask DisposeAsync() => new(CloseAsync());
 
 
+    /// <summary>How long a finished execution waits for its engine to stop before it settles anyway (tests shorten it).</summary>
+    internal static TimeSpan TerminationLimit { get; set; } = TimeSpan.FromSeconds(10);
+
     /// <summary>Message of an aborted execution, as an AbortSignal without a reason reports it.</summary>
     internal const string AbortedMessage = "This operation was aborted";
 
@@ -142,7 +145,7 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             this.store = store; this.cancellationToken = cancellationToken;
             toolsByName = tools.GroupBy(tool => tool.Name, StringComparer.Ordinal).ToImmutableDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
             globalsByName = globals.ToImmutableDictionary(global => global.Name, StringComparer.Ordinal);
-            worker = options.Worker is { } launcher ? new CodemodeProcessWorker(launcher) : new CodemodeThreadWorker();
+            worker = options.WorkerFactory?.Invoke() ?? (options.Worker is { } launcher ? new CodemodeProcessWorker(launcher) : new CodemodeThreadWorker());
         }
 
         public Task<CodemodeResult> Result => result.Task;
@@ -304,7 +307,8 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             abortRegistration.Dispose();
             _ = Task.Run(async () =>
             {
-                try { await worker.TerminateAsync().ConfigureAwait(false); } catch (Exception) { }
+                // The outcome is decided: a termination that stalls must not keep it from the caller.
+                try { await worker.TerminateAsync().WaitAsync(TerminationLimit).ConfigureAwait(false); } catch (Exception) { }
                 CodemodeTrace.Write("finish: result set");
                 result.TrySetResult(outcome);
             });

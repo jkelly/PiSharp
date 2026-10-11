@@ -78,6 +78,21 @@ internal static partial class Program
             while (DateTime.UtcNow < deadline);
             Check(CodemodeProcessWorker.Running == 0, "worker processes left: " + CodemodeProcessWorker.Running);
         }),
+        // A decided outcome reaches the caller even when stopping its engine stalls: a worker exit wait that never completed once
+        // kept a finished script from settling at all (Linux CI, two concurrent WaitForExitAsync calls on one process).
+        Case("isolation.settles-when-termination-stalls", async () =>
+        {
+            var previous = CodemodeSandbox.TerminationLimit;
+            CodemodeSandbox.TerminationLimit = TimeSpan.FromMilliseconds(200);
+            try
+            {
+                await using var sandbox = new CodemodeSandbox(new() { WorkerFactory = () => new StalledWorker() });
+                var started = System.Diagnostics.Stopwatch.StartNew();
+                Ok(await sandbox.ExecuteAsync("return 1").WaitAsync(TimeSpan.FromSeconds(20)), "1", "value despite a stalled termination");
+                Check(started.Elapsed < TimeSpan.FromSeconds(10), "settled soon after the termination limit: " + started.Elapsed);
+            }
+            finally { CodemodeSandbox.TerminationLimit = previous; }
+        }),
         // A host that dies without terminating its workers (killed, crashed) closes their standard input: a worker that sees end
         // of file exits even while its script spins, so it cannot outlive the host. Idle spares do the same.
         Case("isolation.worker-ends-when-its-host-goes-away", async () =>
@@ -144,5 +159,17 @@ internal static partial class Program
         await output.WriteLineAsync(code); await output.FlushAsync();
         while (await input.ReadLineAsync() is not null) { }
         return 0;
+    }
+
+    /// <summary>A worker that finishes its script at once and never finishes terminating.</summary>
+    private sealed class StalledWorker : ICodemodeWorker
+    {
+        public void Start(CodemodeStartMessage start, Action<CodemodeWorkerMessage> received, Action<int?> exited, Action<Exception> broken)
+        {
+            received(new CodemodeReadyMessage());
+            received(new CodemodeDoneMessage(true, "1", "[]", null));
+        }
+        public void Send(CodemodeResultMessage result) { }
+        public Task TerminateAsync() => new TaskCompletionSource().Task;
     }
 }
