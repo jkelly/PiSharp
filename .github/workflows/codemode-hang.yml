@@ -27,7 +27,7 @@ jobs:
         run: |
           dotnet build tests/PiSharp.Codemode.Tests/PiSharp.Codemode.Tests.csproj -c Release \
             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false
-          dotnet tool install -g dotnet-stack
+          cd "$RUNNER_TEMP" && dotnet tool install -g dotnet-stack --add-source https://api.nuget.org/v3/index.json
       - name: Loop
         env:
           CASE: ${{ vars.CODEMODE_CASE || 'prelude.embedded' }}
