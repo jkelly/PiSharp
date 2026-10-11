@@ -302,14 +302,12 @@ public sealed class CodemodeSandbox : IAsyncDisposable
                     ? new(true, value, [.. output], recorded, writes ?? CodemodeStoreWrites.Empty, null)
                     : new(false, null, [.. output], recorded, CodemodeStoreWrites.Empty, error);
             }
-            CodemodeTrace.Write($"finish: {error?.Kind.ToString() ?? "ok"} {error?.Message}");
             timer?.Dispose();
             abortRegistration.Dispose();
             _ = Task.Run(async () =>
             {
                 // The outcome is decided: a termination that stalls must not keep it from the caller.
                 try { await worker.TerminateAsync().WaitAsync(TerminationLimit).ConfigureAwait(false); } catch (Exception) { }
-                CodemodeTrace.Write("finish: result set");
                 result.TrySetResult(outcome);
             });
         }

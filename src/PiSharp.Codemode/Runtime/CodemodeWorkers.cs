@@ -32,16 +32,6 @@ public sealed record CodemodeWorkerLauncher(string FileName, ImmutableArray<stri
     }
 }
 
-/// <summary>TEMPORARY hang diagnostics (PISHARP_CODEMODE_TRACE=1).</summary>
-internal static class CodemodeTrace
-{
-    private static readonly bool On = Environment.GetEnvironmentVariable("PISHARP_CODEMODE_TRACE") == "1";
-    public static void Write(string message)
-    {
-        if (On) Console.Error.WriteLine($"[cm {DateTime.UtcNow:HH:mm:ss.fff} t{Environment.CurrentManagedThreadId}] {message}");
-    }
-}
-
 /// <summary>The worker process side and the default launcher.</summary>
 public static class CodemodeWorker
 {
@@ -175,20 +165,14 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
     /// pipe can never wait on a worker that stopped reading.</summary>
     private static async Task RetireAsync(Process worker)
     {
-        var id = worker.Id;
-        CodemodeTrace.Write($"retire {id}: kill");
-        try { if (!worker.HasExited) worker.Kill(entireProcessTree: true); } catch (Exception error) { CodemodeTrace.Write($"retire {id}: kill failed {error.GetType().Name}: {error.Message}"); }
-        CodemodeTrace.Write($"retire {id}: close stdin");
-        try { worker.StandardInput.Close(); } catch (Exception error) { CodemodeTrace.Write($"retire {id}: close failed {error.GetType().Name}"); }
-        CodemodeTrace.Write($"retire {id}: wait for exit");
+        try { if (!worker.HasExited) worker.Kill(entireProcessTree: true); } catch (Exception) { }
+        try { worker.StandardInput.Close(); } catch (Exception) { }
         try { await ExitOf(worker).WaitAsync(RetireLimit).ConfigureAwait(false); }
-        catch (Exception error)
+        catch (Exception)
         {
             // Killed, so it is gone or going: HasExited reaps it if the exit was missed.
-            CodemodeTrace.Write($"retire {id}: wait failed {error.GetType().Name}");
             try { _ = worker.HasExited; } catch (Exception) { }
         }
-        CodemodeTrace.Write($"retire {id}: exited, disposing");
         Live.TryRemove(worker, out _);
         worker.Dispose();
     }
@@ -214,7 +198,6 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
         var started = new Process { StartInfo = info, EnableRaisingEvents = true };
         if (!started.Start()) { started.Dispose(); throw new InvalidOperationException("The codemode worker process did not start."); }
         Live[started] = started.WaitForExitAsync();
-        CodemodeTrace.Write($"launched {started.Id}");
         // Engine diagnostics belong to no one: drain and discard standard error, as the original discards QuickJS's.
         _ = started.StandardError.BaseStream.CopyToAsync(Stream.Null);
         started.StandardInput.NewLine = "\n";
@@ -226,7 +209,6 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
         Process? spare = null;
         if (Spares.TryRemove(launcher, out var candidate))
         {
-            CodemodeTrace.Write($"take: spare {candidate.Id} exited={candidate.HasExited}");
             if (!candidate.HasExited) spare = candidate;
             else _ = RetireAsync(candidate);
         }
@@ -235,7 +217,6 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
             try
             {
                 var next = Launch(launcher);
-                CodemodeTrace.Write($"spare {next.Id} ready");
                 if (!Spares.TryAdd(launcher, next)) _ = RetireAsync(next);
             }
             catch (Exception) { }
@@ -247,10 +228,8 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
     {
         var started = Take(launcher);
         lock (gate) process = started;
-        CodemodeTrace.Write($"start {started.Id}: writing");
         started.StandardInput.WriteLine(CodemodeWireCodec.Encode(start));
         started.StandardInput.Flush();
-        CodemodeTrace.Write($"start {started.Id}: written");
         reading = Task.Run(async () =>
         {
             try
@@ -260,16 +239,13 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
                     CodemodeWorkerMessage message;
                     try { message = CodemodeWireCodec.DecodeWorker(line); }
                     catch (Exception) { broken(new FormatException("unknown message from the worker")); return; }
-                    CodemodeTrace.Write($"read {started.Id}: {message.GetType().Name}");
                     received(message);
                 }
-                CodemodeTrace.Write($"read {started.Id}: EOF, waiting for exit");
                 await ExitOf(started).ConfigureAwait(false);
-                CodemodeTrace.Write($"read {started.Id}: exited");
                 bool expected; lock (gate) expected = terminating;
                 if (!expected) exited(started.ExitCode);
             }
-            catch (Exception error) { CodemodeTrace.Write($"read: {error.GetType().Name}: {error.Message}"); bool expected; lock (gate) expected = terminating; if (!expected) broken(error); }
+            catch (Exception error) { bool expected; lock (gate) expected = terminating; if (!expected) broken(error); }
         });
     }
 
@@ -285,11 +261,8 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
     {
         Process? target;
         lock (gate) { terminating = true; target = process; }
-        CodemodeTrace.Write($"terminate {target?.Id.ToString() ?? "none"}");
         if (target is null) return;
         await RetireAsync(target).ConfigureAwait(false);
-        CodemodeTrace.Write("terminate: retired, joining reader");
         try { await reading.ConfigureAwait(false); } catch (Exception) { }
-        CodemodeTrace.Write("terminate: done");
     }
 }
