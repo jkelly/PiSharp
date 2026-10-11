@@ -1,5 +1,5 @@
 // Rebuild the second memory pass report from saved captures; Node only, no dependencies.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 const base = fileURLToPath(new URL('memory-pass-2/', import.meta.url));
@@ -64,11 +64,16 @@ const retained = rows => names.map(name=>{
   return result;
 });
 const prior=JSON.parse(readFileSync(new URL('results.json',import.meta.url),'utf8'));
-const transport=json('transport.json'),compatibility=json('compatibility.json'),compatBefore=json('compatibility-before.json');
+// The raw suite reports and restore-previous-pass.patch were recorded in commit 217b926 and are not kept in the tree
+// (`git show 217b926:tools/PerformanceReview/memory-pass-2/<name>`); without them the saved validation summary is reused.
+const suiteReports=['transport.json','compatibility.json','compatibility-before.json','mistral.json','sessions.json','cli-json.json',
+  'interactive.json','source-fixture-validation.json'].every(name=>existsSync(resolve(base,name)));
+const transport=suiteReports&&json('transport.json'),compatibility=suiteReports&&json('compatibility.json'),
+  compatBefore=suiteReports&&json('compatibility-before.json');
 const failures=doc=>doc.tests.filter(t=>t.status==='failed').map(t=>t.testId).sort();
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const transportUnchanged=same(failures(transport),[...prior.validation.unchanged_transport_failures].sort());
-const compatUnchanged=same(failures(compatibility),failures(compatBefore));
+const transportUnchanged=!suiteReports||same(failures(transport),[...prior.validation.unchanged_transport_failures].sort());
+const compatUnchanged=!suiteReports||same(failures(compatibility),failures(compatBefore));
 if(!transportUnchanged||!compatUnchanged)throw Error('New behavior failures');
 const summary=doc=>({passed:doc.passed,failed:doc.failed});
 const parity=doc=>({passed:doc.cases-doc.failures,failed:doc.failures,...(doc.skipped===undefined?{}:{skipped:doc.skipped})});
@@ -96,7 +101,7 @@ const report={
   sustained_post_gc_memory:Object.fromEntries(Object.entries(captures).map(([k,v])=>[k,retained(v.retained)])),
   timing_and_allocation:Object.fromEntries(Object.entries(captures).map(([k,v])=>[k,v.timing.filter(r=>names.includes(r.name))])),
   allocation_profile:Object.fromEntries(['before','after'].map(k=>[k,Object.fromEntries(names.map(n=>[n,json(k+'-profile-'+n+'.json')]))])),
-  validation:{
+  validation:!suiteReports?json('results.json').validation:{
     transport:summary(transport),transport_failures_unchanged:transportUnchanged,unchanged_transport_failures:failures(transport),
     compatibility:summary(compatibility),compatibility_before:summary(compatBefore),compatibility_failures_unchanged:compatUnchanged,
     unchanged_compatibility_failures:failures(compatibility),mistral:summary(json('mistral.json')),sessions:summary(json('sessions.json')),
@@ -107,11 +112,11 @@ const report={
       'Strict JSON escaped/lone-surrogate duplicate names; objects 0/1/7/8/9/16/300 properties; depths 1000/1001',
       'Generic SSE 9000/12000-character fields across single/multiple StringBuilder chunks, subsequent buffer reuse, 1/4096-byte reads, Standard/SDK profiles'],
     builds:'Affected projects/benchmarks built Release, zero warnings/errors.',
-    patch_checks:'git diff --check and git apply --check restore-previous-pass.patch passed.'
+    patch_checks:'git diff --check and git apply --check restore-previous-pass.patch (commit 217b926) passed.'
   },
   reproduce:[
     'Build tools/PerformanceReview/PerformanceReview.csproj and TraceAnalysis/TraceAnalysis.csproj in Release.',
-    'Previous-pass DLLs preserved locally under ignored tools/PerformanceReview/bin/memory-pass-2-before and memory-pass-2-before-retention. Rebuild elsewhere by applying restore-previous-pass.patch to an isolated candidate copy, then build the benchmark. Do not apply to active checkout.',
+    'Previous-pass DLLs preserved locally under ignored tools/PerformanceReview/bin/memory-pass-2-before and memory-pass-2-before-retention. Rebuild elsewhere by applying restore-previous-pass.patch (git show 217b926:tools/PerformanceReview/memory-pass-2/restore-previous-pass.patch) to an isolated candidate copy, then build the benchmark. Do not apply to active checkout.',
     'measure-memory-pass-2.ps1 -PiRoot <installed package root> -Node <Node24 executable> -BeforeHarness <before DLL>; requires fresh output files.',
     'measure-retention-pass-2.ps1 with same arguments using previous production sources plus current benchmark helper for BeforeHarness; requires fresh detailed output files.',
     'measure-timing-pass-2.ps1 with same arguments, using preserved before DLL; requires fresh timing-series output files.',
@@ -146,7 +151,7 @@ for(const n of names){
   md+='- '+n+': live post-GC heap '+mib(a.median_post_gc_heap_bytes)+' MiB (Pi '+mib(p.median_post_gc_heap_bytes)+' MiB), while .NET holds '+mib(a.median_gc_committed_bytes)+' MiB of GC committed space. Sustained RSS ranges '+mib(a.min_post_gc_rss_bytes)+'–'+mib(a.max_post_gc_rss_bytes)+' MiB; Pi '+mib(p.min_post_gc_rss_bytes)+'–'+mib(p.max_post_gc_rss_bytes)+' MiB.\n';
 }
 md+='\nLive heap is broadly stable at the 10/20/30-stream checkpoints. These runs point to GC space retained for reuse, plus runtime/native memory, as the largest remaining resident-memory cost; they do not establish absence of leaks in other workloads. No forced GC, global GC tuning, pooling of mutable snapshots or reduced limits were added to production.\n\n## Behavior verification\n\n';
-md+='- Frozen source captures: 38 anchored-tool + 184 thinking scenarios passed; 409 turns and 4,020 complete publications, matching snapshot shape/order and serialized values.\n- Mistral 60/60; sessions 138/138; CLI JSON 17/17; selected interactive/component/startup cases 55/55 passed.\n- Transport: 219 passed / 24 failed, exactly the existing failure IDs. Compatibility: 224 passed / 10 failed on both previous/current production sources, identical failure IDs. One existing failure requires a missing released npm catalog artifact. These suites are not fully green.\n- Added allocation ceilings, fragmented-read/frame-limit checks, 9/12-KiB SSE line/buffer reuse checks and duplicate-key/depth controls. Release builds and whitespace checks passed.\n\nSee results.json for measurements, ranges, profile summaries, failure IDs and reproduction steps. Raw JSONL captures and behavioral summaries are alongside it. restore-previous-pass.patch reconstructs this pass’s production baseline in an isolated candidate copy.\n';
+md+='- Frozen source captures: 38 anchored-tool + 184 thinking scenarios passed; 409 turns and 4,020 complete publications, matching snapshot shape/order and serialized values.\n- Mistral 60/60; sessions 138/138; CLI JSON 17/17; selected interactive/component/startup cases 55/55 passed.\n- Transport: 219 passed / 24 failed, exactly the existing failure IDs. Compatibility: 224 passed / 10 failed on both previous/current production sources, identical failure IDs. One existing failure requires a missing released npm catalog artifact. These suites are not fully green.\n- Added allocation ceilings, fragmented-read/frame-limit checks, 9/12-KiB SSE line/buffer reuse checks and duplicate-key/depth controls. Release builds and whitespace checks passed.\n\nSee results.json for measurements, ranges, profile summaries, failure IDs and reproduction steps. Raw JSONL captures and allocation profiles are alongside it. The raw suite reports and restore-previous-pass.patch, which reconstructs this pass’s production baseline in an isolated candidate copy, are in commit 217b926 (git show 217b926:tools/PerformanceReview/memory-pass-2/<name>).\n';
 writeFileSync(resolve(base,'results.json'),JSON.stringify(report,null,2)+'\n');
 writeFileSync(resolve(base,'RESULTS.md'),md);
 console.log(JSON.stringify({report:'memory-pass-2/results.json',cold:report.cold_process_memory,sustained:report.sustained_post_gc_memory},null,2));

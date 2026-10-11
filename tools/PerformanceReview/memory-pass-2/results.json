@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "recorded_at_utc": "2026-10-11T14:26:52.467Z",
+  "recorded_at_utc": "2026-10-11T16:10:02.065Z",
   "baseline_description": "Previous optimization pass, preserved before this pass; not pristine HEAD.",
   "base_commit": "c83a06c00f485f0540305db57b8cbc016c8d1717",
   "sdk": "10.0.400",
@@ -1738,7 +1738,7 @@
   },
   "reproduce": [
     "Build tools/PerformanceReview/PerformanceReview.csproj and TraceAnalysis/TraceAnalysis.csproj in Release.",
-    "Previous-pass DLLs preserved locally under ignored tools/PerformanceReview/bin/memory-pass-2-before and memory-pass-2-before-retention. Rebuild elsewhere by applying restore-previous-pass.patch to an isolated candidate copy, then build the benchmark. Do not apply to active checkout.",
+    "Previous-pass DLLs preserved locally under ignored tools/PerformanceReview/bin/memory-pass-2-before and memory-pass-2-before-retention. Rebuild elsewhere by applying restore-previous-pass.patch (git show 217b926:tools/PerformanceReview/memory-pass-2/restore-previous-pass.patch) to an isolated candidate copy, then build the benchmark. Do not apply to active checkout.",
     "measure-memory-pass-2.ps1 -PiRoot <installed package root> -Node <Node24 executable> -BeforeHarness <before DLL>; requires fresh output files.",
     "measure-retention-pass-2.ps1 with same arguments using previous production sources plus current benchmark helper for BeforeHarness; requires fresh detailed output files.",
     "measure-timing-pass-2.ps1 with same arguments, using preserved before DLL; requires fresh timing-series output files.",
