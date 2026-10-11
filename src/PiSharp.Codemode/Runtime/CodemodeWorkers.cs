@@ -160,7 +160,7 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
     /// pipe can never wait on a worker that stopped reading.</summary>
     private static async Task RetireAsync(Process worker)
     {
-        try { if (!worker.HasExited) worker.Kill(entireProcessTree: true); } catch (Exception) { }
+        try { if (!worker.HasExited) worker.Kill(); } catch (Exception) { }
         try { worker.StandardInput.Close(); } catch (Exception) { }
         try { await worker.WaitForExitAsync().ConfigureAwait(false); } catch (Exception) { }
         Live.TryRemove(worker, out _);
@@ -174,7 +174,7 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
             AppDomain.CurrentDomain.ProcessExit += (_, _) =>
             {
                 foreach (var key in Spares.Keys)
-                    if (Spares.TryRemove(key, out var spare)) { try { spare.Kill(entireProcessTree: true); } catch (Exception) { } }
+                    if (Spares.TryRemove(key, out var spare)) { try { spare.Kill(); } catch (Exception) { } }
             };
         var info = new ProcessStartInfo(launcher.FileName)
         {
