@@ -8,7 +8,9 @@ namespace PiSharp.Cli.Commands;
 internal sealed record OwnedProcessCleanupReceipt(int Ordinal, int? ProcessId, int? ExitCode, bool ProcessStarted,
     bool CleanupConfirmed, bool CapturedOutputComplete, ImmutableArray<ProcessDiagnostic> Diagnostics);
 internal sealed class OwnedProcessCleanupException(OwnedProcessCleanupReceipt receipt)
-    : IOException("An owned process returned uncertain cleanup or failed output settlement.")
+    : IOException("An owned process returned uncertain cleanup or failed output settlement" +
+        $" (process {receipt.Ordinal}: started {receipt.ProcessStarted}, exit {receipt.ExitCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none"}," +
+        $" cleanup confirmed {receipt.CleanupConfirmed}, output complete {receipt.CapturedOutputComplete}, diagnostics [{string.Join(", ", receipt.Diagnostics)}]).")
 { internal OwnedProcessCleanupReceipt Receipt { get; } = receipt; }
 
 internal sealed class OwnedProcessCleanup(IProcessRunner runner) : IProcessRunner

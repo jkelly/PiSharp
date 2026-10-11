@@ -8,6 +8,8 @@ using static Expect;
 /// tree-selector.test.ts and format-resume-command.test.ts, plus render snapshots authored from the sources.</summary>
 internal static class SessionSelectorCases
 {
+    // keybindings.ts app.tree.foldOrUp/unfoldOrDown: alt+left/right first on darwin, shown as "option" (keybinding-hints.ts).
+    private static readonly string BranchKeys = OperatingSystem.IsMacOS() ? "option+←/→" : "ctrl+←/→";
     private const string CtrlD = "\u0004";
     private const string CtrlBackspace = "\u001b[127;5u";
     private const string CtrlR = "\u001b[114;5u";
@@ -857,7 +859,7 @@ internal static class SessionSelectorCases
             Lines(
             [
                 "", new string('─', 80), "   Session Tree",
-                "  ↑/↓ move · ←/→ page · ctrl+←/→ branch · ctrl+x copy · shift+l label",
+                $"  ↑/↓ move · ←/→ page · {BranchKeys} branch · ctrl+x copy · shift+l label",
                 "  shift+t label time · filters ctrl+d/t/u/l/a · cycle ctrl+o/shift+ctrl+o",
                 "  Type to search:", new string('─', 80), "",
                 "  • user: first message",
@@ -878,7 +880,7 @@ internal static class SessionSelectorCases
         yield return ("ses.tree.render-help-wide", Sync(() =>
         {
             var lines = Strip(Tree(BranchingTree(), "asst-4a").Render(120));
-            Equal("  ↑/↓ move · ←/→ page · ctrl+←/→ branch · ctrl+x copy · shift+l label · shift+t label time · filters ctrl+d/t/u/l/a", lines[3].TrimEnd(), "help line 1");
+            Equal($"  ↑/↓ move · ←/→ page · {BranchKeys} branch · ctrl+x copy · shift+l label · shift+t label time · filters ctrl+d/t/u/l/a", lines[3].TrimEnd(), "help line 1");
             Equal("  cycle ctrl+o/shift+ctrl+o", lines[4].TrimEnd(), "help line 2");
         }));
         yield return ("ses.tree.render-user-only", Sync(() =>

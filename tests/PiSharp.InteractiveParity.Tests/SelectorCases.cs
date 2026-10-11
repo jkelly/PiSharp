@@ -300,7 +300,7 @@ internal static class SelectorCases
             Contains(Joined(selector, 120), "  Model unavailable", "unavailable model name");
             selector.HandleInput("\u001b[B");
             selector.HandleInput("\r");
-            Contains(Joined(selector, 140), "· 2/2 enabled · 1 unavailable (unsaved)", "dirty footer");
+            Contains(Joined(selector, 160), "· 2/2 enabled · 1 unavailable (unsaved)", "dirty footer"); // macOS's Option+Up/Option+Down wraps at 140
             selector.SetRefreshStatus("Model catalogs refreshed.", "success");
             Equal("  Model catalogs refreshed.", Row(selector, 140, "Model catalogs"), "refresh status");
         }));

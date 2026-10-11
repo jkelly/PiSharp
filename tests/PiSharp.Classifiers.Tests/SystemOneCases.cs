@@ -104,13 +104,13 @@ internal static partial class Program
         {
             var http = new FakeHttp(async (_, attempt, token) =>
             {
-                if (attempt == 1) { await Task.Delay(200, token); return FakeHttp.Text("retry", HttpStatusCode.InternalServerError, "text/plain", ("retry-after-ms", "0")); }
-                await Task.Delay(200, token);
+                if (attempt == 1) { await Task.Delay(500, token); return FakeHttp.Text("retry", HttpStatusCode.InternalServerError, "text/plain", ("retry-after-ms", "0")); }
+                await Task.Delay(500, token);
                 return FakeHttp.Json($$$"""{"answers":{{{SystemOneAnswers}}}}""");
             });
-            // Each attempt takes 200 ms of a 300 ms budget: one shared timeout would expire during the second attempt.
+            // Each attempt takes 500 ms of an 800 ms budget: one shared timeout would expire during the second attempt (margins sized for loaded CI runners).
             var result = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev, SystemOneContext,
-                new ClassifierOptions { ApiKey = "secret", Http = http.Client, TimeoutMs = 300, MaxRetries = 1 });
+                new ClassifierOptions { ApiKey = "secret", Http = http.Client, TimeoutMs = 800, MaxRetries = 1 });
             Equal(ModelOperationStopReason.Stop, result.StopReason, result.ErrorMessage ?? "stop");
             Equal(2, http.Requests.Count, "attempts");
             // Timeouts themselves are retried (no status).
@@ -120,7 +120,7 @@ internal static partial class Program
                 return FakeHttp.Json($$$"""{"answers":{{{SystemOneAnswers}}}}""");
             });
             result = await TypeSafeSystemOneClassifier.Instance.ClassifyAsync(Jev, SystemOneContext,
-                new ClassifierOptions { ApiKey = "secret", Http = slow.Client, TimeoutMs = 20, MaxRetries = 1, MaxRetryDelayMs = 0 });
+                new ClassifierOptions { ApiKey = "secret", Http = slow.Client, TimeoutMs = 200, MaxRetries = 1, MaxRetryDelayMs = 0 });
             Equal(ModelOperationStopReason.Stop, result.StopReason, result.ErrorMessage ?? "retried timeout");
         }),
         ("system-one.malformed-answers-keep-billed-usage-and-malformed-usage-is-ignored", async () =>

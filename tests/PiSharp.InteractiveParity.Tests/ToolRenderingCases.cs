@@ -1154,9 +1154,17 @@ internal static class ToolRenderingCases
 
     // ------------------------------------------------------------------ extension renderers (async rows)
 
+    // Extension rows arrive on a pool thread and redraw through the UI loop the component was created on, as in the app; without
+    // a loop the redraw would race the test's own renders.
+    private static void OnUiLoop(Action<ITui, Action> body)
+    {
+        var (tui, loop, _) = NewTui();
+        WithContext(loop, () => body(tui, () => loop.RunPending()));
+    }
+
     private static IEnumerable<(string Id, Func<Task> Run)> ExtensionAdapterTests()
     {
-        yield return ("tool.extension.async-rows", Sync(() =>
+        yield return ("tool.extension.async-rows", Sync(() => OnUiLoop((ui, pump) =>
         {
             var calls = 0;
             var renderers = new ExtensionToolRenderers(null,
@@ -1167,36 +1175,36 @@ internal static class ToolRenderingCases
                 },
                 (result, context, width, _) => Task.FromResult(new ExtensionCustomComponentRows(
                     [$"ext result {result.Value.GetProperty("content")[0].GetProperty("text").GetString()} partial={context.IsPartial}"], [0])));
-            var component = ToolExecutionComponent.FromExtensionRenderers("ext_tool", "e1", Args("""{"q":1}"""), null, renderers, Ui(), "/");
+            var component = ToolExecutionComponent.FromExtensionRenderers("ext_tool", "e1", Args("""{"q":1}"""), null, renderers, ui, "/");
             Equal("", Render(component), "nothing until rows arrive");
-            var rendered = WaitForRenderedText(() => Render(component), "ext call ext_tool w118 expanded=False");
+            var rendered = WaitForRenderedText(() => Render(component), "ext call ext_tool w118 expanded=False", pump);
             Contains(rendered, "ext call", "call rows");
             var before = calls;
             Render(component);
             Equal(before, calls, "completed rows are reused for the same width and context");
             component.UpdateResult(TextResult("done"), true);
-            WaitForRenderedText(() => Render(component), "ext result done partial=True");
+            WaitForRenderedText(() => Render(component), "ext result done partial=True", pump);
             component.SetExpanded(true);
-            WaitForRenderedText(() => Render(component), "expanded=True");
-        }));
+            WaitForRenderedText(() => Render(component), "expanded=True", pump);
+        })));
 
-        yield return ("tool.extension.failed-renderer-falls-back", Sync(() =>
+        yield return ("tool.extension.failed-renderer-falls-back", Sync(() => OnUiLoop((ui, pump) =>
         {
             var renderers = new ExtensionToolRenderers(ExtensionToolRenderShell.Default,
                 (_, _, _) => Task.FromException<ExtensionCustomComponentRows>(new InvalidOperationException("boom")));
-            var component = ToolExecutionComponent.FromExtensionRenderers("ext_tool", "e2", Args("""{"q":1}"""), null, renderers, Ui(), "/");
+            var component = ToolExecutionComponent.FromExtensionRenderers("ext_tool", "e2", Args("""{"q":1}"""), null, renderers, ui, "/");
             Render(component);
-            var rendered = WaitForRenderedText(() => { component.Invalidate(); return Render(component); }, "ext_tool q=1");
+            var rendered = WaitForRenderedText(() => { component.Invalidate(); return Render(component); }, "ext_tool q=1", pump);
             Contains(rendered, "ext_tool q=1", "generic call header");
-        }));
+        })));
 
-        yield return ("tool.extension.self-shell", Sync(() =>
+        yield return ("tool.extension.self-shell", Sync(() => OnUiLoop((ui, pump) =>
         {
             var renderers = new ExtensionToolRenderers(ExtensionToolRenderShell.Self,
                 (_, width, _) => Task.FromResult(new ExtensionCustomComponentRows([new string('z', width + 10)], [width + 10])));
-            var component = ToolExecutionComponent.FromExtensionRenderers("ext_tool", "e3", Args("{}"), null, renderers, Ui(), "/");
-            var rendered = WaitForRenderedText(() => Render(component, 20), "zzz");
+            var component = ToolExecutionComponent.FromExtensionRenderers("ext_tool", "e3", Args("{}"), null, renderers, ui, "/");
+            var rendered = WaitForRenderedText(() => Render(component, 20), "zzz", pump);
             Lines(["", new string('z', 20)], rendered.Split('\n'), "self shell rows cut to the width");
-        }));
+        })));
     }
 }

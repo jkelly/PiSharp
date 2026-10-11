@@ -181,9 +181,16 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
             if (anchorExit.IsCompleted) return false; // The identity anchor is gone: never signal a group id that may be reused.
             if (Native.kill(-anchor, Native.SIGKILL) != 0 && Marshal.GetLastPInvokeError() != Native.ESRCH) return false;
             await Task.WhenAll(Exit, anchorExit).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
-            for (var attempt = 0; attempt < 100; attempt++)
+            // Members not yet reaped by their new parent (launchd adopts orphans on macOS) keep the group: macOS answers EPERM for a
+            // group of zombies, Linux 0, until it is gone (ESRCH). Any other answer, or a group still present after 5 s, is uncertain.
+            for (var attempt = 0; attempt < 500; attempt++)
             {
-                if (Native.kill(-anchor, 0) != 0) return Marshal.GetLastPInvokeError() == Native.ESRCH;
+                if (Native.kill(-anchor, 0) != 0)
+                {
+                    var error = Marshal.GetLastPInvokeError();
+                    if (error == Native.ESRCH) return true;
+                    if (error != Native.EPERM) return false;
+                }
                 await Task.Delay(10).ConfigureAwait(false);
             }
             return false;
@@ -203,7 +210,7 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
 
     private static class Native
     {
-        internal const int SIGKILL = 9, ESRCH = 3, EINTR = 4, O_RDONLY = 0, O_WRONLY = 1, F_SETFD = 2, FD_CLOEXEC = 1;
+        internal const int SIGKILL = 9, EPERM = 1, ESRCH = 3, EINTR = 4, O_RDONLY = 0, O_WRONLY = 1, F_SETFD = 2, FD_CLOEXEC = 1;
         internal const short POSIX_SPAWN_SETPGROUP = 0x02;
         [DllImport("libc", SetLastError = true)] internal static extern int pipe([Out] int[] fds);
         [DllImport("libc", SetLastError = true)] internal static extern int fcntl(int fd, int command, int argument);

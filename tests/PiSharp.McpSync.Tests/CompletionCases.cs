@@ -170,7 +170,7 @@ internal static partial class Program
             var tool = owner.Current.Session.CaptureToolCatalogRegistry().RegisteredTools.Single(tool => tool.Adapter.Name == "mcp__docs__search");
             Equal(ToolExposure.Deferred, tool.Exposure); Equal("mcp__docs", tool.Namespace?.Name);
             Equal(Intro + "\n- mcp__broken (codemode)\n- mcp__docs (codemode): Docs instructions.\n- mcp__slow (codemode)", source.Render(owner.Current.Generation));
-            Equal(2, reports.Count);
+            Check(reports.Count == 2, "reports before retiring: " + string.Join("; ", reports.Select(report => report.Entry.Name + " " + (report.Failure?.ToString() ?? "connected"))));
         }
         finally
         {
@@ -180,7 +180,8 @@ internal static partial class Program
             foreach (var registry in registries) await registry.DisposeAsync();
         }
         await slowCancelled.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        Equal(2, reports.Count); Equal(1, docsChannel.Closes);
+        Check(reports.Count == 2, "reports: " + string.Join("; ", reports.Select(report => report.Entry.Name + " " + (report.Failure?.ToString() ?? "connected"))));
+        Equal(1, docsChannel.Closes);
     }
 
     private static Task BackgroundPartition()

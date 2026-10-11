@@ -72,9 +72,16 @@ public sealed class UnixProcessGroupLease : IUnixProcessLease
         // Negative PID addresses a process group. Never signal PID 0 or the caller's group.
         if (kill(-_groupId, 9) != 0 && Marshal.GetLastPInvokeError() != 3) return false; // ESRCH
         // A zombie can retain the group until its parent reaps it; our original Exit task performs that reap.
-        for (var attempt = 0; attempt < 100; attempt++)
+        // macOS answers EPERM (1) for a group whose remaining members are zombies awaiting their new parent's reap (launchd adopts
+        // orphans): keep waiting for ESRCH (3), up to 5 s.
+        for (var attempt = 0; attempt < 500; attempt++)
         {
-            if (kill(-_groupId, 0) != 0) return Marshal.GetLastPInvokeError() == 3;
+            if (kill(-_groupId, 0) != 0)
+            {
+                var error = Marshal.GetLastPInvokeError();
+                if (error == 3) return true;
+                if (error != 1) return false;
+            }
             await Task.Delay(10).ConfigureAwait(false);
         }
         return false;
