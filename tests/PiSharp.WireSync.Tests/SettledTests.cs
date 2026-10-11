@@ -22,6 +22,7 @@ internal static class SettledTests
     {
         yield return ("wire.duration.session-rpc-events-jsonl-and-reopen-round-trip", SessionRoundTrip);
         yield return ("wire.agent-settled.rpc-and-session-aborted-flag", Aborted);
+        yield return ("wire.agent-settled.prompt-while-settling-waits-for-the-settlement", PromptWhileSettling);
     }
 
     private sealed record Step(AssistantMessage Message, double Elapsed, bool Pause = false)
@@ -147,5 +148,47 @@ internal static class SettledTests
         await fixture.Send("abort", "stop"); await fixture.Dispatcher.WaitForIdleAsync();
         Equal("""{"type":"agent_settled","aborted":true}""", fixture.Records().Single(record => Type(record) == "agent_settled").GetRawText());
         Check(fixture.Settled.Count == 1 && fixture.Settled[0].Aborted && fixture.Settled[0].Status == "cancelled", "session settlement did not report the abort");
+    }
+
+    /// <summary>Holds the first session settlement until released, so a run stays finished but unsettled.</summary>
+    private sealed class HoldingSink : ISessionOperationEventSink
+    {
+        public TaskCompletionSource Holding { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _held;
+        public async ValueTask EmitAsync(SessionOperationEvent observation, CancellationToken token)
+        {
+            if (observation is not SessionOperationSettled || Interlocked.Exchange(ref _held, 1) != 0) return;
+            Holding.TrySetResult();
+            await Release.Task;
+        }
+    }
+
+    // agent-session.ts prompt(): a prompt that arrives while agent_settled is being emitted is deferred until the run has settled
+    // (_deferredSettledActions), never refused (formerly "Session is settling. Wait for agent_settled before prompting again.").
+    private static async Task PromptWhileSettling()
+    {
+        var transport = new Script(new ManualClock(), new Step(Message(tool: false), 5), new Step(Message(tool: false), 5));
+        await using var fixture = await Fixture.Create(transport, null, []);
+        var hold = new HoldingSink();
+        using var subscription = fixture.Session.SubscribeOperationEvents(hold);
+        await fixture.Send("prompt", "first", "one");
+        await hold.Holding.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        Check(!fixture.Session.Snapshot.Agent.IsRunning, "the first run has finished and is settling");
+        var second = fixture.Send("prompt", "second", "two");
+        await Task.Delay(200);
+        Check(!fixture.Records().Any(record => Type(record) == "response" && record.GetProperty("id").GetString() == "second"),
+            "the second prompt was answered while the first run settled: " + string.Join("\n", fixture.Records().Select(record => record.GetRawText())));
+        hold.Release.TrySetResult();
+        await second.WaitAsync(TimeSpan.FromSeconds(30));
+        await fixture.Dispatcher.WaitForIdleAsync();
+        var records = fixture.Records();
+        var response = records.Single(record => Type(record) == "response" && record.GetProperty("id").GetString() == "second");
+        Check(response.GetProperty("success").GetBoolean(), "second prompt: " + response.GetRawText());
+        Equal(2, records.Count(record => Type(record) == "agent_settled"));
+        var firstSettled = Array.FindIndex(records, record => Type(record) == "agent_settled");
+        var secondStart = Array.FindLastIndex(records, record => Type(record) == "agent_start");
+        Check(firstSettled < secondStart, "the second run starts after the first has settled");
+        Equal(2, transport.Steps.Count(step => step.Entered.Task.IsCompleted));
     }
 }
