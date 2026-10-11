@@ -438,25 +438,28 @@ public static partial class MarkdownLexer
         void Add(MarkdownToken token) { FlushText(); tokens.Add(token); }
         while (position < src.Length)
         {
-            var rest = src[position..];
+            // Plain text must not copy the entire remaining input for every character.
+            // Only tokenizers that actually need a string materialize this suffix.
+            string? rest = null;
+            string Remaining() => rest ??= src[position..];
             Match match;
-            var c = rest[0];
-            if (c == '\\' && (match = Escape().Match(rest)).Success) { Add(new() { Type = "escape", Raw = match.Value, Text = match.Groups[1].Value }); position += match.Length; previous = match.Value[^1]; continue; }
-            if (c is '$' or '\\' && InlineLatex(rest) is { } latex) { Add(latex); position += latex.Raw.Length; previous = latex.Raw[^1]; continue; }
+            var c = src[position];
+            if (c == '\\' && (match = Escape().Match(Remaining())).Success) { Add(new() { Type = "escape", Raw = match.Value, Text = match.Groups[1].Value }); position += match.Length; previous = match.Value[^1]; continue; }
+            if (c is '$' or '\\' && InlineLatex(Remaining()) is { } latex) { Add(latex); position += latex.Raw.Length; previous = latex.Raw[^1]; continue; }
             if (c == '<')
             {
-                if ((match = Autolink().Match(rest)).Success)
+                if ((match = Autolink().Match(Remaining())).Success)
                 {
                     var target = match.Groups[1].Value;
                     var href = target.Contains('@') && !target.Contains(':') ? "mailto:" + target : target;
                     Add(new() { Type = "link", Raw = match.Value, Text = target, Href = href, Tokens = [new() { Type = "text", Raw = target, Text = target }] });
                     position += match.Length; previous = '>'; continue;
                 }
-                if ((match = InlineTag().Match(rest)).Success) { Add(new() { Type = "html", Raw = match.Value, Text = match.Value }); position += match.Length; previous = '>'; continue; }
+                if ((match = InlineTag().Match(Remaining())).Success) { Add(new() { Type = "html", Raw = match.Value, Text = match.Value }); position += match.Length; previous = '>'; continue; }
             }
             if (c is '[' or '!')
             {
-                if ((match = Link().Match(rest)).Success)
+                if ((match = Link().Match(Remaining())).Success)
                 {
                     var image = match.Value[0] == '!';
                     var label = match.Groups[1].Value;
@@ -468,8 +471,8 @@ public static partial class MarkdownLexer
                         : new() { Type = "link", Raw = match.Value, Text = label, Href = href, Title = title, Tokens = InlineTokens(label, links) });
                     position += match.Length; previous = ')'; continue;
                 }
-                var reference = RefLink().Match(rest);
-                if (!reference.Success) reference = NoLink().Match(rest);
+                var reference = RefLink().Match(Remaining());
+                if (!reference.Success) reference = NoLink().Match(Remaining());
                 if (reference.Success)
                 {
                     var key = Regex.Replace((reference.Groups.Count > 2 && reference.Groups[2].Success ? reference.Groups[2].Value : reference.Groups[1].Value).ToLowerInvariant(), @"\s+", " ");
@@ -484,27 +487,27 @@ public static partial class MarkdownLexer
                 }
             }
             if (c is '*' or '_' && EmStrong(src, position, previous, links) is { } emphasis) { Add(emphasis); position += emphasis.Raw.Length; previous = emphasis.Raw[^1]; continue; }
-            if (c == '`' && (match = CodeSpan().Match(rest)).Success)
+            if (c == '`' && (match = CodeSpan().Match(Remaining())).Success)
             {
                 var code = match.Groups[2].Value.Replace('\n', ' ');
                 if (code.Length > 2 && code[0] == ' ' && code[^1] == ' ' && code.Any(ch => ch != ' ')) code = code[1..^1];
                 Add(new() { Type = "codespan", Raw = match.Value, Text = code });
                 position += match.Length; previous = '`'; continue;
             }
-            if (c is ' ' or '\\' && (match = Break().Match(rest)).Success) { Add(new() { Type = "br", Raw = match.Value }); position += match.Length; previous = '\n'; continue; }
-            if (c == '~' && (match = StrictDel().Match(rest)).Success)
+            if (c is ' ' or '\\' && Break().IsMatch(src.AsSpan(position)) && (match = Break().Match(Remaining())).Success) { Add(new() { Type = "br", Raw = match.Value }); position += match.Length; previous = '\n'; continue; }
+            if (c == '~' && (match = StrictDel().Match(Remaining())).Success)
             {
                 Add(new() { Type = "del", Raw = match.Value, Text = match.Groups[2].Value, Tokens = InlineTokens(match.Groups[2].Value, links) });
                 position += match.Length; previous = '~'; continue;
             }
-            if ((c is 'h' or 'f' or 'w') && (position == 0 || !char.IsLetterOrDigit(previous)) && (match = Url().Match(rest)).Success)
+            if ((c is 'h' or 'f' or 'w') && (position == 0 || !char.IsLetterOrDigit(previous)) && Url().IsMatch(src.AsSpan(position)) && (match = Url().Match(Remaining())).Success)
             {
                 var url = TrimUrl(match.Value);
                 var href = url.StartsWith("www.", StringComparison.Ordinal) ? "http://" + url : url;
                 Add(new() { Type = "link", Raw = url, Text = url, Href = href, Tokens = [new() { Type = "text", Raw = url, Text = url }] });
                 position += url.Length; previous = url[^1]; continue;
             }
-            if (char.IsLetterOrDigit(c) && (position == 0 || !char.IsLetterOrDigit(previous) && previous is not ('.' or '+' or '-' or '_')) && (match = Email().Match(rest)).Success)
+            if (char.IsLetterOrDigit(c) && (position == 0 || !char.IsLetterOrDigit(previous) && previous is not ('.' or '+' or '-' or '_')) && Email().IsMatch(src.AsSpan(position)) && (match = Email().Match(Remaining())).Success)
             {
                 Add(new() { Type = "link", Raw = match.Value, Text = match.Value, Href = "mailto:" + match.Value, Tokens = [new() { Type = "text", Raw = match.Value, Text = match.Value }] });
                 position += match.Length; previous = match.Value[^1]; continue;

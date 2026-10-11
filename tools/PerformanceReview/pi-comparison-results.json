@@ -1,0 +1,570 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "c83a06c00f485f0540305db57b8cbc016c8d1717",
+  "recorded_at_utc": "2026-10-11T04:13:21.523Z",
+  "pi_updated_from": "0.86.1",
+  "pi": {
+    "implementation": "@earendil-works/pi-coding-agent",
+    "version": "1.1.0",
+    "runtime": "v24.19.0",
+    "warmups": 5,
+    "repetitions": 7,
+    "package_root": "C:\\Users\\jksof\\AppData\\Roaming\\npm\\node_modules\\@earendil-works\\pi-coding-agent"
+  },
+  "pisharp": {
+    "implementation": "PiSharp",
+    "runtime": "10.0.11",
+    "warmups": 5,
+    "repetitions": 7
+  },
+  "sdk": "10.0.400",
+  "operating_system": "Microsoft Windows NT 10.0.26300.0",
+  "methodology": [
+    "Offline fake HTTP responses through the actual public Pi and PiSharp provider implementations, including SSE decoding. Payload hashes match byte-for-byte.",
+    "500, 1000 or 2000 text deltas of 32 ASCII characters; final text, delta count and successful terminal checked in every run.",
+    "Timing: five warmups, seven repetitions, median; GC before each repetition, without memory samplers in timed intervals. Runs executed sequentially. .NET Release, DOTNET_TieredCompilation=0; Pi uses normal V8 optimization.",
+    "Warm heap growth: separate memory trial after timing runs, sampled at event boundaries; .NET GC.GetTotalMemory(false), V8 process.memoryUsage().heapUsed. Includes uncollected garbage and sampler overhead; not retained-live-memory or cumulative allocations.",
+    "Cold process RAM: three fresh processes per provider, one request each, no warmup; OS peak working set via Process.PeakWorkingSet64 and Node resourceUsage().maxRSS. Baseline, absolute peak, and increase over the previous process high-water mark are reported. Includes runtime/JIT/native memory.",
+    "Cold Pi processes import only the selected provider and its dependencies, excluding session/UI modules. These are provider benchmark processes, not complete interactive CLI sessions; their absolute working sets do not predict full application RAM.",
+    "Cumulative allocated_bytes is exact .NET GC.GetTotalAllocatedBytes(true), measured in a separate trial. No equivalent exact V8 counter was used; do not compare this column to Pi heap growth.",
+    "Session: 256-character user messages. Pi receives SessionManager-style prebuilt byId index. PiSharp append measurement reuses a projected prefix prepared outside each interval; full projection validates and converts the whole immutable forest. Semantics and ownership differ.",
+    "UI: 1000 prebuilt updates ending in 32000 text characters plus thinking, one render at width 80, five warmups and seven repetitions. Rendering/themes can differ across implementations.",
+    "Node 24.19.0 was used because the default Node 22.18.0 is below Pi 1.1.0 minimum 22.19.0. The global Node selection was not changed.",
+    "SDK 10.0.401 pinned by global.json is unavailable; absolute project paths were built from an external temporary directory with SDK 10.0.400. Repository SDK settings were preserved.",
+    "Performance captures are not a pinned upstream parity qualification or a replacement for behavioral tests."
+  ],
+  "identical_provider_payloads": [
+    {
+      "wire_size": 500,
+      "wire_bytes": 53600,
+      "sha256": "0082ef58dd14f21b174271d839c73c9d4f03d4b690a236b9774341c99a8b1aca"
+    },
+    {
+      "wire_size": 1000,
+      "wire_bytes": 107100,
+      "sha256": "47a9a257b20bf4e349fe5542301bac05ae63d0701fc8535fde728f9208dcd01f"
+    },
+    {
+      "wire_size": 2000,
+      "wire_bytes": 214100,
+      "sha256": "7f4b05449e66a8a8ccb43a08d7f0812b3228e508850a0d1ec27f54c67d10b8ae"
+    }
+  ],
+  "timing_and_warm_heap": {
+    "pisharp_before": [
+      {
+        "name": "openai-completions-http-stream",
+        "size": 500,
+        "median_ms": 103.2833,
+        "min_ms": 102.8688,
+        "max_ms": 106.2174,
+        "allocated_bytes": 533275624,
+        "sampled_peak_heap_growth_bytes": 51097360
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 500,
+        "median_ms": 8.3992,
+        "min_ms": 8.0731,
+        "max_ms": 8.8451,
+        "allocated_bytes": 55810904,
+        "sampled_peak_heap_growth_bytes": 50151416
+      },
+      {
+        "name": "openai-completions-http-stream",
+        "size": 1000,
+        "median_ms": 320.4317,
+        "min_ms": 315.4117,
+        "max_ms": 327.153,
+        "allocated_bytes": 1928313248,
+        "sampled_peak_heap_growth_bytes": 51053240
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 1000,
+        "median_ms": 23.5375,
+        "min_ms": 23.1161,
+        "max_ms": 23.9676,
+        "allocated_bytes": 199454568,
+        "sampled_peak_heap_growth_bytes": 50660584
+      },
+      {
+        "name": "openai-completions-http-stream",
+        "size": 2000,
+        "median_ms": 1239.2931,
+        "min_ms": 1221.2206,
+        "max_ms": 1285.9391,
+        "allocated_bytes": 7291709392,
+        "sampled_peak_heap_growth_bytes": 57414776
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 2000,
+        "median_ms": 87.8502,
+        "min_ms": 84.2275,
+        "max_ms": 102.8516,
+        "allocated_bytes": 751169248,
+        "sampled_peak_heap_growth_bytes": 50660712
+      },
+      {
+        "name": "session-full-projection",
+        "size": 100,
+        "median_ms": 0.1166,
+        "min_ms": 0.111,
+        "max_ms": 0.153,
+        "allocated_bytes": 328872,
+        "sampled_peak_heap_growth_bytes": 328928
+      },
+      {
+        "name": "session-append-projection",
+        "size": 100,
+        "median_ms": 0.127,
+        "min_ms": 0.1077,
+        "max_ms": 0.1636,
+        "allocated_bytes": 328808,
+        "sampled_peak_heap_growth_bytes": 328928
+      },
+      {
+        "name": "session-full-projection",
+        "size": 500,
+        "median_ms": 0.6309,
+        "min_ms": 0.5952,
+        "max_ms": 0.6562,
+        "allocated_bytes": 1632152,
+        "sampled_peak_heap_growth_bytes": 1634848
+      },
+      {
+        "name": "session-append-projection",
+        "size": 500,
+        "median_ms": 0.6363,
+        "min_ms": 0.6182,
+        "max_ms": 0.7255,
+        "allocated_bytes": 1632088,
+        "sampled_peak_heap_growth_bytes": 1634848
+      },
+      {
+        "name": "session-full-projection",
+        "size": 1000,
+        "median_ms": 1.3107,
+        "min_ms": 1.265,
+        "max_ms": 1.338,
+        "allocated_bytes": 3267472,
+        "sampled_peak_heap_growth_bytes": 3277744
+      },
+      {
+        "name": "session-append-projection",
+        "size": 1000,
+        "median_ms": 1.2639,
+        "min_ms": 1.2268,
+        "max_ms": 1.3742,
+        "allocated_bytes": 3267408,
+        "sampled_peak_heap_growth_bytes": 3277744
+      },
+      {
+        "name": "session-full-projection",
+        "size": 2000,
+        "median_ms": 2.6749,
+        "min_ms": 2.5796,
+        "max_ms": 2.7438,
+        "allocated_bytes": 6549720,
+        "sampled_peak_heap_growth_bytes": 6569224
+      },
+      {
+        "name": "session-append-projection",
+        "size": 2000,
+        "median_ms": 2.7071,
+        "min_ms": 2.62,
+        "max_ms": 2.8648,
+        "allocated_bytes": 6549656,
+        "sampled_peak_heap_growth_bytes": 6569160
+      }
+    ],
+    "pisharp_after": [
+      {
+        "name": "openai-completions-http-stream",
+        "size": 500,
+        "median_ms": 3.6606,
+        "min_ms": 3.6114,
+        "max_ms": 4.1246,
+        "allocated_bytes": 8427336,
+        "sampled_peak_heap_growth_bytes": 8420992
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 500,
+        "median_ms": 1.6725,
+        "min_ms": 1.6248,
+        "max_ms": 1.7482,
+        "allocated_bytes": 5043352,
+        "sampled_peak_heap_growth_bytes": 5020960
+      },
+      {
+        "name": "openai-completions-http-stream",
+        "size": 1000,
+        "median_ms": 7.0251,
+        "min_ms": 6.8923,
+        "max_ms": 7.2279,
+        "allocated_bytes": 15886096,
+        "sampled_peak_heap_growth_bytes": 15850360
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 1000,
+        "median_ms": 3.2868,
+        "min_ms": 3.2064,
+        "max_ms": 3.6052,
+        "allocated_bytes": 10030120,
+        "sampled_peak_heap_growth_bytes": 9989024
+      },
+      {
+        "name": "openai-completions-http-stream",
+        "size": 2000,
+        "median_ms": 13.7391,
+        "min_ms": 13.5819,
+        "max_ms": 15.6671,
+        "allocated_bytes": 30851320,
+        "sampled_peak_heap_growth_bytes": 21540768
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 2000,
+        "median_ms": 6.498,
+        "min_ms": 6.4144,
+        "max_ms": 6.8795,
+        "allocated_bytes": 20009832,
+        "sampled_peak_heap_growth_bytes": 19931608
+      },
+      {
+        "name": "session-full-projection",
+        "size": 100,
+        "median_ms": 0.1103,
+        "min_ms": 0.1078,
+        "max_ms": 0.1263,
+        "allocated_bytes": 328944,
+        "sampled_peak_heap_growth_bytes": 328936
+      },
+      {
+        "name": "session-append-projection",
+        "size": 100,
+        "median_ms": 0.0034,
+        "min_ms": 0.0029,
+        "max_ms": 0.0126,
+        "allocated_bytes": 6984,
+        "sampled_peak_heap_growth_bytes": 7952
+      },
+      {
+        "name": "session-full-projection",
+        "size": 500,
+        "median_ms": 0.6043,
+        "min_ms": 0.5939,
+        "max_ms": 0.7643,
+        "allocated_bytes": 1632224,
+        "sampled_peak_heap_growth_bytes": 1634856
+      },
+      {
+        "name": "session-append-projection",
+        "size": 500,
+        "median_ms": 0.0052,
+        "min_ms": 0.0042,
+        "max_ms": 0.0133,
+        "allocated_bytes": 19912,
+        "sampled_peak_heap_growth_bytes": 15480
+      },
+      {
+        "name": "session-full-projection",
+        "size": 1000,
+        "median_ms": 1.2568,
+        "min_ms": 1.2484,
+        "max_ms": 1.4595,
+        "allocated_bytes": 3267544,
+        "sampled_peak_heap_growth_bytes": 3277752
+      },
+      {
+        "name": "session-append-projection",
+        "size": 1000,
+        "median_ms": 0.0138,
+        "min_ms": 0.0051,
+        "max_ms": 0.0304,
+        "allocated_bytes": 36040,
+        "sampled_peak_heap_growth_bytes": 32056
+      },
+      {
+        "name": "session-full-projection",
+        "size": 2000,
+        "median_ms": 2.8411,
+        "min_ms": 2.7608,
+        "max_ms": 3.0516,
+        "allocated_bytes": 6549792,
+        "sampled_peak_heap_growth_bytes": 6569232
+      },
+      {
+        "name": "session-append-projection",
+        "size": 2000,
+        "median_ms": 0.0352,
+        "min_ms": 0.0136,
+        "max_ms": 0.0403,
+        "allocated_bytes": 68048,
+        "sampled_peak_heap_growth_bytes": 71584
+      },
+      {
+        "name": "ui-1000-updates-one-render",
+        "size": 1000,
+        "median_ms": 1.7538,
+        "min_ms": 1.703,
+        "max_ms": 1.811,
+        "allocated_bytes": 2401840,
+        "sampled_peak_heap_growth_bytes": 2413568
+      }
+    ],
+    "pi": [
+      {
+        "name": "openai-completions-http-stream",
+        "size": 500,
+        "median_ms": 2.7715999999999212,
+        "min_ms": 2.5849999999999227,
+        "max_ms": 3.123199999999997,
+        "sampled_peak_heap_growth_bytes": 3389208
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 500,
+        "median_ms": 1.3143999999999778,
+        "min_ms": 1.0691000000000486,
+        "max_ms": 1.4102000000000317,
+        "sampled_peak_heap_growth_bytes": 2078184
+      },
+      {
+        "name": "openai-completions-http-stream",
+        "size": 1000,
+        "median_ms": 4.543900000000008,
+        "min_ms": 4.309700000000021,
+        "max_ms": 5.235299999999938,
+        "sampled_peak_heap_growth_bytes": 6426280
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 1000,
+        "median_ms": 2.16700000000003,
+        "min_ms": 2.032600000000002,
+        "max_ms": 2.5335000000000036,
+        "sampled_peak_heap_growth_bytes": 4242880
+      },
+      {
+        "name": "openai-completions-http-stream",
+        "size": 2000,
+        "median_ms": 7.638999999999896,
+        "min_ms": 7.3297000000000025,
+        "max_ms": 7.811999999999898,
+        "sampled_peak_heap_growth_bytes": 12366256
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 2000,
+        "median_ms": 3.7578000000000884,
+        "min_ms": 3.5558999999998377,
+        "max_ms": 3.940499999999929,
+        "sampled_peak_heap_growth_bytes": 8619584
+      },
+      {
+        "name": "session-projection-existing-index",
+        "size": 100,
+        "median_ms": 0.04580000000009932,
+        "min_ms": 0.030799999999999272,
+        "max_ms": 0.07920000000012806,
+        "sampled_peak_heap_growth_bytes": 60976
+      },
+      {
+        "name": "session-projection-existing-index",
+        "size": 500,
+        "median_ms": 0.06480000000010477,
+        "min_ms": 0.06310000000007676,
+        "max_ms": 0.08210000000008222,
+        "sampled_peak_heap_growth_bytes": 198840
+      },
+      {
+        "name": "session-projection-existing-index",
+        "size": 1000,
+        "median_ms": 0.12149999999996908,
+        "min_ms": 0.11940000000004147,
+        "max_ms": 0.12779999999997926,
+        "sampled_peak_heap_growth_bytes": 390832
+      },
+      {
+        "name": "session-projection-existing-index",
+        "size": 2000,
+        "median_ms": 0.2096999999998843,
+        "min_ms": 0.1851000000001477,
+        "max_ms": 0.26910000000020773,
+        "sampled_peak_heap_growth_bytes": 608584
+      },
+      {
+        "name": "ui-1000-updates-one-render",
+        "size": 1000,
+        "median_ms": 3.728700000000117,
+        "min_ms": 3.6118999999998778,
+        "max_ms": 4.740399999999909,
+        "sampled_peak_heap_growth_bytes": 9223800
+      }
+    ]
+  },
+  "cold_process_memory": {
+    "pisharp_before": [
+      {
+        "name": "openai-completions-http-stream",
+        "size": 2000,
+        "processes": 3,
+        "median_baseline_rss_bytes": 40292352,
+        "median_process_peak_rss_bytes": 109305856,
+        "min_process_peak_rss_bytes": 109301760,
+        "max_process_peak_rss_bytes": 109457408,
+        "median_process_peak_rss_increase_bytes": 69050368,
+        "median_sampled_peak_heap_growth_bytes": 53580784
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 2000,
+        "processes": 3,
+        "median_baseline_rss_bytes": 40382464,
+        "median_process_peak_rss_bytes": 108470272,
+        "min_process_peak_rss_bytes": 104452096,
+        "max_process_peak_rss_bytes": 108826624,
+        "median_process_peak_rss_increase_bytes": 68407296,
+        "median_sampled_peak_heap_growth_bytes": 50888872
+      }
+    ],
+    "pisharp_after": [
+      {
+        "name": "openai-completions-http-stream",
+        "size": 2000,
+        "processes": 3,
+        "median_baseline_rss_bytes": 40542208,
+        "median_process_peak_rss_bytes": 74772480,
+        "min_process_peak_rss_bytes": 69496832,
+        "max_process_peak_rss_bytes": 75018240,
+        "median_process_peak_rss_increase_bytes": 34295808,
+        "median_sampled_peak_heap_growth_bytes": 11972400
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 2000,
+        "processes": 3,
+        "median_baseline_rss_bytes": 40579072,
+        "median_process_peak_rss_bytes": 70344704,
+        "min_process_peak_rss_bytes": 70299648,
+        "max_process_peak_rss_bytes": 70406144,
+        "median_process_peak_rss_increase_bytes": 29765632,
+        "median_sampled_peak_heap_growth_bytes": 20232872
+      }
+    ],
+    "pi": [
+      {
+        "name": "openai-completions-http-stream",
+        "size": 2000,
+        "processes": 3,
+        "median_baseline_rss_bytes": 62910464,
+        "median_process_peak_rss_bytes": 67239936,
+        "min_process_peak_rss_bytes": 67227648,
+        "max_process_peak_rss_bytes": 67399680,
+        "median_process_peak_rss_increase_bytes": 4284416,
+        "median_sampled_peak_heap_growth_bytes": 5261136
+      },
+      {
+        "name": "mistral-conversations-http-stream",
+        "size": 2000,
+        "processes": 3,
+        "median_baseline_rss_bytes": 44589056,
+        "median_process_peak_rss_bytes": 55996416,
+        "min_process_peak_rss_bytes": 55537664,
+        "max_process_peak_rss_bytes": 56287232,
+        "median_process_peak_rss_increase_bytes": 11268096,
+        "median_sampled_peak_heap_growth_bytes": 5195360
+      }
+    ]
+  },
+  "validation": {
+    "mistral": {
+      "passed": 59,
+      "failed": 0
+    },
+    "sessions": {
+      "passed": 100,
+      "failed": 0
+    },
+    "interactive_components_and_e2e": {
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    "node_bridge": {
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    "extension_provider_e2e": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "inline_lexer_baseline_comparisons": {
+      "identical": 1010,
+      "different": 0
+    },
+    "transport_baseline": {
+      "passed": 216,
+      "failed": 24
+    },
+    "transport_candidate": {
+      "passed": 218,
+      "failed": 24
+    },
+    "unchanged_transport_failures": [
+      "native-provider.responses-send-cancellation",
+      "native-thinking.per-request-provider-wire-selection",
+      "native-thinking.metadata-free-off-clears-frozen-controls",
+      "responses-http.invalid-data-termination-and-status-cannot-succeed",
+      "responses-http.admission-limits-and-options",
+      "responses-http.early-disposal-awaits-cleanup",
+      "responses-http.factory-send-source-faults-and-fresh-requests",
+      "responses-key.payload-headers-fresh-ownership-and-model-identity",
+      "responses-key.max-output-source-floor-and-explicit-capability",
+      "responses-key.byte-depth-identity-key-boundaries-and-cancellation",
+      "responses-key.session-codepoint-clamp-finite-temperature-and-budgets",
+      "responses-reasoning.bounds-malformed-and-cancellation-cleanup",
+      "responses-reasoning.preterminal-interruption-retains-done-state",
+      "responses-reasoning.pending-signature-limits-and-cleanup",
+      "responses-tier.request-admission-budget-and-malformed-response",
+      "responses-tier.split-config-rejected-before-send",
+      "responses-incomplete.tool-finality-and-reasoning-backfill",
+      "responses-incomplete.malformed-and-trailing-data",
+      "anthropic-http.named-events-eof-done-and-strict-admission",
+      "anthropic-http.request-and-stream-budgets-before-effects",
+      "completions-hooks.legacy-constructor-and-options-deconstruct-control",
+      "completions-hooks.owned-payload-replacement-strict-admission-and-inclusive-byte-budget",
+      "completions-http.exact-done-eof-named-errors-and-strict-json-admission",
+      "completions-http.lower-budgets-and-request-admission-before-send"
+    ],
+    "new_transport_failures": [],
+    "builds": "All affected projects built with zero warnings and zero errors.",
+    "interactive_after_pi_update": {
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    "provider_payload_hashes_identical": true
+  },
+  "behavior_guards": [
+    "Completions source consumers, publication hooks, explicit snapshot capture, tools and near-limit cases retain exact source admission.",
+    "Mistral source snapshots freeze immutable fragment chains; near-limit reducer checks materialize the original snapshot. Arbitrary tool JSON retains eager structural admission.",
+    "Session append cache checks the entire prefix by entry identity and falls back to full validation for navigation, replacement, edits and non-message appends.",
+    "UI coalesces only visual component construction; ordered session events and final updates retain their original processing.",
+    "Extension acknowledgements preserve event order, bound queued progress, permit other Node requests while stalled, and release stalled producers on cancellation."
+  ],
+  "reproduce": [
+    "Build tools/PerformanceReview/PerformanceReview.csproj in Release; run its DLL with DOTNET_TieredCompilation=0 and --pi-comparison.",
+    "node --expose-gc tools/PerformanceReview/pi-comparison.mjs <installed @earendil-works/pi-coding-agent package root>",
+    "For cold memory, append --memory-case openai-completions-http-stream 2000 (or mistral-conversations-http-stream 2000). Run each in a fresh process three times.",
+    "For UI comparison: run PiSharp.InteractiveParity.Tests.dll with DOTNET_TieredCompilation=0, PISHARP_PI_COMPARISON=1 and INTERACTIVEPARITY_FILTER=msg.assistant-message.streaming-coalesces-before-render.",
+    "The original baseline replaces the seven modified Contracts/AI/Sessions sources with versions from baseline_commit and excludes the new incremental projector. Original benchmark code is otherwise the same.",
+    "node tools/PerformanceReview/aggregate-comparison.mjs rebuilds this report from the raw captures."
+  ]
+}

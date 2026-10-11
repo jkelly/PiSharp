@@ -1,0 +1,18 @@
+{
+  "thinking": {
+    "passed": 184,
+    "fixture_sha256": "e872e4581a019e438d96b06440e72d063f4f43f88b5926a1398f39342f312848",
+    "complete_publications": 3680,
+    "failed": 0,
+    "turns": 368,
+    "raw_report": "C:\\Users\\jksof\\AppData\\Local\\Temp\\PiSharp-MemoryProfile-1791727061823\\completions-thinking.json"
+  },
+  "anchored": {
+    "passed": 38,
+    "fixture_sha256": "37ba79cbf6bd41ed99c210598d4484c422a4eacd91e5e6b4af3bee62b1e695a8",
+    "complete_publications": 340,
+    "failed": 0,
+    "turns": 41,
+    "raw_report": "C:\\Users\\jksof\\AppData\\Local\\Temp\\PiSharp-MemoryProfile-1791727061823\\completions-anchored.json"
+  }
+}

@@ -27,22 +27,36 @@ internal sealed class PiProviderTransport(PiExtensionHost host, RegistryModel en
         if (request.ThinkingLevel is { } level && level != "off") options["reasoning"] = level;
         // The extension's streamSimple receives the context as Pi holds it: a lone surrogate travels as JSON.stringify's escape.
         var messages = new JsonArray([.. request.Messages.Select(message => JsonUtf16.Node(message.WireBody))]);
-        var events = Channel.CreateUnbounded<JsonElement>(new() { SingleReader = true });
-        var call = host.CallAsync("provider.stream", new JsonObject
+        const int progressWindow = 32;
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var events = Channel.CreateBounded<(StreamEvent? Event, Func<Task> Acknowledge)>(new BoundedChannelOptions(progressWindow)
+        { SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.Wait });
+        var call = host.CallStreamAsync("provider.stream", new JsonObject
         {
             ["provider"] = entry.Provider, ["api"] = entry.Api, ["model"] = entry.CloneJson(), ["context"] = new JsonObject { ["messages"] = messages }, ["options"] = options
-        }, cancellationToken, value => events.Writer.TryWrite(value.Clone()));
+        }, lifetime.Token, (value, acknowledge) =>
+        {
+            // Retain compact native frames, not the extension's growing partial message.
+            // Credits bound the queue without blocking Node's multiplexed read pump.
+            if (!events.Writer.TryWrite((Map(value, request), acknowledge)))
+                throw new InvalidDataException("Extension provider exceeded its progress window.");
+        }, progressWindow);
         _ = call.ContinueWith(_ => events.Writer.TryComplete(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         var terminal = false;
-        await foreach (var value in events.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        try
         {
-            var mapped = Map(value, request);
-            if (mapped is null) continue;
-            terminal = mapped is StreamTerminalEvent;
-            yield return mapped;
-            if (terminal) break;
+            await foreach (var (mapped, acknowledge) in events.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (mapped is not null && !terminal)
+                {
+                    terminal = mapped is StreamTerminalEvent;
+                    yield return mapped;
+                }
+                await acknowledge().ConfigureAwait(false);
+            }
         }
-        if (terminal) { await Settle(call).ConfigureAwait(false); yield break; }
+        finally { if (!call.IsCompleted) lifetime.Cancel(); await Settle(call).ConfigureAwait(false); }
+        if (terminal) yield break;
         string? failure = null; JsonElement? final = null;
         try { final = await call.ConfigureAwait(false); }
         catch (Exception error) when (error is PiSharp.Compatibility.Node.Pi.PiNodeHostException or InvalidOperationException or IOException) { failure = error.Message; }

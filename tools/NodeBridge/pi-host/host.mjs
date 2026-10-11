@@ -11,6 +11,7 @@ import { Readable } from 'node:stream';
 import { installHooks } from './loader-hooks.mjs';
 import { loadPiModules } from './pi-modules.mjs';
 import { ExtensionRuntime, describeExtension } from './runtime.mjs';
+import { ProgressWindow } from './progress-window.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -94,8 +95,9 @@ function errorOf(error) { return { message: error instanceof Error ? error.messa
 // ------------------------------------------------------------------------------------------------ requests from PiSharp
 let runtime;
 const active = new Map(); // host request id -> AbortController
+const progressWindows = new Map(); // provider request id -> bounded progress credits
 
-async function handle(method, params, id) {
+async function handle(method, params, id, progressWindow = 0) {
   switch (method) {
     case 'init': {
       if (params.agentDir && !process.env.PI_CODING_AGENT_DIR) process.env.PI_CODING_AGENT_DIR = params.agentDir;
@@ -246,16 +248,19 @@ async function handle(method, params, id) {
       const streamSimple = record?.config?.streamSimple;
       if (typeof streamSimple !== 'function') throw new Error(`No extension provider streams the ${params.api} API`);
       const controller = new AbortController(); active.set(id, controller);
+      const flow = progressWindow ? new ProgressWindow(progressWindow, controller.signal) : undefined;
+      if (flow) progressWindows.set(id, flow);
       try {
         const stream = await streamSimple(params.model, params.context, { ...(params.options ?? {}), signal: controller.signal });
         let final;
         for await (const event of stream) {
+          if (flow) await flow.take();
           send({ type: 'progress', id, value: plain(event) });
           if (event.type === 'done') final = event.message; else if (event.type === 'error') final = event.error;
         }
         if (!final && typeof stream.result === 'function') final = await stream.result();
         return plain(final ?? null);
-      } finally { active.delete(id); }
+      } finally { active.delete(id); progressWindows.delete(id); flow?.dispose(); }
     }
     case 'events.deliver': runtime.eventBus.deliver(params.channel, params.data); return null;
     case 'invalidate': runtime.invalidate(params.message); return null;
@@ -269,10 +274,11 @@ port.on('message', (message) => {
     case 'incoming': {
       const frame = message.message;
       if (frame.type === 'request') {
-        Promise.resolve().then(() => handle(frame.method, frame.params ?? {}, frame.id)).then(
+        Promise.resolve().then(() => handle(frame.method, frame.params ?? {}, frame.id, frame.progressWindow)).then(
           (result) => send(result === undefined ? { type: 'response', id: frame.id } : { type: 'response', id: frame.id, result: plain(result) }),
           (error) => send({ type: 'response', id: frame.id, error: errorOf(error) }));
       } else if (frame.type === 'cancel') active.get(frame.id)?.abort();
+      else if (frame.type === 'progress_ack') progressWindows.get(frame.id)?.acknowledge();
       else if (frame.type === 'notify' && frame.method === 'events.deliver') runtime?.eventBus.deliver(frame.params.channel, frame.params.data);
       break;
     }

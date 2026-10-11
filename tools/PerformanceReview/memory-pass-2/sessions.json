@@ -1,0 +1,700 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "native-session-records-storage-migration-archives-tree-context-history-and-pinned-reader-comparisons",
+  "referenceEvidence": "Authored native controls plus frozen unchanged whole-Pi SessionManager observations of actual native exports and branch/history fixtures; no complete phase acceptance",
+  "tests": [
+    {
+      "testId": "session.SessionEntryCodecTests.RecordInventory",
+      "name": "session codec current header and all eleven entry kinds round-trip",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryCodecTests.MessageVariants",
+      "name": "session codec known message/content variants retain wire meaning",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryCodecTests.OpaqueOwnership",
+      "name": "session codec opaque future data and document ownership remain lossless",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryCodecTests.MissingAndNull",
+      "name": "session codec absent/null distinctions and context replacement shape",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryCodecTests.MalformedAndDuplicate",
+      "name": "session codec rejects permissive element syntax malformed records and duplicates",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryCodecTests.NumberProfile",
+      "name": "session codec native integer profile and opaque numeric tokens",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryCodecTests.Limits",
+      "name": "session codec exact character UTF8 depth boundaries and cross-codec limits",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryCodecTests.UnicodeProfile",
+      "name": "session codec strict UTF8 and paired Unicode retain strings",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogReaderTests.FramingAndOwnership",
+      "name": "session reader LF CRLF blanks final record and exact immutable byte ranges",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogReaderTests.InterruptedTails",
+      "name": "session reader distinguishes incomplete EOF JSON and UTF8 from malformed records",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogReaderTests.MiddleDamage",
+      "name": "session reader stops at middle damage and retains hidden descendant bytes",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogReaderTests.HeaderPolicies",
+      "name": "session reader diagnoses missing invalid empty future legacy and duplicate headers",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogReaderTests.Limits",
+      "name": "session reader enforces exact byte line record and codec limits",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogReaderTests.FaultAndCleanup",
+      "name": "session reader waits for owned cleanup and sanitizes read/disposal faults",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogReaderTests.CancellationAndOwnership",
+      "name": "session reader cancellation awaits cleanup and honors caller stream ownership",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogReaderTests.ReadOnlyFiles",
+      "name": "session reader reads readonly files repeatably without changing source hashes",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.CreateAppendReopen",
+      "name": "session store creates appends durably publishes immutable snapshots and reopens",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.Admission",
+      "name": "session store refuses overwrite damaged future invalid graphs and fake durability",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.NonterminatedFraming",
+      "name": "session store preserves nonterminated existing bytes and appends explicit LF",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.SerializationAndDisposal",
+      "name": "session store serializes commits and shares awaited disposal with queued writers",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.FaultStages",
+      "name": "session store partial write flush durable flush and checkpoint faults poison lease",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.Cancellation",
+      "name": "session store prewrite cancellation preserves bytes late cancellation acknowledges commit",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.GrowthLimits",
+      "name": "session store inclusive batch record line and total growth limits reject before writes",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.IndependentWriterLease",
+      "name": "session store Windows lease excludes an independent child writer process",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionLogStoreTests.JavaScriptSerialization",
+      "name": "session store JavaScript serialization writes JSON.stringify records",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextProjectorTests.BranchesAndSettings",
+      "name": "session selected ancestry excludes siblings and replays branch settings",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextProjectorTests.CustomAndOpaqueHistory",
+      "name": "session runtime and model custom context retain owned raw history",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextProjectorTests.ForestDiagnostics",
+      "name": "session forest diagnostics terminate missing parents duplicates cycles",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextProjectorTests.SelectedInfluences",
+      "name": "session stored context influences apply only on selected ancestry",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextProjectorTests.LimitsAndSnapshots",
+      "name": "session projection exact bounds cancellation and retained snapshots",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextProjectorTests.Incremental",
+      "name": "session incremental projection matches fresh validation across append and navigation",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextInfluenceTests.Checkpoints",
+      "name": "session newest checkpoint retains selected range and full ancestry settings",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextInfluenceTests.Edits",
+      "name": "session surviving edits replace content omit contributions and preserve raw metadata",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextInfluenceTests.SummariesAndBash",
+      "name": "session stored summaries and recorded bash convert without effects",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextInfluenceTests.LimitsAndOwnership",
+      "name": "session converted influences obey output budgets and retain snapshots",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionContextInfluenceTests.GenuineWholeModule",
+      "name": "session complete native context matches four genuine whole-module captures",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryMigrationTests.V1Identities",
+      "name": "session migration v1 missing null and explicit versions create owned linear identities",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryMigrationTests.CompactionBoundaries",
+      "name": "session migration compaction indexes address full file array and preserve opaque fields",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryMigrationTests.HookRole",
+      "name": "session migration v2 hook role changes only role and header version",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryMigrationTests.CurrentAndOwnership",
+      "name": "session migration v3 repeat conversion is stable and detached from document lifetime",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryMigrationTests.VersionsAndUnknown",
+      "name": "session migration unknown inert entries survive and future or invalid versions block",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryMigrationTests.Rejections",
+      "name": "session migration identity plans and insufficient known fields block without receipts",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryMigrationTests.UnsafeBoundaries",
+      "name": "session migration ambiguous legacy compaction indexes preserve source and block",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionEntryMigrationTests.LimitsAndStrictJson",
+      "name": "session migration strict array syntax unicode depth byte and count limits are bounded",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionTreeQueriesTests.Topology",
+      "name": "session tree immutable forest indexes roots structural leaves and physical branch points",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionTreeQueriesTests.BranchAndOrdering",
+      "name": "session tree ancestry follows parents while children preserve physical order and stable date ties",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionTreeQueriesTests.Labels",
+      "name": "session tree global labels replay across branches and missing null empty values clear",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionTreeQueriesTests.Names",
+      "name": "session tree latest global name applies exact trimming clearing and metadata capabilities",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionTreeQueriesTests.OpaqueTimestamps",
+      "name": "session tree opaque timestamps remain navigable with explicit chronological diagnostics",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionTreeQueriesTests.GraphFailures",
+      "name": "session tree reuses full projector graph admission and sanitized missing selection failures",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionTreeQueriesTests.LimitsAndCancellation",
+      "name": "session tree exact admission query diagnostics and cancellation limits preserve snapshots",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionTreeQueriesTests.DeepAndOwnership",
+      "name": "session tree deep iterative branches retain unknown records without source mutation",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.ExactCopyAndBranches",
+      "name": "session exact copy preserves immutable source bytes opaque tokens and all branches",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.CompatibleRetention",
+      "name": "session compatible copy preserves every opaque field with explicit zero omissions",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.LegacyCopies",
+      "name": "session explicit copied v1 identities compaction and v2 hook migration retain receipts",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.BlockedInspection",
+      "name": "session future damaged UTF8 and malformed forests inspect without publication",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.PathsAndCollisions",
+      "name": "session copy source aliases destination collisions and traversal-like IDs have no overwrite",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.Budgets",
+      "name": "session copy exact input output line record and Unicode budgets precede effects",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.CancellationAndCleanup",
+      "name": "session copy cancellation joins owned reads temp disposal and cleanup before returning",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.FaultsAndPublication",
+      "name": "session copy IO faults uncertain publication and late cancellation retain honest receipts",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCopyServiceTests.ArchiveCleanup",
+      "name": "session archive cancellation joins held cleanup and reports post-effect publication honestly",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPlannerTests.OpaqueAncestry",
+      "name": "session fork reconnects ancestry and retains exact opaque numeric tokens",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPlannerTests.GlobalLabels",
+      "name": "session fork resolves labels globally in pinned insertion order",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPlannerTests.CompactionReferences",
+      "name": "session fork repairs compaction references to removed labels including self",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPlannerTests.CompactionJsonlReload",
+      "name": "session fork JSONL reload preserves label-remapped compaction context and physical leaf",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPlannerTests.Before",
+      "name": "session fork before extracts concatenated user text and creates empty root branch",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPlannerTests.Admission",
+      "name": "session fork admission rejects invalid graph selection metadata and identity reuse",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPlannerTests.BoundsAndBytes",
+      "name": "session branch bounds cancellation and eager bytes retain immutable source",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPlannerTests.JavaScriptFork",
+      "name": "session fork JavaScript serialization writes JSON.stringify records",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.DurableLocalContent",
+      "name": "session branch publishes exact durable local bytes before returning an owned receipt",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.FreshAndNoOverwrite",
+      "name": "session new branch publishes a fresh header and refuses an existing destination",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.ReceiptRollbackJoins",
+      "name": "session branch rollback shares awaited deletion and closes attachment authority",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.CommitAttachmentRetains",
+      "name": "session branch committed attachment retains its published file on shared disposal",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.ForgedPlans",
+      "name": "session branch forged bytes metadata and invalid graphs fail before file effects",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.Admission",
+      "name": "session branch invalid paths and precancellation have no file effects",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.ExactLimits",
+      "name": "session branch exact reader codec and graph limits admit only complete plans",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.HeldFlushCancellation",
+      "name": "session branch held flush cancellation joins output close and owned temp deletion",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.ShieldedPublication",
+      "name": "session branch late cancellation shields actual publication and returns cleanup authority",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.PublishBeforeMoveFailure",
+      "name": "session branch pre-move failure remains uncertain and retains an unproven final file",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.PublishAfterMoveFailure",
+      "name": "session branch post-move failure remains uncertain and retains actual published bytes",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.CollisionDuringMove",
+      "name": "session branch destination race uses actual nonoverwriting local move",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.StageFailures",
+      "name": "session branch create write flush disk flush and close faults are sanitized",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.PreparationCleanupFailures",
+      "name": "session branch preparation cleanup failures preserve the primary failure and uncertainty",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionBranchPublisherTests.RollbackCleanupFailures",
+      "name": "session branch rollback cleanup faults are sanitized shared and never retried",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCatalogTests.IdentityAndHeaderOnly",
+      "name": "session catalog separates store file and complete header identity without reading message bodies",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCatalogTests.Pagination",
+      "name": "session catalog paginates deterministic bounded headers and binds cursors to query and stores",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCatalogTests.CwdGroups",
+      "name": "session catalog groups foreign Windows and Unix cwd lexically without resolving paths",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCatalogTests.InvalidHeadersAndBounds",
+      "name": "session catalog rejects malformed headers and unsafe names with bounded read diagnostics",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCatalogTests.LimitsAndQueries",
+      "name": "session catalog resource limits and invalid queries never return partial success",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCatalogTests.CancellationJoins",
+      "name": "session catalog cancellation waits for actual reader close before returning",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCatalogTests.CleanupFailure",
+      "name": "session catalog reports cleanup faults after actual file stream close",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionCatalogTests.HeaderChange",
+      "name": "session catalog rechecks exact opened header and does not follow parent metadata",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.MemoryCheckpoint",
+      "name": "session-backend memory acknowledges volatility reopens immutable checkpoints without filesystem",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.MemoryLease",
+      "name": "session-backend memory owns exclusive writer leases and shares repeated close",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.MemoryBounds",
+      "name": "session-backend memory enforces namespace file byte and aggregate resident bounds",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.LazyUser",
+      "name": "session-backend lazy metadata state and disposal stay unmaterialized until first user",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.LazyAssistant",
+      "name": "session-backend lazy first assistant materializes the complete setup checkpoint",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.LazyRace",
+      "name": "session-backend lazy first materialization preserves a racing unrelated destination",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.LazyExactFraming",
+      "name": "session-backend lazy exact copies retain blank whitespace and CRLF framing before and after conversation",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.LazyFileBounds",
+      "name": "session-backend lazy file admission counts materialized pre-existing and pending namespace files",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.LazyOutside",
+      "name": "session-backend lazy local serves session files outside its directory as SessionManager.open does",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.MemoryOutside",
+      "name": "session-backend memory serves session files outside its namespace as local lazy files (--no-session switch)",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.Branches",
+      "name": "session-backend branch publisher uses volatile and deferred receipts then real conversation publication",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.MemoryCopy",
+      "name": "session-backend memory exact copy preserves all source bytes and refuses overwrite",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionStorageBackendTests.MemoryCatalog",
+      "name": "session-backend memory catalog pagination cancellation and inert missing parent metadata",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionHistoryProjectorTests.IndependentViews",
+      "name": "session-history separates compacted model input original display and whole accounting",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionHistoryProjectorTests.SelectedState",
+      "name": "session-history replays selected system and model state without sibling effects",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionHistoryProjectorTests.SystemDeltas",
+      "name": "session-history named section and tool deltas replay removal replacement and insertion order",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionHistoryProjectorTests.UsageSources",
+      "name": "session-history retains usage tool summary failed assistant and opaque contributions",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionHistoryProjectorTests.UnsupportedArithmetic",
+      "name": "session-history rejects unsupported arithmetic without publishing partial totals",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionHistoryProjectorTests.HistoryBounds",
+      "name": "session-history bounds original history independently of reduced context",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionHistoryProjectorTests.GeneratedForests",
+      "name": "session-history generated forests preserve ancestry all leaves and reopen order",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionArchiveCopyTests.FutureArchive",
+      "name": "session archive future formats preserve full bytes without current admission",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionArchiveCopyTests.DamagedArchive",
+      "name": "session archive damaged UTF8 and incomplete JSON remain exact inert data",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionArchiveCopyTests.UnknownRetention",
+      "name": "session export reports retained unknown native state without exclusions",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionArchiveCopyTests.BoundsAndCancellation",
+      "name": "session archive never publishes partial input and pre-cancel has no effects",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionArchiveCopyTests.OriginalLegacyIdentities",
+      "name": "session archive identity receipts use original v1 bytes despite plans missing IDs or blocked compaction",
+      "status": "passed"
+    },
+    {
+      "testId": "session.SessionArchiveCopyTests.UnavailableIdentityInventory",
+      "name": "session archive unavailable identity inventory never returns a partially parsed list",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass11_0.\u003CCases\u003Eb__1",
+      "name": "session-native-copy-reader complete actual export records branches and loss disclosure v3-exact-framing",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass11_0.\u003CCases\u003Eb__1",
+      "name": "session-native-copy-reader complete actual export records branches and loss disclosure v3-full-forest",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass11_0.\u003CCases\u003Eb__1",
+      "name": "session-native-copy-reader complete actual export records branches and loss disclosure v3-opaque-numbers",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass11_0.\u003CCases\u003Eb__1",
+      "name": "session-native-copy-reader complete actual export records branches and loss disclosure v3-stored-media",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass11_0.\u003CCases\u003Eb__1",
+      "name": "session-native-copy-reader complete actual export records branches and loss disclosure v1-copy-compaction",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass11_0.\u003CCases\u003Eb__1",
+      "name": "session-native-copy-reader complete actual export records branches and loss disclosure v2-copy-hook",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass11_0.\u003CCases\u003Eb__1",
+      "name": "session-native-copy-reader complete actual export records branches and loss disclosure v1-explicit-copy-compaction",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass5_0.\u003CCases\u003Eb__1",
+      "name": "session-branch-reference complete unchanged source tree history context and system replay empty-root",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass5_0.\u003CCases\u003Eb__1",
+      "name": "session-branch-reference complete unchanged source tree history context and system replay two-sibling-branch-settings",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass5_0.\u003CCases\u003Eb__1",
+      "name": "session-branch-reference complete unchanged source tree history context and system replay three-sibling-hidden-state",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass5_0.\u003CCases\u003Eb__1",
+      "name": "session-branch-reference complete unchanged source tree history context and system replay multi-root-forest",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass5_0.\u003CCases\u003Eb__1",
+      "name": "session-branch-reference complete unchanged source tree history context and system replay global-labels-and-names",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass5_0.\u003CCases\u003Eb__1",
+      "name": "session-branch-reference complete unchanged source tree history context and system replay compaction-preserves-raw-history",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass5_0.\u003CCases\u003Eb__1",
+      "name": "session-branch-reference complete unchanged source tree history context and system replay context-edit-restore-and-siblings",
+      "status": "passed"
+    },
+    {
+      "testId": "session.\u003C\u003Ec__DisplayClass5_0.\u003CCases\u003Eb__1",
+      "name": "session-branch-reference complete unchanged source tree history context and system replay metadata-only-three-roots",
+      "status": "passed"
+    },
+    {
+      "testId": "session.NativeSessionDiagnosticViewTests.SelectedBranch",
+      "name": "native-diagnostic selected ancestry keeps separate semantic cleanup codes without sibling authority",
+      "status": "passed"
+    },
+    {
+      "testId": "session.NativeSessionDiagnosticViewTests.OmittedBilling",
+      "name": "native-diagnostic omitted assistant remains raw billable and correlated without model metadata",
+      "status": "passed"
+    },
+    {
+      "testId": "session.NativeSessionDiagnosticViewTests.Legacy",
+      "name": "native-diagnostic legacy marker stays unverified and all opaque source bytes survive reading",
+      "status": "passed"
+    },
+    {
+      "testId": "session.NativeSessionDiagnosticViewTests.Malformed",
+      "name": "native-diagnostic malformed numeric schema adapter code and unresolved reference become bounded issues",
+      "status": "passed"
+    },
+    {
+      "testId": "session.NativeSessionDiagnosticViewTests.Bounds",
+      "name": "native-diagnostic enum and bounded newest view preserve current correlation after truncation",
+      "status": "passed"
+    }
+  ],
+  "passed": 138,
+  "failed": 0
+}

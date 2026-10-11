@@ -1,0 +1,1126 @@
+{
+  "schemaVersion": 1,
+  "scope": "native-sse-and-injected-http-transport",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "upstreamParity": "not-assessed",
+  "nodeAbsentRequested": false,
+  "responsesHttpSseScope": "authored-injected-http-sse-to-parsed-responses-composition",
+  "piMessagesIntegration": {
+    "scope": "authored-real-http-native-diagnostics",
+    "status": "authored-regressions",
+    "incompleteReceipt": null,
+    "runtimeAcceptance": false
+  },
+  "filter": null,
+  "tests": [
+    {
+      "testId": "native-provider.explicit-routes-and-ownership",
+      "status": "passed"
+    },
+    {
+      "testId": "native-provider.admission-and-cancellation",
+      "status": "passed"
+    },
+    {
+      "testId": "native-provider.responses-early-disposal",
+      "status": "passed"
+    },
+    {
+      "testId": "native-provider.responses-send-cancellation",
+      "status": "failed",
+      "error": "Cancellation did not interrupt Responses send."
+    },
+    {
+      "testId": "native-thinking.per-request-provider-wire-selection",
+      "status": "failed",
+      "error": "Responses rejection must follow start without a terminal frame."
+    },
+    {
+      "testId": "native-thinking.capability-admission-and-native-cap",
+      "status": "passed"
+    },
+    {
+      "testId": "native-thinking.metadata-free-off-clears-frozen-controls",
+      "status": "failed",
+      "error": "Responses rejection must follow start without a terminal frame."
+    },
+    {
+      "testId": "native-thinking.effective-completions-wire-capability",
+      "status": "passed"
+    },
+    {
+      "testId": "native-thinking.discarded-template-own-field-capability",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.every-byte-split-utf8-and-framing",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.tiny-read-buffers",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.single-and-multiple-chunk-lines-keep-owned-values",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.lf-crlf-cr-and-mixed-boundaries",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.single-leading-bom",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.fields-comments-spaces-and-data-join",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.event-type-reset-and-empty-data",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.id-persistence-null-and-reset",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.retry-ascii-digits-and-big-integers",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.control-only-state",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.eof-standard-discards-pending",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.eof-opt-in-dispatch",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.invalid-utf8-replacement-and-strict",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.line-limits-all-fields",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.event-limits-and-replacement-accounting",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.budgets-reset-between-events",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.cancellation-before-read",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.cancellation-during-read",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.cancellation-buffered-events",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.early-disposal-and-leave-open",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.disposal-awaits-owned-stream-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.read-failure-cleans-up",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.options-and-single-enumeration",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.strict-utf8-complete-prefix-independent-of-chunks",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.strict-utf8-early-stop-before-invalid-byte-in-same-read",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.event-budget-charges-committed-and-pending-ids-before-read",
+      "status": "passed"
+    },
+    {
+      "testId": "sse.event-budget-shared-id-and-replacement-boundaries",
+      "status": "passed"
+    },
+    {
+      "testId": "http.headers-request-and-borrowed-ownership",
+      "status": "passed"
+    },
+    {
+      "testId": "http.incremental-utf8-without-content-buffering",
+      "status": "passed"
+    },
+    {
+      "testId": "http.options-validated-before-send",
+      "status": "passed"
+    },
+    {
+      "testId": "http.cancellation-before-send",
+      "status": "passed"
+    },
+    {
+      "testId": "http.cancellation-during-send",
+      "status": "passed"
+    },
+    {
+      "testId": "http.cancellation-during-body-acquisition",
+      "status": "passed"
+    },
+    {
+      "testId": "http.cancellation-during-read",
+      "status": "passed"
+    },
+    {
+      "testId": "http.success-awaits-body-cleanup-before-response",
+      "status": "passed"
+    },
+    {
+      "testId": "http.early-disposal-awaits-body-cleanup-before-response",
+      "status": "passed"
+    },
+    {
+      "testId": "http.cancel-awaits-body-cleanup-before-response",
+      "status": "passed"
+    },
+    {
+      "testId": "http.read-fault-awaits-body-cleanup-before-response",
+      "status": "passed"
+    },
+    {
+      "testId": "http.rejected-status-does-not-open-or-read-error-body",
+      "status": "passed"
+    },
+    {
+      "testId": "http.read-fault-disposes-body-and-response-once",
+      "status": "passed"
+    },
+    {
+      "testId": "http.decoder-fault-disposes-body-and-response",
+      "status": "passed"
+    },
+    {
+      "testId": "http.body-cleanup-fault-still-disposes-response",
+      "status": "passed"
+    },
+    {
+      "testId": "http.send-fault-does-not-retry-or-dispose-borrowed-inputs",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-http.fragmented-mapping-and-owned-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-http.invalid-data-termination-and-status-cannot-succeed",
+      "status": "failed",
+      "error": "Expected MalformedStream; actual Provider."
+    },
+    {
+      "testId": "responses-http.admission-limits-and-options",
+      "status": "failed",
+      "error": "Expected ResourceLimit; actual Provider."
+    },
+    {
+      "testId": "responses-http.cooperative-cancellation-awaits-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-http.early-disposal-awaits-cleanup",
+      "status": "failed",
+      "error": "Expected 0; actual 1."
+    },
+    {
+      "testId": "responses-http.factory-send-source-faults-and-fresh-requests",
+      "status": "failed",
+      "error": "Factory fault leaked data."
+    },
+    {
+      "testId": "responses-key.payload-headers-fresh-ownership-and-model-identity",
+      "status": "failed",
+      "error": "Active tool replay differs from authored source-linked expectation."
+    },
+    {
+      "testId": "responses-key.max-output-source-floor-and-explicit-capability",
+      "status": "failed",
+      "error": "Expected ResponsesKeyAuthRequestException"
+    },
+    {
+      "testId": "responses-key.genuine-input-suffix-overlap-and-history-immutability",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-key.unsupported-config-transcript-and-sanitized-key-admission",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-key.byte-depth-identity-key-boundaries-and-cancellation",
+      "status": "failed",
+      "error": "Expected ResponsesKeyAuthRequestException"
+    },
+    {
+      "testId": "responses-key.offline-text-roundtrip-awaits-owned-cleanup-and-repeats",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-key.invalid-admission-and-cancel-prevent-http-acquisition",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-key.complete-parsed-payload-matches-three-genuine-sdk-bodies",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-key.session-codepoint-clamp-finite-temperature-and-budgets",
+      "status": "failed",
+      "error": "Invalid Responses key request configuration."
+    },
+    {
+      "testId": "responses-reasoning.request-controls-and-provider-branches",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-reasoning.request-admission-and-payload-bounds",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-reasoning.stream-final-text-selection-and-signatures",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-reasoning.encrypted-backfill-and-two-request-replay",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-reasoning.interleaved-slots-and-missing-added-event",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-reasoning.bounds-malformed-and-cancellation-cleanup",
+      "status": "failed",
+      "error": "Malformed reasoning accepted"
+    },
+    {
+      "testId": "responses-reasoning.final-encryption-ends-before-terminal",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-reasoning.preterminal-interruption-retains-done-state",
+      "status": "failed",
+      "error": "Failure classification changed"
+    },
+    {
+      "testId": "responses-reasoning.pending-signature-limits-and-cleanup",
+      "status": "failed",
+      "error": "Pending signature limit misclassified: eof"
+    },
+    {
+      "testId": "responses-tool-choice.modes-named-omission-and-declarations",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-tool-choice.invalid-shapes-and-exact-byte-boundary",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-tool-choice.fake-http-repeat-and-pre-cancel",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-tool-choice.unicode-decoding-failure-boundary",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-cache.retention-compatibility-matrix-and-default",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-cache.disabled-session-and-invalid-admission",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-cache.captured-environment-default-and-explicit-precedence",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-cache.aggregate-payload-byte-boundary",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-cache.explicit-model-profile-and-identity-admission",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-cache.native-provider-thinking-repeat-and-cancel",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-model-cache.authoritative-flags-through-direct-and-thinking",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-model-cache.missing-null-defaults-and-no-metadata-profile",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-model-cache.malformed-flags-and-model-identity-before-send",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-model-cache.captured-retention-input-and-pre-cancel",
+      "status": "passed",
+      "originalCase": {
+        "originalCreated": true,
+        "originalTaskJoined": true,
+        "originalStatus": "RanToCompletion",
+        "completedSuccessfully": true,
+        "faulted": false,
+        "actuallyCanceled": false,
+        "synchronousFailure": false,
+        "originalFaultGraph": null,
+        "caughtFaultGraph": null
+      }
+    },
+    {
+      "testId": "responses-tier.echo-precedence-model-rates-and-terminal-kinds",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-tier.request-admission-budget-and-malformed-response",
+      "status": "failed",
+      "error": "Malformed tier accepted"
+    },
+    {
+      "testId": "responses-tier.fake-http-request-price-and-owned-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-tier.factory-bound-request-and-pricing",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-tier.split-config-rejected-before-send",
+      "status": "failed",
+      "error": "Legacy delegate split silently admitted"
+    },
+    {
+      "testId": "responses-incomplete.reason-error-usage-and-cost",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-incomplete.tool-finality-and-reasoning-backfill",
+      "status": "failed",
+      "error": "Fabricated text end"
+    },
+    {
+      "testId": "responses-incomplete.malformed-and-trailing-data",
+      "status": "failed",
+      "error": "Malformed incomplete accepted"
+    },
+    {
+      "testId": "responses-incomplete.cleanup-cancellation-and-late-faults",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-tools.complete-native-payloads-match-five-genuine-sdk-bodies",
+      "status": "passed"
+    },
+    {
+      "testId": "responses-tools.comparator-retains-raw-numbers-null-presence-and-array-order",
+      "status": "passed"
+    },
+    {
+      "testId": "anthropic-http.source-informed-complete-key-requests-and-header-replay",
+      "status": "passed"
+    },
+    {
+      "testId": "anthropic-http.actual-turn-tools-next-request-wait-for-owned-cleanup-and-commit",
+      "status": "passed"
+    },
+    {
+      "testId": "anthropic-http.named-events-eof-done-and-strict-admission",
+      "status": "failed",
+      "error": "Expected SourceFailed; actual UnexpectedEof."
+    },
+    {
+      "testId": "anthropic-http.request-and-stream-budgets-before-effects",
+      "status": "failed",
+      "error": "Expected ArgumentException"
+    },
+    {
+      "testId": "anthropic-http.cooperative-cancellation-and-early-disposal-await-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "anthropic-http.factory-send-read-status-cleanup-faults-and-fresh-ownership",
+      "status": "passed"
+    },
+    {
+      "testId": "anthropic-http.three-genuine-sdk-bodies-numeric-observations-and-explicit-metadata-headers",
+      "status": "passed"
+    },
+    {
+      "testId": "anthropic-http.content-type-routing-all-header-sources-and-casing-with-null-json-override",
+      "status": "passed"
+    },
+    {
+      "testId": "anthropic-http.fallback-request-marker-pricing-and-error-settlement",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-hooks.legacy-constructor-and-options-deconstruct-control",
+      "status": "failed",
+      "error": "Existing positional options changed."
+    },
+    {
+      "testId": "completions-hooks.await-response-before-start-and-provider-before-state-mutation",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-hooks.owned-payload-replacement-strict-admission-and-inclusive-byte-budget",
+      "status": "failed",
+      "error": "Malformed/nonfinite/Unicode/depth/over-budget replacement gained effects."
+    },
+    {
+      "testId": "completions-hooks.actual-response-fault-no-start-and-acquisition-fault-after-start",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-hooks.cancellation-and-callback-fault-join-owned-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-hooks.response-id-own-undefined-null-empty-valid-chronology",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-http.all-three-recorded-sdk-requests-and-full-current-mapper-composition",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-http.every-byte-fragmentation-tool-finals-and-awaited-terminal-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-http.exact-done-eof-named-errors-and-strict-json-admission",
+      "status": "failed",
+      "error": "Expected SourceFailed; actual UnexpectedEof."
+    },
+    {
+      "testId": "completions-http.lower-budgets-and-request-admission-before-send",
+      "status": "failed",
+      "error": "Expected ArgumentException"
+    },
+    {
+      "testId": "completions-http.cancellation-and-concurrent-run-disposal-join-owned-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-http.pull-pacing-send-body-status-faults-and-independent-requests",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.actual-abort-result-before-held-cancel-and-joined-failure",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.normal-done-cancel-gate-and-eof-release-only",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.default-canonical-tool-final-and-physical-barrier",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.actual-return-dto-bounded-drain-and-reader-exclusivity",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.live-alias-emission-ownership-and-explicit-public-failure",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.noncooperative-read-throwing-callback-and-concurrent-dispose",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.initial-admission-frame-bounds-numeric-ownership-and-fatal-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.waiting-reader-live-revisions-reentrant-next-and-late-alias",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.waiting-reader-return-retains-unread-result-and-held-owner",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.actual-publication-witnesses-and-nonrecursive-observer-fault",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.safe-failure-observation-keeps-canonical-authority-and-compact-default",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.compact-cancel-retains-actual-owned-abort-observation",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.compact-cancel-rejects-oversized-foreign-and-invalid-observations",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.joined-canonical-admitted-failure-bounds-and-failed-source-admission",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.cleanup-created-failure-keeps-native-authority",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-source.fixed-abort-final-requires-matched-literal-and-bounded-context",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-performance.compact-text-allocation-budget",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-performance.compact-and-observed-progress-match",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-start.synchronous-delivery-before-body-acquisition",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-start.awaited-factory-and-response-hook-before-delivery",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-start.acquisition-fault-after-start-and-hook-fault-before-start",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-start.held-read-and-done-eof-joined-physical-owner",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-start.canonical-return-at-start-closes-unacquired-response",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-start.caller-cancellation-at-handoff-and-throwing-callback",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-start.public-result-only-and-shared-disposal",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-start.public-return-retains-provider-and-bounded-drain",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-pacing.immutable-frames-share-one-demanded-sse-event",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-pacing.capacity-one-multi-final-normal-fatal-and-held-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-pacing.early-close-and-cancel-at-immutable-frame-join-owner",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-pacing.chatrun-capacity-one-acquisition-before-return-and-joined-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-turn.synchronous-source-start-progress-and-late-live-alias",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-turn.cancel-before-await-retains-closed-read-and-joined-owner",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-turn.task-conversion-result-only-and-context-preservation",
+      "status": "passed"
+    },
+    {
+      "testId": "sdk-sse.legacy-constructors-deconstruction-and-standard-behavior",
+      "status": "passed"
+    },
+    {
+      "testId": "sdk-sse.null-empty-named-no-data-reset-and-eof",
+      "status": "passed"
+    },
+    {
+      "testId": "sdk-sse.every-byte-split-replacement-utf8-and-line-reset-bom",
+      "status": "passed"
+    },
+    {
+      "testId": "sdk-sse.inclusive-bounds-ignored-controls-and-standard-current-id",
+      "status": "passed"
+    },
+    {
+      "testId": "sdk-sse.default-completions-real-http-names-done-and-replacement",
+      "status": "passed"
+    },
+    {
+      "testId": "sdk-sse.pull-cancellation-and-sentinel-join-owned-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-lifecycle.native-owned-observation.all-14",
+      "status": "passed"
+    },
+    {
+      "testId": "detached-reader.default-start-retains-cancel-on-reader-return",
+      "status": "passed"
+    },
+    {
+      "testId": "detached-reader.actual-http-continues-and-completion-joins-owned-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "detached-reader.full-channel-handoff-releases-blocked-provider-with-bounded-drain",
+      "status": "passed"
+    },
+    {
+      "testId": "detached-reader.explicit-reader-cancellation-joins-held-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "detached-reader.caller-cancellation-after-detachment-and-shared-disposal",
+      "status": "passed"
+    },
+    {
+      "testId": "detached-reader.throwing-cancellation-callback-and-noncooperative-cleanup-join",
+      "status": "passed"
+    },
+    {
+      "testId": "detached-reader.reader-exclusivity-and-completed-run-buffer-ownership",
+      "status": "passed"
+    },
+    {
+      "testId": "detached-reader.actual-callback-and-cleanup-faults-retain-consistent-error",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-reader.default-http-path-cancellation-and-physical-owner-join",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-reader.actual-done-cancel-release-versus-eof-release-only",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-reader.active-read-and-late-lease-authority-admission",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-reader.cooperative-cancellation-shares-actual-read-settlement",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-reader.throwing-cancel-callback-and-noncooperative-read-join",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-reader.external-result-count-bounds-before-decoding",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-reader.exact-done-real-cancel-release-faults-with-successful-physical-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-reader.predone-eof-and-physical-owner-faults-remain-fatal",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-provider-snapshot.actual-raw-bits-and-ecmascript-json-in-both-views",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-provider-snapshot.awaited-after-legacy-before-mapper-and-retainable",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-provider-snapshot.held-callback-cancel-retains-physical-owner",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-provider-snapshot.legacy-and-snapshot-faults-sanitized-and-joined",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-provider-snapshot.donetoken-errors-falsy-and-thread-envelopes",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-provider-snapshot.character-and-utf8-envelope-limits",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-result-executor.owned-empty-data-physical-eof-logical-close-and-bounds",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-result-executor.single-active-read-shared-cancel-joins-late-result-and-fault",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-result-executor.empty-chunks-between-every-utf8-byte-and-done-tail-in-both-views",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-result-executor.empty-chunks-do-not-dispatch-pending-sse-before-physical-eof",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-result-executor.consecutive-empty-budget-and-factory-admission-before-effects",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-result-executor.invalid-result-observer-fault-and-read-fault-join-owner",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-result-executor.abort-after-empty-result-retains-noncooperative-physical-join",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-body-result.owned-bytes-absent-eof-and-repeat-without-read",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-body-result.genuine-pinned-every-byte-and-eof-dtos",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-body-result.inclusive-read-bound-and-invalid-count-admission",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-body-result.single-active-read-cancel-release-and-self-join",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-body-result.cooperative-and-held-faulted-cancel-share-settlement",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-body-result.cancellation-closure-is-not-physical-eof-or-foreign-failure",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-body-result.actual-http-done-eof-tail-and-held-physical-cleanup",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-body-result.observer-fault-invalid-count-and-physical-fault-remain-fatal",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-preparation.source-enqueue-before-awaited-hook-canonical-zero-acquisition",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-preparation.hook-rejection-retains-noncooperative-prefetch-before-physical-close",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-preparation.hook-cancellation-retains-prefetch-and-private-late-read-fault",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-preparation.canonical-hook-rejection-and-both-status-rejections-zero-acquisition",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-preparation.early-acquisition-cancellation-retains-owner-until-operation-settles",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-preparation.early-acquisition-and-prefetch-faults-join-single-owner",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-input.real-prefetch-partial-consumption-bounds-and-owned-enqueues",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-input.inclusive-byte-bound-invalid-count-and-observer-failure",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-input.noncooperative-refill-cancel-join-no-late-enqueue-and-borrowed-body",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-input.actual-source-done-prefetch-tail-and-joined-physical-owner",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-input.actual-source-observer-and-read-faults-remain-private",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-input.logical-reader-eof-does-not-skip-physical-cancel-authority",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-native-diagnostics.all-eight-real-terminal-result-codes",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-native-diagnostics.primary-cleanup-precedence",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-native-diagnostics.joined-physical-failure-and-source-success",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-native-diagnostics.closed-enum-admission",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-native-diagnostics.unknown-source-fields-and-old-constructors",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-native-diagnostics.agent-loop-propagation-no-tool-effects",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.inner-timeout-preserves-original-failure",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.outer-deadline-retains-original-join",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.all-eight-physical-terminal-result-codes",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.held-primary-cleanup-precedence",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.narrow-chat-run-fallback-and-completions-preservation",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.postterminal-release-preserves-authority-and-joins-original",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.postterminal-completed-call-executor-paths-retain-joined-authority",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.actual-cancellation-callback-failure-owned-settlement",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.wire-primary-error-survives-held-cleanup-fault",
+      "status": "passed"
+    },
+    {
+      "testId": "pi-messages-native-diagnostics.typed-preview-limits-and-admission-failures",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-auth-retry.caller-auth-and-generated-zero-precedence",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-auth-retry.source-status-directive-attempt-and-callback-policy",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-auth-retry.connection-and-timeout-only-before-headers",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-auth-retry.source-delay-precedence-dates-prefix-cap-and-jitter",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-auth-retry.abortable-backoff-has-no-next-send",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-auth-retry.bounded-replay-and-once-only-materialization",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-auth-retry.rejected-ownership-before-retry-and-cleanup-precedence",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-auth-retry.source-start-retries-and-post-headers-never-replay",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-abort-order.source-release-precedes-error-with-held-read-and-cancel",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-abort-order.rejected-cancel-remains-owned-after-source-release",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-abort-order.release-fault-is-private-and-cleanup-stays-held",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-abort-order.noncooperative-custom-reader-refuses-early-release-and-is-joined",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-abort-order.canonical-reader-retains-joined-release-policy",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-tool-image-flow.all-72-complete-source-bodies-at-http-and-canonical-completion",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-tool-image-flow.owned-cleanup-gates-canonical-completion",
+      "status": "passed"
+    },
+    {
+      "testId": "completions-tool-image-flow.malformed-bounded-and-cancelled-history-before-http-effects",
+      "status": "passed"
+    }
+  ],
+  "passed": 219,
+  "failed": 24,
+  "unexecuted": 0
+}

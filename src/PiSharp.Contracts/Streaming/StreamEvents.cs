@@ -3,10 +3,29 @@ namespace PiSharp.Contracts;
 /// <summary>Immutable compact progress frames; snapshots are obtained from the reducer on demand.</summary>
 public abstract record StreamEvent(JsonFields? ExtraProperties = null)
 {
+    private JsonData? _sourceEmissionSnapshot;
+    private Lazy<JsonData>? _deferredSourceEmission;
+    private long _sourceEmissionUpperBound;
     /// <summary>Optional owned producer-facing emission snapshot; compact native wire serialization stays separate.</summary>
-    public JsonData? SourceEmissionSnapshot { get; init; }
+    public JsonData? SourceEmissionSnapshot
+    {
+        get => _sourceEmissionSnapshot ?? _deferredSourceEmission?.Value;
+        init { _sourceEmissionSnapshot = value; _deferredSourceEmission = null; _sourceEmissionUpperBound = 0; }
+    }
     /// <summary>Optional owned drain view at the selected provider-batch boundary; ordinary native frames omit it.</summary>
     public JsonData? SourceDrainSnapshot { get; init; }
+
+    // The factory must close over immutable producer state. Its bound covers both serialized
+    // source characters and the maximum positive reducer growth of this frame. Near a limit
+    // the reducer still materializes the exact snapshot and uses its original admission rules.
+    internal StreamEvent WithDeferredSourceEmission(Func<JsonData> snapshot, long upperBound) => this with
+    {
+        _deferredSourceEmission = new(snapshot, LazyThreadSafetyMode.ExecutionAndPublication),
+        _sourceEmissionSnapshot = null,
+        _sourceEmissionUpperBound = upperBound
+    };
+    internal bool DeferredSourceEmissionFits(long available) =>
+        _deferredSourceEmission is not null && _sourceEmissionUpperBound <= available;
 }
 public sealed record StreamStarted(AssistantMessage Partial, JsonFields? Properties = null) : StreamEvent(Properties);
 public sealed record TextStarted(int ContentIndex, TextContent Content, JsonFields? Properties = null) : StreamEvent(Properties);

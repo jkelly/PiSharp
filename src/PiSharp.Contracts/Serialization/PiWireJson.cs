@@ -162,7 +162,9 @@ public static partial class PiWireJson
     // responseModel, rawStopReason, errorMessage, ...), then event-stream.ts end() sets durationMs and agent-loop.ts Object.assign
     // adds thinkingLevel. JSON.stringify keeps that insertion order.
     private static readonly string[] MessageFields = ["role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp", "durationMs"];
-    private static JsonObject MessageNode(AssistantMessage message)
+    // Internal writing trees are unowned. Their caller must serialize and admit the
+    // complete value before publishing it; sharing builders avoids JSON round trips.
+    internal static JsonObject MessageNode(AssistantMessage message)
     {
         var extras = message.ExtraProperties ?? JsonFields.Empty;
         var node = new JsonObject { ["role"] = "assistant" };
@@ -223,7 +225,7 @@ public static partial class PiWireJson
 
     // Pi content blocks are literals that start with their own fields ({ type: "thinking", thinking, thinkingSignature }); a
     // provider's extra fields follow in the order it assigned them.
-    private static JsonObject ContentNode(AssistantContent content)
+    internal static JsonObject ContentNode(AssistantContent content)
     {
         var node = new JsonObject();
         string[] own;

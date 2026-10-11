@@ -1,0 +1,2973 @@
+diff --git a/src/PiSharp.Contracts/Json/JsonData.cs b/src/PiSharp.Contracts/Json/JsonData.cs
+index 7070d50..e6ffebb 100644
+--- a/src/PiSharp.Contracts/Json/JsonData.cs
++++ b/src/PiSharp.Contracts/Json/JsonData.cs
+@@ -1,122 +1,102 @@
+-using System.Collections.Immutable;
+-using System.Runtime.CompilerServices;
+-using System.Text.Json;
+-
+-namespace PiSharp.Contracts;
+-
+-/// <summary>An owned, immutable JSON value. Cloning severs JsonDocument lifetime and mutable input ownership.</summary>
+-public sealed class JsonData
+-{
+-    [InlineArray(8)]
+-    private struct PropertyNames { private string? _first; }
+-    /// <summary>
+-    /// The deepest nesting an owned value holds (an object or array is one level). JSON.parse has no such limit, but Pi's own writes
+-    /// recurse: V8's JSON.stringify gives up at about 1,700 nested objects on Node's default stack, so Pi cannot store or send a deeper
+-    /// value. PiSharp's readers, validators and writers recurse too; 1,000 levels (System.Text.Json's own writer default) keeps every
+-    /// such walk safely inside a thread's stack.
+-    /// </summary>
+-    public const int MaximumDepth = 1000;
+-
+-    /// <summary>Document options that admit <see cref="MaximumDepth"/> levels (System.Text.Json's default is 64).</summary>
+-    public static JsonDocumentOptions DocumentOptions => new() { MaxDepth = MaximumDepth };
+-
+-    /// <summary>Serializer options whose writer admits the levels of a <see cref="MaximumDepth"/> value nested in a serialized object
+-    /// (System.Text.Json's default is 64).</summary>
+-    public static JsonSerializerOptions SerializerOptions { get; } = new() { MaxDepth = 2 * MaximumDepth };
+-
+-    public JsonElement Value { get; }
+-
+-    private JsonData(JsonElement value)
+-    {
+-        Validate(value);
+-        Value = value.Clone();
+-    }
+-
+-    public static JsonData Parse(string json)
+-    {
+-        using var document = JsonDocument.Parse(json, DocumentOptions);
+-        return new JsonData(document.RootElement);
+-    }
+-
+-    public static JsonData FromElement(JsonElement value) => new(value);
+-    public static JsonData EmptyObject { get; } = Parse("{}");
+-    public static JsonData Null { get; } = Parse("null");
+-    public override string ToString() => Value.GetRawText();
+-
+-    // Iterative: a value of MaximumDepth levels needs no recursion here.
+-    internal static void Validate(JsonElement value)
+-    {
+-        var pending = new Stack<(JsonElement Value, int Depth)>();
+-        pending.Push((value, 0));
+-        while (pending.Count != 0)
+-        {
+-            var (current, depth) = pending.Pop();
+-            if (current.ValueKind == JsonValueKind.Undefined)
+-                throw new JsonException("Undefined is not a JSON value.");
+-            if (current.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)) continue;
+-            if (depth >= MaximumDepth) throw new JsonException("Maximum JSON depth exceeded.");
+-            if (current.ValueKind == JsonValueKind.Object)
+-            {
+-                // Most provider objects have only a few fields. Check those on the
+-                // stack; allocate a hash table only for larger arbitrary objects.
+-                var smallNames = new PropertyNames(); var nameCount = 0;
+-                HashSet<string>? names = null;
+-                foreach (var property in current.EnumerateObject())
+-                {
+-                    // A name may hold a lone surrogate, as a JavaScript property key does (JSON.parse keeps it).
+-                    var name = JsonUtf16.GetName(property);
+-                    var duplicate = false;
+-                    if (names is not null) duplicate = !names.Add(name);
+-                    else if (nameCount < 8)
+-                    {
+-                        for (var i = 0; i < nameCount; i++)
+-                            if (string.Equals(smallNames[i], name, StringComparison.Ordinal)) { duplicate = true; break; }
+-                        if (!duplicate) smallNames[nameCount++] = name;
+-                    }
+-                    else
+-                    {
+-                        names = new(StringComparer.Ordinal);
+-                        for (var i = 0; i < nameCount; i++) names.Add(smallNames[i]!);
+-                        duplicate = !names.Add(name);
+-                    }
+-                    if (duplicate)
+-                        throw new JsonException($"Duplicate JSON property: {JsonUtf16.ToWellFormed(name)}");
+-                    pending.Push((property.Value, depth + 1));
+-                }
+-            }
+-            else foreach (var item in current.EnumerateArray()) pending.Push((item, depth + 1));
+-        }
+-    }
+-}
+-
+-/// <summary>Preserves optional and unknown fields, including explicit null, without exposing mutable dictionaries.</summary>
+-public sealed class JsonFields
+-{
+-    public ImmutableDictionary<string, JsonData> Values { get; }
+-    private readonly ImmutableList<string> _order;
+-    public static JsonFields Empty { get; } = new(ImmutableDictionary<string, JsonData>.Empty, []);
+-
+-    private JsonFields(ImmutableDictionary<string, JsonData> values, ImmutableList<string> order) { Values = values; _order = order; }
+-    /// <summary>Sets a field. A new name goes last; an existing one keeps its position (JavaScript property order).</summary>
+-    public JsonFields Set(string name, JsonData value) =>
+-        new(Values.SetItem(name, value), Values.ContainsKey(name) ? _order : _order.Add(name));
+-    public JsonFields Remove(string name) => Values.ContainsKey(name) ? new(Values.Remove(name), _order.Remove(name)) : this;
+-    public bool TryGet(string name, out JsonData? value) => Values.TryGetValue(name, out value);
+-    /// <summary>The fields in the order they were first set or read (JavaScript object key order).</summary>
+-    public IEnumerable<KeyValuePair<string, JsonData>> Ordered => _order.Select(name => new KeyValuePair<string, JsonData>(name, Values[name]));
+-
+-    public static JsonFields FromObjectExcept(JsonElement value, params string[] knownNames)
+-    {
+-        JsonData.Validate(value);
+-        if (value.ValueKind != JsonValueKind.Object) throw new JsonException("Expected a JSON object.");
+-        var known = knownNames.ToHashSet(StringComparer.Ordinal);
+-        var builder = ImmutableDictionary.CreateBuilder<string, JsonData>(StringComparer.Ordinal);
+-        var order = ImmutableList.CreateBuilder<string>();
+-        foreach (var property in value.EnumerateObject())
+-        {
+-            var name = JsonUtf16.GetName(property);
+-            if (!known.Contains(name)) { builder.Add(name, JsonData.FromElement(property.Value)); order.Add(name); }
+-        }
+-        return new(builder.ToImmutable(), order.ToImmutable());
+-    }
+-}
++using System.Collections.Immutable;
++using System.Text.Json;
++
++namespace PiSharp.Contracts;
++
++/// <summary>An owned, immutable JSON value. Cloning severs JsonDocument lifetime and mutable input ownership.</summary>
++public sealed class JsonData
++{
++    /// <summary>
++    /// The deepest nesting an owned value holds (an object or array is one level). JSON.parse has no such limit, but Pi's own writes
++    /// recurse: V8's JSON.stringify gives up at about 1,700 nested objects on Node's default stack, so Pi cannot store or send a deeper
++    /// value. PiSharp's readers, validators and writers recurse too; 1,000 levels (System.Text.Json's own writer default) keeps every
++    /// such walk safely inside a thread's stack.
++    /// </summary>
++    public const int MaximumDepth = 1000;
++
++    /// <summary>Document options that admit <see cref="MaximumDepth"/> levels (System.Text.Json's default is 64).</summary>
++    public static JsonDocumentOptions DocumentOptions => new() { MaxDepth = MaximumDepth };
++
++    /// <summary>Serializer options whose writer admits the levels of a <see cref="MaximumDepth"/> value nested in a serialized object
++    /// (System.Text.Json's default is 64).</summary>
++    public static JsonSerializerOptions SerializerOptions { get; } = new() { MaxDepth = 2 * MaximumDepth };
++
++    public JsonElement Value { get; }
++
++    private JsonData(JsonElement value)
++    {
++        Validate(value);
++        Value = value.Clone();
++    }
++
++    public static JsonData Parse(string json)
++    {
++        using var document = JsonDocument.Parse(json, DocumentOptions);
++        return new JsonData(document.RootElement);
++    }
++
++    public static JsonData FromElement(JsonElement value) => new(value);
++    public static JsonData EmptyObject { get; } = Parse("{}");
++    public static JsonData Null { get; } = Parse("null");
++    public override string ToString() => Value.GetRawText();
++
++    // Iterative: a value of MaximumDepth levels needs no recursion here.
++    internal static void Validate(JsonElement value)
++    {
++        var pending = new Stack<(JsonElement Value, int Depth)>();
++        pending.Push((value, 0));
++        while (pending.Count != 0)
++        {
++            var (current, depth) = pending.Pop();
++            if (current.ValueKind == JsonValueKind.Undefined)
++                throw new JsonException("Undefined is not a JSON value.");
++            if (current.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)) continue;
++            if (depth >= MaximumDepth) throw new JsonException("Maximum JSON depth exceeded.");
++            if (current.ValueKind == JsonValueKind.Object)
++            {
++                var names = new HashSet<string>(StringComparer.Ordinal);
++                foreach (var property in current.EnumerateObject())
++                {
++                    // A name may hold a lone surrogate, as a JavaScript property key does (JSON.parse keeps it).
++                    var name = JsonUtf16.GetName(property);
++                    if (!names.Add(name))
++                        throw new JsonException($"Duplicate JSON property: {JsonUtf16.ToWellFormed(name)}");
++                    pending.Push((property.Value, depth + 1));
++                }
++            }
++            else foreach (var item in current.EnumerateArray()) pending.Push((item, depth + 1));
++        }
++    }
++}
++
++/// <summary>Preserves optional and unknown fields, including explicit null, without exposing mutable dictionaries.</summary>
++public sealed class JsonFields
++{
++    public ImmutableDictionary<string, JsonData> Values { get; }
++    private readonly ImmutableList<string> _order;
++    public static JsonFields Empty { get; } = new(ImmutableDictionary<string, JsonData>.Empty, []);
++
++    private JsonFields(ImmutableDictionary<string, JsonData> values, ImmutableList<string> order) { Values = values; _order = order; }
++    /// <summary>Sets a field. A new name goes last; an existing one keeps its position (JavaScript property order).</summary>
++    public JsonFields Set(string name, JsonData value) =>
++        new(Values.SetItem(name, value), Values.ContainsKey(name) ? _order : _order.Add(name));
++    public JsonFields Remove(string name) => Values.ContainsKey(name) ? new(Values.Remove(name), _order.Remove(name)) : this;
++    public bool TryGet(string name, out JsonData? value) => Values.TryGetValue(name, out value);
++    /// <summary>The fields in the order they were first set or read (JavaScript object key order).</summary>
++    public IEnumerable<KeyValuePair<string, JsonData>> Ordered => _order.Select(name => new KeyValuePair<string, JsonData>(name, Values[name]));
++
++    public static JsonFields FromObjectExcept(JsonElement value, params string[] knownNames)
++    {
++        JsonData.Validate(value);
++        if (value.ValueKind != JsonValueKind.Object) throw new JsonException("Expected a JSON object.");
++        var known = knownNames.ToHashSet(StringComparer.Ordinal);
++        var builder = ImmutableDictionary.CreateBuilder<string, JsonData>(StringComparer.Ordinal);
++        var order = ImmutableList.CreateBuilder<string>();
++        foreach (var property in value.EnumerateObject())
++        {
++            var name = JsonUtf16.GetName(property);
++            if (!known.Contains(name)) { builder.Add(name, JsonData.FromElement(property.Value)); order.Add(name); }
++        }
++        return new(builder.ToImmutable(), order.ToImmutable());
++    }
++}
+\ No newline at end of file
+diff --git a/src/PiSharp.Contracts/Json/JsonUtf16.cs b/src/PiSharp.Contracts/Json/JsonUtf16.cs
+index 1e1c514..ae67fc2 100644
+--- a/src/PiSharp.Contracts/Json/JsonUtf16.cs
++++ b/src/PiSharp.Contracts/Json/JsonUtf16.cs
+@@ -1,325 +1,324 @@
+-using System.Globalization;
+-using System.Buffers;
+-using System.Text;
+-using System.Text.Json;
+-using System.Text.Json.Nodes;
+-using System.Text.Json.Serialization;
+-using System.Text.Json.Serialization.Metadata;
+-
+-namespace PiSharp.Contracts;
+-
+-/// <summary>
+-/// JSON strings as JavaScript holds them: any sequence of UTF-16 code units, a lone surrogate included. <c>JSON.parse</c> keeps an escaped
+-/// lone surrogate as that code unit and <c>JSON.stringify</c> writes it back as a lowercase <c>\uXXXX</c> escape. A <see cref="JsonData"/>
+-/// carries such a string as its escaped JSON text; System.Text.Json reads it only through these helpers (its own <c>GetString</c> and
+-/// <c>WriteTo</c> refuse it, and its writers turn a lone surrogate of a .NET string into U+FFFD).
+-/// </summary>
+-public static class JsonUtf16
+-{
+-    /// <summary>The string value of <paramref name="value"/> with every code unit, a lone surrogate included.</summary>
+-    public static string GetString(JsonElement value)
+-    {
+-        if (value.ValueKind != JsonValueKind.String) return value.GetString()!; // throws as System.Text.Json does
+-        try { return value.GetString()!; }
+-        catch (InvalidOperationException) { return Unquote(value.GetRawText()); }
+-    }
+-
+-    /// <summary>The name of <paramref name="property"/> with every code unit, a lone surrogate included.</summary>
+-    public static string GetName(JsonProperty property)
+-    {
+-        try { return property.Name; }
+-        catch (InvalidOperationException)
+-        {
+-            var raw = property.ToString();
+-            var end = 1;
+-            for (var escaped = false; end < raw.Length; end++)
+-            {
+-                if (escaped) escaped = false;
+-                else if (raw[end] == '\\') escaped = true;
+-                else if (raw[end] == '"') break;
+-            }
+-            return Unquote(raw[..(end + 1)]);
+-        }
+-    }
+-
+-    /// <summary>Whether <paramref name="text"/> has no lone surrogate.</summary>
+-    public static bool IsWellFormed(string text)
+-    {
+-        ArgumentNullException.ThrowIfNull(text);
+-        for (var index = 0; index < text.Length; index++)
+-        {
+-            if (!char.IsSurrogate(text[index])) continue;
+-            if (char.IsHighSurrogate(text[index]) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1])) { index++; continue; }
+-            return false;
+-        }
+-        return true;
+-    }
+-
+-    /// <summary><c>String.prototype.toWellFormed</c>: every lone surrogate becomes U+FFFD, as Node's UTF-8 encoder writes it.</summary>
+-    public static string ToWellFormed(string text)
+-    {
+-        if (IsWellFormed(text)) return text;
+-        var builder = new StringBuilder(text.Length);
+-        for (var index = 0; index < text.Length; index++)
+-        {
+-            var character = text[index];
+-            if (char.IsHighSurrogate(character) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1])) builder.Append(character).Append(text[++index]);
+-            else builder.Append(char.IsSurrogate(character) ? '�' : character);
+-        }
+-        return builder.ToString();
+-    }
+-
+-    /// <summary>Whether JSON text escapes a surrogate code unit (only a lone one cannot be read by System.Text.Json).</summary>
+-    public static bool HasEscapedSurrogate(string json)
+-    {
+-        ArgumentNullException.ThrowIfNull(json);
+-        for (var index = json.IndexOf('\\'); index >= 0 && index + 3 < json.Length; index = json.IndexOf('\\', index + 2))
+-            if (json[index + 1] == 'u' && json[index + 2] is 'd' or 'D' && json[index + 3] is (>= '8' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F'))
+-                return true;
+-        return false;
+-    }
+-
+-    /// <summary><c>JSON.stringify</c> of a string: only <c>"</c>, <c>\</c>, control characters and lone surrogates are escaped.</summary>
+-    public static string Quote(string text)
+-    {
+-        ArgumentNullException.ThrowIfNull(text);
+-        var builder = new StringBuilder(text.Length + 2);
+-        Quote(builder, text);
+-        return builder.ToString();
+-    }
+-
+-    /// <summary>Appends <c>JSON.stringify(text)</c>.</summary>
+-    public static void Quote(StringBuilder builder, string text)
+-    {
+-        ArgumentNullException.ThrowIfNull(builder); ArgumentNullException.ThrowIfNull(text);
+-        builder.Append('"');
+-        for (var index = 0; index < text.Length; index++)
+-        {
+-            var character = text[index];
+-            switch (character)
+-            {
+-                case '"': builder.Append("\\\""); break;
+-                case '\\': builder.Append("\\\\"); break;
+-                case '\b': builder.Append("\\b"); break;
+-                case '\f': builder.Append("\\f"); break;
+-                case '\n': builder.Append("\\n"); break;
+-                case '\r': builder.Append("\\r"); break;
+-                case '\t': builder.Append("\\t"); break;
+-                default:
+-                    if (char.IsHighSurrogate(character) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
+-                        builder.Append(character).Append(text[++index]);
+-                    else if (character < 0x20 || char.IsSurrogate(character))
+-                        builder.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));
+-                    else builder.Append(character);
+-                    break;
+-            }
+-        }
+-        builder.Append('"');
+-    }
+-
+-    /// <summary>Writes a string value; one with a lone surrogate is written as its <c>JSON.stringify</c> escape.</summary>
+-    public static void WriteStringValue(Utf8JsonWriter writer, string text)
+-    {
+-        ArgumentNullException.ThrowIfNull(writer);
+-        if (IsWellFormed(text)) writer.WriteStringValue(text);
+-        else writer.WriteRawValue(Quote(text), skipInputValidation: true);
+-    }
+-
+-    /// <summary>Writes a property name and string value, keeping a lone surrogate of the value.</summary>
+-    public static void WriteString(Utf8JsonWriter writer, string name, string text)
+-    {
+-        ArgumentNullException.ThrowIfNull(writer);
+-        writer.WritePropertyName(name);
+-        WriteStringValue(writer, text);
+-    }
+-
+-    /// <summary><see cref="JsonElement.WriteTo"/>, which also writes a value whose strings hold a lone surrogate (as their escapes).</summary>
+-    public static void WriteTo(JsonElement value, Utf8JsonWriter writer)
+-    {
+-        ArgumentNullException.ThrowIfNull(writer);
+-        var raw = value.GetRawText();
+-        if (HasEscapedSurrogate(raw)) writer.WriteRawValue(raw, skipInputValidation: true);
+-        else value.WriteTo(writer);
+-    }
+-
+-    /// <summary>A node for a string value: an ordinary string node, or for a string with a lone surrogate a node that writes its
+-    /// <c>JSON.stringify</c> escape. The latter is for writing only.</summary>
+-    public static JsonNode StringNode(string text) => IsWellFormed(text) ? JsonValue.Create(text) : Raw(Quote(text));
+-
+-    /// <summary><c>JsonNode.Parse(json, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)</c>, except that a value whose strings hold a lone surrogate becomes a node that writes the JSON
+-    /// text as it is. The latter is for writing only.</summary>
+-    public static JsonNode? Node(string json)
+-    {
+-        ArgumentNullException.ThrowIfNull(json);
+-        return HasEscapedSurrogate(json) ? Raw(json) : JsonNode.Parse(json, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
+-    }
+-
+-    /// <summary>A mutable tree of <paramref name="value"/> that also holds lone surrogates: a name keeps every code unit (written as its
+-    /// escape by <see cref="Write"/>), a string with a lone surrogate becomes a write-only <see cref="StringNode"/>, a number keeps its text.</summary>
+-    public static JsonNode? MutableNode(JsonElement value)
+-    {
+-        switch (value.ValueKind)
+-        {
+-            case JsonValueKind.Object:
+-                var result = new JsonObject();
+-                foreach (var property in value.EnumerateObject()) result[GetName(property)] = MutableNode(property.Value);
+-                return result;
+-            case JsonValueKind.Array: return new JsonArray([.. value.EnumerateArray().Select(MutableNode)]);
+-            case JsonValueKind.String: return StringNode(GetString(value));
+-            case JsonValueKind.Null: return null;
+-            case JsonValueKind.True or JsonValueKind.False: return JsonValue.Create(value.GetBoolean());
+-            default: return JsonValue.Create(value.Clone());
+-        }
+-    }
+-
+-    /// <summary>A mutable tree of an owned value: <see cref="MutableNode(JsonElement)"/> when its text escapes a surrogate, otherwise
+-    /// <c>JsonNode.Parse</c>.</summary>
+-    public static JsonNode? MutableNode(JsonData value)
+-    {
+-        ArgumentNullException.ThrowIfNull(value);
+-        var text = value.ToString();
+-        return HasEscapedSurrogate(text) ? MutableNode(value.Value) : JsonNode.Parse(text, documentOptions: JsonData.DocumentOptions);
+-    }
+-
+-    /// <summary><c>JsonNode.Parse</c> of JSON text at the depth an owned value holds; text that escapes a surrogate becomes a
+-    /// <see cref="MutableNode(JsonElement)"/> tree.</summary>
+-    public static JsonNode? MutableNode(string json)
+-    {
+-        ArgumentNullException.ThrowIfNull(json);
+-        if (!HasEscapedSurrogate(json)) return JsonNode.Parse(json, documentOptions: JsonData.DocumentOptions);
+-        using var document = JsonDocument.Parse(json, JsonData.DocumentOptions);
+-        return MutableNode(document.RootElement);
+-    }
+-
+-    /// <summary><see cref="Node(string)"/> of a value.</summary>
+-    public static JsonNode? Node(JsonData value)
+-    {
+-        ArgumentNullException.ThrowIfNull(value);
+-        return Node(value.ToString());
+-    }
+-
+-    /// <summary><see cref="JsonNode.ToJsonString"/> (compact, with <paramref name="encoder"/>), which also writes a tree holding values parsed
+-    /// from JSON text with an escaped lone surrogate (such a value is written as that JSON text) and the write-only nodes above.</summary>
+-    public static string ToJsonString(JsonNode? node, System.Text.Encodings.Web.JavaScriptEncoder? encoder = null)
+-    {
+-        var buffer = new ArrayBufferWriter<byte>();
+-        using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Encoder = encoder, SkipValidation = true, MaxDepth = 2 * JsonData.MaximumDepth })) Write(writer, node);
+-        return Encoding.UTF8.GetString(buffer.WrittenSpan);
+-    }
+-
+-    /// <summary>Writes a node as <see cref="ToJsonString"/> does.</summary>
+-    public static void Write(Utf8JsonWriter writer, JsonNode? node)
+-    {
+-        ArgumentNullException.ThrowIfNull(writer);
+-        switch (node)
+-        {
+-            case null: writer.WriteNullValue(); break;
+-            // Utf8JsonWriter writes a lone surrogate of a name as U+FFFD: such an object is written as JSON.stringify text instead.
+-            case JsonObject obj when obj.Any(member => !IsWellFormed(member.Key)):
+-                var text = new StringBuilder("{");
+-                foreach (var (name, value) in obj)
+-                {
+-                    if (text.Length > 1) text.Append(',');
+-                    Quote(text, name); text.Append(':').Append(ToJsonString(value, writer.Options.Encoder));
+-                }
+-                writer.WriteRawValue(text.Append('}').ToString(), skipInputValidation: true);
+-                break;
+-            case JsonObject obj:
+-                writer.WriteStartObject();
+-                foreach (var (name, value) in obj) { writer.WritePropertyName(name); Write(writer, value); }
+-                writer.WriteEndObject();
+-                break;
+-            case JsonArray array:
+-                writer.WriteStartArray();
+-                foreach (var item in array) Write(writer, item);
+-                writer.WriteEndArray();
+-                break;
+-            case JsonValue value when value.TryGetValue<JsonElement>(out var element): WriteTo(element, writer); break;
+-            case JsonValue value when value.TryGetValue<RawJson>(out var raw): writer.WriteRawValue(raw.Text, skipInputValidation: true); break;
+-            default: node.WriteTo(writer); break;
+-        }
+-    }
+-
+-    /// <summary><see cref="JsonElement.DeepEquals"/>, which also compares values whose strings hold a lone surrogate.</summary>
+-    public static bool DeepEquals(JsonElement left, JsonElement right)
+-    {
+-        if (left.ValueKind != right.ValueKind) return false;
+-        if (!HasEscapedSurrogate(left.GetRawText()) && !HasEscapedSurrogate(right.GetRawText())) return JsonElement.DeepEquals(left, right);
+-        switch (left.ValueKind)
+-        {
+-            case JsonValueKind.String: return string.Equals(GetString(left), GetString(right), StringComparison.Ordinal);
+-            case JsonValueKind.Array:
+-                if (left.GetArrayLength() != right.GetArrayLength()) return false;
+-                using (var first = left.EnumerateArray().GetEnumerator())
+-                using (var second = right.EnumerateArray().GetEnumerator())
+-                    while (first.MoveNext() && second.MoveNext()) if (!DeepEquals(first.Current, second.Current)) return false;
+-                return true;
+-            case JsonValueKind.Object:
+-                var others = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+-                foreach (var property in right.EnumerateObject()) others[GetName(property)] = property.Value;
+-                var count = 0;
+-                foreach (var property in left.EnumerateObject())
+-                {
+-                    count++;
+-                    if (!others.TryGetValue(GetName(property), out var other) || !DeepEquals(property.Value, other)) return false;
+-                }
+-                return count == others.Count;
+-            default: return JsonElement.DeepEquals(left, right);
+-        }
+-    }
+-
+-    /// <summary>The value of a JSON string literal, every escape decoded to its code unit.</summary>
+-    public static string Unquote(string literal)
+-    {
+-        ArgumentNullException.ThrowIfNull(literal);
+-        if (literal.Length < 2 || literal[0] != '"' || literal[^1] != '"') throw new JsonException("Expected a JSON string literal.");
+-        var builder = new StringBuilder(literal.Length);
+-        for (var index = 1; index < literal.Length - 1; index++)
+-        {
+-            var character = literal[index];
+-            if (character != '\\') { builder.Append(character); continue; }
+-            if (++index >= literal.Length - 1) throw new JsonException("Unterminated JSON escape.");
+-            switch (literal[index])
+-            {
+-                case '"': builder.Append('"'); break;
+-                case '\\': builder.Append('\\'); break;
+-                case '/': builder.Append('/'); break;
+-                case 'b': builder.Append('\b'); break;
+-                case 'f': builder.Append('\f'); break;
+-                case 'n': builder.Append('\n'); break;
+-                case 'r': builder.Append('\r'); break;
+-                case 't': builder.Append('\t'); break;
+-                case 'u':
+-                    if (index + 4 >= literal.Length ||
+-                        !int.TryParse(literal.AsSpan(index + 1, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var code))
+-                        throw new JsonException("Invalid JSON unicode escape.");
+-                    builder.Append((char)code); index += 4; break;
+-                default: throw new JsonException("Invalid JSON escape.");
+-            }
+-        }
+-        return builder.ToString();
+-    }
+-
+-    /// <summary>A resolver for serializer options passed to <see cref="JsonNode.ToJsonString(JsonSerializerOptions?)"/> on a tree that may
+-    /// hold the write-only nodes above (such options must resolve their type); any other type resolves by reflection.</summary>
+-    public static IJsonTypeInfoResolver Resolver { get; } = JsonTypeInfoResolver.Combine(new RawJsonResolver(), new DefaultJsonTypeInfoResolver());
+-
+-    private static JsonNode Raw(string json) => JsonValue.Create(new RawJson(json), RawJsonInfo)!;
+-
+-    private sealed class RawJsonResolver : IJsonTypeInfoResolver
+-    {
+-        public JsonTypeInfo? GetTypeInfo(Type type, JsonSerializerOptions options) =>
+-            type == typeof(RawJson) ? JsonMetadataServices.CreateValueInfo<RawJson>(options, new RawJsonConverter()) : null;
+-    }
+-
+-    private sealed record RawJson(string Text);
+-    private sealed class RawJsonConverter : JsonConverter<RawJson>
+-    {
+-        public override RawJson Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+-            throw new NotSupportedException("Raw JSON nodes are written only.");
+-        public override void Write(Utf8JsonWriter writer, RawJson value, JsonSerializerOptions options) =>
+-            writer.WriteRawValue(value.Text, skipInputValidation: true);
+-    }
+-    private static readonly JsonTypeInfo<RawJson> RawJsonInfo =
+-        JsonMetadataServices.CreateValueInfo<RawJson>(new JsonSerializerOptions { TypeInfoResolver = JsonTypeInfoResolver.Combine() }, new RawJsonConverter());
+-}
++using System.Globalization;
++using System.Text;
++using System.Text.Json;
++using System.Text.Json.Nodes;
++using System.Text.Json.Serialization;
++using System.Text.Json.Serialization.Metadata;
++
++namespace PiSharp.Contracts;
++
++/// <summary>
++/// JSON strings as JavaScript holds them: any sequence of UTF-16 code units, a lone surrogate included. <c>JSON.parse</c> keeps an escaped
++/// lone surrogate as that code unit and <c>JSON.stringify</c> writes it back as a lowercase <c>\uXXXX</c> escape. A <see cref="JsonData"/>
++/// carries such a string as its escaped JSON text; System.Text.Json reads it only through these helpers (its own <c>GetString</c> and
++/// <c>WriteTo</c> refuse it, and its writers turn a lone surrogate of a .NET string into U+FFFD).
++/// </summary>
++public static class JsonUtf16
++{
++    /// <summary>The string value of <paramref name="value"/> with every code unit, a lone surrogate included.</summary>
++    public static string GetString(JsonElement value)
++    {
++        if (value.ValueKind != JsonValueKind.String) return value.GetString()!; // throws as System.Text.Json does
++        try { return value.GetString()!; }
++        catch (InvalidOperationException) { return Unquote(value.GetRawText()); }
++    }
++
++    /// <summary>The name of <paramref name="property"/> with every code unit, a lone surrogate included.</summary>
++    public static string GetName(JsonProperty property)
++    {
++        try { return property.Name; }
++        catch (InvalidOperationException)
++        {
++            var raw = property.ToString();
++            var end = 1;
++            for (var escaped = false; end < raw.Length; end++)
++            {
++                if (escaped) escaped = false;
++                else if (raw[end] == '\\') escaped = true;
++                else if (raw[end] == '"') break;
++            }
++            return Unquote(raw[..(end + 1)]);
++        }
++    }
++
++    /// <summary>Whether <paramref name="text"/> has no lone surrogate.</summary>
++    public static bool IsWellFormed(string text)
++    {
++        ArgumentNullException.ThrowIfNull(text);
++        for (var index = 0; index < text.Length; index++)
++        {
++            if (!char.IsSurrogate(text[index])) continue;
++            if (char.IsHighSurrogate(text[index]) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1])) { index++; continue; }
++            return false;
++        }
++        return true;
++    }
++
++    /// <summary><c>String.prototype.toWellFormed</c>: every lone surrogate becomes U+FFFD, as Node's UTF-8 encoder writes it.</summary>
++    public static string ToWellFormed(string text)
++    {
++        if (IsWellFormed(text)) return text;
++        var builder = new StringBuilder(text.Length);
++        for (var index = 0; index < text.Length; index++)
++        {
++            var character = text[index];
++            if (char.IsHighSurrogate(character) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1])) builder.Append(character).Append(text[++index]);
++            else builder.Append(char.IsSurrogate(character) ? '�' : character);
++        }
++        return builder.ToString();
++    }
++
++    /// <summary>Whether JSON text escapes a surrogate code unit (only a lone one cannot be read by System.Text.Json).</summary>
++    public static bool HasEscapedSurrogate(string json)
++    {
++        ArgumentNullException.ThrowIfNull(json);
++        for (var index = json.IndexOf('\\'); index >= 0 && index + 3 < json.Length; index = json.IndexOf('\\', index + 2))
++            if (json[index + 1] == 'u' && json[index + 2] is 'd' or 'D' && json[index + 3] is (>= '8' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F'))
++                return true;
++        return false;
++    }
++
++    /// <summary><c>JSON.stringify</c> of a string: only <c>"</c>, <c>\</c>, control characters and lone surrogates are escaped.</summary>
++    public static string Quote(string text)
++    {
++        ArgumentNullException.ThrowIfNull(text);
++        var builder = new StringBuilder(text.Length + 2);
++        Quote(builder, text);
++        return builder.ToString();
++    }
++
++    /// <summary>Appends <c>JSON.stringify(text)</c>.</summary>
++    public static void Quote(StringBuilder builder, string text)
++    {
++        ArgumentNullException.ThrowIfNull(builder); ArgumentNullException.ThrowIfNull(text);
++        builder.Append('"');
++        for (var index = 0; index < text.Length; index++)
++        {
++            var character = text[index];
++            switch (character)
++            {
++                case '"': builder.Append("\\\""); break;
++                case '\\': builder.Append("\\\\"); break;
++                case '\b': builder.Append("\\b"); break;
++                case '\f': builder.Append("\\f"); break;
++                case '\n': builder.Append("\\n"); break;
++                case '\r': builder.Append("\\r"); break;
++                case '\t': builder.Append("\\t"); break;
++                default:
++                    if (char.IsHighSurrogate(character) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
++                        builder.Append(character).Append(text[++index]);
++                    else if (character < 0x20 || char.IsSurrogate(character))
++                        builder.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));
++                    else builder.Append(character);
++                    break;
++            }
++        }
++        builder.Append('"');
++    }
++
++    /// <summary>Writes a string value; one with a lone surrogate is written as its <c>JSON.stringify</c> escape.</summary>
++    public static void WriteStringValue(Utf8JsonWriter writer, string text)
++    {
++        ArgumentNullException.ThrowIfNull(writer);
++        if (IsWellFormed(text)) writer.WriteStringValue(text);
++        else writer.WriteRawValue(Quote(text), skipInputValidation: true);
++    }
++
++    /// <summary>Writes a property name and string value, keeping a lone surrogate of the value.</summary>
++    public static void WriteString(Utf8JsonWriter writer, string name, string text)
++    {
++        ArgumentNullException.ThrowIfNull(writer);
++        writer.WritePropertyName(name);
++        WriteStringValue(writer, text);
++    }
++
++    /// <summary><see cref="JsonElement.WriteTo"/>, which also writes a value whose strings hold a lone surrogate (as their escapes).</summary>
++    public static void WriteTo(JsonElement value, Utf8JsonWriter writer)
++    {
++        ArgumentNullException.ThrowIfNull(writer);
++        var raw = value.GetRawText();
++        if (HasEscapedSurrogate(raw)) writer.WriteRawValue(raw, skipInputValidation: true);
++        else value.WriteTo(writer);
++    }
++
++    /// <summary>A node for a string value: an ordinary string node, or for a string with a lone surrogate a node that writes its
++    /// <c>JSON.stringify</c> escape. The latter is for writing only.</summary>
++    public static JsonNode StringNode(string text) => IsWellFormed(text) ? JsonValue.Create(text) : Raw(Quote(text));
++
++    /// <summary><c>JsonNode.Parse(json, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)</c>, except that a value whose strings hold a lone surrogate becomes a node that writes the JSON
++    /// text as it is. The latter is for writing only.</summary>
++    public static JsonNode? Node(string json)
++    {
++        ArgumentNullException.ThrowIfNull(json);
++        return HasEscapedSurrogate(json) ? Raw(json) : JsonNode.Parse(json, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
++    }
++
++    /// <summary>A mutable tree of <paramref name="value"/> that also holds lone surrogates: a name keeps every code unit (written as its
++    /// escape by <see cref="Write"/>), a string with a lone surrogate becomes a write-only <see cref="StringNode"/>, a number keeps its text.</summary>
++    public static JsonNode? MutableNode(JsonElement value)
++    {
++        switch (value.ValueKind)
++        {
++            case JsonValueKind.Object:
++                var result = new JsonObject();
++                foreach (var property in value.EnumerateObject()) result[GetName(property)] = MutableNode(property.Value);
++                return result;
++            case JsonValueKind.Array: return new JsonArray([.. value.EnumerateArray().Select(MutableNode)]);
++            case JsonValueKind.String: return StringNode(GetString(value));
++            case JsonValueKind.Null: return null;
++            case JsonValueKind.True or JsonValueKind.False: return JsonValue.Create(value.GetBoolean());
++            default: return JsonValue.Create(value.Clone());
++        }
++    }
++
++    /// <summary>A mutable tree of an owned value: <see cref="MutableNode(JsonElement)"/> when its text escapes a surrogate, otherwise
++    /// <c>JsonNode.Parse</c>.</summary>
++    public static JsonNode? MutableNode(JsonData value)
++    {
++        ArgumentNullException.ThrowIfNull(value);
++        var text = value.ToString();
++        return HasEscapedSurrogate(text) ? MutableNode(value.Value) : JsonNode.Parse(text, documentOptions: JsonData.DocumentOptions);
++    }
++
++    /// <summary><c>JsonNode.Parse</c> of JSON text at the depth an owned value holds; text that escapes a surrogate becomes a
++    /// <see cref="MutableNode(JsonElement)"/> tree.</summary>
++    public static JsonNode? MutableNode(string json)
++    {
++        ArgumentNullException.ThrowIfNull(json);
++        if (!HasEscapedSurrogate(json)) return JsonNode.Parse(json, documentOptions: JsonData.DocumentOptions);
++        using var document = JsonDocument.Parse(json, JsonData.DocumentOptions);
++        return MutableNode(document.RootElement);
++    }
++
++    /// <summary><see cref="Node(string)"/> of a value.</summary>
++    public static JsonNode? Node(JsonData value)
++    {
++        ArgumentNullException.ThrowIfNull(value);
++        return Node(value.ToString());
++    }
++
++    /// <summary><see cref="JsonNode.ToJsonString"/> (compact, with <paramref name="encoder"/>), which also writes a tree holding values parsed
++    /// from JSON text with an escaped lone surrogate (such a value is written as that JSON text) and the write-only nodes above.</summary>
++    public static string ToJsonString(JsonNode? node, System.Text.Encodings.Web.JavaScriptEncoder? encoder = null)
++    {
++        using var buffer = new MemoryStream();
++        using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Encoder = encoder, SkipValidation = true, MaxDepth = 2 * JsonData.MaximumDepth })) Write(writer, node);
++        return Encoding.UTF8.GetString(buffer.GetBuffer(), 0, checked((int)buffer.Length));
++    }
++
++    /// <summary>Writes a node as <see cref="ToJsonString"/> does.</summary>
++    public static void Write(Utf8JsonWriter writer, JsonNode? node)
++    {
++        ArgumentNullException.ThrowIfNull(writer);
++        switch (node)
++        {
++            case null: writer.WriteNullValue(); break;
++            // Utf8JsonWriter writes a lone surrogate of a name as U+FFFD: such an object is written as JSON.stringify text instead.
++            case JsonObject obj when obj.Any(member => !IsWellFormed(member.Key)):
++                var text = new StringBuilder("{");
++                foreach (var (name, value) in obj)
++                {
++                    if (text.Length > 1) text.Append(',');
++                    Quote(text, name); text.Append(':').Append(ToJsonString(value, writer.Options.Encoder));
++                }
++                writer.WriteRawValue(text.Append('}').ToString(), skipInputValidation: true);
++                break;
++            case JsonObject obj:
++                writer.WriteStartObject();
++                foreach (var (name, value) in obj) { writer.WritePropertyName(name); Write(writer, value); }
++                writer.WriteEndObject();
++                break;
++            case JsonArray array:
++                writer.WriteStartArray();
++                foreach (var item in array) Write(writer, item);
++                writer.WriteEndArray();
++                break;
++            case JsonValue value when value.TryGetValue<JsonElement>(out var element): WriteTo(element, writer); break;
++            case JsonValue value when value.TryGetValue<RawJson>(out var raw): writer.WriteRawValue(raw.Text, skipInputValidation: true); break;
++            default: node.WriteTo(writer); break;
++        }
++    }
++
++    /// <summary><see cref="JsonElement.DeepEquals"/>, which also compares values whose strings hold a lone surrogate.</summary>
++    public static bool DeepEquals(JsonElement left, JsonElement right)
++    {
++        if (left.ValueKind != right.ValueKind) return false;
++        if (!HasEscapedSurrogate(left.GetRawText()) && !HasEscapedSurrogate(right.GetRawText())) return JsonElement.DeepEquals(left, right);
++        switch (left.ValueKind)
++        {
++            case JsonValueKind.String: return string.Equals(GetString(left), GetString(right), StringComparison.Ordinal);
++            case JsonValueKind.Array:
++                if (left.GetArrayLength() != right.GetArrayLength()) return false;
++                using (var first = left.EnumerateArray().GetEnumerator())
++                using (var second = right.EnumerateArray().GetEnumerator())
++                    while (first.MoveNext() && second.MoveNext()) if (!DeepEquals(first.Current, second.Current)) return false;
++                return true;
++            case JsonValueKind.Object:
++                var others = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
++                foreach (var property in right.EnumerateObject()) others[GetName(property)] = property.Value;
++                var count = 0;
++                foreach (var property in left.EnumerateObject())
++                {
++                    count++;
++                    if (!others.TryGetValue(GetName(property), out var other) || !DeepEquals(property.Value, other)) return false;
++                }
++                return count == others.Count;
++            default: return JsonElement.DeepEquals(left, right);
++        }
++    }
++
++    /// <summary>The value of a JSON string literal, every escape decoded to its code unit.</summary>
++    public static string Unquote(string literal)
++    {
++        ArgumentNullException.ThrowIfNull(literal);
++        if (literal.Length < 2 || literal[0] != '"' || literal[^1] != '"') throw new JsonException("Expected a JSON string literal.");
++        var builder = new StringBuilder(literal.Length);
++        for (var index = 1; index < literal.Length - 1; index++)
++        {
++            var character = literal[index];
++            if (character != '\\') { builder.Append(character); continue; }
++            if (++index >= literal.Length - 1) throw new JsonException("Unterminated JSON escape.");
++            switch (literal[index])
++            {
++                case '"': builder.Append('"'); break;
++                case '\\': builder.Append('\\'); break;
++                case '/': builder.Append('/'); break;
++                case 'b': builder.Append('\b'); break;
++                case 'f': builder.Append('\f'); break;
++                case 'n': builder.Append('\n'); break;
++                case 'r': builder.Append('\r'); break;
++                case 't': builder.Append('\t'); break;
++                case 'u':
++                    if (index + 4 >= literal.Length ||
++                        !int.TryParse(literal.AsSpan(index + 1, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var code))
++                        throw new JsonException("Invalid JSON unicode escape.");
++                    builder.Append((char)code); index += 4; break;
++                default: throw new JsonException("Invalid JSON escape.");
++            }
++        }
++        return builder.ToString();
++    }
++
++    /// <summary>A resolver for serializer options passed to <see cref="JsonNode.ToJsonString(JsonSerializerOptions?)"/> on a tree that may
++    /// hold the write-only nodes above (such options must resolve their type); any other type resolves by reflection.</summary>
++    public static IJsonTypeInfoResolver Resolver { get; } = JsonTypeInfoResolver.Combine(new RawJsonResolver(), new DefaultJsonTypeInfoResolver());
++
++    private static JsonNode Raw(string json) => JsonValue.Create(new RawJson(json), RawJsonInfo)!;
++
++    private sealed class RawJsonResolver : IJsonTypeInfoResolver
++    {
++        public JsonTypeInfo? GetTypeInfo(Type type, JsonSerializerOptions options) =>
++            type == typeof(RawJson) ? JsonMetadataServices.CreateValueInfo<RawJson>(options, new RawJsonConverter()) : null;
++    }
++
++    private sealed record RawJson(string Text);
++    private sealed class RawJsonConverter : JsonConverter<RawJson>
++    {
++        public override RawJson Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
++            throw new NotSupportedException("Raw JSON nodes are written only.");
++        public override void Write(Utf8JsonWriter writer, RawJson value, JsonSerializerOptions options) =>
++            writer.WriteRawValue(value.Text, skipInputValidation: true);
++    }
++    private static readonly JsonTypeInfo<RawJson> RawJsonInfo =
++        JsonMetadataServices.CreateValueInfo<RawJson>(new JsonSerializerOptions { TypeInfoResolver = JsonTypeInfoResolver.Combine() }, new RawJsonConverter());
++}
+\ No newline at end of file
+diff --git a/src/PiSharp.Contracts/Serialization/PiWireJson.cs b/src/PiSharp.Contracts/Serialization/PiWireJson.cs
+index 434e1ba..24b7ad8 100644
+--- a/src/PiSharp.Contracts/Serialization/PiWireJson.cs
++++ b/src/PiSharp.Contracts/Serialization/PiWireJson.cs
+@@ -1,261 +1,259 @@
+-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/types.ts.
+-using System.Collections.Immutable;
+-using System.Text.Json;
+-using System.Text.Json.Nodes;
+-
+-namespace PiSharp.Contracts;
+-
+-/// <summary>Explicit wire adapter; default CLR record serialization is not a Pi protocol.</summary>
+-public static partial class PiWireJson
+-{
+-    public static AssistantMessage ReadMessage(JsonElement value)
+-    {
+-        JsonData.Validate(value);
+-        RequireString(value, "role", "assistant");
+-        // Only a whole nonnegative duration is typed; any other legacy value stays an opaque extra field.
+-        long? duration = value.TryGetProperty("durationMs", out var measured) && measured.ValueKind == JsonValueKind.Number &&
+-            measured.TryGetInt64(out var milliseconds) && milliseconds >= 0 ? milliseconds : null;
+-        string[] known = ["role", "api", "provider", "model", "timestamp", "content", "usage", "stopReason"];
+-        return new(
+-            String(value, "api"), String(value, "provider"), String(value, "model"),
+-            value.GetProperty("timestamp").GetInt64(),
+-            value.GetProperty("content").EnumerateArray().Select(ReadContent).ToImmutableArray(),
+-            ReadUsage(value.GetProperty("usage")), ReadStopReason(String(value, "stopReason")),
+-            JsonFields.FromObjectExcept(value, duration is null ? known : [.. known, "durationMs"]))
+-        { DurationMs = duration };
+-    }
+-
+-    public static AssistantContent ReadContent(JsonElement value)
+-    {
+-        JsonData.Validate(value);
+-        return String(value, "type") switch
+-        {
+-            "text" => new TextContent(String(value, "text"), JsonFields.FromObjectExcept(value, "type", "text")),
+-            "thinking" => new ThinkingContent(String(value, "thinking"), JsonFields.FromObjectExcept(value, "type", "thinking")),
+-            "toolCall" => new ToolCallContent(String(value, "id"), String(value, "name"),
+-                JsonData.FromElement(value.GetProperty("arguments")), JsonFields.FromObjectExcept(value, "type", "id", "name", "arguments")),
+-            var kind => throw new JsonException($"Unsupported assistant content type: {kind}")
+-        };
+-    }
+-
+-    public static StreamEvent ReadEvent(JsonElement value)
+-    {
+-        JsonData.Validate(value);
+-        var kind = String(value, "type");
+-        JsonFields Extras(params string[] known) => JsonFields.FromObjectExcept(value, ["type", .. known]);
+-        int Index() => value.GetProperty("contentIndex").GetInt32();
+-        return kind switch
+-        {
+-            "start" => new StreamStarted(ReadMessage(value.GetProperty("partial")), Extras("partial")),
+-            "text_start" => new TextStarted(Index(), ReadContent(value.GetProperty("content")) as TextContent
+-                ?? throw new JsonException("text_start must contain text."), Extras("contentIndex", "content")),
+-            "text_delta" => new TextDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
+-            "text_end" => new TextEnded(Index(), String(value, "content"), Extras("contentIndex", "content")),
+-            "thinking_start" => new ThinkingStarted(Index(), ReadContent(value.GetProperty("content")) as ThinkingContent
+-                ?? throw new JsonException("thinking_start must contain thinking."), Extras("contentIndex", "content")),
+-            "thinking_delta" => new ThinkingDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
+-            "thinking_checkpoint" => new ThinkingCheckpoint(Index(), String(value, "content"), Extras("contentIndex", "content")),
+-            "thinking_end" => new ThinkingEnded(Index(), String(value, "content"), Extras("contentIndex", "content")),
+-            "toolcall_start" => new ToolCallStarted(Index(), ReadContent(value.GetProperty("toolCall")) as ToolCallContent
+-                ?? throw new JsonException("toolcall_start must contain a tool call."), Extras("contentIndex", "toolCall")),
+-            "toolcall_provisional_start" => new ToolCallProvisionalStarted(Index(), ReadContent(value.GetProperty("toolCall")) as ToolCallContent
+-                ?? throw new JsonException("Provisional start must contain a tool call."), Extras("contentIndex", "toolCall")),
+-            "toolcall_header_update" => new ToolCallHeaderUpdated(Index(), String(value, "id"), String(value, "name"), Extras("contentIndex", "id", "name")),
+-            "toolcall_checkpoint" => new ToolCallCheckpoint(Index(), String(value, "json"), Extras("contentIndex", "json")),
+-            "toolcall_delta" => new ToolCallDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
+-            "toolcall_end" => new ToolCallEnded(Index(), new ToolCallContent(String(value, "id"), String(value, "name"),
+-                JsonData.FromElement(value.GetProperty("arguments")), Extras("contentIndex", "id", "name", "arguments")),
+-                Extras("contentIndex", "id", "name", "arguments")),
+-            "content_finalized" => new ContentBlockFinalized(Index(), ReadContent(value.GetProperty("content")), Extras("contentIndex", "content")),
+-            "done" => new StreamDone(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("message")), Extras("reason", "message")),
+-            "error" => new StreamError(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("error")), Extras("reason", "error")),
+-            _ => throw new JsonException($"Unknown stream event: {kind}")
+-        };
+-    }
+-
+-    public static JsonData WriteMessage(AssistantMessage message) => Own(MessageNode(message));
+-    public static JsonData WriteContent(AssistantContent content) => Own(ContentNode(content));
+-    public static JsonData WriteEvent(StreamEvent value)
+-    {
+-        var node = Object(value.ExtraProperties);
+-        switch (value)
+-        {
+-            case StreamStarted start: node["type"] = "start"; node["partial"] = MessageNode(start.Partial); break;
+-            case TextStarted start: Indexed("text_start", start.ContentIndex); node["content"] = ContentNode(start.Content); break;
+-            case TextDelta delta: Indexed("text_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
+-            case TextEnded end: Indexed("text_end", end.ContentIndex); node["content"] = JsonUtf16.StringNode(end.Content); break;
+-            case ThinkingStarted start: Indexed("thinking_start", start.ContentIndex); node["content"] = ContentNode(start.Content); break;
+-            case ThinkingDelta delta: Indexed("thinking_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
+-            case ThinkingCheckpoint checkpoint: Indexed("thinking_checkpoint", checkpoint.ContentIndex); node["content"] = JsonUtf16.StringNode(checkpoint.Content); break;
+-            case ThinkingEnded end: Indexed("thinking_end", end.ContentIndex); node["content"] = JsonUtf16.StringNode(end.Content); break;
+-            case ToolCallStarted start: Indexed("toolcall_start", start.ContentIndex); node["toolCall"] = ContentNode(start.ToolCall); break;
+-            case ToolCallProvisionalStarted start: Indexed("toolcall_provisional_start", start.ContentIndex); node["toolCall"] = ContentNode(start.ToolCall); break;
+-            case ToolCallHeaderUpdated header: Indexed("toolcall_header_update", header.ContentIndex); node["id"] = header.Id; node["name"] = header.Name; break;
+-            case ToolCallCheckpoint checkpoint: Indexed("toolcall_checkpoint", checkpoint.ContentIndex); node["json"] = JsonUtf16.StringNode(checkpoint.Json); break;
+-            case ToolCallDelta delta: Indexed("toolcall_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
+-            case ToolCallEnded end:
+-                Indexed("toolcall_end", end.ContentIndex);
+-                // Moved, not cloned: a node holding a lone surrogate is written only (see JsonUtf16).
+-                var content = ContentNode(end.ToolCall);
+-                foreach (var key in content.Select(item => item.Key).ToArray())
+-                {
+-                    var item = content[key]; content.Remove(key);
+-                    if (key != "type") node[key] = item;
+-                }
+-                break;
+-            case ContentBlockFinalized finalized: Indexed("content_finalized", finalized.ContentIndex); node["content"] = ContentNode(finalized.Content); break;
+-            case StreamTerminalEvent terminal:
+-                node["type"] = terminal is StreamDone ? "done" : "error";
+-                node["reason"] = StopReasonName(terminal.Reason);
+-                node[terminal is StreamDone ? "message" : "error"] = MessageNode(terminal.Message);
+-                break;
+-            default: throw new ArgumentException("Unknown native stream event.", nameof(value));
+-        }
+-        return Own(node);
+-
+-        void Indexed(string kind, int index) { node["type"] = kind; node["contentIndex"] = index; }
+-    }
+-
+-    public static StopReason ReadStopReason(string reason) => reason switch
+-    {
+-        "pending" => StopReason.Pending, "stop" => StopReason.Stop, "length" => StopReason.Length,
+-        "toolUse" => StopReason.ToolUse, "error" => StopReason.Error, "aborted" => StopReason.Aborted,
+-        "deferred" => StopReason.Deferred, _ => throw new JsonException($"Unknown stop reason: {reason}")
+-    };
+-
+-    public static string StopReasonName(StopReason reason) => reason switch
+-    {
+-        StopReason.Pending => "pending", StopReason.Stop => "stop", StopReason.Length => "length",
+-        StopReason.ToolUse => "toolUse", StopReason.Error => "error", StopReason.Aborted => "aborted",
+-        StopReason.Deferred => "deferred", _ => throw new ArgumentOutOfRangeException(nameof(reason))
+-    };
+-
+-    /// <summary>Reads a Pi Usage object (<c>{ input, output, cacheRead, cacheWrite, totalTokens, cost }</c>).</summary>
+-    public static TokenUsage ReadUsageObject(JsonElement value) => ReadUsage(value);
+-    private static TokenUsage ReadUsage(JsonElement value)
+-    {
+-        var cost = value.GetProperty("cost");
+-        return new(JsonNumber.Read(value.GetProperty("input")), JsonNumber.Read(value.GetProperty("output")),
+-            JsonNumber.Read(value.GetProperty("cacheRead")), JsonNumber.Read(value.GetProperty("cacheWrite")),
+-            JsonNumber.Read(value.GetProperty("totalTokens")),
+-            new(cost.GetProperty("input").GetDecimal(), cost.GetProperty("output").GetDecimal(),
+-                cost.GetProperty("cacheRead").GetDecimal(), cost.GetProperty("cacheWrite").GetDecimal(),
+-                cost.GetProperty("total").GetDecimal(), JsonFields.FromObjectExcept(cost, "input", "output", "cacheRead", "cacheWrite", "total"),
+-                JsonData.Parse("{" + string.Join(",", new[] { "input", "output", "cacheRead", "cacheWrite", "total" }
+-                    .Select(name => JsonSerializer.Serialize(name) + ":" + cost.GetProperty(name).GetRawText())) + "}")),
+-            JsonFields.FromObjectExcept(value, "input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"))
+-        { ExtrasBeforeTotal = ExtraBeforeTotal(value) };
+-    }
+-    // Whether a field outside the standard ones precedes totalTokens (the literal key order; see TokenUsage.ExtrasBeforeTotal).
+-    private static bool ExtraBeforeTotal(JsonElement usage)
+-    {
+-        foreach (var property in usage.EnumerateObject())
+-        {
+-            if (property.Name == "totalTokens") return false;
+-            if (property.Name is not ("input" or "output" or "cacheRead" or "cacheWrite" or "cost")) return true;
+-        }
+-        return false;
+-    }
+-
+-    // Pi builds the message as one literal (each provider's `const output: AssistantMessage = { role, content, api, provider, model,
+-    // [providerThinkingLevel,] usage, stopReason, timestamp }`), assigns optional fields as the stream reports them (responseId,
+-    // responseModel, rawStopReason, errorMessage, ...), then event-stream.ts end() sets durationMs and agent-loop.ts Object.assign
+-    // adds thinkingLevel. JSON.stringify keeps that insertion order.
+-    private static readonly string[] MessageFields = ["role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp", "durationMs"];
+-    // Internal writing trees are unowned. Their caller must serialize and admit the
+-    // complete value before publishing it; sharing builders avoids JSON round trips.
+-    internal static JsonObject MessageNode(AssistantMessage message)
+-    {
+-        var extras = message.ExtraProperties ?? JsonFields.Empty;
+-        var node = new JsonObject { ["role"] = "assistant" };
+-        node["content"] = new JsonArray(message.Content.Select(content => (JsonNode)ContentNode(content)).ToArray());
+-        node["api"] = message.Api; node["provider"] = message.Provider; node["model"] = message.Model;
+-        if (extras.TryGet("providerThinkingLevel", out var providerLevel)) node["providerThinkingLevel"] = JsonUtf16.Node(providerLevel!);
+-        node["usage"] = UsageNode(message.Usage);
+-        node["stopReason"] = StopReasonName(message.StopReason); node["timestamp"] = message.Timestamp;
+-        foreach (var item in extras.Ordered)
+-            if (item.Key is not ("providerThinkingLevel" or "thinkingLevel") && !MessageFields.Contains(item.Key))
+-                node[item.Key] = JsonUtf16.Node(item.Value);
+-        if (message.DurationMs is { } duration) node["durationMs"] = duration;
+-        if (extras.TryGet("thinkingLevel", out var level)) node["thinkingLevel"] = JsonUtf16.Node(level!);
+-        return node;
+-    }
+-
+-    private static readonly string[] UsageFields = ["input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"];
+-    private static JsonObject UsageNode(TokenUsage value)
+-    {
+-        // Counts are JavaScript numbers: a whole count is written as an integer, a fraction as Number::toString writes it.
+-        var usage = new JsonObject { ["input"] = JsonNumber.Node(value.Input), ["output"] = JsonNumber.Node(value.Output), ["cacheRead"] = JsonNumber.Node(value.CacheRead), ["cacheWrite"] = JsonNumber.Node(value.CacheWrite) };
+-        var extras = (value.ExtraProperties ?? JsonFields.Empty).Ordered.Where(item => !UsageFields.Contains(item.Key)).ToArray();
+-        if (value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonUtf16.Node(item.Value);
+-        usage["totalTokens"] = JsonNumber.Node(value.TotalTokens);
+-        var cost = new JsonObject
+-        {
+-            ["input"] = value.Cost.Input, ["output"] = value.Cost.Output, ["cacheRead"] = value.Cost.CacheRead,
+-            ["cacheWrite"] = value.Cost.CacheWrite, ["total"] = value.Cost.Total
+-        };
+-        if (value.Cost.SourceBinary64Cost is { } sourceCost)
+-        {
+-            var source = sourceCost.Value;
+-            var names = new[] { "input", "output", "cacheRead", "cacheWrite", "total" };
+-            if (source.ValueKind != JsonValueKind.Object || source.EnumerateObject().Count() != names.Length)
+-                throw new JsonException("Source cost must contain exactly five numeric fields.");
+-            foreach (var name in names)
+-            {
+-                if (!source.TryGetProperty(name, out var number) || number.ValueKind != JsonValueKind.Number ||
+-                    !number.TryGetDouble(out var parsed) || !double.IsFinite(parsed) || parsed < 0)
+-                    throw new JsonException("Source cost must contain finite nonnegative numbers.");
+-                var typed = name switch
+-                {
+-                    "input" => value.Cost.Input, "output" => value.Cost.Output,
+-                    "cacheRead" => value.Cost.CacheRead, "cacheWrite" => value.Cost.CacheWrite,
+-                    _ => value.Cost.Total
+-                };
+-                if (!number.TryGetDecimal(out var owned) || owned != typed)
+-                    throw new JsonException("Source cost differs from its typed decimal value.");
+-                cost[name] = JsonNode.Parse(number.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
+-            }
+-        }
+-        foreach (var item in (value.Cost.ExtraProperties ?? JsonFields.Empty).Ordered)
+-            if (!cost.ContainsKey(item.Key)) cost[item.Key] = JsonUtf16.Node(item.Value);
+-        usage["cost"] = cost;
+-        if (!value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonUtf16.Node(item.Value);
+-        return usage;
+-    }
+-
+-    // Pi content blocks are literals that start with their own fields ({ type: "thinking", thinking, thinkingSignature }); a
+-    // provider's extra fields follow in the order it assigned them.
+-    internal static JsonObject ContentNode(AssistantContent content)
+-    {
+-        var node = new JsonObject();
+-        string[] own;
+-        switch (content)
+-        {
+-            case TextContent text: node["type"] = "text"; node["text"] = JsonUtf16.StringNode(text.Text); own = ["type", "text"]; break;
+-            case ThinkingContent thinking: node["type"] = "thinking"; node["thinking"] = JsonUtf16.StringNode(thinking.Thinking); own = ["type", "thinking"]; break;
+-            case ToolCallContent tool:
+-                node["type"] = "toolCall"; node["id"] = tool.Id; node["name"] = tool.Name;
+-                node["arguments"] = JsonUtf16.Node(tool.Arguments); own = ["type", "id", "name", "arguments"]; break;
+-            default: throw new ArgumentException("Unknown assistant content.", nameof(content));
+-        }
+-        foreach (var item in (content.ExtraProperties ?? JsonFields.Empty).Ordered)
+-            if (!own.Contains(item.Key)) node[item.Key] = JsonUtf16.Node(item.Value);
+-        return node;
+-    }
+-
+-    private static JsonObject Object(JsonFields? properties)
+-    {
+-        var node = new JsonObject();
+-        foreach (var item in (properties ?? JsonFields.Empty).Ordered)
+-            node[item.Key] = JsonUtf16.Node(item.Value);
+-        return node;
+-    }
+-
+-    private static JsonData Own(JsonNode node) => JsonData.Parse(JsonUtf16.ToJsonString(node));
+-    private static string String(JsonElement value, string name) => (value.GetProperty(name) is { ValueKind: JsonValueKind.String } text ? JsonUtf16.GetString(text) : value.GetProperty(name).GetString())
+-        ?? throw new JsonException($"{name} cannot be null.");
+-    private static void RequireString(JsonElement value, string name, string expected)
+-    {
+-        if (String(value, name) != expected) throw new JsonException($"Expected {name}={expected}.");
+-    }
+-}
++// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/types.ts.
++using System.Collections.Immutable;
++using System.Text.Json;
++using System.Text.Json.Nodes;
++
++namespace PiSharp.Contracts;
++
++/// <summary>Explicit wire adapter; default CLR record serialization is not a Pi protocol.</summary>
++public static partial class PiWireJson
++{
++    public static AssistantMessage ReadMessage(JsonElement value)
++    {
++        JsonData.Validate(value);
++        RequireString(value, "role", "assistant");
++        // Only a whole nonnegative duration is typed; any other legacy value stays an opaque extra field.
++        long? duration = value.TryGetProperty("durationMs", out var measured) && measured.ValueKind == JsonValueKind.Number &&
++            measured.TryGetInt64(out var milliseconds) && milliseconds >= 0 ? milliseconds : null;
++        string[] known = ["role", "api", "provider", "model", "timestamp", "content", "usage", "stopReason"];
++        return new(
++            String(value, "api"), String(value, "provider"), String(value, "model"),
++            value.GetProperty("timestamp").GetInt64(),
++            value.GetProperty("content").EnumerateArray().Select(ReadContent).ToImmutableArray(),
++            ReadUsage(value.GetProperty("usage")), ReadStopReason(String(value, "stopReason")),
++            JsonFields.FromObjectExcept(value, duration is null ? known : [.. known, "durationMs"]))
++        { DurationMs = duration };
++    }
++
++    public static AssistantContent ReadContent(JsonElement value)
++    {
++        JsonData.Validate(value);
++        return String(value, "type") switch
++        {
++            "text" => new TextContent(String(value, "text"), JsonFields.FromObjectExcept(value, "type", "text")),
++            "thinking" => new ThinkingContent(String(value, "thinking"), JsonFields.FromObjectExcept(value, "type", "thinking")),
++            "toolCall" => new ToolCallContent(String(value, "id"), String(value, "name"),
++                JsonData.FromElement(value.GetProperty("arguments")), JsonFields.FromObjectExcept(value, "type", "id", "name", "arguments")),
++            var kind => throw new JsonException($"Unsupported assistant content type: {kind}")
++        };
++    }
++
++    public static StreamEvent ReadEvent(JsonElement value)
++    {
++        JsonData.Validate(value);
++        var kind = String(value, "type");
++        JsonFields Extras(params string[] known) => JsonFields.FromObjectExcept(value, ["type", .. known]);
++        int Index() => value.GetProperty("contentIndex").GetInt32();
++        return kind switch
++        {
++            "start" => new StreamStarted(ReadMessage(value.GetProperty("partial")), Extras("partial")),
++            "text_start" => new TextStarted(Index(), ReadContent(value.GetProperty("content")) as TextContent
++                ?? throw new JsonException("text_start must contain text."), Extras("contentIndex", "content")),
++            "text_delta" => new TextDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
++            "text_end" => new TextEnded(Index(), String(value, "content"), Extras("contentIndex", "content")),
++            "thinking_start" => new ThinkingStarted(Index(), ReadContent(value.GetProperty("content")) as ThinkingContent
++                ?? throw new JsonException("thinking_start must contain thinking."), Extras("contentIndex", "content")),
++            "thinking_delta" => new ThinkingDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
++            "thinking_checkpoint" => new ThinkingCheckpoint(Index(), String(value, "content"), Extras("contentIndex", "content")),
++            "thinking_end" => new ThinkingEnded(Index(), String(value, "content"), Extras("contentIndex", "content")),
++            "toolcall_start" => new ToolCallStarted(Index(), ReadContent(value.GetProperty("toolCall")) as ToolCallContent
++                ?? throw new JsonException("toolcall_start must contain a tool call."), Extras("contentIndex", "toolCall")),
++            "toolcall_provisional_start" => new ToolCallProvisionalStarted(Index(), ReadContent(value.GetProperty("toolCall")) as ToolCallContent
++                ?? throw new JsonException("Provisional start must contain a tool call."), Extras("contentIndex", "toolCall")),
++            "toolcall_header_update" => new ToolCallHeaderUpdated(Index(), String(value, "id"), String(value, "name"), Extras("contentIndex", "id", "name")),
++            "toolcall_checkpoint" => new ToolCallCheckpoint(Index(), String(value, "json"), Extras("contentIndex", "json")),
++            "toolcall_delta" => new ToolCallDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
++            "toolcall_end" => new ToolCallEnded(Index(), new ToolCallContent(String(value, "id"), String(value, "name"),
++                JsonData.FromElement(value.GetProperty("arguments")), Extras("contentIndex", "id", "name", "arguments")),
++                Extras("contentIndex", "id", "name", "arguments")),
++            "content_finalized" => new ContentBlockFinalized(Index(), ReadContent(value.GetProperty("content")), Extras("contentIndex", "content")),
++            "done" => new StreamDone(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("message")), Extras("reason", "message")),
++            "error" => new StreamError(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("error")), Extras("reason", "error")),
++            _ => throw new JsonException($"Unknown stream event: {kind}")
++        };
++    }
++
++    public static JsonData WriteMessage(AssistantMessage message) => Own(MessageNode(message));
++    public static JsonData WriteContent(AssistantContent content) => Own(ContentNode(content));
++    public static JsonData WriteEvent(StreamEvent value)
++    {
++        var node = Object(value.ExtraProperties);
++        switch (value)
++        {
++            case StreamStarted start: node["type"] = "start"; node["partial"] = MessageNode(start.Partial); break;
++            case TextStarted start: Indexed("text_start", start.ContentIndex); node["content"] = ContentNode(start.Content); break;
++            case TextDelta delta: Indexed("text_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
++            case TextEnded end: Indexed("text_end", end.ContentIndex); node["content"] = JsonUtf16.StringNode(end.Content); break;
++            case ThinkingStarted start: Indexed("thinking_start", start.ContentIndex); node["content"] = ContentNode(start.Content); break;
++            case ThinkingDelta delta: Indexed("thinking_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
++            case ThinkingCheckpoint checkpoint: Indexed("thinking_checkpoint", checkpoint.ContentIndex); node["content"] = JsonUtf16.StringNode(checkpoint.Content); break;
++            case ThinkingEnded end: Indexed("thinking_end", end.ContentIndex); node["content"] = JsonUtf16.StringNode(end.Content); break;
++            case ToolCallStarted start: Indexed("toolcall_start", start.ContentIndex); node["toolCall"] = ContentNode(start.ToolCall); break;
++            case ToolCallProvisionalStarted start: Indexed("toolcall_provisional_start", start.ContentIndex); node["toolCall"] = ContentNode(start.ToolCall); break;
++            case ToolCallHeaderUpdated header: Indexed("toolcall_header_update", header.ContentIndex); node["id"] = header.Id; node["name"] = header.Name; break;
++            case ToolCallCheckpoint checkpoint: Indexed("toolcall_checkpoint", checkpoint.ContentIndex); node["json"] = JsonUtf16.StringNode(checkpoint.Json); break;
++            case ToolCallDelta delta: Indexed("toolcall_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
++            case ToolCallEnded end:
++                Indexed("toolcall_end", end.ContentIndex);
++                // Moved, not cloned: a node holding a lone surrogate is written only (see JsonUtf16).
++                var content = ContentNode(end.ToolCall);
++                foreach (var key in content.Select(item => item.Key).ToArray())
++                {
++                    var item = content[key]; content.Remove(key);
++                    if (key != "type") node[key] = item;
++                }
++                break;
++            case ContentBlockFinalized finalized: Indexed("content_finalized", finalized.ContentIndex); node["content"] = ContentNode(finalized.Content); break;
++            case StreamTerminalEvent terminal:
++                node["type"] = terminal is StreamDone ? "done" : "error";
++                node["reason"] = StopReasonName(terminal.Reason);
++                node[terminal is StreamDone ? "message" : "error"] = MessageNode(terminal.Message);
++                break;
++            default: throw new ArgumentException("Unknown native stream event.", nameof(value));
++        }
++        return Own(node);
++
++        void Indexed(string kind, int index) { node["type"] = kind; node["contentIndex"] = index; }
++    }
++
++    public static StopReason ReadStopReason(string reason) => reason switch
++    {
++        "pending" => StopReason.Pending, "stop" => StopReason.Stop, "length" => StopReason.Length,
++        "toolUse" => StopReason.ToolUse, "error" => StopReason.Error, "aborted" => StopReason.Aborted,
++        "deferred" => StopReason.Deferred, _ => throw new JsonException($"Unknown stop reason: {reason}")
++    };
++
++    public static string StopReasonName(StopReason reason) => reason switch
++    {
++        StopReason.Pending => "pending", StopReason.Stop => "stop", StopReason.Length => "length",
++        StopReason.ToolUse => "toolUse", StopReason.Error => "error", StopReason.Aborted => "aborted",
++        StopReason.Deferred => "deferred", _ => throw new ArgumentOutOfRangeException(nameof(reason))
++    };
++
++    /// <summary>Reads a Pi Usage object (<c>{ input, output, cacheRead, cacheWrite, totalTokens, cost }</c>).</summary>
++    public static TokenUsage ReadUsageObject(JsonElement value) => ReadUsage(value);
++    private static TokenUsage ReadUsage(JsonElement value)
++    {
++        var cost = value.GetProperty("cost");
++        return new(JsonNumber.Read(value.GetProperty("input")), JsonNumber.Read(value.GetProperty("output")),
++            JsonNumber.Read(value.GetProperty("cacheRead")), JsonNumber.Read(value.GetProperty("cacheWrite")),
++            JsonNumber.Read(value.GetProperty("totalTokens")),
++            new(cost.GetProperty("input").GetDecimal(), cost.GetProperty("output").GetDecimal(),
++                cost.GetProperty("cacheRead").GetDecimal(), cost.GetProperty("cacheWrite").GetDecimal(),
++                cost.GetProperty("total").GetDecimal(), JsonFields.FromObjectExcept(cost, "input", "output", "cacheRead", "cacheWrite", "total"),
++                JsonData.Parse("{" + string.Join(",", new[] { "input", "output", "cacheRead", "cacheWrite", "total" }
++                    .Select(name => JsonSerializer.Serialize(name) + ":" + cost.GetProperty(name).GetRawText())) + "}")),
++            JsonFields.FromObjectExcept(value, "input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"))
++        { ExtrasBeforeTotal = ExtraBeforeTotal(value) };
++    }
++    // Whether a field outside the standard ones precedes totalTokens (the literal key order; see TokenUsage.ExtrasBeforeTotal).
++    private static bool ExtraBeforeTotal(JsonElement usage)
++    {
++        foreach (var property in usage.EnumerateObject())
++        {
++            if (property.Name == "totalTokens") return false;
++            if (property.Name is not ("input" or "output" or "cacheRead" or "cacheWrite" or "cost")) return true;
++        }
++        return false;
++    }
++
++    // Pi builds the message as one literal (each provider's `const output: AssistantMessage = { role, content, api, provider, model,
++    // [providerThinkingLevel,] usage, stopReason, timestamp }`), assigns optional fields as the stream reports them (responseId,
++    // responseModel, rawStopReason, errorMessage, ...), then event-stream.ts end() sets durationMs and agent-loop.ts Object.assign
++    // adds thinkingLevel. JSON.stringify keeps that insertion order.
++    private static readonly string[] MessageFields = ["role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp", "durationMs"];
++    private static JsonObject MessageNode(AssistantMessage message)
++    {
++        var extras = message.ExtraProperties ?? JsonFields.Empty;
++        var node = new JsonObject { ["role"] = "assistant" };
++        node["content"] = new JsonArray(message.Content.Select(content => (JsonNode)ContentNode(content)).ToArray());
++        node["api"] = message.Api; node["provider"] = message.Provider; node["model"] = message.Model;
++        if (extras.TryGet("providerThinkingLevel", out var providerLevel)) node["providerThinkingLevel"] = JsonUtf16.Node(providerLevel!);
++        node["usage"] = UsageNode(message.Usage);
++        node["stopReason"] = StopReasonName(message.StopReason); node["timestamp"] = message.Timestamp;
++        foreach (var item in extras.Ordered)
++            if (item.Key is not ("providerThinkingLevel" or "thinkingLevel") && !MessageFields.Contains(item.Key))
++                node[item.Key] = JsonUtf16.Node(item.Value);
++        if (message.DurationMs is { } duration) node["durationMs"] = duration;
++        if (extras.TryGet("thinkingLevel", out var level)) node["thinkingLevel"] = JsonUtf16.Node(level!);
++        return node;
++    }
++
++    private static readonly string[] UsageFields = ["input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"];
++    private static JsonObject UsageNode(TokenUsage value)
++    {
++        // Counts are JavaScript numbers: a whole count is written as an integer, a fraction as Number::toString writes it.
++        var usage = new JsonObject { ["input"] = JsonNumber.Node(value.Input), ["output"] = JsonNumber.Node(value.Output), ["cacheRead"] = JsonNumber.Node(value.CacheRead), ["cacheWrite"] = JsonNumber.Node(value.CacheWrite) };
++        var extras = (value.ExtraProperties ?? JsonFields.Empty).Ordered.Where(item => !UsageFields.Contains(item.Key)).ToArray();
++        if (value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonUtf16.Node(item.Value);
++        usage["totalTokens"] = JsonNumber.Node(value.TotalTokens);
++        var cost = new JsonObject
++        {
++            ["input"] = value.Cost.Input, ["output"] = value.Cost.Output, ["cacheRead"] = value.Cost.CacheRead,
++            ["cacheWrite"] = value.Cost.CacheWrite, ["total"] = value.Cost.Total
++        };
++        if (value.Cost.SourceBinary64Cost is { } sourceCost)
++        {
++            var source = sourceCost.Value;
++            var names = new[] { "input", "output", "cacheRead", "cacheWrite", "total" };
++            if (source.ValueKind != JsonValueKind.Object || source.EnumerateObject().Count() != names.Length)
++                throw new JsonException("Source cost must contain exactly five numeric fields.");
++            foreach (var name in names)
++            {
++                if (!source.TryGetProperty(name, out var number) || number.ValueKind != JsonValueKind.Number ||
++                    !number.TryGetDouble(out var parsed) || !double.IsFinite(parsed) || parsed < 0)
++                    throw new JsonException("Source cost must contain finite nonnegative numbers.");
++                var typed = name switch
++                {
++                    "input" => value.Cost.Input, "output" => value.Cost.Output,
++                    "cacheRead" => value.Cost.CacheRead, "cacheWrite" => value.Cost.CacheWrite,
++                    _ => value.Cost.Total
++                };
++                if (!number.TryGetDecimal(out var owned) || owned != typed)
++                    throw new JsonException("Source cost differs from its typed decimal value.");
++                cost[name] = JsonNode.Parse(number.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
++            }
++        }
++        foreach (var item in (value.Cost.ExtraProperties ?? JsonFields.Empty).Ordered)
++            if (!cost.ContainsKey(item.Key)) cost[item.Key] = JsonUtf16.Node(item.Value);
++        usage["cost"] = cost;
++        if (!value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonUtf16.Node(item.Value);
++        return usage;
++    }
++
++    // Pi content blocks are literals that start with their own fields ({ type: "thinking", thinking, thinkingSignature }); a
++    // provider's extra fields follow in the order it assigned them.
++    private static JsonObject ContentNode(AssistantContent content)
++    {
++        var node = new JsonObject();
++        string[] own;
++        switch (content)
++        {
++            case TextContent text: node["type"] = "text"; node["text"] = JsonUtf16.StringNode(text.Text); own = ["type", "text"]; break;
++            case ThinkingContent thinking: node["type"] = "thinking"; node["thinking"] = JsonUtf16.StringNode(thinking.Thinking); own = ["type", "thinking"]; break;
++            case ToolCallContent tool:
++                node["type"] = "toolCall"; node["id"] = tool.Id; node["name"] = tool.Name;
++                node["arguments"] = JsonUtf16.Node(tool.Arguments); own = ["type", "id", "name", "arguments"]; break;
++            default: throw new ArgumentException("Unknown assistant content.", nameof(content));
++        }
++        foreach (var item in (content.ExtraProperties ?? JsonFields.Empty).Ordered)
++            if (!own.Contains(item.Key)) node[item.Key] = JsonUtf16.Node(item.Value);
++        return node;
++    }
++
++    private static JsonObject Object(JsonFields? properties)
++    {
++        var node = new JsonObject();
++        foreach (var item in (properties ?? JsonFields.Empty).Ordered)
++            node[item.Key] = JsonUtf16.Node(item.Value);
++        return node;
++    }
++
++    private static JsonData Own(JsonNode node) => JsonData.Parse(JsonUtf16.ToJsonString(node));
++    private static string String(JsonElement value, string name) => (value.GetProperty(name) is { ValueKind: JsonValueKind.String } text ? JsonUtf16.GetString(text) : value.GetProperty(name).GetString())
++        ?? throw new JsonException($"{name} cannot be null.");
++    private static void RequireString(JsonElement value, string name, string expected)
++    {
++        if (String(value, name) != expected) throw new JsonException($"Expected {name}={expected}.");
++    }
++}
+\ No newline at end of file
+diff --git a/src/PiSharp.AI/Transports/SseDecoder.cs b/src/PiSharp.AI/Transports/SseDecoder.cs
+index c2348ec..9bad6ad 100644
+--- a/src/PiSharp.AI/Transports/SseDecoder.cs
++++ b/src/PiSharp.AI/Transports/SseDecoder.cs
+@@ -1,239 +1,223 @@
+-using System.Globalization;
+-using System.Numerics;
+-using System.Runtime.CompilerServices;
+-using System.Text;
+-
+-namespace PiSharp.AI.Transports;
+-
+-public enum SseEofBehavior { DiscardPendingEvent, DispatchPendingEvent }
+-public enum SseFramingProfile { Standard, OpenAISdk719 }
+-public enum SseDecodeFailure { InvalidUtf8, LineLimit, EventLimit }
+-
+-public sealed class SseDecodeException(SseDecodeFailure failure, string message) : IOException(message)
+-{
+-    public SseDecodeFailure Failure { get; } = failure;
+-}
+-
+-public sealed record SseDecoderOptions(
+-    int ReadBufferBytes = 4096,
+-    int MaximumLineCharacters = PiRequestBudget.StreamCharacters,
+-    int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
+-    bool RejectInvalidUtf8 = false,
+-    SseEofBehavior EofBehavior = SseEofBehavior.DiscardPendingEvent)
+-{
+-    /// <summary>Opt-in framing semantics. OpenAISdk719 requires replacement UTF-8 and pending-event dispatch.</summary>
+-    public SseFramingProfile Profile { get; init; } = SseFramingProfile.Standard;
+-}
+-
+-public sealed record SseStreamState(string LastEventId, BigInteger? RetryMilliseconds);
+-public sealed record SseEvent(string EventType, string Data, string LastEventId, BigInteger? RetryMilliseconds)
+-{
+-    /// <summary>SDK-profile event field: null when absent, empty when explicitly empty. Standard leaves this null.</summary>
+-    public string? EventName { get; init; }
+-}
+-
+-/// <summary>Incremental UTF-8 SSE framing only. It does not interpret JSON, invoke providers or reconnect.</summary>
+-public sealed class SseDecoder
+-{
+-    private readonly SseDecoderOptions _options;
+-    private readonly StringBuilder _line = new();
+-    private readonly StringBuilder _data = new();
+-    private string _eventType = "";
+-    private bool _hasEventName;
+-    private string _idBuffer = "";
+-    private int _retryCharacters;
+-    private bool _atStart = true;
+-    private bool _skipLineFeed;
+-    private int _readerClaimed;
+-    private SseStreamState _state = new("", null);
+-
+-    public SseDecoder(SseDecoderOptions? options = null)
+-    {
+-        _options = options ?? new();
+-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_options.ReadBufferBytes);
+-        ArgumentOutOfRangeException.ThrowIfGreaterThan(_options.ReadBufferBytes, 65_536);
+-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_options.MaximumLineCharacters);
+-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_options.MaximumEventCharacters);
+-        if (!Enum.IsDefined(_options.EofBehavior)) throw new ArgumentOutOfRangeException(nameof(options));
+-        if (!Enum.IsDefined(_options.Profile)) throw new ArgumentOutOfRangeException(nameof(options));
+-        if (SdkProfile && (_options.RejectInvalidUtf8 || _options.EofBehavior != SseEofBehavior.DispatchPendingEvent))
+-            throw new ArgumentException("OpenAI SDK framing requires replacement UTF-8 and pending-event dispatch.", nameof(options));
+-    }
+-
+-    private bool SdkProfile => _options.Profile == SseFramingProfile.OpenAISdk719;
+-
+-    /// <summary>Immutable connection-state snapshot. Retry fields apply immediately; IDs commit at a blank line.</summary>
+-    public SseStreamState State => Volatile.Read(ref _state);
+-
+-    /// <summary>One decoder supports one enumeration. By default it owns and asynchronously disposes the input.</summary>
+-    public async IAsyncEnumerable<SseEvent> DecodeAsync(Stream input, bool leaveOpen = false,
+-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+-    {
+-        ArgumentNullException.ThrowIfNull(input);
+-        if (Interlocked.Exchange(ref _readerClaimed, 1) != 0)
+-            throw new InvalidOperationException("An SSE decoder has exactly one input enumeration.");
+-
+-        try
+-        {
+-            if (!input.CanRead) throw new ArgumentException("An SSE input stream must be readable.", nameof(input));
+-            var encoding = new UTF8Encoding(false, _options.RejectInvalidUtf8);
+-            var utf8 = encoding.GetDecoder();
+-            var bytes = new byte[_options.ReadBufferBytes];
+-            var characters = new char[encoding.GetMaxCharCount(bytes.Length)];
+-
+-            while (true)
+-            {
+-                cancellationToken.ThrowIfCancellationRequested();
+-                var count = await input.ReadAsync(bytes.AsMemory(), cancellationToken).ConfigureAwait(false);
+-                cancellationToken.ThrowIfCancellationRequested();
+-                var offset = 0;
+-                do
+-                {
+-                    cancellationToken.ThrowIfCancellationRequested();
+-                    // A throwing bulk decode can discard valid characters before a malformed byte.
+-                    // Optional strict mode advances byte by byte so complete prefixes survive any read split.
+-                    var segmentLength = _options.RejectInvalidUtf8 ? Math.Min(1, count - offset) : count;
+-                    var characterCount = DecodeUtf8(utf8, bytes, offset, segmentLength, characters, flush: count == 0);
+-                    for (var index = 0; index < characterCount; index++)
+-                    {
+-                        cancellationToken.ThrowIfCancellationRequested();
+-                        var message = Consume(characters[index]);
+-                        if (message is not null) yield return message;
+-                    }
+-                    offset += segmentLength;
+-                }
+-                while (offset < count);
+-                if (count != 0) continue;
+-
+-                if (_options.EofBehavior == SseEofBehavior.DispatchPendingEvent)
+-                {
+-                    if (_line.Length > 0)
+-                    {
+-                        var completedLine = ProcessLine();
+-                        if (completedLine is not null) yield return completedLine;
+-                    }
+-                    var trailing = Dispatch();
+-                    if (trailing is not null) yield return trailing;
+-                }
+-                break;
+-            }
+-        }
+-        finally
+-        {
+-            _line.Clear(); _data.Clear(); _eventType = ""; _hasEventName = false; _idBuffer = "";
+-            if (!leaveOpen) await input.DisposeAsync().ConfigureAwait(false);
+-        }
+-    }
+-
+-    private static int DecodeUtf8(Decoder decoder, byte[] bytes, int offset, int count, char[] characters, bool flush)
+-    {
+-        try { return decoder.GetChars(bytes, offset, count, characters, 0, flush); }
+-        catch (DecoderFallbackException)
+-        { throw new SseDecodeException(SseDecodeFailure.InvalidUtf8, "SSE input contains invalid UTF-8."); }
+-    }
+-
+-    private SseEvent? Consume(char character)
+-    {
+-        if (_atStart)
+-        {
+-            _atStart = false;
+-            if (!SdkProfile && character == '\uFEFF') return null;
+-        }
+-        if (_skipLineFeed)
+-        {
+-            _skipLineFeed = false;
+-            if (character == '\n') return null;
+-        }
+-        if (character is '\r' or '\n')
+-        {
+-            _skipLineFeed = character == '\r';
+-            return ProcessLine();
+-        }
+-        if (_line.Length >= _options.MaximumLineCharacters)
+-            throw new SseDecodeException(SseDecodeFailure.LineLimit, "SSE line character limit exceeded.");
+-        _line.Append(character);
+-        return null;
+-    }
+-
+-    private SseEvent? ProcessLine()
+-    {
+-        if (_line.Length == 0) return Dispatch();
+-        var chunks = _line.GetChunks(); chunks.MoveNext();
+-        var line = chunks.Current.Span;
+-        if (chunks.MoveNext()) line = _line.ToString().AsSpan();
+-        // Consume the borrowed chunk before clearing/reusing its builder. The
+-        // finally also releases a rejected line when field admission throws.
+-        try { return ProcessLine(line); }
+-        finally { _line.Clear(); }
+-    }
+-
+-    private SseEvent? ProcessLine(ReadOnlySpan<char> line)
+-    {
+-        // The SDK invokes a reset TextDecoder for each completed line, stripping that line's first BOM.
+-        // The incremental replacement decoder has no pending UTF-8 sequence across an ASCII line ending.
+-        if (SdkProfile && line[0] == '\uFEFF') line = line[1..];
+-        if (line.Length == 0) return Dispatch();
+-        if (line[0] == ':') return null;
+-        var delimiter = line.IndexOf(':');
+-        var field = delimiter < 0 ? line : line[..delimiter];
+-        var value = delimiter < 0 ? ReadOnlySpan<char>.Empty : line[(delimiter + 1)..];
+-        if (value.Length > 0 && value[0] == ' ') value = value[1..];
+-
+-        switch (field)
+-        {
+-            case "data":
+-                CheckEventSize(_data.Length + (long)value.Length + 1, _eventType.Length, _idBuffer, _retryCharacters);
+-                _data.Append(value); _data.Append('\n');
+-                break;
+-            case "event":
+-                CheckEventSize(_data.Length, value.Length, _idBuffer, _retryCharacters);
+-                _eventType = value.ToString();
+-                if (SdkProfile) _hasEventName = true;
+-                break;
+-            case "id" when !SdkProfile && !value.Contains('\0'):
+-                var id = value.ToString();
+-                CheckEventSize(_data.Length, _eventType.Length, id, _retryCharacters);
+-                _idBuffer = id;
+-                break;
+-            case "retry" when !SdkProfile && value.Length > 0 && IsAsciiDigits(value):
+-                CheckEventSize(_data.Length, _eventType.Length, _idBuffer, value.Length);
+-                var retry = BigInteger.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture);
+-                _retryCharacters = value.Length;
+-                Volatile.Write(ref _state, State with { RetryMilliseconds = retry });
+-                break;
+-        }
+-        return null;
+-    }
+-
+-    private static bool IsAsciiDigits(ReadOnlySpan<char> value)
+-    {
+-        foreach (var character in value) if (character is < '0' or > '9') return false;
+-        return true;
+-    }
+-
+-    private SseEvent? Dispatch()
+-    {
+-        // SDK blank records with neither a truthy name nor a data field preserve the pending empty name.
+-        if (SdkProfile && _eventType.Length == 0 && _data.Length == 0) return null;
+-        Volatile.Write(ref _state, State with { LastEventId = _idBuffer });
+-        SseEvent? message = null;
+-        if (_data.Length != 0 || SdkProfile)
+-        {
+-            if (_data.Length != 0) _data.Length--; // Remove only the final data-field LF.
+-            var state = State;
+-            message = new(_eventType.Length == 0 ? "message" : _eventType, _data.ToString(),
+-                state.LastEventId, state.RetryMilliseconds)
+-            { EventName = SdkProfile && _hasEventName ? _eventType : null };
+-        }
+-        _data.Clear(); _eventType = ""; _hasEventName = false;
+-        return message;
+-    }
+-
+-    private void CheckEventSize(long dataCharacters, int typeCharacters, string pendingId, int retryCharacters)
+-    {
+-        var committedId = State.LastEventId;
+-        var distinctCommittedCharacters = ReferenceEquals(committedId, pendingId) ? 0 : committedId.Length;
+-        if (dataCharacters + typeCharacters + pendingId.Length + distinctCommittedCharacters + retryCharacters > _options.MaximumEventCharacters)
+-            throw new SseDecodeException(SseDecodeFailure.EventLimit, "SSE event character limit exceeded.");
+-    }
+-}
++using System.Globalization;
++using System.Numerics;
++using System.Runtime.CompilerServices;
++using System.Text;
++
++namespace PiSharp.AI.Transports;
++
++public enum SseEofBehavior { DiscardPendingEvent, DispatchPendingEvent }
++public enum SseFramingProfile { Standard, OpenAISdk719 }
++public enum SseDecodeFailure { InvalidUtf8, LineLimit, EventLimit }
++
++public sealed class SseDecodeException(SseDecodeFailure failure, string message) : IOException(message)
++{
++    public SseDecodeFailure Failure { get; } = failure;
++}
++
++public sealed record SseDecoderOptions(
++    int ReadBufferBytes = 4096,
++    int MaximumLineCharacters = PiRequestBudget.StreamCharacters,
++    int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
++    bool RejectInvalidUtf8 = false,
++    SseEofBehavior EofBehavior = SseEofBehavior.DiscardPendingEvent)
++{
++    /// <summary>Opt-in framing semantics. OpenAISdk719 requires replacement UTF-8 and pending-event dispatch.</summary>
++    public SseFramingProfile Profile { get; init; } = SseFramingProfile.Standard;
++}
++
++public sealed record SseStreamState(string LastEventId, BigInteger? RetryMilliseconds);
++public sealed record SseEvent(string EventType, string Data, string LastEventId, BigInteger? RetryMilliseconds)
++{
++    /// <summary>SDK-profile event field: null when absent, empty when explicitly empty. Standard leaves this null.</summary>
++    public string? EventName { get; init; }
++}
++
++/// <summary>Incremental UTF-8 SSE framing only. It does not interpret JSON, invoke providers or reconnect.</summary>
++public sealed class SseDecoder
++{
++    private readonly SseDecoderOptions _options;
++    private readonly StringBuilder _line = new();
++    private readonly StringBuilder _data = new();
++    private string _eventType = "";
++    private bool _hasEventName;
++    private string _idBuffer = "";
++    private int _retryCharacters;
++    private bool _atStart = true;
++    private bool _skipLineFeed;
++    private int _readerClaimed;
++    private SseStreamState _state = new("", null);
++
++    public SseDecoder(SseDecoderOptions? options = null)
++    {
++        _options = options ?? new();
++        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_options.ReadBufferBytes);
++        ArgumentOutOfRangeException.ThrowIfGreaterThan(_options.ReadBufferBytes, 65_536);
++        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_options.MaximumLineCharacters);
++        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(_options.MaximumEventCharacters);
++        if (!Enum.IsDefined(_options.EofBehavior)) throw new ArgumentOutOfRangeException(nameof(options));
++        if (!Enum.IsDefined(_options.Profile)) throw new ArgumentOutOfRangeException(nameof(options));
++        if (SdkProfile && (_options.RejectInvalidUtf8 || _options.EofBehavior != SseEofBehavior.DispatchPendingEvent))
++            throw new ArgumentException("OpenAI SDK framing requires replacement UTF-8 and pending-event dispatch.", nameof(options));
++    }
++
++    private bool SdkProfile => _options.Profile == SseFramingProfile.OpenAISdk719;
++
++    /// <summary>Immutable connection-state snapshot. Retry fields apply immediately; IDs commit at a blank line.</summary>
++    public SseStreamState State => Volatile.Read(ref _state);
++
++    /// <summary>One decoder supports one enumeration. By default it owns and asynchronously disposes the input.</summary>
++    public async IAsyncEnumerable<SseEvent> DecodeAsync(Stream input, bool leaveOpen = false,
++        [EnumeratorCancellation] CancellationToken cancellationToken = default)
++    {
++        ArgumentNullException.ThrowIfNull(input);
++        if (Interlocked.Exchange(ref _readerClaimed, 1) != 0)
++            throw new InvalidOperationException("An SSE decoder has exactly one input enumeration.");
++
++        try
++        {
++            if (!input.CanRead) throw new ArgumentException("An SSE input stream must be readable.", nameof(input));
++            var encoding = new UTF8Encoding(false, _options.RejectInvalidUtf8);
++            var utf8 = encoding.GetDecoder();
++            var bytes = new byte[_options.ReadBufferBytes];
++            var characters = new char[encoding.GetMaxCharCount(bytes.Length)];
++
++            while (true)
++            {
++                cancellationToken.ThrowIfCancellationRequested();
++                var count = await input.ReadAsync(bytes.AsMemory(), cancellationToken).ConfigureAwait(false);
++                cancellationToken.ThrowIfCancellationRequested();
++                var offset = 0;
++                do
++                {
++                    cancellationToken.ThrowIfCancellationRequested();
++                    // A throwing bulk decode can discard valid characters before a malformed byte.
++                    // Optional strict mode advances byte by byte so complete prefixes survive any read split.
++                    var segmentLength = _options.RejectInvalidUtf8 ? Math.Min(1, count - offset) : count;
++                    var characterCount = DecodeUtf8(utf8, bytes, offset, segmentLength, characters, flush: count == 0);
++                    for (var index = 0; index < characterCount; index++)
++                    {
++                        cancellationToken.ThrowIfCancellationRequested();
++                        var message = Consume(characters[index]);
++                        if (message is not null) yield return message;
++                    }
++                    offset += segmentLength;
++                }
++                while (offset < count);
++                if (count != 0) continue;
++
++                if (_options.EofBehavior == SseEofBehavior.DispatchPendingEvent)
++                {
++                    if (_line.Length > 0)
++                    {
++                        var completedLine = ProcessLine();
++                        if (completedLine is not null) yield return completedLine;
++                    }
++                    var trailing = Dispatch();
++                    if (trailing is not null) yield return trailing;
++                }
++                break;
++            }
++        }
++        finally
++        {
++            _line.Clear(); _data.Clear(); _eventType = ""; _hasEventName = false; _idBuffer = "";
++            if (!leaveOpen) await input.DisposeAsync().ConfigureAwait(false);
++        }
++    }
++
++    private static int DecodeUtf8(Decoder decoder, byte[] bytes, int offset, int count, char[] characters, bool flush)
++    {
++        try { return decoder.GetChars(bytes, offset, count, characters, 0, flush); }
++        catch (DecoderFallbackException)
++        { throw new SseDecodeException(SseDecodeFailure.InvalidUtf8, "SSE input contains invalid UTF-8."); }
++    }
++
++    private SseEvent? Consume(char character)
++    {
++        if (_atStart)
++        {
++            _atStart = false;
++            if (!SdkProfile && character == '\uFEFF') return null;
++        }
++        if (_skipLineFeed)
++        {
++            _skipLineFeed = false;
++            if (character == '\n') return null;
++        }
++        if (character is '\r' or '\n')
++        {
++            _skipLineFeed = character == '\r';
++            return ProcessLine();
++        }
++        if (_line.Length >= _options.MaximumLineCharacters)
++            throw new SseDecodeException(SseDecodeFailure.LineLimit, "SSE line character limit exceeded.");
++        _line.Append(character);
++        return null;
++    }
++
++    private SseEvent? ProcessLine()
++    {
++        if (_line.Length == 0) return Dispatch();
++        var line = _line.ToString();
++        _line.Clear();
++        // The SDK invokes a reset TextDecoder for each completed line, stripping that line's first BOM.
++        // The incremental replacement decoder has no pending UTF-8 sequence across an ASCII line ending.
++        if (SdkProfile && line[0] == '\uFEFF') line = line[1..];
++        if (line.Length == 0) return Dispatch();
++        if (line[0] == ':') return null;
++        var delimiter = line.IndexOf(':');
++        var field = delimiter < 0 ? line : line[..delimiter];
++        var value = delimiter < 0 ? "" : line[(delimiter + 1)..];
++        if (value.StartsWith(' ')) value = value[1..];
++
++        switch (field)
++        {
++            case "data":
++                CheckEventSize(_data.Length + (long)value.Length + 1, _eventType.Length, _idBuffer, _retryCharacters);
++                _data.Append(value); _data.Append('\n');
++                break;
++            case "event":
++                CheckEventSize(_data.Length, value.Length, _idBuffer, _retryCharacters);
++                _eventType = value;
++                if (SdkProfile) _hasEventName = true;
++                break;
++            case "id" when !SdkProfile && !value.Contains('\0'):
++                CheckEventSize(_data.Length, _eventType.Length, value, _retryCharacters);
++                _idBuffer = value;
++                break;
++            case "retry" when !SdkProfile && value.Length > 0 && value.All(character => character is >= '0' and <= '9'):
++                CheckEventSize(_data.Length, _eventType.Length, _idBuffer, value.Length);
++                var retry = BigInteger.Parse(value, NumberStyles.None, CultureInfo.InvariantCulture);
++                _retryCharacters = value.Length;
++                Volatile.Write(ref _state, State with { RetryMilliseconds = retry });
++                break;
++        }
++        return null;
++    }
++
++    private SseEvent? Dispatch()
++    {
++        // SDK blank records with neither a truthy name nor a data field preserve the pending empty name.
++        if (SdkProfile && _eventType.Length == 0 && _data.Length == 0) return null;
++        Volatile.Write(ref _state, State with { LastEventId = _idBuffer });
++        SseEvent? message = null;
++        if (_data.Length != 0 || SdkProfile)
++        {
++            if (_data.Length != 0) _data.Length--; // Remove only the final data-field LF.
++            var state = State;
++            message = new(_eventType.Length == 0 ? "message" : _eventType, _data.ToString(),
++                state.LastEventId, state.RetryMilliseconds)
++            { EventName = SdkProfile && _hasEventName ? _eventType : null };
++        }
++        _data.Clear(); _eventType = ""; _hasEventName = false;
++        return message;
++    }
++
++    private void CheckEventSize(long dataCharacters, int typeCharacters, string pendingId, int retryCharacters)
++    {
++        var committedId = State.LastEventId;
++        var distinctCommittedCharacters = ReferenceEquals(committedId, pendingId) ? 0 : committedId.Length;
++        if (dataCharacters + typeCharacters + pendingId.Length + distinctCommittedCharacters + retryCharacters > _options.MaximumEventCharacters)
++            throw new SseDecodeException(SseDecodeFailure.EventLimit, "SSE event character limit exceeded.");
++    }
++}
+\ No newline at end of file
+diff --git a/src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs b/src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs
+index ced36eb..46e79e9 100644
+--- a/src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs
++++ b/src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs
+@@ -1,308 +1,292 @@
+-using System.Collections.Immutable;
+-using System.Runtime.CompilerServices;
+-using System.Text;
+-using System.Text.Json;
+-using System.Text.Json.Nodes;
+-using System.Text.RegularExpressions;
+-using PiSharp.Contracts;
+-
+-namespace PiSharp.AI.Protocols.MistralConversations;
+-
+-/// <summary>Bound Mistral text/function-tool fetch/SSE composition. Borrows client; no ambient auth, retries or tool execution authority.</summary>
+-public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModelProvider, IThinkingLevelTransport
+-{
+-    private readonly HttpClient client;
+-    private readonly ModelDescriptor model;
+-    private readonly MistralTextOptions options;
+-    public string ProviderId => "mistral";
+-    public IReadOnlyList<ModelDescriptor> Models { get; }
+-    public IChatTransport Transport => this;
+-    public MistralTextHttpSseTransport(HttpClient client, ModelDescriptor model, MistralTextOptions options)
+-    {
+-        ArgumentNullException.ThrowIfNull(client); ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(options);
+-        if (model.Provider != "mistral" || model.Api != "mistral-conversations" || string.IsNullOrWhiteSpace(model.Id) || model.Id.Length > 1024) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid bound Mistral identity.");
+-        options.Validate(); this.client = client; this.model = model; this.options = options; Models = ImmutableArray.Create(model);
+-    }
+-    public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default)
+-    {
+-        ArgumentNullException.ThrowIfNull(request);
+-        if (request.Model != model) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral request identity differs from bound model.");
+-        return new Invocation(this, request, cancellationToken);
+-    }
+-    private sealed class Invocation(MistralTextHttpSseTransport owner, ChatRequest request, CancellationToken token) : IAsyncEnumerable<StreamEvent>
+-    {
+-        private int claimed;
+-        public IAsyncEnumerator<StreamEvent> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+-        {
+-            if (Interlocked.Exchange(ref claimed, 1) != 0) throw new StreamProtocolException("Mistral invocation has one reader.");
+-            return owner.Run(request, token).GetAsyncEnumerator(cancellationToken);
+-        }
+-    }
+-    private async IAsyncEnumerable<StreamEvent> Run(ChatRequest request, [EnumeratorCancellation] CancellationToken caller)
+-    {
+-        using var timeout = new CancellationTokenSource();
+-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(caller, timeout.Token);
+-        // StreamOptions.sessionId: the request's session, unless the transport was configured with one.
+-        var options = request.SessionId is { } session && this.options.SessionId is null ? this.options with { SessionId = session } : this.options;
+-        var token = linked.Token; var state = new TextState(request, options);
+-        HttpRequestMessage? send = null; HttpResponseMessage? response = null; Stream? body = null; IAsyncEnumerator<JsonData>? reader = null;
+-        Exception? failure = null, cleanup = null; var completed = false;
+-        try
+-        {
+-            try
+-            {
+-                token.ThrowIfCancellationRequested(); var payload = Admit(() => BuildPayload(request));
+-                if (string.IsNullOrEmpty(options.ApiKey)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "No API key for provider: mistral");
+-                if (options.OnPayload is { } hook)
+-                {
+-                    var replacement = await AwaitSource(() => hook(payload, model, token)).ConfigureAwait(false);
+-                    token.ThrowIfCancellationRequested();
+-                    if (replacement is not null) { Admit(() => { AdmitPayload(replacement.Value, camel: true); return true; }); payload = replacement; }
+-                }
+-                var wire = JsonNode.Parse(payload.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
+-                MapRequestOptions(wire);
+-                foreach (var message in wire["messages"]!.AsArray())
+-                {
+-                    foreach (var (from, to) in new[] { ("toolCalls", "tool_calls"), ("toolCallId", "tool_call_id") })
+-                        if (message!.AsObject().ContainsKey(from)) { var value = message[from]; message.AsObject().Remove(from); message[to] = value; }
+-                    if (message!["content"] is JsonArray parts)
+-                        foreach (var part in parts)
+-                            if (part!.AsObject().ContainsKey("imageUrl"))
+-                            { var image = part["imageUrl"]; part.AsObject().Remove("imageUrl"); part["image_url"] = image; }
+-                }
+-                var bytes = Encoding.UTF8.GetBytes(wire.ToJsonString()); Limit(bytes.Length, options.MaximumPayloadBytes);
+-                var baseUri = new Uri(options.BaseUrl.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/");
+-                send = new(HttpMethod.Post, new Uri(baseUri, "v1/chat/completions")) { Content = new ByteArrayContent(bytes) };
+-                var key = options.ApiKey!;
+-                if (key.Contains('\r') || key.Contains('\n') || key.Length + 7 > options.MaximumHeaderCharacters) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral credential/header limit.");
+-                send.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key); send.Headers.TryAddWithoutValidation("User-Agent", options.UserAgent);
+-                send.Headers.TryAddWithoutValidation("Accept", "text/event-stream"); send.Content.Headers.ContentType = new("application/json");
+-                ApplyHeaders(send, options.ModelHeaders); ApplyHeaders(send, options.Headers);
+-                var explicitAffinity = new[] { options.ModelHeaders, options.Headers }.Any(headers =>
+-                    headers?.Keys.Any(name => name.Equals("x-affinity", StringComparison.OrdinalIgnoreCase)) == true);
+-                if (options.CachePrompt && !string.IsNullOrEmpty(options.SessionId) && !explicitAffinity)
+-                    send.Headers.TryAddWithoutValidation("x-affinity", options.SessionId);
+-                ObserveHeaders(send.Headers.Concat(send.Content.Headers));
+-                token.ThrowIfCancellationRequested();
+-                timeout.CancelAfter(options.TimeoutMilliseconds);
+-                response = await AwaitSource(() => new ValueTask<HttpResponseMessage>(client.SendAsync(send, HttpCompletionOption.ResponseHeadersRead, token))).ConfigureAwait(false);
+-                var observed = ObserveHeaders(response.Headers.Concat(response.Content.Headers));
+-                if (options.OnResponse is { } responseHook) await AwaitSource(() => responseHook(JsonData.Parse(new JsonObject { ["status"] = (int)response.StatusCode, ["headers"] = observed }.ToJsonString()), model, token)).ConfigureAwait(false);
+-                token.ThrowIfCancellationRequested(); body = await AwaitSource(() => new ValueTask<Stream>(response.Content.ReadAsStreamAsync(token))).ConfigureAwait(false);
+-                if (!response.IsSuccessStatusCode) throw await HttpError(response, body, token).ConfigureAwait(false);
+-                if (body is null) throw Fail(NativeChatFailureCode.SourceFailed, "Mistral response has no body");
+-                reader = Decode(body, token).GetAsyncEnumerator(token);
+-            }
+-            catch (Exception error) { failure = error; }
+-            if (failure is null) yield return new StreamStarted(state.Message(StopReason.Pending));
+-            while (failure is null)
+-            {
+-                ImmutableArray<StreamEvent> frames = []; var moved = false;
+-                try
+-                {
+-                    token.ThrowIfCancellationRequested(); moved = await reader!.MoveNextAsync().ConfigureAwait(false);
+-                    if (moved)
+-                    {
+-                        var chunk = reader.Current;
+-                        if (options.OnProviderStreamEvent is { } hook) await AwaitSource(() => hook(chunk, model, token)).ConfigureAwait(false);
+-                        token.ThrowIfCancellationRequested(); frames = state.Convert(chunk);
+-                    }
+-                }
+-                catch (Exception error) { failure = error; }
+-                if (failure is not null || !moved) break;
+-                foreach (var frame in frames) yield return frame;
+-            }
+-            completed = true;
+-        }
+-        finally
+-        {
+-            if (reader is not null) try { await reader.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { cleanup ??= error; }
+-            if (body is not null) try { await body.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { cleanup ??= error; }
+-            try { response?.Dispose(); } catch (Exception error) { cleanup ??= error; }
+-            try { send?.Dispose(); } catch (Exception error) { cleanup ??= error; }
+-            if (!completed && cleanup is not null) throw Fail(NativeChatFailureCode.CleanupFailed, "Mistral iterator cleanup failed.");
+-        }
+-        // End and terminal are emitted only after the original callback/send/pull/disposal operations settle.
+-        foreach (var frame in state.Finish()) yield return frame;
+-        var reason = state.Reason; var code = NativeChatFailureCode.SourceFailed; string? text = null;
+-        if (caller.IsCancellationRequested) { reason = StopReason.Aborted; code = NativeChatFailureCode.Cancelled; text = "Request was aborted"; }
+-        else if (failure is not null) { reason = StopReason.Error; code = MistralNativeDiagnostics.FromException(failure).Code; text = failure is MistralTextException ? failure.Message : timeout.IsCancellationRequested ? "Mistral request timed out." : "Mistral operation failed."; }
+-        else if (reason == StopReason.Pending) { reason = StopReason.Error; code = NativeChatFailureCode.UnexpectedEof; text = "Mistral stream ended without a finish reason"; }
+-        else if (reason == StopReason.Error) { code = NativeChatFailureCode.ProviderError; text = state.ProviderError; }
+-        if (cleanup is not null && text is null) { reason = StopReason.Error; code = NativeChatFailureCode.CleanupFailed; text = "Mistral invocation cleanup failed."; }
+-        StreamTerminalEvent terminal = text is null ? new StreamDone(reason, state.Message(reason)) : new StreamError(reason, state.Message(reason, text)) { NativeDiagnostic = MistralNativeDiagnostics.FromCode(code) };
+-        if (cleanup is not null) terminal = terminal with { NativeCleanupDiagnostic = MistralNativeDiagnostics.FromCode(NativeChatFailureCode.CleanupFailed) };
+-        yield return terminal;
+-    }
+-    private JsonData BuildPayload(ChatRequest request)
+-    {
+-        var messages = new JsonArray(); long total = 0; var ids = new MistralToolIds();
+-        var replay = ResolveReplay(request, ids);
+-        for (var i = 0; i < replay.Length; i++)
+-        {
+-            var entry = replay[i]; var value = entry.WireBody.Value;
+-            Limit(Encoding.UTF8.GetByteCount(value.GetRawText()), options.MaximumPayloadBytes); CheckDepth(value, 0);
+-            if (value.ValueKind != JsonValueKind.Object) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral transcript value.");
+-            if (entry.Role is "assistant" or "toolResult")
+-            {
+-                var history = ProjectToolHistory(entry);
+-                if (history is not null) { total += history.ToJsonString().Length; Limit(total, options.MaximumContentCharacters); messages.Add(history); }
+-                continue;
+-            }
+-            if (entry.Role is not ("system" or "user")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral replay role.");
+-            // Pi v1.1.0 maps only role and content; other stored fields (such as a system message's "offlineApi") are ignored.
+-            if (value.TryGetProperty("role", out var role) && role.GetString() != entry.Role) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral transcript role mismatch.");
+-            var content = value.GetProperty("content"); JsonNode? node;
+-            if (content.ValueKind == JsonValueKind.String) node = JsonValue.Create(Sanitize(content.GetString()!));
+-            else if (content.ValueKind == JsonValueKind.Array)
+-            {
+-                var parts = new JsonArray(); foreach (var part in content.EnumerateArray())
+-                { Limit(parts.Count + 1, options.MaximumContentBlocks); parts.Add(ProjectInputPart(part)); }
+-                node = entry.Role == "system" ? JsonValue.Create(string.Join("\n", parts.Select(x => x!["text"]!.GetValue<string>()))) : parts;
+-            }
+-            else throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral text content.");
+-            if (entry.Role == "system") node = JsonValue.Create(Sanitize(SystemText(value, i != 0)));
+-            total += node!.ToJsonString().Length; Limit(total, options.MaximumContentCharacters);
+-            if (entry.Role == "system" && node is JsonValue s && s.GetValue<string>().Length == 0 || node is JsonArray a && a.Count == 0) continue;
+-            messages.Add(new JsonObject { ["role"] = entry.Role, ["content"] = node });
+-        }
+-        var payload = new JsonObject { ["model"] = model.Id, ["stream"] = true, ["messages"] = messages };
+-        var tools = ProjectTools(request); if (tools.Count > 0) payload["tools"] = tools;
+-        if (options.ToolChoice is { } choice) payload["toolChoice"] = Choice(choice.Value);
+-        AddSimpleOptions(payload, request);
+-        if (options.Temperature is { } temperature) payload["temperature"] = temperature;
+-        if (options.MaxTokens is { } max) payload["maxTokens"] = max;
+-        var data = JsonData.Parse(payload.ToJsonString()); AdmitPayload(data.Value, true); return data;
+-    }
+-    private void AdmitPayload(JsonElement value, bool camel)
+-    {
+-        Limit(Encoding.UTF8.GetByteCount(value.GetRawText()), options.MaximumPayloadBytes); CheckDepth(value, 0);
+-        if (value.ValueKind != JsonValueKind.Object || value.GetProperty("model").GetString() != model.Id || value.GetProperty("stream").ValueKind != JsonValueKind.True) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload replacement.");
+-        // Original MistralChatPayload has an unknown-valued index signature. The hook's
+-        // extra root fields survive the wire conversion; byte/depth and core admission
+-        // still apply to the complete replacement before any HTTP effect.
+-        foreach (var field in new[] { "promptMode", "reasoningEffort", "promptCacheKey" })
+-            if (value.TryGetProperty(field, out var text) && text.ValueKind != JsonValueKind.String)
+-                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral reasoning/cache option.");
+-        if (value.TryGetProperty("toolChoice", out var choice)) _ = Choice(choice);
+-        if (value.TryGetProperty("tools", out var tools))
+-            foreach (var tool in tools.EnumerateArray())
+-            {
+-                if (tool.GetProperty("type").GetString() != "function") throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral tool kind.");
+-                var function = tool.GetProperty("function");
+-                if (string.IsNullOrEmpty(function.GetProperty("name").GetString()) || function.GetProperty("parameters").ValueKind != JsonValueKind.Object)
+-                    throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral function declaration.");
+-            }
+-        foreach (var name in new[] { "temperature", camel ? "maxTokens" : "max_tokens" }) if (value.TryGetProperty(name, out var number) && (number.ValueKind != JsonValueKind.Number || !number.TryGetDouble(out var n) || !double.IsFinite(n))) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral numeric option.");
+-        var index = 0; long size = 0;
+-        foreach (var message in value.GetProperty("messages").EnumerateArray())
+-        {
+-            foreach (var p in message.EnumerateObject()) if (p.Name is not ("role" or "content" or "toolCalls" or "toolCallId" or "name" or "prefix")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload message field.");
+-            var role = message.GetProperty("role").GetString(); if (role is not ("system" or "user" or "assistant" or "tool")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload role.");
+-            if (message.TryGetProperty("toolCalls", out var calls)) { if (role != "assistant") throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral tool-call role."); ValidateToolCalls(calls); }
+-            // A nameless call's result replays with name "" (owner decision 13).
+-            if (role == "tool" && (string.IsNullOrEmpty(message.GetProperty("toolCallId").GetString()) || message.GetProperty("name").GetString() is null))
+-                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral tool result.");
+-            if (!message.TryGetProperty("content", out var content))
+-            { if (role != "assistant" || !message.TryGetProperty("toolCalls", out _)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Missing Mistral content."); index++; continue; }
+-            if (content.ValueKind == JsonValueKind.Array && role is "user" or "assistant" or "tool") foreach (var part in content.EnumerateArray())
+-            {
+-                Limit(content.GetArrayLength(), options.MaximumContentBlocks);
+-                if (role == "assistant") ValidateReplayPart(part); else ValidateInputPart(part);
+-            }
+-            else if (content.ValueKind != JsonValueKind.String) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload content.");
+-            size += content.GetRawText().Length; Limit(size, options.MaximumContentCharacters); index++;
+-        }
+-    }
+-    private void CheckDepth(JsonElement value, int depth) { Limit(depth, options.MaximumJsonDepth); if (value.ValueKind == JsonValueKind.Object) foreach (var p in value.EnumerateObject()) CheckDepth(p.Value, depth + 1); else if (value.ValueKind == JsonValueKind.Array) foreach (var p in value.EnumerateArray()) CheckDepth(p, depth + 1); }
+-    private JsonObject ObserveHeaders(IEnumerable<KeyValuePair<string, IEnumerable<string>>> fields)
+-    {
+-        var result = new JsonObject(); long total = 0; var count = 0;
+-        foreach (var field in fields) { var text = string.Join(", ", field.Value); Limit(++count, options.MaximumHeaders); Limit(field.Key.Length + text.Length, options.MaximumHeaderCharacters); total += field.Key.Length + text.Length; Limit(total, options.MaximumTotalHeaderCharacters); result[field.Key.ToLowerInvariant()] = text; }
+-        return result;
+-    }
+-    private static void ApplyHeaders(HttpRequestMessage request, ImmutableDictionary<string, string?>? headers)
+-    {
+-        if (headers is null) return;
+-        var content = request.Content ?? throw Fail(NativeChatFailureCode.UnsupportedFeature, "Missing Mistral request content.");
+-        foreach (var pair in headers)
+-        {
+-            foreach (var name in request.Headers.Select(header => header.Key).Where(name => name.Equals(pair.Key, StringComparison.OrdinalIgnoreCase)).ToArray()) request.Headers.Remove(name);
+-            foreach (var name in content.Headers.Select(header => header.Key).Where(name => name.Equals(pair.Key, StringComparison.OrdinalIgnoreCase)).ToArray()) content.Headers.Remove(name);
+-            if (pair.Value is not null && !request.Headers.TryAddWithoutValidation(pair.Key, pair.Value) &&
+-                !content.Headers.TryAddWithoutValidation(pair.Key, pair.Value))
+-                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral header binding.");
+-        }
+-    }
+-    private async ValueTask<MistralTextException> HttpError(HttpResponseMessage response, Stream body, CancellationToken token)
+-    {
+-        using var bytes = new MemoryStream(); var buffer = new byte[4096]; int count;
+-        while ((count = await AwaitSource(() => body.ReadAsync(buffer.AsMemory(), token)).ConfigureAwait(false)) != 0) { Limit(bytes.Length + count, options.MaximumErrorBytes); bytes.Write(buffer, 0, count); }
+-        var text = Encoding.UTF8.GetString(bytes.ToArray()).Trim(EcmaWhitespace);
+-        var suffix = text.Length > 0 ? text.Length > 4000 ? text[..4000] + $"... [truncated {text.Length - 4000} chars]" : text : (string.IsNullOrEmpty(response.ReasonPhrase) ? $"Request failed with status {(int)response.StatusCode}" : response.ReasonPhrase);
+-        return Fail(NativeChatFailureCode.ProviderError, $"Mistral API error ({(int)response.StatusCode}): {suffix}");
+-    }
+-    private static readonly Regex Boundary = new("\\r\\n\\r\\n|\\r\\n\\r|\\r\\n\\n|\\r\\r\\n|\\n\\r\\n|\\r\\r|\\n\\r|\\n\\n", RegexOptions.CultureInvariant);
+-    private static readonly char[] EcmaWhitespace = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff".ToCharArray();
+-    private async IAsyncEnumerable<JsonData> Decode(Stream body, [EnumeratorCancellation] CancellationToken token)
+-    {
+-        using var input = new StreamReader(body, new UTF8Encoding(false, false), detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+-        var buffer = new char[4096]; var pending = ""; long total = 0; int count; var first = true;
+-        while ((count = await AwaitSource(() => input.ReadAsync(buffer.AsMemory(), token)).ConfigureAwait(false)) != 0)
+-        {
+-            total += count; Limit(total, options.MaximumTotalCharacters); var incoming = new string(buffer, 0, count);
+-            if (first) { first = false; if (incoming.StartsWith('\uFEFF')) incoming = incoming[1..]; }
+-            pending += incoming;
+-            // Keep one buffer per read. Slicing the entire remainder after every event
+-            // copied each character repeatedly when a read contained many small deltas.
+-            var consumed = 0;
+-            while (true)
+-            {
+-                var match = Boundary.Match(pending, consumed); if (!match.Success) break;
+-                var raw = pending[consumed..match.Index]; consumed = match.Index + match.Length;
+-                var data = ParseFrame(raw); if (data == "[DONE]") yield break;
+-                if (data.Length > 0) yield return ParseChunk(data);
+-            }
+-            if (consumed != 0) pending = pending[consumed..];
+-            Limit(pending.Length, options.MaximumFrameCharacters);
+-        }
+-        var tail = ParseFrame(pending); if (tail.Length > 0 && tail != "[DONE]") yield return ParseChunk(tail);
+-    }
+-    private string ParseFrame(string raw)
+-    {
+-        Limit(raw.Length, options.MaximumFrameCharacters);
+-        if (raw.StartsWith("data:", StringComparison.Ordinal) && raw.AsSpan().IndexOfAny('\r', '\n') < 0)
+-            return raw.AsSpan(5).Trim(EcmaWhitespace).ToString();
+-        return string.Join("\n", Regex.Split(raw, "\\r\\n|\\r|\\n").Where(x => x.StartsWith("data:", StringComparison.Ordinal)).Select(x => x[5..].TrimStart(EcmaWhitespace))).Trim(EcmaWhitespace);
+-    }
+-    private JsonData ParseChunk(string text) => Admit(() => ParseChunkCore(text));
+-    private JsonData ParseChunkCore(string text) { using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = options.MaximumJsonDepth }); var value = document.RootElement; if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array) throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral streaming event"); return JsonData.FromElement(value); }
+-    internal static string ReadTextPart(JsonElement part) { if (part.ValueKind != JsonValueKind.Object || part.GetProperty("type").GetString() != "text" || part.GetProperty("text").ValueKind != JsonValueKind.String || part.EnumerateObject().Any(x => x.Name is not ("type" or "text"))) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral text/media/reasoning chunk."); return part.GetProperty("text").GetString()!; }
+-    internal static string Sanitize(string text) { if (JsonUtf16.IsWellFormed(text)) return text; var builder = new StringBuilder(text.Length); for (var i = 0; i < text.Length; i++) { if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) { builder.Append(text[i]); builder.Append(text[++i]); } else if (!char.IsSurrogate(text[i])) builder.Append(text[i]); } return builder.ToString(); }
+-    // Shape classification is scoped to owned admission, never inferred from foreign
+-    // callback/HTTP/read exception types. Foreign failures keep fixed SourceFailed text.
+-    internal static T Admit<T>(Func<T> action)
+-    {
+-        try { return action(); }
+-        catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
+-        { throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral admitted data."); }
+-        catch (StreamingJsonPreviewException error)
+-        { throw Fail(error.Failure is StreamingJsonPreviewFailure.CharacterLimit or StreamingJsonPreviewFailure.DepthLimit
+-            ? NativeChatFailureCode.ResourceLimit : NativeChatFailureCode.MalformedStream, "Invalid Mistral tool argument fragment."); }
+-        catch (OverflowException) { throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral numeric limit."); }
+-    }
+-    private static async ValueTask<T> AwaitSource<T>(Func<ValueTask<T>> action)
+-    {
+-        try { return await action().ConfigureAwait(false); }
+-        catch (OperationCanceledException) { throw; }
+-        catch (Exception) { throw Fail(NativeChatFailureCode.SourceFailed, "Mistral source operation failed."); }
+-    }
+-    private static async ValueTask AwaitSource(Func<ValueTask> action)
+-    {
+-        try { await action().ConfigureAwait(false); }
+-        catch (OperationCanceledException) { throw; }
+-        catch (Exception) { throw Fail(NativeChatFailureCode.SourceFailed, "Mistral source operation failed."); }
+-    }
+-    internal static void Limit(long value, long maximum) { if (value > maximum) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral data exceeds configured limits."); }
+-    internal static MistralTextException Fail(NativeChatFailureCode code, string message) => new(code, message);
+-}
++using System.Collections.Immutable;
++using System.Runtime.CompilerServices;
++using System.Text;
++using System.Text.Json;
++using System.Text.Json.Nodes;
++using System.Text.RegularExpressions;
++using PiSharp.Contracts;
++
++namespace PiSharp.AI.Protocols.MistralConversations;
++
++/// <summary>Bound Mistral text/function-tool fetch/SSE composition. Borrows client; no ambient auth, retries or tool execution authority.</summary>
++public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModelProvider, IThinkingLevelTransport
++{
++    private readonly HttpClient client;
++    private readonly ModelDescriptor model;
++    private readonly MistralTextOptions options;
++    public string ProviderId => "mistral";
++    public IReadOnlyList<ModelDescriptor> Models { get; }
++    public IChatTransport Transport => this;
++    public MistralTextHttpSseTransport(HttpClient client, ModelDescriptor model, MistralTextOptions options)
++    {
++        ArgumentNullException.ThrowIfNull(client); ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(options);
++        if (model.Provider != "mistral" || model.Api != "mistral-conversations" || string.IsNullOrWhiteSpace(model.Id) || model.Id.Length > 1024) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid bound Mistral identity.");
++        options.Validate(); this.client = client; this.model = model; this.options = options; Models = ImmutableArray.Create(model);
++    }
++    public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default)
++    {
++        ArgumentNullException.ThrowIfNull(request);
++        if (request.Model != model) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral request identity differs from bound model.");
++        return new Invocation(this, request, cancellationToken);
++    }
++    private sealed class Invocation(MistralTextHttpSseTransport owner, ChatRequest request, CancellationToken token) : IAsyncEnumerable<StreamEvent>
++    {
++        private int claimed;
++        public IAsyncEnumerator<StreamEvent> GetAsyncEnumerator(CancellationToken cancellationToken = default)
++        {
++            if (Interlocked.Exchange(ref claimed, 1) != 0) throw new StreamProtocolException("Mistral invocation has one reader.");
++            return owner.Run(request, token).GetAsyncEnumerator(cancellationToken);
++        }
++    }
++    private async IAsyncEnumerable<StreamEvent> Run(ChatRequest request, [EnumeratorCancellation] CancellationToken caller)
++    {
++        using var timeout = new CancellationTokenSource();
++        using var linked = CancellationTokenSource.CreateLinkedTokenSource(caller, timeout.Token);
++        // StreamOptions.sessionId: the request's session, unless the transport was configured with one.
++        var options = request.SessionId is { } session && this.options.SessionId is null ? this.options with { SessionId = session } : this.options;
++        var token = linked.Token; var state = new TextState(request, options);
++        HttpRequestMessage? send = null; HttpResponseMessage? response = null; Stream? body = null; IAsyncEnumerator<JsonData>? reader = null;
++        Exception? failure = null, cleanup = null; var completed = false;
++        try
++        {
++            try
++            {
++                token.ThrowIfCancellationRequested(); var payload = Admit(() => BuildPayload(request));
++                if (string.IsNullOrEmpty(options.ApiKey)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "No API key for provider: mistral");
++                if (options.OnPayload is { } hook)
++                {
++                    var replacement = await AwaitSource(() => hook(payload, model, token)).ConfigureAwait(false);
++                    token.ThrowIfCancellationRequested();
++                    if (replacement is not null) { Admit(() => { AdmitPayload(replacement.Value, camel: true); return true; }); payload = replacement; }
++                }
++                var wire = JsonNode.Parse(payload.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
++                MapRequestOptions(wire);
++                foreach (var message in wire["messages"]!.AsArray())
++                {
++                    foreach (var (from, to) in new[] { ("toolCalls", "tool_calls"), ("toolCallId", "tool_call_id") })
++                        if (message!.AsObject().ContainsKey(from)) { var value = message[from]; message.AsObject().Remove(from); message[to] = value; }
++                    if (message!["content"] is JsonArray parts)
++                        foreach (var part in parts)
++                            if (part!.AsObject().ContainsKey("imageUrl"))
++                            { var image = part["imageUrl"]; part.AsObject().Remove("imageUrl"); part["image_url"] = image; }
++                }
++                var bytes = Encoding.UTF8.GetBytes(wire.ToJsonString()); Limit(bytes.Length, options.MaximumPayloadBytes);
++                var baseUri = new Uri(options.BaseUrl.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/");
++                send = new(HttpMethod.Post, new Uri(baseUri, "v1/chat/completions")) { Content = new ByteArrayContent(bytes) };
++                var key = options.ApiKey!;
++                if (key.Contains('\r') || key.Contains('\n') || key.Length + 7 > options.MaximumHeaderCharacters) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral credential/header limit.");
++                send.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key); send.Headers.TryAddWithoutValidation("User-Agent", options.UserAgent);
++                send.Headers.TryAddWithoutValidation("Accept", "text/event-stream"); send.Content.Headers.ContentType = new("application/json");
++                ApplyHeaders(send, options.ModelHeaders); ApplyHeaders(send, options.Headers);
++                var explicitAffinity = new[] { options.ModelHeaders, options.Headers }.Any(headers =>
++                    headers?.Keys.Any(name => name.Equals("x-affinity", StringComparison.OrdinalIgnoreCase)) == true);
++                if (options.CachePrompt && !string.IsNullOrEmpty(options.SessionId) && !explicitAffinity)
++                    send.Headers.TryAddWithoutValidation("x-affinity", options.SessionId);
++                ObserveHeaders(send.Headers.Concat(send.Content.Headers));
++                token.ThrowIfCancellationRequested();
++                timeout.CancelAfter(options.TimeoutMilliseconds);
++                response = await AwaitSource(() => new ValueTask<HttpResponseMessage>(client.SendAsync(send, HttpCompletionOption.ResponseHeadersRead, token))).ConfigureAwait(false);
++                var observed = ObserveHeaders(response.Headers.Concat(response.Content.Headers));
++                if (options.OnResponse is { } responseHook) await AwaitSource(() => responseHook(JsonData.Parse(new JsonObject { ["status"] = (int)response.StatusCode, ["headers"] = observed }.ToJsonString()), model, token)).ConfigureAwait(false);
++                token.ThrowIfCancellationRequested(); body = await AwaitSource(() => new ValueTask<Stream>(response.Content.ReadAsStreamAsync(token))).ConfigureAwait(false);
++                if (!response.IsSuccessStatusCode) throw await HttpError(response, body, token).ConfigureAwait(false);
++                if (body is null) throw Fail(NativeChatFailureCode.SourceFailed, "Mistral response has no body");
++                reader = Decode(body, token).GetAsyncEnumerator(token);
++            }
++            catch (Exception error) { failure = error; }
++            if (failure is null) yield return new StreamStarted(state.Message(StopReason.Pending));
++            while (failure is null)
++            {
++                ImmutableArray<StreamEvent> frames = []; var moved = false;
++                try
++                {
++                    token.ThrowIfCancellationRequested(); moved = await reader!.MoveNextAsync().ConfigureAwait(false);
++                    if (moved)
++                    {
++                        var chunk = reader.Current;
++                        if (options.OnProviderStreamEvent is { } hook) await AwaitSource(() => hook(chunk, model, token)).ConfigureAwait(false);
++                        token.ThrowIfCancellationRequested(); frames = state.Convert(chunk);
++                    }
++                }
++                catch (Exception error) { failure = error; }
++                if (failure is not null || !moved) break;
++                foreach (var frame in frames) yield return frame;
++            }
++            completed = true;
++        }
++        finally
++        {
++            if (reader is not null) try { await reader.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { cleanup ??= error; }
++            if (body is not null) try { await body.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { cleanup ??= error; }
++            try { response?.Dispose(); } catch (Exception error) { cleanup ??= error; }
++            try { send?.Dispose(); } catch (Exception error) { cleanup ??= error; }
++            if (!completed && cleanup is not null) throw Fail(NativeChatFailureCode.CleanupFailed, "Mistral iterator cleanup failed.");
++        }
++        // End and terminal are emitted only after the original callback/send/pull/disposal operations settle.
++        foreach (var frame in state.Finish()) yield return frame;
++        var reason = state.Reason; var code = NativeChatFailureCode.SourceFailed; string? text = null;
++        if (caller.IsCancellationRequested) { reason = StopReason.Aborted; code = NativeChatFailureCode.Cancelled; text = "Request was aborted"; }
++        else if (failure is not null) { reason = StopReason.Error; code = MistralNativeDiagnostics.FromException(failure).Code; text = failure is MistralTextException ? failure.Message : timeout.IsCancellationRequested ? "Mistral request timed out." : "Mistral operation failed."; }
++        else if (reason == StopReason.Pending) { reason = StopReason.Error; code = NativeChatFailureCode.UnexpectedEof; text = "Mistral stream ended without a finish reason"; }
++        else if (reason == StopReason.Error) { code = NativeChatFailureCode.ProviderError; text = state.ProviderError; }
++        if (cleanup is not null && text is null) { reason = StopReason.Error; code = NativeChatFailureCode.CleanupFailed; text = "Mistral invocation cleanup failed."; }
++        StreamTerminalEvent terminal = text is null ? new StreamDone(reason, state.Message(reason)) : new StreamError(reason, state.Message(reason, text)) { NativeDiagnostic = MistralNativeDiagnostics.FromCode(code) };
++        if (cleanup is not null) terminal = terminal with { NativeCleanupDiagnostic = MistralNativeDiagnostics.FromCode(NativeChatFailureCode.CleanupFailed) };
++        yield return terminal;
++    }
++    private JsonData BuildPayload(ChatRequest request)
++    {
++        var messages = new JsonArray(); long total = 0; var ids = new MistralToolIds();
++        var replay = ResolveReplay(request, ids);
++        for (var i = 0; i < replay.Length; i++)
++        {
++            var entry = replay[i]; var value = entry.WireBody.Value;
++            Limit(Encoding.UTF8.GetByteCount(value.GetRawText()), options.MaximumPayloadBytes); CheckDepth(value, 0);
++            if (value.ValueKind != JsonValueKind.Object) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral transcript value.");
++            if (entry.Role is "assistant" or "toolResult")
++            {
++                var history = ProjectToolHistory(entry);
++                if (history is not null) { total += history.ToJsonString().Length; Limit(total, options.MaximumContentCharacters); messages.Add(history); }
++                continue;
++            }
++            if (entry.Role is not ("system" or "user")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral replay role.");
++            // Pi v1.1.0 maps only role and content; other stored fields (such as a system message's "offlineApi") are ignored.
++            if (value.TryGetProperty("role", out var role) && role.GetString() != entry.Role) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral transcript role mismatch.");
++            var content = value.GetProperty("content"); JsonNode? node;
++            if (content.ValueKind == JsonValueKind.String) node = JsonValue.Create(Sanitize(content.GetString()!));
++            else if (content.ValueKind == JsonValueKind.Array)
++            {
++                var parts = new JsonArray(); foreach (var part in content.EnumerateArray())
++                { Limit(parts.Count + 1, options.MaximumContentBlocks); parts.Add(ProjectInputPart(part)); }
++                node = entry.Role == "system" ? JsonValue.Create(string.Join("\n", parts.Select(x => x!["text"]!.GetValue<string>()))) : parts;
++            }
++            else throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral text content.");
++            if (entry.Role == "system") node = JsonValue.Create(Sanitize(SystemText(value, i != 0)));
++            total += node!.ToJsonString().Length; Limit(total, options.MaximumContentCharacters);
++            if (entry.Role == "system" && node is JsonValue s && s.GetValue<string>().Length == 0 || node is JsonArray a && a.Count == 0) continue;
++            messages.Add(new JsonObject { ["role"] = entry.Role, ["content"] = node });
++        }
++        var payload = new JsonObject { ["model"] = model.Id, ["stream"] = true, ["messages"] = messages };
++        var tools = ProjectTools(request); if (tools.Count > 0) payload["tools"] = tools;
++        if (options.ToolChoice is { } choice) payload["toolChoice"] = Choice(choice.Value);
++        AddSimpleOptions(payload, request);
++        if (options.Temperature is { } temperature) payload["temperature"] = temperature;
++        if (options.MaxTokens is { } max) payload["maxTokens"] = max;
++        var data = JsonData.Parse(payload.ToJsonString()); AdmitPayload(data.Value, true); return data;
++    }
++    private void AdmitPayload(JsonElement value, bool camel)
++    {
++        Limit(Encoding.UTF8.GetByteCount(value.GetRawText()), options.MaximumPayloadBytes); CheckDepth(value, 0);
++        if (value.ValueKind != JsonValueKind.Object || value.GetProperty("model").GetString() != model.Id || value.GetProperty("stream").ValueKind != JsonValueKind.True) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload replacement.");
++        // Original MistralChatPayload has an unknown-valued index signature. The hook's
++        // extra root fields survive the wire conversion; byte/depth and core admission
++        // still apply to the complete replacement before any HTTP effect.
++        foreach (var field in new[] { "promptMode", "reasoningEffort", "promptCacheKey" })
++            if (value.TryGetProperty(field, out var text) && text.ValueKind != JsonValueKind.String)
++                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral reasoning/cache option.");
++        if (value.TryGetProperty("toolChoice", out var choice)) _ = Choice(choice);
++        if (value.TryGetProperty("tools", out var tools))
++            foreach (var tool in tools.EnumerateArray())
++            {
++                if (tool.GetProperty("type").GetString() != "function") throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral tool kind.");
++                var function = tool.GetProperty("function");
++                if (string.IsNullOrEmpty(function.GetProperty("name").GetString()) || function.GetProperty("parameters").ValueKind != JsonValueKind.Object)
++                    throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral function declaration.");
++            }
++        foreach (var name in new[] { "temperature", camel ? "maxTokens" : "max_tokens" }) if (value.TryGetProperty(name, out var number) && (number.ValueKind != JsonValueKind.Number || !number.TryGetDouble(out var n) || !double.IsFinite(n))) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral numeric option.");
++        var index = 0; long size = 0;
++        foreach (var message in value.GetProperty("messages").EnumerateArray())
++        {
++            foreach (var p in message.EnumerateObject()) if (p.Name is not ("role" or "content" or "toolCalls" or "toolCallId" or "name" or "prefix")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload message field.");
++            var role = message.GetProperty("role").GetString(); if (role is not ("system" or "user" or "assistant" or "tool")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload role.");
++            if (message.TryGetProperty("toolCalls", out var calls)) { if (role != "assistant") throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral tool-call role."); ValidateToolCalls(calls); }
++            // A nameless call's result replays with name "" (owner decision 13).
++            if (role == "tool" && (string.IsNullOrEmpty(message.GetProperty("toolCallId").GetString()) || message.GetProperty("name").GetString() is null))
++                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral tool result.");
++            if (!message.TryGetProperty("content", out var content))
++            { if (role != "assistant" || !message.TryGetProperty("toolCalls", out _)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Missing Mistral content."); index++; continue; }
++            if (content.ValueKind == JsonValueKind.Array && role is "user" or "assistant" or "tool") foreach (var part in content.EnumerateArray())
++            {
++                Limit(content.GetArrayLength(), options.MaximumContentBlocks);
++                if (role == "assistant") ValidateReplayPart(part); else ValidateInputPart(part);
++            }
++            else if (content.ValueKind != JsonValueKind.String) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload content.");
++            size += content.GetRawText().Length; Limit(size, options.MaximumContentCharacters); index++;
++        }
++    }
++    private void CheckDepth(JsonElement value, int depth) { Limit(depth, options.MaximumJsonDepth); if (value.ValueKind == JsonValueKind.Object) foreach (var p in value.EnumerateObject()) CheckDepth(p.Value, depth + 1); else if (value.ValueKind == JsonValueKind.Array) foreach (var p in value.EnumerateArray()) CheckDepth(p, depth + 1); }
++    private JsonObject ObserveHeaders(IEnumerable<KeyValuePair<string, IEnumerable<string>>> fields)
++    {
++        var result = new JsonObject(); long total = 0; var count = 0;
++        foreach (var field in fields) { var text = string.Join(", ", field.Value); Limit(++count, options.MaximumHeaders); Limit(field.Key.Length + text.Length, options.MaximumHeaderCharacters); total += field.Key.Length + text.Length; Limit(total, options.MaximumTotalHeaderCharacters); result[field.Key.ToLowerInvariant()] = text; }
++        return result;
++    }
++    private static void ApplyHeaders(HttpRequestMessage request, ImmutableDictionary<string, string?>? headers)
++    {
++        if (headers is null) return;
++        var content = request.Content ?? throw Fail(NativeChatFailureCode.UnsupportedFeature, "Missing Mistral request content.");
++        foreach (var pair in headers)
++        {
++            foreach (var name in request.Headers.Select(header => header.Key).Where(name => name.Equals(pair.Key, StringComparison.OrdinalIgnoreCase)).ToArray()) request.Headers.Remove(name);
++            foreach (var name in content.Headers.Select(header => header.Key).Where(name => name.Equals(pair.Key, StringComparison.OrdinalIgnoreCase)).ToArray()) content.Headers.Remove(name);
++            if (pair.Value is not null && !request.Headers.TryAddWithoutValidation(pair.Key, pair.Value) &&
++                !content.Headers.TryAddWithoutValidation(pair.Key, pair.Value))
++                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral header binding.");
++        }
++    }
++    private async ValueTask<MistralTextException> HttpError(HttpResponseMessage response, Stream body, CancellationToken token)
++    {
++        using var bytes = new MemoryStream(); var buffer = new byte[4096]; int count;
++        while ((count = await AwaitSource(() => body.ReadAsync(buffer.AsMemory(), token)).ConfigureAwait(false)) != 0) { Limit(bytes.Length + count, options.MaximumErrorBytes); bytes.Write(buffer, 0, count); }
++        var text = Encoding.UTF8.GetString(bytes.ToArray()).Trim(EcmaWhitespace);
++        var suffix = text.Length > 0 ? text.Length > 4000 ? text[..4000] + $"... [truncated {text.Length - 4000} chars]" : text : (string.IsNullOrEmpty(response.ReasonPhrase) ? $"Request failed with status {(int)response.StatusCode}" : response.ReasonPhrase);
++        return Fail(NativeChatFailureCode.ProviderError, $"Mistral API error ({(int)response.StatusCode}): {suffix}");
++    }
++    private static readonly Regex Boundary = new("\\r\\n\\r\\n|\\r\\n\\r|\\r\\n\\n|\\r\\r\\n|\\n\\r\\n|\\r\\r|\\n\\r|\\n\\n", RegexOptions.CultureInvariant);
++    private static readonly char[] EcmaWhitespace = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff".ToCharArray();
++    private async IAsyncEnumerable<JsonData> Decode(Stream body, [EnumeratorCancellation] CancellationToken token)
++    {
++        using var input = new StreamReader(body, new UTF8Encoding(false, false), detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
++        var buffer = new char[4096]; var pending = ""; long total = 0; int count; var first = true;
++        while ((count = await AwaitSource(() => input.ReadAsync(buffer.AsMemory(), token)).ConfigureAwait(false)) != 0)
++        {
++            total += count; Limit(total, options.MaximumTotalCharacters); var incoming = new string(buffer, 0, count);
++            if (first) { first = false; if (incoming.StartsWith('\uFEFF')) incoming = incoming[1..]; }
++            pending += incoming;
++            while (true) { var match = Boundary.Match(pending); if (!match.Success) break; var raw = pending[..match.Index]; pending = pending[(match.Index + match.Length)..]; var data = ParseFrame(raw); if (data == "[DONE]") yield break; if (data.Length > 0) yield return ParseChunk(data); }
++            Limit(pending.Length, options.MaximumFrameCharacters);
++        }
++        var tail = ParseFrame(pending); if (tail.Length > 0 && tail != "[DONE]") yield return ParseChunk(tail);
++    }
++    private string ParseFrame(string raw) { Limit(raw.Length, options.MaximumFrameCharacters); return string.Join("\n", Regex.Split(raw, "\\r\\n|\\r|\\n").Where(x => x.StartsWith("data:", StringComparison.Ordinal)).Select(x => x[5..].TrimStart(EcmaWhitespace))).Trim(EcmaWhitespace); }
++    private JsonData ParseChunk(string text) => Admit(() => ParseChunkCore(text));
++    private JsonData ParseChunkCore(string text) { using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = options.MaximumJsonDepth }); var value = document.RootElement; if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array) throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral streaming event"); return JsonData.FromElement(value); }
++    internal static string ReadTextPart(JsonElement part) { if (part.ValueKind != JsonValueKind.Object || part.GetProperty("type").GetString() != "text" || part.GetProperty("text").ValueKind != JsonValueKind.String || part.EnumerateObject().Any(x => x.Name is not ("type" or "text"))) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral text/media/reasoning chunk."); return part.GetProperty("text").GetString()!; }
++    internal static string Sanitize(string text) { var builder = new StringBuilder(text.Length); for (var i = 0; i < text.Length; i++) { if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) { builder.Append(text[i]); builder.Append(text[++i]); } else if (!char.IsSurrogate(text[i])) builder.Append(text[i]); } return builder.ToString(); }
++    // Shape classification is scoped to owned admission, never inferred from foreign
++    // callback/HTTP/read exception types. Foreign failures keep fixed SourceFailed text.
++    internal static T Admit<T>(Func<T> action)
++    {
++        try { return action(); }
++        catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
++        { throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral admitted data."); }
++        catch (StreamingJsonPreviewException error)
++        { throw Fail(error.Failure is StreamingJsonPreviewFailure.CharacterLimit or StreamingJsonPreviewFailure.DepthLimit
++            ? NativeChatFailureCode.ResourceLimit : NativeChatFailureCode.MalformedStream, "Invalid Mistral tool argument fragment."); }
++        catch (OverflowException) { throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral numeric limit."); }
++    }
++    private static async ValueTask<T> AwaitSource<T>(Func<ValueTask<T>> action)
++    {
++        try { return await action().ConfigureAwait(false); }
++        catch (OperationCanceledException) { throw; }
++        catch (Exception) { throw Fail(NativeChatFailureCode.SourceFailed, "Mistral source operation failed."); }
++    }
++    private static async ValueTask AwaitSource(Func<ValueTask> action)
++    {
++        try { await action().ConfigureAwait(false); }
++        catch (OperationCanceledException) { throw; }
++        catch (Exception) { throw Fail(NativeChatFailureCode.SourceFailed, "Mistral source operation failed."); }
++    }
++    internal static void Limit(long value, long maximum) { if (value > maximum) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral data exceeds configured limits."); }
++    internal static MistralTextException Fail(NativeChatFailureCode code, string message) => new(code, message);
++}
+\ No newline at end of file
+diff --git a/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSourceEventProjection.cs b/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSourceEventProjection.cs
+index 1a4019f..8a80c5e 100644
+--- a/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSourceEventProjection.cs
++++ b/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSourceEventProjection.cs
+@@ -1,195 +1,195 @@
+-using System.Text.Json.Nodes;
+-using System.Text.Json;
+-using PiSharp.AI.Providers;
+-using PiSharp.Contracts;
+-
+-namespace PiSharp.AI.Protocols.OpenAICompletions;
+-
+-internal sealed record CompletionsToolSourceView(int ContentIndex, int? WireIndex, string RawArguments,
+-    JsonData DisplayArguments, bool Ended)
+-{
+-    internal JsonData? CustomInput { get; init; }
+-    internal bool UndefinedPartialArguments { get; init; }
+-}
+-
+-/// <summary>
+-/// Source-facing owned push snapshots. Native compact frames and their immutable
+-/// timing are distinct from the source queue's mutable message aliases.
+-/// </summary>
+-public static class CompletionsSourceEventProjection
+-{
+-    /// <summary>Selects bounded full push capture without changing the native progress contract.</summary>
+-    public static OpenAICompletionsWireOptions CaptureOwnedSnapshots(OpenAICompletionsWireOptions? options = null) =>
+-        (options ?? new()) with { CaptureSourceEmissionSnapshots = true };
+-
+-    public static JsonData? ReadEmission(StreamEvent frame)
+-    {
+-        ArgumentNullException.ThrowIfNull(frame);
+-        return frame is ToolCallHeaderUpdated ? null : frame.SourceEmissionSnapshot;
+-    }
+-
+-    public static JsonData? ReadDrain(StreamEvent frame)
+-    {
+-        ArgumentNullException.ThrowIfNull(frame);
+-        return frame is ToolCallHeaderUpdated ? null : frame.SourceDrainSnapshot;
+-    }
+-
+-    /// <summary>Owned source-facing final view and presence sidecar; the canonical native message remains unchanged.</summary>
+-    public static JsonData? ReadFinalObservation(StreamTerminalEvent frame, int maximumCharacters = 1_048_576)
+-    {
+-        ArgumentNullException.ThrowIfNull(frame); ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCharacters);
+-        if (ReadEmission(frame) is not { } captured) return null;
+-        var input = captured.ToString();
+-        if (input.Length > maximumCharacters + 256L) throw new StreamLimitException("Captured source final input limit exceeded.");
+-        var member = frame is StreamDone ? "message" : "error";
+-        // Public frame sidecars can retain permissive JsonElement syntax; admit the entire retained input strictly.
+-        var root = JsonData.Parse(input).Value; var prefix = "/" + member;
+-        var paths = root.GetProperty("ownUndefinedPaths").EnumerateArray().Select(item => item.GetString()!)
+-            .Where(path => path.StartsWith(prefix + "/", StringComparison.Ordinal)).Select(path => path[prefix.Length..]).ToArray();
+-        var raw = "{\"value\":" + root.GetProperty("value").GetProperty(member).GetRawText() + ",\"ownUndefinedPaths\":" + JsonSerializer.Serialize(paths) + "}";
+-        if (raw.Length > maximumCharacters) throw new StreamLimitException("Captured source final limit exceeded.");
+-        return JsonData.Parse(raw);
+-    }
+-
+-    internal static JsonData Capture(StreamEvent frame, AssistantMessage snapshot,
+-        IReadOnlyList<CompletionsToolSourceView> tools, bool responseIdAssigned = false, JsonData? responseId = null,
+-        IReadOnlyList<string>? addedPropertyOrder = null)
+-    {
+-        var partial = SourceMessage(snapshot, responseIdAssigned, responseId, addedPropertyOrder);
+-        var content = partial["content"]!.AsArray();
+-        var undefined = new JsonArray();
+-        foreach (var tool in tools)
+-        {
+-            if (tool.Ended) continue;
+-            var node = content[tool.ContentIndex]!.AsObject();
+-            node["arguments"] = PiSharp.Contracts.JsonUtf16.MutableNode(tool.DisplayArguments.ToString());
+-            // Pi's catch removes parsing buffers before its error publication.
+-            // Retain the real parsed preview, without reconstructing scratch fields on a terminal.
+-            if (frame is StreamTerminalEvent) continue;
+-            if (tool.CustomInput is { } custom)
+-            {
+-                node.Remove("partialArgs");
+-                node["customInput"] = PiSharp.Contracts.JsonUtf16.MutableNode(custom.ToString());
+-                if (tool.UndefinedPartialArguments) undefined.Add($"/partial/content/{tool.ContentIndex}/partialArgs");
+-            }
+-            else
+-            {
+-                node["partialArgs"] = tool.RawArguments;
+-                undefined.Add($"/partial/content/{tool.ContentIndex}/customInput");
+-            }
+-            if (tool.WireIndex is { } index) node["streamIndex"] = index;
+-            if (tool.WireIndex is null) undefined.Add($"/partial/content/{tool.ContentIndex}/streamIndex");
+-        }
+-        var value = new JsonObject();
+-        switch (frame)
+-        {
+-            case StreamStarted: value["type"] = "start"; break;
+-            case TextStarted start: Indexed("text_start", start.ContentIndex); break;
+-            case TextDelta delta: Indexed("text_delta", delta.ContentIndex); value["delta"] = delta.Delta; break;
+-            case TextEnded end: Indexed("text_end", end.ContentIndex); value["content"] = end.Content; break;
+-            case ThinkingStarted start: Indexed("thinking_start", start.ContentIndex); break;
+-            case ThinkingDelta delta: Indexed("thinking_delta", delta.ContentIndex); value["delta"] = delta.Delta; break;
+-            case ThinkingEnded end: Indexed("thinking_end", end.ContentIndex); value["content"] = end.Content; break;
+-            case ToolCallStarted start: Indexed("toolcall_start", start.ContentIndex); break;
+-            case ToolCallProvisionalStarted start: Indexed("toolcall_start", start.ContentIndex); break;
+-            case ToolCallDelta delta: Indexed("toolcall_delta", delta.ContentIndex); value["delta"] = delta.Delta; break;
+-            case ToolCallEnded end:
+-                Indexed("toolcall_end", end.ContentIndex); value["toolCall"] = SourceContent(end.ToolCall); break;
+-            case StreamTerminalEvent terminal:
+-                value["type"] = terminal is StreamDone ? "done" : "error";
+-                value["reason"] = PiWireJson.StopReasonName(terminal.Reason);
+-                value[terminal is StreamDone ? "message" : "error"] = partial;
+-                undefined.Clear();
+-                if (responseIdAssigned && responseId is null) undefined.Add(terminal is StreamDone ? "/message/responseId" : "/error/responseId");
+-                return Own(value, undefined);
+-            default: throw new StreamProtocolException("Native operation has no Completions source push.");
+-        }
+-        value["partial"] = partial;
+-        if (responseIdAssigned && responseId is null) undefined.Add("/partial/responseId");
+-        // The oracle sorts undefined paths; array order is itself compared exactly.
+-        var sorted = new JsonArray(undefined.Select(node => node!.GetValue<string>()).Order(StringComparer.Ordinal)
+-            .Select(path => (JsonNode?)JsonValue.Create(path)).ToArray());
+-        return Own(value, sorted);
+-
+-        void Indexed(string type, int index) { value["type"] = type; value["contentIndex"] = index; }
+-    }
+-
+-    // The generic native serializer retains a different schema order. Source snapshots
+-    // must retain Pi's object insertion order, including fields assigned after construction.
+-    // Values, binary64 cost syntax and the generic ECMAScript serializer remain unchanged.
+-    private static JsonObject SourceMessage(AssistantMessage snapshot, bool responseIdAssigned, JsonData? responseId,
+-        IReadOnlyList<string>? addedPropertyOrder)
+-    {
+-        var native = PiWireJson.MessageNode(snapshot);
+-        native["content"] = new JsonArray(snapshot.Content.Select(block => (JsonNode)SourceContent(block)).ToArray());
+-        var usage = native["usage"]!.AsObject();
+-        usage["cost"] = InOrder(usage["cost"]!.AsObject(), ["input", "output", "cacheRead", "cacheWrite", "total"]);
+-        native["usage"] = InOrder(usage, ["input", "output", "cacheRead", "cacheWrite", "reasoning", "totalTokens", "cost"]);
+-        if (responseIdAssigned)
+-        {
+-            if (responseId is null) native.Remove("responseId");
+-            else native["responseId"] = PiSharp.Contracts.JsonUtf16.MutableNode(responseId.ToString());
+-        }
+-        return InOrder(native, new[] { "role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp" }
+-            .Concat(addedPropertyOrder ?? []).Concat(["responseId", "responseModel", "rawStopReason", "errorMessage"]));
+-    }
+-
+-    private static JsonObject SourceContent(AssistantContent content)
+-    {
+-        var native = PiWireJson.ContentNode(content);
+-        return InOrder(native, content switch
+-        {
+-            TextContent => ["type", "text"],
+-            ThinkingContent => ["type", "thinking", "thinkingSignature"],
+-            ToolCallContent => ["type", "id", "name", "arguments"],
+-            _ => throw new StreamProtocolException("Unknown Completions source content.")
+-        });
+-    }
+-
+-    private static JsonObject InOrder(JsonObject source, IEnumerable<string> names)
+-    {
+-        var ordered = new JsonObject();
+-        foreach (var name in names)
+-            if (source.TryGetPropertyValue(name, out var value))
+-            { source.Remove(name); ordered.Add(name, value); }
+-        foreach (var item in source.ToArray())
+-        { source.Remove(item.Key); ordered.Add(item.Key, item.Value); }
+-        return ordered;
+-    }
+-
+-    /// <summary>
+-    /// Returns owned drain views captured at the qualified source-await boundaries.
+-    /// It neither replaces a partial with a final nor infers arbitrary consumer timing.
+-    /// Error/cancellation drain timing is not qualified by the successful corpus.
+-    /// </summary>
+-    public static IReadOnlyList<JsonData> ReadCapturedDrainObservations(IReadOnlyList<StreamEvent> frames,
+-        int maximumCharacters = 1_048_576)
+-    {
+-        ArgumentNullException.ThrowIfNull(frames);
+-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCharacters);
+-        if (frames.Count == 0 || frames[^1] is not StreamDone || ReadEmission(frames[^1]) is null || ReadDrain(frames[^1]) is null)
+-            throw new StreamProtocolException("Captured source drain requires owned successful terminal push and drain snapshots.");
+-        var result = new List<JsonData>();
+-        long characters = 0;
+-        foreach (var frame in frames)
+-        {
+-            if (frame is ToolCallHeaderUpdated) continue;
+-            var emission = ReadEmission(frame) ?? throw new StreamProtocolException("A source push lacks its owned snapshot.");
+-            var drain = ReadDrain(frame) ?? throw new StreamProtocolException("A source push lacks its owned drain boundary snapshot.");
+-            Charge(emission.ToString().Length);
+-            Charge(drain.ToString().Length);
+-            result.Add(drain);
+-        }
+-        return result;
+-
+-        void Charge(int size)
+-        {
+-            if (size > maximumCharacters - characters) throw new StreamLimitException("Captured source drain limit exceeded.");
+-            characters += size;
+-        }
+-    }
+-
+-    // A value read from the stream keeps a lone surrogate (JSON.parse); JsonUtf16 writes it back as its escape.
+-    private static JsonData Own(JsonObject value, JsonArray undefined) => JsonData.Parse(PiSharp.Contracts.JsonUtf16.ToJsonString(
+-        new JsonObject { ["value"] = value, ["ownUndefinedPaths"] = undefined }));
+-}
++using System.Text.Json.Nodes;
++using System.Text.Json;
++using PiSharp.AI.Providers;
++using PiSharp.Contracts;
++
++namespace PiSharp.AI.Protocols.OpenAICompletions;
++
++internal sealed record CompletionsToolSourceView(int ContentIndex, int? WireIndex, string RawArguments,
++    JsonData DisplayArguments, bool Ended)
++{
++    internal JsonData? CustomInput { get; init; }
++    internal bool UndefinedPartialArguments { get; init; }
++}
++
++/// <summary>
++/// Source-facing owned push snapshots. Native compact frames and their immutable
++/// timing are distinct from the source queue's mutable message aliases.
++/// </summary>
++public static class CompletionsSourceEventProjection
++{
++    /// <summary>Selects bounded full push capture without changing the native progress contract.</summary>
++    public static OpenAICompletionsWireOptions CaptureOwnedSnapshots(OpenAICompletionsWireOptions? options = null) =>
++        (options ?? new()) with { CaptureSourceEmissionSnapshots = true };
++
++    public static JsonData? ReadEmission(StreamEvent frame)
++    {
++        ArgumentNullException.ThrowIfNull(frame);
++        return frame is ToolCallHeaderUpdated ? null : frame.SourceEmissionSnapshot;
++    }
++
++    public static JsonData? ReadDrain(StreamEvent frame)
++    {
++        ArgumentNullException.ThrowIfNull(frame);
++        return frame is ToolCallHeaderUpdated ? null : frame.SourceDrainSnapshot;
++    }
++
++    /// <summary>Owned source-facing final view and presence sidecar; the canonical native message remains unchanged.</summary>
++    public static JsonData? ReadFinalObservation(StreamTerminalEvent frame, int maximumCharacters = 1_048_576)
++    {
++        ArgumentNullException.ThrowIfNull(frame); ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCharacters);
++        if (ReadEmission(frame) is not { } captured) return null;
++        var input = captured.ToString();
++        if (input.Length > maximumCharacters + 256L) throw new StreamLimitException("Captured source final input limit exceeded.");
++        var member = frame is StreamDone ? "message" : "error";
++        // Public frame sidecars can retain permissive JsonElement syntax; admit the entire retained input strictly.
++        var root = JsonData.Parse(input).Value; var prefix = "/" + member;
++        var paths = root.GetProperty("ownUndefinedPaths").EnumerateArray().Select(item => item.GetString()!)
++            .Where(path => path.StartsWith(prefix + "/", StringComparison.Ordinal)).Select(path => path[prefix.Length..]).ToArray();
++        var raw = "{\"value\":" + root.GetProperty("value").GetProperty(member).GetRawText() + ",\"ownUndefinedPaths\":" + JsonSerializer.Serialize(paths) + "}";
++        if (raw.Length > maximumCharacters) throw new StreamLimitException("Captured source final limit exceeded.");
++        return JsonData.Parse(raw);
++    }
++
++    internal static JsonData Capture(StreamEvent frame, AssistantMessage snapshot,
++        IReadOnlyList<CompletionsToolSourceView> tools, bool responseIdAssigned = false, JsonData? responseId = null,
++        IReadOnlyList<string>? addedPropertyOrder = null)
++    {
++        var partial = SourceMessage(snapshot, responseIdAssigned, responseId, addedPropertyOrder);
++        var content = partial["content"]!.AsArray();
++        var undefined = new JsonArray();
++        foreach (var tool in tools)
++        {
++            if (tool.Ended) continue;
++            var node = content[tool.ContentIndex]!.AsObject();
++            node["arguments"] = PiSharp.Contracts.JsonUtf16.MutableNode(tool.DisplayArguments.ToString());
++            // Pi's catch removes parsing buffers before its error publication.
++            // Retain the real parsed preview, without reconstructing scratch fields on a terminal.
++            if (frame is StreamTerminalEvent) continue;
++            if (tool.CustomInput is { } custom)
++            {
++                node.Remove("partialArgs");
++                node["customInput"] = PiSharp.Contracts.JsonUtf16.MutableNode(custom.ToString());
++                if (tool.UndefinedPartialArguments) undefined.Add($"/partial/content/{tool.ContentIndex}/partialArgs");
++            }
++            else
++            {
++                node["partialArgs"] = tool.RawArguments;
++                undefined.Add($"/partial/content/{tool.ContentIndex}/customInput");
++            }
++            if (tool.WireIndex is { } index) node["streamIndex"] = index;
++            if (tool.WireIndex is null) undefined.Add($"/partial/content/{tool.ContentIndex}/streamIndex");
++        }
++        var value = new JsonObject();
++        switch (frame)
++        {
++            case StreamStarted: value["type"] = "start"; break;
++            case TextStarted start: Indexed("text_start", start.ContentIndex); break;
++            case TextDelta delta: Indexed("text_delta", delta.ContentIndex); value["delta"] = delta.Delta; break;
++            case TextEnded end: Indexed("text_end", end.ContentIndex); value["content"] = end.Content; break;
++            case ThinkingStarted start: Indexed("thinking_start", start.ContentIndex); break;
++            case ThinkingDelta delta: Indexed("thinking_delta", delta.ContentIndex); value["delta"] = delta.Delta; break;
++            case ThinkingEnded end: Indexed("thinking_end", end.ContentIndex); value["content"] = end.Content; break;
++            case ToolCallStarted start: Indexed("toolcall_start", start.ContentIndex); break;
++            case ToolCallProvisionalStarted start: Indexed("toolcall_start", start.ContentIndex); break;
++            case ToolCallDelta delta: Indexed("toolcall_delta", delta.ContentIndex); value["delta"] = delta.Delta; break;
++            case ToolCallEnded end:
++                Indexed("toolcall_end", end.ContentIndex); value["toolCall"] = SourceContent(end.ToolCall); break;
++            case StreamTerminalEvent terminal:
++                value["type"] = terminal is StreamDone ? "done" : "error";
++                value["reason"] = PiWireJson.StopReasonName(terminal.Reason);
++                value[terminal is StreamDone ? "message" : "error"] = partial;
++                undefined.Clear();
++                if (responseIdAssigned && responseId is null) undefined.Add(terminal is StreamDone ? "/message/responseId" : "/error/responseId");
++                return Own(value, undefined);
++            default: throw new StreamProtocolException("Native operation has no Completions source push.");
++        }
++        value["partial"] = partial;
++        if (responseIdAssigned && responseId is null) undefined.Add("/partial/responseId");
++        // The oracle sorts undefined paths; array order is itself compared exactly.
++        var sorted = new JsonArray(undefined.Select(node => node!.GetValue<string>()).Order(StringComparer.Ordinal)
++            .Select(path => (JsonNode?)JsonValue.Create(path)).ToArray());
++        return Own(value, sorted);
++
++        void Indexed(string type, int index) { value["type"] = type; value["contentIndex"] = index; }
++    }
++
++    // The generic native serializer retains a different schema order. Source snapshots
++    // must retain Pi's object insertion order, including fields assigned after construction.
++    // Values, binary64 cost syntax and the generic ECMAScript serializer remain unchanged.
++    private static JsonObject SourceMessage(AssistantMessage snapshot, bool responseIdAssigned, JsonData? responseId,
++        IReadOnlyList<string>? addedPropertyOrder)
++    {
++        var native = PiSharp.Contracts.JsonUtf16.MutableNode(PiWireJson.WriteMessage(snapshot).ToString())!.AsObject();
++        native["content"] = new JsonArray(snapshot.Content.Select(block => (JsonNode)SourceContent(block)).ToArray());
++        var usage = native["usage"]!.AsObject();
++        usage["cost"] = InOrder(usage["cost"]!.AsObject(), ["input", "output", "cacheRead", "cacheWrite", "total"]);
++        native["usage"] = InOrder(usage, ["input", "output", "cacheRead", "cacheWrite", "reasoning", "totalTokens", "cost"]);
++        if (responseIdAssigned)
++        {
++            if (responseId is null) native.Remove("responseId");
++            else native["responseId"] = PiSharp.Contracts.JsonUtf16.MutableNode(responseId.ToString());
++        }
++        return InOrder(native, new[] { "role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp" }
++            .Concat(addedPropertyOrder ?? []).Concat(["responseId", "responseModel", "rawStopReason", "errorMessage"]));
++    }
++
++    private static JsonObject SourceContent(AssistantContent content)
++    {
++        var native = PiSharp.Contracts.JsonUtf16.MutableNode(PiWireJson.WriteContent(content).ToString())!.AsObject();
++        return InOrder(native, content switch
++        {
++            TextContent => ["type", "text"],
++            ThinkingContent => ["type", "thinking", "thinkingSignature"],
++            ToolCallContent => ["type", "id", "name", "arguments"],
++            _ => throw new StreamProtocolException("Unknown Completions source content.")
++        });
++    }
++
++    private static JsonObject InOrder(JsonObject source, IEnumerable<string> names)
++    {
++        var ordered = new JsonObject();
++        foreach (var name in names)
++            if (source.TryGetPropertyValue(name, out var value))
++            { source.Remove(name); ordered.Add(name, value); }
++        foreach (var item in source.ToArray())
++        { source.Remove(item.Key); ordered.Add(item.Key, item.Value); }
++        return ordered;
++    }
++
++    /// <summary>
++    /// Returns owned drain views captured at the qualified source-await boundaries.
++    /// It neither replaces a partial with a final nor infers arbitrary consumer timing.
++    /// Error/cancellation drain timing is not qualified by the successful corpus.
++    /// </summary>
++    public static IReadOnlyList<JsonData> ReadCapturedDrainObservations(IReadOnlyList<StreamEvent> frames,
++        int maximumCharacters = 1_048_576)
++    {
++        ArgumentNullException.ThrowIfNull(frames);
++        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCharacters);
++        if (frames.Count == 0 || frames[^1] is not StreamDone || ReadEmission(frames[^1]) is null || ReadDrain(frames[^1]) is null)
++            throw new StreamProtocolException("Captured source drain requires owned successful terminal push and drain snapshots.");
++        var result = new List<JsonData>();
++        long characters = 0;
++        foreach (var frame in frames)
++        {
++            if (frame is ToolCallHeaderUpdated) continue;
++            var emission = ReadEmission(frame) ?? throw new StreamProtocolException("A source push lacks its owned snapshot.");
++            var drain = ReadDrain(frame) ?? throw new StreamProtocolException("A source push lacks its owned drain boundary snapshot.");
++            Charge(emission.ToString().Length);
++            Charge(drain.ToString().Length);
++            result.Add(drain);
++        }
++        return result;
++
++        void Charge(int size)
++        {
++            if (size > maximumCharacters - characters) throw new StreamLimitException("Captured source drain limit exceeded.");
++            characters += size;
++        }
++    }
++
++    // A value read from the stream keeps a lone surrogate (JSON.parse); JsonUtf16 writes it back as its escape.
++    private static JsonData Own(JsonObject value, JsonArray undefined) => JsonData.Parse(PiSharp.Contracts.JsonUtf16.ToJsonString(
++        new JsonObject { ["value"] = value, ["ownUndefinedPaths"] = undefined }));
++}
+\ No newline at end of file
+diff --git a/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSourceValues.cs b/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSourceValues.cs
+index b9b8168..257a552 100644
+--- a/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSourceValues.cs
++++ b/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsSourceValues.cs
+@@ -44,10 +44,10 @@ public sealed class CompletionsSourceSnapshot
+             throw new StreamLimitException("Completions source value exceeds configured limits.");
+         // JsonData already validates syntax/duplicates and owns an immutable clone.
+         // Sharing it preserves its lifetime without parsing/copying the same bytes again.
+-        Raw = raw;
++        Raw = JsonData.Parse(text);
+         OwnUndefinedPaths = Raw.Value.GetProperty("ownUndefinedPaths").EnumerateArray()
+             .Select(path => path.GetString()!).ToImmutableArray();
+-        SerializedJson = EcmaScriptJsonProjection.Project(JsonData.FromElement(Raw.Value.GetProperty("value")), new(MaximumInputCharacters: maximumCharacters,
++        SerializedJson = EcmaScriptJsonProjection.Project(JsonData.Parse(Raw.Value.GetProperty("value").GetRawText()), new(MaximumInputCharacters: maximumCharacters,
+             MaximumInputBytes: maximumBytes, MaximumOutputCharacters: maximumCharacters,
+             MaximumOutputBytes: maximumBytes, MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumStringCharacters: maximumCharacters));
+     }
+@@ -80,13 +80,8 @@ public sealed class CompletionsSourceEvent
+     {
+         Type = emission.Value.GetProperty("value").GetProperty("type").GetString()!;
+         _member = Type == "done" ? "message" : Type == "error" ? "error" : "partial";
+-        var descriptor = new JsonObject();
+-        foreach (var property in emission.Value.GetProperty("value").EnumerateObject())
+-        {
+-            var name = JsonUtf16.GetName(property);
+-            if (name != _member) descriptor[name] = JsonUtf16.MutableNode(property.Value);
+-        }
+-        _descriptor = JsonData.Parse(PiSharp.Contracts.JsonUtf16.ToJsonString(descriptor));
++        var descriptor = PiSharp.Contracts.JsonUtf16.MutableNode(emission.Value.GetProperty("value"))!.AsObject();
++        descriptor.Remove(_member); _descriptor = JsonData.Parse(PiSharp.Contracts.JsonUtf16.ToJsonString(descriptor));
+         Message = message; _characters = characters; _bytes = bytes;
+         Emission = new(emission, characters, bytes);
+     }
+diff --git a/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsRun.cs b/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsRun.cs
+index 40b8bba..41fd8a5 100644
+--- a/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsRun.cs
++++ b/src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsRun.cs
+@@ -136,8 +136,8 @@ public sealed class CompletionsRun : IAsyncDisposable
+                 var compact = !sourceView && _options.Hooks?.OnSourcePublished is null &&
+                     !_captureCanonicalObservation && frame is TextDelta or ThinkingDelta &&
+                     _context.CompactProgressFits(_options.MaximumSourceValueCharacters, _options.MaximumSourceValueBytes);
+-                var captured = compact ? null : PublishMessage(frame);
+-                var source = compact || frame is ToolCallHeaderUpdated ? null : SourceFrame(frame, captured!);
++                if (!compact) PublishMessage(frame);
++                var source = compact || frame is ToolCallHeaderUpdated ? null : SourceFrame(frame);
+                 if (frame is StreamTerminalEvent terminal)
+                 { _semanticTerminal = ObserveTerminal(terminal, source); Volatile.Write(ref _sourceTerminal, source); break; }
+                 var envelope = new Envelope(frame, source, _context.FinalBatch,
+@@ -163,8 +163,8 @@ public sealed class CompletionsRun : IAsyncDisposable
+                 .Set("errorMessage", JsonData.Parse(aborted ? "\"Completions stream was cancelled.\"" : "\"Completions stream did not complete.\"")) })
+             { NativeDiagnostic = OpenAICompletionsWireSource.Diagnostic(aborted ? OpenAICompletionsWireFailure.Cancelled :
+                 error is StreamLimitException ? OpenAICompletionsWireFailure.ResourceLimit : OpenAICompletionsWireFailure.SourceFailed) };
+-            var captured = PublishMessage(_semanticTerminal);
+-            var source = SourceFrame(_semanticTerminal, captured);
++            PublishMessage(_semanticTerminal);
++            var source = SourceFrame(_semanticTerminal);
+             _semanticTerminal = ObserveTerminal(_semanticTerminal, source);
+             Volatile.Write(ref _sourceTerminal, source);
+         }
+@@ -229,25 +229,25 @@ public sealed class CompletionsRun : IAsyncDisposable
+         catch (Exception error) when (error is StreamLimitException or JsonException) { return terminal; }
+     }
+ 
+-    private JsonData PublishMessage(StreamEvent frame)
++    private void PublishMessage(StreamEvent frame)
+     {
+-        var captured = _context.Capture(frame);
++        var captured = _context.Capture(frame).Value;
+         var member = frame is StreamTerminalEvent ? frame is StreamDone ? "message" : "error" : "partial";
+-        var message = PiSharp.Contracts.JsonUtf16.MutableNode(captured.Value.GetProperty("value").GetProperty(member))!.AsObject();
++        var message = PiSharp.Contracts.JsonUtf16.MutableNode(captured.GetProperty("value").GetProperty(member))!.AsObject();
+         if (frame is StreamError)
+         {
+             message["errorMessage"] = frame is StreamError { Reason: StopReason.Aborted } ? "Request was aborted" :
+                 _context.PublicFailure?.Message ?? "Completions operation failed.";
+         }
+-        var paths = captured.Value.GetProperty("ownUndefinedPaths").EnumerateArray().Select(path => path.GetString()!)
++        var paths = captured.GetProperty("ownUndefinedPaths").EnumerateArray().Select(path => path.GetString()!)
+             .Where(path => path.StartsWith("/" + member + "/", StringComparison.Ordinal)).Select(path => path[(member.Length + 1)..]);
+         _message.Update(Snapshot(JsonData.Parse("{\"value\":" + PiSharp.Contracts.JsonUtf16.ToJsonString(message) + ",\"ownUndefinedPaths\":" + JsonSerializer.Serialize(paths) + "}")));
+-        return captured;
++
+     }
+ 
+-    private CompletionsSourceEvent SourceFrame(StreamEvent frame, JsonData captured)
++    private CompletionsSourceEvent SourceFrame(StreamEvent frame)
+     {
+-        var emission = frame.SourceEmissionSnapshot ?? captured;
++        var emission = frame.SourceEmissionSnapshot ?? _context.Capture(frame);
+         if (frame is StreamTerminalEvent)
+         {
+             var member = frame is StreamDone ? "message" : "error";

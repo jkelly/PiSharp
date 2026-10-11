@@ -1,0 +1,77 @@
+{
+  "sourceSha": "abe508e1b89912adde45528136c3221eb69acdd7",
+  "status": "AUTHORED NATIVE; NO UPSTREAM CAPTURE",
+  "cases": 17,
+  "failures": 0,
+  "genuineSourceCasesCaptured": 0,
+  "results": [
+    {
+      "Id": "entry.json-mode-header-then-event-lines",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-syntax.v8-messages-match-the-node-22-goldens",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-syntax.parse-failures-carry-the-v8-message",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "validation.mcp-tool-plain-json-schema-coerces-and-rejects-before-calling-the-server",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "rpc-input.json-parse-values-duplicates-surrogates-and-invalid-utf8",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.mcp-tool-result-keeps-a-lone-surrogate",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.lone-surrogates-travel-through-rpc-prompt-tool-arguments-and-session",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.lone-surrogates-in-streamed-text-and-arguments",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.each-api-replays-lone-surrogates-as-pi-does",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.lone-surrogate-names-travel-through-rpc-tool-arguments-and-session",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.each-api-replays-lone-surrogate-names-as-pi-does",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.completions-and-responses-events-keep-lone-surrogates",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.fractional-usage-counts-are-kept-and-priced-as-pi-does",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.deep-values-pass-rpc-tool-arguments-and-sessions",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.each-api-replays-deep-arguments",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.pi-entry-bounds-follow-the-javascript-string-limit",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    },
+    {
+      "Id": "json-fidelity.session-and-rpc-records-beyond-the-former-mib-bounds",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    }
+  ]
+}

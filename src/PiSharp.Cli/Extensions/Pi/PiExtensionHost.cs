@@ -351,6 +351,9 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     internal Task<JsonElement?> CallAsync(string method, JsonObject parameters, CancellationToken token, Action<JsonElement>? onProgress = null,
         bool afterPrecedingFrames = false) => Node.RequestAsync(method, parameters, token, onProgress, afterPrecedingFrames);
 
+    internal Task<JsonElement?> CallStreamAsync(string method, JsonObject parameters, CancellationToken token,
+        Action<JsonElement, Func<Task>> onProgress, int progressWindow) => Node.RequestStreamAsync(method, parameters, onProgress, token, progressWindow);
+
     /// <summary>Reports extension errors returned by a Node dispatch (<c>errors: [{ event, error }]</c>).</summary>
     internal async ValueTask ReportErrorsAsync(PiLoadedExtension extension, JsonElement? result)
     {

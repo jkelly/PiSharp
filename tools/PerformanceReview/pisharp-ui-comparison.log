@@ -1,0 +1,16 @@
+{"benchmark":"ui-1000-updates-one-render","before_bytes":3432808,"after_bytes":2401840,"before_ms":3.3089,"after_ms":2.1173}
+{"name":"ui-1000-updates-one-render","size":1000,"median_ms":1.7538,"min_ms":1.703,"max_ms":1.811,"allocated_bytes":2401840,"sampled_peak_heap_growth_bytes":2413568}
+{
+  "sourceSha": "abe508e1b89912adde45528136c3221eb69acdd7",
+  "status": "AUTHORED NATIVE; NO UPSTREAM CAPTURE",
+  "cases": 1,
+  "failures": 0,
+  "skipped": 0,
+  "genuineSourceCasesCaptured": 0,
+  "results": [
+    {
+      "Id": "msg.assistant-message.streaming-coalesces-before-render",
+      "status": "PASS_AUTHORED_NATIVE_ONLY"
+    }
+  ]
+}

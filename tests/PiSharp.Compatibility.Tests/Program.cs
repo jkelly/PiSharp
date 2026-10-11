@@ -42,6 +42,7 @@ var tests = new List<(string Name, Func<Task> Run)>
     ("native.reducer.interleaved-authoritative-ends", Interleaved),
     ("native.reducer.invalid-transitions", InvalidTransitions),
     ("native.json.owned-immutable-and-optional", OwnedJson),
+    ("native.json.small-and-large-objects-keep-strict-validation", JsonValidationShapes),
     ("native.json.reject-duplicate-known-wire-keys", DuplicateWireKeys),
     ("native.tools.strict-complete-json", StrictArguments),
     ("native.stream.eof-settles", EofSettles),
@@ -244,6 +245,24 @@ static Task OwnedJson()
     Equal(0, serialized.Value.GetProperty("usage").GetProperty("reasoning").GetInt32());
     Assert(JsonElement.DeepEquals(serialized.Value, PiWireJson.WriteMessage(PiWireJson.ReadMessage(serialized.Value)).Value), "Wire round trip changed metadata.");
     Throws<JsonException>(() => JsonData.Parse("{\"x\":1,\"x\":2}"));
+    return Task.CompletedTask;
+}
+static Task JsonValidationShapes()
+{
+    foreach (var count in new[] { 0, 1, 7, 8, 9, 16, 300 })
+    {
+        var members = Enumerable.Range(0, count).Select(i => $"\"p{i}\":{i}").ToArray();
+        var json = "{" + string.Join(",", members) + "}";
+        var owned = JsonData.Parse(json);
+        Equal(count, owned.Value.EnumerateObject().Count());
+        var prefix = members.Length == 0 ? "" : string.Join(",", members) + ",";
+        Throws<JsonException>(() => JsonData.Parse("{" + prefix + "\"same\":0,\"s\\u0061me\":1}"));
+        Throws<JsonException>(() => JsonData.Parse("{" + prefix + "\"\\ud800\":0,\"\\uD800\":1}"));
+    }
+    var deepest = new string('[', JsonData.MaximumDepth) + "0" + new string(']', JsonData.MaximumDepth);
+    Equal(deepest, JsonData.Parse(deepest).ToString());
+    Throws<JsonException>(() => JsonData.Parse("[" + deepest + "]"));
+    Throws<JsonException>(() => JsonData.Parse("[{\"x\":1,\"x\":2}]"));
     return Task.CompletedTask;
 }
 static Task StrictArguments()

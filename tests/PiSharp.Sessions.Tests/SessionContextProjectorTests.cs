@@ -14,7 +14,8 @@ internal static class SessionContextProjectorTests
         ("session runtime and model custom context retain owned raw history", CustomAndOpaqueHistory),
         ("session forest diagnostics terminate missing parents duplicates cycles", ForestDiagnostics),
         ("session stored context influences apply only on selected ancestry", SelectedInfluences),
-        ("session projection exact bounds cancellation and retained snapshots", LimitsAndSnapshots)
+        ("session projection exact bounds cancellation and retained snapshots", LimitsAndSnapshots),
+        ("session incremental projection matches fresh validation across append and navigation", Incremental)
     ];
 
     private static Task BranchesAndSettings()
@@ -144,6 +145,48 @@ internal static class SessionContextProjectorTests
         Equal(3, new SessionContextProjector().Project(later, "later").Messages.Length);
         Equal(2, snapshot.Messages.Length); Equal(2, snapshot.ById.Count); Equal(2, snapshot.Ancestry.Length);
         Equal("child", snapshot.LeafId); Equal("root", snapshot.Messages[0].WireBody.Value.GetProperty("content").GetString());
+        return Task.CompletedTask;
+    }
+
+    private static Task Incremental()
+    {
+        var cached = new SessionContextProjector();
+        ImmutableArray<SessionEntry> entries = [];
+        var original = cached.ProjectLatest(entries);
+        void Compare(string? leaf)
+        {
+            var expected = new SessionContextProjector().Project(entries, leaf);
+            var actual = cached.Project(entries, leaf);
+            Equal(expected.LeafId, actual.LeafId); Equal(expected.Model, actual.Model); Equal(expected.ThinkingLevel, actual.ThinkingLevel);
+            Sequence(expected.Ancestry.Select(e => e.Id), actual.Ancestry.Select(e => e.Id));
+            Sequence(expected.RootIds, actual.RootIds);
+            Sequence(expected.Messages.Select(e => e.WireBody.ToString()), actual.Messages.Select(e => e.WireBody.ToString()));
+            Sequence(expected.LlmMessages.Select(e => e.WireBody.ToString()), actual.LlmMessages.Select(e => e.WireBody.ToString()));
+            Sequence(expected.ContextEntries.Select(e => e.SourceEntry.Id), actual.ContextEntries.Select(e => e.SourceEntry.Id));
+            Sequence(expected.ContextEntries.SelectMany(e => e.Messages).Select(e => e.WireBody.ToString()), actual.ContextEntries.SelectMany(e => e.Messages).Select(e => e.WireBody.ToString()));
+            Equal(expected.ById.Count, actual.ById.Count);
+            foreach (var pair in expected.ById) Equal(pair.Value.WireBody.ToString(), actual.ById[pair.Key].WireBody.ToString());
+        }
+        for (var i = 0; i < 25; i++)
+        { entries = entries.Add(Message("e" + i, i == 0 ? null : "e" + (i - 1), i % 3 == 0 ? Assistant() : User("value " + i))); Compare("e" + i); }
+        Equal(0, original.Messages.Length); Equal(0, original.ById.Count);
+        Compare("e10"); // navigation invalidates the append cache
+        entries = entries.Add(Message("sibling", "e10", User("sibling"))); Compare("sibling");
+        entries = entries.SetItem(0, Message("e0", null, User("replacement")));
+        entries = entries.Add(Message("replaced", "sibling", User("after replacement"))); Compare("replaced");
+        entries = entries.Add(Entry("context_edit", "edit", "replaced", """{"targetId":"e1","replacement":null}""")); Compare("edit");
+        entries = entries.Add(Message("after-edit", "edit", User("after edit"))); Compare("after-edit");
+        entries = entries.Add(Entry("compaction", "compact", "after-edit", """{"summary":"summary","firstKeptEntryId":"after-edit","tokensBefore":100}""")); Compare("compact");
+        entries = entries.Add(Message("after-compact", "compact", User("after compact"))); Compare("after-compact");
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        Throws<OperationCanceledException>(() => cached.ProjectLatest(entries, cancellation.Token));
+        var root = Message("root", null, User("root")); var child = Message("child", "root", User("child"));
+        foreach (var limits in new[] { new SessionContextProjectionOptions(MaximumAncestorSteps: 1), new(MaximumOutputMessages: 1),
+            new(MaximumInputCharacters: root.WireBody.ToString().Length), new(MaximumOutputCharacters: root.WireBody.Value.GetProperty("message").GetRawText().Length) })
+        {
+            var bounded = new SessionContextProjector(limits); bounded.ProjectLatest([root]);
+            Fails(SessionContextProjectionFailure.ResourceLimit, () => bounded.ProjectLatest([root, child]));
+        }
         return Task.CompletedTask;
     }
 

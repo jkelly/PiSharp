@@ -64,7 +64,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
         var state = new State(request, sourceView ? _options with { CaptureSourceEmissionSnapshots = true } : _options, cancellationToken);
-        owner?.Bind(state.CaptureLive, state.Finish, state.Current);
+        owner?.Bind(state.CaptureLive, state.Finish, state.Current, state.CompactProgressFits);
         IAsyncEnumerator<JsonData>? enumerator = null;
         OpenAICompletionsWireFailure? failure = null;
         NativeChatDiagnostic? cleanupDiagnostic = null;
@@ -264,6 +264,17 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         }
 
         public AssistantMessage Current() => _reducer.Snapshot() with { Usage = _usage, StopReason = _reason, ExtraProperties = _properties };
+
+        public bool CompactProgressFits(int characters, int bytes)
+        {
+            // Only text/thinking progress can use this bound. Tool previews and opaque reasoning
+            // details retain their exact source admission. A UTF-16 unit needs at most six JSON
+            // bytes; a delta can appear both in its field and the accumulated partial. The fixed
+            // reserve covers the two block headers, presence paths, usage and message envelope.
+            if (_tools.Count != 0 || _reasoningDetails.Count != 0) return false;
+            var upperBound = 4096L + 12 * _contentCharacters;
+            return upperBound <= characters && upperBound <= bytes;
+        }
 
         private void Emit(StreamEvent item, List<StreamEvent> progress)
         {

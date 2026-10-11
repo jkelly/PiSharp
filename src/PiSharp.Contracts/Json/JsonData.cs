@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace PiSharp.Contracts;
@@ -6,6 +7,8 @@ namespace PiSharp.Contracts;
 /// <summary>An owned, immutable JSON value. Cloning severs JsonDocument lifetime and mutable input ownership.</summary>
 public sealed class JsonData
 {
+    [InlineArray(8)]
+    private struct PropertyNames { private string? _first; }
     /// <summary>
     /// The deepest nesting an owned value holds (an object or array is one level). JSON.parse has no such limit, but Pi's own writes
     /// recurse: V8's JSON.stringify gives up at about 1,700 nested objects on Node's default stack, so Pi cannot store or send a deeper
@@ -54,12 +57,29 @@ public sealed class JsonData
             if (depth >= MaximumDepth) throw new JsonException("Maximum JSON depth exceeded.");
             if (current.ValueKind == JsonValueKind.Object)
             {
-                var names = new HashSet<string>(StringComparer.Ordinal);
+                // Most provider objects have only a few fields. Check those on the
+                // stack; allocate a hash table only for larger arbitrary objects.
+                var smallNames = new PropertyNames(); var nameCount = 0;
+                HashSet<string>? names = null;
                 foreach (var property in current.EnumerateObject())
                 {
                     // A name may hold a lone surrogate, as a JavaScript property key does (JSON.parse keeps it).
                     var name = JsonUtf16.GetName(property);
-                    if (!names.Add(name))
+                    var duplicate = false;
+                    if (names is not null) duplicate = !names.Add(name);
+                    else if (nameCount < 8)
+                    {
+                        for (var i = 0; i < nameCount; i++)
+                            if (string.Equals(smallNames[i], name, StringComparison.Ordinal)) { duplicate = true; break; }
+                        if (!duplicate) smallNames[nameCount++] = name;
+                    }
+                    else
+                    {
+                        names = new(StringComparer.Ordinal);
+                        for (var i = 0; i < nameCount; i++) names.Add(smallNames[i]!);
+                        duplicate = !names.Add(name);
+                    }
+                    if (duplicate)
                         throw new JsonException($"Duplicate JSON property: {JsonUtf16.ToWellFormed(name)}");
                     pending.Push((property.Value, depth + 1));
                 }

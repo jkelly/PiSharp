@@ -130,8 +130,14 @@ public sealed class CompletionsRun : IAsyncDisposable
             await foreach (var frame in mapper.StreamOwnedAsync(request, _context, _work.Token, sourceView).ConfigureAwait(false))
             {
                 _captureCanonicalObservation |= frame.SourceEmissionSnapshot is not null;
-                PublishMessage(frame);
-                var source = frame is ToolCallHeaderUpdated ? null : SourceFrame(frame);
+                // The internal canonical reader never consumes source aliases. Preserve exact
+                // admission near source limits and whenever a source observer/capture needs them.
+                // Ends and terminals still publish the same fully admitted live message.
+                var compact = !sourceView && _options.Hooks?.OnSourcePublished is null &&
+                    !_captureCanonicalObservation && frame is TextDelta or ThinkingDelta &&
+                    _context.CompactProgressFits(_options.MaximumSourceValueCharacters, _options.MaximumSourceValueBytes);
+                var captured = compact ? null : PublishMessage(frame);
+                var source = compact || frame is ToolCallHeaderUpdated ? null : SourceFrame(frame, captured!);
                 if (frame is StreamTerminalEvent terminal)
                 { _semanticTerminal = ObserveTerminal(terminal, source); Volatile.Write(ref _sourceTerminal, source); break; }
                 var envelope = new Envelope(frame, source, _context.FinalBatch,
@@ -157,8 +163,8 @@ public sealed class CompletionsRun : IAsyncDisposable
                 .Set("errorMessage", JsonData.Parse(aborted ? "\"Completions stream was cancelled.\"" : "\"Completions stream did not complete.\"")) })
             { NativeDiagnostic = OpenAICompletionsWireSource.Diagnostic(aborted ? OpenAICompletionsWireFailure.Cancelled :
                 error is StreamLimitException ? OpenAICompletionsWireFailure.ResourceLimit : OpenAICompletionsWireFailure.SourceFailed) };
-            PublishMessage(_semanticTerminal);
-            var source = SourceFrame(_semanticTerminal);
+            var captured = PublishMessage(_semanticTerminal);
+            var source = SourceFrame(_semanticTerminal, captured);
             _semanticTerminal = ObserveTerminal(_semanticTerminal, source);
             Volatile.Write(ref _sourceTerminal, source);
         }
@@ -223,24 +229,25 @@ public sealed class CompletionsRun : IAsyncDisposable
         catch (Exception error) when (error is StreamLimitException or JsonException) { return terminal; }
     }
 
-    private void PublishMessage(StreamEvent frame)
+    private JsonData PublishMessage(StreamEvent frame)
     {
-        var captured = _context.Capture(frame).Value;
+        var captured = _context.Capture(frame);
         var member = frame is StreamTerminalEvent ? frame is StreamDone ? "message" : "error" : "partial";
-        var message = PiSharp.Contracts.JsonUtf16.MutableNode(captured.GetProperty("value").GetProperty(member))!.AsObject();
+        var message = PiSharp.Contracts.JsonUtf16.MutableNode(captured.Value.GetProperty("value").GetProperty(member))!.AsObject();
         if (frame is StreamError)
         {
             message["errorMessage"] = frame is StreamError { Reason: StopReason.Aborted } ? "Request was aborted" :
                 _context.PublicFailure?.Message ?? "Completions operation failed.";
         }
-        var paths = captured.GetProperty("ownUndefinedPaths").EnumerateArray().Select(path => path.GetString()!)
+        var paths = captured.Value.GetProperty("ownUndefinedPaths").EnumerateArray().Select(path => path.GetString()!)
             .Where(path => path.StartsWith("/" + member + "/", StringComparison.Ordinal)).Select(path => path[(member.Length + 1)..]);
         _message.Update(Snapshot(JsonData.Parse("{\"value\":" + PiSharp.Contracts.JsonUtf16.ToJsonString(message) + ",\"ownUndefinedPaths\":" + JsonSerializer.Serialize(paths) + "}")));
+        return captured;
     }
 
-    private CompletionsSourceEvent SourceFrame(StreamEvent frame)
+    private CompletionsSourceEvent SourceFrame(StreamEvent frame, JsonData captured)
     {
-        var emission = frame.SourceEmissionSnapshot ?? _context.Capture(frame);
+        var emission = frame.SourceEmissionSnapshot ?? captured;
         if (frame is StreamTerminalEvent)
         {
             var member = frame is StreamDone ? "message" : "error";

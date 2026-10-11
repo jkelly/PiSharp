@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -201,9 +202,9 @@ public static class JsonUtf16
     /// from JSON text with an escaped lone surrogate (such a value is written as that JSON text) and the write-only nodes above.</summary>
     public static string ToJsonString(JsonNode? node, System.Text.Encodings.Web.JavaScriptEncoder? encoder = null)
     {
-        using var buffer = new MemoryStream();
+        var buffer = new ArrayBufferWriter<byte>();
         using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Encoder = encoder, SkipValidation = true, MaxDepth = 2 * JsonData.MaximumDepth })) Write(writer, node);
-        return Encoding.UTF8.GetString(buffer.GetBuffer(), 0, checked((int)buffer.Length));
+        return Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 
     /// <summary>Writes a node as <see cref="ToJsonString"/> does.</summary>

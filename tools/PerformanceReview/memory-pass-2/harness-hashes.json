@@ -1,0 +1,14 @@
+[
+  {
+    "Path": "E:\\AI\\PiSharp\\PiSharp\\tools\\PerformanceReview\\bin\\memory-pass-2-before\\PerformanceReview.dll",
+    "Hash": "ED60980BEE79DF44F6612836CFC2B76EC77E069E1D8B5C6CD034A874531F73C8"
+  },
+  {
+    "Path": "E:\\AI\\PiSharp\\PiSharp\\tools\\PerformanceReview\\bin\\memory-pass-2-before-retention\\PerformanceReview.dll",
+    "Hash": "E442098210DCCFD796EE92ED7D8714318296CDE49534A61636FE826E0575B086"
+  },
+  {
+    "Path": "E:\\AI\\PiSharp\\PiSharp\\tools\\PerformanceReview\\bin\\Release\\net10.0\\PerformanceReview.dll",
+    "Hash": "48893AFDAE2D88E9893419CC0ADD53C5F766A0E282FA494F084748E3C4272390"
+  }
+]

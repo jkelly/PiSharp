@@ -151,21 +151,45 @@ public sealed class PiNodeHost : IAsyncDisposable
     /// <param name="afterPrecedingFrames">Return only once every request and notification Node sent before its response has been
     /// handled (or started, for asynchronous requests), so effects the callee published (ctx.ui.notify, pi.appendEntry) land while
     /// the caller's context is still current. Never set it from code that itself handles a Node frame.</param>
-    public async Task<JsonElement?> RequestAsync(string method, object? parameters, CancellationToken cancellationToken = default,
-        Action<JsonElement>? onProgress = null, bool afterPrecedingFrames = false)
+    public Task<JsonElement?> RequestAsync(string method, object? parameters, CancellationToken cancellationToken = default,
+        Action<JsonElement>? onProgress = null, bool afterPrecedingFrames = false) =>
+        RequestCoreAsync(method, parameters, cancellationToken, onProgress, afterPrecedingFrames, null, 0);
+
+    /// <summary>Provider progress with a bounded number of unacknowledged frames. Acknowledge each frame after consuming it;
+    /// the Node producer waits for credit while the shared protocol reader remains free to handle other requests.</summary>
+    public Task<JsonElement?> RequestStreamAsync(string method, object? parameters,
+        Action<JsonElement, Func<Task>> onProgress, CancellationToken cancellationToken = default, int progressWindow = 32)
     {
+        ArgumentNullException.ThrowIfNull(onProgress);
+        if (progressWindow is < 1 or > 1024) throw new ArgumentOutOfRangeException(nameof(progressWindow));
+        return RequestCoreAsync(method, parameters, cancellationToken, null, false, onProgress, progressWindow);
+    }
+
+    private async Task<JsonElement?> RequestCoreAsync(string method, object? parameters, CancellationToken cancellationToken,
+        Action<JsonElement>? onProgress, bool afterPrecedingFrames, Action<JsonElement, Func<Task>>? acknowledgedProgress, int progressWindow)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var id = Interlocked.Increment(ref _nextId);
-        var pending = new Pending(new(TaskCreationOptions.RunContinuationsAsynchronously), onProgress);
+        Func<Task> acknowledge = () => WriteAsync(new JsonObject { ["type"] = "progress_ack", ["id"] = id });
+        var pending = new Pending(new(TaskCreationOptions.RunContinuationsAsynchronously),
+            acknowledgedProgress is null ? onProgress : value => acknowledgedProgress(value, acknowledge));
         _pending[id] = pending;
-        using var registration = cancellationToken.CanBeCanceled
-            ? cancellationToken.Register(() => _ = WriteAsync(new JsonObject { ["type"] = "cancel", ["id"] = id }))
-            : default;
         try
         {
-            await WriteAsync(new JsonObject { ["type"] = "request", ["id"] = id, ["method"] = method, ["params"] = ToNode(parameters) }).ConfigureAwait(false);
+            var frame = new JsonObject { ["type"] = "request", ["id"] = id, ["method"] = method, ["params"] = ToNode(parameters) };
+            if (progressWindow > 0) frame["progressWindow"] = progressWindow;
+            await WriteAsync(frame).ConfigureAwait(false);
             var result = await pending.Result.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             if (afterPrecedingFrames) await WaitProcessedAsync(Volatile.Read(ref pending.Barrier), cancellationToken).ConfigureAwait(false);
             return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Send cancellation before removing the pending request. A token callback can
+            // otherwise be unregistered by the cancelled wait before it sends the frame.
+            try { await WriteAsync(new JsonObject { ["type"] = "cancel", ["id"] = id }).ConfigureAwait(false); }
+            catch (InvalidOperationException) { }
+            throw;
         }
         finally { _pending.TryRemove(id, out _); }
     }

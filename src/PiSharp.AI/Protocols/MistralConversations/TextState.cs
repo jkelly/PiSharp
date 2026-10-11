@@ -10,13 +10,15 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
 {
     private readonly List<AssistantContent> blocks = [];
     private readonly Dictionary<string, (int Index, string Raw)> tools = new(StringComparer.Ordinal);
+    private readonly Dictionary<int, TextFragments> text = [];
     private int currentText = -1;
     private long characters;
     private TokenUsage usage = TokenUsage.Zero;
     private string? responseId, rawStop;
     public StopReason Reason { get; private set; } = StopReason.Pending;
     public string? ProviderError { get; private set; }
-    public AssistantMessage Message(StopReason reason, string? error = null)
+    public AssistantMessage Message(StopReason reason, string? error = null) => Materialize(MessageHeader(reason, error), text);
+    private AssistantMessage MessageHeader(StopReason reason, string? error = null)
     {
         var extra = JsonFields.Empty;
         if (responseId is not null) extra = extra.Set("responseId", String(responseId));
@@ -25,17 +27,27 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
         return new(request.Model.Api, request.Model.Provider, request.Model.Id, request.Timestamp,
             blocks.ToImmutableArray(), usage, reason, extra);
     }
+    private static AssistantMessage Materialize(AssistantMessage message, IEnumerable<KeyValuePair<int, TextFragments>> fragments)
+    {
+        var content = message.Content.ToBuilder();
+        foreach (var (index, value) in fragments)
+            content[index] = content[index] is ThinkingContent thinking
+                ? thinking with { Thinking = value.Flatten() } : ((TextContent)content[index]) with { Text = value.Flatten() };
+        return message with { Content = content.ToImmutable() };
+    }
     public ImmutableArray<StreamEvent> Convert(JsonData chunk)
     {
         // A chunk is published as one batch. Restore every staged mutation if admission
         // fails so cleanup can only close text whose start/deltas were published.
         var oldBlocks = blocks.ToArray(); var oldTools = tools.ToArray(); var oldText = currentText;
+        var oldFragments = text.ToArray();
         var oldCharacters = characters; var oldUsage = usage;
         var oldId = responseId; var oldStop = rawStop; var oldReason = Reason; var oldError = ProviderError;
         try { return Admit(() => ConvertCore(chunk)); }
         catch
         {
             blocks.Clear(); blocks.AddRange(oldBlocks); tools.Clear(); foreach (var item in oldTools) tools.Add(item.Key, item.Value);
+            text.Clear(); foreach (var item in oldFragments) text.Add(item.Key, item.Value);
             currentText = oldText; characters = oldCharacters; usage = oldUsage;
             responseId = oldId; rawStop = oldStop; Reason = oldReason; ProviderError = oldError;
             throw;
@@ -136,15 +148,17 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
                 if (thinking) { blocks.Add(new ThinkingContent("")); frames.Add(Snapshot(new ThinkingStarted(currentText, new ThinkingContent("")))); }
                 else { blocks.Add(new TextContent("")); frames.Add(Snapshot(new TextStarted(currentText, new TextContent("")))); }
             }
-            if (thinking)
-            { blocks[currentText] = new ThinkingContent(((ThinkingContent)blocks[currentText]).Thinking + clean); frames.Add(Snapshot(new ThinkingDelta(currentText, clean))); }
-            else
-            { blocks[currentText] = new TextContent(((TextContent)blocks[currentText]).Text + clean); frames.Add(Snapshot(new TextDelta(currentText, clean))); }
+            text.TryGetValue(currentText, out var previous);
+            text[currentText] = new(clean, previous);
+            frames.Add(Snapshot(thinking ? new ThinkingDelta(currentText, clean) : new TextDelta(currentText, clean)));
         }
     }
     private void EndText(ImmutableArray<StreamEvent>.Builder frames)
     {
         if (currentText < 0) return;
+        if (text.Remove(currentText, out var fragments))
+            blocks[currentText] = blocks[currentText] is ThinkingContent thinkingText
+                ? thinkingText with { Thinking = fragments.Flatten() } : ((TextContent)blocks[currentText]) with { Text = fragments.Flatten() };
         frames.Add(Snapshot(blocks[currentText] is ThinkingContent thinking
             ? new ThinkingEnded(currentText, thinking.Thinking) : new TextEnded(currentText, ((TextContent)blocks[currentText]).Text))); currentText = -1;
     }
@@ -163,7 +177,32 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
         foreach (var item in tools.Values) frames.Add(Snapshot(new ToolCallEnded(item.Index, (ToolCallContent)blocks[item.Index])));
         return frames.ToImmutable();
     }
-    private StreamEvent Snapshot(StreamEvent frame) => frame with { SourceEmissionSnapshot = PiWireJson.WriteMessage(Message(Reason)) };
+    private StreamEvent Snapshot(StreamEvent frame)
+    {
+        // Tool JSON can fail structural admission when nested in a message. Preserve
+        // that eager validation and its original failure boundary for arbitrary payloads.
+        if (tools.Count > 0) return frame with { SourceEmissionSnapshot = PiWireJson.WriteMessage(Message(Reason)) };
+        var header = MessageHeader(Reason); var fragments = text.ToArray();
+        // At most six JSON characters per UTF-16 unit. Reserve an additional copy for
+        // the frame's reducer growth, plus per-block and fixed envelope/usage overhead.
+        var upperBound = 4096L + blocks.Count * 512L + 12 * (characters +
+            (long)request.Model.Api.Length + request.Model.Provider.Length + request.Model.Id.Length +
+            (long)(responseId?.Length ?? 0) + (rawStop?.Length ?? 0) + (ProviderError?.Length ?? 0));
+        return frame.WithDeferredSourceEmission(() => PiWireJson.WriteMessage(Materialize(header, fragments)), upperBound);
+    }
+
+    private sealed class TextFragments(string fragment, TextFragments? previous)
+    {
+        private readonly string part = fragment;
+        private readonly TextFragments? parent = previous;
+        private readonly int length = checked(fragment.Length + (previous?.length ?? 0));
+        public string Flatten() => string.Create(length, this, static (span, tail) =>
+        {
+            var offset = span.Length;
+            for (TextFragments? node = tail; node is not null; node = node.parent)
+            { offset -= node.part.Length; node.part.AsSpan().CopyTo(span[offset..]); }
+        });
+    }
     private void SetUsage(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.Object) throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral usage.");

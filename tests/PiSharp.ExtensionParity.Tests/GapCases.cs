@@ -23,6 +23,7 @@ internal static partial class Program
         ("gap.registrations-after-the-factory-take-effect", LateRegistrations),
         ("gap.reload-reloads-extensions-and-resources", Reload),
         ("gap.chat-provider-registration-and-unregistration", ChatProvider),
+        ("gap.chat-provider-long-stream-lossless", LongChatProvider),
         ("gap.editor-component-and-autocomplete-provider", EditorAndAutocomplete),
     ];
 
@@ -438,6 +439,40 @@ internal static partial class Program
         Equal(0, rpcCode, "rpc exit; " + rpcError);
         Check(HasAcme(records.First(record => IsResponse(record, "before"))), "acme model available while registered");
         Check(!HasAcme(records.Last(record => IsResponse(record, "after"))), "unregisterProvider removed the models");
+    }
+
+    private static async Task LongChatProvider()
+    {
+        RequirePiRuntime();
+        using var sandbox = NodeSandbox("chat-provider-long");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "long.mjs"), """
+            export default function (pi) {
+              pi.registerProvider('long-chat', {
+                baseUrl: 'https://offline.invalid/', apiKey: 'fixture', api: 'long-api',
+                models: [{ id: 'offline', name: 'Offline', reasoning: false, input: ['text'],
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8000, maxTokens: 4000 }],
+                async *streamSimple(model) {
+                  const message = { role: 'assistant', api: model.api, provider: model.provider, model: model.id,
+                    content: [], stopReason: 'stop', timestamp: 0,
+                    usage: { input: 0, output: 2000, cacheRead: 0, cacheWrite: 0, totalTokens: 2000,
+                      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
+                  yield { type: 'start', partial: message };
+                  message.content.push({ type: 'text', text: '' });
+                  yield { type: 'text_start', contentIndex: 0, partial: message };
+                  for (let i = 0; i < 2000; i++) {
+                    message.content[0].text += 'x';
+                    yield { type: 'text_delta', contentIndex: 0, delta: 'x', partial: message };
+                  }
+                  yield { type: 'text_end', contentIndex: 0, content: message.content[0].text, partial: message };
+                  yield { type: 'done', reason: 'stop', message };
+                }
+              });
+            }
+            """);
+        var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "long-chat", "--model", "offline", "-e", extension, "stream");
+        Equal(0, code, "long extension stream exit; " + stderr);
+        Equal(new string('x', 2000), stdout.Trim(), "all streamed deltas reached authoritative completion");
+        Equal(0, sandbox.Requests.Count, "extension stream used no HTTP provider");
     }
 
     // interactive-mode.ts setCustomEditorComponent / addAutocompleteProvider: an extension's editor (a CustomEditor) renders and takes

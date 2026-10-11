@@ -85,6 +85,7 @@ internal static class Program
         foreach (var (name, run) in MistralFactorySimpleTests.Cases()) await Check(name, run);
         foreach (var (name, run) in MistralReplayTests.Cases()) await Check(name, run);
         foreach (var (name, run) in MistralVisionTests.Cases()) await Check(name, run);
+        foreach (var (name, run) in MistralStreamingPerformanceTests.Cases()) await Check(name, run);
         await Check("bound-identity-before-any-callback-or-send", async () =>
         {
             var callbacks = 0; using var h = new Handler((_, _) => throw new InvalidOperationException()); using var client = new HttpClient(h);

@@ -42,10 +42,12 @@ public sealed class CompletionsSourceSnapshot
         var text = raw.ToString();
         if (text.Length > maximumCharacters || Encoding.UTF8.GetByteCount(text) > maximumBytes)
             throw new StreamLimitException("Completions source value exceeds configured limits.");
-        Raw = JsonData.Parse(text); // Strict retained syntax, owned duplicate validation.
+        // JsonData already validates syntax/duplicates and owns an immutable clone.
+        // Sharing it preserves its lifetime without parsing/copying the same bytes again.
+        Raw = raw;
         OwnUndefinedPaths = Raw.Value.GetProperty("ownUndefinedPaths").EnumerateArray()
             .Select(path => path.GetString()!).ToImmutableArray();
-        SerializedJson = EcmaScriptJsonProjection.Project(JsonData.Parse(Raw.Value.GetProperty("value").GetRawText()), new(MaximumInputCharacters: maximumCharacters,
+        SerializedJson = EcmaScriptJsonProjection.Project(JsonData.FromElement(Raw.Value.GetProperty("value")), new(MaximumInputCharacters: maximumCharacters,
             MaximumInputBytes: maximumBytes, MaximumOutputCharacters: maximumCharacters,
             MaximumOutputBytes: maximumBytes, MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumStringCharacters: maximumCharacters));
     }
@@ -78,8 +80,13 @@ public sealed class CompletionsSourceEvent
     {
         Type = emission.Value.GetProperty("value").GetProperty("type").GetString()!;
         _member = Type == "done" ? "message" : Type == "error" ? "error" : "partial";
-        var descriptor = PiSharp.Contracts.JsonUtf16.MutableNode(emission.Value.GetProperty("value"))!.AsObject();
-        descriptor.Remove(_member); _descriptor = JsonData.Parse(PiSharp.Contracts.JsonUtf16.ToJsonString(descriptor));
+        var descriptor = new JsonObject();
+        foreach (var property in emission.Value.GetProperty("value").EnumerateObject())
+        {
+            var name = JsonUtf16.GetName(property);
+            if (name != _member) descriptor[name] = JsonUtf16.MutableNode(property.Value);
+        }
+        _descriptor = JsonData.Parse(PiSharp.Contracts.JsonUtf16.ToJsonString(descriptor));
         Message = message; _characters = characters; _bytes = bytes;
         Emission = new(emission, characters, bytes);
     }
@@ -131,14 +138,16 @@ internal sealed class CompletionsProductionContext
     private Func<StreamEvent, JsonData>? _capture;
     private Func<OpenAICompletionsWireFailure?, List<StreamEvent>>? _finish;
     private Func<AssistantMessage>? _current;
+    private Func<int, int, bool>? _compactProgressFits;
     private Task _cleanup = Task.CompletedTask;
     public bool FinalBatch { get; private set; }
     public CompletionsPublicFailure? PublicFailure { get; private set; }
     public Task Cleanup => _cleanup;
     public AssistantMessage? Current => _current?.Invoke();
     public void Bind(Func<StreamEvent, JsonData> capture, Func<OpenAICompletionsWireFailure?, List<StreamEvent>> finish,
-        Func<AssistantMessage> current)
-    { _capture = capture; _finish = finish; _current = current; }
+        Func<AssistantMessage> current, Func<int, int, bool> compactProgressFits)
+    { _capture = capture; _finish = finish; _current = current; _compactProgressFits = compactProgressFits; }
+    public bool CompactProgressFits(int characters, int bytes) => _compactProgressFits?.Invoke(characters, bytes) == true;
     public JsonData Capture(StreamEvent frame) => _capture is { } capture ? capture(frame) :
         CompletionsSourceEventProjection.Capture(frame, frame is StreamTerminalEvent terminal ? terminal.Message :
             ((StreamStarted)frame).Partial, []);
