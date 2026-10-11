@@ -68,6 +68,8 @@ public sealed record CodemodeSandboxOptions
     /// <see cref="CodemodeWorker.Default"/>; null runs the engine on a thread of this process, which deep native recursion
     /// can crash.</summary>
     public CodemodeWorkerLauncher? Worker { get; init; } = CodemodeWorker.Default;
+    /// <summary>Replaces the engine with another worker (tests).</summary>
+    internal Func<ICodemodeWorker>? WorkerFactory { get; init; }
     /// <summary>Maximum JavaScript call depth. Default 10000.</summary>
     public int RecursionLimit { get; init; } = CodemodeLimits.DefaultRecursionLimit;
 }
