@@ -231,12 +231,25 @@
       "version": "1.1.0.5",
       "kind": "patch",
       "baseline": "v1.1.0",
-      "status": "release-candidate",
+      "status": "published",
       "branch": "fix/1.1.0.4-release-flakes",
       "supersedes": "1.1.0.4 (tag v1.1.0.4 at b81fb4e, release run 38084810861 failed in tests; never published)",
       "ships": "startup header names PiSharp (PR #7); lone surrogates in compaction estimates; agent_settled to extensions first; settings reads under the lock",
       "notes": "docs/release-notes/1.1.0.5.md",
       "changelog": "website/src/content/changelog/1.1.0.5.md (date 2026-10-10)",
+      "tag": "v1.1.0.5 (024ea93), release run 38088377417",
+      "publishedOn": "2026-10-10",
+      "blockers": []
+    },
+    "1.1.0.6": {
+      "version": "1.1.0.6",
+      "kind": "patch",
+      "baseline": "v1.1.0",
+      "status": "release-candidate",
+      "branch": "release/1.1.0.6",
+      "ships": "PR #10 (macOS arm64 CI, EPERM process-group stop, MCP teardown reports), PR #12 (codemode exit-wait hang), PR #11 (streaming memory; RPC prompt during settling waits)",
+      "notes": "docs/release-notes/1.1.0.6.md",
+      "changelog": "website/src/content/changelog/1.1.0.6.md (date 2026-10-11)",
       "blockers": []
     }
   },
