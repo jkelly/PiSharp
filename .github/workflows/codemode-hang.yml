@@ -1,0 +1,60 @@
+name: Codemode hang repro (temporary)
+
+# Temporary: runs the first worker-launching codemode case in fresh processes many times and, if one hangs, records the process
+# tree and the managed stacks of the test process and its workers. Removed before merging.
+on:
+  push:
+    branches: [fix/codemode-worker-hang]
+
+permissions:
+  contents: read
+
+jobs:
+  loop:
+    name: Loop ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Build
+        run: |
+          dotnet build tests/PiSharp.Codemode.Tests/PiSharp.Codemode.Tests.csproj -c Release \
+            -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false
+          dotnet tool install -g dotnet-stack
+      - name: Loop
+        env:
+          CASE: ${{ vars.CODEMODE_CASE || 'prelude.embedded' }}
+        run: |
+          exe="$GITHUB_WORKSPACE/tests/PiSharp.Codemode.Tests/bin/Release/net10.0/PiSharp.Codemode.Tests"
+          cd "$GITHUB_WORKSPACE/tests/PiSharp.Codemode.Tests/bin/Release/net10.0"
+          hangs=0; fails=0
+          for i in $(seq 1 120); do
+            "$exe" --only "$CASE" > "out-$i.txt" 2>&1 &
+            pid=$!
+            for t in $(seq 1 600); do kill -0 $pid 2>/dev/null || break; sleep 0.1; done
+            if kill -0 $pid 2>/dev/null; then
+              hangs=$((hangs+1))
+              echo "::warning::iteration $i hung (pid $pid)"
+              ps -ef --forest | grep -v grep | grep -A5 -B1 "PiSharp.Codemode.Tests" || true
+              for p in $pid $(pgrep -P $pid); do
+                echo "===== stacks of $p: $(tr '\0' ' ' < /proc/$p/cmdline)"
+                cat /proc/$p/status | grep -E "State|Threads" || true
+                ~/.dotnet/tools/dotnet-stack report -p $p || true
+                ls -l /proc/$p/fd | grep pipe || true
+              done
+              kill -9 $pid $(pgrep -P $pid) 2>/dev/null || true
+              cat "out-$i.txt" | tail -20
+            else
+              wait $pid; code=$?
+              if [ $code -ne 0 ]; then fails=$((fails+1)); echo "::warning::iteration $i failed ($code)"; tail -20 "out-$i.txt"; fi
+            fi
+          done
+          echo "hangs=$hangs fails=$fails"
+          [ $hangs -eq 0 ] && [ $fails -eq 0 ]
