@@ -1042,8 +1042,8 @@
       "originalSha256": "95932e0d9b7d1f8448b2af884adc83db7b5c1e88615cc6cc1da76e6506b696ab"
     },
     {
-      "currentSha256": "d1441f7b2ecc7921e47dad68050d4c495047164aeb1e60d04c38f8e1c0eb6699",
-      "currentBytes": 48032,
+      "currentSha256": "5d0bfbffd9f0a68239e806a82e49bee3df6dc98c38ec83e5b5acd7c4a4d41d4a",
+      "currentBytes": 48114,
       "originalBytes": 48032,
       "path": "docs/architecture.md",
       "originalSha256": "d1441f7b2ecc7921e47dad68050d4c495047164aeb1e60d04c38f8e1c0eb6699"
@@ -5865,8 +5865,8 @@
       "originalSha256": "5256a7e3e07d2c5c94f7a1e6c45f39aab011c659c5e2d53e452dea525ce04575"
     },
     {
-      "currentSha256": "9c4be93b23c83852220e2032751affa8d9a711d4ef7903f0a03abd37a1640dd1",
-      "currentBytes": 10775,
+      "currentSha256": "2d47429e209745f4b2ffc87139689ca9f98e1acb50ff75a6e7881b0fc65d234a",
+      "currentBytes": 11146,
       "originalBytes": 8236,
       "path": "PiSharp.slnx",
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"

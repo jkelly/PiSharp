@@ -1,0 +1,1411 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "abe508e1b89912adde45528136c3221eb69acdd7",
+  "decision": "docs/decisions/0005-pi-durable-experimental.md",
+  "statusMeaning": {
+    "planned": "Not started.",
+    "in-progress": "Being ported.",
+    "ported": "Ported, with the listed upstream tests passing.",
+    "excluded": "Out of scope per decision 0005.",
+    "skipped": "Test not portable offline; the note gives the reason."
+  },
+  "files": [
+    {
+      "upstream": "packages/durable/src/documents.ts",
+      "blobSha1": "92753d0194bed12f3e6b11173fd1701e54e0e6fa",
+      "lines": 208,
+      "pisharp": "src/PiSharp.Durable/Documents.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/entries.ts",
+      "blobSha1": "95bb6aff14a733228fa11cb25c83f555735c59b7",
+      "lines": 34,
+      "pisharp": "src/PiSharp.Durable/Entries.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/env/decode.ts",
+      "blobSha1": "b271900563a17fbfcd7c58c650672f97095d27bf",
+      "lines": 30,
+      "pisharp": "src/PiSharp.Durable.Tools/Env/Decode.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/env/index.ts",
+      "blobSha1": "31b1a5349eb0516668b1af2aaace10ad296757c4",
+      "lines": 327,
+      "pisharp": "src/PiSharp.Durable/Env/Env.cs",
+      "phase": "P4",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/env/line-scan.ts",
+      "blobSha1": "45880fd747c47e3c41d1162b5eaa5f94ed827891",
+      "lines": 145,
+      "pisharp": "src/PiSharp.Durable.Tools/Env/LineScan.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/env/node-watch.ts",
+      "blobSha1": "7f3b8ab55de8824076a858af3ab0c77ec325902c",
+      "lines": 522,
+      "pisharp": "src/PiSharp.Durable.Tools/Env/NodeWatch.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/env/node.ts",
+      "blobSha1": "bb9776e7249280fdc09f4d81ac81b7a5eaaaa629",
+      "lines": 1226,
+      "pisharp": "src/PiSharp.Durable.Tools/Env/Node.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/errors.ts",
+      "blobSha1": "65f1572b89254baa8c2efebae31cd0bcd928c2eb",
+      "lines": 28,
+      "pisharp": "src/PiSharp.Durable/Errors.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/agent.ts",
+      "blobSha1": "6908b957d77744121dd6394ae8aae707b47c620b",
+      "lines": 266,
+      "pisharp": "src/PiSharp.Durable/Harness/Agent.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/compaction.ts",
+      "blobSha1": "db700163bad025dd724bb9ffcc5801d6c8273aac",
+      "lines": 453,
+      "pisharp": "src/PiSharp.Durable/Harness/Compaction.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/context.ts",
+      "blobSha1": "95f00adec63fee273ae96a18466a231dfa05bca7",
+      "lines": 293,
+      "pisharp": "src/PiSharp.Durable/Harness/Context.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/define.ts",
+      "blobSha1": "b9bbd913f1ea47e61b8f5e84f8ce353c796be9f3",
+      "lines": 44,
+      "pisharp": "src/PiSharp.Durable/Harness/Define.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/events.ts",
+      "blobSha1": "dc14df94914a0c21a7f95d4a447f304015859fee",
+      "lines": 425,
+      "pisharp": "src/PiSharp.Durable/Harness/Events.cs",
+      "phase": "P10",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/generation.ts",
+      "blobSha1": "ea384605ab9e38d713427ca8500b5cce5e15be50",
+      "lines": 681,
+      "pisharp": "src/PiSharp.Durable/Harness/Generation.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/harness.ts",
+      "blobSha1": "320c712bfa3ca0f1d74343dfbf728f8e191c789f",
+      "lines": 437,
+      "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/inbox.ts",
+      "blobSha1": "7ba380291faab6c289ce188e6de09c180b4494df",
+      "lines": 132,
+      "pisharp": "src/PiSharp.Durable/Harness/Inbox.cs",
+      "phase": "P10",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/json.ts",
+      "blobSha1": "66cfcd891f484e0f3809b3d7d93c957a543bb69a",
+      "lines": 31,
+      "pisharp": "src/PiSharp.Durable/Harness/Json.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/live.ts",
+      "blobSha1": "0191e06101c9ff6351c87c67b902ccd113b608f0",
+      "lines": 175,
+      "pisharp": "src/PiSharp.Durable/Harness/Live.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/output.ts",
+      "blobSha1": "de9aa526a6de110aafbb8b2694cdb34144cc0863",
+      "lines": 341,
+      "pisharp": "src/PiSharp.Durable/Harness/Output.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/prompt.ts",
+      "blobSha1": "2adeef04396b7673cbabd3c82131458da41076b7",
+      "lines": 158,
+      "pisharp": "src/PiSharp.Durable/Harness/Prompt.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/provider.ts",
+      "blobSha1": "b838982a686d3eb49c64324d91d281c9f55fb407",
+      "lines": 39,
+      "pisharp": "src/PiSharp.Durable/Harness/Provider.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/registry.ts",
+      "blobSha1": "a30b9413fb1d956db06501c3112850004b1c63b3",
+      "lines": 114,
+      "pisharp": "src/PiSharp.Durable/Harness/Registry.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/scheduler.ts",
+      "blobSha1": "dcc611f52d1febc362cb80cbab69559e19f8d46c",
+      "lines": 1435,
+      "pisharp": "src/PiSharp.Durable/Harness/Scheduler.cs",
+      "phase": "P7",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/submissions.ts",
+      "blobSha1": "496b6cbaa04f81be186e82c9da3d8b2fe5416dd6",
+      "lines": 207,
+      "pisharp": "src/PiSharp.Durable/Harness/Submissions.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/task-graph.ts",
+      "blobSha1": "f2065d5d01cd2e7736e258c75bf89574b46487e5",
+      "lines": 222,
+      "pisharp": "src/PiSharp.Durable/Harness/TaskGraph.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/tool.ts",
+      "blobSha1": "df2dac03a689dfbe3e9a6807e51eed00bbb54e12",
+      "lines": 509,
+      "pisharp": "src/PiSharp.Durable/Harness/Tool.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/types.ts",
+      "blobSha1": "9e44ff89c552b4b33b2b854dab09fc90d2109942",
+      "lines": 679,
+      "pisharp": "src/PiSharp.Durable/Harness/Types.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/usage.ts",
+      "blobSha1": "24cd9d721d9205b943758eda32306e2f536ac7a4",
+      "lines": 72,
+      "pisharp": "src/PiSharp.Durable/Harness/Usage.cs",
+      "phase": "P10",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/util.ts",
+      "blobSha1": "a92b9d94f71ecf59568d58646847c46093005abf",
+      "lines": 58,
+      "pisharp": "src/PiSharp.Durable/Harness/Util.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/harness/view.ts",
+      "blobSha1": "1b706e4012d0276b528687d3c16e98a1e2bb7170",
+      "lines": 244,
+      "pisharp": "src/PiSharp.Durable/Harness/View.cs",
+      "phase": "P10",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/ids.ts",
+      "blobSha1": "f69ffebd150d7ef7d9a9a425afab070620778d3c",
+      "lines": 11,
+      "pisharp": "src/PiSharp.Durable/Ids.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/index.ts",
+      "blobSha1": "2b1dc30371f88417d809d69af123129af9ff45d0",
+      "lines": 185,
+      "pisharp": "src/PiSharp.Durable/Exports.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/session/forks.ts",
+      "blobSha1": "102be46795d76dbcb748effb5534d84970ef2fb7",
+      "lines": 97,
+      "pisharp": "src/PiSharp.Durable/Session/Forks.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/session/observation.ts",
+      "blobSha1": "ac74d438a825e2754bf9c2e73ca46924d0695996",
+      "lines": 301,
+      "pisharp": "src/PiSharp.Durable/Session/Observation.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/session/session.ts",
+      "blobSha1": "571d608588bf60836e497e08e89705855962819e",
+      "lines": 569,
+      "pisharp": "src/PiSharp.Durable/Session/Session.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/session/transaction.ts",
+      "blobSha1": "4c0bfd3e681ab3ad58a895fa03b7901032b766d2",
+      "lines": 1042,
+      "pisharp": "src/PiSharp.Durable/Session/Transaction.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/jsonl/index.ts",
+      "blobSha1": "972566abfa4e0bdf7ebe1b5271dafc48c4addf0f",
+      "lines": 6,
+      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/Jsonl.cs",
+      "phase": "P4",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/jsonl/node.ts",
+      "blobSha1": "8dac938402d6d5806cf2f9b786867f69c1293c1f",
+      "lines": 14,
+      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/Node.cs",
+      "phase": "P4",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/jsonl/storage.ts",
+      "blobSha1": "a059cff8f7b9aaf0f701e22976e59b91f1942ebb",
+      "lines": 845,
+      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/Storage.cs",
+      "phase": "P4",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/memory.ts",
+      "blobSha1": "7333d37f9a075172f038e10bd1a495aa2b85db1f",
+      "lines": 864,
+      "pisharp": "src/PiSharp.Durable/Storage/Memory.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/scan.ts",
+      "blobSha1": "8cbc1938c0898e7bf9084b4d7d64db47a5e8ebbc",
+      "lines": 38,
+      "pisharp": "src/PiSharp.Durable/Storage/Scan.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/sqlite/cloudflare.ts",
+      "blobSha1": "5385133c31f784adad3c22b22bceb1d30169b0bc",
+      "lines": 139,
+      "pisharp": null,
+      "phase": null,
+      "status": "excluded",
+      "note": "Cloudflare Durable Object adapter (decision 0005)"
+    },
+    {
+      "upstream": "packages/durable/src/storage/sqlite/database.ts",
+      "blobSha1": "64edf8a0c5e8efc00a3b8afbef0b9e519a3f31aa",
+      "lines": 38,
+      "pisharp": "src/PiSharp.Durable.Sqlite/Database.cs",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/sqlite/index.ts",
+      "blobSha1": "6665418685444cbe585e99fabd232efce547e78a",
+      "lines": 8,
+      "pisharp": "src/PiSharp.Durable.Sqlite/Sqlite.cs",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/sqlite/migrations.ts",
+      "blobSha1": "541422d534286f03b25cd8e0690a150cc35ca141",
+      "lines": 125,
+      "pisharp": "src/PiSharp.Durable.Sqlite/Migrations.cs",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/sqlite/node.ts",
+      "blobSha1": "eabfa31fe243b692d538a72794349fcd81ad2715",
+      "lines": 210,
+      "pisharp": "src/PiSharp.Durable.Sqlite/Node.cs",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/storage/sqlite/storage.ts",
+      "blobSha1": "90666efc2d16c6ac8e6fa9d26c381d7beb16bf04",
+      "lines": 934,
+      "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tasks.ts",
+      "blobSha1": "aa7a32c21102661b41e30234e49322ae911587be",
+      "lines": 8,
+      "pisharp": "src/PiSharp.Durable/Tasks.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/testing/assertions.ts",
+      "blobSha1": "a450554b673bef3c44d111aa841e8d7aac6290b1",
+      "lines": 39,
+      "pisharp": "src/PiSharp.Durable/Testing/Assertions.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/testing/env-conformance.ts",
+      "blobSha1": "442b9a4442f29ddb4f299ddce6782d614a94fa43",
+      "lines": 511,
+      "pisharp": "src/PiSharp.Durable/Testing/EnvConformance.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/testing/index.ts",
+      "blobSha1": "fdaa421f5c39c21a215e1f283d9dbda1b7e7d567",
+      "lines": 27,
+      "pisharp": "src/PiSharp.Durable/Testing/Testing.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/testing/runner.ts",
+      "blobSha1": "c7d82d83f2b2d5a43a318f81af76ce948b16948f",
+      "lines": 38,
+      "pisharp": "src/PiSharp.Durable/Testing/Runner.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/testing/storage-benchmark.ts",
+      "blobSha1": "28c7a37d10f2e66a65eaea88df18bbcb53b31bd8",
+      "lines": 489,
+      "pisharp": "src/PiSharp.Durable/Testing/StorageBenchmark.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/testing/storage-conformance.ts",
+      "blobSha1": "753bf2395c1983f9a071f05621b8a7daaecce14d",
+      "lines": 1662,
+      "pisharp": "src/PiSharp.Durable/Testing/StorageConformance.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/testing/types.ts",
+      "blobSha1": "1b7ec09a5496057726f1eb4fe133d2fcf74de9ca",
+      "lines": 44,
+      "pisharp": "src/PiSharp.Durable/Testing/Types.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/bash.ts",
+      "blobSha1": "ae2603efe4e3407c65895fc4281be279f7680d28",
+      "lines": 164,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/Bash.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/edit-diff.ts",
+      "blobSha1": "c4534401c9d29807f93c7058d96e2fd198b61007",
+      "lines": 500,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/EditDiff.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/edit.ts",
+      "blobSha1": "807b6d568390bdaa18a2332616cb6d49ad170543",
+      "lines": 144,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/Edit.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/env.ts",
+      "blobSha1": "bfa40c3d98d374b29dc804a8b9ccb6d22c5e8258",
+      "lines": 8,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/Env.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/file-mutation-queue.ts",
+      "blobSha1": "e0ee93d3b499117d29db2e498b6f0a3bde1ef7ad",
+      "lines": 55,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/FileMutationQueue.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/image.ts",
+      "blobSha1": "dbb2f2a3b51f89748907546429f9a88b5d3d5252",
+      "lines": 132,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/Image.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/index.ts",
+      "blobSha1": "b277dada74c815539aeb8cda7205a6af51d98da6",
+      "lines": 25,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/Tools.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/path-utils.ts",
+      "blobSha1": "42c7af5076b1bf763ac61ba8006558a8c482d187",
+      "lines": 30,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/PathUtils.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/read.ts",
+      "blobSha1": "2667b2b58369500fc5b2b3dfbe526e6c855ce1a5",
+      "lines": 216,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/Read.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/tools/write.ts",
+      "blobSha1": "c25103948e4e13a90fafbad7ad5854ac6c566783",
+      "lines": 39,
+      "pisharp": "src/PiSharp.Durable.Tools/Tools/Write.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/truncate.ts",
+      "blobSha1": "ed2041f788b6b0bfc3c96a6e313247c71056b2d7",
+      "lines": 205,
+      "pisharp": "src/PiSharp.Durable/Truncate.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/src/types.ts",
+      "blobSha1": "b2924e82dc8682bdfe321f721b10650cd52a7a52",
+      "lines": 1107,
+      "pisharp": "src/PiSharp.Durable/Types.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/context/index.ts",
+      "blobSha1": "fbe54bcc46480da299d49a735daf8ccdbc20a631",
+      "lines": 121,
+      "pisharp": "src/PiSharp.Durable/Chord/DurableContext.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/delta/index.ts",
+      "blobSha1": "982a6f464bb7211b4580959667add4b244021454",
+      "lines": 694,
+      "pisharp": "src/PiSharp.Durable/Chord/Delta/Ops.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/delta/tracker.ts",
+      "blobSha1": "6cad0ee8c95a1055e18530b4b251447342c163ad",
+      "lines": 2205,
+      "pisharp": "src/PiSharp.Durable/Chord/Delta/Draft.cs",
+      "phase": "P1",
+      "status": "planned",
+      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005)"
+    },
+    {
+      "upstream": "packages/chord/src/delta/diff.ts",
+      "blobSha1": "b022d142a2ca6a6f2fe411342d77f67d1dfb500a",
+      "lines": 523,
+      "pisharp": "src/PiSharp.Durable/Chord/Delta/Diff.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/delta/apply-immutable-trusted.ts",
+      "blobSha1": "9049ab0407f3f1e69ec2001fdaef1b8074649cf7",
+      "lines": 128,
+      "pisharp": "src/PiSharp.Durable/Chord/Delta/ApplyImmutableTrusted.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/delta/revision-validator.ts",
+      "blobSha1": "d78373e7a63c486237f9f694752ea137122415a2",
+      "lines": 75,
+      "pisharp": "src/PiSharp.Durable/Chord/Delta/RevisionValidator.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/json.ts",
+      "blobSha1": "4747dddd472e6da317a889961fb6315759380282",
+      "lines": 120,
+      "pisharp": "src/PiSharp.Durable/Chord/JsonValue.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/services/state.ts",
+      "blobSha1": "505ac69bd8b3571b0e002fb6182c826042711304",
+      "lines": 457,
+      "pisharp": "src/PiSharp.Durable/Chord/ReplicatedState.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/services/state-internals.ts",
+      "blobSha1": "ed5c1ff0e327163eb40dc69c92cd8216273b40e0",
+      "lines": 19,
+      "pisharp": "src/PiSharp.Durable/Chord/ReplicatedState.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/chord/src/types.ts",
+      "blobSha1": "19ac55e745ec5a01519af15c386b16f84b66021e",
+      "lines": 339,
+      "pisharp": "src/PiSharp.Durable/Chord/Types.cs",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/chat-support.ts",
+      "blobSha1": "5f72a7edb41384090a8dae40719c47b4bdbc4c0c",
+      "lines": 118,
+      "pisharp": "tests/PiSharp.Durable.Tests/ChatSupportCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/chord-guide.test.ts",
+      "blobSha1": "4d4aa845589abad5394cb2426ef3b44899ce4388",
+      "lines": 394,
+      "pisharp": "tests/PiSharp.Durable.Tests/ChordGuideCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/env-line-scan.test.ts",
+      "blobSha1": "538c59bc7aee28c256010db7e673ee30eadedac5",
+      "lines": 107,
+      "pisharp": "tests/PiSharp.Durable.Tests/EnvLineScanCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/env-node-conformance.test.ts",
+      "blobSha1": "38e8de61b60c08c027aca65bdbe020dc32e9a763",
+      "lines": 126,
+      "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeConformanceCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/env-node-spill.test.ts",
+      "blobSha1": "c451c11f85bf993b4f75f482398897fc9085e40c",
+      "lines": 89,
+      "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeSpillCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/env-node.test.ts",
+      "blobSha1": "37410f05ca418c6643c13769f32c736f9c59f2c9",
+      "lines": 1002,
+      "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/env-truncate.test.ts",
+      "blobSha1": "7a2f3f5efc064c3799b875835d10baa0eb22a1c6",
+      "lines": 98,
+      "pisharp": "tests/PiSharp.Durable.Tests/EnvTruncateCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/00-conversation.ts",
+      "blobSha1": "4f5f8ceac936d6530dbe9bf1b4dc73cc80e690f5",
+      "lines": 21,
+      "pisharp": "tests/PiSharp.Durable.Tests/00ConversationCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/01-documents.ts",
+      "blobSha1": "d6638eba699e3fc56bf562cc9bed47dad38cbfcb",
+      "lines": 45,
+      "pisharp": "tests/PiSharp.Durable.Tests/01DocumentsCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/02-forks.ts",
+      "blobSha1": "ef51a84a5d775e75d81c487ecc69e84499e72c76",
+      "lines": 55,
+      "pisharp": "tests/PiSharp.Durable.Tests/02ForksCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/03-owned-conversations.ts",
+      "blobSha1": "cdf3240f614c653e516aab41ca2bc9b484663a7b",
+      "lines": 69,
+      "pisharp": "tests/PiSharp.Durable.Tests/03OwnedConversationsCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/04-chord-state.ts",
+      "blobSha1": "50778fd6d2746ad6a92a13b48fecd3a26be9f109",
+      "lines": 37,
+      "pisharp": "tests/PiSharp.Durable.Tests/04ChordStateCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/05-watches.ts",
+      "blobSha1": "c0c6d6b58f957ed73e248a225decd905841bb591",
+      "lines": 41,
+      "pisharp": "tests/PiSharp.Durable.Tests/05WatchesCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/06-harness.ts",
+      "blobSha1": "ef672f1537e730d36eb86df6a656151bdc8a05c4",
+      "lines": 66,
+      "pisharp": "tests/PiSharp.Durable.Tests/06HarnessCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/07-configuration.ts",
+      "blobSha1": "0e760ed93acca24408103fd4710ce9db762f2c9b",
+      "lines": 99,
+      "pisharp": "tests/PiSharp.Durable.Tests/07ConfigurationCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/08-harness-conversations.ts",
+      "blobSha1": "da07f30553381c624fa69d7f1db8fcfbc6cceca8",
+      "lines": 42,
+      "pisharp": "tests/PiSharp.Durable.Tests/08HarnessConversationsCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/09-context.ts",
+      "blobSha1": "8082b8c1ed67588d330b9967daf61617aa6a6e29",
+      "lines": 136,
+      "pisharp": "tests/PiSharp.Durable.Tests/09ContextCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/10-registry-reload.ts",
+      "blobSha1": "bf3bd4c30271cf48b69b0589a0feb392f6483c35",
+      "lines": 48,
+      "pisharp": "tests/PiSharp.Durable.Tests/10RegistryReloadCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/11-extension-state.ts",
+      "blobSha1": "3f41a3cacbbaefe9f3440fd2ffc98645152b9a3d",
+      "lines": 86,
+      "pisharp": "tests/PiSharp.Durable.Tests/11ExtensionStateCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/12-tasks.ts",
+      "blobSha1": "26865ca97e555015c74b3f4aaa918385a5f91b8e",
+      "lines": 64,
+      "pisharp": "tests/PiSharp.Durable.Tests/12TasksCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/13-recovery.ts",
+      "blobSha1": "2b3cc4116a22136ebc5b8d52b7aea649a08fbf75",
+      "lines": 90,
+      "pisharp": "tests/PiSharp.Durable.Tests/13RecoveryCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/14-chat.ts",
+      "blobSha1": "5abc706f072c223ee2a1b5d4921aa4395225bc0f",
+      "lines": 45,
+      "pisharp": "tests/PiSharp.Durable.Tests/14ChatCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/15-system-prompt.ts",
+      "blobSha1": "2202871c952892da469b7d37d3d9e8d04211ad05",
+      "lines": 93,
+      "pisharp": "tests/PiSharp.Durable.Tests/15SystemPromptCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/16-real-model.ts",
+      "blobSha1": "00ce628565d0672e97df29b7707c33062cf8e8b4",
+      "lines": 69,
+      "pisharp": "tests/PiSharp.Durable.Tests/16RealModelCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/17-coding-tools.ts",
+      "blobSha1": "033313ff85a1391470d5a447d011411b6e95c4b5",
+      "lines": 101,
+      "pisharp": "tests/PiSharp.Durable.Tests/17CodingToolsCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/18-print.ts",
+      "blobSha1": "2438efbb8813163925360b48ba8afece9d8b47ee",
+      "lines": 53,
+      "pisharp": "tests/PiSharp.Durable.Tests/18PrintCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/19-json.ts",
+      "blobSha1": "95a894f1d85d86f487192dad8ad33ca1c0f1a176",
+      "lines": 103,
+      "pisharp": "tests/PiSharp.Durable.Tests/19JsonCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/20-inbox.ts",
+      "blobSha1": "90beb1ae3bdb7b662cac9ce1d637d4ff3d4e7c2d",
+      "lines": 72,
+      "pisharp": "tests/PiSharp.Durable.Tests/20InboxCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/21-late-join.ts",
+      "blobSha1": "da65dd01b896dce65cc0ba06754991d994ff7b43",
+      "lines": 100,
+      "pisharp": "tests/PiSharp.Durable.Tests/21LateJoinCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/22-subagent-foreground.ts",
+      "blobSha1": "060ded2db22ec03f7386124e18d7d34b6b9717d4",
+      "lines": 136,
+      "pisharp": "tests/PiSharp.Durable.Tests/22SubagentForegroundCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/23-subagent-background.ts",
+      "blobSha1": "261a4e7e45c4b93f3060c43544ba59a423d40cc6",
+      "lines": 363,
+      "pisharp": "tests/PiSharp.Durable.Tests/23SubagentBackgroundCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/24-child-tasks.ts",
+      "blobSha1": "e1b49defe1ab44e47b0c40c0e4716048b5279251",
+      "lines": 141,
+      "pisharp": "tests/PiSharp.Durable.Tests/24ChildTasksCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/25-compaction.ts",
+      "blobSha1": "5fb353ce167e168c79e4cfdda4fd1f23c6be4638",
+      "lines": 123,
+      "pisharp": "tests/PiSharp.Durable.Tests/25CompactionCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/26-coding-agent.ts",
+      "blobSha1": "d5b0e7c479759a90902a916e2fa076a24473ea0f",
+      "lines": 81,
+      "pisharp": "tests/PiSharp.Durable.Tests/26CodingAgentCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/27-plan-mode.ts",
+      "blobSha1": "05c621cd15362fea8c0949013c06e2018be23c56",
+      "lines": 115,
+      "pisharp": "tests/PiSharp.Durable.Tests/27PlanModeCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/28-reviewer.ts",
+      "blobSha1": "f219aa9e070f30215be4e81477231a7276732273",
+      "lines": 111,
+      "pisharp": "tests/PiSharp.Durable.Tests/28ReviewerCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/29-sandbox-per-conversation.ts",
+      "blobSha1": "792e328cb4d39a3065dfa83264643eb1cfb1a414",
+      "lines": 82,
+      "pisharp": "tests/PiSharp.Durable.Tests/29SandboxPerConversationCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/30-tool-override.ts",
+      "blobSha1": "bafdcaa3a14c8cd017ba878df1b4726d371d6923",
+      "lines": 102,
+      "pisharp": "tests/PiSharp.Durable.Tests/30ToolOverrideCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/examples/31-reload-and-restart.ts",
+      "blobSha1": "727c6039f8139936497ebb2550e12d3d3e0ad3ad",
+      "lines": 90,
+      "pisharp": "tests/PiSharp.Durable.Tests/31ReloadAndRestartCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/fixtures/delete-buffer.ts",
+      "blobSha1": "b25ca4c0e301d06a497331d8dd43507ee4d39707",
+      "lines": 2,
+      "pisharp": "tests/PiSharp.Durable.Tests/DeleteBufferCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/fixtures/utf8-byte-length-without-buffer.ts",
+      "blobSha1": "7136deda5415c572db4da22def28f281d3c09466",
+      "lines": 11,
+      "pisharp": "tests/PiSharp.Durable.Tests/Utf8ByteLengthWithoutBufferCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-compaction.test.ts",
+      "blobSha1": "edd2d4bd98aa0af54ed67469f6de900e8b9df127",
+      "lines": 2304,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessCompactionCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-context.test.ts",
+      "blobSha1": "d6e9cc3261ae596c2fd086c0b458561789155de2",
+      "lines": 712,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessContextCases.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-conversations.test.ts",
+      "blobSha1": "b92e46a178375e9a99abca90891eceb9dc4fa02a",
+      "lines": 476,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessConversationsCases.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-events.test.ts",
+      "blobSha1": "9c11d4e22cccc4d6252cde5fc4b01ad05f589567",
+      "lines": 616,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessEventsCases.cs",
+      "phase": "P10",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-generation-recovery.test.ts",
+      "blobSha1": "fed804c5e4e9f6744de02ddb827a25150c610a98",
+      "lines": 289,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessGenerationRecoveryCases.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-generation.test.ts",
+      "blobSha1": "2e2309eedc3bf3f4991fad1146c77e9eb40d31da",
+      "lines": 693,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessGenerationCases.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-inbox.test.ts",
+      "blobSha1": "bd8b2a6f22799133e3226ced1e4e879676891dba",
+      "lines": 923,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessInboxCases.cs",
+      "phase": "P10",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-inspect.test.ts",
+      "blobSha1": "78aa8f20de13813fd7b827e888a1a7947baebad9",
+      "lines": 162,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessInspectCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-lifecycle.test.ts",
+      "blobSha1": "425a5f81ef8db80cdcc2b79da857bf1181fb2d0e",
+      "lines": 613,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessLifecycleCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-live-deltas.test.ts",
+      "blobSha1": "5cf68d464344939dbfc21289f43e14c95e844679",
+      "lines": 454,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessLiveDeltasCases.cs",
+      "phase": "P10",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-output-skip.test.ts",
+      "blobSha1": "ef87504b327cd35c166e2ac9c0695e21845dc647",
+      "lines": 144,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessOutputSkipCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-output.test.ts",
+      "blobSha1": "a64b456ac08f89a39b8c9974576fd146466e8bae",
+      "lines": 311,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessOutputCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-ownership.test.ts",
+      "blobSha1": "c46b51a29564bc6433334d845ce666d411f739d0",
+      "lines": 965,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessOwnershipCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-prompt.test.ts",
+      "blobSha1": "8c47b19dbcad47ab7fdeec3d5e131fe6762bd8f8",
+      "lines": 274,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessPromptCases.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-registry.test.ts",
+      "blobSha1": "3def50429179834f4022c26d1f85ba5e4d622f0e",
+      "lines": 300,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessRegistryCases.cs",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-structured.test.ts",
+      "blobSha1": "f061e1055d819234267979e559531293025b7f11",
+      "lines": 1712,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessStructuredCases.cs",
+      "phase": "P7",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-submissions.test.ts",
+      "blobSha1": "07afaa5476ef286677ea56008e5a99486aa90f48",
+      "lines": 278,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessSubmissionsCases.cs",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-support.ts",
+      "blobSha1": "fc04a3b49bd676d399f8e3192f3997dac4f27683",
+      "lines": 158,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessSupportCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-task-graph.test.ts",
+      "blobSha1": "3beb45e0111f2ba0711d48a404f780c36f720738",
+      "lines": 358,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessTaskGraphCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-tasks-recovery.test.ts",
+      "blobSha1": "1c2458773397ea52b11c1fa62075ed2ad62d621c",
+      "lines": 886,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessTasksRecoveryCases.cs",
+      "phase": "P7",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-tasks.test.ts",
+      "blobSha1": "f88b25567b2b95d9736e642d6b09f747ed3be679",
+      "lines": 1404,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessTasksCases.cs",
+      "phase": "P7",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-tools-recovery.test.ts",
+      "blobSha1": "a03932f96711f92efe7ee13fd16f2037e7c44dc4",
+      "lines": 405,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessToolsRecoveryCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-tools.test.ts",
+      "blobSha1": "83ff0e015c31010feea1b9e693deeca73b5c357e",
+      "lines": 1195,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessToolsCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/harness-view.test.ts",
+      "blobSha1": "ce05d4c2a8b82219a086f751aecf32c2eef8bed4",
+      "lines": 353,
+      "pisharp": "tests/PiSharp.Durable.Tests/HarnessViewCases.cs",
+      "phase": "P10",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/jsonl-storage.test.ts",
+      "blobSha1": "cebfb0a69ec892669e3a03cdecbac489d5873a35",
+      "lines": 1156,
+      "pisharp": "tests/PiSharp.Durable.Tests/JsonlStorageCases.cs",
+      "phase": "P4",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/memory-storage.test.ts",
+      "blobSha1": "f01af3ed30928b74220633915f263cc14696b632",
+      "lines": 32,
+      "pisharp": "tests/PiSharp.Durable.Tests/MemoryStorageCases.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/provider-session-cache-e2e.test.ts",
+      "blobSha1": "7a74a206564ba982bf01d61f9e8ae8825d926e06",
+      "lines": 124,
+      "pisharp": null,
+      "phase": null,
+      "status": "skipped",
+      "note": "Needs live provider credentials"
+    },
+    {
+      "upstream": "packages/durable/test/session-checkpoints-migrations.test.ts",
+      "blobSha1": "375287979a9dcf4754d67ca848a3d674513eccff",
+      "lines": 844,
+      "pisharp": "tests/PiSharp.Durable.Tests/SessionCheckpointsMigrationsCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/session-definitions.test.ts",
+      "blobSha1": "ddc791187926619044dc139f0c39e1fdad7415f7",
+      "lines": 177,
+      "pisharp": "tests/PiSharp.Durable.Tests/SessionDefinitionsCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/session-documents.test.ts",
+      "blobSha1": "c9764eac7db238bcda91e605286fb9ca957f4d9d",
+      "lines": 656,
+      "pisharp": "tests/PiSharp.Durable.Tests/SessionDocumentsCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/session-forks.test.ts",
+      "blobSha1": "76400af22d40a45e3001c20e9ab77a234ccc13c1",
+      "lines": 695,
+      "pisharp": "tests/PiSharp.Durable.Tests/SessionForksCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/session-states.test.ts",
+      "blobSha1": "4c3678b46e92f28c3526a8bd0b8efa1511dbe681",
+      "lines": 232,
+      "pisharp": "tests/PiSharp.Durable.Tests/SessionStatesCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/session-support.ts",
+      "blobSha1": "e8da108d8662bb9f7812164435900025367b5cb7",
+      "lines": 155,
+      "pisharp": "tests/PiSharp.Durable.Tests/SessionSupportCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/session-tables.test.ts",
+      "blobSha1": "2afb280ee426c9e6d5301a9574a81c613d2ed621",
+      "lines": 460,
+      "pisharp": "tests/PiSharp.Durable.Tests/SessionTablesCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/session-watches.test.ts",
+      "blobSha1": "3b03d182293af71c8503f45b383f1176ed4013f9",
+      "lines": 503,
+      "pisharp": "tests/PiSharp.Durable.Tests/SessionWatchesCases.cs",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/spec-usage.test.ts",
+      "blobSha1": "a38161a4e51f185e8396a12924cc34e320e16039",
+      "lines": 380,
+      "pisharp": "tests/PiSharp.Durable.Tests/SpecUsageCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/sqlite-cloudflare.test.ts",
+      "blobSha1": "41dbb9110e2b7ad83dbf416c7c0b68d80841f7b7",
+      "lines": 130,
+      "pisharp": null,
+      "phase": null,
+      "status": "excluded",
+      "note": "Cloudflare adapter"
+    },
+    {
+      "upstream": "packages/durable/test/sqlite-facade.test.ts",
+      "blobSha1": "86b2bb09671c388e272d156d62c2dd2b4b109afc",
+      "lines": 373,
+      "pisharp": "tests/PiSharp.Durable.Tests/SqliteFacadeCases.cs",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/sqlite-migrations.test.ts",
+      "blobSha1": "c55117ea655b39ea02cdd00e908001f9b23e98d3",
+      "lines": 160,
+      "pisharp": "tests/PiSharp.Durable.Tests/SqliteMigrationsCases.cs",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/sqlite-storage.test.ts",
+      "blobSha1": "f68dc0a3cacadc82a2fbe2eddaa8b804fe0f5a24",
+      "lines": 617,
+      "pisharp": "tests/PiSharp.Durable.Tests/SqliteStorageCases.cs",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/storage-memory.ts",
+      "blobSha1": "0e105fdc8b042757ec3341363959be7162f8d2d8",
+      "lines": 238,
+      "pisharp": "tests/PiSharp.Durable.Tests/StorageMemoryCases.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/storage-runtime-boundary.test.ts",
+      "blobSha1": "84ef2d51252f0f9d23b9dc788af58c4bcec6e81c",
+      "lines": 48,
+      "pisharp": "tests/PiSharp.Durable.Tests/StorageRuntimeBoundaryCases.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/storage.bench.ts",
+      "blobSha1": "f24e915eb3d4a478041ce1068a9d4314e811ad45",
+      "lines": 191,
+      "pisharp": "tests/PiSharp.Durable.Tests/StorageBenchCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/system-order-cache-e2e.test.ts",
+      "blobSha1": "e4ed24b6fc5268a91c3f8cbb21672c72bdc5db4a",
+      "lines": 144,
+      "pisharp": null,
+      "phase": null,
+      "status": "skipped",
+      "note": "Needs live provider credentials"
+    },
+    {
+      "upstream": "packages/durable/test/task-support.ts",
+      "blobSha1": "403fc40d76dfe60d382c5c49ab5b065c52da374b",
+      "lines": 113,
+      "pisharp": "tests/PiSharp.Durable.Tests/TaskSupportCases.cs",
+      "phase": "P11",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/tool-output-bench.ts",
+      "blobSha1": "040c3c7b41a42016f8cd67bed2c715515952fa32",
+      "lines": 301,
+      "pisharp": "tests/PiSharp.Durable.Tests/ToolOutputBenchCases.cs",
+      "phase": "P13",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/tools-read-differential.test.ts",
+      "blobSha1": "c191d8a1fbf82302ab33afa5ea31e2cbd8782b1d",
+      "lines": 210,
+      "pisharp": "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/tools.test.ts",
+      "blobSha1": "5dcdd9f12c17d056c8bf2153afa4ca4e70a50a62",
+      "lines": 741,
+      "pisharp": "tests/PiSharp.Durable.Tests/ToolsCases.cs",
+      "phase": "P9",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/durable/test/types.test.ts",
+      "blobSha1": "8a20bc07f0e6a91a7aab8b1617fa2f49a499d633",
+      "lines": 346,
+      "pisharp": "tests/PiSharp.Durable.Tests/TypesCases.cs",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/coding-agent/src/experimental/durable/harness-setup.ts",
+      "blobSha1": "4d6a4be5333ebb8e0f17eac1987f18ea35a91fc7",
+      "lines": 123,
+      "pisharp": "src/PiSharp.Cli/Durable/DurableHarnessSetup.cs",
+      "phase": "P12",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/coding-agent/src/experimental/durable/main.ts",
+      "blobSha1": "d3d843d5f85405d79f24e8dac526f3a89d2be878",
+      "lines": 20,
+      "pisharp": "src/PiSharp.Cli/Durable/DurableMain.cs",
+      "phase": "P12",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/coding-agent/src/experimental/durable/prompt.ts",
+      "blobSha1": "8e2f5d5273fba58da8b314766956ed62951c3814",
+      "lines": 74,
+      "pisharp": "src/PiSharp.Cli/Durable/DurablePrompt.cs",
+      "phase": "P12",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/coding-agent/src/experimental/durable/runtime.ts",
+      "blobSha1": "fcd6e5239e999ebf17dea0335fb3dc9cd7f7ce45",
+      "lines": 367,
+      "pisharp": "src/PiSharp.Cli/Durable/DurableRuntime.cs",
+      "phase": "P12",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/coding-agent/src/experimental/durable/sessions.ts",
+      "blobSha1": "34f9ceeeaeaf874f7478d56115da2e4f726c6a85",
+      "lines": 56,
+      "pisharp": "src/PiSharp.Cli/Durable/DurableSessions.cs",
+      "phase": "P12",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/coding-agent/src/experimental/durable/subagent.ts",
+      "blobSha1": "e767d54e0bf2908e0f4f41c6933b55c00562eb25",
+      "lines": 55,
+      "pisharp": "src/PiSharp.Cli/Durable/DurableSubagent.cs",
+      "phase": "P12",
+      "status": "planned"
+    },
+    {
+      "upstream": "packages/coding-agent/src/experimental/durable/tui.ts",
+      "blobSha1": "397b276cbeb1c90e1fbc96c3cc59e6a25f92dad7",
+      "lines": 655,
+      "pisharp": "src/PiSharp.Cli/Durable/DurableTui.cs",
+      "phase": "P12",
+      "status": "planned"
+    }
+  ]
+}

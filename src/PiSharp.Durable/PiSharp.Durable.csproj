@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0005: experimental port of Pi's pi-durable (branch feature/pi-durable). Not packed until a release is approved. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Sqlite" />
+    <InternalsVisibleTo Include="PiSharp.Durable.Tools" />
+    <InternalsVisibleTo Include="PiSharp.Durable.Tests" />
+    <InternalsVisibleTo Include="PiSharp.Cli" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <ProjectReference Include="../PiSharp.AI/PiSharp.AI.csproj" />
+  </ItemGroup>
+</Project>

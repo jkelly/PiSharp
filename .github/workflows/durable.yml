@@ -1,0 +1,65 @@
+name: Durable
+
+# Branch CI for the experimental pi-durable port (decision 0005). Runs on feature/pi-durable only; the release and macOS
+# workflows stay unchanged until the branch is merged. SQLite native-asset checks join in phase P5.
+on:
+  push:
+    branches: [feature/pi-durable]
+  pull_request:
+    branches: [feature/pi-durable]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: durable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Durable tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # macOS's TMPDIR (/var/folders/…) is a symlink to /private/var/folders/…; tests use the resolved path, as a Mac process does.
+      - name: Run PiSharp.Durable.Tests
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj -c Release \
+            -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
+            -- --report "$RUNNER_TEMP/durable-${{ matrix.os }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/durable-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
+  port-map:
+    name: Port map matches the pinned upstream
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch Pi at the pinned commit
+        run: |
+          git init -q "$RUNNER_TEMP/pi" && cd "$RUNNER_TEMP/pi"
+          git fetch -q --depth 1 https://github.com/earendil-works/pi abe508e1b89912adde45528136c3221eb69acdd7
+          git checkout -q FETCH_HEAD
+      - name: Check compatibility/durable-port-map.json
+        run: node tools/DurablePortMap/build-port-map.mjs --upstream "$RUNNER_TEMP/pi" --check

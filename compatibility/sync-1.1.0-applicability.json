@@ -684,13 +684,32 @@
       "notes": "Jint 4.16.3 sandbox (decision 0003) with upstream's prelude byte-for-byte; declarations, // @options:, output framing and budget, image(), store as a session custom entry, models.* bridge, nested calls through the shared invoker (uncapped for codemode, as upstream), grammar sampling; codemode registered in every session; codemode MCP servers connect and scripts wait inside the call for the servers they need, as upstream. The interactive renderer is shown (IMPL-I; InteractiveParity tool.codemode.*). Intentional deviations (docs/compatibility/codemode-engine.md, decision 0004 item 7): each script runs in a worker process (~100-300 ms start); the deadline starts when the script starts; memory and recursion overruns are not catchable; throwing ~3000 calls deep exhausts memory; engine error texts differ."
     },
     {
-      "id": "exclude.durable",
+      "id": "port.durable",
       "upstream": [
         "packages/durable",
-        "packages/coding-agent/src/experimental/durable",
+        "packages/coding-agent/src/experimental/durable"
+      ],
+      "change": "pi-durable runtime and the experimental durable agent.",
+      "pisharp": [
+        "src/PiSharp.Durable",
+        "src/PiSharp.Durable.Sqlite",
+        "src/PiSharp.Durable.Tools",
+        "src/PiSharp.Cli/Durable"
+      ],
+      "status": "port",
+      "release": "experimental (branch feature/pi-durable; not released)",
+      "test": [
+        "tests/PiSharp.Durable.Tests"
+      ],
+      "decision": "docs/decisions/0005-pi-durable-experimental.md",
+      "notes": "Per-file progress in compatibility/durable-port-map.json."
+    },
+    {
+      "id": "exclude.vacation",
+      "upstream": [
         "packages/coding-agent/src/experimental/vacation"
       ],
-      "change": "pi-durable runtime and experimental durable modes.",
+      "change": "Demo agent built on pi-durable.",
       "status": "exclude",
       "decision": "docs/decisions/0002-pi-1.1.0-sync.md"
     },

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0005: SQLite storage for PiSharp.Durable. Microsoft.Data.Sqlite is admitted in phase P5. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Tests" />
+    <InternalsVisibleTo Include="PiSharp.Cli" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
+  </ItemGroup>
+</Project>
