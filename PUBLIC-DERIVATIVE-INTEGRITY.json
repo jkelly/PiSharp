@@ -17345,8 +17345,8 @@
       "originalSha256": "e19cf1c735524baa2df474154c117399e4a3ecf2c7ba98e337cd12afecc77071"
     },
     {
-      "currentSha256": "cae7675a717ec3a7887d392f9d54a7aa602a7b6d96c05b5d7a42033dd14fe82a",
-      "currentBytes": 19074,
+      "currentSha256": "091ab7102ca23756346e79a52aa66652a0832a244a82cddcb65ff5cdbc23f751",
+      "currentBytes": 20846,
       "originalBytes": 11780,
       "path": "THIRD-PARTY-NOTICES.md",
       "originalSha256": "24221bb14cd6d8e6e579012398de5ef553806f67eaa182a5900d142fc20faf09"
@@ -18563,8 +18563,8 @@
       "originalSha256": "8a4ffb0eaf9f35fa6b2684783ca4665545fbad98ede826f5f64f162da3112211"
     },
     {
-      "currentSha256": "a326f7be254119150401baa32dbe101090ec7ab272dfc3f69e91698e5943c820",
-      "currentBytes": 7978,
+      "currentSha256": "bc96aefa27db590ee4fb5fa972ffec388b42cf6b405a4ba3acf1fc0630936e06",
+      "currentBytes": 8771,
       "originalBytes": 5050,
       "path": "tools/release/native-sdk-package.ps1",
       "originalSha256": "e2f23f054bd7b898dc70d284716014f23b034be107e8d7c1fe7561cc113e02ea"
