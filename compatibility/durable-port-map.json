@@ -359,15 +359,17 @@
       "lines": 38,
       "pisharp": "src/PiSharp.Durable.Sqlite/Database.cs",
       "phase": "P5",
-      "status": "planned"
+      "status": "ported",
+      "note": "ISqliteExecutor/ISqliteDatabase (async facade; TransactionAsync holds the queue) and SqliteRow (ordered column map). Bindings are null/long/int/double/string/byte[]. Tests: storage.sqlite.facade.*"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/index.ts",
       "blobSha1": "6665418685444cbe585e99fabd232efce547e78a",
       "lines": 8,
-      "pisharp": "src/PiSharp.Durable.Sqlite/Sqlite.cs",
+      "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
       "phase": "P5",
-      "status": "planned"
+      "status": "ported",
+      "note": "No barrel file in C#: the exports are the public types of PiSharp.Durable.Sqlite (ISqliteDatabase, ISqliteExecutor, SqliteRow, SqliteMigration, SqliteMigrations, SqliteStorage, SqliteStorageOptions, SqliteConnectionDatabase)"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/migrations.ts",
@@ -375,15 +377,17 @@
       "lines": 125,
       "pisharp": "src/PiSharp.Durable.Sqlite/Migrations.cs",
       "phase": "P5",
-      "status": "planned"
+      "status": "ported",
+      "note": "SqliteMigrations.Migrations/CurrentSchemaVersion/ApplyAsync. Schema v1 statements are upstream text verbatim (whitespace included; SHA-256 pinned by storage.sqlite.migrations.initial-schema-is-upstream-text-verbatim). Tests: storage.sqlite.migrations.*"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/node.ts",
       "blobSha1": "eabfa31fe243b692d538a72794349fcd81ad2715",
       "lines": 210,
-      "pisharp": "src/PiSharp.Durable.Sqlite/Node.cs",
+      "pisharp": "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs",
       "phase": "P5",
-      "status": "planned"
+      "status": "ported",
+      "note": "SqliteConnectionDatabase over Microsoft.Data.Sqlite 10.0.12 (decision 0005): serial operation queue, per-connection statement cache, WAL, synchronous=NORMAL, busy_timeout 5000, wal_autocheckpoint 1000, wal_checkpoint(TRUNCATE) on close, Pooling=False, SQLite >= 3.37 check. Unnamed ? parameters are numbered for the binding. SqliteStorage.OpenAsync(path) is openNodeSqliteStorage. Tests: storage.sqlite.facade.*, storage.sqlite.native.*"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/storage.ts",
@@ -391,7 +395,8 @@
       "lines": 934,
       "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
       "phase": "P5",
-      "status": "planned"
+      "status": "ported",
+      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.*"
     },
     {
       "upstream": "packages/durable/src/tasks.ts",
@@ -1280,25 +1285,28 @@
       "upstream": "packages/durable/test/sqlite-facade.test.ts",
       "blobSha1": "86b2bb09671c388e272d156d62c2dd2b4b109afc",
       "lines": 373,
-      "pisharp": "tests/PiSharp.Durable.Tests/SqliteFacadeCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs",
       "phase": "P5",
-      "status": "planned"
+      "status": "ported",
+      "note": "All 11 cases as storage.sqlite.facade.*. Microtask observations use gates; prepare counting uses the adapter counter instead of subclassing DatabaseSync"
     },
     {
       "upstream": "packages/durable/test/sqlite-migrations.test.ts",
       "blobSha1": "c55117ea655b39ea02cdd00e908001f9b23e98d3",
       "lines": 160,
-      "pisharp": "tests/PiSharp.Durable.Tests/SqliteMigrationsCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs",
       "phase": "P5",
-      "status": "planned"
+      "status": "ported",
+      "note": "All 4 cases as storage.sqlite.migrations.*, plus authored initial-schema-is-upstream-text-verbatim, initial-schema-creates-upstream-tables-and-indexes and rejects-migrations-without-contiguous-versions"
     },
     {
       "upstream": "packages/durable/test/sqlite-storage.test.ts",
       "blobSha1": "f68dc0a3cacadc82a2fbe2eddaa8b804fe0f5a24",
       "lines": 617,
-      "pisharp": "tests/PiSharp.Durable.Tests/SqliteStorageCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs",
       "phase": "P5",
-      "status": "planned"
+      "status": "ported",
+      "note": "Conformance kit on SqliteStorage (storage.sqlite.conformance.*) and across reopen after every commit (storage.sqlite.reopen.conformance.*); all 11 cases as storage.sqlite.*, two adapted for immutable values (failing-statement wrapper instead of a circular input; equal second read instead of mutation); authored storage.sqlite.native.*"
     },
     {
       "upstream": "packages/durable/test/storage-memory.ts",

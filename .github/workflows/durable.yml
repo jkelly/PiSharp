@@ -1,7 +1,8 @@
 name: Durable
 
 # Branch CI for the experimental pi-durable port (decision 0005). Runs on feature/pi-durable only; the release and macOS
-# workflows stay unchanged until the branch is merged. SQLite native-asset checks join in phase P5.
+# workflows stay unchanged until the branch is merged. The test job's storage.sqlite.native case loads e_sqlite3 on each OS;
+# sqlite-publish checks that a publish for each release RID carries that RID's e_sqlite3 native asset.
 on:
   push:
     branches: [feature/pi-durable]
@@ -47,6 +48,49 @@ jobs:
           name: durable-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-${{ matrix.os }}.json
           if-no-files-found: ignore
+
+  sqlite-publish:
+    name: SQLite native asset (${{ matrix.rid }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            asset: e_sqlite3.dll
+          - rid: linux-x64
+            asset: libe_sqlite3.so
+          - rid: linux-musl-x64
+            asset: libe_sqlite3.so
+          - rid: osx-arm64
+            asset: libe_sqlite3.dylib
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Framework-dependent and without an apphost, so no runtime or host pack is needed; the publish is checked, not run.
+      - name: Publish PiSharp.Durable.Tests for ${{ matrix.rid }}
+        run: |
+          dotnet publish tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj -c Release -r ${{ matrix.rid }} --self-contained false \
+            -p:UseAppHost=false -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
+            -o "$RUNNER_TEMP/publish"
+
+      - name: Check the e_sqlite3 native asset
+        run: |
+          out="$RUNNER_TEMP/publish"
+          version=$(jq -r '.dependencies["net10.0"]["SQLitePCLRaw.lib.e_sqlite3"].resolved' src/PiSharp.Durable.Sqlite/packages.lock.json)
+          expected="$HOME/.nuget/packages/sqlitepclraw.lib.e_sqlite3/$version/runtimes/${{ matrix.rid }}/native/${{ matrix.asset }}"
+          for file in ${{ matrix.asset }} Microsoft.Data.Sqlite.dll SQLitePCLRaw.core.dll SQLitePCLRaw.provider.e_sqlite3.dll \
+            SQLitePCLRaw.batteries_v2.dll PiSharp.Durable.Sqlite.dll; do
+            if [ ! -s "$out/$file" ]; then echo "::error::$file is missing from the ${{ matrix.rid }} publish"; ls -la "$out"; exit 1; fi
+          done
+          # The asset must be the package's build for this RID (the linux-x64 and linux-musl-x64 builds differ).
+          cmp "$out/${{ matrix.asset }}" "$expected"
+          echo "${{ matrix.rid }}: ${{ matrix.asset }} from SQLitePCLRaw.lib.e_sqlite3 $version ($(stat -c %s "$out/${{ matrix.asset }}") bytes)"
 
   port-map:
     name: Port map matches the pinned upstream
