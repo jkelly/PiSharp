@@ -139,7 +139,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
       "phase": "P6",
       "status": "in-progress",
-      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Placeholders throwing NotImplementedException: submit/submission/abortSubmission and the bound submit (TODO(P8)), reset, viewState, watch and usage (TODO(P10)), compact, taskGraph, watchTaskGraph (TODO(P11)). Tests: harness.tasks.*; harness-conversations.test.ts is still to port"
+      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Placeholders throwing NotImplementedException: submit/submission/abortSubmission and the bound submit (TODO(P8)), reset, viewState, watch and usage (TODO(P10)), compact, taskGraph, watchTaskGraph (TODO(P11)). Tests: harness.tasks.*, harness.conversations.*, harness.context.* (memory, jsonl, sqlite)"
     },
     {
       "upstream": "packages/durable/src/harness/inbox.ts",
@@ -209,7 +209,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Scheduler.cs",
       "phase": "P7",
       "status": "ported",
-      "note": "DurableTaskScheduler (renamed: System.Threading.Tasks.TaskScheduler is used across the assembly): open/reconcile, reservation, run and abort invocations with a step per phase, sleep, ownership walks, cascades, failFast checks, idle context expiry, inspect, join and waitForIdle. One short lock guards the in-memory mirror (never held across awaits or host code); microtask wakeups are thread-pool work items; AbortController is CancellationSignal; timers come from HarnessOptions.TimeProvider. Tests: harness.tasks.* (memory, jsonl, sqlite); harness-tasks-recovery and the task parts of harness-structured/harness-ownership are still to port"
+      "note": "DurableTaskScheduler (renamed: System.Threading.Tasks.TaskScheduler is used across the assembly): open/reconcile, reservation, run and abort invocations with a step per phase, sleep, ownership walks, cascades, failFast checks, idle context expiry, inspect, join and waitForIdle. One short lock guards the in-memory mirror (never held across awaits or host code); microtask wakeups are thread-pool work items; AbortController is CancellationSignal; timers come from HarnessOptions.TimeProvider. Tests: harness.tasks.*, harness.tasks-recovery.*, the 41 task-runtime cases of harness.structured.* (memory, jsonl, sqlite); the tool-round parts of harness-structured (P8/P9) and harness-ownership (P11) are still to port"
     },
     {
       "upstream": "packages/durable/src/harness/submissions.ts",
