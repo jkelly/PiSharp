@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0005, milestone M0: Pi v1.1.0 packages/durable/test/examples 00-05 on memory, JSONL and SQLite storage. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Durable.Examples</AssemblyName>
+    <RootNamespace>PiSharp.Durable.Examples</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

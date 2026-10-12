@@ -727,49 +727,55 @@
       "upstream": "packages/durable/test/examples/00-conversation.ts",
       "blobSha1": "4f5f8ceac936d6530dbe9bf1b4dc73cc80e690f5",
       "lines": 21,
-      "pisharp": "tests/PiSharp.Durable.Tests/00ConversationCases.cs",
+      "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node."
     },
     {
       "upstream": "packages/durable/test/examples/01-documents.ts",
       "blobSha1": "d6638eba699e3fc56bf562cc9bed47dad38cbfcb",
       "lines": 45,
-      "pisharp": "tests/PiSharp.Durable.Tests/01DocumentsCases.cs",
+      "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node."
     },
     {
       "upstream": "packages/durable/test/examples/02-forks.ts",
       "blobSha1": "ef51a84a5d775e75d81c487ecc69e84499e72c76",
       "lines": 55,
-      "pisharp": "tests/PiSharp.Durable.Tests/02ForksCases.cs",
+      "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node."
     },
     {
       "upstream": "packages/durable/test/examples/03-owned-conversations.ts",
       "blobSha1": "cdf3240f614c653e516aab41ca2bc9b484663a7b",
       "lines": 69,
-      "pisharp": "tests/PiSharp.Durable.Tests/03OwnedConversationsCases.cs",
+      "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node."
     },
     {
       "upstream": "packages/durable/test/examples/04-chord-state.ts",
       "blobSha1": "50778fd6d2746ad6a92a13b48fecd3a26be9f109",
       "lines": 37,
-      "pisharp": "tests/PiSharp.Durable.Tests/04ChordStateCases.cs",
+      "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node."
     },
     {
       "upstream": "packages/durable/test/examples/05-watches.ts",
       "blobSha1": "c0c6d6b58f957ed73e248a225decd905841bb591",
       "lines": 41,
-      "pisharp": "tests/PiSharp.Durable.Tests/05WatchesCases.cs",
+      "pisharp": "samples/Durable.Examples/Examples.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Milestone M0: runs on memory, JSONL and SQLite storage and reads back after reopen; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node."
     },
     {
       "upstream": "packages/durable/test/examples/06-harness.ts",

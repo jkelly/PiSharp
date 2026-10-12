@@ -47,6 +47,13 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
+      "durable.examples": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Durable": "[1.1.0.6, )",
+          "PiSharp.Durable.Sqlite": "[1.1.0.6, )"
+        }
+      },
       "pisharp.agent": {
         "type": "Project",
         "dependencies": {

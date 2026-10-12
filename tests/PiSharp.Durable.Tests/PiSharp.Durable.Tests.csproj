@@ -7,5 +7,6 @@
     <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+    <ProjectReference Include="../../samples/Durable.Examples/Durable.Examples.csproj" />
   </ItemGroup>
 </Project>
