@@ -15,7 +15,7 @@ internal static partial class Program
     private static readonly DurableContext Bg = DurableContext.Background;
 
     private static JsonValue V(int value) => JsonValue.Object(KeyValuePair.Create("value", (JsonValue)JsonValue.Number(value)));
-    private static int Num(JsonValue value) => (int)((JsonNumberValue)At(value, "value")).Value;
+    private static int ValueOf(JsonValue value) => (int)((JsonNumberValue)At(value, "value")).Value;
     private static IReadOnlyList<Op> SetValue(int value) => [new SetOp(DeltaPath.Of("value"), JsonValue.Number(value))];
     private static IReplicatedStateInternals<JsonValue>? Internals(object state) => ReplicatedStateInternals.Get<JsonValue>(state);
     private static void Seq<T>(IEnumerable<T> expected, IEnumerable<T> actual, string what) =>
@@ -55,7 +55,7 @@ internal static partial class Program
             Internals(state)!.SubscribeSource((_, sequence, _) => sourceSequences.Add(sequence));
             state.Subscribe((value, _, delivery) =>
             {
-                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) deliveries.Add((Num(value), delivery.Sequence));
+                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) deliveries.Add((ValueOf(value), delivery.Sequence));
             });
             state.Apply(Bg, SetValue(1));
             Seq([1L, 2L], sourceSequences, "source sequences");
@@ -188,11 +188,11 @@ internal static partial class Program
                 if (sequence != 1 || nested) return;
                 nested = true;
                 source.Commit(V(2), SetValue(2));
-                state.Subscribe((value, _, delivery) => late.Add((delivery, Num(value))));
+                state.Subscribe((value, _, delivery) => late.Add((delivery, ValueOf(value))));
             });
             state.Subscribe((value, _, delivery) =>
             {
-                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) received.Add(Num(value));
+                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) received.Add(ValueOf(value));
             });
             source.Commit(V(1), SetValue(1));
             Seq([1, 2], received, "received");
@@ -210,7 +210,7 @@ internal static partial class Program
             });
             state.Subscribe((value, _, delivery) =>
             {
-                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) received.Add(Num(value));
+                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) received.Add(ValueOf(value));
             });
             source.Commit(V(1), SetValue(1));
             source.Commit(V(2), SetValue(2));
@@ -236,15 +236,15 @@ internal static partial class Program
             var second = ReplicatedState.Attach(source);
             Equal(2, source.Attachments.Count, "two attachments");
             source.Commit(V(1), SetValue(1));
-            Equal(1, Num(first.Value), "first");
-            Equal(1, Num(second.Value), "second");
+            Equal(1, ValueOf(first.Value), "first");
+            Equal(1, ValueOf(second.Value), "second");
 
             first.Dispose();
             first.Dispose();
             Equal(1, source.Attachments.Count, "one attachment left");
             source.Commit(V(2), SetValue(2));
-            Equal(1, Num(first.Value), "first keeps its last value");
-            Equal(2, Num(second.Value), "second advances");
+            Equal(1, ValueOf(first.Value), "first keeps its last value");
+            Equal(2, ValueOf(second.Value), "second advances");
             second.Dispose();
             Equal(0, source.Attachments.Count, "none left");
         }),
@@ -264,8 +264,8 @@ internal static partial class Program
                 var received = new List<int>();
                 state.Subscribe((value, _, _) =>
                 {
-                    received.Add(Num(value));
-                    return Num(value) == 0 ? Task.FromException(failure) : Task.CompletedTask;
+                    received.Add(ValueOf(value));
+                    return ValueOf(value) == 0 ? Task.FromException(failure) : Task.CompletedTask;
                 });
                 state.Replace(Bg, V(1));
                 Seq([0, 1], received, "received");
@@ -380,13 +380,13 @@ internal static partial class Program
                 Action<ReplicatedStateSourceFrame<JsonValue>>? receive = null;
                 var state = ReplicatedState.Attach(new DelegateSource<JsonValue>(new ReplicatedStateSnapshot<JsonValue>(V(0), 0), listener => receive = listener),
                     new ReplicatedStateSourceOptions { OnError = onError });
-                return new StateFixture(state, (value, context) => receive!(new ReplicatedStateSourceFrame<JsonValue>(Num(value), value, SetValue(Num(value)), context)));
+                return new StateFixture(state, (value, context) => receive!(new ReplicatedStateSourceFrame<JsonValue>(ValueOf(value), value, SetValue(ValueOf(value)), context)));
             }
             default:
             {
                 var replica = new ReplicatedStateReplica(onError);
                 replica.Hydrate(0, [new ReplaceOp(V(0))], Bg);
-                return new StateFixture(replica, (value, context) => replica.Update(Num(value), SetValue(Num(value)), context));
+                return new StateFixture(replica, (value, context) => replica.Update(ValueOf(value), SetValue(ValueOf(value)), context));
             }
         }
     }
@@ -406,12 +406,12 @@ internal static partial class Program
             Internals(state)?.SubscribeSource((_, sequence, _) => exact.Add(sequence));
             state.Subscribe(async (value, _, _) =>
             {
-                events.Add($"start:{Num(value)}");
-                if (Num(value) == 0) await hydration.Task;
-                if (Num(value) == 1) await update.Task;
-                events.Add($"end:{Num(value)}");
+                events.Add($"start:{ValueOf(value)}");
+                if (ValueOf(value) == 0) await hydration.Task;
+                if (ValueOf(value) == 1) await update.Task;
+                events.Add($"end:{ValueOf(value)}");
             });
-            state.Subscribe((value, _, _) => fast.Add(Num(value)));
+            state.Subscribe((value, _, _) => fast.Add(ValueOf(value)));
             publish(V(1), Bg);
             publish(V(2), Bg);
             Seq(["start:0"], events, "events");
@@ -435,8 +435,8 @@ internal static partial class Program
                 Internals(state)?.SubscribeSource((_, sequence, _) => exact.Add(sequence));
                 state.Subscribe((value, _, _) =>
                 {
-                    received.Add(Num(value));
-                    return Num(value) == 0 ? hydration.Task : Task.CompletedTask;
+                    received.Add(ValueOf(value));
+                    return ValueOf(value) == 0 ? hydration.Task : Task.CompletedTask;
                 });
                 for (var value = 1; value <= count; value += 1) publish(V(value), Bg);
                 Seq([0], received, "before release");
@@ -455,15 +455,15 @@ internal static partial class Program
             state.Subscribe((value, deliveryContext, delivery) =>
             {
                 received.Add((value, deliveryContext, delivery));
-                return Num(value) == 1 ? gate.Task : Task.CompletedTask;
+                return ValueOf(value) == 1 ? gate.Task : Task.CompletedTask;
             });
             for (var value = 1; value < 102; value += 1) publish(V(value), Bg);
             publish(V(102), context);
             var adopted = state.Value;
             publish(V(103), Bg);
-            Seq([0, 1], received.Select(entry => Num(entry.Value)), "before release");
+            Seq([0, 1], received.Select(entry => ValueOf(entry.Value)), "before release");
             gate.SetResult();
-            Seq([0, 1, 102, 103], received.Select(entry => Num(entry.Value)), "after release");
+            Seq([0, 1, 102, 103], received.Select(entry => ValueOf(entry.Value)), "after release");
             Check(ReferenceEquals(adopted, received[2].Value), "adopted value");
             Check(ReferenceEquals(context, received[2].Context), "exact context");
             Equal(ReplicatedStateDelivery.Update(102), received[2].Delivery, "delivery");
@@ -474,9 +474,9 @@ internal static partial class Program
             var events = new List<string>();
             state.Subscribe((value, _, _) =>
             {
-                events.Add($"start:{Num(value)}");
-                if (Num(value) < 2) publish(V(Num(value) + 1), Bg);
-                events.Add($"end:{Num(value)}");
+                events.Add($"start:{ValueOf(value)}");
+                if (ValueOf(value) < 2) publish(V(ValueOf(value) + 1), Bg);
+                events.Add($"end:{ValueOf(value)}");
             });
             Seq(["start:0", "end:0", "start:1", "end:1", "start:2", "end:2"], events, "events");
         });
@@ -487,8 +487,8 @@ internal static partial class Program
             var received = new List<int>();
             Func<JsonValue, DurableContext, ReplicatedStateDelivery, Task> listener = (value, _, _) =>
             {
-                received.Add(Num(value));
-                return Num(value) == 0 ? gate.Task : Task.CompletedTask;
+                received.Add(ValueOf(value));
+                return ValueOf(value) == 0 ? gate.Task : Task.CompletedTask;
             };
             var stopFirst = state.Subscribe(listener);
             var stopSecond = state.Subscribe(listener);
@@ -510,8 +510,8 @@ internal static partial class Program
             var completed = false;
             var stop = state.Subscribe(async (value, _, _) =>
             {
-                received.Add(Num(value));
-                if (Num(value) == 1)
+                received.Add(ValueOf(value));
+                if (ValueOf(value) == 1)
                 {
                     await gate.Task;
                     completed = true;
@@ -541,8 +541,8 @@ internal static partial class Program
             var failure = new InvalidOperationException("sync hydration");
             state.Subscribe((value, _, _) =>
             {
-                received.Add(Num(value));
-                if (Num(value) == 0) throw failure;
+                received.Add(ValueOf(value));
+                if (ValueOf(value) == 0) throw failure;
             });
             publish(V(1), Bg);
             Check(errors is [var only] && ReferenceEquals(only, failure), "one report of the failure");
@@ -557,8 +557,8 @@ internal static partial class Program
             var fast = new List<int>();
             state.Subscribe((value, _, _) =>
             {
-                received.Add(Num(value));
-                return Num(value) switch
+                received.Add(ValueOf(value));
+                return ValueOf(value) switch
                 {
                     0 => gate.Task,
                     1 => throw new InvalidOperationException("sync update"),
@@ -566,7 +566,7 @@ internal static partial class Program
                     _ => Task.CompletedTask,
                 };
             });
-            state.Subscribe((value, _, _) => fast.Add(Num(value)));
+            state.Subscribe((value, _, _) => fast.Add(ValueOf(value)));
             for (var value = 1; value <= 3; value += 1) publish(V(value), Bg);
             gate.SetException(new InvalidOperationException("async hydration"));
             Seq([0, 1, 2, 3], received, "received");
@@ -581,7 +581,7 @@ internal static partial class Program
             var received = new List<int>();
             var stop = state.Subscribe((value, _, _) =>
             {
-                received.Add(Num(value));
+                received.Add(ValueOf(value));
                 return gate.Task;
             });
             publish(V(1), Bg);
