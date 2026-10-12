@@ -616,8 +616,8 @@
       "lines": 457,
       "pisharp": "src/PiSharp.Durable/Chord/ReplicatedState.cs",
       "phase": "P1",
-      "status": "in-progress",
-      "note": "Publisher, subscriber, attached source state and replica ported in process; MutableReplicatedState publishes caller op batches (Apply) and root replacements (Replace) until the draft tracker and diff land, so change(context, mutate) is pending. Tests: chord.state.*"
+      "status": "ported",
+      "note": "Publisher, subscriber, attached source state and replica ported in process. MutableReplicatedState is backed by a Tracker: Change(context, Action<Draft>) (plus a Func<Draft, object?> overload that rejects returned tasks) publishes the prepared compact ops with rollback, reentrancy and async rejection; Replace adopts the value through prepareReplace and publishes [[\"r\", value]] as upstream does. A per-state change gate serializes mutations across threads (see the file header). Tests: chord.state.* (state.test.ts, state-delivery.test.ts), chord.state.value.* (state-value.test.ts), chord.state.draft.* (state-draft.test.ts), chord.state.diff.* (state-diff.test.ts), chord.state.fuzz.converges-across-randomized-prepared-revisions (state-fuzz.test.ts), chord.state.native.*"
     },
     {
       "upstream": "packages/chord/src/services/state-internals.ts",

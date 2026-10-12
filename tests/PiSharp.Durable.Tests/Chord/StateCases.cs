@@ -1,11 +1,11 @@
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/test/state.test.ts and state-delivery.test.ts (the cases that do
-// not need the draft tracker or the diff). Adaptations, each repeated where it applies:
-// - change(context, draft => ...) is MutableReplicatedState.Apply(context, ops) with the operations that draft would have produced;
-//   the cases using it guard publication, sequencing and sharing, not the draft.
-// - replace publishes [["r", value]] until the diff lands; no ported case asserts the replace operations.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/test/state.test.ts, state-delivery.test.ts, state-value.test.ts,
+// state-draft.test.ts, state-diff.test.ts and state-fuzz.test.ts. Adaptations, each repeated where it applies:
+// - Drafts are the explicit draft API (decision 0005, as in TrackerCases.cs): property assignment is Set, delete is Delete, a nested
+//   draft is GetObject/GetArray, push/unshift/pop/shift are Add/Insert/RemoveAt, fill/copyWithin are expressed with Set, and JS
+//   TypeError/Error are InvalidOperationException with upstream's message words.
 // - Promise deferreds are TaskCompletionSource barriers; subscription continuations run synchronously when a task completes, so the
 //   state upstream reaches after `await` / vi.waitFor is asserted right after SetResult/SetException, with no sleeps.
 // - Object.isFrozen checks are dropped: JsonValue trees are immutable, never frozen copies. toBe is ReferenceEquals.
@@ -23,21 +23,67 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> ChordStateCases() =>
     [
-        // Adapted: the draft's two writes to changed.value are the two set operations it would record.
         Case("chord.state.publishes-one-immutable-structurally-shared-revision", () =>
         {
             var state = ReplicatedState.Create(J("{\"changed\":{\"value\":1},\"retained\":{\"value\":2}}"));
             var previous = state.Value;
             var deliveries = new List<long>();
             state.Subscribe((_, _, delivery) => deliveries.Add(delivery.Sequence));
-            state.Apply(Bg, Ops("[[\"s\",[\"changed\",\"value\"],3],[\"s\",[\"changed\",\"value\"],4]]"));
+            state.Change(Bg, draft =>
+            {
+                draft.AsObject().GetObject("changed").Set("value", 3);
+                draft.AsObject().GetObject("changed").Set("value", 4);
+            });
             Same("{\"changed\":{\"value\":4},\"retained\":{\"value\":2}}", state.Value, "value");
             Check(!ReferenceEquals(state.Value, previous), "new root");
             Check(!ReferenceEquals(At(state.Value, "changed"), At(previous, "changed")), "changed branch copied");
             Check(ReferenceEquals(At(state.Value, "retained"), At(previous, "retained")), "retained branch shared");
             Seq([0L, 1L], deliveries, "deliveries");
         }),
-        // Adapted: draft writes become set operations.
+        Case("chord.state.rolls-back-callback-failures-and-revokes-escaped-drafts", () =>
+        {
+            var state = ReplicatedState.Create(J("{\"nested\":{\"value\":1}}"));
+            var previous = state.Value;
+            DraftObject? escaped = null;
+            Equal("stop", Throws<InvalidOperationException>(() => state.Change(Bg, draft =>
+            {
+                escaped = draft.AsObject().GetObject("nested");
+                draft.AsObject().GetObject("nested").Set("value", 2);
+                throw new InvalidOperationException("stop");
+            }), "change throws").Message, "message");
+            Check(ReferenceEquals(previous, state.Value), "rolled back");
+            Throws<InvalidOperationException>(() => escaped!.Get("value"), "escaped draft revoked");
+        }),
+        // Adapted: a C# PromiseLike is a returned Task, through the Func<Draft, object?> overload (a non-async lambda returning a task).
+        Case("chord.state.rejects-promiselike-callbacks-and-aborts-their-draft", () =>
+        {
+            var state = ReplicatedState.Create(V(0));
+            var previous = state.Value;
+            var error = Throws<InvalidOperationException>(() => state.Change(Bg, draft =>
+            {
+                draft.AsObject().Set("value", 1);
+                return Task.CompletedTask;
+            }), "promise-like callback");
+            Check(error.Message.Contains("synchronous", StringComparison.Ordinal), "message: " + error.Message);
+            Check(ReferenceEquals(previous, state.Value), "draft aborted");
+        }),
+        Case("chord.state.rejects-nested-changes-and-replacements-without-losing-the-outer-rollback", () =>
+        {
+            var state = ReplicatedState.Create(J("{\"left\":0,\"right\":0}"));
+            var nested = Throws<InvalidOperationException>(() => state.Change(Bg, draft =>
+            {
+                draft.AsObject().Set("left", 1);
+                state.Change(Bg, inner => inner.AsObject().Set("right", 2));
+            }), "nested change");
+            Check(nested.Message.Contains("reentrantly", StringComparison.Ordinal), "message: " + nested.Message);
+            Same("{\"left\":0,\"right\":0}", state.Value, "outer rolled back");
+            var replaced = Throws<InvalidOperationException>(() => state.Change(Bg, _ =>
+            {
+                state.Replace(Bg, J("{\"left\":1,\"right\":2}"));
+            }), "nested replace");
+            Check(replaced.Message.Contains("change callback", StringComparison.Ordinal), "message: " + replaced.Message);
+            Same("{\"left\":0,\"right\":0}", state.Value, "replacement rejected");
+        }),
         Case("chord.state.queues-listener-triggered-changes-in-sequence-order", () =>
         {
             var state = ReplicatedState.Create(V(0));
@@ -49,7 +95,7 @@ internal static partial class Program
             {
                 if (nested) return;
                 nested = true;
-                state.Apply(Bg, SetValue(2));
+                state.Change(Bg, draft => draft.AsObject().Set("value", 2));
                 state.Subscribe((_, _, delivery) => lateDeliveries.Add(delivery));
             });
             Internals(state)!.SubscribeSource((_, sequence, _) => sourceSequences.Add(sequence));
@@ -57,23 +103,40 @@ internal static partial class Program
             {
                 if (delivery.Kind == ReplicatedStateDeliveryKind.Update) deliveries.Add((ValueOf(value), delivery.Sequence));
             });
-            state.Apply(Bg, SetValue(1));
+            state.Change(Bg, draft => draft.AsObject().Set("value", 1));
             Seq([1L, 2L], sourceSequences, "source sequences");
             Seq([(1, 1L), (2, 2L)], deliveries, "deliveries");
             Seq([ReplicatedStateDelivery.Hydrate(2)], lateDeliveries, "late deliveries");
         }),
-        // Adapted: draft write becomes a set operation.
         Case("chord.state.isolates-listener-failures-after-committing-the-revision", () =>
         {
             var state = ReplicatedState.Create(V(0));
             var received = new List<long>();
             Internals(state)!.SubscribeSource((_, _, _) => throw new InvalidOperationException("listener failed"));
             Internals(state)!.SubscribeSource((_, sequence, _) => received.Add(sequence));
-            Equal("listener failed", Throws<InvalidOperationException>(() => state.Apply(Bg, SetValue(1)), "change throws").Message, "message");
+            Equal("listener failed", Throws<InvalidOperationException>(() => state.Change(Bg, draft => draft.AsObject().Set("value", 1)),
+                "change throws").Message, "message");
             Same("{\"value\":1}", state.Value, "committed");
             Seq([1L], received, "received");
         }),
-        // Adapted: the follow-up draft write is a set operation; alias freedom is structural for immutable values.
+        // Adapted: the placed value is immutable, so it cannot change and two placements need no copies; the draft's edit of one slot
+        // copies that slot only (left is a new object, right keeps the placed reference).
+        Case("chord.state.copies-assigned-values-by-value", () =>
+        {
+            var external = V(1);
+            var state = ReplicatedState.Create(J("{\"left\":null,\"right\":null}"));
+            state.Change(Bg, draft =>
+            {
+                var root = draft.AsObject();
+                root.Set("left", external);
+                root.Set("right", external);
+                root.GetObject("left").Set("value", 2);
+            });
+            Equal(1, ValueOf(external), "external unchanged");
+            Same("{\"left\":{\"value\":2},\"right\":{\"value\":1}}", state.Value, "value");
+            Check(!ReferenceEquals(At(state.Value, "left"), At(state.Value, "right")), "left and right independent");
+        }),
+        // Adapted: alias freedom of the replacement is structural for immutable values.
         Case("chord.state.takes-immutable-ownership-of-alias-free-replacements", () =>
         {
             var state = ReplicatedState.Create(J("{\"left\":{\"value\":1},\"right\":{\"value\":2}}"));
@@ -82,8 +145,23 @@ internal static partial class Program
             state.Replace(Bg, replacement);
             Check(ReferenceEquals(replacement, state.Value), "replacement adopted as is");
             Check(!ReferenceEquals(At(state.Value, "left"), At(state.Value, "right")), "no alias");
-            state.Apply(Bg, Ops("[[\"s\",[\"left\",\"value\"],9]]"));
+            state.Change(Bg, draft => draft.AsObject().GetObject("left").Set("value", 9));
             Same("{\"left\":{\"value\":9},\"right\":{\"value\":1}}", state.Value, "value");
+        }),
+        Case("chord.state.preserves-compact-string-splice-and-permutation-operations", () =>
+        {
+            var (a, b, c) = (J("{\"id\":\"a\"}"), J("{\"id\":\"b\"}"), J("{\"id\":\"c\"}"));
+            var state = ReplicatedState.Create(Obj(("text", "abcdefgh"), ("values", JsonValue.Array(a, b, c))));
+            var batches = new List<JsonValue>();
+            Internals(state)!.SubscribeSource((operations, _, _) => batches.Add(OpsJson(operations)));
+            state.Change(Bg, draft =>
+            {
+                draft.AsObject().Set("text", "defghxyz");
+                draft.AsObject().GetArray("values").RemoveAt(0);
+            });
+            state.Change(Bg, draft => draft.AsObject().GetArray("values").Reverse());
+            Same("[[[\"t\",[\"text\"],3],[\"a\",[\"text\"],\"xyz\"],[\"p\",[\"values\"],0,1,[]]],[[\"m\",[\"values\"],[1,0]]]]",
+                JsonValue.Array(batches), "batches");
         }),
         Case("chord.state.validates-replica-revisions-without-freezing-shared-immutable-payloads", () =>
         {
@@ -332,13 +410,92 @@ internal static partial class Program
             await Task.WhenAll(Enumerable.Range(0, threads).Select(thread => Task.Run(() =>
             {
                 for (var index = 0; index < perThread; index++)
-                    state.Apply(Bg, [new SetOp(DeltaPath.Of($"t{thread}-{index}"), JsonValue.Number(index))]);
+                    state.Change(Bg, draft => draft.AsObject().Set($"t{thread}-{index}", JsonValue.Number(index)));
             })));
             await last.Task;
             Equal(total, ((JsonObjectValue)state.Value).Count, "every commit applied");
             lock (exactGate) Seq(Enumerable.Range(1, total).Select(sequence => (long)sequence), exact, "exact listeners see every sequence in order");
             Check(!overlapped, "callbacks of one subscription never overlap");
             Check(delivered[0] == 0 && delivered.Zip(delivered.Skip(1)).All(pair => pair.First < pair.Second), "deliveries increase");
+        }),
+        // Native: a change on another thread waits for a running mutation and drafts over its committed revision, never a stale base.
+        Case("chord.state.native.a-concurrent-change-waits-for-the-running-mutation", async () =>
+        {
+            var state = ReplicatedState.Create(J("{\"a\":0}"));
+            var sequences = new List<long>();
+            Internals(state)!.SubscribeSource((_, sequence, _) => { lock (sequences) sequences.Add(sequence); });
+            using var entered = new ManualResetEventSlim();
+            using var otherStarted = new ManualResetEventSlim();
+            JsonValue? seen = null;
+            var first = Task.Run(() => state.Change(Bg, draft =>
+            {
+                draft.AsObject().Set("a", 1);
+                entered.Set();
+                Check(otherStarted.Wait(TimeSpan.FromSeconds(30)), "other change started");
+            }));
+            Check(entered.Wait(TimeSpan.FromSeconds(30)), "first mutation entered");
+            var second = Task.Run(() =>
+            {
+                otherStarted.Set();
+                state.Change(Bg, draft =>
+                {
+                    seen = draft.AsObject()["a"];
+                    draft.AsObject().Set("b", 2);
+                });
+            });
+            await Task.WhenAll(first, second);
+            Same("1", seen!, "second mutation drafts over the first commit");
+            Same("{\"a\":1,\"b\":2}", state.Value, "both committed");
+            lock (sequences) Seq([1L, 2L], sequences, "published in order");
+        }),
+        // Native: an async lambda binds to Action<Draft> as async void; it is rejected before it runs, so no continuation can touch a
+        // revoked draft. Returned ValueTasks and faulted tasks are PromiseLike too.
+        Case("chord.state.native.rejects-async-mutations", () =>
+        {
+            var state = ReplicatedState.Create(V(0));
+            var previous = state.Value;
+            var ran = 0;
+            var asyncLambda = Throws<InvalidOperationException>(() => state.Change(Bg, async draft =>
+            {
+                ran++;
+                draft.AsObject().Set("value", 1);
+                await Task.Yield();
+            }), "async lambda");
+            Check(asyncLambda.Message.Contains("synchronous", StringComparison.Ordinal), "message: " + asyncLambda.Message);
+            Equal(0, ran, "async lambda never ran");
+            Throws<InvalidOperationException>(() => state.Change(Bg, draft =>
+            {
+                draft.AsObject().Set("value", 2);
+                return ValueTask.CompletedTask;
+            }), "returned ValueTask");
+            Throws<InvalidOperationException>(() => state.Change(Bg, draft =>
+            {
+                draft.AsObject().Set("value", 3);
+                return Task.FromException(new InvalidOperationException("observed"));
+            }), "returned faulted task");
+            Check(ReferenceEquals(previous, state.Value), "nothing committed");
+            Equal(0L, Internals(state)!.Snapshot().Sequence, "nothing published");
+            state.Change(Bg, draft => draft.AsObject().Delete("missing"));
+            Equal(0L, Internals(state)!.Snapshot().Sequence, "a non-awaitable return value is ignored");
+        }),
+        // Native: upstream's replace goes through the tracker's prepareReplace, which publishes the root replacement itself (no diff), and
+        // a no-op change or replacement publishes nothing and keeps the current value.
+        Case("chord.state.native.replace-publishes-the-root-and-no-ops-publish-nothing", () =>
+        {
+            var state = ReplicatedState.Create(J("{\"value\":0,\"nested\":{\"value\":1}}"));
+            var previous = state.Value;
+            var batches = new List<IReadOnlyList<Op>>();
+            Internals(state)!.SubscribeSource((operations, _, _) => batches.Add(operations));
+            state.Change(Bg, draft => draft.AsObject().Set("value", 0));
+            state.Change(Bg, draft => draft.AsObject().GetObject("nested").Set("value", 1));
+            state.Replace(Bg, J("{\"value\":0,\"nested\":{\"value\":1}}"));
+            Check(ReferenceEquals(previous, state.Value), "no-ops keep the value");
+            Equal(0, batches.Count, "no-ops publish nothing");
+            var replacement = J("{\"value\":1,\"nested\":{\"value\":1}}");
+            state.Replace(Bg, replacement);
+            Check(ReferenceEquals(replacement, state.Value), "replacement adopted");
+            Check(batches is [[ReplaceOp { Value: var root }]] && ReferenceEquals(root, replacement), "published [[\"r\", value]]");
+            Equal(1L, Internals(state)!.Snapshot().Sequence, "one publication");
         }),
         .. StateDeliveryCases(StateKind.Mutable),
         .. StateDeliveryCases(StateKind.Attached),
@@ -360,6 +517,345 @@ internal static partial class Program
             Throws<PathError>(() => DeltaApplyTrusted.Apply(input, Ops("[[\"a\",[\"stable\"],\"x\"]]")), "unresolvable still throws");
         }),
     ];
+
+    // state-value.test.ts
+    private static IEnumerable<(string, Func<Task>)> ChordStateValueCases() =>
+    [
+        Case("chord.state.value.takes-ownership-of-an-alias-free-mutable-json-root-without-freezing", () =>
+        {
+            var input = J("{\"left\":{\"value\":1},\"right\":{\"value\":1}}");
+            var tracker = Tracker.Track(input);
+            Check(ReferenceEquals(input, tracker.Value), "root taken as is");
+            Check(!ReferenceEquals(At(tracker.Value, "left"), At(tracker.Value, "right")), "no alias");
+        }),
+        Case("chord.state.value.commits-transaction-copies-in-place-while-sharing-unchanged-branches", () =>
+        {
+            var tracker = Tracker.Track(J("{\"changed\":{\"value\":1},\"retained\":{\"value\":2}}"));
+            var baseRoot = tracker.Value;
+            var baseSnapshot = baseRoot.ToJson();
+            var change = tracker.BeginChange();
+            Root(change).GetObject("changed").Set("value", 3);
+            var prepared = change.Prepare();
+            Check(!ReferenceEquals(At(prepared.Value, "changed"), At(baseRoot, "changed")), "changed branch copied");
+            Check(ReferenceEquals(At(prepared.Value, "retained"), At(baseRoot, "retained")), "retained branch shared");
+            tracker.Adopt(prepared);
+            Equal(baseSnapshot, baseRoot.ToJson(), "base unchanged");
+            Check(ReferenceEquals(prepared.Value, tracker.Value), "adopted");
+        }),
+        // Adapted: placing one immutable value twice may share its reference (nothing can mutate it), so the guarded independence is
+        // checked by editing one placement through the draft: the other keeps the placed value.
+        Case("chord.state.value.makes-repeated-placements-independent", () =>
+        {
+            var tracker = Tracker.Track(J("{\"values\":[]}"));
+            var change = tracker.BeginChange();
+            var shared = V(1);
+            Root(change).GetArray("values").AddRange([shared, shared]);
+            Root(change).GetArray("values").GetObject(0).Set("value", 2);
+            var prepared = change.Prepare();
+            Same("[{\"value\":2},{\"value\":1}]", At(prepared.Value, "values"), "values");
+            Check(!ReferenceEquals(At(prepared.Value, "values", 0), At(prepared.Value, "values", 1)), "independent placements");
+            Equal(1, ValueOf(shared), "placed value unchanged");
+        }),
+    ];
+
+    // state-draft.test.ts
+    private static IEnumerable<(string, Func<Task>)> ChordStateDraftCases() =>
+    [
+        Case("chord.state.draft.copies-only-changed-branches", () =>
+        {
+            var tracker = Tracker.Track(J("{\"changed\":{\"count\":1,\"sibling\":{\"value\":\"kept\"}},\"untouched\":{\"value\":2}}"));
+            var baseRoot = tracker.Value;
+            var change = tracker.BeginChange();
+            var first = Root(change).GetObject("changed");
+            Check(ReferenceEquals(first, Root(change).GetObject("changed")), "one draft per slot");
+            Root(change).GetObject("changed").Set("count", 3);
+            var prepared = change.Prepare();
+            Check(!ReferenceEquals(baseRoot, prepared.Value), "new root");
+            Check(!ReferenceEquals(At(baseRoot, "changed"), At(prepared.Value, "changed")), "changed copied");
+            Check(ReferenceEquals(At(baseRoot, "changed", "sibling"), At(prepared.Value, "changed", "sibling")), "sibling shared");
+            Check(ReferenceEquals(At(baseRoot, "untouched"), At(prepared.Value, "untouched")), "untouched shared");
+        }),
+        // Adapted: frozen bases are every base (immutable); fill(9, 1, 3) and copyWithin(1, 0, 2) are written as the Sets they perform.
+        Case("chord.state.draft.supports-frozen-bases-deletion-and-native-array-mutators", () =>
+        {
+            var tracker = Tracker.Track(J("{\"optional\":\"remove\",\"values\":[3,1,2]}"));
+            var change = tracker.BeginChange();
+            Root(change).Delete("optional");
+            var values = Root(change).GetArray("values");
+            values.Add(4);
+            Equal(4d, Num(values.RemoveAt(values.Count - 1)), "pop");
+            values.Insert(0, 0);
+            Equal(0d, Num(values.RemoveAt(0)), "shift");
+            Same("[1]", JsonValue.Array(values.Splice(1, 1, 5, 4)), "splice");
+            values.Sort((left, right) => Num(left).CompareTo(Num(right)));
+            values.Reverse();
+            values.Set(1, 9);
+            values.Set(2, 9);
+            var (copy0, copy1) = (values[0], values[1]);
+            values.Set(1, copy0);
+            values.Set(2, copy1);
+            Same("{\"values\":[5,5,9,2]}", change.Prepare().Value, "value");
+        }),
+        // Adapted: unshift(held) places the held draft's current value (held.ToValue()); the held handle keeps following its element.
+        Case("chord.state.draft.copies-inserted-draft-values-without-aliasing-their-original-handle", () =>
+        {
+            var tracker = Tracker.Track(J("{\"values\":[{\"value\":1},{\"value\":2}]}"));
+            var change = tracker.BeginChange();
+            var held = Root(change).GetArray("values").GetObject(0);
+            Root(change).GetArray("values").Insert(0, held.ToValue());
+            held.Set("value", 9);
+            var prepared = change.Prepare();
+            Same("[{\"value\":1},{\"value\":9},{\"value\":2}]", At(prepared.Value, "values"), "values");
+            Check(!ReferenceEquals(At(prepared.Value, "values", 0), At(prepared.Value, "values", 1)), "no alias");
+        }),
+        // Adapted: a C# sort comparison sees immutable element values and must not use the draft (DraftArray.Sort), so the comparator's
+        // per-row edits are recorded during the sort and written through the element drafts after it, which follow their rows.
+        Case("chord.state.draft.keeps-comparator-edits-when-sorting-object-drafts", () =>
+        {
+            var tracker = Tracker.Track(J("{\"rows\":[{\"rank\":2,\"comparisons\":0},{\"rank\":1,\"comparisons\":0}]}"));
+            var change = tracker.BeginChange();
+            var rows = Root(change).GetArray("rows");
+            var drafts = Enumerable.Range(0, rows.Count).Select(rows.GetObject).ToArray();
+            var originals = drafts.Select(draft => draft.ToValue()).ToArray();
+            var comparisons = new Dictionary<JsonValue, int>(ReferenceEqualityComparer.Instance);
+            rows.Sort((left, right) =>
+            {
+                comparisons[left] = comparisons.GetValueOrDefault(left) + 1;
+                comparisons[right] = comparisons.GetValueOrDefault(right) + 1;
+                return Num(At(left, "rank")).CompareTo(Num(At(right, "rank")));
+            });
+            for (var index = 0; index < drafts.Length; index++)
+                drafts[index].Set("comparisons", Num(drafts[index]["comparisons"]) + comparisons.GetValueOrDefault(originals[index]));
+            var prepared = change.Prepare();
+            Seq([1d, 2d], ((JsonArrayValue)At(prepared.Value, "rows")).Select(row => Num(At(row, "rank"))), "ranks");
+            Seq([1d, 1d], ((JsonArrayValue)At(prepared.Value, "rows")).Select(row => Num(At(row, "comparisons"))), "comparisons");
+        }),
+        // Adapted: shift() returning the removed element's draft is the element draft taken before RemoveAt(0).
+        Case("chord.state.draft.drops-writes-through-detached-child-handles", () =>
+        {
+            var tracker = Tracker.Track(J("{\"child\":{\"value\":\"removed\"},\"items\":[{\"value\":\"removed\"},{\"value\":\"kept\"}]}"));
+            var change = tracker.BeginChange();
+            var child = Root(change).GetObject("child");
+            var shifted = Root(change).GetArray("items").GetObject(0);
+            Root(change).GetArray("items").RemoveAt(0);
+            Root(change).Delete("child");
+            child.Set("value", "detached child");
+            shifted.Set("value", "detached item");
+            Same("{\"items\":[{\"value\":\"kept\"}]}", change.Prepare().Value, "value");
+        }),
+        Case("chord.state.draft.inserts-100000-items-with-unshift-without-argument-overflow", () => InsertsHundredThousand(unshift: true)),
+        Case("chord.state.draft.inserts-100000-items-with-splice-without-argument-overflow", () => InsertsHundredThousand(unshift: false)),
+        // Adapted: undefined is a null reference and is rejected (ArgumentNullException) before the draft changes, also inside a batch
+        // placement; NaN cannot become a JsonValue (strict JSON); a Date has no JsonValue form, so that assertion is dropped.
+        Case("chord.state.draft.rejects-non-strict-json-placements-without-mutating-the-draft-or-base", () =>
+        {
+            var tracker = Tracker.Track(J("{\"number\":0,\"payload\":null,\"values\":[1,2]}"));
+            var change = tracker.BeginChange();
+            Throws<ArgumentNullException>(() => Root(change).GetArray("values").Set(0, null!), "undefined element");
+            Throws<ArgumentNullException>(() => Root(change).GetArray("values").AddRange([J("{\"nested\":1}"), null!]), "undefined in a placement batch");
+            var nan = Throws<ArgumentException>(() => Root(change).Set("number", JsonValue.Number(double.NaN)), "NaN");
+            Check(nan.Message.Contains("strict JSON", StringComparison.Ordinal), "message: " + nan.Message);
+            Check(JsonValue.DeepEquals(tracker.Value, change.State.ToValue()), "draft unchanged");
+            change.Abort();
+            Same("{\"number\":0,\"payload\":null,\"values\":[1,2]}", tracker.Value, "base unchanged");
+        }),
+        // Adapted: `delete values[0]` has no C# form; the hole it would make is the write past the end, rejected the same way.
+        Case("chord.state.draft.rejects-array-holes-without-mutating-the-committed-base", () =>
+        {
+            var tracker = Tracker.Track(J("{\"values\":[1,2]}"));
+            var change = tracker.BeginChange();
+            var error = Throws<InvalidOperationException>(() => Root(change).GetArray("values").Set(3, 0), "hole");
+            Check(error.Message.Contains("dense", StringComparison.Ordinal) || error.Message.Contains("holes", StringComparison.Ordinal), "message: " + error.Message);
+            change.Abort();
+            Same("[1,2]", At(tracker.Value, "values"), "base unchanged");
+        }),
+    ];
+
+    private static void InsertsHundredThousand(bool unshift)
+    {
+        var tracker = Tracker.Track(J("{\"values\":[-1]}"));
+        var change = tracker.BeginChange();
+        var items = Enumerable.Range(0, 100_000).Select(value => (JsonValue)value).ToArray();
+        var values = Root(change).GetArray("values");
+        if (unshift) values.InsertRange(0, items);
+        else values.Splice(1, 0, items);
+        var prepared = change.Prepare();
+        Equal(100_001, ((JsonArrayValue)At(prepared.Value, "values")).Count, "length");
+        Equal(0d, Num(At(prepared.Value, "values", unshift ? 0 : 1)), "first inserted");
+        Equal(99_999d, Num(At(prepared.Value, "values", unshift ? 99_999 : 100_000)), "last inserted");
+        Check(JsonValue.DeepEquals(DeltaApply.Apply(prepared.Base, prepared.Ops), prepared.Value), "replay");
+    }
+
+    // state-diff.test.ts is delta-diff.test.ts (ported in DiffCases.cs) without "keeps a large rotation payload-free" and with its last
+    // case renamed "falls back to a base operation when leaf operations are larger" (that copy drops one replay assertion, which the
+    // shared body keeps). The inputs and expected operations are identical, so the bodies are shared under chord.state.diff ids.
+    private static IEnumerable<(string, Func<Task>)> ChordStateDiffCases()
+    {
+        const string prefix = "chord.diff.";
+        foreach (var (id, run) in ChordDiffCases())
+        {
+            if (id == prefix + "keeps-a-large-rotation-payload-free") continue;
+            var name = id == prefix + "bounds-a-wide-normalized-array-fallback-with-a-root-replacement"
+                ? "falls-back-to-a-base-operation-when-leaf-operations-are-larger"
+                : id[prefix.Length..];
+            yield return ("chord.state.diff." + name, run);
+        }
+    }
+
+    // state-fuzz.test.ts: the same mulberry32 generator (Mulberry32, TrackerCases.cs) and seeds 1..100, 100 steps each; the plain-object `expected` is a mutable model.
+    private static IEnumerable<(string, Func<Task>)> ChordStateFuzzCases() =>
+    [
+        Case("chord.state.fuzz.converges-across-randomized-prepared-revisions", () =>
+        {
+            for (var seed = 1; seed <= 100; seed++)
+            {
+                var random = Mulberry32((uint)seed);
+                var expected = new FuzzDocument([.. Enumerable.Range(0, 4).Select(id => new FuzzItem(id, $"item-{id}", 0))], "start", 0, null);
+                var tracker = Tracker.Track(expected.ToValue());
+                var replica = J(tracker.Value.ToJson());
+                for (var step = 0; step < 100; step++)
+                {
+                    var choice = (int)Math.Floor(random() * 14);
+                    var value = seed * 1_000 + step;
+                    var where = $"seed {seed} step {step} choice {choice}";
+                    var baseRoot = tracker.Value;
+                    var baseJson = baseRoot.ToJson();
+                    expected.Mutate(choice, value);
+                    var change = tracker.BeginChange();
+                    FuzzMutate(change.State.AsObject(), choice, value);
+                    var prepared = change.Prepare();
+                    var operations = Ops(OpsJson(prepared.Ops).ToJson());
+                    Equal(baseJson, baseRoot.ToJson(), "prepare base " + where);
+                    Check(ReferenceEquals(baseRoot, prepared.Base), "prepared base " + where);
+                    replica = DeltaApply.Apply(replica, operations);
+                    Check(JsonValue.DeepEquals(replica, prepared.Value), "replay " + where);
+                    tracker.Adopt(prepared);
+                    Equal(baseJson, baseRoot.ToJson(), "adopt base " + where);
+                    Check(ReferenceEquals(prepared.Value, tracker.Value), "adopted " + where);
+                    var model = expected.ToValue();
+                    Check(JsonValue.DeepEquals(model, tracker.Value), $"state {where}: expected {model.ToJson()}, actual {tracker.Value.ToJson()}");
+                    Check(JsonValue.DeepEquals(model, replica), "replica " + where);
+                    AssertAliasFree(tracker.Value);
+                }
+            }
+        }),
+    ];
+
+    private static void FuzzMutate(DraftObject document, int choice, int value)
+    {
+        JsonValue Item() => Obj(("id", value), ("text", $"item-{value}"), ("score", value % 7));
+        var items = document.GetArray("items");
+        switch (choice)
+        {
+            case 0: document.Set("text", Str(document["text"]) + $"-{value}"); break;
+            case 1:
+            {
+                var text = Str(document["text"]);
+                document.Set("text", text[Math.Min(2, text.Length)..] + value);
+                break;
+            }
+            case 2: items.Add(Item()); break;
+            case 3: items.Insert(0, Item()); break;
+            case 4: if (items.Count > 0) items.RemoveAt(0); break;
+            case 5: if (items.Count > 0) items.RemoveAt(items.Count - 1); break;
+            case 6:
+            {
+                var index = items.Count == 0 ? 0 : value % (items.Count + 1);
+                items.Splice(index, items.Count == 0 ? 0 : value % 2, Item());
+                break;
+            }
+            case 7: items.Reverse(); break;
+            case 8: items.Sort((left, right) => Num(At(left, "id")).CompareTo(Num(At(right, "id")))); break;
+            case 9: if (items.Count > 0) items.GetObject(value % items.Count).Set("score", value); break;
+            case 10:
+            {
+                var meta = document.GetObject("meta");
+                meta.Set("revision", Num(meta["revision"]) + 1);
+                meta.Set("label", $"revision-{value}");
+                break;
+            }
+            case 11: document.GetObject("meta").Delete("label"); break;
+            case 12: if (items.Count > 1) items.Set(1, J(items[0].ToJson())); break;
+            default:
+                for (var index = 0; index < Math.Min(2, items.Count); index++) items.Set(index, Item());
+                break;
+        }
+    }
+
+    private sealed record FuzzItem(int Id, string Text, int Score)
+    {
+        public int Score { get; set; } = Score;
+        public JsonValue ToValue() => Obj(("id", Id), ("text", Text), ("score", Score));
+    }
+
+    /// <summary>The plain mutable document upstream mutates alongside the draft.</summary>
+    private sealed class FuzzDocument(List<FuzzItem> items, string text, int revision, string? label)
+    {
+        public void Mutate(int choice, int value)
+        {
+            FuzzItem Item() => new(value, $"item-{value}", value % 7);
+            switch (choice)
+            {
+                case 0: text += $"-{value}"; break;
+                case 1: text = text[Math.Min(2, text.Length)..] + value; break;
+                case 2: items.Add(Item()); break;
+                case 3: items.Insert(0, Item()); break;
+                case 4: if (items.Count > 0) items.RemoveAt(0); break;
+                case 5: if (items.Count > 0) items.RemoveAt(items.Count - 1); break;
+                case 6:
+                {
+                    var index = items.Count == 0 ? 0 : value % (items.Count + 1);
+                    var remove = items.Count == 0 ? 0 : Math.Min(value % 2, items.Count - index);
+                    items.RemoveRange(index, remove);
+                    items.Insert(index, Item());
+                    break;
+                }
+                case 7: items.Reverse(); break;
+                case 8:
+                {
+                    var sorted = items.OrderBy(item => item.Id).ToList();
+                    items.Clear();
+                    items.AddRange(sorted);
+                    break;
+                }
+                case 9: if (items.Count > 0) items[value % items.Count].Score = value; break;
+                case 10:
+                    revision += 1;
+                    label = $"revision-{value}";
+                    break;
+                case 11: label = null; break;
+                case 12: if (items.Count > 1) items[1] = items[0] with { }; break;
+                default:
+                    for (var index = 0; index < Math.Min(2, items.Count); index++) items[index] = Item();
+                    break;
+            }
+        }
+
+        public JsonValue ToValue()
+        {
+            var meta = label is null ? Obj(("revision", revision)) : Obj(("revision", revision), ("label", label));
+            return Obj(("items", JsonValue.Array(items.Select(item => item.ToValue()))), ("text", text), ("meta", meta));
+        }
+    }
+
+    /// <summary>Upstream's expectAliasFree: no container appears twice in one revision.</summary>
+    private static void AssertAliasFree(JsonValue root)
+    {
+        var seen = new Dictionary<JsonValue, string>(ReferenceEqualityComparer.Instance);
+        void Visit(JsonValue current, string path)
+        {
+            if (current is not (JsonObjectValue or JsonArrayValue)) return;
+            if (seen.TryGetValue(current, out var previous)) throw new InvalidOperationException($"container at {path} aliases {previous}");
+            seen[current] = path;
+            if (current is JsonArrayValue array)
+            {
+                for (var index = 0; index < array.Count; index++) Visit(array[index], $"{path}[{index}]");
+                return;
+            }
+            foreach (var (key, value) in (JsonObjectValue)current) Visit(value, $"{path}.{key}");
+        }
+        Visit(root, "$root");
+    }
 
     private enum StateKind { Mutable, Attached, Replica }
 

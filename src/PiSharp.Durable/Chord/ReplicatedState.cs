@@ -4,10 +4,14 @@
 // (state-codec.ts) and service RPC are not part of this file.
 //
 // Concurrency model. JavaScript runs all of this on one thread and relies on reentrancy guards; .NET callers may be on any thread, so
-// each guard becomes an ownership flag taken under a short lock that is never held while user code runs:
+// each guard becomes an ownership flag taken under a short lock that is never held while user code runs (the one exception is a local
+// state's change gate, below):
 // - A state's gate makes every commit atomic: the next value, its sequence and its queued publication (and, for a local state, the
-//   operation application; for an attached state, the cursor check). A subscription registers and queues its hydration under the
-//   same gate, so it hydrates at exactly one sequence and later sees only later sequences.
+//   tracker adoption; for an attached state, the cursor check). A subscription registers and queues its hydration under the same gate,
+//   so it hydrates at exactly one sequence and later sees only later sequences.
+// - A local state's change gate serializes its tracker (upstream's #changing): it is held while a change's mutation runs, which is user
+//   code, through the commit, and released before delivery. Another thread's change or replacement waits for it; the mutating thread's
+//   own nested change or replacement is rejected, as upstream rejects a reentrant one.
 // - Exactly one thread owns a state's publication loop at a time (upstream's #delivering). A commit made while the loop is owned, by
 //   a reentrant callback or by another thread, is queued and delivered by the owner in sequence order, and the committer returns
 //   without listener errors, as an upstream reentrant commit does. Exact (internal) listeners run on the owning thread, synchronously.
@@ -20,6 +24,7 @@
 // ReplicatedState.UnhandledError synchronously instead.
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using PiSharp.Durable.Chord.Delta;
 
@@ -107,20 +112,31 @@ public static class ReplicatedState
 
 /// <summary>
 /// Authoritative in-process state (upstream <c>MutableReplicatedState</c>). Revisions are published atomically with a sequence; the
-/// initial value is sequence 0.
+/// initial value is sequence 0. A <see cref="Tracker"/> owns the revision sequence: <see cref="Change(DurableContext, Action{Draft})"/>
+/// drafts a transaction over the current value and <see cref="Replace"/> takes ownership of a whole new root.
 /// </summary>
 /// <remarks>
-/// Upstream changes state through a transactional draft (<c>change(context, mutate)</c>) and computes the published operations by
-/// diffing (<c>replace</c>). Until the draft tracker and diff are ported, <see cref="Apply"/> publishes a caller-supplied operation batch
-/// and <see cref="Replace"/> publishes a single root replacement; values, sequencing, delivery and error semantics are upstream's.
+/// Changes and replacements of one state are serialized by a per-state change gate held while the mutation runs (upstream relies on its
+/// single thread): another thread's change waits for it, while the mutating thread itself is rejected if it changes or replaces the state
+/// again from inside the mutation. The gate is released before listeners run, so a listener may change the state; that revision is
+/// queued and delivered in sequence order by the delivery owner. A mutation must therefore not block on another thread that changes the
+/// same state.
 /// </remarks>
 public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IReplicatedStateInternals<JsonValue>
 {
+    private const string SynchronousOnly = "Replicated state change callbacks must be synchronous";
+
     private readonly ReplicatedStatePublisher<JsonValue> publisher;
+    private readonly Tracker tracker;
+    // Serializes every use of the tracker (draft, prepare, adopt). Held while a mutation runs, never while listeners run.
+    private readonly Lock changeGate = new();
+    // Guarded by changeGate: true while a mutation runs on the gate's owning thread (upstream's #changing).
+    private bool changing;
 
     internal MutableReplicatedState(JsonValue initial)
     {
         RequireContainer(initial, nameof(initial));
+        tracker = Tracker.Track(initial);
         publisher = new ReplicatedStatePublisher<JsonValue>(initial, ReplicatedState.ReportUnhandled);
     }
 
@@ -128,36 +144,63 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
     public JsonValue Value => publisher.Value;
 
     /// <summary>
-    /// Atomically applies one operation batch (<see cref="DeltaApply.Apply"/>, so untouched subtrees stay shared) and publishes the
-    /// result with exactly these operations. An empty batch publishes nothing. If the batch does not apply, or would leave a root that is
-    /// not an object or array, nothing is published and the error is thrown. Once published, exact-listener failures are thrown: one as
-    /// itself, several as an <see cref="AggregateException"/>; the revision stays committed. The batch must not be mutated afterwards.
+    /// Atomically publishes one synchronous draft mutation (upstream <c>change(context, mutate)</c>). <paramref name="mutate"/> receives
+    /// the root draft (an object or array draft, as the root is); every draft is revoked when it returns, so held handles throw. The
+    /// change is prepared into its exact compact operations (string append/truncate, splices, permutations, sets and deletes) and the
+    /// adopted revision is published with them; untouched subtrees keep their references, and a change that leaves the value deeply equal
+    /// publishes nothing. Values placed through the draft are immutable, so a placement is a copy by value.
     /// </summary>
-    public void Apply(DurableContext context, IReadOnlyList<Op> ops)
+    /// <remarks>
+    /// If <paramref name="mutate"/> throws, the draft is aborted, nothing is published and the exception propagates. An <c>async</c>
+    /// lambda or method is rejected before it runs (upstream rejects a callback returning a promise); changing or replacing this state
+    /// from inside <paramref name="mutate"/> throws <see cref="InvalidOperationException"/> and, unless caught there, rolls the outer
+    /// change back. Once published, exact-listener failures are thrown: one as itself, several as an <see cref="AggregateException"/>; the
+    /// revision stays committed.
+    /// </remarks>
+    public void Change(DurableContext context, Action<Draft> mutate)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(ops);
-        ReplicatedState.ThrowCollected(publisher.Publish(current =>
+        ArgumentNullException.ThrowIfNull(mutate);
+        // An async lambda bound to Action is async void: its continuation would run against revoked drafts and fail unobserved.
+        var asynchronous = mutate.Method.IsDefined(typeof(AsyncStateMachineAttribute), inherit: false);
+        ChangeCore(context, draft =>
         {
-            if (ops.Count == 0) return null;
-            var next = DeltaApply.Apply(current, ops);
-            RequireContainer(next, nameof(ops));
-            return (next, ops);
-        }, context), "Replicated state listeners failed");
+            mutate(draft);
+            return null;
+        }, asynchronous);
     }
 
     /// <summary>
-    /// Atomically takes ownership of <paramref name="value"/> as the next revision (upstream <c>replace</c>); a deeply equal replacement
-    /// publishes nothing. Published as <c>[["r", value]]</c> until the diff is ported (upstream publishes the diff). Listener failures as
-    /// in <see cref="Apply"/>.
+    /// <see cref="Change(DurableContext, Action{Draft})"/> for a mutation that returns a value, which is ignored, as upstream ignores a
+    /// callback's return value. A returned awaitable (<see cref="Task"/>, <see cref="ValueTask"/>, <see cref="ValueTask{TResult}"/> or
+    /// another <see cref="IAsyncResult"/>) is upstream's PromiseLike: its failure is observed, the draft is aborted and the change throws
+    /// <see cref="InvalidOperationException"/> ("must be synchronous").
+    /// </summary>
+    public void Change(DurableContext context, Func<Draft, object?> mutate)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(mutate);
+        ChangeCore(context, mutate, asynchronous: false);
+    }
+
+    /// <summary>
+    /// Atomically takes ownership of <paramref name="value"/> as the next revision (upstream <c>replace</c>, through the tracker's
+    /// <c>prepareReplace</c>): the new value is <paramref name="value"/> itself, published as <c>[["r", value]]</c>, exactly as upstream
+    /// publishes it (upstream does not diff a replacement). A deeply equal replacement keeps the current value and publishes nothing.
+    /// Throws <see cref="InvalidOperationException"/> when called from inside a change mutation. Listener failures as in
+    /// <see cref="Change(DurableContext, Action{Draft})"/>.
     /// </summary>
     public void Replace(DurableContext context, JsonValue value)
     {
         ArgumentNullException.ThrowIfNull(context);
         RequireContainer(value, nameof(value));
-        ReplicatedState.ThrowCollected(publisher.Publish(current =>
-            JsonValue.DeepEquals(current, value) ? null : (value, (IReadOnlyList<Op>)[new ReplaceOp(value)]), context),
-            "Replicated state listeners failed");
+        bool deliver;
+        lock (changeGate)
+        {
+            if (changing) throw new InvalidOperationException("Replicated state cannot be replaced from a change callback");
+            deliver = Commit(tracker.PrepareReplace(value), context);
+        }
+        if (deliver) ReplicatedState.ThrowCollected(publisher.Deliver(), "Replicated state listeners failed");
     }
 
     /// <inheritdoc/>
@@ -169,6 +212,69 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
     (JsonValue Value, long Sequence) IReplicatedStateInternals<JsonValue>.Snapshot() => publisher.Snapshot();
 
     IDisposable IReplicatedStateInternals<JsonValue>.SubscribeSource(Action<IReadOnlyList<Op>, long, DurableContext> listener) => publisher.SubscribeSource(listener);
+
+    private void ChangeCore(DurableContext context, Func<Draft, object?> mutate, bool asynchronous)
+    {
+        bool deliver;
+        lock (changeGate)
+        {
+            if (changing) throw new InvalidOperationException("Replicated state cannot be changed reentrantly from a change callback");
+            if (asynchronous) throw new InvalidOperationException(SynchronousOnly);
+            changing = true;
+            Prepared prepared;
+            try
+            {
+                var change = tracker.BeginChange();
+                try
+                {
+                    var outcome = mutate(change.State);
+                    if (IsAwaitable(outcome))
+                    {
+                        Observe(outcome!);
+                        throw new InvalidOperationException(SynchronousOnly);
+                    }
+                    prepared = change.Prepare();
+                }
+                catch
+                {
+                    change.Abort();
+                    throw;
+                }
+            }
+            finally
+            {
+                changing = false;
+            }
+            deliver = Commit(prepared, context);
+        }
+        if (deliver) ReplicatedState.ThrowCollected(publisher.Deliver(), "Replicated state listeners failed");
+    }
+
+    // Adoption and publication commit together under the publisher's gate; a no-op is adopted (the tracker revision advances) but not
+    // published. Returns whether the caller owns delivery; the caller delivers after releasing the change gate.
+    private bool Commit(Prepared prepared, DurableContext context) => publisher.Commit(_ =>
+    {
+        tracker.Adopt(prepared);
+        return prepared.Ops.IsEmpty ? null : (prepared.Value, prepared.Ops);
+    }, context);
+
+    private static bool IsAwaitable(object? outcome) =>
+        outcome is IAsyncResult or ValueTask ||
+        outcome?.GetType() is { IsGenericType: true } type && type.GetGenericTypeDefinition() == typeof(ValueTask<>);
+
+    // Upstream's `void Promise.resolve(outcome).catch(() => undefined)`: a later failure is observed, never reported as unobserved.
+    // A ValueTask<TResult> or other IAsyncResult has no failure to observe here.
+    private static void Observe(object outcome)
+    {
+        var task = outcome switch
+        {
+            Task pending => pending,
+            ValueTask pending => pending.AsTask(),
+            _ => null,
+        };
+        task?.ContinueWith(static completed => _ = completed.Exception, CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+    }
 
     private static void RequireContainer(JsonValue value, string parameter)
     {
@@ -546,18 +652,30 @@ internal sealed class ReplicatedStatePublisher<T>(T initial, Action<Exception> r
     /// and propagates) and, unless another delivery owns the loop, delivers queued publications. Returns the isolated exact-listener
     /// failures of the publications this call delivered.
     /// </summary>
-    public List<Exception> Publish(Func<T, (T Value, IReadOnlyList<Op> Ops)?> prepare, DurableContext context)
+    public List<Exception> Publish(Func<T, (T Value, IReadOnlyList<Op> Ops)?> prepare, DurableContext context) =>
+        Commit(prepare, context) ? Deliver() : [];
+
+    /// <summary>
+    /// The commit half of <see cref="Publish"/>: <paramref name="prepare"/> runs under the gate. Returns true when this call took
+    /// ownership of the delivery loop; the caller must then call <see cref="Deliver"/>.
+    /// </summary>
+    public bool Commit(Func<T, (T Value, IReadOnlyList<Op> Ops)?> prepare, DurableContext context)
     {
         lock (gate)
         {
-            if (prepare(value) is not { } revision) return [];
+            if (prepare(value) is not { } revision) return false;
             value = revision.Value;
             sequence += 1;
             publications.Enqueue(new Publication(revision.Value, revision.Ops, sequence, context));
-            if (delivering) return [];
+            if (delivering) return false;
             delivering = true;
+            return true;
         }
+    }
 
+    /// <summary>The delivery half of <see cref="Publish"/>, run by the owner of the delivery loop until no publication is queued.</summary>
+    public List<Exception> Deliver()
+    {
         var errors = new List<Exception>();
         try
         {
