@@ -570,8 +570,8 @@
       "lines": 2205,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Draft.cs",
       "phase": "P1",
-      "status": "planned",
-      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005)"
+      "status": "ported",
+      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005): Draft.cs (DraftObject/DraftArray) and Tracker.cs (Tracker, Change, Prepared, emission). Upstream's asserted op sequences are reproduced exactly. Tests: chord.tracker.*, chord.fuzz.tracker-ops-replay-to-value"
     },
     {
       "upstream": "packages/chord/src/delta/diff.ts",
@@ -579,7 +579,8 @@
       "lines": 523,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Diff.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "ported",
+      "note": "DeltaDiff.DiffRevisions with JavaScript identity (containers by reference, scalars by value). Tests: chord.diff.*, chord.fuzz.diff-replays-between-tracked-and-reconstructed-revisions"
     },
     {
       "upstream": "packages/chord/src/delta/apply-immutable-trusted.ts",
@@ -595,7 +596,8 @@
       "lines": 75,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/RevisionValidator.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "ported",
+      "note": "JsonRevisionValidator: JsonValue enforces strict JSON at construction, so validation is the memoized walk. Tests: chord.tracker.revision-validator-skips-validated-containers"
     },
     {
       "upstream": "packages/chord/src/json.ts",
