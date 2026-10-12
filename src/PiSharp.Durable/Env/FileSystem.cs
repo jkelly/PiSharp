@@ -136,3 +136,12 @@ public static class FileSystemExtensions
     public static Task<Result<Unit, FileError>> AppendFileAsync(this IFileSystem fileSystem, string path, string content, DurableContext context) =>
         fileSystem.AppendFileAsync(path, Encoding.UTF8.GetBytes(content), context);
 }
+
+/// <summary>
+/// The environment tools and prompt sections run in (upstream <c>ExecutionEnv</c>, <c>FileSystem &amp; Shell</c>). The Harness builds one per
+/// use through <c>HarnessOptions.Env</c> and hands it to task runtimes. TODO(P9): the Shell half joins with the local execution environment;
+/// until then an environment is its file system.
+/// </summary>
+public interface IExecutionEnv : IFileSystem
+{
+}

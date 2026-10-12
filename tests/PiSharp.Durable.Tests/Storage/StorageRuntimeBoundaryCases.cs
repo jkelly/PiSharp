@@ -10,7 +10,9 @@ using PiSharp.Durable.Storage;
 // - env/node.ts (its file-system half) is PiSharp.Durable/Env/Local/ (LocalFileSystem); its shell half joins PiSharp.Durable.Tools (P9);
 // - storage/jsonl/node.ts is PiSharp.Durable/Storage/Jsonl/Local/ (JsonlStorage.OpenAsync over LocalFileSystem).
 // The portable core (PiSharp.Durable outside Env/, Storage/Jsonl/ and Testing/) references only Contracts and AI, reaches neither the
-// environment nor JSONL nor SQLite, and touches no local file or process API. Testing/ (upstream's separate testing subpath) may use the
+// environment nor JSONL nor SQLite, and touches no local file or process API. Since P6 the core names one environment type, IExecutionEnv,
+// as upstream's core imports ExecutionEnv type-only (erased, so not part of its runtime graph); naming any other environment type is reach
+// (BoundaryEnvironmentUse). Testing/ (upstream's separate testing subpath) may use the
 // portable environment, never a Local/ folder. Portable Env/ and Storage/Jsonl/ files touch no local API and never reach a Local/ folder
 // or PiSharp.Durable.Tools. The Local/ folders may use System.IO but no process API, and do not reach PiSharp.Durable.Tools either.
 internal static partial class Program
@@ -38,7 +40,8 @@ internal static partial class Program
             foreach (var file in BoundaryCoreSources(root, excluded: ["Env", Path.Combine("Storage", "Jsonl"), "Testing"]))
             {
                 var source = File.ReadAllText(file);
-                Check(!source.Contains("PiSharp.Durable.Env", StringComparison.Ordinal), BoundaryRelative(root, file) + " reaches the environment");
+                var reached = BoundaryEnvironmentUse(source);
+                Check(reached is null, BoundaryRelative(root, file) + " reaches the environment: " + reached);
                 Check(!source.Contains("PiSharp.Durable.Storage.Jsonl", StringComparison.Ordinal), BoundaryRelative(root, file) + " reaches JSONL storage");
                 Check(!source.Contains("PiSharp.Durable.Sqlite", StringComparison.Ordinal), BoundaryRelative(root, file) + " reaches SQLite storage");
                 Check(!BoundaryLocalApi.IsMatch(source), BoundaryRelative(root, file) + " uses a local file or process API: " + BoundaryLocalApi.Match(source).Value);
@@ -111,4 +114,30 @@ internal static partial class Program
     }
 
     private static string BoundaryRelative(string root, string file) => Path.GetRelativePath(root, file);
+
+    /// <summary>Environment types the core may name, as upstream's core does through erased <c>import type</c> (types.ts, harness/types.ts
+    /// and harness/scheduler.ts import the type <c>ExecutionEnv</c> only).</summary>
+    private static readonly HashSet<string> BoundaryTypeOnlyEnvironment = new(StringComparer.Ordinal) { "IExecutionEnv" };
+
+    /// <summary>
+    /// How a core source reaches the environment, or null. Upstream's graph follows only runtime imports; a type-only import is erased. C# has
+    /// no erased imports, so a core file may import the portable environment namespace only to name the type-only allow-list: any other
+    /// environment type (Result, FileSystemExtensions, LocalFileSystem, ...) or any qualified environment reference is runtime reach.
+    /// </summary>
+    private static string? BoundaryEnvironmentUse(string source)
+    {
+        var code = Regex.Replace(source, @"//[^\n]*", "");
+        const string import = "using PiSharp.Durable.Env;";
+        var imported = code.Contains(import, StringComparison.Ordinal);
+        if (code.Replace(import, "", StringComparison.Ordinal).Contains("PiSharp.Durable.Env", StringComparison.Ordinal)) return "a qualified reference";
+        if (!imported) return null;
+        foreach (var type in typeof(MemoryStorage).Assembly.GetTypes())
+        {
+            if (type.Namespace is not { } ns || !(ns == "PiSharp.Durable.Env" || ns.StartsWith("PiSharp.Durable.Env.", StringComparison.Ordinal))) continue;
+            if (!type.IsPublic) continue;
+            var name = type.Name.Split('`')[0];
+            if (!BoundaryTypeOnlyEnvironment.Contains(name) && Regex.IsMatch(code, $@"\b{Regex.Escape(name)}\b")) return name;
+        }
+        return null;
+    }
 }
