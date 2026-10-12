@@ -104,7 +104,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Context.cs",
       "phase": "P6",
       "status": "in-progress",
-      "note": "Code complete (ConversationContext: CaptureContextBoundsAsync, ReadContextFromAsync with kept ranges, ReadContextAsync, DeriveContextAsync, ActiveEntriesAsync, OrderToolResults); messages are pi-ai wire JSON. Exercised by harness.tasks.task-runtime.reads-committed-documents-*; harness-context.test.ts is still to port"
+      "note": "Code complete (ConversationContext: CaptureContextBoundsAsync, ReadContextFromAsync with kept ranges, ReadContextAsync, DeriveContextAsync, ActiveEntriesAsync, OrderToolResults); messages are pi-ai wire JSON. Tests: harness.context.* (16 cases on three backends; views identical to upstream on Node) and harness.tasks.task-runtime.reads-committed-documents-*. ActiveEntriesAsync is exercised once view.ts (P10) is ported"
     },
     {
       "upstream": "packages/durable/src/harness/define.ts",
@@ -1029,17 +1029,19 @@
       "upstream": "packages/durable/test/harness-context.test.ts",
       "blobSha1": "d6e9cc3261ae596c2fd086c0b458561789155de2",
       "lines": 712,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessContextCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessContextCases.cs",
       "phase": "P6",
-      "status": "planned"
+      "status": "ported",
+      "note": "harness.context.* (16 cases) on MemoryStorage, plus harness.context.jsonl.* and harness.context.sqlite.* (16 each); countingSetup is CountingStorage over the group storage. Adapted: keeps-returned-views-and-kept-ranges-apart and freezes-kept-entries-deeply (no mutable arrays or freezeJson here: views are ImmutableArrays of immutable JsonValues, so the ports replace the returned arrays / read through fresh copies and keep the final equality checks); the fake-timer case uses ManualTimeProvider and awaits the expiry timer with Eventually because idle waiters resume on the thread pool. Differential check against upstream on Node: 192 views (as-of reads and the 150+20-step pseudo-random transcript) are identical"
     },
     {
       "upstream": "packages/durable/test/harness-conversations.test.ts",
       "blobSha1": "b92e46a178375e9a99abca90891eceb9dc4fa02a",
       "lines": 476,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessConversationsCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessConversationsCases.cs",
       "phase": "P6",
-      "status": "planned"
+      "status": "ported",
+      "note": "harness.conversations.* (12 cases) on MemoryStorage, plus harness.conversations.jsonl.* (12) and harness.conversations.sqlite.* (11; the reopen case needs one reopenable location, so it runs on a SQLite file as upstream does and on a JSONL directory, closing storage before each reopen). Support in Harness/HarnessConversationsSupport.cs. Adapted: the paginates case cannot pass a foreign conversationId (EntryQueryBounds has no conversation field); expect.unreachable() init is a throwing init"
     },
     {
       "upstream": "packages/durable/test/harness-events.test.ts",
