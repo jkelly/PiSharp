@@ -1175,9 +1175,10 @@
       "upstream": "packages/durable/test/harness-tasks-recovery.test.ts",
       "blobSha1": "1c2458773397ea52b11c1fa62075ed2ad62d621c",
       "lines": 886,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessTasksRecoveryCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessTasksRecoveryCases.cs",
       "phase": "P7",
-      "status": "planned"
+      "status": "ported",
+      "note": "harness.tasks-recovery.* (24 of 24 cases; none pending): reopen cases on a SQLite file and the rest on MemoryStorage as upstream, plus harness.tasks-recovery.jsonl.* (all 24, reopening the same directory) and harness.tasks-recovery.sqlite.* (the 18 MemoryStorage cases); 66 cases in all. Helpers in Harness/HarnessRecoverySupport.cs. Crashes are simulated as upstream (abandoned Harness, ControlledStorage.Crash), not by killing a process. Adapted: String(report) is type name plus message; error.cause is Exception.Data[\"cause\"]; the preserves-an-abort-mark case reads the commit log after close. No src fixes were needed"
     },
     {
       "upstream": "packages/durable/test/harness-tasks.test.ts",
