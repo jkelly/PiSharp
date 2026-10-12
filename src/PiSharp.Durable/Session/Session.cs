@@ -338,7 +338,7 @@ public class Session : ISession
     // ─── Lifecycle ──────────────────────────────────────────────────────────
 
     /// <inheritdoc/>
-    public Task CloseAsync(DurableContext context)
+    public virtual Task CloseAsync(DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         Task closed;

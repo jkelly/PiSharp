@@ -114,6 +114,17 @@ public sealed class DurableContext
         return new DurableContext(this, SignalKey, signal is null ? own : CancellationSignal.Any(signal, own));
     }
 
+    /// <summary>Internal: <see cref="WithCancellation"/> for a signal that carries its reason (an owned <c>AbortController</c>'s
+    /// signal), so waiters bound to it fail with that reason.</summary>
+    internal DurableContext WithSignal(CancellationSignal own)
+    {
+        ArgumentNullException.ThrowIfNull(own);
+        return new DurableContext(this, SignalKey, signal is null ? own : CancellationSignal.Any(signal, own));
+    }
+
+    /// <summary>Internal: the signal on the chain, if any.</summary>
+    internal CancellationSignal? Signal => signal;
+
     /// <summary>
     /// Derives a context retaining every value except caller cancellation (<c>withoutAbortSignal</c>). Intended for mandatory cleanup
     /// only.
