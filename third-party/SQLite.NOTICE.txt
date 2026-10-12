@@ -1,0 +1,13 @@
+SQLite
+
+The e_sqlite3 native library (package SQLitePCLRaw.lib.e_sqlite3 2.1.12) is a build of SQLite 3.53.3
+(source id 2026-06-26 20:14:12 d4c0e51e4aeb96955b99185ab9cde75c339e2c29c3f3f12428d364a10d782c62).
+SQLite is in the public domain (https://sqlite.org/copyright.html). Its sources carry this notice in
+place of a license (src/sqlite.h.in at tag version-3.53.3):
+
+** The author disclaims copyright to this source code.  In place of
+** a legal notice, here is a blessing:
+**
+**    May you do good and not evil.
+**    May you find forgiveness for yourself and forgive others.
+**    May you share freely, never taking more than you give.
