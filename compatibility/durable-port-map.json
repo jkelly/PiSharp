@@ -632,9 +632,10 @@
       "upstream": "packages/chord/src/types.ts",
       "blobSha1": "19ac55e745ec5a01519af15c386b16f84b66021e",
       "lines": 339,
-      "pisharp": "src/PiSharp.Durable/Chord/Types.cs",
+      "pisharp": "src/PiSharp.Durable/Chord/ReplicatedStateTypes.cs",
       "phase": "P1",
-      "status": "in-progress"
+      "status": "ported",
+      "note": "The subset pi-durable uses: JsonValue in Chord/JsonValue.cs, replicated-state types in Chord/ReplicatedStateTypes.cs, delta types in Chord/Delta/*.cs. Facet/service/wire types are out of scope (decision 0005)."
     },
     {
       "upstream": "packages/durable/test/chat-support.ts",
