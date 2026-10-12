@@ -42,7 +42,8 @@
       "lines": 327,
       "pisharp": "src/PiSharp.Durable/Env/Env.cs",
       "phase": "P4",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "FileSystem half (P4): Result<TValue, TError>/Unit, FileErrorCode/FileError, FileKind and FileMetadata (upstream FileInfo) in Env.cs; IFileSystem, IBinaryReader, IDirReader and their options in Env/FileSystem.cs, with byte contents and UTF-8 string overloads (FileSystemExtensions). Still to come with P9: TextLineReader/readTextLines, BinaryReader.scanLines/LineScan, watch, createTempDir/createTempFile, cleanup, ExecutionError, Shell, ExecutionEnv. Tests: env.filesystem.*"
     },
     {
       "upstream": "packages/durable/src/env/line-scan.ts",
@@ -64,9 +65,10 @@
       "upstream": "packages/durable/src/env/node.ts",
       "blobSha1": "bb9776e7249280fdc09f4d81ac81b7a5eaaaa629",
       "lines": 1226,
-      "pisharp": "src/PiSharp.Durable.Tools/Env/Node.cs",
+      "pisharp": "src/PiSharp.Durable/Env/Local/LocalFileSystem.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "FileSystem half ported in P4 as LocalFileSystem (System.IO; resolvePath/toFileError equivalents, binary and directory readers, handles shared for rename/delete, FileStream.Flush(true) for fsync, MoveFileEx/rename(2) replacement, brief retries of Windows sharing violations). Env/Local/ is the boundary counterpart of this file. The shell half, watches and text-line readers join as LocalExecutionEnv in src/PiSharp.Durable.Tools (P9). Tests: env.filesystem.*"
     },
     {
       "upstream": "packages/durable/src/errors.ts",
@@ -306,25 +308,28 @@
       "upstream": "packages/durable/src/storage/jsonl/index.ts",
       "blobSha1": "972566abfa4e0bdf7ebe1b5271dafc48c4addf0f",
       "lines": 6,
-      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/Jsonl.cs",
+      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs",
       "phase": "P4",
-      "status": "planned"
+      "status": "ported",
+      "note": "Exports only: JsonlStorage, JsonlStorageOptions, JsonlCorruptionException and JsonlStoragePoisonedException are in namespace PiSharp.Durable.Storage.Jsonl. Tests: storage.jsonl.*"
     },
     {
       "upstream": "packages/durable/src/storage/jsonl/node.ts",
       "blobSha1": "8dac938402d6d5806cf2f9b786867f69c1293c1f",
       "lines": 14,
-      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/Node.cs",
+      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/Local/JsonlStorage.Local.cs",
       "phase": "P4",
-      "status": "planned"
+      "status": "ported",
+      "note": "openNodeJsonlStorage is JsonlStorage.OpenAsync(directory, context, options) over LocalFileSystem (a partial of JsonlStorage in Storage/Jsonl/Local/, the boundary counterpart of this file). Tests: storage.jsonl.opens-through-the-local-adapter"
     },
     {
       "upstream": "packages/durable/src/storage/jsonl/storage.ts",
       "blobSha1": "a059cff8f7b9aaf0f701e22976e59b91f1942ebb",
       "lines": 845,
-      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/Storage.cs",
+      "pisharp": "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs",
       "phase": "P4",
-      "status": "planned"
+      "status": "ported",
+      "note": "JsonlStorage over IFileSystem on MemoryStorage's PrepareCommit/Apply (replay passes the recorded sequence). JsonlCorruptionError/JsonlStoragePoisonedError are exceptions with upstream's messages; file failures are IOExceptions. File names and lines are byte-for-byte upstream's (checked against Pi v1.1.0 writing, fsync-writing, reopening and recovering the same commits); a resolved document copy keeps upstream's {kind, version, value} base. Tests: storage.jsonl.*"
     },
     {
       "upstream": "packages/durable/src/storage/memory.ts",
@@ -416,7 +421,8 @@
       "lines": 511,
       "pisharp": "src/PiSharp.Durable/Testing/EnvConformance.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "File-system cases (P4): EnvConformance.Create(provider) with the binary-reader (read ranges, rename, refusals) and directory-reader cases over IFileSystem; read(0, 1.5) is dropped (integer offsets). Still to come with P9: scanLines, watch, exec and symlink cases. Tests: env.filesystem.conformance.*"
     },
     {
       "upstream": "packages/durable/src/testing/index.ts",
@@ -458,7 +464,7 @@
       "pisharp": "src/PiSharp.Durable/Testing/Types.cs",
       "phase": "P9",
       "status": "in-progress",
-      "note": "Storage half: StorageConformanceProvider, StorageConformanceCase (with Slug), StorageConformanceException; env conformance types join with P9"
+      "note": "Storage half: StorageConformanceProvider, StorageConformanceCase (with Slug), StorageConformanceException. Env half (P4): EnvConformanceProvider over IFileSystem, EnvConformanceCase, EnvConformanceException; shell and symlink options join with the ExecutionEnv in P9"
     },
     {
       "upstream": "packages/durable/src/tools/bash.ts",
@@ -678,7 +684,8 @@
       "lines": 126,
       "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeConformanceCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "File-system half (P4): the env conformance kit on LocalFileSystem (env.filesystem.conformance.*) and \"reads ranges spanning several internal chunks exactly\" (env.filesystem.local.*). Still to come with P9: polling watches, watch limits, shell cases; the FIFO case needs a non-blocking open .NET lacks"
     },
     {
       "upstream": "packages/durable/test/env-node-spill.test.ts",
@@ -694,7 +701,8 @@
       "lines": 1002,
       "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "\"NodeExecutionEnv filesystem\" cases that LocalFileSystem covers, as env.filesystem.local.* (readTextLines, temp files and cleanup left out; non-integer truncation sizes dropped; the FileHandle.sync spy has no analogue; symlink assertions only where links can be created) plus an authored held-open-file case. Still to come with P9: text line reader, shell, spill"
     },
     {
       "upstream": "packages/durable/test/env-truncate.test.ts",
@@ -1173,9 +1181,10 @@
       "upstream": "packages/durable/test/jsonl-storage.test.ts",
       "blobSha1": "cebfb0a69ec892669e3a03cdecbac489d5873a35",
       "lines": 1156,
-      "pisharp": "tests/PiSharp.Durable.Tests/JsonlStorageCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Storage/JsonlStorageCases.cs",
       "phase": "P4",
-      "status": "planned"
+      "status": "ported",
+      "note": "All cases as storage.jsonl.<case> (one case per failure point), with InstrumentedFileSystem (Storage/InstrumentedFileSystem.cs) as the fault-injecting InstrumentedEnv, the conformance kit directly (storage.jsonl.conformance.*) and across reopen (storage.jsonl.reopen.conformance.*). Adapted: the BigInt serialization failure becomes a PrepareCommit rejection. Authored: storage.jsonl.writes-upstream-line-formats"
     },
     {
       "upstream": "packages/durable/test/memory-storage.test.ts",
@@ -1315,7 +1324,7 @@
       "pisharp": "tests/PiSharp.Durable.Tests/Storage/StorageRuntimeBoundaryCases.cs",
       "phase": "P2",
       "status": "ported",
-      "note": "Adapted from the Node import graph to assembly references and source scans (no local file/process API in the portable core, Env/ or Storage/Jsonl/; no PiSharp.Durable.Tools reference). Tests: storage.runtime-boundary.*"
+      "note": "Adapted from the Node import graph to assembly references and source scans. Node-specific files map to Local/ folders (env/node.ts -> Env/Local/, storage/jsonl/node.ts -> Storage/Jsonl/Local/): the portable core touches no local file/process API and reaches neither Env, JSONL nor SQLite; Testing/ may use the portable Env only; portable Env/ and Storage/Jsonl/ never reach Local/ or PiSharp.Durable.Tools; Local/ folders use no process API. Tests: storage.runtime-boundary.*"
     },
     {
       "upstream": "packages/durable/test/storage.bench.ts",
