@@ -16,7 +16,8 @@
       "lines": 208,
       "pisharp": "src/PiSharp.Durable/Documents.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "defineDoc/defineDocFamily as one factory per scope (Documents.DefineSessionDoc ... DefineTaskDocFamily) returning scope-typed tokens; DocDefinition is the erased definition; address, scope, version and migration checks are internal for the Session (P3). Values are JsonObjectValue (no static T). Tests: documents.* (authored); Session-level coverage ports with session-definitions/session-checkpoints-migrations (P3)"
     },
     {
       "upstream": "packages/durable/src/entries.ts",
@@ -24,7 +25,8 @@
       "lines": 34,
       "pisharp": "src/PiSharp.Durable/Entries.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "Entry and Entries.DefineEntry plus the six built-in kinds. Entry data is JsonValue; typed ToolResultEntry/CompactionEntry payloads join with P9/P11. Tests: entries.*"
     },
     {
       "upstream": "packages/durable/src/env/decode.ts",
@@ -72,7 +74,8 @@
       "lines": 28,
       "pisharp": "src/PiSharp.Durable/Errors.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "ReadAfterWriteException, StorageRejectedException, ConversationBusyException with upstream messages. Tests: storage.memory.conformance.copies-stored-document-bases-independently-and-rejects-ambiguous-sources"
     },
     {
       "upstream": "packages/durable/src/harness/agent.ts",
@@ -256,7 +259,8 @@
       "lines": 11,
       "pisharp": "src/PiSharp.Durable/Ids.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "Also holds the Id/Seq/ROOT_CONVERSATION_ID declarations of types.ts: one readonly record struct per kind (ConversationId, EntryId, TaskId, SubmissionId, DocumentId) over long, IDurableId<TSelf>.FromNumber, Seq (not an ID), Ids.FromNumber/SeqFromNumber/RootConversationId. TaskId<Result> typing joins with P7. Tests: types.brands-numeric-ids-by-record-kind-and-carries-task-result-types"
     },
     {
       "upstream": "packages/durable/src/index.ts",
@@ -328,7 +332,8 @@
       "lines": 864,
       "pisharp": "src/PiSharp.Durable/Storage/Memory.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "MemoryStorage with the prepare/apply split (PrepareCommit -> PreparedMemoryCommit.Apply). Immutable records replace clone/freeze; one lock per operation. Tests: storage.memory.*"
     },
     {
       "upstream": "packages/durable/src/storage/scan.ts",
@@ -336,7 +341,8 @@
       "lines": 38,
       "pisharp": "src/PiSharp.Durable/Storage/Scan.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "StorageScan.Start/NextCursor and ScanStart. Tests: storage.memory.conformance.scans-tables-in-either-id-order-and-continues-a-cursor-in-its-order"
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/cloudflare.ts",
@@ -393,7 +399,8 @@
       "lines": 8,
       "pisharp": "src/PiSharp.Durable/Tasks.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "Tasks.DefineTask and DurableTask with the persisted identity (name, version, initial); phases, abort, migrate and hooks need the TaskRuntime (P7)"
     },
     {
       "upstream": "packages/durable/src/testing/assertions.ts",
@@ -441,7 +448,8 @@
       "lines": 1662,
       "pisharp": "src/PiSharp.Durable/Testing/StorageConformance.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "Public kit: StorageConformance.Create(StorageConformanceProvider) returns 24 named cases that assert themselves (no injected runner assertions). Two detachment cases adapted for immutable values. Tests: storage.memory.conformance.*"
     },
     {
       "upstream": "packages/durable/src/testing/types.ts",
@@ -449,7 +457,8 @@
       "lines": 44,
       "pisharp": "src/PiSharp.Durable/Testing/Types.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "Storage half: StorageConformanceProvider, StorageConformanceCase (with Slug), StorageConformanceException; env conformance types join with P9"
     },
     {
       "upstream": "packages/durable/src/tools/bash.ts",
@@ -537,7 +546,8 @@
       "lines": 205,
       "pisharp": "src/PiSharp.Durable/Truncate.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "Truncation.TruncateHead/TruncateHeadOf/Utf8ByteLength/FormatSize and the 2000-line/50KB defaults. Tests: truncate.*"
     },
     {
       "upstream": "packages/durable/src/types.ts",
@@ -545,7 +555,8 @@
       "lines": 1107,
       "pisharp": "src/PiSharp.Durable/Types.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "Records and storage contract ported, split across Types.cs (conversation, entry, submission and task records), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage) and Ids.cs; JSON via ToJson/FromJson with fixed key orders. Tx, Session, CommitPublication, DocumentState/Watch and EntryDraft join with P3; TaskRuntime, PhaseHandler and typed task records with P7. Tests: types.*, storage.memory.*"
     },
     {
       "upstream": "packages/chord/src/context/index.ts",
@@ -689,9 +700,10 @@
       "upstream": "packages/durable/test/env-truncate.test.ts",
       "blobSha1": "7a2f3f5efc064c3799b875835d10baa0eb22a1c6",
       "lines": 98,
-      "pisharp": "tests/PiSharp.Durable.Tests/EnvTruncateCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/TruncateCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported early with truncate.ts; the no-Buffer child process becomes a check of Truncation.Utf8ByteLength against .NET UTF-8 encoding. Tests: truncate.*"
     },
     {
       "upstream": "packages/durable/test/examples/00-conversation.ts",
@@ -1169,9 +1181,10 @@
       "upstream": "packages/durable/test/memory-storage.test.ts",
       "blobSha1": "f01af3ed30928b74220633915f263cc14696b632",
       "lines": 32,
-      "pisharp": "tests/PiSharp.Durable.Tests/MemoryStorageCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Storage/MemoryStorageCases.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "Conformance on MemoryStorage as storage.memory.conformance.<case> plus storage.memory.does-not-expose-retained-state-through-a-prepared-commit; storage.memory.prepare-* are authored for the prepare/apply split"
     },
     {
       "upstream": "packages/durable/test/provider-session-cache-e2e.test.ts",
@@ -1299,9 +1312,10 @@
       "upstream": "packages/durable/test/storage-runtime-boundary.test.ts",
       "blobSha1": "84ef2d51252f0f9d23b9dc788af58c4bcec6e81c",
       "lines": 48,
-      "pisharp": "tests/PiSharp.Durable.Tests/StorageRuntimeBoundaryCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Storage/StorageRuntimeBoundaryCases.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "Adapted from the Node import graph to assembly references and source scans (no local file/process API in the portable core, Env/ or Storage/Jsonl/; no PiSharp.Durable.Tools reference). Tests: storage.runtime-boundary.*"
     },
     {
       "upstream": "packages/durable/test/storage.bench.ts",
@@ -1358,7 +1372,8 @@
       "lines": 346,
       "pisharp": "tests/PiSharp.Durable.Tests/TypesCases.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "Runtime parts ported: ID kinds, and every @ts-expect-error shape rejected by FromJson/Validate. The Harness typing test (submissions, task waits, compaction, extensions) joins with P6-P8. Tests: types.*"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/harness-setup.ts",

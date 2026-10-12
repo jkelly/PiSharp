@@ -1,0 +1,20 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/testing/types.ts (the storage half; the ExecutionEnv conformance
+// types join with the environment in P9). Upstream injects runner assertions; these cases assert themselves and fail by throwing
+// StorageConformanceException, which any test runner reports.
+namespace PiSharp.Durable.Testing;
+
+/// <summary>Calls <c>use</c> exactly once with a storage for one case and awaits it, then releases the storage. A provider may hand out a
+/// fresh backend, or one that is closed and reopened between operations to run the suite across reopen.</summary>
+public delegate Task StorageConformanceProvider(Func<IStorage, Task> use);
+
+/// <summary>One runner-independent storage conformance case.</summary>
+/// <param name="Name">Upstream's case name.</param>
+/// <param name="Run">Runs the case against a storage from the provider.</param>
+public sealed record StorageConformanceCase(string Name, Func<Task> Run)
+{
+    /// <summary>The name as a lowercase, hyphen-separated identifier, for test IDs.</summary>
+    public string Slug => System.Text.RegularExpressions.Regex.Replace(Name.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+}
+
+/// <summary>A storage conformance assertion failed.</summary>
+public sealed class StorageConformanceException(string message) : Exception(message);
