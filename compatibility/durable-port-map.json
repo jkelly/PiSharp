@@ -561,7 +561,8 @@
       "lines": 694,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Ops.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ops, validation, overlap, apply/applyImmutable(Batches) and codec. Tests: chord.delta.*, chord.apply-immutable.*"
     },
     {
       "upstream": "packages/chord/src/delta/tracker.ts",
@@ -602,7 +603,8 @@
       "lines": 120,
       "pisharp": "src/PiSharp.Durable/Chord/JsonValue.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "ported",
+      "note": "Immutable JsonValue with JavaScript key order, number and string semantics; copyJson/isJsonValue are unnecessary for immutable values. Tests: chord.json.*"
     },
     {
       "upstream": "packages/chord/src/services/state.ts",
@@ -626,7 +628,7 @@
       "lines": 339,
       "pisharp": "src/PiSharp.Durable/Chord/Types.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "in-progress"
     },
     {
       "upstream": "packages/durable/test/chat-support.ts",
