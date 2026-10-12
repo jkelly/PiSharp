@@ -1142,9 +1142,10 @@
       "upstream": "packages/durable/test/harness-structured.test.ts",
       "blobSha1": "f061e1055d819234267979e559531293025b7f11",
       "lines": 1712,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessStructuredCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs",
       "phase": "P7",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "41 of 51 upstream tests ported (39 of 49 it() sites; two sites are parameterized into two tests each), as harness.structured.* (41 cases) on MemoryStorage with SQLite reopen for the recovery describes, harness.structured.jsonl.* (41, JSONL reopen) and harness.structured.sqlite.* (33, no reopen); support in Harness/HarnessStructuredSupport.cs. 10 pending until P8/P9: the 5 tests of 'tool rounds' and the 5 of 'tool rounds and events' need faux models, generation and tool tasks (P8) and watchEvents (P9). Adapted: per-case Nodes fixture instead of module state; deferred barrier where a script reads the parent ID the test assigns after start(); Committed barrier for handler-assigned IDs; settled(...)=true awaits the task; a null TaskOptions ownership for upstream's {} (NullReferenceException for TypeError); Rejecting storage is a decorator"
     },
     {
       "upstream": "packages/durable/test/harness-submissions.test.ts",
