@@ -4,10 +4,9 @@
 // serialization gives SQLite and JSONL (spec §4, §11.1). Records and JSON values here are immutable, so sharing them is already detached:
 // no caller can change a retained value or a read result, and the copies are omitted. Upstream runs on one JavaScript thread; this port
 // takes one lock per operation so that concurrent reads never observe a half-applied commit. The Session still serializes commits.
+// The batch validation, addressing and paging rules are shared with SqliteStorage (StorageRules.cs).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
-using PiSharp.Durable.Chord.Delta;
-using PiSharp.Durable.Internal;
 
 namespace PiSharp.Durable.Storage;
 
@@ -53,21 +52,12 @@ public sealed class PreparedMemoryCommit
 /// </summary>
 public sealed class MemoryStorage : IStorage
 {
-    private enum TableName { Conversation, Entry, Task, Submission, Document }
-
     private sealed record Revision(DocumentContent Content, Seq Seq);
 
     private sealed class StoredDocumentState(DocumentRecord record, List<Revision> revisions)
     {
         public DocumentRecord Record { get; set; } = record;
         public List<Revision> Revisions { get; set; } = revisions;
-    }
-
-    private sealed class DocumentAction
-    {
-        public DocumentCreate? Create { get; set; }
-        public DocumentContent? Content { get; set; }
-        public bool Retire { get; set; }
     }
 
     private sealed class DocumentAddressIndex
@@ -77,7 +67,7 @@ public sealed class MemoryStorage : IStorage
     }
 
     private readonly Lock gate = new();
-    private readonly Dictionary<long, TableName> recordTypes = [];
+    private readonly Dictionary<long, StorageTable> recordTypes = [];
     private readonly Dictionary<long, ConversationRecord> conversations = [];
     private readonly List<long> conversationIds = [];
     private readonly Dictionary<long, List<long>> conversationIdsByOwnerConversation = [];
@@ -116,9 +106,11 @@ public sealed class MemoryStorage : IStorage
                 throw new InvalidOperationException($"Commit sequence {commitSeq} does not strictly increase");
             foreach (var write in writes) ArgumentNullException.ThrowIfNull(write, nameof(writes));
             var detached = ResolveDocumentCopies(writes);
-            CheckGlobalIds(detached);
-            var actions = PrepareDocumentActions(detached);
-            CheckDocumentActions(actions);
+            StorageRules.CheckGlobalIds(detached, id => recordTypes.TryGetValue(id, out var table) ? table : null);
+            var actions = StorageRules.PrepareDocumentActions(detached);
+            StorageRules.CheckDocumentActions(actions,
+                id => documents.TryGetValue(id, out var stored) ? new DocumentCheckState(stored.Record, stored.Revisions.LastOrDefault()?.Content.Version) : null,
+                key => documentAddresses.GetValueOrDefault(key)?.CurrentId);
             return new PreparedMemoryCommit(gate, commitSeq, detached, () => ApplyPreparedCommit(detached, actions, commitSeq));
         }
     }
@@ -147,11 +139,7 @@ public sealed class MemoryStorage : IStorage
                     throw new InvalidOperationException($"Fork source document {sourceId} is changed in the copy batch");
                 var stored = MaterializeDocument(sourceId, copy.Source.At) ??
                     throw new InvalidOperationException($"Fork source document {sourceId} cannot be read");
-                if (stored.Record.Scope.Kind != DocumentScopeKind.Conversation || copy.Record.Scope.Kind != DocumentScopeKind.Conversation ||
-                    !string.Equals(stored.Record.Kind, copy.Record.Kind, StringComparison.Ordinal) ||
-                    !string.Equals(stored.Record.Key, copy.Record.Key, StringComparison.Ordinal) ||
-                    stored.Record.History != copy.Record.History || stored.Record.Fork != copy.Record.Fork)
-                    throw new InvalidOperationException($"Fork source document {sourceId} does not match the copied record");
+                StorageRules.CheckCopySource(stored, copy.Record);
                 return (StorageWrite)new DocumentCreateWrite(copy.Record, DocumentContent.Base(stored.Version, stored.Value));
             }
             catch (StorageRejectedException) { throw; }
@@ -159,7 +147,7 @@ public sealed class MemoryStorage : IStorage
         })];
     }
 
-    private void ApplyPreparedCommit(ImmutableArray<StorageWrite> prepared, OrderedDictionary<long, DocumentAction> documentActions, Seq seq)
+    private void ApplyPreparedCommit(ImmutableArray<StorageWrite> prepared, OrderedDictionary<long, DocumentBatchAction> documentActions, Seq seq)
     {
         foreach (var write in prepared)
         {
@@ -168,7 +156,7 @@ public sealed class MemoryStorage : IStorage
                 case ConversationWrite { Value: var value }:
                 {
                     var id = value.Id.Value;
-                    recordTypes[id] = TableName.Conversation;
+                    recordTypes[id] = StorageTable.Conversation;
                     conversations[id] = value;
                     InsertSorted(conversationIds, id);
                     if (value.Owner is { } owner)
@@ -182,7 +170,7 @@ public sealed class MemoryStorage : IStorage
                 case EntryWrite { Value: var value }:
                 {
                     var id = value.Id.Value;
-                    recordTypes[id] = TableName.Entry;
+                    recordTypes[id] = StorageTable.Entry;
                     entries[id] = value;
                     entryCommitSeqs[id] = seq;
                     InsertMapId(entryIds, value.ConversationId.Value, id);
@@ -193,7 +181,7 @@ public sealed class MemoryStorage : IStorage
                 case TaskWrite { Value: var value }:
                 {
                     var id = value.Id.Value;
-                    recordTypes[id] = TableName.Task;
+                    recordTypes[id] = StorageTable.Task;
                     if (!tasks.TryGetValue(id, out var previous))
                     {
                         InsertSorted(taskIds, id);
@@ -211,7 +199,7 @@ public sealed class MemoryStorage : IStorage
                 case SubmissionWrite { Value: var value }:
                 {
                     var id = value.Id.Value;
-                    recordTypes[id] = TableName.Submission;
+                    recordTypes[id] = StorageTable.Submission;
                     submissions.TryGetValue(id, out var previous);
                     if (previous is null)
                     {
@@ -279,7 +267,7 @@ public sealed class MemoryStorage : IStorage
             if (query.OwnerConversationId is { } owner && value.Owner?.ConversationId != owner) continue;
             values.Add(value);
         }
-        return MakePage(values, limit, start.Order, value => value.Id.Value);
+        return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
     });
 
     /// <inheritdoc/>
@@ -327,7 +315,7 @@ public sealed class MemoryStorage : IStorage
             visible.Add(entry);
             if (visible.Count > limit) break;
         }
-        return MakePage(visible, limit, order, entry => entry.Id.Value);
+        return StorageRules.MakePage(visible, limit, order, entry => entry.Id.Value);
     });
 
     /// <inheritdoc/>
@@ -350,7 +338,7 @@ public sealed class MemoryStorage : IStorage
             if (query.Background is { } background && value.Background != background) continue;
             values.Add(value);
         }
-        return MakePage(values, limit, start.Order, value => value.Id.Value);
+        return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
     });
 
     /// <inheritdoc/>
@@ -370,7 +358,7 @@ public sealed class MemoryStorage : IStorage
             if (query.ConversationId is { } conversationId && value.ConversationId != conversationId) continue;
             values.Add(value);
         }
-        return MakePage(values, limit, start.Order, value => value.Id.Value);
+        return StorageRules.MakePage(values, limit, start.Order, value => value.Id.Value);
     });
 
     /// <inheritdoc/>
@@ -385,12 +373,12 @@ public sealed class MemoryStorage : IStorage
     public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) => Read(() =>
     {
         ArgumentNullException.ThrowIfNull(address);
-        var index = documentAddresses.GetValueOrDefault(AddressKey(address.Kind, address.Scope, address.Key));
+        var index = documentAddresses.GetValueOrDefault(StorageRules.AddressKey(address.Kind, address.Scope, address.Key));
         if (at.IsCurrent) return index?.CurrentId is { } currentId ? documents[currentId].Record : null;
         foreach (var id in index?.Ids ?? [])
         {
             var record = documents[id].Record;
-            if (IsAliveAt(record, at)) return record;
+            if (StorageRules.IsAliveAt(record, at)) return record;
         }
         return null;
     });
@@ -402,16 +390,16 @@ public sealed class MemoryStorage : IStorage
     public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) => Read(() =>
     {
         ArgumentNullException.ThrowIfNull(query);
-        var ids = documentIdsByScope.GetValueOrDefault(ScopeKey(query.Scope)) ?? [];
-        var after = CursorId(cursor);
+        var ids = documentIdsByScope.GetValueOrDefault(StorageRules.ScopeKey(query.Scope)) ?? [];
+        var after = StorageRules.CursorId(cursor);
         var values = new List<DocumentRecord>();
         for (var index = after is { } last ? UpperBound(ids, last) : 0; index < ids.Count && values.Count <= limit; index++)
         {
             var record = documents[ids[index]].Record;
             if (query.Kind is { } kind && !string.Equals(record.Kind, kind, StringComparison.Ordinal)) continue;
-            if (IsAliveAt(record, query.At)) values.Add(record);
+            if (StorageRules.IsAliveAt(record, query.At)) values.Add(record);
         }
-        return MakePage(values, limit, ScanOrder.Ascending, record => record.Id.Value);
+        return StorageRules.MakePage(values, limit, ScanOrder.Ascending, record => record.Id.Value);
     });
 
     /// <inheritdoc/>
@@ -424,27 +412,17 @@ public sealed class MemoryStorage : IStorage
     private StoredDocument? MaterializeDocument(DocumentId id, DocumentPoint at)
     {
         if (!documents.TryGetValue(id.Value, out var stored)) return null;
-        if (!at.IsCurrent && IsCurrentOnly(stored.Record))
+        if (!at.IsCurrent && StorageRules.IsCurrentOnly(stored.Record))
             throw new InvalidOperationException($"Document {id} does not retain historical content");
-        if (!IsAliveAt(stored.Record, at)) return null;
+        if (!StorageRules.IsAliveAt(stored.Record, at)) return null;
         var revisions = at.Seq is { } seq ? [.. stored.Revisions.Where(revision => revision.Seq <= seq)] : stored.Revisions;
         var baseIndex = revisions.Count - 1;
         while (baseIndex >= 0 && revisions[baseIndex].Content is not DocumentBase) baseIndex--;
         if (baseIndex < 0 || revisions[baseIndex].Content is not DocumentBase documentBase)
             throw new InvalidOperationException($"Document {id} is missing a required base");
-        var value = DeltaApply.ApplyBatches(documentBase.Value, DocumentDeltaBatches(id, documentBase.Version, revisions, baseIndex + 1));
-        if (value is not JsonObjectValue valueObject) throw new InvalidOperationException($"Document {id} does not replay to a JSON object");
-        return new StoredDocument(stored.Record, documentBase.Version, valueObject, revisions.Count - baseIndex - 1);
-    }
-
-    private static IEnumerable<IEnumerable<Op>> DocumentDeltaBatches(DocumentId id, int version, List<Revision> revisions, int start)
-    {
-        for (var index = start; index < revisions.Count; index++)
-        {
-            if (revisions[index].Content is not DocumentDelta delta || delta.Version != version)
-                throw new InvalidOperationException($"Document {id} crosses a stored version boundary without a base");
-            yield return delta.Ops;
-        }
+        var value = StorageRules.Replay(id, documentBase.Version, documentBase.Value, revisions.Skip(baseIndex + 1),
+            revision => (revision.Content is DocumentDelta, revision.Content.Version), revision => ((DocumentDelta)revision.Content).Ops);
+        return new StoredDocument(stored.Record, documentBase.Version, value, revisions.Count - baseIndex - 1);
     }
 
     private IEnumerable<EntryRecord> VisibleEntries(ConversationId conversationId, long minEntryId, long maxEntryId)
@@ -508,103 +486,7 @@ public sealed class MemoryStorage : IStorage
         }
     }
 
-    private void CheckGlobalIds(ImmutableArray<StorageWrite> writes)
-    {
-        var claimed = new Dictionary<long, TableName>();
-        foreach (var write in writes)
-        {
-            (TableName Table, long Id)? claim = write switch
-            {
-                ConversationWrite conversation => (TableName.Conversation, conversation.Value.Id.Value),
-                EntryWrite entry => (TableName.Entry, entry.Value.Id.Value),
-                TaskWrite task => (TableName.Task, task.Value.Id.Value),
-                SubmissionWrite submission => (TableName.Submission, submission.Value.Id.Value),
-                DocumentCreateWrite create => (TableName.Document, create.Record.Id.Value),
-                DocumentCopyWrite copy => (TableName.Document, copy.Record.Id.Value),
-                _ => null, // document.change and document.retire claim no ID
-            };
-            if (claim is not { } claimedId) continue;
-            var (table, id) = claimedId;
-            var hasExisting = recordTypes.TryGetValue(id, out var existing);
-            var hasEarlier = claimed.TryGetValue(id, out var earlier);
-            if (table is TableName.Conversation or TableName.Entry or TableName.Document)
-            {
-                if (hasExisting) throw new InvalidOperationException($"ID {id} already belongs to {Name(existing)}");
-                if (hasEarlier) throw new InvalidOperationException($"ID {id} is written more than once");
-            }
-            else
-            {
-                if (hasExisting && existing != table) throw new InvalidOperationException($"ID {id} already belongs to {Name(existing)}");
-                if (hasEarlier && earlier != table) throw new InvalidOperationException($"ID {id} is written as two record types");
-            }
-            claimed[id] = table;
-        }
-    }
-
-    private static OrderedDictionary<long, DocumentAction> PrepareDocumentActions(ImmutableArray<StorageWrite> writes)
-    {
-        var actions = new OrderedDictionary<long, DocumentAction>();
-        foreach (var write in writes)
-        {
-            var id = write switch
-            {
-                DocumentCreateWrite create => create.Record.Id,
-                DocumentChangeWrite change => change.Id,
-                DocumentRetireWrite retire => retire.Id,
-                _ => (DocumentId?)null,
-            };
-            if (id is not { } documentId) continue;
-            if (!actions.TryGetValue(documentId.Value, out var action)) actions.Add(documentId.Value, action = new DocumentAction());
-            switch (write)
-            {
-                case DocumentCreateWrite create:
-                    if (action.Create is not null || action.Content is not null)
-                        throw new InvalidOperationException($"Document {documentId} has more than one content command");
-                    action.Create = create.Record;
-                    action.Content = create.Content;
-                    break;
-                case DocumentChangeWrite change:
-                    if (action.Content is not null) throw new InvalidOperationException($"Document {documentId} has more than one content command");
-                    action.Content = change.Content;
-                    break;
-                default:
-                    if (action.Retire) throw new InvalidOperationException($"Document {documentId} is retired more than once");
-                    action.Retire = true;
-                    break;
-            }
-        }
-        return actions;
-    }
-
-    private void CheckDocumentActions(OrderedDictionary<long, DocumentAction> actions)
-    {
-        var liveCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var (id, action) in actions)
-        {
-            documents.TryGetValue(id, out var existing);
-            if (action.Create is null && existing is null) throw new InvalidOperationException($"Unknown document: {id}");
-            if (action.Create is not null && existing is not null) throw new InvalidOperationException($"Document {id} already exists");
-            if (existing?.Record.RetiredAt is not null) throw new InvalidOperationException($"Document {id} is retired");
-            var previous = existing?.Revisions.LastOrDefault();
-            if (action.Content is DocumentDelta delta)
-            {
-                if (previous is null) throw new InvalidOperationException($"Document {id} delta has no base");
-                if (previous.Content.Version != delta.Version) throw new InvalidOperationException($"Document {id} version transition requires a base");
-            }
-
-            IDocumentDescriptor descriptor = action.Create is not null ? action.Create : existing!.Record;
-            var key = AddressKey(descriptor.Kind, descriptor.Scope, descriptor.Key);
-            var currentId = documentAddresses.GetValueOrDefault(key)?.CurrentId;
-            if (!liveCounts.TryGetValue(key, out var live)) live = currentId is null ? 0 : 1;
-            if (action.Retire && currentId == id) live--;
-            if (action.Create is not null && !action.Retire) live++;
-            liveCounts[key] = live;
-        }
-        foreach (var live in liveCounts.Values)
-            if (live > 1) throw new InvalidOperationException("Document address already has a current incarnation");
-    }
-
-    private void ApplyDocumentActions(OrderedDictionary<long, DocumentAction> actions, Seq seq)
+    private void ApplyDocumentActions(OrderedDictionary<long, DocumentBatchAction> actions, Seq seq)
     {
         foreach (var (id, action) in actions)
         {
@@ -613,12 +495,12 @@ public sealed class MemoryStorage : IStorage
             {
                 var record = action.Create.ToRecord(seq, action.Retire ? seq : null);
                 stored = new StoredDocumentState(record, [new Revision(action.Content!, seq)]);
-                recordTypes[id] = TableName.Document;
+                recordTypes[id] = StorageTable.Document;
                 documents[id] = stored;
-                var key = AddressKey(record.Kind, record.Scope, record.Key);
+                var key = StorageRules.AddressKey(record.Kind, record.Scope, record.Key);
                 if (!documentAddresses.TryGetValue(key, out var address)) documentAddresses[key] = address = new DocumentAddressIndex();
                 InsertSorted(address.Ids, id);
-                var scopeKey = ScopeKey(record.Scope);
+                var scopeKey = StorageRules.ScopeKey(record.Scope);
                 if (!documentIdsByScope.TryGetValue(scopeKey, out var scopeIds)) documentIdsByScope[scopeKey] = scopeIds = [];
                 InsertSorted(scopeIds, id);
                 nextId = Math.Max(nextId, id + 1);
@@ -629,16 +511,16 @@ public sealed class MemoryStorage : IStorage
                 if (action.Content is not null)
                 {
                     var revision = new Revision(action.Content, seq);
-                    if (action.Content is DocumentBase && IsCurrentOnly(stored.Record)) stored.Revisions = [revision];
+                    if (action.Content is DocumentBase && StorageRules.IsCurrentOnly(stored.Record)) stored.Revisions = [revision];
                     else stored.Revisions.Add(revision);
                 }
             }
 
             if (action.Retire && action.Create is null) stored.Record = stored.Record with { RetiredAt = seq };
-            if (action.Retire && IsCurrentOnly(stored.Record)) stored.Revisions = [];
+            if (action.Retire && StorageRules.IsCurrentOnly(stored.Record)) stored.Revisions = [];
             if (action.Create is not null || action.Retire)
             {
-                var address = documentAddresses[AddressKey(stored.Record.Kind, stored.Record.Scope, stored.Record.Key)];
+                var address = documentAddresses[StorageRules.AddressKey(stored.Record.Kind, stored.Record.Scope, stored.Record.Key)];
                 if (action.Retire && address.CurrentId == id) address.CurrentId = null;
                 if (action.Create is not null && !action.Retire) address.CurrentId = id;
             }
@@ -666,24 +548,6 @@ public sealed class MemoryStorage : IStorage
         catch (Exception error) { return Task.FromException<T>(error); }
     }
 
-    private static string Name(TableName table) => WireName.Of(table);
-
-    private static long? CursorId(JsonObjectValue? cursor)
-    {
-        if (cursor is null || !cursor.TryGetValue("after", out var after)) return null;
-        if (after is not JsonNumberValue { Value: var number } || Math.Floor(number) != number || Math.Abs(number) > Ids.MaxSafeInteger)
-            throw new ArgumentException("Invalid storage cursor");
-        return (long)number;
-    }
-
-    private static Page<T> MakePage<T>(List<T> values, int limit, ScanOrder order, Func<T, long> id)
-    {
-        if (limit < 0 || (limit == 0 && values.Count > 0))
-            throw new ArgumentOutOfRangeException(nameof(limit), limit, "A scan that returns items needs a positive limit");
-        var items = values.Count <= limit ? [.. values] : values.Take(limit).ToImmutableArray();
-        return values.Count <= limit ? new(items, null) : new(items, StorageScan.NextCursor(id(items[^1]), order));
-    }
-
     /// <summary>Indexes of sorted <paramref name="ids"/> in scan order, after the cursor's ID when there is one.</summary>
     private static IEnumerable<int> ScanIndexes(IReadOnlyList<long> ids, ScanStart start)
     {
@@ -696,24 +560,6 @@ public sealed class MemoryStorage : IStorage
             for (var index = (start.After is { } after ? LowerBound(ids, after) : ids.Count) - 1; index >= 0; index--) yield return index;
         }
     }
-
-    private static string ScopeKey(DocumentScope scope) => scope.Kind switch
-    {
-        DocumentScopeKind.Session => JsonValue.Array(JsonValue.String("session")).ToJson(),
-        DocumentScopeKind.Conversation => JsonValue.Array(JsonValue.String("conversation"), JsonValue.Number(scope.OwnerId)).ToJson(),
-        _ => JsonValue.Array(JsonValue.String("task"), JsonValue.Number(scope.OwnerId)).ToJson(),
-    };
-
-    private static string AddressKey(string kind, DocumentScope scope, string? key) => JsonValue.Array(
-        JsonValue.String(kind), JsonValue.String(ScopeKey(scope)),
-        key is null ? JsonValue.Array(JsonValue.String("singleton")) : JsonValue.Array(JsonValue.String("family"), JsonValue.String(key))).ToJson();
-
-    private static bool IsAliveAt(DocumentRecord record, DocumentPoint at) => at.Seq is not { } seq
-        ? record.RetiredAt is null
-        : record.CreatedAt <= seq && (record.RetiredAt is not { } retiredAt || seq < retiredAt);
-
-    private static bool IsCurrentOnly(DocumentRecord record) =>
-        record.Scope.Kind != DocumentScopeKind.Conversation || record.History == DocumentHistory.Latest;
 
     private static int LowerBound(IReadOnlyList<long> ids, long target)
     {
