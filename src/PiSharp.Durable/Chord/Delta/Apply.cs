@@ -14,7 +14,13 @@ public static class DeltaApply
     public static JsonValue Apply(JsonValue? target, IEnumerable<Op> ops) => ApplyBatches(target, [ops]);
 
     /// <summary>Applies batches as one final-result-only replay. Nothing partial is exposed: a failure throws before any result.</summary>
-    public static JsonValue ApplyBatches(JsonValue? target, IEnumerable<IEnumerable<Op>> batches)
+    public static JsonValue ApplyBatches(JsonValue? target, IEnumerable<IEnumerable<Op>> batches) => ApplyBatches(target, batches, trusted: false);
+
+    /// <summary>
+    /// The shared replay. <paramref name="trusted"/> (applyImmutableTrusted, see <see cref="DeltaApplyTrusted"/>) skips the path-safety
+    /// check for operations this process produced and already validated; resolution failures still throw.
+    /// </summary>
+    internal static JsonValue ApplyBatches(JsonValue? target, IEnumerable<IEnumerable<Op>> batches, bool trusted)
     {
         ArgumentNullException.ThrowIfNull(batches);
         object? root = target;
@@ -26,7 +32,7 @@ public static class DeltaApply
                 ArgumentNullException.ThrowIfNull(op);
                 if (op is ReplaceOp replace) { root = replace.Value; continue; }
                 var path = ((PathOp)op).Path;
-                DeltaValidation.AssertSafePath(path);
+                if (!trusted) DeltaValidation.AssertSafePath(path);
                 var containerPath = op is SpliceOp or MoveOp ? path : path[..^1];
                 root = Own(root, containerPath, path);
                 ApplyOne((Work)root, op, path);

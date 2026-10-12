@@ -553,7 +553,8 @@
       "lines": 121,
       "pisharp": "src/PiSharp.Durable/Chord/DurableContext.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "ported",
+      "note": "DurableContext + ContextKey<T>; AbortSignal is a CancellationToken plus a reason (WithCancel). Tests: chord.context.*"
     },
     {
       "upstream": "packages/chord/src/delta/index.ts",
@@ -587,7 +588,8 @@
       "lines": 128,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/ApplyImmutableTrusted.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "ported",
+      "note": "Internal option of DeltaApply (DeltaApplyTrusted): skips the path-safety scan; immutable values make it otherwise the same applier. Tests: chord.apply-immutable-trusted.*"
     },
     {
       "upstream": "packages/chord/src/delta/revision-validator.ts",
@@ -612,15 +614,17 @@
       "lines": 457,
       "pisharp": "src/PiSharp.Durable/Chord/ReplicatedState.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "Publisher, subscriber, attached source state and replica ported in process; MutableReplicatedState publishes caller op batches (Apply) and root replacements (Replace) until the draft tracker and diff land, so change(context, mutate) is pending. Tests: chord.state.*"
     },
     {
       "upstream": "packages/chord/src/services/state-internals.ts",
       "blobSha1": "ed5c1ff0e327163eb40dc69c92cd8216273b40e0",
       "lines": 19,
-      "pisharp": "src/PiSharp.Durable/Chord/ReplicatedState.cs",
+      "pisharp": "src/PiSharp.Durable/Chord/ReplicatedStateInternals.cs",
       "phase": "P1",
-      "status": "planned"
+      "status": "ported",
+      "note": "Internal interface instead of a WeakMap. Tests: chord.state.* (exact listeners and snapshots)"
     },
     {
       "upstream": "packages/chord/src/types.ts",
