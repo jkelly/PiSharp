@@ -200,7 +200,7 @@ public abstract record StorageWrite
 }
 
 /// <summary><c>{type: "conversation", value}</c>: creates a conversation; conversations are immutable.</summary>
-public sealed record ConversationWrite(ConversationRecord Value) : StorageWrite
+public sealed record ConversationWrite(ConversationRecord Value) : StorageWrite, ICommitChange
 {
     /// <inheritdoc/>
     public override string Type => "conversation";
@@ -209,7 +209,7 @@ public sealed record ConversationWrite(ConversationRecord Value) : StorageWrite
 }
 
 /// <summary><c>{type: "entry", value}</c>: appends an entry; entries are immutable.</summary>
-public sealed record EntryWrite(EntryRecord Value) : StorageWrite
+public sealed record EntryWrite(EntryRecord Value) : StorageWrite, ICommitChange
 {
     /// <inheritdoc/>
     public override string Type => "entry";
@@ -218,7 +218,7 @@ public sealed record EntryWrite(EntryRecord Value) : StorageWrite
 }
 
 /// <summary><c>{type: "task", value}</c>: creates or completely replaces a task record.</summary>
-public sealed record TaskWrite(TaskRecord Value) : StorageWrite
+public sealed record TaskWrite(TaskRecord Value) : StorageWrite, ICommitChange
 {
     /// <inheritdoc/>
     public override string Type => "task";
@@ -227,7 +227,7 @@ public sealed record TaskWrite(TaskRecord Value) : StorageWrite
 }
 
 /// <summary><c>{type: "submission", value}</c>: creates or completely replaces a submission record.</summary>
-public sealed record SubmissionWrite(SubmissionRecord Value) : StorageWrite
+public sealed record SubmissionWrite(SubmissionRecord Value) : StorageWrite, ICommitChange
 {
     /// <inheritdoc/>
     public override string Type => "submission";

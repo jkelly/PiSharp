@@ -26,7 +26,7 @@
       "pisharp": "src/PiSharp.Durable/Entries.cs",
       "phase": "P2",
       "status": "ported",
-      "note": "Entry and Entries.DefineEntry plus the six built-in kinds. Entry data is JsonValue; typed ToolResultEntry/CompactionEntry payloads join with P9/P11. Tests: entries.*"
+      "note": "Entry (a data-less kind, upstream Entry<never>), Entry<TData> where TData : JsonValue (P3) and Entries.DefineEntry/DefineEntry<TData> plus the six built-in kinds; ToolResultEntry and CompactionEntry carry a JsonObjectValue until their typed payloads join with P9/P11. Tests: entries.*, session.definitions.appends-and-reads-typed-entries"
     },
     {
       "upstream": "packages/durable/src/env/decode.ts",
@@ -278,7 +278,8 @@
       "lines": 97,
       "pisharp": "src/PiSharp.Durable/Session/Forks.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "prepareForkDocumentCopies as Forks.PrepareForkDocumentCopiesAsync (internal); asOf copies from the entry-owning ancestor at the entry's commit, current copies from the parent's current state. Tests: session.forks.*"
     },
     {
       "upstream": "packages/durable/src/session/observation.ts",
@@ -286,7 +287,8 @@
       "lines": 301,
       "pisharp": "src/PiSharp.Durable/Session/Observation.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "CommittedStateSource, SessionSourceAttachment and CommittedWatch (IWatchHandle) with the 100-frame overflow; queueMicrotask becomes an ObservationScheduler (Session.Defer: deliveries a commit schedules run on the line right after its publication; a started watch delivers in its own line job, never inline). Tests: session.states.*, session.watches.*"
     },
     {
       "upstream": "packages/durable/src/session/session.ts",
@@ -294,7 +296,8 @@
       "lines": 569,
       "pisharp": "src/PiSharp.Durable/Session/Session.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "Session (ISession, Session.Create) with SessionLine, a FIFO job queue whose order is enqueue order; no lock held across user callbacks; job results complete asynchronously. Internal CommitWithAsync/ReadOnLineAsync/ConversationDocumentOnLineAsync/UnloadDocumentsAsync/FlushLineAsync and the ConversationCreatedAsync/BeforeCloseAsync hooks for the Harness. Tests: session.*"
     },
     {
       "upstream": "packages/durable/src/session/transaction.ts",
@@ -302,7 +305,8 @@
       "lines": 1042,
       "pisharp": "src/PiSharp.Durable/Session/Transaction.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "Transaction (ITx): table reads/writes with ReadAfterWrite, documents through the Chord tracker (DraftObject), fork copies, checkpoints, migrations, task records (CreateTaskAsync, internal SetTask; execution is P7), submissions. A lock guards its state because Tx operations may run concurrently in .NET. Tests: session.tables.*, session.documents.*, session.checkpoints-migrations.*, session.forks.*"
     },
     {
       "upstream": "packages/durable/src/storage/jsonl/index.ts",
@@ -567,7 +571,7 @@
       "pisharp": "src/PiSharp.Durable/Types.cs",
       "phase": "P2",
       "status": "in-progress",
-      "note": "Records and storage contract ported, split across Types.cs (conversation, entry, submission and task records), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage) and Ids.cs; JSON via ToJson/FromJson with fixed key orders. Tx, Session, CommitPublication, DocumentState/Watch and EntryDraft join with P3; TaskRuntime, PhaseHandler and typed task records with P7. Tests: types.*, storage.memory.*"
+      "note": "Records and storage contract ported, split across Types.cs (conversation, entry, submission and task records), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd/IWatchHandle, IDocumentReader/IDocumentObserver, ISession, ITx; P3) and Ids.cs; JSON via ToJson/FromJson with fixed key orders. TaskRuntime, PhaseHandler, NextTaskState and typed task records join with P7. Tests: types.*, storage.memory.*, session.*"
     },
     {
       "upstream": "packages/chord/src/context/index.ts",
@@ -671,9 +675,10 @@
       "upstream": "packages/durable/test/chord-guide.test.ts",
       "blobSha1": "4d4aa845589abad5394cb2426ef3b44899ce4388",
       "lines": 394,
-      "pisharp": "tests/PiSharp.Durable.Tests/ChordGuideCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/ChordGuideCases.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "session.chord-guide.* (3 cases): the guide's documents, commits, document states and watch on a Session; facets, services and the wire are excluded (decision 0005) and replaced by direct subscriptions. The job example's task runtime (runtime.commit, waitForTask, resume) is replaced by task-attributed Session commits until P7"
     },
     {
       "upstream": "packages/durable/test/env-line-scan.test.ts",
@@ -1213,65 +1218,73 @@
       "upstream": "packages/durable/test/session-checkpoints-migrations.test.ts",
       "blobSha1": "375287979a9dcf4754d67ca848a3d674513eccff",
       "lines": 844,
-      "pisharp": "tests/PiSharp.Durable.Tests/SessionCheckpointsMigrationsCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionCheckpointsMigrationsCases.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "session.checkpoints-migrations.* (20 cases). Adapted: checkpointWhen's `this` is the token's definition via closure; a non-object migration result is null (\"must return a JSON object\"); immutable migration results need no copy"
     },
     {
       "upstream": "packages/durable/test/session-definitions.test.ts",
       "blobSha1": "ddc791187926619044dc139f0c39e1fdad7415f7",
       "lines": 177,
-      "pisharp": "tests/PiSharp.Durable.Tests/SessionDefinitionsCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionDefinitionsCases.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "session.definitions.* (4 cases). The expectTypeOf/@ts-expect-error cases are compile-time overload checks (TypeChecks/ObservationTypeChecks); version 1.5 cannot be written (int); one authored case runs the typed-entry overloads"
     },
     {
       "upstream": "packages/durable/test/session-documents.test.ts",
       "blobSha1": "c9764eac7db238bcda91e605286fb9ca957f4d9d",
       "lines": 656,
-      "pisharp": "tests/PiSharp.Durable.Tests/SessionDocumentsCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionDocumentsCases.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "session.documents.* (27 cases). Adapted: placements are immutable (no per-placement copy to observe); a Date/undefined value cannot be JsonValue, so the initializer returns null and the placement passes null; a held line is checked with Task.Yield instead of flush"
     },
     {
       "upstream": "packages/durable/test/session-forks.test.ts",
       "blobSha1": "76400af22d40a45e3001c20e9ab77a234ccc13c1",
       "lines": 695,
-      "pisharp": "tests/PiSharp.Durable.Tests/SessionForksCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionForksCases.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "session.forks.* (14 cases), verbatim"
     },
     {
       "upstream": "packages/durable/test/session-states.test.ts",
       "blobSha1": "4c3678b46e92f28c3526a8bd0b8efa1511dbe681",
       "lines": 232,
-      "pisharp": "tests/PiSharp.Durable.Tests/SessionStatesCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "session.states.* (10 cases). getReplicatedStateInternals is ReplicatedStateInternals.Get; Object.isFrozen checks dropped (immutable values)"
     },
     {
       "upstream": "packages/durable/test/session-support.ts",
       "blobSha1": "e8da108d8662bb9f7812164435900025367b5cb7",
       "lines": 155,
-      "pisharp": "tests/PiSharp.Durable.Tests/SessionSupportCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionSupport.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "SessionTests.All(prefix, storageFactory) runs every session.* group on any IStorage (ControlledStorage decorates it); SessionCases() runs them on MemoryStorage. flush() is a Session line barrier (FlushLineAsync); deferreds are TaskCompletionSource barriers; Session/SessionLineCases.cs adds session.line.* (3 authored cases) for the .NET line guarantees: FIFO across threads, caller tasks completed off the line, watch start never inline"
     },
     {
       "upstream": "packages/durable/test/session-tables.test.ts",
       "blobSha1": "2afb280ee426c9e6d5301a9574a81c613d2ed621",
       "lines": 460,
-      "pisharp": "tests/PiSharp.Durable.Tests/SessionTablesCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionTablesCases.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "session.tables.* (12 cases). Adapted: committed JSON is immutable (no caller mutation to observe); NaN cannot be constructed as JSON"
     },
     {
       "upstream": "packages/durable/test/session-watches.test.ts",
       "blobSha1": "3b03d182293af71c8503f45b383f1176ed4013f9",
       "lines": 503,
-      "pisharp": "tests/PiSharp.Durable.Tests/SessionWatchesCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs",
       "phase": "P3",
-      "status": "planned"
+      "status": "ported",
+      "note": "session.watches.* (21 cases). Adapted: \"never inline\" is checked by thread and Start scope; AbortController is CancellationTokenSource; applyImmutable is DeltaApply.Apply"
     },
     {
       "upstream": "packages/durable/test/spec-usage.test.ts",
