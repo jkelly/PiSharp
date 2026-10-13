@@ -174,6 +174,9 @@ public class LocalExecutionEnv : LocalFileSystem, IExecutionEnv
         // Output seen before the spill starts: counted against the thresholds and kept for the spill's prefix.
         private long seenBytes, seenNewlines;
         private long lastActivity = System.Environment.TickCount64;
+        /// <summary>Pumps still reading, and how many of them are parked in a read: output is idle only while every open pump waits for
+        /// more, so output already in a pipe is never abandoned to a pump that has not been scheduled yet.</summary>
+        private int pumpsOpen = 2, pumpsInRead;
 
         public async Task<Result<ShellExecResult, ExecutionError>> RunAsync()
         {
@@ -182,8 +185,8 @@ public class LocalExecutionEnv : LocalFileSystem, IExecutionEnv
                 : null;
             using var registration = context.CancellationToken.Register(Kill);
             using var reads = new CancellationTokenSource();
-            var stdout = Task.Run(() => PumpAsync(process.StandardOutput, ShellStream.Stdout, reads.Token));
-            var stderr = Task.Run(() => PumpAsync(process.StandardError, ShellStream.Stderr, reads.Token));
+            var stdout = Pump(process.StandardOutput, ShellStream.Stdout, reads.Token);
+            var stderr = Pump(process.StandardError, ShellStream.Stderr, reads.Token);
             var pumps = Task.WhenAll(stdout, stderr);
             var exit = await process.Exit.ConfigureAwait(false);
             await WaitForStdioAsync(pumps).ConfigureAwait(false);
@@ -227,11 +230,29 @@ public class LocalExecutionEnv : LocalFileSystem, IExecutionEnv
             while (!pumps.IsCompleted)
             {
                 var draining = spillError is null && spillStarted && (spillStream is null || spillBusy);
-                if (draining || turn.CurrentCount == 0) Interlocked.Exchange(ref lastActivity, System.Environment.TickCount64);
+                var waiting = Volatile.Read(ref pumpsInRead) >= Volatile.Read(ref pumpsOpen);
+                if (draining || turn.CurrentCount == 0 || !waiting) Interlocked.Exchange(ref lastActivity, System.Environment.TickCount64);
                 var remaining = ExitStdioGraceMs - (System.Environment.TickCount64 - Interlocked.Read(ref lastActivity));
                 if (remaining <= 0) return;
                 await Task.WhenAny(pumps, Task.Delay((int)Math.Min(remaining, ExitStdioGraceMs))).ConfigureAwait(false);
             }
+        }
+
+        /// <summary>Reads one output stream until it ends. Windows pipes are overlapped and read asynchronously. POSIX pipes are blocking
+        /// descriptors whose asynchronous reads are blocking reads queued to the thread pool, which can start long after the process exited
+        /// when the pool is busy, so each gets a thread of its own; a descendant that escaped the process group can hold such a read until it
+        /// exits, and only that thread waits for it.</summary>
+        private Task Pump(Stream stream, ShellStream source, CancellationToken cancellation)
+        {
+            if (OperatingSystem.IsWindows()) return Task.Run(() => PumpAsync(stream, source, cancellation));
+            var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var thread = new Thread(() =>
+            {
+                try { PumpBlocking(stream, source); }
+                finally { done.TrySetResult(); }
+            }) { IsBackground = true, Name = "durable exec " + source.ToString().ToLowerInvariant() };
+            thread.Start();
+            return done.Task;
         }
 
         private async Task PumpAsync(Stream stream, ShellStream source, CancellationToken cancellation)
@@ -241,12 +262,35 @@ public class LocalExecutionEnv : LocalFileSystem, IExecutionEnv
             {
                 while (!finalized)
                 {
-                    var read = await stream.ReadAsync(buffer, cancellation).ConfigureAwait(false);
+                    int read;
+                    Interlocked.Increment(ref pumpsInRead);
+                    try { read = await stream.ReadAsync(buffer, cancellation).ConfigureAwait(false); }
+                    finally { Interlocked.Decrement(ref pumpsInRead); }
                     if (read == 0) return;
                     await HandleAsync(buffer.AsSpan(0, read).ToArray(), source).ConfigureAwait(false);
                 }
             }
             catch (Exception) { } // A stream closed or cancelled after settlement, or a broken pipe: the stream ended.
+            finally { Interlocked.Decrement(ref pumpsOpen); }
+        }
+
+        private void PumpBlocking(Stream stream, ShellStream source)
+        {
+            var buffer = new byte[ReadChunk];
+            try
+            {
+                while (!finalized)
+                {
+                    int read;
+                    Interlocked.Increment(ref pumpsInRead);
+                    try { read = stream.Read(buffer); }
+                    finally { Interlocked.Decrement(ref pumpsInRead); }
+                    if (read == 0) return;
+                    HandleAsync(buffer.AsSpan(0, read).ToArray(), source).GetAwaiter().GetResult();
+                }
+            }
+            catch (Exception) { } // A stream closed after settlement, or a broken pipe: the stream ended.
+            finally { Interlocked.Decrement(ref pumpsOpen); }
         }
 
         private void Kill()

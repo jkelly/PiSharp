@@ -21,7 +21,8 @@ using PiSharp.Durable.Tools.Env;
 //   killed by another hand. POSIX only, as upstream ($$ is an MSYS pid under Git Bash).
 // - "maps signal-killed processes to a non-zero exit code" is POSIX only, as upstream (Windows has no signals).
 // Symbolic-link assertions run only where the process may create links (on Windows that needs Developer Mode or elevation).
-// Authored: env.node.replaces-and-truncates-files-that-other-handles-hold-open pins the sharing behaviour JSONL relies on: appends, flushes
+// Authored: env.node.reads-output-written-before-the-exit-while-the-thread-pool-is-saturated (see the case), and
+// env.node.replaces-and-truncates-files-that-other-handles-hold-open, which pins the sharing behaviour JSONL relies on: appends, flushes
 // and truncation work while another handle (such as a binary reader) holds the file open; a rename over a held file replaces it on POSIX and
 // fails cleanly on Windows, as Node's MoveFileEx-based rename does.
 internal static partial class Program
@@ -399,6 +400,28 @@ internal static partial class Program
                 Check(output.Contains("child-exiting", StringComparison.Ordinal), "output: " + output);
             }
             finally { cancellation.Cancel(); }
+        }),
+
+        // Authored: output a command wrote before it exited is delivered even when the thread pool cannot start the reads promptly (on
+        // macOS CI, two reads blocked by a hung command left a three-thread pool unable to read the next command's output within the
+        // post-exit grace period).
+        EnvCase("reads-output-written-before-the-exit-while-the-thread-pool-is-saturated", async (root, env) =>
+        {
+            using var release = new ManualResetEventSlim();
+            var blockers = Enumerable.Range(0, Environment.ProcessorCount * 4)
+                .Select(_ => Task.Factory.StartNew(() => release.Wait(TimeSpan.FromSeconds(30)), CancellationToken.None, TaskCreationOptions.None,
+                    TaskScheduler.Default)).ToList();
+            try
+            {
+                var (result, output) = await CollectShellOutput(env, "sleep 60 & echo child-exiting", null, EnvContext).WaitAsync(TimeSpan.FromSeconds(30));
+                result.GetOrThrow();
+                Check(output.Contains("child-exiting", StringComparison.Ordinal), "output: " + output);
+            }
+            finally
+            {
+                release.Set();
+                await Task.WhenAll(blockers);
+            }
         }),
 
         EnvCase("cleanup-terminates-active-shell-processes", async (root, env) =>
