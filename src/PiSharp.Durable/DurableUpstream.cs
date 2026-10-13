@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/index.ts, which only re-exports. The PiSharp.Durable namespace is
-// the package root (PiSharp.Durable.Testing the testing subpath, PiSharp.Durable.Sqlite and PiSharp.Durable.Tools its storage/sqlite, env and
-// tools subpaths). Its type-only exports map as the port map records: task inputs, checkpoints and results (GenerationInput, ToolTaskResult
+// the package root (the Testing namespace is the testing subpath; the SQLite and tools assemblies hold the storage/sqlite, env and tools
+// subpaths). Its type-only exports map as the port map records: task inputs, checkpoints and results (GenerationInput, ToolTaskResult
 // and the like) and document states (LiveState, InboxState, ProviderState) are JSON values; the helper types AnyTask, HooksOf, HookResult,
 // UserInput and InputSubmissionDraft become DurableTask, a task's hook class, the hook delegates' return types and SubmissionDraft; the watch
 // types are IWatchHandle<T>; the document definition and semantics types are the scope-typed tokens of Documents.cs; and TableCommitChange
