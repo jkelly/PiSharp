@@ -32,9 +32,10 @@
       "upstream": "packages/durable/src/env/decode.ts",
       "blobSha1": "b271900563a17fbfcd7c58c650672f97095d27bf",
       "lines": 30,
-      "pisharp": "src/PiSharp.Durable.Tools/Env/Decode.cs",
+      "pisharp": "src/PiSharp.Durable/Env/Decode.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "Portable, as index.ts re-exports it: Utf8Decoding.RangeDecoder/StartsWithBom and StreamDecoder over .NET's UTF-8 decoder (no BOM stripping, WHATWG maximal-subpart replacement), pinned against Node by Fixtures/env-line-scan.upstream.json. Tests: env.line-scan.*"
     },
     {
       "upstream": "packages/durable/src/env/index.ts",
@@ -42,33 +43,35 @@
       "lines": 327,
       "pisharp": "src/PiSharp.Durable/Env/Env.cs",
       "phase": "P4",
-      "status": "in-progress",
-      "note": "FileSystem half (P4): Result<TValue, TError>/Unit, FileErrorCode/FileError, FileKind and FileMetadata (upstream FileInfo) in Env.cs; IFileSystem, IBinaryReader, IDirReader and their options in Env/FileSystem.cs, with byte contents and UTF-8 string overloads (FileSystemExtensions). Still to come with P9: TextLineReader/readTextLines, BinaryReader.scanLines/LineScan, watch, createTempDir/createTempFile, cleanup, ExecutionError, Shell, and the Shell half of IExecutionEnv (Env/FileSystem.cs holds IExecutionEnv : IFileSystem as the Harness's environment type since P6; the core names it type-only, see storage.runtime-boundary). Tests: env.filesystem.*"
+      "status": "ported",
+      "note": "Env.cs: Result<TValue, TError>/Unit, FileErrorCode/FileError, ExecutionErrorCode/ExecutionError (SpillPath), FileKind, FileMetadata (upstream FileInfo). FileSystem.cs: IFileSystem with ITextLineReader/TextLine, ReadTextLinesOptions, IBinaryReader (ScanLinesAsync, LineScan), IDirReader, WatchTarget/WatchExclusions, the WatchChange records (WatchPathsChange, WatchOverflowChange, WatchErrorChange), IFileWatcher/WatchMode, TempFileOptions, CleanupAsync. Shell.cs: ShellCommand (string or argv), ShellExecOptions, ShellSpillOptions, ShellExecResult, ShellOutputWindow/ShellOutputSkip/ShellOutputInfo/ShellStream, ShellOutputHandler, IShell, IExecutionEnv : IFileSystem, IShell. Contents are bytes with UTF-8 string overloads (FileSystemExtensions). Tests: env.*"
     },
     {
       "upstream": "packages/durable/src/env/line-scan.ts",
       "blobSha1": "45880fd747c47e3c41d1162b5eaa5f94ed827891",
       "lines": 145,
-      "pisharp": "src/PiSharp.Durable.Tools/Env/LineScan.cs",
+      "pisharp": "src/PiSharp.Durable/Env/LineScan.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "Portable, as index.ts re-exports it: LineScanner(startLine, endLine?) with long line numbers (a null end for Infinity). Tests: env.line-scan.*, env.node-conformance.*.binary-reader-scans-lines-like-decoding-the-whole-file"
     },
     {
       "upstream": "packages/durable/src/env/node-watch.ts",
       "blobSha1": "7f3b8ab55de8824076a858af3ab0c77ec325902c",
       "lines": 522,
-      "pisharp": "src/PiSharp.Durable.Tools/Env/NodeWatch.cs",
+      "pisharp": "src/PiSharp.Durable/Env/Local/LocalFileWatcher.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "LocalFileWatcher and LocalWatchOptions (Env/Local, the file-system side of the boundary). fs.watch is FileSystemWatcher: per directory on Linux, one recursive watcher per target elsewhere, a linked file watched through its target's directory; polling by default on Windows and on Linux network/FUSE file systems (statfs magic). Device and inode identities come from NativeFiles (Env/Local/NativeFileStatus.cs: GetFileInformationByHandle, statx, macOS lstat), with creation time as the identity where statx is missing. Tests: env.node-conformance.*.watch-*, env.node-conformance.watch-limits.*"
     },
     {
       "upstream": "packages/durable/src/env/node.ts",
       "blobSha1": "bb9776e7249280fdc09f4d81ac81b7a5eaaaa629",
       "lines": 1226,
-      "pisharp": "src/PiSharp.Durable/Env/Local/LocalFileSystem.cs",
+      "pisharp": "src/PiSharp.Durable.Tools/Env/LocalExecutionEnv.cs",
       "phase": "P9",
-      "status": "in-progress",
-      "note": "FileSystem half ported in P4 as LocalFileSystem (System.IO; resolvePath/toFileError equivalents, binary and directory readers, handles shared for rename/delete, FileStream.Flush(true) for fsync, MoveFileEx/rename(2) replacement, brief retries of Windows sharing violations). Env/Local/ is the boundary counterpart of this file. The shell half, watches and text-line readers join as LocalExecutionEnv in src/PiSharp.Durable.Tools (P9). Tests: env.filesystem.*"
+      "status": "ported",
+      "note": "Split along the storage boundary: the FileSystem half is LocalFileSystem (src/PiSharp.Durable/Env/Local/LocalFileSystem.cs: text-line reader, scanLines, temp files, cleanup, watch, a FIFO refused before opening); the Shell half is LocalExecutionEnv : LocalFileSystem, IExecutionEnv with LocalExecutionEnvOptions (Cwd, ShellPath, ShellEnv, Watch), over PiSharp.Tools' ShellDiscovery, the Windows job-object lifetime and the POSIX process-group admission (Env/LocalProcess.cs). Intentional differences, documented in LocalExecutionEnv.cs: settling kills descendants left in the job or group; killed Windows jobs exit 1; the working directory is not searched for bash. Tests: env.node.*, env.node-conformance.*, env.node-spill.*"
     },
     {
       "upstream": "packages/durable/src/errors.ts",
@@ -237,7 +240,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Tool.cs",
       "phase": "P9",
       "status": "ported",
-      "note": "HarnessTasks.ToolTask (pi.tool v1): phases call and execute and the abort handler with upstream's input {assistant, callId}, checkpoints {phase: call} and {phase: execute, arguments, replay} and result {entryId, control?}; recovery reruns a call only when the recorded and the current registration both say replay safe, otherwise it settles failed with an interrupted result from the durable slot. prepareArguments, validation through Internal/PiAi/Validation.cs (an internal copy of PiSharp.Agent's ToolArgumentValidation, the port of pi-ai validateToolArguments, since the core does not reference PiSharp.Agent; piai.validation.* compares it with the pinned pi-ai and with the agent's copy; ToolRegistration.ParametersOrigin, default TypeBox), beforeTool/afterTool hooks, controls, diagnostics in {severity, code?, message} order, running output, details and diagnostics published to pi.live.tools through Progress, the tool execution api (IToolExecutionApi, implemented by ToolExecutionApi; DelegatingToolExecutionApi for wrappers), harnessError and appendToolResult. The env/index.ts shapes the api names type-only (ShellOutputWindow, ShellOutputSkip) are in Env/ShellOutput.cs until the execution environment lands. Tests: harness.tools.*, harness.tools-recovery.*, harness.tools-differential.* (Fixtures/tool-rounds.upstream.json, captured by Fixtures/capture-tool-rounds.mjs) and the P9 tool-round tests of harness.structured.*"
+      "note": "HarnessTasks.ToolTask (pi.tool v1): phases call and execute and the abort handler with upstream's input {assistant, callId}, checkpoints {phase: call} and {phase: execute, arguments, replay} and result {entryId, control?}; recovery reruns a call only when the recorded and the current registration both say replay safe, otherwise it settles failed with an interrupted result from the durable slot. prepareArguments, validation through Internal/PiAi/Validation.cs (an internal copy of PiSharp.Agent's ToolArgumentValidation, the port of pi-ai validateToolArguments, since the core does not reference PiSharp.Agent; piai.validation.* compares it with the pinned pi-ai and with the agent's copy; ToolRegistration.ParametersOrigin, default TypeBox), beforeTool/afterTool hooks, controls, diagnostics in {severity, code?, message} order, running output, details and diagnostics published to pi.live.tools through Progress, the tool execution api (IToolExecutionApi, implemented by ToolExecutionApi; DelegatingToolExecutionApi for wrappers), harnessError and appendToolResult. The env/index.ts shapes the api names type-only (ShellOutputWindow, ShellOutputSkip) are in Env/Shell.cs with the rest of the Shell half. Tests: harness.tools.*, harness.tools-recovery.*, harness.tools-differential.* (Fixtures/tool-rounds.upstream.json, captured by Fixtures/capture-tool-rounds.mjs) and the P9 tool-round tests of harness.structured.*"
     },
     {
       "upstream": "packages/durable/src/harness/types.ts",
@@ -441,7 +444,8 @@
       "lines": 39,
       "pisharp": "src/PiSharp.Durable/Testing/Assertions.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "ConformanceAssertions.Create(failure) builds IConformanceAssertions (Ok, StrictEqual, DeepEqual, PartialDeepEqual, GreaterThan, RejectsAsync) from the runner's failure exception instead of a Vitest expect"
     },
     {
       "upstream": "packages/durable/src/testing/env-conformance.ts",
@@ -449,16 +453,17 @@
       "lines": 511,
       "pisharp": "src/PiSharp.Durable/Testing/EnvConformance.cs",
       "phase": "P9",
-      "status": "in-progress",
-      "note": "File-system cases (P4): EnvConformance.Create(provider) with the binary-reader (read ranges, rename, refusals) and directory-reader cases over IFileSystem; read(0, 1.5) is dropped (integer offsets). Still to come with P9: scanLines, watch, exec and symlink cases. Tests: env.filesystem.conformance.*"
+      "status": "ported",
+      "note": "EnvConformance.Create(EnvConformanceOptions or provider): all 24 cases over IExecutionEnv with injected assertions (read(0, 1.5) dropped: integer offsets). Tests: env.node-conformance.conformance.* and env.node-conformance.polling.*"
     },
     {
       "upstream": "packages/durable/src/testing/index.ts",
       "blobSha1": "fdaa421f5c39c21a215e1f283d9dbda1b7e7d567",
       "lines": 27,
-      "pisharp": "src/PiSharp.Durable/Testing/Testing.cs",
+      "pisharp": "src/PiSharp.Durable/Testing/Runner.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "Only re-exports; the PiSharp.Durable.Testing namespace is the subpath (header in Runner.cs)"
     },
     {
       "upstream": "packages/durable/src/testing/runner.ts",
@@ -466,7 +471,8 @@
       "lines": 38,
       "pisharp": "src/PiSharp.Durable/Testing/Runner.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "IConformanceTestRunner (Describe, It with timeout, Assertions) and ConformanceRunner.RegisterStorageConformance/RegisterEnvConformance. Tests: env.node-conformance.* register through it"
     },
     {
       "upstream": "packages/durable/src/testing/storage-benchmark.ts",
@@ -491,8 +497,8 @@
       "lines": 44,
       "pisharp": "src/PiSharp.Durable/Testing/Types.cs",
       "phase": "P9",
-      "status": "in-progress",
-      "note": "Storage half: StorageConformanceProvider, StorageConformanceCase (with Slug), StorageConformanceException. Env half (P4): EnvConformanceProvider over IFileSystem, EnvConformanceCase, EnvConformanceException; shell and symlink options join with the ExecutionEnv in P9"
+      "status": "ported",
+      "note": "IConformanceAssertions, StorageConformanceProvider/Case/Exception (the storage kit keeps asserting itself), EnvConformanceProvider over IExecutionEnv, EnvConformanceOptions (WithEnv, Assertions, Shell, Symlinks), EnvConformanceCase (TimeoutMs, Slug), EnvConformanceException"
     },
     {
       "upstream": "packages/durable/src/tools/bash.ts",
@@ -706,7 +712,8 @@
       "lines": 107,
       "pisharp": "tests/PiSharp.Durable.Tests/EnvLineScanCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "4 cases as env.line-scan.*: the seeded generator and chunking ported exactly and checked against Fixtures/env-line-scan.upstream.json (Fixtures/capture-env-line-scan.mjs runs the pinned decode.ts/line-scan.ts and TextDecoder under Node) as well as the test's own assertions. LineScanner(1.5) dropped (long line numbers)"
     },
     {
       "upstream": "packages/durable/test/env-node-conformance.test.ts",
@@ -714,8 +721,8 @@
       "lines": 126,
       "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeConformanceCases.cs",
       "phase": "P9",
-      "status": "in-progress",
-      "note": "File-system half (P4): the env conformance kit on LocalFileSystem (env.filesystem.conformance.*) and \"reads ranges spanning several internal chunks exactly\" (env.filesystem.local.*). Still to come with P9: polling watches, watch limits, shell cases; the FIFO case needs a non-blocking open .NET lacks"
+      "status": "ported",
+      "note": "Both kit registrations through ConformanceRunner on LocalExecutionEnv (env.node-conformance.conformance.*, env.node-conformance.polling.*: 22 cases on Windows with Git Bash and symlinks off as upstream, 24 elsewhere), watch limits (env.node-conformance.watch-limits.*) and readers (env.node-conformance.readers.*; the FIFO case POSIX only, as upstream)"
     },
     {
       "upstream": "packages/durable/test/env-node-spill.test.ts",
@@ -723,7 +730,8 @@
       "lines": 89,
       "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeSpillCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "env.node-spill.*: the mocked slow createWriteStream is an OpenSpillStream override whose writes take 600 ms; runs on every OS (upstream skips Windows)"
     },
     {
       "upstream": "packages/durable/test/env-node.test.ts",
@@ -731,8 +739,8 @@
       "lines": 1002,
       "pisharp": "tests/PiSharp.Durable.Tests/EnvNodeCases.cs",
       "phase": "P9",
-      "status": "in-progress",
-      "note": "\"NodeExecutionEnv filesystem\" cases that LocalFileSystem covers, as env.filesystem.local.* (readTextLines, temp files and cleanup left out; non-integer truncation sizes dropped; the FileHandle.sync spy has no analogue; symlink assertions only where links can be created) plus an authored held-open-file case. Still to come with P9: text line reader, shell, spill"
+      "status": "ported",
+      "note": "All 47 cases (49 with it.each rows) as env.node.*, plus the authored held-open-file case. Adapted: non-integer truncation sizes dropped; FileHandle spies become LocalFileSystem seams (SyncFile, ReadTextChunkAsync); node -e commands become printf/head/tr; the taskkill case keeps its observable claim (abort wins over an external kill). Platform skips as upstream: legacy WSL path, signal exit and taskkill on Windows; symlink assertions where links can be created"
     },
     {
       "upstream": "packages/durable/test/env-truncate.test.ts",

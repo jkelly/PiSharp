@@ -129,4 +129,12 @@ internal sealed class InstrumentedFileSystem(IFileSystem inner) : IFileSystem
     public Task<Result<string, FileError>> CanonicalPathAsync(string path, DurableContext context) => inner.CanonicalPathAsync(path, context);
     public Task<Result<bool, FileError>> ExistsAsync(string path, DurableContext context) => inner.ExistsAsync(path, context);
     public Task<Result<Unit, FileError>> CreateDirAsync(string path, CreateDirOptions? options, DurableContext context) => inner.CreateDirAsync(path, options, context);
+    public Task<Result<ITextLineReader, FileError>> OpenTextLineReaderAsync(string path, DurableContext context) => inner.OpenTextLineReaderAsync(path, context);
+    public Task<Result<ImmutableArray<string>, FileError>> ReadTextLinesAsync(string path, ReadTextLinesOptions? options, DurableContext context) =>
+        inner.ReadTextLinesAsync(path, options, context);
+    public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context) =>
+        inner.WatchAsync(targets, onChange, context);
+    public Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context) => inner.CreateTempDirAsync(prefix, context);
+    public Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context) => inner.CreateTempFileAsync(options, context);
+    public Task CleanupAsync(DurableContext context) => inner.CleanupAsync(context);
 }

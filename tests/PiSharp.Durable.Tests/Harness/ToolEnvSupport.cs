@@ -1,7 +1,7 @@
 // The one execution environment the tool-task cases build (upstream's `new NodeExecutionEnv({ cwd })` where a test reads only `env.cwd`).
 // It is the only test class implementing IExecutionEnv directly, so when the execution environment adds members (text line readers, watch,
 // temp files, cleanup and the Shell half) this file is the one place to update. Its file operations reject: no harness.tools case touches a
-// file system or a shell; the cases that do (the coding tools and the real bash interruption) are pending until the environment lands.
+// file system or a shell; the cases that do (the coding tools and the real bash interruption) are pending until the coding tools land.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -33,4 +33,14 @@ internal sealed class ToolTestEnv(string cwd) : IExecutionEnv
     public Task<Result<bool, FileError>> ExistsAsync(string path, DurableContext context) => Unsupported<bool>();
     public Task<Result<Unit, FileError>> CreateDirAsync(string path, CreateDirOptions? options, DurableContext context) => Unsupported<Unit>();
     public Task<Result<Unit, FileError>> RemoveAsync(string path, RemoveOptions? options, DurableContext context) => Unsupported<Unit>();
+    public Task<Result<ITextLineReader, FileError>> OpenTextLineReaderAsync(string path, DurableContext context) => Unsupported<ITextLineReader>();
+    public Task<Result<ImmutableArray<string>, FileError>> ReadTextLinesAsync(string path, ReadTextLinesOptions? options, DurableContext context) =>
+        Unsupported<ImmutableArray<string>>();
+    public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context) =>
+        Unsupported<IFileWatcher>();
+    public Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context) => Unsupported<string>();
+    public Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context) => Unsupported<string>();
+    public Task<Result<ShellExecResult, ExecutionError>> ExecAsync(ShellCommand command, ShellExecOptions? options, DurableContext context) =>
+        Task.FromException<Result<ShellExecResult, ExecutionError>>(new NotSupportedException("ToolTestEnv has no shell"));
+    public Task CleanupAsync(DurableContext context) => Task.CompletedTask;
 }

@@ -1,6 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/index.ts (results, file errors and file metadata; the
-// FileSystem capability is in FileSystem.cs). The Shell and ExecutionEnv halves, watches, text-line readers, line scans and temporary
-// files join with the local execution environment in P9; JSONL storage (P4) needs only the file system.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/index.ts (results, file and execution errors, file
+// metadata). The FileSystem capability, its readers, line scans and watches are in FileSystem.cs; the Shell and ExecutionEnv halves in
+// Shell.cs; decode.ts and line-scan.ts, which index.ts re-exports, in Decode.cs and LineScan.cs.
 using System.Diagnostics.CodeAnalysis;
 
 namespace PiSharp.Durable.Env;
@@ -132,3 +132,40 @@ public sealed class FileError(FileErrorCode code, string message, string? path =
 /// <param name="Size">Size in bytes of a file.</param>
 /// <param name="MtimeMs">Last modification, in milliseconds since the Unix epoch.</param>
 public sealed record FileMetadata(string Name, string Path, FileKind Kind, long Size, double MtimeMs);
+
+/// <summary>Why a command could not run to completion (upstream <c>ExecutionErrorCode</c>; <c>"shell_unavailable"</c> is
+/// <see cref="ShellUnavailable"/>). A command that ran and exited non-zero is not an error.</summary>
+public enum ExecutionErrorCode
+{
+    /// <summary><c>aborted</c>: the context was cancelled.</summary>
+    Aborted,
+    /// <summary><c>timeout</c>: the command outlived its timeout, or the timeout was invalid.</summary>
+    Timeout,
+    /// <summary><c>shell_unavailable</c>: no shell to run a string command.</summary>
+    ShellUnavailable,
+    /// <summary><c>spawn_error</c>: the program could not be started.</summary>
+    SpawnError,
+    /// <summary><c>callback_error</c>: the output callback threw.</summary>
+    CallbackError,
+    /// <summary><c>unknown</c>.</summary>
+    Unknown,
+}
+
+/// <summary>A command that could not run to completion (upstream <c>ExecutionError</c>).</summary>
+public sealed class ExecutionError(ExecutionErrorCode code, string message, Exception? cause = null) : Exception(message, cause)
+{
+    /// <summary>The failure class.</summary>
+    public ExecutionErrorCode Code { get; } = code;
+
+    /// <summary>Spill file of a command that timed out or was aborted after its output crossed the spill thresholds.</summary>
+    public string? SpillPath { get; set; }
+
+    /// <summary>Upstream's code string, such as <c>"spawn_error"</c>.</summary>
+    public string CodeName => Code switch
+    {
+        ExecutionErrorCode.ShellUnavailable => "shell_unavailable",
+        ExecutionErrorCode.SpawnError => "spawn_error",
+        ExecutionErrorCode.CallbackError => "callback_error",
+        _ => Code.ToString().ToLowerInvariant(),
+    };
+}

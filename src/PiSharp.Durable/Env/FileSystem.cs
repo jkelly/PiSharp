@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/index.ts (the portable FileSystem capability, its binary and
-// directory readers). Upstream's `string | Uint8Array` contents are bytes here, with UTF-8 string overloads in FileSystemExtensions.
-// Members still to come with P9: openTextLineReader/readTextLines, BinaryReader.scanLines, watch, createTempDir/createTempFile, cleanup.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/index.ts (the portable FileSystem capability: its text-line,
+// binary and directory readers, line scans, watches and temporary files). Upstream's `string | Uint8Array` contents are bytes here, with
+// UTF-8 string overloads in FileSystemExtensions; upstream's `{ paths } | { overflow } | { error }` WatchChange union is the WatchChange
+// record hierarchy.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -41,7 +42,119 @@ public interface IBinaryReader
     /// <summary>Up to <paramref name="length"/> bytes at <paramref name="offset"/>; fewer only at end of file.</summary>
     Task<Result<byte[], FileError>> ReadAsync(long offset, long length, DurableContext context);
 
+    /// <summary>
+    /// One pass over the file that locates lines <c>[startLine, endLine)</c> (<paramref name="endLine"/> null: to the end), 0-based, where
+    /// line <c>k</c> starts after the <c>k</c>-th newline byte. Decoded sizes are those of the text decoding the whole file as UTF-8 (WHATWG,
+    /// as <see cref="StreamDecoder"/>) would produce for that range, so a byte-order mark at the start of the file is not counted. An empty
+    /// or negative range fails with <see cref="FileErrorCode.Invalid"/>.
+    /// </summary>
+    Task<Result<LineScan, FileError>> ScanLinesAsync(long startLine, long? endLine, DurableContext context);
+
     /// <summary>Releases the file; idempotent. Later reads fail with <see cref="FileErrorCode.Invalid"/>.</summary>
+    Task CloseAsync(DurableContext context);
+}
+
+/// <summary>Where lines of a file are, as <see cref="IBinaryReader.ScanLinesAsync"/> found them (upstream <c>LineScan</c>).</summary>
+/// <param name="Newlines">Newline bytes in the whole file; it has <c>Newlines + 1</c> lines.</param>
+/// <param name="Start">Start of the byte range of the selected lines: from the start of the first to the end of the last, without the newline
+/// that ends it. A selection past the last line is empty at the end of the file.</param>
+/// <param name="End">End of that byte range.</param>
+/// <param name="FirstLineEnd">Where the first selected line ends: its newline, or the end of the file.</param>
+/// <param name="LastLineStart">Where the last selected line starts.</param>
+/// <param name="SelectedBytes">UTF-8 byte length of the decoded selection.</param>
+/// <param name="FirstLineBytes">UTF-8 byte length of the decoded first selected line.</param>
+public sealed record LineScan(long Newlines, long Start, long End, long FirstLineEnd, long LastLineStart, long SelectedBytes, long FirstLineBytes);
+
+/// <summary>One line of a text file (upstream <c>TextLine</c>).</summary>
+/// <param name="Text">The line without its newline; a carriage return before the newline is kept.</param>
+/// <param name="Terminated">Whether a newline ended the line (false only for a last line without one).</param>
+public sealed record TextLine(string Text, bool Terminated);
+
+/// <summary>Strict LF line reads of one opened text file, decoded as UTF-8 with a leading byte-order mark dropped (upstream
+/// <c>TextLineReader</c>).</summary>
+public interface ITextLineReader
+{
+    /// <summary>The next line, or null at the end of the file. A cancelled read consumes nothing, so it can be retried.</summary>
+    Task<Result<TextLine?, FileError>> ReadLineAsync(DurableContext context);
+
+    /// <summary>Releases the file; idempotent. Later reads fail with <see cref="FileErrorCode.Invalid"/>.</summary>
+    Task CloseAsync(DurableContext context);
+}
+
+/// <summary>Options of <see cref="IFileSystem.ReadTextLinesAsync"/>.</summary>
+public sealed record ReadTextLinesOptions
+{
+    /// <summary>Stop after this many lines; zero or less reads none. Null: every line.</summary>
+    public int? MaxLines { get; init; }
+}
+
+/// <summary>Options of <see cref="IFileSystem.CreateTempFileAsync"/>.</summary>
+public sealed record TempFileOptions
+{
+    /// <summary>Text before the file's unique name.</summary>
+    public string? Prefix { get; init; }
+    /// <summary>Text after the file's unique name, such as an extension.</summary>
+    public string? Suffix { get; init; }
+}
+
+/// <summary>Entries below a watched directory that are neither watched nor reported (upstream <c>WatchTarget.exclude</c>).</summary>
+public sealed record WatchExclusions
+{
+    /// <summary>Names starting with <c>.</c>.</summary>
+    public bool Hidden { get; init; }
+    /// <summary>These names.</summary>
+    public ImmutableArray<string> Names { get; init; } = [];
+}
+
+/// <summary>A file or directory to watch (upstream <c>WatchTarget</c>). It may be missing; creating it is a change.</summary>
+/// <param name="Path">The path, relative paths resolving against the file system's working directory.</param>
+public sealed record WatchTarget(string Path)
+{
+    /// <summary>Watch everything below a directory, not only its entries. Symbolic links below it are not followed.</summary>
+    public bool Recursive { get; init; }
+    /// <summary>Entries below <see cref="Path"/> that are neither watched nor reported.</summary>
+    public WatchExclusions? Exclude { get; init; }
+}
+
+/// <summary>
+/// What changed (upstream <c>WatchChange</c>): <see cref="WatchPathsChange"/>, something at or below each path may have changed (calls may be
+/// spurious; a change is never missed while the watcher is healthy); <see cref="WatchOverflowChange"/>, coverage was uncertain for a while,
+/// so rescan everything that is watched; <see cref="WatchErrorChange"/>, the watcher stopped and no calls follow.
+/// </summary>
+public abstract record WatchChange
+{
+    private protected WatchChange() { }
+}
+
+/// <summary>Something at or below each path may have changed; a directory path covers its whole subtree (upstream <c>{ paths }</c>).</summary>
+/// <param name="Paths">Absolute paths, sorted ordinally.</param>
+public sealed record WatchPathsChange(ImmutableArray<string> Paths) : WatchChange;
+
+/// <summary>Coverage was uncertain for a while (lost events, reconnect): rescan everything that is watched (upstream <c>{ overflow: true }</c>).</summary>
+public sealed record WatchOverflowChange : WatchChange;
+
+/// <summary>The watcher stopped, for example because the watched tree grew past the environment's limit; no calls follow (upstream
+/// <c>{ error }</c>).</summary>
+/// <param name="Error">Why it stopped.</param>
+public sealed record WatchErrorChange(FileError Error) : WatchChange;
+
+/// <summary>How reliably a watcher reports changes (upstream <c>FileWatcher.mode</c>).</summary>
+public enum WatchMode
+{
+    /// <summary><c>native</c>: changes are reported within about two seconds.</summary>
+    Native,
+    /// <summary><c>polling</c>: the environment compares snapshots, because the file system does not report changes reliably (network and
+    /// FUSE file systems); a change undone between two snapshots can be missed.</summary>
+    Polling,
+}
+
+/// <summary>A running watch (upstream <c>FileWatcher</c>).</summary>
+public interface IFileWatcher
+{
+    /// <summary>How changes are found.</summary>
+    WatchMode Mode { get; }
+
+    /// <summary>Stops watching; no change callback starts after this completes. Idempotent.</summary>
     Task CloseAsync(DurableContext context);
 }
 
@@ -80,6 +193,12 @@ public interface IFileSystem
 
     /// <summary>The whole file decoded as UTF-8.</summary>
     Task<Result<string, FileError>> ReadTextFileAsync(string path, DurableContext context);
+
+    /// <summary>Opens a text file for strict LF line reads.</summary>
+    Task<Result<ITextLineReader, FileError>> OpenTextLineReaderAsync(string path, DurableContext context);
+
+    /// <summary>The lines of a text file, as <see cref="OpenTextLineReaderAsync"/> reads them, up to <see cref="ReadTextLinesOptions.MaxLines"/>.</summary>
+    Task<Result<ImmutableArray<string>, FileError>> ReadTextLinesAsync(string path, ReadTextLinesOptions? options, DurableContext context);
 
     /// <summary>The whole file.</summary>
     Task<Result<byte[], FileError>> ReadBinaryFileAsync(string path, DurableContext context);
@@ -123,6 +242,24 @@ public interface IFileSystem
 
     /// <summary>Removes a file, link or directory.</summary>
     Task<Result<Unit, FileError>> RemoveAsync(string path, RemoveOptions? options, DurableContext context);
+
+    /// <summary>
+    /// Reports changes to files and directories, for hosts that load resources from the environment. When the returned watcher exists,
+    /// coverage is established: a host that watches before it loads cannot miss a change made during the load. See <see cref="WatchChange"/>
+    /// for what is reported and <see cref="IFileWatcher.Mode"/> for how reliably. <paramref name="onChange"/> runs on a background thread, one
+    /// call at a time; an exception it throws is ignored.
+    /// </summary>
+    Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context);
+
+    /// <summary>Creates a new, empty directory under the environment's temporary directory; its name starts with
+    /// <paramref name="prefix"/> (default <c>tmp-</c>).</summary>
+    Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context);
+
+    /// <summary>Creates a new, empty file in a new temporary directory and returns its path.</summary>
+    Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context);
+
+    /// <summary>Releases what the environment still holds, for its owner's shutdown; best effort, never fails.</summary>
+    Task CleanupAsync(DurableContext context);
 }
 
 /// <summary>Upstream's string contents: text is written as UTF-8.</summary>
@@ -135,13 +272,4 @@ public static class FileSystemExtensions
     /// <summary>Appends UTF-8 text.</summary>
     public static Task<Result<Unit, FileError>> AppendFileAsync(this IFileSystem fileSystem, string path, string content, DurableContext context) =>
         fileSystem.AppendFileAsync(path, Encoding.UTF8.GetBytes(content), context);
-}
-
-/// <summary>
-/// The environment tools and prompt sections run in (upstream <c>ExecutionEnv</c>, <c>FileSystem &amp; Shell</c>). The Harness builds one per
-/// use through <c>HarnessOptions.Env</c> and hands it to task runtimes. TODO(P9): the Shell half joins with the local execution environment;
-/// until then an environment is its file system.
-/// </summary>
-public interface IExecutionEnv : IFileSystem
-{
 }

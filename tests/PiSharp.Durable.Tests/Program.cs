@@ -19,7 +19,8 @@ internal static partial class Program
             .Where(method => method.Name.EndsWith("Cases", StringComparison.Ordinal) && method.GetParameters().Length == 0 &&
                 method.ReturnType == typeof(IEnumerable<(string, Func<Task>)>)).OrderBy(method => method.Name, StringComparer.Ordinal))
             cases.AddRange((IEnumerable<(string, Func<Task>)>)method.Invoke(null, null)!);
-        if (cases.Select(test => test.Id).Distinct(StringComparer.Ordinal).Count() != cases.Count) throw new InvalidOperationException("Duplicate case ids.");
+        if (cases.GroupBy(test => test.Id, StringComparer.Ordinal).Where(group => group.Count() > 1).Select(group => group.Key).ToList() is { Count: > 0 } duplicates)
+            throw new InvalidOperationException("Duplicate case ids: " + string.Join(", ", duplicates));
         if (args is ["--only", var prefix]) cases = [.. cases.Where(test => test.Id.StartsWith(prefix, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)

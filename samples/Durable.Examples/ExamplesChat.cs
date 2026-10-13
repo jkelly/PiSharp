@@ -4,7 +4,7 @@
 // read back.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
-using PiSharp.Durable.Env.Local;
+using PiSharp.Durable.Tools.Env;
 
 namespace PiSharp.Durable.Examples;
 
@@ -132,18 +132,21 @@ public static partial class Examples
     }
 
     /// <summary>
-    /// The example environment: a local file system whose working directory is the agent's <c>cwd</c> as given (upstream's
+    /// The example environment: a local execution environment whose working directory is the agent's <c>cwd</c> as given (upstream's
     /// <c>new NodeExecutionEnv({ cwd })</c> keeps POSIX paths as they are; LocalFileSystem resolves them against the current drive on
-    /// Windows, so this environment reports the logical path and resolves file operations through LocalFileSystem).
+    /// Windows, so this environment reports the logical path and runs file operations and commands through LocalExecutionEnv).
     /// </summary>
     private sealed class ExampleEnv(string cwd) : IExecutionEnv
     {
-        private readonly LocalFileSystem files = new(Directory.GetCurrentDirectory());
+        private readonly LocalExecutionEnv files = new(Directory.GetCurrentDirectory());
         public string Id => files.Id;
         public string Cwd { get; set; } = cwd;
         public Task<Result<string, FileError>> AbsolutePathAsync(string path, DurableContext context) => files.AbsolutePathAsync(path, context);
         public Task<Result<string, FileError>> JoinPathAsync(IReadOnlyList<string> parts, DurableContext context) => files.JoinPathAsync(parts, context);
         public Task<Result<string, FileError>> ReadTextFileAsync(string path, DurableContext context) => files.ReadTextFileAsync(path, context);
+        public Task<Result<ITextLineReader, FileError>> OpenTextLineReaderAsync(string path, DurableContext context) => files.OpenTextLineReaderAsync(path, context);
+        public Task<Result<System.Collections.Immutable.ImmutableArray<string>, FileError>> ReadTextLinesAsync(string path, ReadTextLinesOptions? options,
+            DurableContext context) => files.ReadTextLinesAsync(path, options, context);
         public Task<Result<byte[], FileError>> ReadBinaryFileAsync(string path, DurableContext context) => files.ReadBinaryFileAsync(path, context);
         public Task<Result<IBinaryReader, FileError>> OpenBinaryReaderAsync(string path, BinaryReaderOptions? options, DurableContext context) =>
             files.OpenBinaryReaderAsync(path, options, context);
@@ -164,5 +167,12 @@ public static partial class Examples
         public Task<Result<Unit, FileError>> CreateDirAsync(string path, CreateDirOptions? options, DurableContext context) =>
             files.CreateDirAsync(path, options, context);
         public Task<Result<Unit, FileError>> RemoveAsync(string path, RemoveOptions? options, DurableContext context) => files.RemoveAsync(path, options, context);
+        public Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange, DurableContext context) =>
+            files.WatchAsync(targets, onChange, context);
+        public Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context) => files.CreateTempDirAsync(prefix, context);
+        public Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context) => files.CreateTempFileAsync(options, context);
+        public Task<Result<ShellExecResult, ExecutionError>> ExecAsync(ShellCommand command, ShellExecOptions? options, DurableContext context) =>
+            files.ExecAsync(command, options, context);
+        public Task CleanupAsync(DurableContext context) => files.CleanupAsync(context);
     }
 }
