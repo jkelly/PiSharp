@@ -4,9 +4,9 @@
 // - canvas: the provider facet's state and addStroke and the consumer's subscription run directly; the shutdown order (detach clients,
 //   withdraw services, then close) becomes disposing the states before closing the Session.
 // - diff reviews: the keyed facet instance becomes one document state per review key.
-// - job output: the task's phase handler is replaced by Session commits attributed to the task (CommitWithAsync with its scope), and its
-//   completion by committing the terminal record, which retires the task's documents. The runtime-driven version (runtime.commit,
-//   harness.waitForTask, harness.resume) ports with the task runtime (P7).
+// - job output: as upstream, on a Harness: the job's phase handler appends through runtime.CommitAsync, the observer watches until
+//   WaitForTaskAsync settles, and completion retires the task's documents. Upstream runs it on MemoryStorage only; here it runs on every
+//   backend of the session.* groups.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;
@@ -98,17 +98,15 @@ internal static partial class SessionTests
         // ─── 3. Task-scoped output and a tool/task watch ─────────────────────
         var jobOutputDoc = Documents.DefineTaskDoc("app.job-output", 1, () => O("{\"stdout\":\"\",\"chunks\":0}"),
             checkpointWhen: (_, _, info) => info.DeltasSinceBase >= 99);
-        var job = Tasks.DefineTask(new TaskDefinition { Name = "app.job", Version = 1, Initial = _ => O("{\"phase\":\"running\"}") });
-
-        Task AppendJobOutput(Session session, TaskId taskId, ConversationId conversationId, string chunk, DurableContext context) =>
-            // Read process output outside this callback.
-            session.CommitWithAsync(async tx =>
+        Task AppendJobOutput(ITaskRuntime runtime, string chunk, DurableContext context) =>
+            // Read process output outside this callback. The runtime gates the live task.
+            runtime.CommitAsync(async (tx, _) =>
             {
-                var draft = await tx.DocAsync(jobOutputDoc, taskId);
+                var draft = await tx.DocAsync(jobOutputDoc, runtime.TaskId);
                 var stdout = S(draft["stdout"]) + chunk;
                 draft["stdout"] = stdout.Length > 50_000 ? stdout[^50_000..] : stdout;
                 draft["chunks"] = N(draft["chunks"]) + 1;
-            }, context, new TransactionScope(conversationId, taskId));
+            }, context);
 
         async Task ObserveJob(IDocumentObserver api, TaskId producerTaskId, Task finished, List<string> logged, List<string> rendered,
             DurableContext context)
@@ -135,34 +133,46 @@ internal static partial class SessionTests
         {
             var logged = new List<string>();
             var rendered = new List<string>();
-            var (_, session, _) = Open(storageFactory);
-            var root = await session.CommitWithAsync(tx => tx.CreateRootConversationAsync(), Context);
-            var id = await session.CommitAsync(tx => tx.CreateTaskAsync(job, O("{\"command\":\"make\"}"),
-                new TaskOptions(TaskOwnership.Conversation) { ConversationId = root.Id }), Context);
-            // The running phase: first chunk, then wait for the gate.
-            await AppendJobOutput(session, id, root.Id, "$ make\n", Context);
-            Equal(1.0, N((await session.SnapshotAsync(jobOutputDoc, id, Context))!["chunks"]), "first chunk");
-            var finished = new Deferred(inline: false);
-            var observing = ObserveJob(session, id, finished.Task, logged, rendered, Context);
+            var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var job = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "app.job",
+                Version = 1,
+                Initial = _ => O("{\"phase\":\"running\"}"),
+                Phases = new Dictionary<string, TaskPhaseHandler>
+                {
+                    ["running"] = async (task, runtime, ctx) =>
+                    {
+                        await AppendJobOutput(runtime, $"$ {S(((JsonObjectValue)task.Input)["command"])}\n", ctx);
+                        await gate.Task;
+                        await AppendJobOutput(runtime, "ok\n", ctx);
+                        await runtime.CommitAsync((_, _) => NextTaskState.Completed(JsonValue.Null), ctx);
+                    },
+                },
+                Abort = (_, _, _) => Task.CompletedTask,
+            });
+            var registry = Registry.Create();
+            registry.Install(new Extension { Name = "task:app.job", Tasks = [job] });
+            var harness = await Harness.OpenAsync(storageFactory(), new HarnessOptions { Models = EmptyDurableModels.Instance, Registry = registry }, Context);
+            var root = await harness.RootAsync(Context);
+            var id = await root.CommitAsync(tx => tx.CreateTaskAsync(job, O("{\"command\":\"make\"}"), new TaskOptions(TaskOwnership.Conversation)), Context);
+            harness.Resume();
+            // Upstream: eventually(() => snapshot(JobOutputDoc, id).chunks === 1); the job then waits at its gate.
+            while (await harness.SnapshotAsync(jobOutputDoc, id, Context) is not { } first || N(first["chunks"]) != 1) await Task.Delay(1);
+            Task finished = harness.WaitForTaskAsync(id, Context);
+            var observing = ObserveJob(harness, id, finished, logged, rendered, Context);
             while (true)
             {
                 lock (logged) if (logged.Count == 1) break;
                 await Task.Yield();
             }
-            // The gate opens: second chunk, then completion, which retires the task's documents.
-            await AppendJobOutput(session, id, root.Id, "ok\n", Context);
-            await session.CommitWithAsync(async tx =>
-            {
-                var task = (await tx.GetTaskAsync(id))!;
-                tx.SetTask(task with { State = new TerminalTaskState(new CompletedTaskOutcome(JsonValue.Null)) });
-            }, Context);
-            finished.Resolve();
+            gate.SetResult();
             await observing;
             lock (logged) Seq(["$ make\n"], logged, "logged");
             // Stopped once the task finished; the retirement frame may or may not have been delivered before.
             lock (rendered) Seq(["$ make\nok\n"], rendered.Take(1), "rendered");
-            Check(await session.WatchDocAsync(jobOutputDoc, id, Context) is null, "retired with the task");
-            await session.CloseAsync(Context);
+            Check(await harness.WatchDocAsync(jobOutputDoc, id, Context) is null, "retired with the task");
+            await harness.CloseAsync(Context);
         });
     }
 }
