@@ -142,7 +142,7 @@
       "lines": 437,
       "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
       "phase": "P6",
-      "status": "in-progress",
+      "status": "ported",
       "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Reset and usage (P10): Conversation.ResetAsync (a write submission of a pi.reset entry with head \"self\" and an optional handoff user message) and IHarness.UsageAsync (every conversation's pi.usage summed). Views (P10): DurableHarness.Views (ConversationViews, built with the Harness) behind Conversation.ViewStateAsync and WatchAsync, and AgentEvents.WatchEventsAsync. TaskGraphAsync and WatchTaskGraphAsync are the task graph (task-graph.ts). Conversation.CompactAsync admits the compaction task (compaction.ts). Tests: harness.tasks.*, harness.conversations.*, harness.ownership.*, harness.lifecycle.*, harness.context.*, harness.inbox.*, harness.view.*, harness.events.* (memory, jsonl, sqlite)"
     },
     {
