@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Examples;
 
@@ -12,6 +13,12 @@ using PiSharp.Durable.Examples;
 // ScriptedModels; 13 keeps its storage in a temporary SQLite file on memory, as upstream does, and reopens the runner's storage otherwise),
 // 25-compaction, whose model reports the faux provider's usage estimate (its file backends read back the stored entries and summaries),
 // and 31-reload-and-restart, which restarts on its own storage the same way as 13, so it has no separate read-back.
+// P13 adds the rest. 16-real-model runs with an environment without OPENAI_API_KEY and prints upstream's skip line. 18-print, 26-coding-agent
+// (pwd compares as <workspace>), 27-plan-mode and 28-reviewer use ScriptedModels. 21-late-join, 23-subagent-background and 24-child-tasks run
+// on an ExampleClock driven like Node's event loop (24 and 23 restart on their own storage, as 13 does). 19-json prints both modes; its
+// lines are upstream's captured output (Fixtures/examples-19-json-*.upstream.jsonl, from one run of each mode under Node) and compare as
+// JSON with sorted keys, with timestamps, durations, the faux API name and the provider session ID as placeholders: those are random or
+// clock values, and record key order is pinned by the compat.* cases.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -29,7 +36,9 @@ internal static partial class Program
         "pi.assistant",
     ];
 
-    // Declared before ExamplesUpstreamOutput, which spreads it.
+    // Declared before ExamplesUpstreamOutput, which spreads them.
+    private static readonly string[] JsonModeEvents = JsonModeFixture("events");
+    private static readonly string[] JsonModeOps = JsonModeFixture("ops");
     private static readonly string[] ReviewerTranscript =
     [
         "> Review user.ts.",
@@ -119,6 +128,11 @@ internal static partial class Program
         CodingToolsStorage,
         "== 18-print",
         PrintAnswer,
+        "== 19-json",
+        "mode: events",
+        .. JsonModeEvents,
+        "mode: ops",
+        .. JsonModeOps,
         "== 20-inbox",
         "rejected: Conversation 1 is busy",
         "withdraw: aborted",
@@ -304,6 +318,9 @@ internal static partial class Program
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
 
+    private static string[] JsonModeFixture(string mode) => File.ReadAllLines(
+        Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", $"examples-19-json-{mode}.upstream.jsonl"));
+
     private const string LateJoinLastLine = "event: usage_changed";
 
     // The output lines 21-late-join prints once the client joined: each committed line, first from the view, then from the event stream.
@@ -373,6 +390,7 @@ internal static partial class Program
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
         [PrintAnswer] = [PrintAnswer],
+        [JsonModeOps[^1]] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
         [LateJoinLastLine] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
         [CodingAgentLastLine] = ["bash ran in: <workspace>", CodingAgentLastLine],
         [PlanModeLastLine] = [PlanSteps],
@@ -412,12 +430,31 @@ internal static partial class Program
 
     private static void Lines(string output, IReadOnlyList<string> expected)
     {
-        var actual = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => Regex.Replace(line.TrimEnd('\r'), "\"timestamp\":[0-9]+", "\"timestamp\":<time>"))
-            .Select(line => Regex.Replace(line, "^cat /tmp/1gb.txt took [0-9]+ ms$", "cat /tmp/1gb.txt took <ms> ms"))
-            .Select(line => Regex.Replace(line, "^storage: .+$", "storage: <dir>"))
-            .Select(line => Regex.Replace(line, "^bash ran in: .*/pi-durable-agent-[A-Za-z0-9]+", "bash ran in: <workspace>")).ToArray();
+        var actual = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(Normalize).ToArray();
         for (var index = 0; index < Math.Max(actual.Length, expected.Count); index++)
-            Equal(index < expected.Count ? expected[index] : "<end>", index < actual.Length ? actual[index] : "<end>", "line " + (index + 1));
+            Equal(index < expected.Count ? Normalize(expected[index]) : "<end>", index < actual.Length ? actual[index] : "<end>", "line " + (index + 1));
     }
+
+    // Clock and random values as placeholders; a line that is a JSON object (19-json's) has its keys sorted first. Expected lines go through
+    // the same steps, which leave the placeholders already in them alone.
+    private static string Normalize(string line)
+    {
+        line = line.TrimEnd('\r');
+        if (line.StartsWith("{\"", StringComparison.Ordinal)) line = SortKeys(JsonNode.Parse(line))!.ToJsonString();
+        line = Regex.Replace(line, "\"timestamp\":[0-9]+", "\"timestamp\":<time>");
+        line = Regex.Replace(line, "\"durationMs\":[0-9]+", "\"durationMs\":<ms>");
+        line = Regex.Replace(line, "\"faux:[0-9]+:[a-z0-9]+\"", "\"faux:<api>\"");
+        line = Regex.Replace(line, "\"sessionId\":\"[^\"]+\"", "\"sessionId\":\"<session>\"");
+        line = Regex.Replace(line, "^cat /tmp/1gb.txt took [0-9]+ ms$", "cat /tmp/1gb.txt took <ms> ms");
+        line = Regex.Replace(line, "^storage: .+$", "storage: <dir>");
+        return Regex.Replace(line, "^bash ran in: .*/pi-durable-agent-[A-Za-z0-9]+", "bash ran in: <workspace>");
+    }
+
+    private static JsonNode? SortKeys(JsonNode? node) => node switch
+    {
+        JsonObject value => new JsonObject(value.OrderBy(property => property.Key, StringComparer.Ordinal)
+            .Select(property => KeyValuePair.Create(property.Key, SortKeys(property.Value)))),
+        JsonArray items => new JsonArray([.. items.Select(SortKeys)]),
+        _ => node?.DeepClone(),
+    };
 }

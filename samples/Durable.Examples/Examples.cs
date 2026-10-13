@@ -58,6 +58,7 @@ public static partial class Examples
         ("16-real-model", RealModelAsync),
         ("17-coding-tools", CodingToolsAsync),
         ("18-print", PrintAsync),
+        ("19-json", JsonModeAsync),
         ("20-inbox", InboxAsync),
         ("21-late-join", LateJoinAsync),
         ("22-subagent-foreground", SubagentForegroundAsync),
