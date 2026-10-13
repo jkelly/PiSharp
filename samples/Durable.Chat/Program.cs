@@ -1,10 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/16-real-model.ts. Milestone M1 of decision 0005: a
 // real model streams an answer through NativeDurableModels into a Harness on SQLite (by default); the storage is then closed, reopened
 // and the stored answer entry printed, to show it survived. --continue reopens an existing directory and shows its earlier turns first.
-//
-// TODO(P8 generation and submissions): until the parallel port of pi.generation, submissions and prompt sections merges,
-// Conversation.SubmitAsync throws NotImplementedException; this sample reports that and exits with code 3. The calls below follow the
-// upstream API shape (root.submit, submission.wait, settled.answer, pi.live generation.message); revisit them if the merged names differ.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -100,26 +96,13 @@ try
         }
         liveWatch.Start((value, _, _) =>
         {
-            // TODO(P8): upstream pi.live shape {generation: {message: AssistantMessage}}; confirm against the merged generation port.
             if (value is not null && value.TryGetValue("generation", out var generation) && generation is JsonObjectValue live &&
                 live.TryGetValue("message", out var message) && FirstText(message) is { } text) PrintText(text);
             return Task.CompletedTask;
         });
         harness.Resume();
         Console.Write("answer: ");
-        ISubmission submission;
-        try
-        {
-            // TODO(P8): Conversation.SubmitAsync and ISubmission.WaitAsync join with the submissions port.
-            submission = await root.SubmitAsync(SubmissionDraft.Input(prompt), context);
-        }
-        catch (NotImplementedException error)
-        {
-            await liveWatch.StopAsync();
-            Console.WriteLine();
-            Console.WriteLine($"unavailable: {error.Message}");
-            return exitCode = 3;
-        }
+        var submission = await root.SubmitAsync(SubmissionDraft.Input(prompt), context);
         var settled = await submission.WaitAsync(context);
         await liveWatch.StopAsync();
         if (settled.Status == SubmissionStatus.Done && settled.Type == SubmissionType.Input && settled.Answer is { } answer)
