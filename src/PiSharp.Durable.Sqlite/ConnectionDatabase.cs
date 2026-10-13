@@ -8,6 +8,8 @@
 // - Microsoft.Data.Sqlite retries a busy statement until its command timeout on top of SQLite's busy_timeout; the command timeout is set
 //   to the busy timeout rounded up to whole seconds (at least one), so a competing lock fails after roughly the same time.
 // - Opening checks the SQLite library is at least 3.37.0, the first release with STRICT tables, which the schema uses.
+// - Opening a file retries a transient SQLITE_IOERR for up to five seconds (see OpenAsync); upstream opens once.
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using Microsoft.Data.Sqlite;
@@ -345,6 +347,32 @@ public sealed class SqliteConnectionDatabase : SqliteConnectionExecutor, ISqlite
     public static async Task<SqliteConnectionDatabase> OpenAsync(string path, SqliteStorageOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(path);
+        // Intentional difference from upstream: a file database that fails to open with SQLITE_IOERR is retried for a bounded time. On
+        // Windows a process killed mid-write can keep its WAL shared-memory mapping briefly after it exits, and the first statement's WAL
+        // recovery then fails with a disk I/O error (seen on CI runners in the crash.sqlite.* kill tests); reopening a moment later
+        // recovers normally. Any other failure, or one that outlasts the window, is thrown unchanged.
+        var started = Stopwatch.GetTimestamp();
+        for (var delay = OpenRetryInitialDelay; ; delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, OpenRetryMaximumDelay.Ticks)))
+        {
+            try
+            {
+                return await OpenOnceAsync(path, options).ConfigureAwait(false);
+            }
+            catch (SqliteException error) when (error.SqliteErrorCode == SqliteIoError && path != ":memory:" &&
+                Stopwatch.GetElapsedTime(started) + delay < OpenRetryWindow)
+            {
+                await Task.Delay(delay).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private const int SqliteIoError = 10;
+    private static readonly TimeSpan OpenRetryInitialDelay = TimeSpan.FromMilliseconds(25);
+    private static readonly TimeSpan OpenRetryMaximumDelay = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan OpenRetryWindow = TimeSpan.FromSeconds(5);
+
+    private static async Task<SqliteConnectionDatabase> OpenOnceAsync(string path, SqliteStorageOptions? options)
+    {
         var checkpointPages = options?.WalAutoCheckpointPages ?? DefaultWalAutoCheckpointPages;
         var timeout = options?.BusyTimeoutMs ?? DefaultBusyTimeoutMs;
         ArgumentOutOfRangeException.ThrowIfNegative(timeout, nameof(options));
