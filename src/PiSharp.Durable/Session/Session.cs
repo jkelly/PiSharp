@@ -156,6 +156,9 @@ public class Session : ISession
     /// have run. It works on a closed or poisoned Session.</summary>
     internal Task FlushLineAsync() => line.Enqueue(() => Task.FromResult(true));
 
+    /// <summary>Internal test barrier: how many jobs wait on the line behind the running one.</summary>
+    internal int LineBacklog => line.Waiting;
+
     // ─── Reads ──────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>
@@ -656,6 +659,12 @@ internal sealed class SessionLine
     private readonly Lock gate = new();
     private readonly Queue<Func<Task>> jobs = new();
     private bool running;
+
+    /// <summary>How many jobs wait behind the running one.</summary>
+    public int Waiting
+    {
+        get { lock (gate) return jobs.Count; }
+    }
 
     /// <summary>
     /// Enqueues <paramref name="job"/>. On an idle line it starts inline when <paramref name="inline"/> is true, else on the thread pool.

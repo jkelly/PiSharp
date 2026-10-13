@@ -1,5 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/usage.ts (UsageDoc, recordUsage, addUsage). Usage values
-// are pi-ai Usage wire JSON. TODO(P10): addUsageState and the Harness usage total join with the views phase.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/usage.ts. Usage values are pi-ai Usage wire JSON. Upstream's
+// addUsage mutates a draft or a plain object; here AddUsage(DraftObject, ...) changes a draft in a commit, and the plain-value overload and
+// AddUsageState return a new value. A summed key keeps its position and a new key goes last, as upstream's assignments do.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
@@ -36,6 +37,38 @@ public static class UsageLedger
         var spent = (JsonObjectValue)usage["cost"];
         foreach (var key in new[] { "input", "output", "cacheRead", "cacheWrite", "total" }) Add(cost, key, Number(spent, key));
     }
+
+    /// <summary>The plain-value <c>addUsage</c>: <paramref name="total"/> with every counter of <paramref name="usage"/> added.</summary>
+    internal static JsonObjectValue AddUsage(JsonObjectValue total, JsonObjectValue usage)
+    {
+        var sum = total.ToBuilder();
+        foreach (var key in new[] { "input", "output", "cacheRead", "cacheWrite", "totalTokens" }) Add(sum, key, Number(usage, key));
+        if (usage.TryGetValue("cacheWrite1h", out var cacheWrite1h)) Add(sum, "cacheWrite1h", Number(cacheWrite1h));
+        if (usage.TryGetValue("reasoning", out var reasoning)) Add(sum, "reasoning", Number(reasoning));
+        var cost = ((JsonObjectValue)total["cost"]).ToBuilder();
+        var spent = (JsonObjectValue)usage["cost"];
+        foreach (var key in new[] { "input", "output", "cacheRead", "cacheWrite", "total" }) Add(cost, key, Number(spent, key));
+        sum["cost"] = cost.ToImmutable();
+        return sum.ToImmutable();
+    }
+
+    /// <summary>Adds every bucket of <paramref name="state"/> into <paramref name="sum"/>, both <c>pi.usage</c> values (upstream
+    /// <c>addUsageState</c>). Keys are own JSON keys, so a tool named <c>__proto__</c> or <c>toString</c> is an ordinary key.</summary>
+    internal static JsonObjectValue AddUsageState(JsonObjectValue sum, JsonObjectValue state)
+    {
+        var result = sum.ToBuilder();
+        foreach (var bucket in new[] { "models", "tools" })
+        {
+            var totals = ((JsonObjectValue)sum[bucket]).ToBuilder();
+            foreach (var (key, usage) in (JsonObjectValue)state[bucket])
+                totals[key] = totals.TryGetValue(key, out var total) ? AddUsage((JsonObjectValue)total, (JsonObjectValue)usage) : usage;
+            result[bucket] = totals.ToImmutable();
+        }
+        return result.ToImmutable();
+    }
+
+    private static void Add(JsonObjectValue.Builder total, string key, double value) =>
+        total[key] = JsonValue.Number((total.TryGetValue(key, out var current) ? Number(current) : 0) + value);
 
     private static void Add(DraftObject total, string key, double value) =>
         total.Set(key, JsonValue.Number((total.ContainsKey(key) ? Number(total.Get(key)) : 0) + value));

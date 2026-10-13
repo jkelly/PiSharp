@@ -142,7 +142,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
       "phase": "P6",
       "status": "in-progress",
-      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Placeholders throwing NotImplementedException: reset, viewState, watch and usage (TODO(P10)), compact, taskGraph, watchTaskGraph (TODO(P11)). Tests: harness.tasks.*, harness.conversations.*, harness.context.* (memory, jsonl, sqlite)"
+      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Reset and usage (P10): Conversation.ResetAsync (a write submission of a pi.reset entry with head \"self\" and an optional handoff user message) and IHarness.UsageAsync (every conversation's pi.usage summed). Placeholders throwing NotImplementedException: viewState and watch (TODO(P10)), compact, taskGraph, watchTaskGraph (TODO(P11)). Tests: harness.tasks.*, harness.conversations.*, harness.context.*, harness.inbox.* (memory, jsonl, sqlite)"
     },
     {
       "upstream": "packages/durable/src/harness/inbox.ts",
@@ -150,8 +150,8 @@
       "lines": 132,
       "pisharp": "src/PiSharp.Durable/Harness/Inbox.cs",
       "phase": "P10",
-      "status": "in-progress",
-      "note": "Inbox.InboxDoc (pi.inbox), PrepareBoundaryAsync/ApplyBoundaryAsync/IsStale (the boundaries generation and submissions use, P8), RemoveInboxItemAsync, WithdrawQueuedInputsAsync, and the EntryDraft JSON of queued writes. TODO(P10): the harness-inbox tests (steer/follow-up modes, resets, views)"
+      "status": "ported",
+      "note": "Inbox.InboxDoc (pi.inbox, a complete base exactly while empty), PrepareBoundaryAsync/ApplyBoundaryAsync/IsStale (spec §6: every write, the first or all steers, at the final boundary the first or all follow-ups, a queued reset turning postTools final, stale head writes), RemoveInboxItemAsync and WithdrawQueuedInputsAsync. Queued writes store their EntryDraft as plain JSON {kind, head?, model?, data?, edits?}, the key order of upstream's own reset and compaction drafts (upstream copies the caller's object). Steer and follow-up admission is Submissions.AdmitSubmissionAsync (submissions.ts); the conversation view of the inbox is view.ts's. Tests: harness.inbox.*, harness.inbox-differential.* (Fixtures/inbox.upstream.json, captured by Fixtures/capture-inbox.mjs: a steer mid-turn, a queued reset with handoff and a stale write, queue modes all; identical records, IDs and document key order on memory, JSONL and SQLite)"
     },
     {
       "upstream": "packages/durable/src/harness/json.ts",
@@ -257,8 +257,8 @@
       "lines": 72,
       "pisharp": "src/PiSharp.Durable/Harness/Usage.cs",
       "phase": "P10",
-      "status": "in-progress",
-      "note": "UsageLedger.UsageDoc (pi.usage), RecordUsageAsync (assistant entries and tool results, used by generation since P8), AddUsage. TODO(P10): addUsageState and Harness.UsageAsync"
+      "status": "ported",
+      "note": "UsageLedger.UsageDoc (pi.usage, a complete base on every change), RecordUsageAsync (assistant entries, summarization attempts and tool results), AddUsage over a draft and over a plain value, and AddUsageState (own JSON keys, so tools named __proto__ or toString are ordinary keys); IHarness.UsageAsync sums every conversation's committed pi.usage. Tests: harness.inbox.usage.*, harness.inbox-differential.* (the Session total)"
     },
     {
       "upstream": "packages/durable/src/harness/util.ts",
@@ -934,9 +934,10 @@
       "upstream": "packages/durable/test/examples/20-inbox.ts",
       "blobSha1": "90beb1ae3bdb7b662cac9ce1d637d4ff3d4e7c2d",
       "lines": 72,
-      "pisharp": "tests/PiSharp.Durable.Tests/20InboxCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesInbox.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 20-inbox with ScriptedModels (a ScriptedReply.Held first answer) in place of the faux provider, on memory, JSONL and SQLite with reopen (transcript and the empty inbox read back); examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/21-late-join.ts",
@@ -1100,9 +1101,10 @@
       "upstream": "packages/durable/test/harness-inbox.test.ts",
       "blobSha1": "bd8b2a6f22799133e3226ced1e4e879676891dba",
       "lines": 923,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessInboxCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs",
       "phase": "P10",
-      "status": "planned"
+      "status": "ported",
+      "note": "32 of 32 tests (27 inbox, 5 usage): harness.inbox.* on MemoryStorage with the two reopen cases on a SQLite file as upstream, harness.inbox.jsonl.* (32, reopening a JSONL directory) and harness.inbox.sqlite.* (30: the reopen cases run in harness.inbox.*). Adapted: the queue-mode case waits for the answer's boundary commit to queue behind the held commit with Session.LineBacklog (a deterministic barrier for upstream's onYield + flush); the two cases that read what a commit listener recorded after a submission wait flush the Session line first (a C# wait resumes on its own listener, upstream's after all listeners); RecordingStorage is a decorator; [id, mode] inbox items compare as \"id mode\" strings"
     },
     {
       "upstream": "packages/durable/test/harness-inspect.test.ts",
