@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/types.ts. The parts the openable Harness (P6) and the
 // task runtime (P7) need are complete; later-phase shapes keep upstream's names and carry TODO markers where their final C# signatures
-// join (tool execution P9, views P10, compaction and the task graph P11). Submissions and the generation hooks are final (P8).
+// join (views P10, compaction and the task graph P11). Submissions and the generation hooks are final (P8); tools are final (P9).
 //
 // Mappings: upstream's `Tool` generic (a host's own ToolRegistration subtype) becomes record inheritance, so `{ ...tool, x }` is
 // `tool with { X = ... }` and keeps the subtype; pi-ai messages and tool calls are wire JSON (JsonValue); a field that may be given,
@@ -198,21 +198,29 @@ public sealed record ToolExecutionResult
     public ToolControl? Control { get; init; }
 }
 
-/// <summary>Output bounds of a tool (upstream <c>outputLimits</c>).</summary>
+/// <summary>Which end of a tool's output is kept (upstream <c>"head" | "tail"</c>).</summary>
+public enum ToolOutputRetention
+{
+    /// <summary><c>head</c>: the beginning (the default).</summary>
+    Head,
+    /// <summary><c>tail</c>: the end.</summary>
+    Tail,
+}
+
+/// <summary>Output bounds of a tool (upstream <c>outputLimits</c>); a null field takes its default.</summary>
 public sealed record ToolOutputLimits
 {
-    /// <summary>Maximum retained bytes.</summary>
-    public int? MaxBytes { get; init; }
-    /// <summary>Maximum retained lines.</summary>
-    public int? MaxLines { get; init; }
-    /// <summary>Whether the head or the tail is kept.</summary>
-    public string? Retain { get; init; }
+    /// <summary>Maximum retained bytes; default 50 KiB (<see cref="Truncation.DefaultMaxBytes"/>).</summary>
+    public long? MaxBytes { get; init; }
+    /// <summary>Maximum retained lines; default 2000 (<see cref="Truncation.DefaultMaxLines"/>).</summary>
+    public long? MaxLines { get; init; }
+    /// <summary>Whether the head or the tail is kept; default <see cref="ToolOutputRetention.Head"/>.</summary>
+    public ToolOutputRetention? Retain { get; init; }
 }
 
 /// <summary>
-/// Operations available to one tool invocation (upstream <c>ToolExecutionApi</c>). Every operation rejects after the invocation ends.
-/// TODO(P9): running output, diagnostics, details, commits, memos, task creation and waits, and conversation handles join with the tool
-/// task.
+/// Operations available to one tool invocation (upstream <c>ToolExecutionApi</c>). Every operation rejects after the invocation ends. Upstream's
+/// api is a plain object a wrapper spreads; here a wrapper derives from <see cref="DelegatingToolExecutionApi"/> and overrides what it changes.
 /// </summary>
 public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
 {
@@ -222,6 +230,51 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     ConversationId ConversationId { get; }
     /// <summary>The model's tool call ID.</summary>
     string CallId { get; }
+    /// <summary>The tool task's phase snapshot.</summary>
+    IRegistrySnapshot Registry { get; }
+    /// <summary>The calling conversation's agent, as the tool task's phase resolved it.</summary>
+    Task<Agent> AgentAsync(DurableContext context);
+    /// <summary><c>HarnessOptions.Models</c>: the catalog, credentials and request transforms generation uses.</summary>
+    IDurableModels Models { get; }
+    /// <summary>Built by <c>HarnessOptions.Env</c> for this call; null without an environment.</summary>
+    IExecutionEnv? Env { get; }
+    /// <summary>
+    /// Appends running output; it becomes the result content when the result omits <c>Content</c>. <paramref name="skipped"/> counts output
+    /// omitted before the chunk, as reported by an environment given <see cref="OutputWindow"/> (<c>ShellOutputInfo.skipped</c>). Throws once
+    /// the call has settled.
+    /// </summary>
+    void Output(string chunk, ShellOutputSkip? skipped = null);
+    /// <summary>Appends running output as UTF-8 bytes; a character split across chunks survives. See
+    /// <see cref="Output(string, ShellOutputSkip?)"/>.</summary>
+    void Output(ReadOnlySpan<byte> chunk, ShellOutputSkip? skipped = null);
+    /// <summary>
+    /// The tail this call's output keeps and the pace of its progress commits, for <c>ShellExecOptions.Window</c>; null when the tool keeps the
+    /// head of its output, which cannot accept skips. A wrapper that replaces <c>Output</c> and transforms text must also replace this with
+    /// null, so skipped text cannot bypass its transform.
+    /// </summary>
+    ShellOutputWindow? OutputWindow { get; }
+    /// <summary>Records a model-visible remark about this call. Throws once the call has settled.</summary>
+    void Diagnostic(ToolDiagnostic diagnostic);
+    /// <summary>Replaces the running details; the last value becomes the result details when the result omits <c>Details</c>. Resolves with
+    /// the progress commit that includes it; cancelling <paramref name="context"/> stops the wait, not the update.</summary>
+    Task DetailsAsync(JsonValue value, DurableContext context);
+    /// <summary>Commits on the Session line in the tool task's scope; appended entries carry the task as <c>byTaskId</c>.</summary>
+    Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context);
+    /// <summary>Commits on the Session line in the tool task's scope.</summary>
+    Task CommitAsync(Func<ITx, Task> change, DurableContext context);
+    /// <summary>Reads a memo of the tool task.</summary>
+    Task<JsonValue?> MemoAsync(string name, DurableContext context);
+    /// <summary>Stores a memo of the tool task unless one exists; returns the winner.</summary>
+    Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context);
+    /// <summary>Creates a task in its own commit; <see cref="TaskOptions.ConversationId"/> defaults to the calling conversation (upstream
+    /// takes the options without it).</summary>
+    Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, DurableContext context);
+    /// <summary>The committed task record.</summary>
+    Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context);
+    /// <summary>Resolves with the task's terminal receipt; rejects when the invocation ends.</summary>
+    Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context);
+    /// <summary>Invocation-bound handle of an existing conversation, such as one this tool created in a commit.</summary>
+    Task<IConversationHandle?> ConversationAsync(ConversationId id, DurableContext context);
 }
 
 /// <summary>Runs a tool with its validated arguments.</summary>
@@ -246,7 +299,14 @@ public record ToolRegistration
     public ToolReplay? Replay { get; init; }
     /// <summary>Default: the settings' <c>ToolExecution</c>. One sequential call makes its whole round sequential.</summary>
     public ToolExecutionMode? ExecutionMode { get; init; }
-    /// <summary>Repairs arguments models commonly get wrong before validation; pure.</summary>
+    /// <summary>How <see cref="Parameters"/> was built, which decides how arguments are converted and coerced before validation (pi-ai
+    /// <c>validateToolArguments</c>). Default <see cref="PiSharp.Contracts.ToolSchemaOrigin.TypeBox"/>: upstream tools declare TypeBox schemas.</summary>
+    public PiSharp.Contracts.ToolSchemaOrigin ParametersOrigin { get; init; } = PiSharp.Contracts.ToolSchemaOrigin.TypeBox;
+    /// <summary>
+    /// Repairs arguments models commonly get wrong before validation, such as a JSON string where an array belongs. Must be pure: it runs
+    /// again when a call is retried before its intent is recorded. Its result is still validated against <see cref="Parameters"/>; a throw
+    /// makes the arguments invalid.
+    /// </summary>
     public Func<JsonValue, JsonValue>? PrepareArguments { get; init; }
     /// <summary>Output bounds.</summary>
     public ToolOutputLimits? OutputLimits { get; init; }
@@ -855,8 +915,8 @@ public sealed class GenerationHooks
 /// <summary>What <see cref="ToolHooks.BeforeTool"/> decides: replacement arguments or a block.</summary>
 public sealed record BeforeToolDecision(JsonObjectValue? Arguments = null, string? Block = null);
 
-/// <summary>Hooks of the built-in tool task (upstream <c>ToolHooks</c>). Calls are pi-ai <c>ToolCall</c> wire JSON. TODO(P9): signatures
-/// are confirmed when the tool task is ported.</summary>
+/// <summary>Hooks of the built-in tool task (upstream <c>ToolHooks</c>); every handler is optional. Calls are pi-ai <c>ToolCall</c> wire
+/// JSON; hooks receive the tool task's runtime as their <see cref="IHookApi"/>, so their memos are the call's.</summary>
 public sealed class ToolHooks
 {
     /// <summary>Before intent; the first block wins, otherwise arguments replace the call's arguments. A throw blocks.</summary>
