@@ -2,7 +2,7 @@
 // file: Fixtures/compaction.upstream.json holds what the pinned pi-durable commits for the scenarios below with pi-ai's faux provider on
 // MemoryStorage, as printed by Fixtures/capture-compaction.mjs: every entry, task and submission, the conversation's pi.live, pi.inbox,
 // pi.usage, pi.agent and pi.provider documents, Harness.usage(), and each summarization request's messages and options (without its
-// signal). It is normalized as HarnessChatDifferentialCases.cs's fixture is, and compared the same way: as JSON values, and the documents
+// signal). It is normalized as HarnessChatDifferentialCases.cs's fixture is, and compared the same way: as JSON values and by their exact text, and the documents
 // built by the Harness and the usage total by their exact text. The summary's usage is the faux provider's estimate of the request, so the
 // fixture also pins the summarization prompts and the serialized conversation. The scenarios run here on memory, JSONL and SQLite and must
 // produce the same records, IDs included.
@@ -129,6 +129,7 @@ internal static class CompactionDifferentialTests
     {
         var expected = Upstream.Value[scenario];
         Check(JsonValue.DeepEquals(expected, actual), $"{scenario}: expected {expected.ToJson()}, actual {actual.ToJson()}");
+        Equal(expected.ToJson(), actual.ToJson(), $"{scenario}: key order");
         // The documents and the usage total are built by the Harness, so their key order is upstream's too.
         foreach (var (expectedDoc, actualDoc) in ChatDifferentialTests.Documents(expected).Zip(ChatDifferentialTests.Documents(actual)))
             Equal(expectedDoc.ToJson(), actualDoc.ToJson(), $"{scenario}: document key order");

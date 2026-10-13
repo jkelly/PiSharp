@@ -137,13 +137,13 @@ public static class Inbox
     /// object, keeping its key order; this is the order of upstream's own write drafts, a reset (<c>{kind, head, model}</c>) and a compaction
     /// summary (<c>{kind, head, model, data}</c>).
     /// </summary>
-    internal static JsonObjectValue EntryDraftToJson(EntryDraft draft) => new RecordJson.Writer()
+    internal static JsonObjectValue EntryDraftToJson(EntryDraft draft) => RecordJson.Ordered(new RecordJson.Writer()
         .Add("kind", draft.Kind)
         .Add("head", draft.Head is { } head ? head.IsSelf ? JsonValue.String("self") : head.Id!.Value.ToJson() : null)
         .Add("model", draft.Model)
         .Add("data", draft.Data)
         .Add("edits", draft.Edits is { } edits ? JsonValue.Array(edits.Select(edit => (JsonValue)edit.ToJson())) : null)
-        .Build();
+        .Build(), draft.KeyOrder);
 
     /// <summary>The entry draft an inbox write item stores.</summary>
     internal static EntryDraft EntryDraftFromJson(JsonObjectValue value) => new()
@@ -155,6 +155,7 @@ public static class Inbox
             ? head is JsonStringValue { Value: "self" } ? EntryHead.Self : EntryHead.At(new EntryId((long)((JsonNumberValue)head).Value))
             : null,
         Edits = value.TryGetValue("edits", out var edits) ? [.. ((JsonArrayValue)edits).Select(ContextEdit.FromJson)] : null,
+        KeyOrder = RecordJson.KeysOf(value),
     };
 
     private static string? Mode(JsonObjectValue item) => item.TryGetValue("mode", out var mode) && mode is JsonStringValue text ? text.Value : null;

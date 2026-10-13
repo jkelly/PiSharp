@@ -141,7 +141,7 @@ internal static partial class Program
                 Equal($"{{\"version\":{nextVersion}}}", (await database.GetAsync("SELECT version FROM durable_schema WHERE singleton = 1"))?.ToString(),
                     "version after the retry");
                 var entry = (await database.GetAsync("SELECT record, commit_seq FROM entries WHERE id = 2"))!;
-                Equal("{\"id\":2,\"conversationId\":1,\"kind\":\"retained\",\"data\":{\"retained\":true}}", entry.GetString("record"), "entry record JSON");
+                Equal("{\"kind\":\"retained\",\"data\":{\"retained\":true},\"id\":2,\"conversationId\":1}", entry.GetString("record"), "entry record JSON");
                 Equal(1L, entry.GetInt64("commit_seq"), "entry commit sequence");
                 Equal("{\"next_id\":\"3\",\"next_seq\":2}",
                     (await database.GetAsync("SELECT next_id, next_seq FROM durable_metadata WHERE singleton = 1"))?.ToString(), "metadata");

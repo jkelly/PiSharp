@@ -1,5 +1,6 @@
 // Decoding and encoding helpers for the persisted record JSON of packages/durable/src/types.ts (no upstream counterpart: upstream
 // records are plain JavaScript objects and its backends JSON.stringify/JSON.parse them).
+using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Internal;
@@ -84,6 +85,24 @@ internal static class RecordJson
 
     public static TEnum Enum<TEnum>(JsonObjectValue value, string key, string what) where TEnum : struct, System.Enum =>
         WireName.Parse<TEnum>(String(value, key, what), what);
+
+    /// <summary>
+    /// JavaScript key order for a record whose object history is known: the keys in <paramref name="order"/> (the keys the object had when
+    /// it was created or decoded) come first, in that order, and keys added later follow in <paramref name="json"/>'s order, as a spread
+    /// (<c>{ ...current, entry }</c>) appends a new key and keeps an existing key's position. A default <paramref name="order"/> keeps
+    /// <paramref name="json"/> as it is.
+    /// </summary>
+    public static JsonObjectValue Ordered(JsonObjectValue json, ImmutableArray<string> order)
+    {
+        if (order.IsDefaultOrEmpty) return json;
+        var builder = JsonObjectValue.CreateBuilder();
+        foreach (var key in order) if (json.TryGetValue(key, out var value) && !builder.ContainsKey(key)) builder[key] = value;
+        foreach (var (key, value) in json) if (!builder.ContainsKey(key)) builder[key] = value;
+        return builder.ToImmutable();
+    }
+
+    /// <summary>The keys of a decoded object, as <see cref="Ordered"/> takes them.</summary>
+    public static ImmutableArray<string> KeysOf(JsonObjectValue value) => [.. value.Keys];
 
     /// <summary>An order-preserving object writer that skips absent (null) fields, as <c>JSON.stringify</c> skips <c>undefined</c>.</summary>
     public sealed class Writer

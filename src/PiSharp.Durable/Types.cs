@@ -177,8 +177,10 @@ public sealed class ContextEdit : DurableValue
 }
 
 /// <summary>An immutable transcript event with separate model-facing and application-facing payloads (upstream <c>EntryRecord</c>).
-/// JSON key order: <c>id, conversationId, kind, model, data, head, edits, byTaskId</c> (the declaration order; the Session's own order
-/// depends on the caller's draft).</summary>
+/// JSON key order is upstream's: the Session builds a record as <c>{ ...draft (without head), id, conversationId, head, byTaskId }</c>, so the
+/// draft's fields come first in the draft's own order (an untyped draft literal is <c>kind, model, data, edits</c>; a typed append
+/// <c>{ ...draft, kind }</c> puts <c>kind</c> last). <see cref="KeyOrder"/> carries that order from the appending path, or from the decoded
+/// JSON, so a record read back writes the same text.</summary>
 public sealed record EntryRecord
 {
     /// <summary>The entry ID.</summary>
@@ -197,12 +199,15 @@ public sealed record EntryRecord
     public ImmutableArray<ContextEdit>? Edits { get; init; }
     /// <summary>Task that appended this entry, when durable work produced it.</summary>
     public TaskId? ByTaskId { get; init; }
+    /// <summary>The JSON key order of the record's creation (see <see cref="RecordJson.Ordered"/>); default: an untyped draft's.</summary>
+    internal ImmutableArray<string> KeyOrder { get; init; }
 
     /// <summary>The persisted JSON.</summary>
-    public JsonObjectValue ToJson() => new RecordJson.Writer()
-        .Add("id", Id.ToJson()).Add("conversationId", ConversationId.ToJson()).Add("kind", Kind).Add("model", Model).Add("data", Data)
-        .Add("head", Head?.ToJson()).Add("edits", Edits is { } edits ? JsonValue.Array(edits.Select(edit => edit.ToJson())) : null)
-        .Add("byTaskId", ByTaskId?.ToJson()).Build();
+    public JsonObjectValue ToJson() => RecordJson.Ordered(new RecordJson.Writer()
+        .Add("kind", Kind).Add("model", Model).Add("data", Data)
+        .Add("edits", Edits is { } edits ? JsonValue.Array(edits.Select(edit => edit.ToJson())) : null)
+        .Add("id", Id.ToJson()).Add("conversationId", ConversationId.ToJson()).Add("head", Head?.ToJson())
+        .Add("byTaskId", ByTaskId?.ToJson()).Build(), KeyOrder);
 
     /// <summary>Decodes <see cref="ToJson"/>.</summary>
     public static EntryRecord FromJson(JsonValue json)
@@ -220,6 +225,7 @@ public sealed record EntryRecord
             Head = RecordJson.OptionalId<EntryId>(value, "head", what),
             Edits = RecordJson.Optional(value, "edits") is { } edits ? [.. RecordJson.Array(edits, "edits", what).Select(ContextEdit.FromJson)] : null,
             ByTaskId = RecordJson.OptionalId<TaskId>(value, "byTaskId", what),
+            KeyOrder = RecordJson.KeysOf(value),
         };
     }
 
@@ -275,9 +281,11 @@ public interface ISubmissionFields
 }
 
 /// <summary>Durable lifecycle of one admitted user input or passive entry write (upstream <c>SubmissionRecord</c>). Which fields a
-/// status allows follows upstream's union exactly; <see cref="Validate"/> and <see cref="FromJson"/> enforce it. JSON key order:
-/// <c>id, conversationId, requestId, type, status, entry, answer, reason, detail</c> (the declaration order; the Session's own order
-/// depends on the admission path).</summary>
+/// status allows follows upstream's union exactly; <see cref="Validate"/> and <see cref="FromJson"/> enforce it. JSON key order is
+/// upstream's: the Session creates <c>{ ...create, id }</c> (<c>conversationId, requestId, type, status, entry, answer, reason, detail</c>,
+/// each when present, then <c>id</c>), and a placement or settlement spreads the current record, so a field it adds (a queued input's
+/// <c>entry</c>, an <c>answer</c>, a <c>reason</c>) follows <c>id</c>. <see cref="KeyOrder"/> carries the creation order, or the decoded
+/// JSON's, through <c>with</c>.</summary>
 public sealed record SubmissionRecord : ISubmissionFields
 {
     /// <summary>The submission ID.</summary>
@@ -299,11 +307,15 @@ public sealed record SubmissionRecord : ISubmissionFields
     /// <inheritdoc/>
     public JsonValue? Detail { get; init; }
 
+    /// <summary>The JSON key order of the record's creation (see <see cref="RecordJson.Ordered"/>); default: the create's fields, then <c>id</c>.</summary>
+    internal ImmutableArray<string> KeyOrder { get; init; }
+
     /// <summary>Throws when the fields do not form one of upstream's submission shapes.</summary>
     public SubmissionRecord Validate() { SubmissionShape.Validate(this, "submission record"); return this; }
 
     /// <summary>The persisted JSON.</summary>
-    public JsonObjectValue ToJson() => SubmissionShape.Write(new RecordJson.Writer().Add("id", Id.ToJson()), this);
+    public JsonObjectValue ToJson() =>
+        RecordJson.Ordered(SubmissionShape.Write(new RecordJson.Writer(), this).Add("id", Id.ToJson()).Build(), KeyOrder);
 
     /// <summary>Decodes and validates <see cref="ToJson"/>.</summary>
     public static SubmissionRecord FromJson(JsonValue json)
@@ -312,7 +324,7 @@ public sealed record SubmissionRecord : ISubmissionFields
         var value = RecordJson.Object(json, what);
         RecordJson.OnlyKeys(value, what, "id", "conversationId", "requestId", "type", "status", "entry", "answer", "reason", "detail");
         var create = SubmissionShape.Read(value, what);
-        return create.WithId(RecordJson.Id<SubmissionId>(value, "id", what)).Validate();
+        return (create.WithId(RecordJson.Id<SubmissionId>(value, "id", what)) with { KeyOrder = RecordJson.KeysOf(value) }).Validate();
     }
 
     /// <inheritdoc/>
@@ -346,15 +358,15 @@ public sealed record SubmissionCreate : ISubmissionFields
     /// <summary>Throws when the fields do not form one of upstream's submission shapes.</summary>
     public SubmissionCreate Validate() { SubmissionShape.Validate(this, "submission create"); return this; }
 
-    /// <summary>The record with <paramref name="id"/>.</summary>
+    /// <summary>The record with <paramref name="id"/>: upstream's <c>{ ...create, id }</c>, whose later fields follow <c>id</c>.</summary>
     public SubmissionRecord WithId(SubmissionId id) => new()
     {
         Id = id, ConversationId = ConversationId, RequestId = RequestId, Type = Type, Status = Status, Entry = Entry, Answer = Answer,
-        Reason = Reason, Detail = Detail,
+        Reason = Reason, Detail = Detail, KeyOrder = [.. ToJson().Keys, "id"],
     };
 
     /// <summary>The JSON, without an ID.</summary>
-    public JsonObjectValue ToJson() => SubmissionShape.Write(new RecordJson.Writer(), this);
+    public JsonObjectValue ToJson() => SubmissionShape.Write(new RecordJson.Writer(), this).Build();
 
     /// <summary>Decodes and validates <see cref="ToJson"/>; an <c>id</c> is rejected because the Session assigns it.</summary>
     public static SubmissionCreate FromJson(JsonValue json)
@@ -402,10 +414,10 @@ public sealed class SubmissionSettlement : DurableValue
 
 internal static class SubmissionShape
 {
-    public static JsonObjectValue Write(RecordJson.Writer writer, ISubmissionFields value) => writer
+    public static RecordJson.Writer Write(RecordJson.Writer writer, ISubmissionFields value) => writer
         .Add("conversationId", value.ConversationId.ToJson()).Add("requestId", value.RequestId).Add("type", WireName.Of(value.Type))
         .Add("status", WireName.Of(value.Status)).Add("entry", value.Entry?.ToJson()).Add("answer", value.Answer?.ToJson())
-        .Add("reason", value.Reason).Add("detail", value.Detail).Build();
+        .Add("reason", value.Reason).Add("detail", value.Detail);
 
     public static SubmissionCreate Read(JsonObjectValue value, string what) => new()
     {
@@ -712,8 +724,10 @@ public sealed class TerminalTaskState(TaskOutcome outcome) : SettlingTaskState(o
 }
 
 /// <summary>Complete replacement record for one durable task state machine (upstream <c>TaskRecord&lt;JsonValue, JsonValue,
-/// JsonValue&gt;</c>; typed task views join with the runtime in P7). JSON key order: <c>id, conversationId, kind, version, input, owner,
-/// background, abortRequested, state, memos, startedAt, endedAt</c>, as the Session creates and then replaces records.</summary>
+/// JsonValue&gt;</c>; typed task views join with the runtime in P7). JSON key order is upstream's: <c>id, conversationId, kind, version, input,
+/// owner, background, abortRequested, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first change to
+/// running), <c>memos</c> (added by a running invocation, dropped with the outcome) and <c>endedAt</c>, each appended by a spread of the
+/// current record. <see cref="KeyOrder"/> keeps a decoded record's own order through <c>with</c>.</summary>
 public sealed record TaskRecord
 {
     /// <summary>The task ID.</summary>
@@ -740,6 +754,8 @@ public sealed record TaskRecord
     public double? StartedAt { get; init; }
     /// <summary>Wall-clock milliseconds of the change to terminal, stamped by the Session.</summary>
     public double? EndedAt { get; init; }
+    /// <summary>The JSON key order of a decoded record (see <see cref="RecordJson.Ordered"/>); default: the creation order above.</summary>
+    internal ImmutableArray<string> KeyOrder { get; init; }
 
     /// <summary>Throws when a completing or terminal record retains memos.</summary>
     public TaskRecord Validate()
@@ -749,10 +765,10 @@ public sealed record TaskRecord
     }
 
     /// <summary>The persisted JSON.</summary>
-    public JsonObjectValue ToJson() => new RecordJson.Writer()
+    public JsonObjectValue ToJson() => RecordJson.Ordered(new RecordJson.Writer()
         .Add("id", Id.ToJson()).Add("conversationId", ConversationId.ToJson()).Add("kind", Kind).Number("version", Version).Add("input", Input)
         .Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested).Add("state", State.ToJson())
-        .Add("memos", Memos).Number("startedAt", StartedAt).Number("endedAt", EndedAt).Build();
+        .Number("startedAt", StartedAt).Add("memos", Memos).Number("endedAt", EndedAt).Build(), KeyOrder);
 
     /// <summary>Decodes and validates <see cref="ToJson"/>.</summary>
     public static TaskRecord FromJson(JsonValue json)
@@ -775,6 +791,7 @@ public sealed record TaskRecord
             Memos = RecordJson.Optional(value, "memos") is { } memos ? RecordJson.Object(memos, "task memos") : null,
             StartedAt = RecordJson.OptionalNumber(value, "startedAt", what),
             EndedAt = RecordJson.OptionalNumber(value, "endedAt", what),
+            KeyOrder = RecordJson.KeysOf(value),
         }.Validate();
     }
 

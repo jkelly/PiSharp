@@ -45,6 +45,18 @@ public sealed record EntryDraft
     public EntryHead? Head { get; init; }
     /// <summary>Context-only overrides of earlier visible entries.</summary>
     public ImmutableArray<ContextEdit>? Edits { get; init; }
+    /// <summary>
+    /// The draft's JSON key order, which leads the appended record's (see <see cref="EntryRecord"/>): a draft decoded from JSON (an inbox write
+    /// item) keeps its own, a typed append is <see cref="TypedOrder"/>, and the default is an untyped draft literal's, <see cref="DefaultOrder"/>.
+    /// </summary>
+    internal ImmutableArray<string> KeyOrder { get; init; }
+
+    /// <summary>Upstream's untyped draft literals: <c>{ kind, head, model, data }</c> (compaction, reset, write submissions).</summary>
+    internal static readonly ImmutableArray<string> DefaultOrder = ["kind", "head", "model", "data", "edits"];
+
+    /// <summary>A typed append, <c>{ ...draft, kind: token.kind }</c>, over upstream's typed draft literals (<c>{ model }</c>, <c>{ model, data }</c>,
+    /// <c>{ head, model }</c>).</summary>
+    internal static readonly ImmutableArray<string> TypedOrder = ["head", "model", "data", "edits", "kind"];
 }
 
 /// <summary>Entry content of a data-less typed kind; the token supplies the kind (upstream <c>TypedEntryDraft&lt;never&gt;</c>).</summary>

@@ -6,7 +6,8 @@ using PiSharp.Durable.Chord;
 // lines are compile-time rejections of invalid record shapes; here each record kind is its own struct or closed type, and the shapes the
 // TypeScript union forbids are rejected where persisted JSON is decoded (FromJson) and by the records' Validate(). The third upstream test
 // ("types submissions, task waits, compaction, and tasks erased into extensions") types the Harness surface and joins with P6-P8.
-// types.record-json-key-order is authored: it pins the key orders this port writes (see Types.cs).
+// types.record-json-key-order is authored: it pins the key orders this port writes, which are upstream's (see Types.cs; compat.* checks them
+// against sessions upstream wrote).
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> TypesCases() =>
@@ -112,20 +113,20 @@ internal static partial class Program
         {
             Equal("{\"id\":3,\"parent\":{\"conversationId\":1,\"at\":2},\"owner\":{\"conversationId\":1,\"taskId\":4}}",
                 new ConversationRecord(new(3), new(ConversationId.Root, new(2)), new(ConversationId.Root, new(4))).ToJson().ToJson(), "conversation");
-            Equal("{\"id\":2,\"conversationId\":1,\"kind\":\"pi.user\",\"model\":[],\"data\":null,\"head\":2,\"edits\":[{\"target\":1,\"action\":\"omit\"}],\"byTaskId\":4}",
+            Equal("{\"kind\":\"pi.user\",\"model\":[],\"data\":null,\"edits\":[{\"target\":1,\"action\":\"omit\"}],\"id\":2,\"conversationId\":1,\"head\":2,\"byTaskId\":4}",
                 new EntryRecord
                 {
                     Id = new(2), ConversationId = ConversationId.Root, Kind = "pi.user", Model = JsonArrayValue.Empty, Data = JsonValue.Null, Head = new(2),
                     Edits = [ContextEdit.Omit(new(1))], ByTaskId = new(4),
                 }.ToJson().ToJson(), "entry");
-            Equal("{\"id\":5,\"conversationId\":1,\"requestId\":\"r\",\"type\":\"input\",\"status\":\"unanswered\",\"entry\":2,\"reason\":\"closed\",\"detail\":{}}",
+            Equal("{\"conversationId\":1,\"requestId\":\"r\",\"type\":\"input\",\"status\":\"unanswered\",\"entry\":2,\"reason\":\"closed\",\"detail\":{},\"id\":5}",
                 new SubmissionRecord
                 {
                     Id = new(5), ConversationId = ConversationId.Root, RequestId = "r", Type = SubmissionType.Input, Status = SubmissionStatus.Unanswered,
                     Entry = new(2), Reason = "closed", Detail = JsonObjectValue.Empty,
                 }.Validate().ToJson().ToJson(), "submission");
             Equal("{\"id\":4,\"conversationId\":1,\"kind\":\"k\",\"version\":2,\"input\":{},\"owner\":3,\"background\":false,\"abortRequested\":true," +
-                "\"state\":{\"status\":\"waiting\",\"checkpoint\":{\"phase\":\"p\"},\"on\":[3],\"policy\":\"failFast\"},\"memos\":{},\"startedAt\":10,\"endedAt\":0.5}",
+                "\"state\":{\"status\":\"waiting\",\"checkpoint\":{\"phase\":\"p\"},\"on\":[3],\"policy\":\"failFast\"},\"startedAt\":10,\"memos\":{},\"endedAt\":0.5}",
                 new TaskRecord
                 {
                     Id = new(4), ConversationId = ConversationId.Root, Kind = "k", Version = 2, Input = JsonObjectValue.Empty, Owner = new(3), Background = false,
@@ -134,6 +135,19 @@ internal static partial class Program
                 }.ToJson().ToJson(), "task");
             Equal("{\"status\":\"failed\",\"error\":{\"message\":\"m\",\"detail\":1},\"result\":2}",
                 new FailedTaskOutcome(new TaskOutcomeError("m", 1), 2).ToJson().ToJson(), "failed outcome");
+            // Decoded records keep their own key order; a spread-like change appends a new key, as upstream's { ...current, entry } does.
+            foreach (var json in new[]
+            {
+                "{\"model\":[],\"data\":{},\"kind\":\"pi.tool-result\",\"id\":2,\"conversationId\":1,\"byTaskId\":4}",
+                "{\"kind\":\"pi.compaction\",\"model\":[],\"data\":{},\"id\":2,\"conversationId\":1,\"head\":1,\"byTaskId\":4}",
+            })
+                Equal(json, EntryRecord.FromJson(J(json)).ToJson().ToJson(), "decoded entry order");
+            var queued = new SubmissionCreate { ConversationId = ConversationId.Root, Type = SubmissionType.Input, Status = SubmissionStatus.Queued }.WithId(new(5));
+            var placed = queued with { Status = SubmissionStatus.Placed, Entry = new(6) };
+            Equal("{\"conversationId\":1,\"type\":\"input\",\"status\":\"placed\",\"id\":5,\"entry\":6}", placed.ToJson().ToJson(), "placed after queued");
+            Equal("{\"conversationId\":1,\"type\":\"input\",\"status\":\"done\",\"id\":5,\"entry\":6,\"answer\":7}",
+                (placed with { Status = SubmissionStatus.Done, Answer = new(7) }).ToJson().ToJson(), "answered after queued");
+            Equal(placed.ToJson().ToJson(), SubmissionRecord.FromJson(placed.ToJson()).ToJson().ToJson(), "decoded submission order");
             Equal("{\"id\":6,\"kind\":\"k\",\"key\":\"f\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"latest\",\"fork\":\"initial\",\"createdAt\":7,\"retiredAt\":8}",
                 new DocumentRecord
                 {

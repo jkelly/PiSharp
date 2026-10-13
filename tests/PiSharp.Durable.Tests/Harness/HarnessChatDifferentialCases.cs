@@ -3,9 +3,10 @@
 // pi.inbox, pi.usage, pi.agent and pi.provider documents) that the pinned pi-durable writes for the scenarios below with pi-ai's faux
 // provider on MemoryStorage, as printed by Fixtures/chat-turns.upstream.ts. Times and the provider session ID are normalized; task
 // startedAt/endedAt are dropped. The scenarios run here on memory, JSONL and SQLite and must produce the same records, IDs included.
-// Records compare as JSON values (vitest's toEqual): PiSharp.Contracts writes an assistant message's optional fields after its timestamp,
-// where the faux provider writes errorMessage before it, and the record types write their fields in declaration order where upstream's
-// storage keeps each object's insertion order. The Harness documents also compare by their exact JSON text, key order included.
+// Records compare as JSON values (vitest's toEqual) and then by their exact JSON text, key order included: the record types write upstream's
+// per-path key order (EntryRecord, SubmissionRecord and TaskRecord carry it), and Generation.ToWire restores pi-ai's assistant message order
+// (errorMessage before timestamp) over PiSharp.Contracts' writer. compat.* (Compat/CompatCases.cs) checks the same against sessions upstream
+// itself wrote.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -70,6 +71,7 @@ internal static class ChatDifferentialTests
     {
         var expected = path.Aggregate((JsonValue)Upstream.Value[scenario], (value, key) => ((JsonObjectValue)value)[key]);
         Check(JsonValue.DeepEquals(expected, actual), $"{scenario}: expected {expected.ToJson()}, actual {actual.ToJson()}");
+        Equal(expected.ToJson(), actual.ToJson(), $"{scenario}: key order");
         // The documents are built by the Harness, so their key order is upstream's too.
         foreach (var (expectedDocs, actualDocs) in Documents(expected).Zip(Documents(actual)))
             Equal(expectedDocs.ToJson(), actualDocs.ToJson(), $"{scenario}: document key order");

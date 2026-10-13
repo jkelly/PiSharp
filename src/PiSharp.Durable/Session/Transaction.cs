@@ -207,7 +207,10 @@ internal sealed class Transaction : ITx
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(value);
-        return AppendEntryCore(conversationId, new EntryDraft { Kind = token.Kind, Model = value.Model, Head = value.Head, Edits = value.Edits });
+        return AppendEntryCore(conversationId, new EntryDraft
+        {
+            Kind = token.Kind, Model = value.Model, Head = value.Head, Edits = value.Edits, KeyOrder = EntryDraft.TypedOrder,
+        });
     }
 
     public async Task<TypedEntry<TData>> AppendEntryAsync<TData>(Entry<TData> token, ConversationId conversationId, TypedEntryDraft<TData> value)
@@ -215,7 +218,10 @@ internal sealed class Transaction : ITx
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(value);
-        var draft = new EntryDraft { Kind = token.Kind, Model = value.Model, Data = value.Data, Head = value.Head, Edits = value.Edits };
+        var draft = new EntryDraft
+        {
+            Kind = token.Kind, Model = value.Model, Data = value.Data, Head = value.Head, Edits = value.Edits, KeyOrder = EntryDraft.TypedOrder,
+        };
         return new TypedEntry<TData>(await AppendEntryCore(conversationId, draft).ConfigureAwait(false));
     }
 
@@ -226,10 +232,13 @@ internal sealed class Transaction : ITx
         AssertOpen();
         var id = await host.Storage.MintIdAsync<EntryId>().ConfigureAwait(false);
         AssertOpen();
+        // Upstream's { ...draft without head, id, conversationId, head, byTaskId }: the draft's own key order leads.
+        var draftOrder = value.KeyOrder.IsDefault ? EntryDraft.DefaultOrder : value.KeyOrder;
         var record = new EntryRecord
         {
             Id = id, ConversationId = conversationId, Kind = value.Kind, Model = value.Model, Data = value.Data,
             Head = value.Head?.Resolve(id), Edits = value.Edits, ByTaskId = scope.TaskId,
+            KeyOrder = [.. draftOrder.Where(key => key != "head"), "id", "conversationId", "head", "byTaskId"],
         };
         lock (gate) writes.Add(new EntryWrite(record));
         return record;

@@ -751,6 +751,14 @@ internal static class GenerationPhases
 
     // ─── JSON helpers ───────────────────────────────────────────────────────
 
+    /// <summary>
+    /// pi-ai's assistant message key order, as its faux provider builds the message (<c>fauxAssistantMessage</c>): the optional
+    /// <c>deferred</c>, <c>errorMessage</c> and <c>responseId</c> come before <c>timestamp</c>. PiSharp.Contracts' wire writer puts them after
+    /// it; the order is restored here, at the durable boundary, so a persisted entry is upstream's text. Keys not listed keep their order after.
+    /// </summary>
+    private static readonly ImmutableArray<string> AssistantKeyOrder =
+        ["role", "content", "api", "provider", "model", "usage", "stopReason", "deferred", "errorMessage", "responseId", "timestamp"];
+
     /// <summary>A provider message as pi-ai wire JSON. A non-finite usage count is not strict JSON (Chord's copyJson error).</summary>
     internal static JsonObjectValue ToWire(AssistantMessage message)
     {
@@ -758,7 +766,7 @@ internal static class GenerationPhases
         if (!double.IsFinite(usage.Input) || !double.IsFinite(usage.Output) || !double.IsFinite(usage.CacheRead) ||
             !double.IsFinite(usage.CacheWrite) || !double.IsFinite(usage.TotalTokens))
             throw new ArgumentException("Value contains a non-finite number and is not strict JSON");
-        return (JsonObjectValue)JsonValue.FromData(PiWireJson.WriteMessage(message));
+        return RecordJson.Ordered((JsonObjectValue)JsonValue.FromData(PiWireJson.WriteMessage(message)), AssistantKeyOrder);
     }
 
     /// <summary>The settings' request options as the JSON a <c>request</c> checkpoint pins, in upstream's
