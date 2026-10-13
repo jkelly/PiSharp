@@ -195,7 +195,8 @@ internal static partial class CompatTests
                     SameJson(Expected(scenario.Name, "records.json", backend), await Dump(await OpenBackend(backend, directory)), "records");
                     var upstream = Path.Combine(Fixtures, scenario.Name, backend);
                     if (backend == "jsonl") SameFiles(upstream, directory);
-                    else SameColumns(Path.Combine(upstream, "session.sqlite"), Path.Combine(directory, "session.sqlite"));
+                    // A copy: even a read-only connection to a WAL database leaves -wal and -shm files beside it.
+                    else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend), "session.sqlite"), Path.Combine(directory, "session.sqlite"));
                     if (scenario.Resume is { } resume)
                     {
                         await resume(() => OpenBackend(backend, directory));

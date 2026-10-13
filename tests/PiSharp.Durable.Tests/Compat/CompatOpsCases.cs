@@ -32,6 +32,17 @@ internal static partial class CompatTests
             yield return Case($"compat.ops.document-{number}", () => { ReplayDocument(document, $"document {number}"); });
         }
         yield return Case("compat.reverse.upstream-reads-pisharp-sessions", ReverseAsync);
+        // Last: the fixtures are exactly the captured files (no case wrote beside them, as a SQLite connection's -wal and -shm would).
+        yield return Case("compat.manifest.fixtures-are-the-captured-files", () =>
+        {
+            var listed = ((JsonArrayValue)Load("manifest.json")["files"]).Cast<JsonObjectValue>()
+                .Select(file => $"{S(file["path"])} {N(file["bytes"])}").Order(StringComparer.Ordinal);
+            var present = Directory.GetFiles(Fixtures, "*", SearchOption.AllDirectories)
+                .Select(path => (Name: Path.GetRelativePath(Fixtures, path).Replace('\\', '/'), Bytes: new FileInfo(path).Length))
+                .Where(file => file.Name is not ("manifest.json" or ".gitattributes"))
+                .Select(file => $"{file.Name} {file.Bytes}").Order(StringComparer.Ordinal);
+            Equal(string.Join("\n", listed), string.Join("\n", present), "fixture files");
+        });
     }
 
     /// <summary>Replays one corpus document; returns PiSharp's tracker operations for each batch.</summary>
