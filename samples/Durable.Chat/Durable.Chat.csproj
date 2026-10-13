@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0005, milestone M1: one prompt answered headless through a real provider (NativeDurableModels), on SQLite by default, and
+       still there after reopen. The PiSharp counterpart of Pi v1.1.0 packages/durable/test/examples/16-real-model.ts. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Durable.Chat</AssemblyName>
+    <RootNamespace>PiSharp.Durable.Chat</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

@@ -175,6 +175,9 @@
   <Folder Name="/tests/parity/PiSharp.SessionParity.Tests/">
     <Project Path="tests/PiSharp.SessionParity.Tests/PiSharp.SessionParity.Tests.csproj" />
   </Folder>
+  <Folder Name="/samples/Durable.Chat/">
+    <Project Path="samples/Durable.Chat/Durable.Chat.csproj" />
+  </Folder>
   <Folder Name="/samples/Durable.Examples/">
     <Project Path="samples/Durable.Examples/Durable.Examples.csproj" />
   </Folder>

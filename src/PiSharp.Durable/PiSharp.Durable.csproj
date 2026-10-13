@@ -13,4 +13,8 @@
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
     <ProjectReference Include="../PiSharp.AI/PiSharp.AI.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- NativeDurableModels: PiSharp.Cli's byte-pinned pi-ai 1.1.0 catalog shards, linked (not copied) and verified by hash on load. -->
+    <EmbeddedResource Include="../PiSharp.Cli/Models/*.json" LogicalName="PiSharp.Durable.Models.%(Filename)%(Extension)" Link="Models/Catalog/%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
