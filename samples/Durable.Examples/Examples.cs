@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts (14-chat.ts
-// and 15-system-prompt.ts are in ExamplesChat.cs; 17-coding-tools.ts, 29-sandbox-per-conversation.ts and 30-tool-override.ts are in
-// ExamplesTools.cs; 20-inbox.ts is in ExamplesInbox.cs; 25-compaction.ts is in ExamplesCompaction.cs).
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts (06-harness.ts
+// through 13-recovery.ts are in ExamplesHarness.cs; 14-chat.ts and 15-system-prompt.ts are in ExamplesChat.cs; 17-coding-tools.ts,
+// 29-sandbox-per-conversation.ts and 30-tool-override.ts are in ExamplesTools.cs; 20-inbox.ts is in ExamplesInbox.cs; 25-compaction.ts is
+// in ExamplesCompaction.cs).
 // Each example prints what upstream's console.log prints, as JSON. Upstream runs every example on a fresh MemoryStorage; here each one
 // can also run on its own JSONL directory or SQLite file, and then the storage is reopened in a new Session and read back (milestone M0
 // of decision 0005: the examples survive close and reopen).
@@ -22,7 +23,7 @@ public enum ExampleStorage
     Sqlite,
 }
 
-/// <summary>Upstream durable examples 00-05, 14, 15, 17, 20, 25, 29 and 30.</summary>
+/// <summary>Upstream durable examples 00-15, 17, 20, 25, 29 and 30.</summary>
 public static partial class Examples
 {
     // Every Session call takes a context, which is used for cancellation. Background means "never cancel".
@@ -44,6 +45,14 @@ public static partial class Examples
         ("03-owned-conversations", OwnedConversationsAsync),
         ("04-chord-state", ChordStateAsync),
         ("05-watches", WatchesAsync),
+        ("06-harness", HarnessAsync),
+        ("07-configuration", ConfigurationAsync),
+        ("08-harness-conversations", HarnessConversationsAsync),
+        ("09-context", ContextAsync),
+        ("10-registry-reload", RegistryReloadAsync),
+        ("11-extension-state", ExtensionStateAsync),
+        ("12-tasks", TasksAsync),
+        ("13-recovery", RecoveryAsync),
         ("14-chat", ChatAsync),
         ("15-system-prompt", SystemPromptAsync),
         ("17-coding-tools", CodingToolsAsync),

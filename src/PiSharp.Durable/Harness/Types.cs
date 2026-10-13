@@ -1,6 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/types.ts. The parts the openable Harness (P6) and the
-// task runtime (P7) need are complete; later-phase shapes keep upstream's names and carry TODO markers where their final C# signatures
-// join (compaction and the task graph, P11). Submissions and the generation hooks are final (P8); tools are final (P9); views are final (P10).
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/types.ts. The openable Harness (P6) and the task runtime (P7)
+// are complete; submissions and the generation hooks are final (P8); tools are final (P9); views are final (P10); compaction and the task
+// graph are final (P11).
 //
 // Mappings: upstream's `Tool` generic (a host's own ToolRegistration subtype) becomes record inheritance, so `{ ...tool, x }` is
 // `tool with { X = ... }` and keeps the subtype; pi-ai messages and tool calls are wire JSON (JsonValue); a field that may be given,
@@ -890,10 +890,12 @@ public interface IHarness : ISession
     Task WaitForIdleAsync(DurableContext context);
     /// <summary>Session total: every conversation's <c>pi.usage</c> summed (upstream <c>UsageState</c> JSON).</summary>
     Task<JsonObjectValue> UsageAsync(DurableContext context);
-    /// <summary>Every live task with its owner edge, status, and owned conversations (spec §9.5). TODO(P11).</summary>
-    Task<AttachedReplicatedState<JsonObjectValue>> TaskGraphAsync(DurableContext context);
-    /// <summary>The task graph as a serialized exact-frame watch. TODO(P11).</summary>
-    Task<IWatchHandle<JsonObjectValue>> WatchTaskGraphAsync(DurableContext context);
+    /// <summary>Every live task with its owner edge, status, and owned conversations, as a disposable read-only Chord state (spec §9.5).
+    /// Reads only: it does not enable scheduling.</summary>
+    Task<AttachedReplicatedState<TaskGraph>> TaskGraphAsync(DurableContext context);
+    /// <summary>The task graph as a serialized exact-frame watch whose operations address <see cref="TaskGraph.ToJson"/>; cancelling
+    /// <paramref name="context"/> stops it (spec §9.5).</summary>
+    Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context);
 }
 
 /// <summary>Result of <see cref="IHarness.AbortTaskAsync"/>.</summary>

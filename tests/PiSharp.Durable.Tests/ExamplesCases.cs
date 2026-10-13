@@ -7,8 +7,9 @@ using PiSharp.Durable.Examples;
 // timestamps come from the clock, so both sides compare them as <time>. The file backends also reopen each example's storage in a new
 // Session and read it back. P9 adds 17-coding-tools, 29-sandbox-per-conversation and 30-tool-override, whose tools run over LocalExecutionEnv
 // in temporary directories (Git Bash on Windows); 17's timing of `cat /tmp/1gb.txt` compares as <ms> and its storage directory as <dir>.
-// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held. P11 adds 25-compaction, whose model reports the faux provider's usage
-// estimate; its file backends read back the stored entries and summaries.
+// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held. P11 adds 06-harness through 13-recovery (11's faux provider is
+// ScriptedModels; 13 keeps its storage in a temporary SQLite file on memory, as upstream does, and reopens the runner's storage otherwise),
+// and 25-compaction, whose model reports the faux provider's usage estimate; its file backends read back the stored entries and summaries.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -49,6 +50,45 @@ internal static partial class Program
         "== 05-watches",
         "watch baseline: {\"text\":\"first\"}",
         "watch update: {\"text\":\"observed asynchronously\"}",
+        "== 06-harness",
+        "root: 1 {\"text\":\"root notes\"}",
+        "stored agent: {\"thinkingLevel\":\"low\"}",
+        HarnessResolved,
+        "== 07-configuration",
+        """default tools: ["read","write","grep"]""",
+        ConfigurationStored,
+        """model: {"provider":"anthropic","modelId":"claude-sonnet-4-5"} thinking: high tools: ["write","read"]""",
+        """without search: ["read","write"]""",
+        """files uninstalled: ["grep"]""",
+        ConfigurationReinstalled,
+        "== 08-harness-conversations",
+        "typed entry: true example",
+        "helper thinking: minimal",
+        "fork thinking: high",
+        "lookup: true",
+        "== 09-context",
+        """raw active entries: ["message","message","message","message","pi.system","message","message","edit","note"]""",
+        """request messages: ["user: read files a and b","assistant: reading call(a) call(b)","result(a)","result(b)","system: {\"cwd\":\"<cwd>/repo</cwd>\"}","assistant: a and b look fine"]""",
+        """fork messages: ["user: read a and b","assistant: reading call(a) call(b)","result(a) error","result(b) error"]""",
+        """after summary: summary ["user: Summary: a and b are fine."]""",
+        """newest stored entries: ["summary","note","edit"] more: true""",
+        "== 10-registry-reload",
+        """after reload: ["read: Read a file","grep: Search files, faster"]""",
+        """with audit: ["read: Read a file (audited)","grep: Search files, faster"]""",
+        """after uninstall: ["read: Read a file","grep: Search files, faster"]""",
+        "== 11-extension-state",
+        ExtensionStateTodos,
+        ExtensionStateSystem,
+        "== 12-tasks",
+        PaymentOutcome,
+        "== 13-recovery",
+        "tick 1",
+        "tick 2",
+        """closed; saved checkpoint: {"status":"pending","checkpoint":{"phase":"tick","n":2}} memos: {"printed-1":true,"printed-2":true}""",
+        "tick 3",
+        "tick 4",
+        "tick 5",
+        """after reopen: {"status":"completed","result":"counted to 5"}""",
         "== 14-chat",
         ChatAnswer,
         ChatTranscript,
@@ -137,6 +177,14 @@ internal static partial class Program
         TimedBashCalls,
     ];
 
+    private const string HarnessResolved = """resolved: low ["files"] ["read"]""";
+    private const string ConfigurationStored =
+        """stored: {"model":{"provider":"anthropic","modelId":"claude-sonnet-4-5"},"thinkingLevel":"high","tools":["write","read"]}""";
+    private const string ConfigurationReinstalled = """files reinstalled: ["read","write","grep"]""";
+    private const string ExtensionStateTodos = """todos: {"items":["fix the build"]}""";
+    private const string ExtensionStateSystem =
+        """system messages: [{"toolsAdded":["todo"]},{"sections":{"todos":"<todos>\nfix the build\n</todos>"}}]""";
+    private const string PaymentOutcome = """payment outcome: {"status":"completed","result":{"receipt":500}}""";
     private const string CodingToolsStorage = "storage: <dir>";
     private const string InboxTranscript = """transcript: ["pi.user","pi.assistant","app.note","pi.user","pi.user","pi.assistant"]""";
     // Repeated within 25-compaction's output; the read-back follows its last occurrence, the example's last line.
@@ -176,6 +224,12 @@ internal static partial class Program
         ],
         ["Chord notes: update 1 {\"text\":\"published through Chord\"}"] = ["Chord notes: hydrate 0 {\"text\":\"published through Chord\"}"],
         ["watch update: {\"text\":\"observed asynchronously\"}"] = ["watch baseline: {\"text\":\"observed asynchronously\"}"],
+        [HarnessResolved] = ["root: 1 {\"text\":\"root notes\"}", "stored agent: {\"thinkingLevel\":\"low\"}"],
+        // The last configure call selected exactly files and search, and cleared the tool selection.
+        [ConfigurationReinstalled] =
+            ["""stored: {"model":{"provider":"anthropic","modelId":"claude-sonnet-4-5"},"thinkingLevel":"high","extensions":["files","search"]}"""],
+        [ExtensionStateSystem] = [ExtensionStateTodos],
+        [PaymentOutcome] = [PaymentOutcome],
         [ChatTranscript] = [ChatTranscript, ChatAnswer],
         [RootAfterCwdChange] = [RootAfterCwdChange],
         [CodingToolsStorage] = CodingToolsTranscript,
