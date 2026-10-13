@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
 // upstream's HarnessImpl extends SessionImpl. Placeholders for later phases fail with NotImplementedException naming their phase:
-// views (P10), compaction and the task graph (P11).
+// compaction and the task graph (P11).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -61,6 +61,7 @@ internal sealed class DurableHarness : Session, IHarness
     private readonly Action<Exception> report;
     private readonly DurableTaskScheduler scheduler;
     private readonly Submissions submissions;
+    private readonly ConversationViews views;
     private volatile bool closed;
 
     public DurableHarness(IStorage storage, HarnessOptions options, DurableContext context)
@@ -92,6 +93,7 @@ internal sealed class DurableHarness : Session, IHarness
             Context = context.WithoutCancellation(),
         });
         submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(options.Settings), () => scheduler.Resume());
+        views = new ConversationViews(this, storage);
     }
 
     /// <summary>The Harness clock.</summary>
@@ -102,6 +104,9 @@ internal sealed class DurableHarness : Session, IHarness
     internal DurableTaskScheduler Scheduler => scheduler;
 
     internal Submissions Submissions => submissions;
+
+    /// <summary>The conversation view mounts (upstream <c>host.views</c>).</summary>
+    internal ConversationViews Views => views;
 
     private static Func<double> Clock(HarnessOptions options)
     {
@@ -350,13 +355,9 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
         return harness.Scheduler.WaitForIdleAsync(Id, context);
     }
 
-    /// <summary>TODO(P10): the structural view.</summary>
-    public Task<AttachedReplicatedState<JsonObjectValue>> ViewStateAsync(DurableContext context) =>
-        Task.FromException<AttachedReplicatedState<JsonObjectValue>>(Harness.NotPorted("Conversation.ViewStateAsync", "P10"));
+    public Task<AttachedReplicatedState<ConversationView>> ViewStateAsync(DurableContext context) => harness.Views.StateAsync(Id, context);
 
-    /// <summary>TODO(P10): the structural view.</summary>
-    public Task<IWatchHandle<JsonObjectValue>> WatchAsync(DurableContext context) =>
-        Task.FromException<IWatchHandle<JsonObjectValue>>(Harness.NotPorted("Conversation.WatchAsync", "P10"));
+    public Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context) => harness.Views.WatchAsync(Id, context);
 
     public override string ToString() => $"Conversation {Id}";
 }

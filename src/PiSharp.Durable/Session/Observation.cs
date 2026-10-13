@@ -218,11 +218,12 @@ internal sealed class SessionSourceAttachment<T>(ReplicatedStateSnapshot<T> snap
 /// Serialized exact-frame watch bound to one document incarnation or conversation view (upstream <c>CommittedWatch</c>). A null value
 /// retires it.
 /// </summary>
-internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T> where T : JsonValue?
+internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T> where T : class?
 {
     private readonly Lock gate = new();
     private readonly Action detach;
     private readonly Func<T>? replace;
+    private readonly Func<T, JsonValue>? json;
     private readonly ObservationScheduler schedule;
     // Completed off the terminating thread, so an awaiting caller never runs inside a close listener or a line job.
     private readonly TaskCompletionSource<WatchEnd> closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -238,13 +239,15 @@ internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T>
     private bool resolved;
     private CancellationTokenRegistration cancellation;
 
-    /// <summary><paramref name="replace"/> gives the value an overflow delivers; by default the newest value.</summary>
-    public CommittedWatch(T value, Action detach, ObservationScheduler schedule, Func<T>? replace = null)
+    /// <summary><paramref name="replace"/> gives the value an overflow delivers; by default the newest value. <paramref name="json"/> is the
+    /// JSON form of a value that is not itself JSON, for the overflow's root replacement (a conversation view's <c>ToJson()</c>).</summary>
+    public CommittedWatch(T value, Action detach, ObservationScheduler schedule, Func<T>? replace = null, Func<T, JsonValue>? json = null)
     {
         this.value = value;
         this.detach = detach;
         this.schedule = schedule;
         this.replace = replace;
+        this.json = json;
     }
 
     public T Value { get { lock (gate) return value; } }
@@ -306,7 +309,8 @@ internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T>
             {
                 pending.Clear();
                 var replacement = replace is null ? value : replace();
-                pending.Add(new WatchFrame(replacement, [new ReplaceOp((JsonValue?)replacement ?? JsonValue.Null)], context));
+                var root = replacement is null ? JsonValue.Null : json is null ? (JsonValue)(object)replacement : json(replacement);
+                pending.Add(new WatchFrame(replacement, [new ReplaceOp(root)], context));
             }
             else
             {
