@@ -1,7 +1,7 @@
 // Captures tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions: durable sessions that the pinned pi-durable (Pi v1.1.0,
 // abe508e1b89912adde45528136c3221eb69acdd7) itself writes, on its node:sqlite SQLite storage (`session.sqlite`) and its JSONL storage
 // (a directory), with pi-ai's faux provider as the model; plus an ops corpus from Chord's tracker. PiSharp's compat.* cases
-// (tests/PiSharp.Durable.Tests/CompatCases.cs) open, read and resume these files offline.
+// (tests/PiSharp.Durable.Tests/Compat/CompatCases.cs) open, read and resume these files offline.
 //
 // For each scenario and backend it writes <out>/<scenario>/<backend>/ (the session as upstream closed it), and <out>/<scenario>/records.json:
 // what upstream's storage reads back from each file (every conversation, each conversation's visible entries, every task and submission,

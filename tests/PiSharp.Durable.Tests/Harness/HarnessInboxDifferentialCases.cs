@@ -2,7 +2,7 @@
 // file: Fixtures/inbox.upstream.json holds what the pinned pi-durable commits for the scenarios below with pi-ai's faux provider on
 // MemoryStorage, as printed by Fixtures/capture-inbox.mjs: the inbox and the submissions while the conversation is busy, then every entry,
 // task and submission, the conversation's pi.live, pi.inbox, pi.usage, pi.agent and pi.provider documents, and Harness.usage(). It is
-// normalized as HarnessChatDifferentialCases.cs's fixture is, and compared the same way: as JSON values, and the documents built by the
+// normalized as HarnessChatDifferentialCases.cs's fixture is, and compared the same way: as JSON values and by their exact text, and the documents built by the
 // Harness (the busy inbox included) and the usage total by their exact text. The scenarios run here on memory, JSONL and SQLite and must
 // produce the same records, IDs included.
 using PiSharp.Durable;
@@ -81,6 +81,7 @@ internal static class InboxDifferentialTests
         {
             var value = expected[name];
             Check(JsonValue.DeepEquals(value, actual), $"{scenario} {name}: expected {value.ToJson()}, actual {actual.ToJson()}");
+            Equal(value.ToJson(), actual.ToJson(), $"{scenario} {name}: key order");
             // The documents and the usage total are built by the Harness, so their key order is upstream's too.
             foreach (var (expectedDoc, actualDoc) in ChatDifferentialTests.Documents(value).Zip(ChatDifferentialTests.Documents(actual)))
                 Equal(expectedDoc.ToJson(), actualDoc.ToJson(), $"{scenario} {name}: document key order");

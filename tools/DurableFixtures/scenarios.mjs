@@ -1,5 +1,5 @@
 // The scenarios capture.mjs runs on the pinned upstream pi-durable, and the storage helpers capture.mjs and verify-reverse.mjs share.
-// tests/PiSharp.Durable.Tests/CompatScenarios.cs runs the same scenarios on PiSharp; keep the two in step.
+// tests/PiSharp.Durable.Tests/Compat/CompatScenarios.cs runs the same scenarios on PiSharp; keep the two in step.
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 

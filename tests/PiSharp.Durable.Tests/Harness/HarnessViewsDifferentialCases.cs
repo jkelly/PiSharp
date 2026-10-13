@@ -2,8 +2,8 @@
 // There is no upstream test file: Fixtures/views.upstream.json holds what the pinned pi-durable delivers to a conversation watch (the
 // acquisition view, each frame's operations, the final view) and to an agent event stream (the snapshot and each batch), both attached
 // before the run, for the scenarios below with pi-ai's faux provider on MemoryStorage, as printed by Fixtures/capture-views.mjs. It is
-// normalized as HarnessChatDifferentialCases.cs's fixture is and compared as JSON values; every event's keys must also come in upstream's
-// order. The scenarios run here on memory, JSONL and SQLite and must deliver the same frames and batches, IDs included. Upstream's
+// normalized as HarnessChatDifferentialCases.cs's fixture is and compared as JSON values and by their exact text; every event's keys must
+// also come in upstream's order. The scenarios run here on memory, JSONL and SQLite and must deliver the same frames and batches, IDs included. Upstream's
 // `setTimeout(0)` before reading the last frame is ViewTests.Drained (a Session line barrier).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -79,7 +79,10 @@ internal static class ViewsDifferentialTests
         var expected = (JsonObjectValue)Upstream.Value[scenario];
         var got = (JsonObjectValue)actual;
         foreach (var part in new[] { "initial", "frames", "final", "snapshot", "batches" })
+        {
             Check(JsonValue.DeepEquals(expected[part], got[part]), $"{scenario}.{part}: expected {expected[part].ToJson()}, actual {got[part].ToJson()}");
+            Equal(expected[part].ToJson(), got[part].ToJson(), $"{scenario}.{part}: key order");
+        }
         // Events are built here, so their keys come in upstream's order too.
         var expectedEvents = ((JsonArrayValue)expected["batches"]).SelectMany(batch => (JsonArrayValue)batch).Prepend(expected["snapshot"]);
         var actualEvents = ((JsonArrayValue)got["batches"]).SelectMany(batch => (JsonArrayValue)batch).Prepend(got["snapshot"]);
