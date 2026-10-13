@@ -506,7 +506,8 @@
       "lines": 164,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Bash.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "CodingTools.CreateBashTool/CreatePowerShellTool with BashToolOptions/PowerShellToolOptions, BashExecution and the BashPrepare delegate (ValueTask). Output streams to api.Output(text, info.Skipped) with api.OutputWindow as ShellExecOptions.Window, OutputLimits { Retain = Tail }, spill at the default limits reported as a full_output diagnostic; replay unset (unsafe) as upstream. On Windows LocalExecutionEnv runs bash through Git Bash. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/edit-diff.ts",
@@ -514,7 +515,8 @@
       "lines": 500,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/EditDiff.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "EditDiff (internal): line endings, fuzzy normalization (JavaScript normalize/trimEnd semantics, lone surrogates kept), multi-edit matching and its error texts, display diff and unified patch. jsdiff 8.0.4 diffLines and createTwoFilesPatch are ported in Tools/JsDiff.cs (BSD-3-Clause, THIRD-PARTY-NOTICES.md); tools.node.diffs-match-jsdiff-for-seeded-edits pins 600 diffs and patches against Node. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/edit.ts",
@@ -522,7 +524,8 @@
       "lines": 144,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Edit.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "CodingTools.CreateEditTool: prepareArguments repairs (JSON-string edits, single edit object, top-level oldText/newText) over immutable JSON, file mutation queue, BOM and CRLF preservation, details {diff, patch, firstChangedLine?}; \"Operation aborted\" is an OperationCanceledException. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/env.ts",
@@ -530,7 +533,8 @@
       "lines": 8,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Env.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "ToolEnv.Require (internal): \"No execution environment is configured\". Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/file-mutation-queue.ts",
@@ -538,7 +542,8 @@
       "lines": 55,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/FileMutationQueue.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "FileMutationQueue.RunAsync (internal): per process, keyed by file system id and canonical path (a missing file by its canonical parent). LocalFileSystem.Id is virtual so a test can name another file system, as upstream overrides its id field. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/image.ts",
@@ -546,7 +551,8 @@
       "lines": 132,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Image.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "ImageDetection (internal): MIME detection of JPEG, non-animated PNG (APNG chunk walk in 64 KiB blocks), GIF, WebP, BMP. Detection only, as upstream: read reports images as unsupported, so no image backend (PiSharp.Tools.Skia) is involved. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/index.ts",
@@ -554,7 +560,8 @@
       "lines": 25,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Tools.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "CodingTools: CreateReadTool, CreateWriteTool, CreateEditTool, CreateBashTool, CreatePowerShellTool and the coding-tools Extension (read, write, edit, bash). Declarations (name, description, TypeBox-printed parameters, ParametersOrigin TypeBox) match upstream byte for byte (tools.node.declarations-match-upstream-byte-for-byte). Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/path-utils.ts",
@@ -562,7 +569,8 @@
       "lines": 30,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/PathUtils.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "PathUtils (internal): Unicode spaces, leading @, and the read variants (narrow no-break space before AM/PM, NFD, curly apostrophe); Unicode.Normalize keeps lone surrogates as JavaScript does. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/read.ts",
@@ -570,7 +578,8 @@
       "lines": 216,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Read.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "CodingTools.CreateReadTool over IBinaryReader scans: bounded reads, offsets and limits as JavaScript numbers (NaN, fractions, negatives, 1e20) with JavaScript number formatting, truncation diagnostics and details {truncation} in upstream key order, the concurrent-writer retry, unsupported images. tools.read-differential.* compares 1600 seeded outcomes with the whole-file reference and with Node digests. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/tools/write.ts",
@@ -578,7 +587,8 @@
       "lines": 39,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Write.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "CodingTools.CreateWriteTool through the file mutation queue. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/truncate.ts",
@@ -899,9 +909,10 @@
       "upstream": "packages/durable/test/examples/17-coding-tools.ts",
       "blobSha1": "033313ff85a1391470d5a447d011411b6e95c4b5",
       "lines": 101,
-      "pisharp": "tests/PiSharp.Durable.Tests/17CodingToolsCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesTools.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 17-coding-tools with ScriptedModels tool-calling replies in place of the faux provider and LocalExecutionEnv over a temporary directory, on memory, JSONL and SQLite (upstream: JSONL) with reopen; examples.* pins upstream's Node output (the cat timing as <ms>, the storage directory as <dir>)"
     },
     {
       "upstream": "packages/durable/test/examples/18-print.ts",
@@ -995,17 +1006,19 @@
       "upstream": "packages/durable/test/examples/29-sandbox-per-conversation.ts",
       "blobSha1": "792e328cb4d39a3065dfa83264643eb1cfb1a414",
       "lines": 82,
-      "pisharp": "tests/PiSharp.Durable.Tests/29SandboxPerConversationCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesTools.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 29-sandbox-per-conversation: the app.sandbox document chooses each conversation's LocalExecutionEnv; on memory, JSONL and SQLite with reopen; examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/30-tool-override.ts",
       "blobSha1": "bafdcaa3a14c8cd017ba878df1b4726d371d6923",
       "lines": 102,
-      "pisharp": "tests/PiSharp.Durable.Tests/30ToolOverrideCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesTools.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 30-tool-override: a venv bash replacing CodingTools' bash where selected and a timing wrapTool; on memory, JSONL and SQLite with reopen; examples.* pins upstream's Node output (the project path as <project>, as upstream prints it)"
     },
     {
       "upstream": "packages/durable/test/examples/31-reload-and-restart.ts",
@@ -1218,8 +1231,8 @@
       "lines": 405,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsRecoveryCases.cs",
       "phase": "P9",
-      "status": "in-progress",
-      "note": "8 of 9 tests: harness.tools-recovery.* reopening a SQLite file as upstream does, and harness.tools-recovery.jsonl.* reopening a JSONL directory. Pending until the execution environment and the coding tools land: \"answers a real bash command interrupted by close and reopen, then finishes the run\" (createBashTool and a real shell). Adapted: the faulting result carries a null tool name in control.addTools instead of a function in details (both are not strict JSON and make the result commit throw); NodeExecutionEnv read only for cwd is ToolTestEnv"
+      "status": "ported",
+      "note": "9 tests: harness.tools-recovery.* reopening a SQLite file as upstream does, and harness.tools-recovery.jsonl.* reopening a JSONL directory. \"answers a real bash command interrupted by close and reopen\" runs CodingTools' bash over LocalExecutionEnv in its own directory (upstream: the SQLite file's directory). Adapted: the faulting result carries a null tool name in control.addTools instead of a function in details (both are not strict JSON and make the result commit throw); NodeExecutionEnv read only for cwd is ToolTestEnv"
     },
     {
       "upstream": "packages/durable/test/harness-tools.test.ts",
@@ -1227,8 +1240,8 @@
       "lines": 1195,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
       "phase": "P9",
-      "status": "in-progress",
-      "note": "36 of 38 tests: harness.tools.* on MemoryStorage, harness.tools.jsonl.* and harness.tools.sqlite.* (36 each). Pending until the execution environment and the coding tools land (they need createBashTool/createReadTool/createEditTool and a real file system and shell): \"answers a failing command with its retained tail and diagnostics in order\", \"reads, edits, and runs a command in one run, then answers\". Adapted: NodeExecutionEnv read only for cwd is ToolTestEnv (Harness/ToolEnvSupport.cs); \"drops control keys set to undefined\" returns a ToolControl with Terminate unset; explicit null details are JsonValue.Null"
+      "status": "ported",
+      "note": "38 tests: harness.tools.* on MemoryStorage, harness.tools.jsonl.* and harness.tools.sqlite.* (38 each). The two coding-tools cases run CodingTools over LocalExecutionEnv in a fresh directory on each backend (upstream: MemoryStorage). Adapted: NodeExecutionEnv read only for cwd is ToolTestEnv (Harness/ToolEnvSupport.cs); \"drops control keys set to undefined\" returns a ToolControl with Terminate unset; explicit null details are JsonValue.Null"
     },
     {
       "upstream": "packages/durable/test/harness-view.test.ts",
@@ -1438,7 +1451,8 @@
       "lines": 210,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "tools.read-differential.* (2 tests): the whole-file reference ported; NaN offsets and limits go through ReadTool.ExecuteAsync (JSON arguments cannot carry NaN). Each of the 1600 trials also matches a digest of upstream's own outcome (Fixtures/tools.upstream.json, read)"
     },
     {
       "upstream": "packages/durable/test/tools.test.ts",
@@ -1446,7 +1460,8 @@
       "lines": 741,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolsCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "tools.* (36 cases; upstream counts its it.each as one test: 35). Adapted: FakeToolApi (ToolsSupport.cs) is upstream's fakeApi; ToolRunner.ApplyPatch stands in for jsdiff applyPatch; the growing-log reader is a LocalExecutionEnv subclass; prepare gets the call's context object. Platform: symbolic-link assertions run only where links can be created (Windows needs Developer Mode or elevation; four cases return early without it); the backslash-name case is skipped on Windows and the real-PowerShell case runs only on Windows, both as upstream; $PWD is compared only on POSIX, as upstream. Added: tools.node.* (declarations, 600 jsdiff diffs, 28 edit cases, 9 bash cases) against Fixtures/tools.upstream.json from Fixtures/capture-tools.mjs"
     },
     {
       "upstream": "packages/durable/test/types.test.ts",
