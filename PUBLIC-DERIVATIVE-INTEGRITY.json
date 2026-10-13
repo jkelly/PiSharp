@@ -5865,8 +5865,8 @@
       "originalSha256": "5256a7e3e07d2c5c94f7a1e6c45f39aab011c659c5e2d53e452dea525ce04575"
     },
     {
-      "currentSha256": "108748b481e15a86284bf3a45e308ac57ac7dfa801cf69c9ece1177c6d37ac6f",
-      "currentBytes": 11275,
+      "currentSha256": "ea741d7895bf89eb5747dcaaf9fe202ec91c9c5187138f7baa13ab28dc284a5e",
+      "currentBytes": 11392,
       "originalBytes": 8236,
       "path": "PiSharp.slnx",
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
