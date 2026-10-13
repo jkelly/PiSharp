@@ -492,7 +492,7 @@ public class Session : ISession
     /// Schedules observer delivery work (upstream <c>queueMicrotask</c>). During a publication it runs in that commit's job right after the
     /// publication; otherwise it becomes its own line job, so it never runs inline in the caller.
     /// </summary>
-    private void Defer(Action work)
+    internal void Defer(Action work)
     {
         lock (deferGate)
         {

@@ -77,6 +77,8 @@ internal static partial class StructuredTests
             .. AbortOrder(prefix + "abort-order.", fresh),
             .. Boundaries(prefix + "boundaries.", fresh),
             .. ToolRounds(prefix + "tool-rounds.", fresh),
+            .. ToolRoundTurns(prefix + "tool-rounds.", fresh),
+            .. ToolRoundsAndEvents(prefix + "tool-rounds-and-events.", fresh),
             .. DefinitionsAndWaits(prefix + "definitions-and-waits.", fresh),
             .. ConversationAbort(prefix + "conversation-abort-and-boundaries.", fresh),
         ];

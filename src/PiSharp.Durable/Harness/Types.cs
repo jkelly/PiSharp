@@ -811,10 +811,11 @@ public interface IConversation
     /// transitively, by its non-background tasks.
     /// </summary>
     Task WaitForIdleAsync(DurableContext context);
-    /// <summary>The structural view (spec §9.3) as a disposable read-only Chord state. TODO(P10): the view's typed shape.</summary>
-    Task<AttachedReplicatedState<JsonObjectValue>> ViewStateAsync(DurableContext context);
-    /// <summary>The structural view as a serialized exact-frame watch. TODO(P10).</summary>
-    Task<IWatchHandle<JsonObjectValue>> WatchAsync(DurableContext context);
+    /// <summary>The structural view (spec §9.3) as a disposable read-only Chord state.</summary>
+    Task<AttachedReplicatedState<ConversationView>> ViewStateAsync(DurableContext context);
+    /// <summary>The structural view as a serialized exact-frame watch with bounded pending frames; cancelling <paramref name="context"/> stops
+    /// it.</summary>
+    Task<IWatchHandle<ConversationView>> WatchAsync(DurableContext context);
 }
 
 /// <summary>Bounds of <see cref="IConversation.EntriesAsync"/> (upstream <c>Omit&lt;EntryQuery, "conversationId"&gt;</c>).</summary>
