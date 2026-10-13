@@ -278,7 +278,12 @@ internal sealed record FauxOptions
     public int? MaxTokenSize { get; init; }
     /// <summary>Context window of faux-1 (default 128000).</summary>
     public double? ContextWindow { get; init; }
+    /// <summary>The provider's models (upstream <c>models</c>); absent: one faux-1 model.</summary>
+    public IReadOnlyList<FauxModelOptions>? Models { get; init; }
 }
+
+/// <summary>One faux model (upstream <c>FauxModelDefinition</c>): context window default 128000, output limit default 16384.</summary>
+internal sealed record FauxModelOptions(string Id, double? ContextWindow = null, double? MaxTokens = null);
 
 /// <summary>What a response factory sees: the request (upstream's factory arguments).</summary>
 internal sealed record FauxRequest(ImmutableArray<JsonValue> Messages, DurableStreamOptions? Options, CancellationToken Signal, FauxState State,
@@ -332,16 +337,22 @@ internal sealed class FauxModels : IDurableModels
         Provider = this.options.Provider ?? "faux";
         minTokenSize = Math.Max(1, Math.Min(this.options.MinTokenSize ?? DefaultMinTokenSize, this.options.MaxTokenSize ?? DefaultMaxTokenSize));
         maxTokenSize = Math.Max(minTokenSize, this.options.MaxTokenSize ?? DefaultMaxTokenSize);
-        Model = new DurableModel
+        var definitions = this.options.Models is { Count: > 0 } listed ? listed : [new FauxModelOptions("faux-1", this.options.ContextWindow)];
+        Models = [.. definitions.Select(definition => new DurableModel
         {
-            Id = "faux-1", Name = "Faux Model", Api = Api, Provider = Provider, BaseUrl = "http://localhost:0", Reasoning = false,
-            Input = ["text", "image"], ContextWindow = this.options.ContextWindow ?? 128000, MaxTokens = 16384,
-        };
+            Id = definition.Id, Name = definition.Id == "faux-1" && this.options.Models is null ? "Faux Model" : definition.Id, Api = Api,
+            Provider = Provider, BaseUrl = "http://localhost:0", Reasoning = false, Input = ["text", "image"],
+            ContextWindow = definition.ContextWindow ?? 128000, MaxTokens = definition.MaxTokens ?? 16384,
+        })];
+        Model = Models[0];
     }
 
     public string Api { get; }
     public string Provider { get; }
+    /// <summary>The first model.</summary>
     public DurableModel Model { get; }
+    /// <summary>Every model of the provider.</summary>
+    public ImmutableArray<DurableModel> Models { get; }
     public FauxState State { get; } = new();
 
     public void SetResponses(params FauxStep[] responses)
@@ -366,7 +377,8 @@ internal sealed class FauxModels : IDurableModels
     internal static string RandomId(string prefix) =>
         $"{prefix}:{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}:{Convert.ToString(Random.Shared.NextInt64(long.MaxValue), 16)}";
 
-    public DurableModel? GetModel(string provider, string modelId) => provider == Provider && modelId == Model.Id ? Model : null;
+    public DurableModel? GetModel(string provider, string modelId) =>
+        provider == Provider ? Models.FirstOrDefault(model => model.Id == modelId) : null;
 
     public IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
         CancellationToken cancellationToken)

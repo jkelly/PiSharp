@@ -9,10 +9,6 @@
 //   C# method cannot be replaced, so the case counts the Session's commit listeners (by reflection) against the count before the cancelled
 //   acquisitions; it reads the same thing: no observer subscription outlives a cancelled acquisition.
 // - `/closed/.test(String(error))` tests the exception's message.
-//
-// Pending (written in full, but not run until the parallel P11 compaction work merges; see Pending below):
-// - "rejects conversation and Harness operations once close begins; inspect queued before reports closing": Conversation.compact.
-// - "schedules from every progress call": Conversation.compact.
 using System.Reflection;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -27,13 +23,13 @@ using static SessionTests;
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> HarnessLifecycleCases() =>
-        LifecycleTests.Cases("harness.lifecycle.", () => Task.FromResult<IStorage>(new MemoryStorage()), LifecycleSqliteLocation, LifecycleTests.RunPending);
+        LifecycleTests.Cases("harness.lifecycle.", () => Task.FromResult<IStorage>(new MemoryStorage()), LifecycleSqliteLocation);
 
     private static IEnumerable<(string, Func<Task>)> HarnessLifecycleJsonlCases() =>
-        LifecycleTests.Cases("harness.lifecycle.jsonl.", () => LifecycleJsonlLocation()(), LifecycleJsonlLocation, LifecycleTests.RunPending);
+        LifecycleTests.Cases("harness.lifecycle.jsonl.", () => LifecycleJsonlLocation()(), LifecycleJsonlLocation);
 
     private static IEnumerable<(string, Func<Task>)> HarnessLifecycleSqliteCases() =>
-        LifecycleTests.Cases("harness.lifecycle.sqlite.", () => LifecycleSqliteLocation()(), null, LifecycleTests.RunPending);
+        LifecycleTests.Cases("harness.lifecycle.sqlite.", () => LifecycleSqliteLocation()(), null);
 
     private static StructuredTests.OpenLocation LifecycleSqliteLocation()
     {
@@ -54,25 +50,11 @@ internal static class LifecycleTests
     private static readonly DurableContext Context = DurableContext.Background;
 
     /// <summary>
-    /// Case names (without prefix) written in full but not run yet, with what they wait for. TODO(P11 merge): remove an entry once the
-    /// compaction work it names has merged, and the case runs.
+    /// The harness.lifecycle.* cases on storages from <paramref name="fresh"/>; the reopen case uses locations from <paramref name="reopenable"/>
+    /// and is left out without one.
     /// </summary>
-    internal static readonly IReadOnlyDictionary<string, string> Pending = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["rejects-conversation-and-harness-operations-once-close-begins-inspect-queued-before-reports-closing"] = "Conversation.CompactAsync (compaction)",
-        ["schedules-from-every-progress-call"] = "Conversation.CompactAsync (compaction)",
-    };
-
-    /// <summary>Set PISHARP_DURABLE_PENDING=1 to run the pending cases too, for example to check them once their dependency merges.</summary>
-    internal static bool RunPending => Environment.GetEnvironmentVariable("PISHARP_DURABLE_PENDING") == "1";
-
-    /// <summary>
-    /// The runnable harness.lifecycle.* cases on storages from <paramref name="fresh"/>; the reopen case uses locations from
-    /// <paramref name="reopenable"/> and is left out without one. <paramref name="includePending"/> also yields the pending cases.
-    /// </summary>
-    internal static IEnumerable<(string, Func<Task>)> Cases(string prefix, Func<Task<IStorage>> fresh, Func<StructuredTests.OpenLocation>? reopenable,
-        bool includePending = false) =>
-        All(prefix, fresh, reopenable).Where(test => includePending || !Pending.ContainsKey(test.Item1[prefix.Length..]));
+    internal static IEnumerable<(string, Func<Task>)> Cases(string prefix, Func<Task<IStorage>> fresh, Func<StructuredTests.OpenLocation>? reopenable) =>
+        All(prefix, fresh, reopenable);
 
     // ─── Support ────────────────────────────────────────────────────────────
 

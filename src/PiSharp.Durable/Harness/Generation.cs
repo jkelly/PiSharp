@@ -826,18 +826,6 @@ internal static class GenerationPhases
         value.TryGetValue(key, out var field) && field is JsonNumberValue number ? number.Value : null;
 }
 
-/// <summary>Placeholder handlers for built-in tasks whose state machines later phases port.</summary>
-internal static class BuiltinPlaceholders
-{
-    /// <summary>A phase map whose handlers all fault.</summary>
-    public static IReadOnlyDictionary<string, TaskPhaseHandler> Phases(string kind, string phase, params string[] names) =>
-        names.ToDictionary(name => name, _ => Handler(kind, phase), StringComparer.Ordinal);
-
-    /// <summary>A handler that faults with "not ported yet".</summary>
-    public static TaskPhaseHandler Handler(string kind, string phase) =>
-        (_, _, _) => System.Threading.Tasks.Task.FromException(new NotImplementedException($"Task {kind} is not ported yet ({phase})"));
-}
-
 /// <summary>The timers of a task runtime: the Harness TimeProvider, which drives the partial throttle as upstream's setTimeout.</summary>
 internal interface ITaskTimeSource
 {

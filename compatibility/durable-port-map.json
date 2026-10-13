@@ -97,8 +97,8 @@
       "lines": 453,
       "pisharp": "src/PiSharp.Durable/Harness/Compaction.cs",
       "phase": "P11",
-      "status": "in-progress",
-      "note": "HarnessTasks.CompactionTask identity (pi.compaction v1, initial {phase: select}) whose phases (select, summarize, retry) and abort fault with \"not ported yet (P11)\"; Compaction.CreateCompactionAsync, SelectCut and EstimateContext, which generation's threshold and overflow checks use (P8). TODO(P11): the state machine, summaries and their placement"
+      "status": "ported",
+      "note": "HarnessTasks.CompactionTask (pi.compaction v1: select, summarize, retry, abort; upstream checkpoint, input, result and live status JSON), the summarization prompts and request, the pi.compaction summary entry placed by append (blocking) or write submission (conversation-owned), CompactionHooks.BeforeCompact over CompactionRequest/CompactionDecision, Conversation.CompactAsync and CompactionResult; Compaction.CreateCompactionAsync, SelectCut, SummarizedMessages, SerializeConversation and EstimateContext. Tests: harness.compaction.*, harness.compaction-differential.* (Fixtures/compaction.upstream.json)"
     },
     {
       "upstream": "packages/durable/src/harness/context.ts",
@@ -143,7 +143,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
       "phase": "P6",
       "status": "in-progress",
-      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Reset and usage (P10): Conversation.ResetAsync (a write submission of a pi.reset entry with head \"self\" and an optional handoff user message) and IHarness.UsageAsync (every conversation's pi.usage summed). Views (P10): DurableHarness.Views (ConversationViews, built with the Harness) behind Conversation.ViewStateAsync and WatchAsync, and AgentEvents.WatchEventsAsync. TaskGraphAsync and WatchTaskGraphAsync are the task graph (task-graph.ts). Placeholder throwing NotImplementedException: compact (TODO(P11)). Tests: harness.tasks.*, harness.conversations.*, harness.ownership.*, harness.lifecycle.* (open failure, close joins and seal, registry changes before resume), harness.context.*, harness.inbox.*, harness.view.*, harness.events.* (memory, jsonl, sqlite)"
+      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Reset and usage (P10): Conversation.ResetAsync (a write submission of a pi.reset entry with head \"self\" and an optional handoff user message) and IHarness.UsageAsync (every conversation's pi.usage summed). Views (P10): DurableHarness.Views (ConversationViews, built with the Harness) behind Conversation.ViewStateAsync and WatchAsync, and AgentEvents.WatchEventsAsync. TaskGraphAsync and WatchTaskGraphAsync are the task graph (task-graph.ts). Conversation.CompactAsync admits the compaction task (compaction.ts). Tests: harness.tasks.*, harness.conversations.*, harness.ownership.*, harness.lifecycle.*, harness.context.*, harness.inbox.*, harness.view.*, harness.events.* (memory, jsonl, sqlite)"
     },
     {
       "upstream": "packages/durable/src/harness/inbox.ts",
@@ -986,9 +986,10 @@
       "upstream": "packages/durable/test/examples/25-compaction.ts",
       "blobSha1": "5fb353ce167e168c79e4cfdda4fd1f23c6be4638",
       "lines": 123,
-      "pisharp": "tests/PiSharp.Durable.Tests/25CompactionCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesCompaction.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 25-compaction with an offline model reporting the faux provider usage estimate (prompt cache included), on memory, JSONL and SQLite with reopen (stored entries and summaries read back); two ordering barriers keep Node's event-loop order (a chat answer waits for listed compactions to select; in part 2 preparation waits for compact() and the summary for the held request); examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/26-coding-agent.ts",
@@ -1045,25 +1046,28 @@
       "upstream": "packages/durable/test/fixtures/delete-buffer.ts",
       "blobSha1": "b25ca4c0e301d06a497331d8dd43507ee4d39707",
       "lines": 2,
-      "pisharp": "tests/PiSharp.Durable.Tests/DeleteBufferCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/TruncateCases.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "skipped",
+      "note": "Not applicable: a Node child-process preload (delete-buffer) and probe (utf8-byte-length-without-buffer) of env-truncate.test.ts that check utf8ByteLength and truncateHead without a global Buffer; .NET has no Buffer global, and TruncateCases checks Truncation.Utf8ByteLength against .NET UTF-8 encoding instead. No compaction test uses them"
     },
     {
       "upstream": "packages/durable/test/fixtures/utf8-byte-length-without-buffer.ts",
       "blobSha1": "7136deda5415c572db4da22def28f281d3c09466",
       "lines": 11,
-      "pisharp": "tests/PiSharp.Durable.Tests/Utf8ByteLengthWithoutBufferCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/TruncateCases.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "skipped",
+      "note": "Not applicable: a Node child-process preload (delete-buffer) and probe (utf8-byte-length-without-buffer) of env-truncate.test.ts that check utf8ByteLength and truncateHead without a global Buffer; .NET has no Buffer global, and TruncateCases checks Truncation.Utf8ByteLength against .NET UTF-8 encoding instead. No compaction test uses them"
     },
     {
       "upstream": "packages/durable/test/harness-compaction.test.ts",
       "blobSha1": "edd2d4bd98aa0af54ed67469f6de900e8b9df127",
       "lines": 2304,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessCompactionCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "ported",
+      "note": "harness.compaction.* on memory (reopen cases on SQLite, as upstream), harness.compaction.jsonl.* (reopen cases on JSONL) and harness.compaction.sqlite.*; range selection and serialization run once. One adaptation: the 300 ms real retry backoff of \"keeps a background summary queued through a retry backoff...\" runs on a ManualTimeProvider advanced after the case steps"
     },
     {
       "upstream": "packages/durable/test/harness-context.test.ts",
@@ -1134,8 +1138,8 @@
       "lines": 613,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs",
       "phase": "P11",
-      "status": "in-progress",
-      "note": "All 14 tests written; 12 run: harness.lifecycle.* (12) on MemoryStorage with the reopen case on a SQLite file, harness.lifecycle.jsonl.* (12, reopening a JSONL directory) and harness.lifecycle.sqlite.* (11, no reopen). Pending (LifecycleTests.Pending; PISHARP_DURABLE_PENDING=1 runs them) until the parallel P11 compaction work merges: 'schedules from every progress call' and 'rejects conversation and Harness operations once close begins ...' (Conversation.compact); with that call removed, both pass. Adapted: FailingClose is a decorator; the patched harness.subscribeCommits is a count of the Session's commit listeners"
+      "status": "ported",
+      "note": "14 of 14 tests: harness.lifecycle.* (14) on MemoryStorage with the reopen case on a SQLite file as upstream, harness.lifecycle.jsonl.* (14, reopening a JSONL directory) and harness.lifecycle.sqlite.* (13, no reopen). Adapted: FailingClose is a decorator; the patched harness.subscribeCommits is a count of the Session's commit listeners; a context read queued at close's seal is held open by Session.HoldStorageOpen, which upstream's single thread does not need"
     },
     {
       "upstream": "packages/durable/test/harness-live-deltas.test.ts",
