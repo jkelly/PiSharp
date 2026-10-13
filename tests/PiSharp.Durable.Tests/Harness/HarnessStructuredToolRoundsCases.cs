@@ -1,8 +1,12 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-structured.test.ts, describe "tool rounds": the one test
-// that generation alone (P8) unblocks, "keeps run control with a faulted generation until its owned work drains, and retries a rejected
-// final commit". It runs no tool. The other tests of "tool rounds" and "tool rounds and events" are pending (see HarnessStructuredCases.cs).
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-structured.test.ts, describe "tool rounds": the three
+// tests the tool task (P9) unblocks, "owns its tool tasks, waits for them, and hands the run to a conversation-owned generation", "aborts a
+// parallel round with its generation: tools first, then the generation, with every result written" and "answers the unstarted calls of an
+// aborted sequential round with aborted results, in call order", and the one generation alone (P8) unblocked, "keeps run control with a
+// faulted generation until its owned work drains, and retries a rejected final commit". "ends a turn at the generation's hold, before its
+// successor's turn starts" and the "tool rounds and events" tests need watchEvents (P10) and are pending (see HarnessStructuredCases.cs).
 // Adaptations beyond those of HarnessStructuredSupport.cs and ChatSupport.cs: invalidFinalStream is GenerationTests.InvalidFinalStream (a
-// non-finite usage count instead of a function, see HarnessGenerationCases.cs).
+// non-finite usage count instead of a function, see HarnessGenerationCases.cs); upstream's module-level blockingTool and toolCalls are
+// BlockingRoundTool and ToolCalls below; `Promise.all([one.started, two.started])` is Task.WhenAll.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static ChatTests;
@@ -12,8 +16,100 @@ using static SessionTests;
 
 internal static partial class StructuredTests
 {
+    /// <summary>A sequential tool that writes "partial" and blocks until its invocation is cancelled (upstream <c>blockingTool</c>).</summary>
+    private static (Task Started, ToolRegistration Registration) BlockingRoundTool(string name)
+    {
+        var started = new HarnessTests.Deferred();
+        return (started.Task, Define.Tool(new ToolRegistration
+        {
+            Name = name,
+            Description = $"The {name} tool",
+            ExecutionMode = ToolExecutionMode.Sequential,
+            Execute = async (_, api, callContext) =>
+            {
+                api.Output("partial");
+                started.Resolve();
+                await Aborted(callContext.CancellationToken);
+                throw new InvalidOperationException("unreachable");
+            },
+        }));
+    }
+
+    /// <summary>A tool-calling answer with one call per <c>(name, id)</c> (upstream <c>toolCalls</c>).</summary>
+    private static JsonObjectValue ToolCalls(params (string Name, string Id)[] ids) =>
+        FauxAssistantMessage(ids.Select(call => FauxToolCall(call.Name, JsonObjectValue.Empty, call.Id)), stopReason: "toolUse");
+
     private static IEnumerable<(string, Func<Task>)> ToolRounds(string prefix, Func<Task<IStorage>> fresh)
     {
+        yield return Case(prefix + "owns-its-tool-tasks-waits-for-them-and-hands-the-run-to-a-conversation-owned-generation", async () =>
+        {
+            var setup = Setup();
+            AddTool(setup.Registry, Define.Tool(new ToolRegistration
+            {
+                Name = "noop",
+                Description = "Does nothing",
+                Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+            }));
+            setup.Faux.SetResponses(ToolCalls(("noop", "c1"), ("noop", "c2")), FauxAssistantMessage("done"));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            Equal(SubmissionStatus.Done, (await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context)).Status, "status");
+            var tasks = (await harness.CommitAsync(tx => tx.ScanTasksAsync(new TaskQuery { ConversationId = root.Id }, 20), Context)).Items;
+            var generations = tasks.Where(task => task.Kind == "pi.generation").ToList();
+            var (first, second) = (generations[0], generations[1]);
+            Seq([first.Id, first.Id], tasks.Where(task => task.Kind == "pi.tool").Select(task => task.Owner!.Value), "tool owners");
+            Check(first.Owner is null, "first generation is conversation-owned");
+            Check(second.Owner is null, "second generation is conversation-owned");
+            var assistant = (await AllEntries(root)).First(entry => entry.Kind == "pi.assistant");
+            SameJson("{\"status\":\"terminal\",\"outcome\":{\"status\":\"completed\",\"result\":{\"entryId\":" + assistant.Id.Value + "}}}",
+                first.State.ToJson(), "first state");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "aborts-a-parallel-round-with-its-generation-tools-first-then-the-generation-with-every-result-written", async () =>
+        {
+            var setup = Setup();
+            var one = BlockingRoundTool("one");
+            var two = BlockingRoundTool("two");
+            AddTool(setup.Registry, one.Registration with { ExecutionMode = ToolExecutionMode.Parallel });
+            AddTool(setup.Registry, two.Registration with { ExecutionMode = ToolExecutionMode.Parallel });
+            setup.Faux.SetResponses(ToolCalls(("one", "c1"), ("two", "c2")));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            await Task.WhenAll(one.Started, two.Started);
+            var generation = new TaskId((long)N(((JsonObjectValue)(await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!["run"])["taskId"]));
+            await harness.AbortTaskAsync(generation, Context);
+            MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
+            var results = (await AllEntries(root)).Where(entry => entry.Kind == "pi.tool-result").ToList();
+            Seq(["c1", "c2"], results.Select(entry => S(((JsonObjectValue)entry.Model![0])["toolCallId"])), "results");
+            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
+            Equal(TaskOutcomeStatus.Aborted, ((SettlingTaskState)(await harness.WaitForTaskAsync(generation, Context)).State).Outcome.Status, "generation");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "answers-the-unstarted-calls-of-an-aborted-sequential-round-with-aborted-results-in-call-order", async () =>
+        {
+            var setup = Setup();
+            var one = BlockingRoundTool("one");
+            AddTool(setup.Registry, one.Registration);
+            AddTool(setup.Registry, BlockingRoundTool("two").Registration with { Name = "two" });
+            setup.Faux.SetResponses(ToolCalls(("one", "c1"), ("two", "c2"), ("two", "c3")));
+            var (harness, root) = await OpenChat(await fresh(), setup);
+            var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            await one.Started;
+            var slots = (JsonArrayValue)(await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!["tools"];
+            Seq([true, false, false], slots.Select(slot => ((JsonObjectValue)slot).ContainsKey("taskId")), "slots with a task");
+            var generation = new TaskId((long)N(((JsonObjectValue)(await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!["run"])["taskId"]));
+            await harness.AbortTaskAsync(generation, Context);
+            MatchJson("""{"status":"unanswered","reason":"aborted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
+            var results = (await AllEntries(root)).Where(entry => entry.Kind == "pi.tool-result").Select(entry => (JsonObjectValue)entry.Model![0]).ToList();
+            Seq(["c1", "c2", "c3"], results.Select(result => S(result["toolCallId"])), "call ids");
+            Seq([true, true, true], results.Select(result => result["isError"] is JsonBooleanValue { Value: true }), "isError");
+            SameJson("[{\"type\":\"text\",\"text\":\"<harness>\\n[error] Tool two was aborted\\n</harness>\"}]", results[1]["content"], "unstarted content");
+            var tools = (await harness.CommitAsync(tx => tx.ScanTasksAsync(new TaskQuery { ConversationId = root.Id, Kind = "pi.tool" }, 20), Context)).Items;
+            Equal(1, tools.Count(), "tool tasks");
+            await harness.CloseAsync(Context);
+        });
+
         yield return Case(prefix + "keeps-run-control-with-a-faulted-generation-until-its-owned-work-drains-and-retries-a-rejected-final-commit", async () =>
         {
             var nodes = new Nodes();

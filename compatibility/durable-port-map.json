@@ -174,7 +174,8 @@
       "lines": 341,
       "pisharp": "src/PiSharp.Durable/Harness/Output.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "ToolOutput (sanitizeOutput, boundOutput, characterEnd), OutputBuffer and Progress, internal as upstream does not export them. TextEncoder/TextDecoder are a UTF8Encoding and its streaming Decoder; Progress runs on the Harness TimeProvider and settles waiters inline, in order. Tests: harness.output.*, harness.output-skip.*"
     },
     {
       "upstream": "packages/durable/src/harness/prompt.ts",
@@ -235,8 +236,8 @@
       "lines": 509,
       "pisharp": "src/PiSharp.Durable/Harness/Tool.cs",
       "phase": "P9",
-      "status": "in-progress",
-      "note": "HarnessTasks.ToolTask identity (pi.tool v1, initial {phase: call}) whose phases (call, execute) and abort fault with \"not ported yet (P9)\"; ToolResults.HarnessError and AppendToolResultAsync, which generation uses for unoffered calls and the unstarted calls of an aborted sequential round (P8). TODO(P9): the state machine"
+      "status": "ported",
+      "note": "HarnessTasks.ToolTask (pi.tool v1): phases call and execute and the abort handler with upstream's input {assistant, callId}, checkpoints {phase: call} and {phase: execute, arguments, replay} and result {entryId, control?}; recovery reruns a call only when the recorded and the current registration both say replay safe, otherwise it settles failed with an interrupted result from the durable slot. prepareArguments, validation through Internal/PiAi/Validation.cs (an internal copy of PiSharp.Agent's ToolArgumentValidation, the port of pi-ai validateToolArguments, since the core does not reference PiSharp.Agent; piai.validation.* compares it with the pinned pi-ai and with the agent's copy; ToolRegistration.ParametersOrigin, default TypeBox), beforeTool/afterTool hooks, controls, diagnostics in {severity, code?, message} order, running output, details and diagnostics published to pi.live.tools through Progress, the tool execution api (IToolExecutionApi, implemented by ToolExecutionApi; DelegatingToolExecutionApi for wrappers), harnessError and appendToolResult. The env/index.ts shapes the api needs (ShellOutputWindow, ShellOutputSkip) are in Harness/ShellOutput.cs until the execution environment lands. Tests: harness.tools.*, harness.tools-recovery.*, harness.tools-differential.* (Fixtures/tool-rounds.upstream.json, captured by Fixtures/capture-tool-rounds.mjs) and the P9 tool-round tests of harness.structured.*"
     },
     {
       "upstream": "packages/durable/src/harness/types.ts",
@@ -1110,17 +1111,19 @@
       "upstream": "packages/durable/test/harness-output-skip.test.ts",
       "blobSha1": "ef87504b327cd35c166e2ac9c0695e21845dc647",
       "lines": 144,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessOutputSkipCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessOutputSkipCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "4 of 4 tests: harness.output-skip.* (storage-free). Adapted: mulberry32 on uint (Math.imul arithmetic modulo 2^32)"
     },
     {
       "upstream": "packages/durable/test/harness-output.test.ts",
       "blobSha1": "a64b456ac08f89a39b8c9974576fd146466e8bae",
       "lines": 311,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessOutputCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessOutputCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "ported",
+      "note": "20 of 20 tests: harness.output.* (storage-free). Adapted: Buffer is Encoding.UTF8; vi fake timers are a ManualTimeProvider passed to Progress; the fuzz PRNG runs on uint"
     },
     {
       "upstream": "packages/durable/test/harness-ownership.test.ts",
@@ -1155,7 +1158,7 @@
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs",
       "phase": "P7",
       "status": "in-progress",
-      "note": "42 of 51 upstream tests ported (40 of 49 it() sites; two sites are parameterized into two tests each), as harness.structured.* (42 cases) on MemoryStorage with SQLite reopen for the recovery describes, harness.structured.jsonl.* (42, JSONL reopen) and harness.structured.sqlite.* (34, no reopen); support in Harness/HarnessStructuredSupport.cs. P8 ported the 'tool rounds' test 'keeps run control with a faulted generation until its owned work drains, and retries a rejected final commit' (Harness/HarnessStructuredToolRoundsCases.cs). 9 pending: 3 'tool rounds' tests need the tool task (P9); 'ends a turn at the generation's hold, before its successor's turn starts' and the 5 'tool rounds and events' tests need the tool task and watchEvents (P9 + P10). Adapted: per-case Nodes fixture instead of module state; deferred barrier where a script reads the parent ID the test assigns after start(); Committed barrier for handler-assigned IDs; settled(...)=true awaits the task; a null TaskOptions ownership for upstream's {} (NullReferenceException for TypeError); Rejecting storage is a decorator; invalidFinalStream carries a non-finite usage count"
+      "note": "45 of 51 upstream tests ported (43 of 49 it() sites; two sites are parameterized into two tests each), as harness.structured.* (45 cases) on MemoryStorage with SQLite reopen for the recovery describes, harness.structured.jsonl.* (45, JSONL reopen) and harness.structured.sqlite.* (37, no reopen); support in Harness/HarnessStructuredSupport.cs. Harness/HarnessStructuredToolRoundsCases.cs ports the 'tool rounds' tests 'keeps run control with a faulted generation until its owned work drains, and retries a rejected final commit' (P8), 'owns its tool tasks, waits for them, and hands the run to a conversation-owned generation', 'aborts a parallel round with its generation: tools first, then the generation, with every result written' and 'answers the unstarted calls of an aborted sequential round with aborted results, in call order' (P9). 6 pending, all needing watchEvents (P10): 'ends a turn at the generation's hold, before its successor's turn starts' and the 5 'tool rounds and events' tests. Adapted: per-case Nodes fixture instead of module state; deferred barrier where a script reads the parent ID the test assigns after start(); Committed barrier for handler-assigned IDs; settled(...)=true awaits the task; a null TaskOptions ownership for upstream's {} (NullReferenceException for TypeError); Rejecting storage is a decorator; invalidFinalStream carries a non-finite usage count"
     },
     {
       "upstream": "packages/durable/test/harness-submissions.test.ts",
@@ -1205,17 +1208,19 @@
       "upstream": "packages/durable/test/harness-tools-recovery.test.ts",
       "blobSha1": "a03932f96711f92efe7ee13fd16f2037e7c44dc4",
       "lines": 405,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessToolsRecoveryCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsRecoveryCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "8 of 9 tests: harness.tools-recovery.* reopening a SQLite file as upstream does, and harness.tools-recovery.jsonl.* reopening a JSONL directory. Pending until the execution environment and the coding tools land: \"answers a real bash command interrupted by close and reopen, then finishes the run\" (createBashTool and a real shell). Adapted: the faulting result carries a null tool name in control.addTools instead of a function in details (both are not strict JSON and make the result commit throw); NodeExecutionEnv read only for cwd is ToolTestEnv"
     },
     {
       "upstream": "packages/durable/test/harness-tools.test.ts",
       "blobSha1": "83ff0e015c31010feea1b9e693deeca73b5c357e",
       "lines": 1195,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessToolsCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
       "phase": "P9",
-      "status": "planned"
+      "status": "in-progress",
+      "note": "36 of 38 tests: harness.tools.* on MemoryStorage, harness.tools.jsonl.* and harness.tools.sqlite.* (36 each). Pending until the execution environment and the coding tools land (they need createBashTool/createReadTool/createEditTool and a real file system and shell): \"answers a failing command with its retained tail and diagnostics in order\", \"reads, edits, and runs a command in one run, then answers\". Adapted: NodeExecutionEnv read only for cwd is ToolTestEnv (Harness/ToolEnvSupport.cs); \"drops control keys set to undefined\" returns a ToolControl with Terminate unset; explicit null details are JsonValue.Null"
     },
     {
       "upstream": "packages/durable/test/harness-view.test.ts",

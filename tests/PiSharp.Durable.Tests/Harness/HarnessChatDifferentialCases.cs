@@ -37,7 +37,7 @@ internal static class ChatDifferentialTests
     private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
         File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "chat-turns.upstream.json"))));
 
-    private static JsonValue Normalize(JsonValue value, string? key = null) => value switch
+    internal static JsonValue Normalize(JsonValue value, string? key = null) => value switch
     {
         JsonArrayValue items => JsonValue.Array(items.Select(item => Normalize(item))),
         JsonObjectValue properties => JsonValue.Object(properties.Select(property => KeyValuePair.Create(property.Key, Normalize(property.Value, property.Key)))),
@@ -46,7 +46,7 @@ internal static class ChatDifferentialTests
         _ => value,
     };
 
-    private static async Task<JsonValue> Dump(IHarness harness, IStorage storage, ConversationId conversation)
+    internal static async Task<JsonValue> Dump(IHarness harness, IStorage storage, ConversationId conversation)
     {
         var entries = await storage.ScanEntriesAsync(new EntryQuery(conversation) { Order = ScanOrder.Ascending }, 1000, null, Context);
         var docs = new List<(string, JsonValue)>();
@@ -75,7 +75,7 @@ internal static class ChatDifferentialTests
             Equal(expectedDocs.ToJson(), actualDocs.ToJson(), $"{scenario}: document key order");
     }
 
-    private static IEnumerable<JsonValue> Documents(JsonValue dump)
+    internal static IEnumerable<JsonValue> Documents(JsonValue dump)
     {
         var value = (JsonObjectValue)dump;
         if (value.TryGetValue("inbox", out var inbox)) yield return inbox;
