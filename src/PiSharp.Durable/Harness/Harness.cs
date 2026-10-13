@@ -299,9 +299,12 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
         await harness.Submissions.SubmitAsync(Id, SubmissionDraft.Write(entry), context).ConfigureAwait(false);
     }
 
-    /// <summary>TODO(P11): manual compaction.</summary>
-    public Task<TaskId> CompactAsync(string? instructions, DurableContext context) =>
-        Task.FromException<TaskId>(Harness.NotPorted("Conversation.CompactAsync", "P11"));
+    /// <summary>Creates a manual compaction task with its live status in one commit (upstream <c>compact</c>).</summary>
+    public Task<TaskId> CompactAsync(string? instructions, DurableContext context)
+    {
+        harness.Scheduler.Resume();
+        return harness.CommitWithAsync(tx => Compaction.CreateCompactionAsync(tx, Id, "manual", instructions), context);
+    }
 
     public Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context)
     {

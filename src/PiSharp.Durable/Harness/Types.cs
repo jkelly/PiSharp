@@ -757,8 +757,26 @@ public interface IConversationHandle
     Task WaitForIdleAsync(DurableContext context);
 }
 
-/// <summary>What a compaction produced (upstream <c>CompactionResult</c>). TODO(P11).</summary>
-public sealed record CompactionResult(EntryId? EntryId = null, SubmissionId? SubmissionId = null);
+/// <summary>
+/// What a compaction produced (upstream <c>CompactionResult</c>): the <see cref="EntryId"/> of a blocking compaction's summary, or the
+/// <see cref="SubmissionId"/> of a conversation-owned compaction's summary write; both null when nothing was compacted. A completed
+/// <c>pi.compaction</c> task's result is its JSON, <c>{entryId}</c>, <c>{submissionId}</c> or <c>{}</c>.
+/// </summary>
+public sealed record CompactionResult(EntryId? EntryId = null, SubmissionId? SubmissionId = null)
+{
+    /// <summary><c>{entryId?, submissionId?}</c>.</summary>
+    public JsonObjectValue ToJson() => new RecordJson.Writer().Add("entryId", EntryId?.ToJson()).Add("submissionId", SubmissionId?.ToJson()).Build();
+
+    /// <summary>Reads a completed compaction task's result.</summary>
+    public static CompactionResult FromJson(JsonValue json)
+    {
+        var value = RecordJson.Object(json, "compaction result");
+        RecordJson.OnlyKeys(value, "compaction result", "entryId", "submissionId");
+        return new CompactionResult(
+            RecordJson.OptionalInteger(value, "entryId", "compaction result") is { } entry ? new EntryId(entry) : null,
+            RecordJson.OptionalInteger(value, "submissionId", "compaction result") is { } submission ? new SubmissionId(submission) : null);
+    }
+}
 
 /// <summary>Stateless handle for one conversation, bound to the Harness that returned it. Compare handles by <see cref="Id"/> (upstream
 /// <c>Conversation</c>).</summary>
@@ -781,7 +799,11 @@ public interface IConversation
     /// <summary>Admits a write of a <c>pi.reset</c> entry that starts a new context, carrying <paramref name="handoff"/> as a user message
     /// when given.</summary>
     Task ResetAsync(string? handoff, DurableContext context);
-    /// <summary>Admits a manual compaction task and returns its ID. TODO(P11).</summary>
+    /// <summary>
+    /// Creates a manual compaction task in its own commit and returns its ID; its result is a <see cref="CompactionResult"/>. The task is
+    /// conversation-owned ordinary work: idle waits include it and <see cref="AbortAsync"/> stops it, but it never makes the conversation
+    /// busy. Its summary is admitted as a write submission, placed at once when idle and otherwise at the next boundary. Enables scheduling.
+    /// </summary>
     Task<TaskId> CompactAsync(string? instructions, DurableContext context);
 
     /// <summary>A Session commit whose <c>tx.CreateTaskAsync()</c> defaults to this conversation.</summary>
@@ -927,14 +949,49 @@ public sealed class ToolHooks
     public Func<JsonObjectValue, ToolExecutionResult, IHookApi, DurableContext, Task<ToolExecutionResult?>>? AfterTool { get; init; }
 }
 
-/// <summary>What <see cref="CompactionHooks.BeforeCompact"/> decides: decline, or a summary.</summary>
-public sealed record CompactionDecision(bool Decline = false, string? Summary = null);
+/// <summary>What <see cref="CompactionHooks.BeforeCompact"/> sees (upstream's <c>compaction</c> argument).</summary>
+public sealed record CompactionRequest
+{
+    /// <summary>Why the compaction runs: <c>manual</c>, <c>threshold</c> or <c>overflow</c> (upstream <c>CompactionReason</c>).</summary>
+    public required string Reason { get; init; }
+    /// <summary>The active entries the summary replaces, the head marker first.</summary>
+    public required ImmutableArray<EntryRecord> Entries { get; init; }
+    /// <summary>Their model context (pi-ai wire messages), the summarizer's source.</summary>
+    public required ImmutableArray<JsonValue> Messages { get; init; }
+    /// <summary>The first entry kept verbatim; the summary's <c>head</c>.</summary>
+    public required EntryId FirstKept { get; init; }
+    /// <summary>The instructions of <c>CompactAsync</c>, if any.</summary>
+    public string? Instructions { get; init; }
+}
 
-/// <summary>Hooks of the built-in compaction task (upstream <c>CompactionHooks</c>). TODO(P11): signatures are confirmed when compaction is
-/// ported.</summary>
+/// <summary>What <see cref="CompactionHooks.BeforeCompact"/> decides (upstream <c>{decline: true} | {summary}</c>).</summary>
+public sealed record CompactionDecision
+{
+    private CompactionDecision(bool decline, string? summary)
+    {
+        Decline = decline;
+        Summary = summary;
+    }
+
+    /// <summary>Whether the compaction completes without a summary.</summary>
+    public bool Decline { get; }
+    /// <summary>The summary to place instead of summarizing; null when declining.</summary>
+    public string? Summary { get; }
+
+    /// <summary><c>{decline: true}</c>: complete with <c>{}</c>.</summary>
+    public static CompactionDecision Declined { get; } = new(true, null);
+
+    /// <summary><c>{summary}</c>: place <paramref name="summary"/> without a summarization request.</summary>
+    public static CompactionDecision FromSummary(string summary) => new(false, summary ?? throw new ArgumentNullException(nameof(summary)));
+}
+
+/// <summary>Hooks of the built-in compaction task (upstream <c>CompactionHooks</c>); hooks receive the compaction's runtime as their
+/// <see cref="IHookApi"/>.</summary>
 public sealed class CompactionHooks
 {
-    /// <summary>After range selection, before summarizing; the first decision wins. The request is <c>{reason, entries, messages,
-    /// firstKept, instructions?}</c>.</summary>
-    public Func<JsonObjectValue, IHookApi, DurableContext, Task<CompactionDecision?>>? BeforeCompact { get; init; }
+    /// <summary>
+    /// After range selection, before summarizing; the first non-null decision wins, and a throw is reported and skipped. Null asks the next
+    /// hook, and without a decision the task summarizes.
+    /// </summary>
+    public Func<CompactionRequest, IHookApi, DurableContext, Task<CompactionDecision?>>? BeforeCompact { get; init; }
 }
