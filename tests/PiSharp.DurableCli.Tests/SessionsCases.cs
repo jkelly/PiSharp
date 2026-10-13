@@ -169,6 +169,59 @@ internal static partial class Program
             Equal(created.Directory, taken.Directory, "taken over once stale");
             await taken.ReleaseAsync();
         }),
+        // Pi and PiSharp continue each other's sessions. Runs the pinned upstream sessions.ts under Node when PISHARP_DURABLE_UPSTREAM names a
+        // Pi checkout at the pinned commit (with node_modules) and node is on PATH; otherwise it checks nothing.
+        Case("sessions.interop.pinned-upstream-under-node", async () =>
+        {
+            var upstream = Environment.GetEnvironmentVariable("PISHARP_DURABLE_UPSTREAM");
+            if (string.IsNullOrEmpty(upstream)) { Console.Error.WriteLine("sessions.interop: PISHARP_DURABLE_UPSTREAM unset; skipped"); return; }
+            await using var agent = new TestAgent("interop");
+            var sessions = Path.Combine(upstream, "packages", "coding-agent", "src", "experimental", "durable", "sessions.ts");
+            var probe = Path.Combine(agent.Root, "probe.ts");
+            File.WriteAllText(probe, $$"""
+                import { selectSession } from "{{new Uri(sessions).AbsoluteUri}}";
+                const [cwd, mode, holdMs] = process.argv.slice(2);
+                try {
+                	const location = await selectSession(cwd, mode === "continue");
+                	console.log(JSON.stringify({ id: location.id, directory: location.directory, cwd: location.cwd }));
+                	await new Promise((resolve) => setTimeout(resolve, Number(holdMs)));
+                	await location.release();
+                } catch (error) {
+                	console.log(JSON.stringify({ error: (error as Error).message }));
+                }
+                """);
+            async Task<System.Text.Json.JsonElement> Node(string mode, int holdMs)
+            {
+                var start = new System.Diagnostics.ProcessStartInfo("node") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+                foreach (var argument in new[] { "--no-warnings", "--conditions=source", "--experimental-strip-types", probe,
+                    agent.Cwd.ToLowerInvariant(), mode, holdMs.ToString(System.Globalization.CultureInfo.InvariantCulture) }) start.ArgumentList.Add(argument);
+                start.Environment["PI_CODING_AGENT_DIR"] = agent.AgentDir;
+                using var process = System.Diagnostics.Process.Start(start)!;
+                var line = await process.StandardOutput.ReadLineAsync();
+                await process.WaitForExitAsync();
+                return System.Text.Json.JsonDocument.Parse(line ?? "{}").RootElement.Clone();
+            }
+            // Pi creates; PiSharp continues it, from a differently spelled cwd on Windows.
+            var created = await Node("new", 0);
+            var continued = await DurableSessions.SelectAsync(OperatingSystem.IsWindows() ? agent.Cwd.ToUpperInvariant() : agent.Cwd, true, agent.AgentDir);
+            Equal(created.GetProperty("directory").GetString(), continued.Directory, "PiSharp continues Pi's session");
+            Equal(created.GetProperty("cwd").GetString(), continued.Cwd, "the same real cwd");
+            // While PiSharp holds it, Pi gives up after its retries with upstream's message.
+            var refused = await Node("continue", 0);
+            Equal($"Session is already open in another process: {continued.Directory}", refused.GetProperty("error").GetString(), "Pi refused");
+            await continued.ReleaseAsync();
+            // PiSharp creates a newer session; Pi continues it, and while Pi holds it PiSharp is refused.
+            await Task.Delay(5);
+            var mine = await DurableSessions.SelectAsync(agent.Cwd, false, agent.AgentDir);
+            await mine.ReleaseAsync();
+            var holding = Node("continue", 3000);
+            while (!Directory.Exists(mine.Directory + ".lock") && !holding.IsCompleted) await Task.Delay(50);
+            await ThrowsAsync<DurableSessionLockedException>(() => DurableSessions.SelectAsync(agent.Cwd, true, agent.AgentDir, new PiLockOptions()), "held by Pi");
+            Equal(mine.Directory, (await holding).GetProperty("directory").GetString(), "Pi continues PiSharp's session");
+            var after = await DurableSessions.SelectAsync(agent.Cwd, true, agent.AgentDir, new PiLockOptions());
+            Equal(mine.Directory, after.Directory, "released by Pi");
+            await after.ReleaseAsync();
+        }),
         Case("sessions.lockfile.settings-step-is-exclusive", () =>
         {
             var root = Temp("lockfile");
