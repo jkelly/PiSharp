@@ -331,7 +331,7 @@
       "pisharp": "src/PiSharp.Durable/Session/Transaction.cs",
       "phase": "P3",
       "status": "ported",
-      "note": "Transaction (ITx): table reads/writes with ReadAfterWrite, documents through the Chord tracker (DraftObject), fork copies, checkpoints, migrations, task records (CreateTaskAsync, internal SetTask; execution is P7), submissions. A lock guards its state because Tx operations may run concurrently in .NET. Tests: session.tables.*, session.documents.*, session.checkpoints-migrations.*, session.forks.*"
+      "note": "Transaction (ITx): table reads/writes with ReadAfterWrite, documents through the Chord tracker (DraftObject), fork copies, checkpoints, migrations, task records (CreateTaskAsync, internal SetTask; execution is P7), submissions. A lock guards its state because Tx operations may run concurrently in .NET. Tests: session.tables.*, session.documents.*, session.checkpoints-migrations.*, session.forks.* Record key order is upstream's per path: an entry is { ...draft, id, conversationId, head, byTaskId } (EntryRecord/EntryDraft KeyOrder), a submission { ...create, id } with later fields appended, a task's startedAt before memos; checked against upstream-written sessions by compat.*."
     },
     {
       "upstream": "packages/durable/src/storage/jsonl/index.ts",
@@ -358,7 +358,7 @@
       "pisharp": "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs",
       "phase": "P4",
       "status": "ported",
-      "note": "JsonlStorage over IFileSystem on MemoryStorage's PrepareCommit/Apply (replay passes the recorded sequence). JsonlCorruptionError/JsonlStoragePoisonedError are exceptions with upstream's messages; file failures are IOExceptions. File names and lines are byte-for-byte upstream's (checked against Pi v1.1.0 writing, fsync-writing, reopening and recovering the same commits); a resolved document copy keeps upstream's {kind, version, value} base. Tests: storage.jsonl.*"
+      "note": "JsonlStorage over IFileSystem on MemoryStorage's PrepareCommit/Apply (replay passes the recorded sequence). JsonlCorruptionError/JsonlStoragePoisonedError are exceptions with upstream's messages; file failures are IOExceptions. File names and lines are byte-for-byte upstream's (checked against Pi v1.1.0 writing, fsync-writing, reopening and recovering the same commits); a resolved document copy keeps upstream's {kind, version, value} base. Tests: storage.jsonl.* P13: compat.*.jsonl.* open, read, resume and rewrite JSONL sessions the pinned upstream wrote (tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions, tools/DurableFixtures/capture.mjs): PiSharp writes the same files byte for byte, and upstream reads PiSharp's (compat.reverse.*)."
     },
     {
       "upstream": "packages/durable/src/storage/memory.ts",
@@ -430,7 +430,7 @@
       "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
       "phase": "P5",
       "status": "ported",
-      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.*"
+      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.* P13: compat.*.sqlite.* open, read, resume and rewrite SQLite sessions the pinned upstream wrote (Fixtures/upstream-sessions); PiSharp's rows and JSON columns are upstream's text, and upstream reads PiSharp's (compat.reverse.*)."
     },
     {
       "upstream": "packages/durable/src/tasks.ts",
@@ -627,7 +627,7 @@
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Ops.cs",
       "phase": "P1",
       "status": "ported",
-      "note": "Ops, validation, overlap, apply/applyImmutable(Batches) and codec. Tests: chord.delta.*, chord.apply-immutable.*"
+      "note": "Ops, validation, overlap, apply/applyImmutable(Batches) and codec. Tests: chord.delta.*, chord.apply-immutable.* P13: compat.ops.* replay the upstream-captured ops corpus, and upstream replays PiSharp's operations (compat.reverse.*)."
     },
     {
       "upstream": "packages/chord/src/delta/tracker.ts",
@@ -636,7 +636,7 @@
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Draft.cs",
       "phase": "P1",
       "status": "ported",
-      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005): Draft.cs (DraftObject/DraftArray) and Tracker.cs (Tracker, Change, Prepared, emission). Upstream's asserted op sequences are reproduced exactly. Tests: chord.tracker.*, chord.fuzz.tracker-ops-replay-to-value"
+      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005): Draft.cs (DraftObject/DraftArray) and Tracker.cs (Tracker, Change, Prepared, emission). Upstream's asserted op sequences are reproduced exactly. Tests: chord.tracker.*, chord.fuzz.tracker-ops-replay-to-value P13: compat.ops.* make the seeded edits of an upstream-captured ops corpus (Fixtures/upstream-sessions/ops-corpus.json) and must emit upstream's exact operations."
     },
     {
       "upstream": "packages/chord/src/delta/diff.ts",
