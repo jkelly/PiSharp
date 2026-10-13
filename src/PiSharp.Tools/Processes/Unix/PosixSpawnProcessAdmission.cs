@@ -82,9 +82,20 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
     private static void Pipe(int[] fds)
     {
         if (Native.pipe(fds) != 0) throw new Win32Exception(Marshal.GetLastPInvokeError(), "pipe failed");
-        // The parent's ends must not leak into later children.
-        _ = Native.fcntl(fds[0], Native.F_SETFD, Native.FD_CLOEXEC);
-        _ = Native.fcntl(fds[1], Native.F_SETFD, Native.FD_CLOEXEC);
+        // The parent's ends must not leak into later children: a child holding the write end of its own input never sees EOF, and one
+        // holding an output's write end keeps it open after the command exits.
+        try { CloseOnExec(fds[0]); CloseOnExec(fds[1]); }
+        catch { Close(ref fds[0]); Close(ref fds[1]); throw; }
+    }
+
+    /// <summary>Sets FD_CLOEXEC and checks it. fcntl is variadic, and on Apple arm64 variadic arguments travel on the stack, so a P/Invoke
+    /// that passes the flag as a third fixed argument hands fcntl garbage there; macOS sets the flag through ioctl(FIOCLEX), which takes no
+    /// variadic argument. Reading the flags back (fcntl with only its two fixed arguments) is safe everywhere.</summary>
+    private static void CloseOnExec(int fd)
+    {
+        var set = OperatingSystem.IsMacOS() ? Native.ioctl(fd, Native.FIOCLEX) : Native.fcntl(fd, Native.F_SETFD, Native.FD_CLOEXEC);
+        if (set != 0 || (Native.fcntl(fd, Native.F_GETFD) & Native.FD_CLOEXEC) == 0)
+            throw new Win32Exception(Marshal.GetLastPInvokeError(), "close-on-exec failed");
     }
 
     private static void Close(ref int fd) { if (fd >= 0) { _ = Native.close(fd); fd = -1; } }
@@ -210,10 +221,14 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
 
     private static class Native
     {
-        internal const int SIGKILL = 9, EPERM = 1, ESRCH = 3, EINTR = 4, O_RDONLY = 0, O_WRONLY = 1, F_SETFD = 2, FD_CLOEXEC = 1;
+        internal const int SIGKILL = 9, EPERM = 1, ESRCH = 3, EINTR = 4, O_RDONLY = 0, O_WRONLY = 1, F_GETFD = 1, F_SETFD = 2, FD_CLOEXEC = 1;
+        /// <summary>macOS <c>_IO('f', 1)</c>.</summary>
+        internal const nuint FIOCLEX = 0x20006601;
         internal const short POSIX_SPAWN_SETPGROUP = 0x02;
         [DllImport("libc", SetLastError = true)] internal static extern int pipe([Out] int[] fds);
         [DllImport("libc", SetLastError = true)] internal static extern int fcntl(int fd, int command, int argument);
+        [DllImport("libc", SetLastError = true)] internal static extern int fcntl(int fd, int command);
+        [DllImport("libc", SetLastError = true)] internal static extern int ioctl(int fd, nuint request);
         [DllImport("libc", SetLastError = true)] internal static extern int close(int fd);
         [DllImport("libc", SetLastError = true)] internal static extern int kill(int pid, int signal);
         [DllImport("libc", SetLastError = true)] internal static extern int waitpid(int pid, out int status, int options);
