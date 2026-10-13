@@ -9,7 +9,8 @@ using PiSharp.Durable.Examples;
 // in temporary directories (Git Bash on Windows); 17's timing of `cat /tmp/1gb.txt` compares as <ms> and its storage directory as <dir>.
 // P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held. P11 adds 06-harness through 13-recovery (11's faux provider is
 // ScriptedModels; 13 keeps its storage in a temporary SQLite file on memory, as upstream does, and reopens the runner's storage otherwise),
-// and 25-compaction, whose model reports the faux provider's usage estimate; its file backends read back the stored entries and summaries.
+// 25-compaction, whose model reports the faux provider's usage estimate (its file backends read back the stored entries and summaries),
+// and 31-reload-and-restart, which restarts on its own storage the same way as 13, so it has no separate read-back.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -175,6 +176,12 @@ internal static partial class Program
         "plain conversation: venv:",
         PythonConversation,
         TimedBashCalls,
+        "== 31-reload-and-restart",
+        "call running during the reload: v1",
+        "next call: v2",
+        "after restart, before install: []",
+        // Upstream's util.inspect prints [ 'version' ].
+        "after install: [\"version\"]",
     ];
 
     private const string HarnessResolved = """resolved: low ["files"] ["read"]""";

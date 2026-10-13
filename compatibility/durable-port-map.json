@@ -107,7 +107,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Context.cs",
       "phase": "P6",
       "status": "ported",
-      "note": "Code complete (ConversationContext: CaptureContextBoundsAsync, ReadContextFromAsync with kept ranges, ReadContextAsync, DeriveContextAsync, ActiveEntriesAsync, OrderToolResults); messages are pi-ai wire JSON. Tests: harness.context.* (16 cases on three backends; views identical to upstream on Node) and harness.tasks.task-runtime.reads-committed-documents-*; ActiveEntriesAsync builds conversation view mounts (view.ts), exercised by harness.view.*"
+      "note": "Code complete (ConversationContext: CaptureContextBoundsAsync, ReadContextFromAsync with kept ranges, ReadContextAsync, DeriveContextAsync, ActiveEntriesAsync, OrderToolResults); messages are pi-ai wire JSON. Tests: harness.context.* (16 cases on three backends; views identical to upstream on Node) and harness.tasks.task-runtime.reads-committed-documents-*; ActiveEntriesAsync builds conversation view mounts (view.ts), exercised by harness.view.*; ReadContextAsync holds Storage open (Session.HoldStorageOpen, taken in its bounds job) until its off-line derive ends, so a context read queued on the line at close's seal completes as spec 2.2 requires (harness.lifecycle 'completes reads queued at the seal ...', P11)"
     },
     {
       "upstream": "packages/durable/src/harness/define.ts",
@@ -143,7 +143,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
       "phase": "P6",
       "status": "in-progress",
-      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Reset and usage (P10): Conversation.ResetAsync (a write submission of a pi.reset entry with head \"self\" and an optional handoff user message) and IHarness.UsageAsync (every conversation's pi.usage summed). Views (P10): DurableHarness.Views (ConversationViews, built with the Harness) behind Conversation.ViewStateAsync and WatchAsync, and AgentEvents.WatchEventsAsync. Placeholders throwing NotImplementedException: compact, taskGraph, watchTaskGraph (TODO(P11)). Tests: harness.tasks.*, harness.conversations.*, harness.context.*, harness.inbox.*, harness.view.*, harness.events.* (memory, jsonl, sqlite)"
+      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Reset and usage (P10): Conversation.ResetAsync (a write submission of a pi.reset entry with head \"self\" and an optional handoff user message) and IHarness.UsageAsync (every conversation's pi.usage summed). Views (P10): DurableHarness.Views (ConversationViews, built with the Harness) behind Conversation.ViewStateAsync and WatchAsync, and AgentEvents.WatchEventsAsync. TaskGraphAsync and WatchTaskGraphAsync are the task graph (task-graph.ts). Conversation.CompactAsync admits the compaction task (compaction.ts). Tests: harness.tasks.*, harness.conversations.*, harness.ownership.*, harness.lifecycle.*, harness.context.*, harness.inbox.*, harness.view.*, harness.events.* (memory, jsonl, sqlite)"
     },
     {
       "upstream": "packages/durable/src/harness/inbox.ts",
@@ -215,7 +215,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Scheduler.cs",
       "phase": "P7",
       "status": "ported",
-      "note": "DurableTaskScheduler (renamed: System.Threading.Tasks.TaskScheduler is used across the assembly): open/reconcile, reservation, run and abort invocations with a step per phase, sleep, ownership walks, cascades, failFast checks, idle context expiry, inspect, join and waitForIdle. One short lock guards the in-memory mirror (never held across awaits or host code); microtask wakeups are thread-pool work items; AbortController is CancellationSignal; timers come from HarnessOptions.TimeProvider. Tests: harness.tasks.*, harness.tasks-recovery.*, the 41 task-runtime cases of harness.structured.* (memory, jsonl, sqlite); the tool-round parts of harness-structured (P8/P9) and harness-ownership (P11) are still to port"
+      "note": "DurableTaskScheduler (renamed: System.Threading.Tasks.TaskScheduler is used across the assembly): open/reconcile, reservation, run and abort invocations with a step per phase, sleep, ownership walks, cascades, failFast checks, idle context expiry, inspect, join and waitForIdle. One short lock guards the in-memory mirror (never held across awaits or host code); microtask wakeups are thread-pool work items; AbortController is CancellationSignal; timers come from HarnessOptions.TimeProvider. Tests: harness.tasks.*, harness.tasks-recovery.*, the 41 task-runtime cases of harness.structured.* (memory, jsonl, sqlite), the tool-round cases of harness.structured.* (P8/P9), harness.ownership.* (P11: cascades, owned conversations from tools and supervisors, reopen derivation) and harness.lifecycle.*"
     },
     {
       "upstream": "packages/durable/src/harness/submissions.ts",
@@ -322,7 +322,7 @@
       "pisharp": "src/PiSharp.Durable/Session/Session.cs",
       "phase": "P3",
       "status": "ported",
-      "note": "Session (ISession, Session.Create) with SessionLine, a FIFO job queue whose order is enqueue order; no lock held across user callbacks; job results complete asynchronously. Internal CommitWithAsync/ReadOnLineAsync/ConversationDocumentOnLineAsync/UnloadDocumentsAsync/FlushLineAsync and the ConversationCreatedAsync/BeforeCloseAsync hooks for the Harness. Tests: session.*"
+      "note": "Session (ISession, Session.Create) with SessionLine, a FIFO job queue whose order is enqueue order; no lock held across user callbacks; job results complete asynchronously. Internal CommitWithAsync/ReadOnLineAsync/ConversationDocumentOnLineAsync/UnloadDocumentsAsync/FlushLineAsync and the ConversationCreatedAsync/BeforeCloseAsync hooks for the Harness; HoldStorageOpen (P11) lets a read that captured its bounds on the line finish off it before close closes Storage, which upstream's single thread gives for free. Tests: session.*, harness.lifecycle.*"
     },
     {
       "upstream": "packages/durable/src/session/transaction.ts",
@@ -1037,9 +1037,10 @@
       "upstream": "packages/durable/test/examples/31-reload-and-restart.ts",
       "blobSha1": "727c6039f8139936497ebb2550e12d3d3e0ad3ad",
       "lines": 90,
-      "pisharp": "tests/PiSharp.Durable.Tests/31ReloadAndRestartCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesReload.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 31-reload-and-restart with ScriptedModels in place of the faux provider; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; a JSONL directory or SQLite file otherwise); examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/fixtures/delete-buffer.ts",
@@ -1135,9 +1136,10 @@
       "upstream": "packages/durable/test/harness-lifecycle.test.ts",
       "blobSha1": "425a5f81ef8db80cdcc2b79da857bf1181fb2d0e",
       "lines": 613,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessLifecycleCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "ported",
+      "note": "14 of 14 tests: harness.lifecycle.* (14) on MemoryStorage with the reopen case on a SQLite file as upstream, harness.lifecycle.jsonl.* (14, reopening a JSONL directory) and harness.lifecycle.sqlite.* (13, no reopen). Adapted: FailingClose is a decorator; the patched harness.subscribeCommits is a count of the Session's commit listeners; a context read queued at close's seal is held open by Session.HoldStorageOpen, which upstream's single thread does not need"
     },
     {
       "upstream": "packages/durable/test/harness-live-deltas.test.ts",
@@ -1170,9 +1172,10 @@
       "upstream": "packages/durable/test/harness-ownership.test.ts",
       "blobSha1": "c46b51a29564bc6433334d845ce666d411f739d0",
       "lines": 965,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessOwnershipCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipCases.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "ported",
+      "note": "26 of 26 tests (25 it() sites; 'derives marks a crash left unapplied below ... at open' is two): harness.ownership.* (26) on MemoryStorage with the reopen cases on a SQLite file as upstream, harness.ownership.jsonl.* (26, reopening a JSONL directory) and harness.ownership.sqlite.* (18, no reopen); support in Harness/HarnessOwnershipSupport.cs. Adapted: per-case Holds fixture instead of module-scope gates and run counts; Rejecting storage and the patched storage.commit are MarkRejectingStorage, a decorator; test.hold's slow abort handler also ends when close aborts its signal (upstream's close never meets a started slow abort handler, as its abort reservation runs after close seals; here the reservation can win that race, and a handler ignoring its signal would hold close forever); the queued-on-the-line case waits for the abort mark to queue behind the held commit (Session.LineBacklog) before the tool queues its submit"
     },
     {
       "upstream": "packages/durable/test/harness-prompt.test.ts",
