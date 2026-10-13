@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Examples;
 
@@ -17,8 +16,8 @@ using PiSharp.Durable.Examples;
 // (pwd compares as <workspace>), 27-plan-mode and 28-reviewer use ScriptedModels. 21-late-join, 23-subagent-background and 24-child-tasks run
 // on an ExampleClock driven like Node's event loop (24 and 23 restart on their own storage, as 13 does). 19-json prints both modes; its
 // lines are upstream's captured output (Fixtures/examples-19-json-*.upstream.jsonl, from one run of each mode under Node) and compare as
-// JSON with sorted keys, with timestamps, durations, the faux API name and the provider session ID as placeholders: those are random or
-// clock values, and record key order is pinned by the compat.* cases.
+// text, key order included, with timestamps, durations, the faux API name and the provider session ID as placeholders: those are random
+// or clock values.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -435,12 +434,10 @@ internal static partial class Program
             Equal(index < expected.Count ? Normalize(expected[index]) : "<end>", index < actual.Length ? actual[index] : "<end>", "line " + (index + 1));
     }
 
-    // Clock and random values as placeholders; a line that is a JSON object (19-json's) has its keys sorted first. Expected lines go through
-    // the same steps, which leave the placeholders already in them alone.
+    // Clock and random values as placeholders. Expected lines go through the same steps, which leave the placeholders already in them alone.
     private static string Normalize(string line)
     {
         line = line.TrimEnd('\r');
-        if (line.StartsWith("{\"", StringComparison.Ordinal)) line = SortKeys(JsonNode.Parse(line))!.ToJsonString();
         line = Regex.Replace(line, "\"timestamp\":[0-9]+", "\"timestamp\":<time>");
         line = Regex.Replace(line, "\"durationMs\":[0-9]+", "\"durationMs\":<ms>");
         line = Regex.Replace(line, "\"faux:[0-9]+:[a-z0-9]+\"", "\"faux:<api>\"");
@@ -449,12 +446,4 @@ internal static partial class Program
         line = Regex.Replace(line, "^storage: .+$", "storage: <dir>");
         return Regex.Replace(line, "^bash ran in: .*/pi-durable-agent-[A-Za-z0-9]+", "bash ran in: <workspace>");
     }
-
-    private static JsonNode? SortKeys(JsonNode? node) => node switch
-    {
-        JsonObject value => new JsonObject(value.OrderBy(property => property.Key, StringComparer.Ordinal)
-            .Select(property => KeyValuePair.Create(property.Key, SortKeys(property.Value)))),
-        JsonArray items => new JsonArray([.. items.Select(SortKeys)]),
-        _ => node?.DeepClone(),
-    };
 }
