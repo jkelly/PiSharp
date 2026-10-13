@@ -1383,8 +1383,9 @@ internal sealed class DurableTaskScheduler
     // ─── Invocation runtime ──────────────────────────────────────────────────
 
     /// <summary>The task runtime of one invocation (upstream <c>#runtime</c>).</summary>
-    private sealed class Runtime(DurableTaskScheduler scheduler, Invocation invocation, Phase phase) : ITaskRuntime, IHookRunner
+    private sealed class Runtime(DurableTaskScheduler scheduler, Invocation invocation, Phase phase) : ITaskRuntime, IHookRunner, ITaskTimeSource
     {
+        public TimeProvider TimeProvider => scheduler.timeProvider;
         public TaskId TaskId => invocation.TaskId;
         public ConversationId ConversationId => invocation.ConversationId;
         public CancellationToken Signal => invocation.Controller.Token;

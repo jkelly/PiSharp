@@ -1,8 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction status removal, tool
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction statuses, tool
 // slot lookup and finishing, and settleSchedulerOutcome, the cleanup the scheduler runs for faulted and orphaned outcomes). The state is
 // upstream's JSON: {run?: {taskId, inputs}, generation?: {attempt, message?, retry?, deferred?}, tools?: ToolSlot[], compactions?: [...]}.
-// TODO(P8): startRun/handOver and the generation-side writers join with the generation task; TODO(P11): addCompactionStatus and
-// compactionStatus join with compaction.
+// Upstream's run writers startRun and handOver live in generation.ts, as HarnessTasks.StartRunAsync and HandOver do in Generation.cs.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
@@ -40,6 +39,23 @@ public static class Live
         }
         live.Delete("generation");
         live.Delete("tools");
+    }
+
+    /// <summary>Adds the status <c>{taskId, reason, blocking, attempt, retry?}</c> of a compaction task created in this commit; statuses stay
+    /// in task ID order (upstream <c>addCompactionStatus</c>).</summary>
+    public static void AddCompactionStatus(DraftObject live, JsonObjectValue status)
+    {
+        if (!live.ContainsKey("compactions")) live.Set("compactions", JsonArrayValue.Empty);
+        live.GetArray("compactions").Add(status);
+    }
+
+    /// <summary>The status of compaction task <paramref name="taskId"/>, if listed (upstream <c>compactionStatus</c>).</summary>
+    public static DraftObject? CompactionStatus(DraftObject live, TaskId taskId)
+    {
+        if (!live.ContainsKey("compactions")) return null;
+        var statuses = live.GetArray("compactions");
+        var index = IndexOf(statuses, "taskId", taskId.Value);
+        return index < 0 ? null : statuses.GetObject(index);
     }
 
     /// <summary>Removes the status of compaction task <paramref name="taskId"/>, and the list once empty (upstream
