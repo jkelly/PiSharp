@@ -455,7 +455,8 @@ internal sealed class Progress(Func<Task<long>> write, Action<Exception> onError
         {
             if (written.IsCompletedSuccessfully)
             {
-                lock (owner.gate) owner.nextAt = started + Math.Max(owner.minIntervalMs, written.Result * 1000 / ToolOutput.ProgressBytesPerSecond);
+                var bytes = written.GetAwaiter().GetResult();
+                lock (owner.gate) owner.nextAt = started + Math.Max(owner.minIntervalMs, bytes * 1000 / ToolOutput.ProgressBytesPerSecond);
                 foreach (var waiter in waiters) waiter.TrySetResult();
             }
             else

@@ -6,7 +6,8 @@
 // successor's turn starts" and the "tool rounds and events" tests need watchEvents (P10) and are pending (see HarnessStructuredCases.cs).
 // Adaptations beyond those of HarnessStructuredSupport.cs and ChatSupport.cs: invalidFinalStream is GenerationTests.InvalidFinalStream (a
 // non-finite usage count instead of a function, see HarnessGenerationCases.cs); upstream's module-level blockingTool and toolCalls are
-// BlockingRoundTool and ToolCalls below; `Promise.all([one.started, two.started])` is Task.WhenAll.
+// BlockingRoundTool and ToolCalls below; `Promise.all([one.started, two.started])` is Task.WhenAll; "aborts a parallel round ..." orders the
+// two tools' aborts with a barrier (see there).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static ChatTests;
@@ -17,10 +18,14 @@ using static SessionTests;
 internal static partial class StructuredTests
 {
     /// <summary>A sequential tool that writes "partial" and blocks until its invocation is cancelled (upstream <c>blockingTool</c>).</summary>
-    private static (Task Started, ToolRegistration Registration) BlockingRoundTool(string name)
+    /// <param name="name">The tool name.</param>
+    /// <param name="started">Receives the tool task's ID when the call starts.</param>
+    /// <param name="aborting">Awaited once the call is aborted, before it rejects; a test-only ordering barrier.</param>
+    private static (Task Started, ToolRegistration Registration) BlockingRoundTool(string name, Action<TaskId>? started = null,
+        Func<Task>? aborting = null)
     {
-        var started = new HarnessTests.Deferred();
-        return (started.Task, Define.Tool(new ToolRegistration
+        var reached = new HarnessTests.Deferred();
+        return (reached.Task, Define.Tool(new ToolRegistration
         {
             Name = name,
             Description = $"The {name} tool",
@@ -28,8 +33,17 @@ internal static partial class StructuredTests
             Execute = async (_, api, callContext) =>
             {
                 api.Output("partial");
-                started.Resolve();
-                await Aborted(callContext.CancellationToken);
+                started?.Invoke(api.TaskId);
+                reached.Resolve();
+                try
+                {
+                    await Aborted(callContext.CancellationToken);
+                }
+                catch (OperationCanceledException) when (aborting is not null)
+                {
+                    await aborting();
+                    throw;
+                }
                 throw new InvalidOperationException("unreachable");
             },
         }));
@@ -68,12 +82,18 @@ internal static partial class StructuredTests
         yield return Case(prefix + "aborts-a-parallel-round-with-its-generation-tools-first-then-the-generation-with-every-result-written", async () =>
         {
             var setup = Setup();
-            var one = BlockingRoundTool("one");
-            var two = BlockingRoundTool("two");
+            IHarness? opened = null;
+            TaskId? first = null;
+            var one = BlockingRoundTool("one", started: id => first = id);
+            // Barrier: upstream's abort signal runs both tools' listeners in registration order and every later step of their abort follows in
+            // microtask FIFO order, so c1's result is appended before c2's. Here the two invocations end and abort on the thread pool, so tool
+            // two lets its abort through only once tool one's task is terminal, with its result written.
+            var two = BlockingRoundTool("two", aborting: () => opened!.WaitForTaskAsync(first!.Value, Context));
             AddTool(setup.Registry, one.Registration with { ExecutionMode = ToolExecutionMode.Parallel });
             AddTool(setup.Registry, two.Registration with { ExecutionMode = ToolExecutionMode.Parallel });
             setup.Faux.SetResponses(ToolCalls(("one", "c1"), ("two", "c2")));
             var (harness, root) = await OpenChat(await fresh(), setup);
+            opened = harness;
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             await Task.WhenAll(one.Started, two.Started);
             var generation = new TaskId((long)N(((JsonObjectValue)(await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))!["run"])["taskId"]));

@@ -11,7 +11,8 @@ using PiSharp.Durable.Storage;
 // - storage/jsonl/node.ts is PiSharp.Durable/Storage/Jsonl/Local/ (JsonlStorage.OpenAsync over LocalFileSystem).
 // The portable core (PiSharp.Durable outside Env/, Storage/Jsonl/ and Testing/) references only Contracts and AI, reaches neither the
 // environment nor JSONL nor SQLite, and touches no local file or process API. Since P6 the core names one environment type, IExecutionEnv,
-// as upstream's core imports ExecutionEnv type-only (erased, so not part of its runtime graph); naming any other environment type is reach
+// as upstream's core imports ExecutionEnv type-only (erased, so not part of its runtime graph), and since P9 the two Shell output shapes the
+// tool task and its output buffer import type-only, ShellOutputSkip and ShellOutputWindow; naming any other environment type is reach
 // (BoundaryEnvironmentUse). Testing/ (upstream's separate testing subpath) may use the
 // portable environment, never a Local/ folder. Portable Env/ and Storage/Jsonl/ files touch no local API and never reach a Local/ folder
 // or PiSharp.Durable.Tools. The Local/ folders may use System.IO but no process API, and do not reach PiSharp.Durable.Tools either.
@@ -117,7 +118,9 @@ internal static partial class Program
 
     /// <summary>Environment types the core may name, as upstream's core does through erased <c>import type</c> (types.ts, harness/types.ts
     /// and harness/scheduler.ts import the type <c>ExecutionEnv</c> only).</summary>
-    private static readonly HashSet<string> BoundaryTypeOnlyEnvironment = new(StringComparer.Ordinal) { "IExecutionEnv" };
+    // Upstream's harness imports these type-only: ExecutionEnv (generation, harness, scheduler, types), ShellOutputSkip (output.ts, types.ts)
+    // and ShellOutputWindow (types.ts).
+    private static readonly HashSet<string> BoundaryTypeOnlyEnvironment = new(StringComparer.Ordinal) { "IExecutionEnv", "ShellOutputSkip", "ShellOutputWindow" };
 
     /// <summary>
     /// How a core source reaches the environment, or null. Upstream's graph follows only runtime imports; a type-only import is erased. C# has

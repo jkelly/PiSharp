@@ -1,7 +1,8 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/index.ts (ShellOutputWindow and ShellOutputSkip only).
-// The tool output buffer (output.ts) and the tool execution API need these two shapes of the Shell half before the execution environment
-// lands. They keep upstream's names and namespace so the environment's Shell types (ShellExecOptions.window, ShellOutputInfo.skipped) use
-// them unchanged. MERGE NOTE: when the environment branch defines them in Env/, delete this file and keep that definition.
+// The tool output buffer (output.ts) and the tool execution API name these two shapes of the Shell half type-only, as upstream's output.ts and
+// types.ts import them, before the execution environment lands. They keep upstream's names and namespace so the environment's Shell types
+// (ShellExecOptions.window, ShellOutputInfo.skipped) use them unchanged. MERGE NOTE: the environment branch defines the same two records in
+// Env/Shell.cs; when it merges, delete this file and keep that definition.
 namespace PiSharp.Durable.Env;
 
 /// <summary>
