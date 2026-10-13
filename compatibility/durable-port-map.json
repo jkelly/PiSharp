@@ -1552,7 +1552,8 @@
       "lines": 655,
       "pisharp": "src/PiSharp.Cli/Durable/DurableTui.cs",
       "phase": "P12",
-      "status": "planned"
+      "status": "ported",
+      "note": "Split by concern: DurableTui.cs (runDurableTui: the UiLoop, terminal, theme controller, slash commands and selectors; DurableTuiOptions lets tests pass a terminal), DurableTuiView.cs (class DurableTui), DurableTuiComponents.cs (ListSelector, CompactionComponent, SELECT_THEME) and DurableTuiState.cs (agentOf, userText, totalUsage, contextTokens, describeTask, and the adapter reading ConversationView entries and documents as System.Text.Json nodes for pi's interactive components). Reuses the Interactive ports unchanged (AssistantMessageComponent, UserMessageComponent, ToolExecutionComponent with BuiltInToolRenderers, CustomEditor, WorkingStatusIndicator, DynamicBorder, FooterComponent.FormatTokens, KeybindingHints, AppKeybindings, Themes, InteractiveThemeController over an InteractiveSettings snapshot of PiSettings.Merged) and PiSharp.Tui's TuiAltScreen, ScrollView and VStack. Intentional differences: view changes from any thread are posted to the TUI loop and coalesced to the newest view; controller failures are observed and dropped (upstream leaves `void` promises unhandled; the runtime reports failures as notices); cancellation of RunAsync's token exits like Ctrl+C. Tests (authored, upstream has none): tui.* in tests/PiSharp.DurableCli.Tests (Tui*Cases.cs) on the interactive cases' VirtualTerminal."
     }
   ]
 }
