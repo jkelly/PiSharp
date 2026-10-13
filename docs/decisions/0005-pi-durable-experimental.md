@@ -55,6 +55,13 @@ At the end of P13, `compatibility/durable-port-map.json` maps 174 upstream files
 
 None is planned or in progress.
 
+**Test cases.** `tests/PiSharp.Durable.Tests` has 2485 cases:
+- 2411 authored natively (ported upstream tests, examples, crash and smoke cases);
+- 73 upstream-capture cases (`compat.*`), which open, read, resume and rewrite sessions the pinned upstream wrote, and replay its ops corpus;
+- 1 reverse case, `compat.reverse.upstream-reads-pisharp-sessions`, which runs only when `PISHARP_DURABLE_UPSTREAM` points at an upstream checkout and is skipped otherwise.
+
+`tests/PiSharp.DurableCli.Tests` has 57 cases.
+
 **Excluded (by this decision):**
 - `src/storage/sqlite/cloudflare.ts` and `test/sqlite-cloudflare.test.ts`. The Cloudflare Durable Object SQLite adapter is out of scope.
 - These have no rows: the `vacation` demo, `pi-env`, and Chord's facets, services and wire. Instead:
