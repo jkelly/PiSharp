@@ -2,7 +2,7 @@
 // file: Fixtures/tool-rounds.upstream.json holds the committed records (every entry, task and submission, and the conversation's pi.live,
 // pi.inbox, pi.usage, pi.agent and pi.provider documents) that the pinned pi-durable writes for the scenarios below with pi-ai's faux
 // provider on MemoryStorage, as printed by Fixtures/capture-tool-rounds.mjs. It is normalized as HarnessChatDifferentialCases.cs's fixture
-// is, and compared the same way: as JSON values, and the Harness documents by their exact text. The scenarios run here on memory, JSONL and
+// is, and compared the same way: as JSON values and by their exact text. The scenarios run here on memory, JSONL and
 // SQLite and must produce the same records, IDs included. Parameters are the JSON TypeBox prints for the scenarios' schemas.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -56,6 +56,7 @@ internal static class ToolsDifferentialTests
     {
         var expected = path.Aggregate((JsonValue)Upstream.Value[scenario], (value, key) => ((JsonObjectValue)value)[key]);
         Check(JsonValue.DeepEquals(expected, actual), $"{scenario}: expected {expected.ToJson()}, actual {actual.ToJson()}");
+        Equal(expected.ToJson(), actual.ToJson(), $"{scenario}: key order");
         // The documents are built by the Harness, so their key order is upstream's too.
         foreach (var (expectedDocs, actualDocs) in ChatDifferentialTests.Documents(expected).Zip(ChatDifferentialTests.Documents(actual)))
             Equal(expectedDocs.ToJson(), actualDocs.ToJson(), $"{scenario}: document key order");

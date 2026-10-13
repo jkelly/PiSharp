@@ -520,7 +520,9 @@ internal static partial class Program
         });
 
         // Authored: the exact lines upstream writes for every write kind (checked against Pi v1.1.0's JsonlStorage writing the same
-        // commits), including the {kind, version, value} base that MemoryStorage builds when it resolves a document copy.
+        // commits), including the {kind, version, value} base that MemoryStorage builds when it resolves a document copy. Records built here
+        // without a Session take the key order the Session creates them in (an untyped entry draft's fields, then id and conversationId;
+        // a submission's fields, then id); compat.* checks the per-path orders against sessions upstream wrote.
         yield return JsonlCase("writes-upstream-line-formats", async fixture =>
         {
             var directory = fixture.NewDirectory();
@@ -546,8 +548,8 @@ internal static partial class Program
 
             Equal(string.Join("\n",
                 "{\"format\":1,\"type\":\"commit\",\"seq\":1,\"writes\":[{\"type\":\"conversation\",\"value\":{\"id\":1}}]}",
-                "{\"format\":1,\"type\":\"commit\",\"seq\":2,\"writes\":[{\"type\":\"entry\",\"value\":{\"id\":3,\"conversationId\":1,\"kind\":\"note\",\"data\":{\"text\":\"é\u2028\"}}}," +
-                    "{\"type\":\"task.sidecar\",\"id\":2,\"ordinal\":0},{\"type\":\"submission\",\"value\":{\"id\":4,\"conversationId\":1,\"requestId\":\"r\",\"type\":\"input\",\"status\":\"placed\",\"entry\":3}}]}",
+                "{\"format\":1,\"type\":\"commit\",\"seq\":2,\"writes\":[{\"type\":\"entry\",\"value\":{\"kind\":\"note\",\"data\":{\"text\":\"é\u2028\"},\"id\":3,\"conversationId\":1}}," +
+                    "{\"type\":\"task.sidecar\",\"id\":2,\"ordinal\":0},{\"type\":\"submission\",\"value\":{\"conversationId\":1,\"requestId\":\"r\",\"type\":\"input\",\"status\":\"placed\",\"entry\":3,\"id\":4}}]}",
                 "{\"format\":1,\"type\":\"commit\",\"seq\":3,\"writes\":[{\"type\":\"document.create\",\"record\":{\"id\":5,\"kind\":\"notes\",\"scope\":{\"kind\":\"conversation\",\"conversationId\":1},\"history\":\"rewindable\",\"fork\":\"asOf\"},\"ordinal\":0}," +
                     "{\"type\":\"task.sidecar\",\"id\":2,\"ordinal\":1}]}",
                 "{\"format\":1,\"type\":\"commit\",\"seq\":4,\"writes\":[{\"type\":\"document.change\",\"id\":5,\"ordinal\":0}]}",

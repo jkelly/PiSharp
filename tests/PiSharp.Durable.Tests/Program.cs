@@ -25,16 +25,26 @@ internal static partial class Program
         if (cases.GroupBy(test => test.Id, StringComparer.Ordinal).Where(group => group.Count() > 1).Select(group => group.Key).ToList() is { Count: > 0 } duplicates)
             throw new InvalidOperationException("Duplicate case ids: " + string.Join(", ", duplicates));
         if (args is ["--only", var prefix]) cases = [.. cases.Where(test => test.Id.StartsWith(prefix, StringComparison.Ordinal))];
-        var results = new List<object>(); var failures = 0;
+        var results = new List<object>(); var failures = 0; var authored = 0; var captured = 0; var skipped = 0;
         foreach (var test in cases)
         {
             var started = System.Diagnostics.Stopwatch.StartNew();
             Console.Error.WriteLine("start " + test.Id);
-            try { await test.Run().WaitAsync(TimeSpan.FromSeconds(120)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds }); }
+            // compat.* cases check PiSharp against sessions and operations the pinned upstream itself produced (Compat/CompatCases.cs):
+            // captured upstream evidence, counted apart from the authored cases.
+            var upstreamCapture = test.Id.StartsWith("compat.", StringComparison.Ordinal);
+            try
+            {
+                await test.Run().WaitAsync(TimeSpan.FromSeconds(120));
+                if (upstreamCapture) captured++; else authored++;
+                results.Add(new { test.Id, status = upstreamCapture ? "PASS_UPSTREAM_CAPTURE" : "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds });
+            }
+            catch (CaseSkippedException skip) { skipped++; results.Add(new { test.Id, status = "SKIPPED_NO_UPSTREAM", reason = skip.Message }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures,
-            genuineSourceCasesCaptured = 0, results };
+        var report = new { sourceSha = Upstream, status = captured == 0 ? "AUTHORED NATIVE; NO UPSTREAM CAPTURE" : "AUTHORED NATIVE; UPSTREAM CAPTURE (compat.*)",
+            cases = cases.Count, failures, authoredCases = authored, upstreamCaptureCases = captured, skipped,
+            genuineSourceCasesCaptured = captured, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
         if (args is ["--report", var path])
         {
