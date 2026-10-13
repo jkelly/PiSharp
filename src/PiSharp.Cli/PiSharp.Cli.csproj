@@ -19,6 +19,8 @@
     <InternalsVisibleTo Include="PiSharp.CliParity.Tests" />
     <InternalsVisibleTo Include="PiSharp.ExtensionParity.Tests" />
     <InternalsVisibleTo Include="PiSharp.InteractiveParity.Tests" />
+    <!-- Branch feature/pi-durable (decision 0005, P12). -->
+    <InternalsVisibleTo Include="PiSharp.DurableCli.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />

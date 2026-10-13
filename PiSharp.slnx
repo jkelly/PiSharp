@@ -181,6 +181,9 @@
   <Folder Name="/samples/Durable.Examples/">
     <Project Path="samples/Durable.Examples/Durable.Examples.csproj" />
   </Folder>
+  <Folder Name="/tests/parity/PiSharp.DurableCli.Tests/">
+    <Project Path="tests/PiSharp.DurableCli.Tests/PiSharp.DurableCli.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/parity/PiSharp.Durable.Tests/">
     <Project Path="tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj" />
   </Folder>

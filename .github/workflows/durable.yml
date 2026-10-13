@@ -42,6 +42,19 @@ jobs:
             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
             -- --report "$RUNNER_TEMP/durable-${{ matrix.os }}.json"
 
+      - name: Run PiSharp.DurableCli.Tests
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.DurableCli.Tests/PiSharp.DurableCli.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-cli-${{ matrix.os }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-cli-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/durable-cli-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
