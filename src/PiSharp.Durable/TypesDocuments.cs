@@ -283,15 +283,16 @@ public abstract class DocumentContent : DurableValue
     }
 }
 
-/// <summary><c>{version, kind: "base", value}</c>: a complete value. A base storage builds itself from a stored document (a fork copy, a
-/// reclaimed creation) is <c>{kind: "base", version, value}</c> upstream (<see cref="KindFirst"/>).</summary>
+/// <summary><c>{version, kind: "base", value}</c>: a complete value. A base upstream's storage builds itself from a stored document (a fork
+/// copy) is <c>{kind: "base", version, value}</c>; JsonlStorage writes that spelling for a resolved copy, and a base decoded in it keeps it
+/// (<see cref="KindFirst"/>), so it encodes back to the same text.</summary>
 public sealed class DocumentBase(int version, JsonObjectValue value) : DocumentContent(version)
 {
     /// <inheritdoc/>
     public override DocumentContentKind Kind => DocumentContentKind.Base;
     /// <summary>The value.</summary>
     public JsonObjectValue Value { get; } = value ?? throw new ArgumentNullException(nameof(value));
-    /// <summary>Whether the JSON leads with <c>kind</c>: upstream storage's own <c>{ kind: "base", version, value }</c> literals.</summary>
+    /// <summary>Whether the JSON leads with <c>kind</c>, as decoded from upstream storage's own <c>{ kind: "base", version, value }</c>.</summary>
     internal bool KindFirst { get; init; }
     /// <inheritdoc/>
     public override JsonObjectValue ToJson() => KindFirst
