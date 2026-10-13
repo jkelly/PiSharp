@@ -10,4 +10,8 @@
     <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The tui.* cases drive the TUI on the interactive-mode cases' in-memory terminal. -->
+    <Compile Include="../PiSharp.InteractiveParity.Tests/VirtualTerminal.cs" Link="VirtualTerminal.cs" />
+  </ItemGroup>
 </Project>
