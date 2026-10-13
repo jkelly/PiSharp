@@ -1,7 +1,7 @@
 using PiSharp.Durable.Examples;
 
 // Usage: Durable.Examples [--storage memory|jsonl|sqlite] [--dir <directory>] [example ...]
-// Examples are named by number (00-15, 17, 20, 29, 30) or file name (00-conversation). File storage goes under --dir, or a fresh temporary directory.
+// Examples are named by number (00-15, 17, 20, 25, 29, 30) or file name (00-conversation). File storage goes under --dir, or a fresh temporary directory.
 var storage = ExampleStorage.Memory;
 string? root = null;
 var only = new List<string>();

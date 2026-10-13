@@ -8,7 +8,8 @@ using PiSharp.Durable.Examples;
 // Session and read it back. P9 adds 17-coding-tools, 29-sandbox-per-conversation and 30-tool-override, whose tools run over LocalExecutionEnv
 // in temporary directories (Git Bash on Windows); 17's timing of `cat /tmp/1gb.txt` compares as <ms> and its storage directory as <dir>.
 // P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held. P11 adds 06-harness through 13-recovery (11's faux provider is
-// ScriptedModels; 13 keeps its storage in a temporary SQLite file on memory, as upstream does, and reopens the runner's storage otherwise).
+// ScriptedModels; 13 keeps its storage in a temporary SQLite file on memory, as upstream does, and reopens the runner's storage otherwise),
+// and 25-compaction, whose model reports the faux provider's usage estimate; its file backends read back the stored entries and summaries.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -113,6 +114,60 @@ internal static partial class Program
         "note: done ",
         "withdrawn: unanswered aborted",
         InboxTranscript,
+        "== 25-compaction",
+        "after \"Where should we stay?\" (answered): 2 messages in context, 2 entries stored",
+        "  user      Where should we stay?",
+        "  assistant A detailed answer to \"Where should we stay?\": details details details ",
+        "after \"What should we eat?\" (answered): 4 messages in context, 4 entries stored",
+        "  user      Where should we stay?",
+        "  assistant A detailed answer to \"Where should we stay?\": details details details ",
+        "  user      What should we eat?",
+        "  assistant A detailed answer to \"What should we eat?\": details details details de",
+        "after \"Which day trips?\" (answered): 4 messages in context, 7 entries stored",
+        "  (threshold compaction summary first)",
+        "  user      The conversation history before this point was compacted into the foll",
+        "  assistant A detailed answer to \"What should we eat?\": details details details de",
+        "  user      Which day trips?",
+        "  assistant A detailed answer to \"Which day trips?\": details details details detai",
+        "after \"Any museums?\" (answered): 7 messages in context, 10 entries stored",
+        "  (threshold compaction summary first)",
+        "  user      The conversation history before this point was compacted into the foll",
+        "  assistant A detailed answer to \"What should we eat?\": details details details de",
+        "  user      Which day trips?",
+        "  assistant A detailed answer to \"Which day trips?\": details details details detai",
+        "  user      Any museums?",
+        "  system    (system prompt)",
+        "  assistant A detailed answer to \"Any museums?\": details details details details d",
+        "after \"Nightlife?\" (answered): 5 messages in context, 14 entries stored",
+        "  (threshold compaction summary first)",
+        "  user      The conversation history before this point was compacted into the foll",
+        "  assistant A detailed answer to \"Any museums?\": details details details details d",
+        "  user      Nightlife?",
+        "  system    (system prompt)",
+        "  assistant A detailed answer to \"Nightlife?\": details details details details det",
+        "manual compaction finished; its summary is queued",
+        "after the answer, the summary is done",
+        "after compact(): 4 messages in context, 17 entries stored",
+        "  (manual compaction summary first)",
+        "  user      The conversation history before this point was compacted into the foll",
+        "  assistant A detailed answer to \"Nightlife?\": details details details details det",
+        "  user      How do we get around?",
+        "  assistant A detailed answer to \"How do we get around?\": details details details ",
+        "after \"What should we pack?\" (answered): 7 messages in context, 20 entries stored",
+        "  (manual compaction summary first)",
+        "  user      The conversation history before this point was compacted into the foll",
+        "  assistant A detailed answer to \"Nightlife?\": details details details details det",
+        "  user      How do we get around?",
+        "  assistant A detailed answer to \"How do we get around?\": details details details ",
+        "  user      What should we pack?",
+        "  system    (system prompt)",
+        "  assistant A detailed answer to \"What should we pack?\": details details details d",
+        "after \"Summarize the plan for my partner\" (model_error): 4 messages in context, 24 entries stored",
+        "  (threshold compaction summary first)",
+        "  user      The conversation history before this point was compacted into the foll",
+        "  assistant A detailed answer to \"What should we pack?\": details details details d",
+        "  user      Summarize the plan for my partner",
+        CompactionLastLine,
         "== 29-sandbox-per-conversation",
         "alice's sandbox: from alice",
         BobsSandbox,
@@ -132,6 +187,8 @@ internal static partial class Program
     private const string PaymentOutcome = """payment outcome: {"status":"completed","result":{"receipt":500}}""";
     private const string CodingToolsStorage = "storage: <dir>";
     private const string InboxTranscript = """transcript: ["pi.user","pi.assistant","app.note","pi.user","pi.user","pi.assistant"]""";
+    // Repeated within 25-compaction's output; the read-back follows its last occurrence, the example's last line.
+    private const string CompactionLastLine = "  system    (system prompt)";
     private const string BobsSandbox = "bob's sandbox: from bob";
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
@@ -177,6 +234,7 @@ internal static partial class Program
         [RootAfterCwdChange] = [RootAfterCwdChange],
         [CodingToolsStorage] = CodingToolsTranscript,
         [InboxTranscript] = [InboxTranscript, "inbox: []"],
+        [CompactionLastLine] = ["24 entries stored, summaries: [\"threshold\",\"threshold\",\"manual\",\"threshold\"]"],
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
     };
@@ -188,10 +246,13 @@ internal static partial class Program
             yield return Case($"examples.{storage.ToString().ToLowerInvariant()}.reopen", async () =>
             {
                 var expected = new List<string>();
-                foreach (var line in ExamplesUpstreamOutput)
+                for (var index = 0; index < ExamplesUpstreamOutput.Length; index++)
                 {
+                    var line = ExamplesUpstreamOutput[index];
                     expected.Add(line);
-                    if (ExamplesReopened.TryGetValue(line, out var reopened)) { expected.Add("-- reopened"); expected.AddRange(reopened); }
+                    // An example reads back after its last line.
+                    var last = index + 1 == ExamplesUpstreamOutput.Length || ExamplesUpstreamOutput[index + 1].StartsWith("== ", StringComparison.Ordinal);
+                    if (last && ExamplesReopened.TryGetValue(line, out var reopened)) { expected.Add("-- reopened"); expected.AddRange(reopened); }
                 }
                 Lines(await RunExamplesAsync(storage, Temp("examples-" + storage)), expected);
             });

@@ -1,6 +1,5 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
-// upstream's HarnessImpl extends SessionImpl. Placeholders for later phases fail with NotImplementedException naming their phase:
-// compaction and the task graph (P11).
+// upstream's HarnessImpl extends SessionImpl.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -47,8 +46,6 @@ public static class Harness
         }
         return harness;
     }
-
-    internal static NotImplementedException NotPorted(string what, string phase) => new($"{what} is not ported yet ({phase})");
 }
 
 /// <summary>The Session kernel extended with conversation handles, a registry and the task scheduler (upstream <c>HarnessImpl</c>).</summary>
@@ -297,9 +294,12 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
         await harness.Submissions.SubmitAsync(Id, SubmissionDraft.Write(entry), context).ConfigureAwait(false);
     }
 
-    /// <summary>TODO(P11): manual compaction.</summary>
-    public Task<TaskId> CompactAsync(string? instructions, DurableContext context) =>
-        Task.FromException<TaskId>(Harness.NotPorted("Conversation.CompactAsync", "P11"));
+    /// <summary>Creates a manual compaction task with its live status in one commit (upstream <c>compact</c>).</summary>
+    public Task<TaskId> CompactAsync(string? instructions, DurableContext context)
+    {
+        harness.Scheduler.Resume();
+        return harness.CommitWithAsync(tx => Compaction.CreateCompactionAsync(tx, Id, "manual", instructions), context);
+    }
 
     public Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context)
     {
