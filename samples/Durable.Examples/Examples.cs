@@ -1,4 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts (14-chat.ts
+// and 15-system-prompt.ts are in ExamplesChat.cs).
 // Each example prints what upstream's console.log prints, as JSON. Upstream runs every example on a fresh MemoryStorage; here each one
 // can also run on its own JSONL directory or SQLite file, and then the storage is reopened in a new Session and read back (milestone M0
 // of decision 0005: the examples survive close and reopen).
@@ -20,8 +21,8 @@ public enum ExampleStorage
     Sqlite,
 }
 
-/// <summary>Upstream durable examples 00-05.</summary>
-public static class Examples
+/// <summary>Upstream durable examples 00-05, 14 and 15.</summary>
+public static partial class Examples
 {
     // Every Session call takes a context, which is used for cancellation. Background means "never cancel".
     private static readonly DurableContext Context = DurableContext.Background;
@@ -42,6 +43,8 @@ public static class Examples
         ("03-owned-conversations", OwnedConversationsAsync),
         ("04-chord-state", ChordStateAsync),
         ("05-watches", WatchesAsync),
+        ("14-chat", ChatAsync),
+        ("15-system-prompt", SystemPromptAsync),
     ];
 
     /// <summary>The example names, in order.</summary>

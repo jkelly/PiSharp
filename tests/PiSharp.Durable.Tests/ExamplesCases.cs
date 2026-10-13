@@ -1,8 +1,11 @@
+using System.Text.RegularExpressions;
 using PiSharp.Durable.Examples;
 
-// Milestone M0 (decision 0005): samples/Durable.Examples ports Pi v1.1.0 packages/durable/test/examples 00-05. The printed values are
-// the ones the pinned upstream prints under Node (node --conditions=source --experimental-strip-types test/examples/<name>.ts), as JSON
-// in place of util.inspect. The file backends also reopen each example's storage in a new Session and read it back.
+// Milestone M0 (decision 0005): samples/Durable.Examples ports Pi v1.1.0 packages/durable/test/examples 00-05; P8 adds 14-chat and
+// 15-system-prompt, with a scripted model in place of pi-ai's faux provider. The printed values are the ones the pinned upstream prints
+// under Node (node --conditions=source --experimental-strip-types test/examples/<name>.ts), as JSON in place of util.inspect; message
+// timestamps come from the clock, so both sides compare them as <time>. The file backends also reopen each example's storage in a new
+// Session and read it back.
 internal static partial class Program
 {
     private static readonly string[] ExamplesUpstreamOutput =
@@ -28,7 +31,21 @@ internal static partial class Program
         "== 05-watches",
         "watch baseline: {\"text\":\"first\"}",
         "watch update: {\"text\":\"observed asynchronously\"}",
+        "== 14-chat",
+        ChatAnswer,
+        ChatTranscript,
+        "== 15-system-prompt",
+        "root system prompt: [" + RootPrompt + "]",
+        """subagent system prompt: [{"role":"system","content":"","sections":{"preamble":"You are a coding agent. Be terse.","cwd":"<cwd>\n/repo\n</cwd>","instructions":"<instructions>\nOnly read; never edit files.\n</instructions>"},"timestamp":<time>}]""",
+        RootAfterCwdChange,
     ];
+
+    private const string ChatAnswer = """answer: [{"type":"text","text":"Paris."}]""";
+    private const string ChatTranscript = """transcript: ["pi.user","pi.system","pi.assistant"]""";
+    private const string RootPrompt =
+        """{"role":"system","content":"","sections":{"preamble":"You are a coding agent. Be terse.","cwd":"<cwd>\n/repo\n</cwd>","agents_md":"<agents_md>\nRun npm run check after changes.\n</agents_md>"},"timestamp":<time>}""";
+    private const string RootAfterCwdChange = "root system entries after cwd change: [" + RootPrompt +
+        """,{"role":"system","content":"","sections":{"cwd":"<cwd>\n/repo/packages\n</cwd>"},"timestamp":<time>}]""";
 
     // What each example reads back after reopen, keyed by the example's last upstream line.
     private static readonly Dictionary<string, string[]> ExamplesReopened = new(StringComparer.Ordinal)
@@ -54,6 +71,8 @@ internal static partial class Program
         ],
         ["Chord notes: update 1 {\"text\":\"published through Chord\"}"] = ["Chord notes: hydrate 0 {\"text\":\"published through Chord\"}"],
         ["watch update: {\"text\":\"observed asynchronously\"}"] = ["watch baseline: {\"text\":\"observed asynchronously\"}"],
+        [ChatTranscript] = [ChatTranscript, ChatAnswer],
+        [RootAfterCwdChange] = [RootAfterCwdChange],
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()
@@ -86,7 +105,8 @@ internal static partial class Program
 
     private static void Lines(string output, IReadOnlyList<string> expected)
     {
-        var actual = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => line.TrimEnd('\r')).ToArray();
+        var actual = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => Regex.Replace(line.TrimEnd('\r'), "\"timestamp\":[0-9]+", "\"timestamp\":<time>")).ToArray();
         for (var index = 0; index < Math.Max(actual.Length, expected.Count); index++)
             Equal(index < expected.Count ? expected[index] : "<end>", index < actual.Length ? actual[index] : "<end>", "line " + (index + 1));
     }

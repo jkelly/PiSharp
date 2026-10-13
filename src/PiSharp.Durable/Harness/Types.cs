@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/types.ts. The parts the openable Harness (P6) and the
 // task runtime (P7) need are complete; later-phase shapes keep upstream's names and carry TODO markers where their final C# signatures
-// join (submissions P8, tool execution P9, views P10, compaction and the task graph P11).
+// join (tool execution P9, views P10, compaction and the task graph P11). Submissions and the generation hooks are final (P8).
 //
 // Mappings: upstream's `Tool` generic (a host's own ToolRegistration subtype) becomes record inheritance, so `{ ...tool, x }` is
 // `tool with { X = ... }` and keeps the subtype; pi-ai messages and tool calls are wire JSON (JsonValue); a field that may be given,
@@ -630,8 +630,8 @@ public enum WhenBusy
     Reject,
 }
 
-/// <summary>A host submission: user input that may start a run, or a passive entry write (upstream <c>SubmissionDraft</c>).
-/// TODO(P8): admission joins with the submissions port.</summary>
+/// <summary>A host submission: user input that may start a run, or a passive entry write (upstream <c>SubmissionDraft</c>). A request ID
+/// deduplicates within one conversation before any write; reusing one for the other submission type rejects.</summary>
 public sealed record SubmissionDraft
 {
     private SubmissionDraft() { }
@@ -666,16 +666,18 @@ public enum SubmissionAbortResult
     NotFound,
 }
 
-/// <summary>Awaitable host object for one durably admitted submission (upstream <c>Submission</c>). TODO(P8).</summary>
+/// <summary>Awaitable host object for one durably admitted submission (upstream <c>Submission</c>).</summary>
 public interface ISubmission
 {
     /// <summary>The submission.</summary>
     SubmissionId Id { get; }
     /// <summary>The committed record.</summary>
     Task<SubmissionRecord> StatusAsync(DurableContext context);
-    /// <summary>Resolves with the settled record.</summary>
+    /// <summary>Resolves with the settled record (status <c>done</c> or <c>unanswered</c>; upstream <c>SettledSubmissionRecord</c>); cancelling
+    /// <paramref name="context"/> cancels only this wait, and close rejects it.</summary>
     Task<SubmissionRecord> WaitAsync(DurableContext context);
-    /// <summary>Withdraws a queued submission.</summary>
+    /// <summary>Withdraws a queued submission: <c>aborted</c>; <c>already_placed</c> for a placed input and <c>settled</c> for a settled
+    /// submission.</summary>
     Task<SubmissionAbortResult> AbortAsync(DurableContext context);
 }
 
@@ -687,7 +689,7 @@ public interface IConversationHandle
 {
     /// <summary>The conversation.</summary>
     ConversationId Id { get; }
-    /// <summary>Admits user input. TODO(P8).</summary>
+    /// <summary>Admits user input; the returned submission's operations are bound to the invocation too.</summary>
     Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context);
     /// <summary><c>Conversation.AbortAsync()</c>: withdraw queued inputs, abort the ordinary ownership scope, and wait until it is idle.</summary>
     Task AbortAsync(DurableContext context, ConversationAbortOptions? options = null);
@@ -710,7 +712,11 @@ public interface IConversation
     /// <summary>Applies <paramref name="change"/> to <c>pi.agent</c> in its own commit.</summary>
     Task ConfigureAsync(AgentChange change, DurableContext context);
 
-    /// <summary>Durably admits user input or a passive entry write. TODO(P8).</summary>
+    /// <summary>
+    /// Durably admits user input or a passive entry write. A busy conversation queues it in <c>pi.inbox</c>, or rejects
+    /// <see cref="WhenBusy.Reject"/> input with <see cref="ConversationBusyException"/> and writes nothing. Idle input places a user entry
+    /// and starts a run; an idle write appends its entry.
+    /// </summary>
     Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context);
     /// <summary>Admits a write of a <c>pi.reset</c> entry that starts a new context. TODO(P10).</summary>
     Task ResetAsync(string? handoff, DurableContext context);
@@ -784,9 +790,10 @@ public interface IHarness : ISession
     Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context);
     /// <summary>Live tasks and unsettled submissions. Writes nothing and runs no task code.</summary>
     Task<HarnessInspection> InspectAsync(DurableContext context);
-    /// <summary>Reacquires a submission, for example after reopen. TODO(P8).</summary>
+    /// <summary>Reacquires a submission, for example after reopen; null when it does not exist.</summary>
     Task<ISubmission?> SubmissionAsync(SubmissionId id, DurableContext context);
-    /// <summary>Aborts a submission. TODO(P8).</summary>
+    /// <summary>Aborts a submission; <see cref="SubmissionAbortResult.NotFound"/> for an unknown submission or one of another conversation
+    /// than <paramref name="conversationId"/>.</summary>
     Task<SubmissionAbortResult> AbortSubmissionAsync(SubmissionId id, DurableContext context, ConversationId? conversationId = null);
     /// <summary>
     /// Commits the abort mark, signals and joins an active run invocation, and schedules the abort invocation. A task whose definition
@@ -832,7 +839,7 @@ public interface IHookApi : IDocumentReader
 }
 
 /// <summary>Hooks of the built-in generation task (upstream <c>GenerationHooks</c>); every handler is optional. Messages are pi-ai wire
-/// JSON. TODO(P8): signatures are confirmed when the generation task is ported.</summary>
+/// JSON; hooks receive the generation's runtime as their <see cref="IHookApi"/>.</summary>
 public sealed class GenerationHooks
 {
     /// <summary>Before every request attempt, including recovery; a returned message list is used for that request only.</summary>

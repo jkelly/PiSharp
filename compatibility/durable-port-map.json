@@ -95,7 +95,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Compaction.cs",
       "phase": "P11",
       "status": "in-progress",
-      "note": "HarnessTasks.CompactionTask identity (pi.compaction v1, initial {phase: select}) whose phases (select, summarize, retry) and abort fault with \"not ported yet (P11)\". TODO(P11): the state machine"
+      "note": "HarnessTasks.CompactionTask identity (pi.compaction v1, initial {phase: select}) whose phases (select, summarize, retry) and abort fault with \"not ported yet (P11)\"; Compaction.CreateCompactionAsync, SelectCut and EstimateContext, which generation's threshold and overflow checks use (P8). TODO(P11): the state machine, summaries and their placement"
     },
     {
       "upstream": "packages/durable/src/harness/context.ts",
@@ -129,8 +129,8 @@
       "lines": 681,
       "pisharp": "src/PiSharp.Durable/Harness/Generation.cs",
       "phase": "P8",
-      "status": "in-progress",
-      "note": "HarnessTasks.GenerationTask identity (pi.generation v1, initial {phase: prepare, attempt: 1}) whose phases (prepare, request, retry, poll, tools) and abort fault with \"not ported yet (P8)\"; ConvertPartialAsync/AppendAssistantAsync for the scheduler's fault cleanup. TODO(P8): the state machine"
+      "status": "ported",
+      "note": "HarnessTasks.GenerationTask (pi.generation v1, initial {phase: prepare, attempt: 1}) with phases prepare, request, retry, poll and tools and its abort handler (GenerationPhases): section rendering and pi.system planning, threshold and overflow compaction starts, streaming through IDurableModels with throttled partial commits to pi.live.generation.message (an AssistantStreamReducer snapshot per event; the throttle timer is the Harness TimeProvider's), the beforeRequest/afterResponse/onYield/afterTools hooks (the runtime is the hooks' IHookApi), retry backoff, deferred polling and cancellation, usage recording (appendAssistant), the final boundary, the tool round hand-off (tool_unavailable results, owned tool tasks, sequential pending calls, finishToolRound with terminate/handoff/addTools controls) and startRun/handOver. Provider messages are stored as PiWireJson wire JSON; a non-finite usage count throws Chord's copyJson error. Tests: harness.generation.*, harness.generation-recovery.*, harness.chat-differential.*, harness.structured.tool-rounds.*"
     },
     {
       "upstream": "packages/durable/src/harness/harness.ts",
@@ -139,7 +139,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
       "phase": "P6",
       "status": "in-progress",
-      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Placeholders throwing NotImplementedException: submit/submission/abortSubmission and the bound submit (TODO(P8)), reset, viewState, watch and usage (TODO(P10)), compact, taskGraph, watchTaskGraph (TODO(P11)). Tests: harness.tasks.*, harness.conversations.*, harness.context.* (memory, jsonl, sqlite)"
+      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Placeholders throwing NotImplementedException: reset, viewState, watch and usage (TODO(P10)), compact, taskGraph, watchTaskGraph (TODO(P11)). Tests: harness.tasks.*, harness.conversations.*, harness.context.* (memory, jsonl, sqlite)"
     },
     {
       "upstream": "packages/durable/src/harness/inbox.ts",
@@ -148,7 +148,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Inbox.cs",
       "phase": "P10",
       "status": "in-progress",
-      "note": "Inbox.InboxDoc (pi.inbox), RemoveInboxItemAsync, WithdrawQueuedInputsAsync (the scheduler's withdrawInputs seam). TODO(P10): prepareBoundary, applyBoundary, isStale"
+      "note": "Inbox.InboxDoc (pi.inbox), PrepareBoundaryAsync/ApplyBoundaryAsync/IsStale (the boundaries generation and submissions use, P8), RemoveInboxItemAsync, WithdrawQueuedInputsAsync, and the EntryDraft JSON of queued writes. TODO(P10): the harness-inbox tests (steer/follow-up modes, resets, views)"
     },
     {
       "upstream": "packages/durable/src/harness/json.ts",
@@ -165,8 +165,8 @@
       "lines": 175,
       "pisharp": "src/PiSharp.Durable/Harness/Live.cs",
       "phase": "P8",
-      "status": "in-progress",
-      "note": "Live.LiveDoc (pi.live), EndRun, RemoveCompactionStatus, ToolSlot, FinishSlot, ClearProgress and SettleSchedulerOutcomeAsync (the scheduler's settleOutcome seam, with HarnessTasks.ConvertPartialAsync from generation.ts). TODO(P8): startRun/handOver writers; TODO(P11): addCompactionStatus/compactionStatus"
+      "status": "ported",
+      "note": "Live.LiveDoc (pi.live), EndRun, AddCompactionStatus/CompactionStatus/RemoveCompactionStatus, ToolSlot, FinishSlot, ClearProgress and SettleSchedulerOutcomeAsync (the scheduler's settleOutcome seam, with HarnessTasks.ConvertPartialAsync). The run writers startRun and handOver are in Generation.cs, as upstream keeps them in generation.ts. Tests: harness.generation.*, harness.submissions.*"
     },
     {
       "upstream": "packages/durable/src/harness/output.ts",
@@ -182,7 +182,8 @@
       "lines": 158,
       "pisharp": "src/PiSharp.Durable/Harness/Prompt.cs",
       "phase": "P8",
-      "status": "planned"
+      "status": "ported",
+      "note": "HarnessPrompt (internal): ReplaySections, RenderSectionsAsync, PlanSystemEntries (head rebaseline with omit edits, minimal or remove-all/re-add-all section patches, planTools over pi-ai declarations; tool changes ride on the last entry). Section maps are insertion-ordered like JavaScript Maps; patches are JSON objects in JavaScript key order. Tests: harness.prompt.* (memory, jsonl, sqlite)"
     },
     {
       "upstream": "packages/durable/src/harness/provider.ts",
@@ -190,8 +191,8 @@
       "lines": 39,
       "pisharp": "src/PiSharp.Durable/Harness/Provider.cs",
       "phase": "P8",
-      "status": "in-progress",
-      "note": "Code complete: ProviderIdentity.ProviderDoc (pi.provider, sessionId from Guid.CreateVersion7) and EnsureProviderSessionIdAsync; its tests come with generation (P8)"
+      "status": "ported",
+      "note": "ProviderIdentity.ProviderDoc (pi.provider, sessionId from PiAiUuid.UuidV7, i.e. Guid.CreateVersion7) and EnsureProviderSessionIdAsync. Tests: harness.generation.forwards-stream-options-*, keeps-provider-session-ids-*, creates-and-persists-provider-state-*"
     },
     {
       "upstream": "packages/durable/src/harness/registry.ts",
@@ -217,7 +218,8 @@
       "lines": 207,
       "pisharp": "src/PiSharp.Durable/Harness/Submissions.cs",
       "phase": "P8",
-      "status": "planned"
+      "status": "ported",
+      "note": "Submissions (internal: admission in one commit with request-id idempotency, status/wait/abort, waiters resolved from submission commit changes and rejected on close), the handle behind ISubmission, BoundSubmission for invocation-bound handles, and AdmitSubmissionAsync (busy queueing, whenBusy reject with ConversationBusyException, an idle boundary behind queued items, stale head writes). Tests: harness.submissions.* (memory, jsonl, sqlite; reopen on sqlite and jsonl)"
     },
     {
       "upstream": "packages/durable/src/harness/task-graph.ts",
@@ -234,7 +236,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Tool.cs",
       "phase": "P9",
       "status": "in-progress",
-      "note": "HarnessTasks.ToolTask identity (pi.tool v1, initial {phase: call}) whose phases (call, execute) and abort fault with \"not ported yet (P9)\". TODO(P9): the state machine"
+      "note": "HarnessTasks.ToolTask identity (pi.tool v1, initial {phase: call}) whose phases (call, execute) and abort fault with \"not ported yet (P9)\"; ToolResults.HarnessError and AppendToolResultAsync, which generation uses for unoffered calls and the unstarted calls of an aborted sequential round (P8). TODO(P9): the state machine"
     },
     {
       "upstream": "packages/durable/src/harness/types.ts",
@@ -243,7 +245,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Types.cs",
       "phase": "P6",
       "status": "in-progress",
-      "note": "P6/P7 shapes complete: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi. Later-phase shapes keep upstream names with TODO markers: SubmissionDraft/ISubmission and GenerationHooks (P8), IToolExecutionApi and ToolHooks (P9), views and usage as JsonObjectValue (P10), CompactionResult/CompactionHooks and the task graph (P11). The pi-ai Models seam is IDurableModels in Harness/Models.cs (DurableModel, DurableStreamOptions, DurableDeferredHandle, EmptyDurableModels)"
+      "note": "P6/P7 shapes complete: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi. SubmissionDraft/ISubmission and GenerationHooks are final (P8); ITaskRuntime extends IHookApi. Later-phase shapes keep upstream names with TODO markers: IToolExecutionApi and ToolHooks (P9), views and usage as JsonObjectValue (P10), CompactionResult/CompactionHooks and the task graph (P11). The pi-ai Models seam is IDurableModels in Harness/Models.cs (DurableModel, DurableStreamOptions, DurableDeferredHandle, EmptyDurableModels)"
     },
     {
       "upstream": "packages/durable/src/harness/usage.ts",
@@ -252,7 +254,7 @@
       "pisharp": "src/PiSharp.Durable/Harness/Usage.cs",
       "phase": "P10",
       "status": "in-progress",
-      "note": "UsageLedger.UsageDoc (pi.usage), RecordUsageAsync, AddUsage. TODO(P10): addUsageState and Harness.UsageAsync"
+      "note": "UsageLedger.UsageDoc (pi.usage), RecordUsageAsync (assistant entries and tool results, used by generation since P8), AddUsage. TODO(P10): addUsageState and Harness.UsageAsync"
     },
     {
       "upstream": "packages/durable/src/harness/util.ts",
@@ -683,9 +685,10 @@
       "upstream": "packages/durable/test/chat-support.ts",
       "blobSha1": "5f72a7edb41384090a8dae40719c47b4bdbc4c0c",
       "lines": 118,
-      "pisharp": "tests/PiSharp.Durable.Tests/ChatSupportCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/ChatSupport.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "ported",
+      "note": "ChatTests: Setup (ChatSetup with mutable settings fields read through HarnessSettings getters), OpenChat, AllEntries/Kinds, TextOf, Unanswered, ToolsNamed, ScriptedStream, MatchJson/MatchExactly; FauxModels ports pi-ai's faux provider (packages/ai/src/providers/faux.ts: fauxAssistantMessage/fauxText/fauxThinking/fauxToolCall, scripted steps and factories, token-paced deltas, deferred responses with pending fetches and cancellation, the prompt-cache usage estimate) as an IDurableModels; ModelsOverride stands for upstream's Proxy over models"
     },
     {
       "upstream": "packages/durable/test/chord-guide.test.ts",
@@ -861,17 +864,19 @@
       "upstream": "packages/durable/test/examples/14-chat.ts",
       "blobSha1": "5abc706f072c223ee2a1b5d4921aa4395225bc0f",
       "lines": 45,
-      "pisharp": "tests/PiSharp.Durable.Tests/14ChatCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesChat.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 14-chat with ScriptedModels in place of the faux provider, on memory, JSONL and SQLite with reopen; examples.* pins upstream's Node output (timestamps as <time>)"
     },
     {
       "upstream": "packages/durable/test/examples/15-system-prompt.ts",
       "blobSha1": "2202871c952892da469b7d37d3d9e8d04211ad05",
       "lines": 93,
-      "pisharp": "tests/PiSharp.Durable.Tests/15SystemPromptCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesChat.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 15-system-prompt with ScriptedModels and an example environment reporting the agent cwd as given (upstream's NodeExecutionEnv), on memory, JSONL and SQLite with reopen; examples.* pins upstream's Node output (timestamps as <time>)"
     },
     {
       "upstream": "packages/durable/test/examples/16-real-model.ts",
@@ -1055,17 +1060,19 @@
       "upstream": "packages/durable/test/harness-generation-recovery.test.ts",
       "blobSha1": "fed804c5e4e9f6744de02ddb827a25150c610a98",
       "lines": 289,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessGenerationRecoveryCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationRecoveryCases.cs",
       "phase": "P8",
-      "status": "planned"
+      "status": "ported",
+      "note": "7 of 7 tests: harness.generation-recovery.* reopening a SQLite file as upstream does, and harness.generation-recovery.jsonl.* reopening a JSONL directory"
     },
     {
       "upstream": "packages/durable/test/harness-generation.test.ts",
       "blobSha1": "2e2309eedc3bf3f4991fad1146c77e9eb40d31da",
       "lines": 693,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessGenerationCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs",
       "phase": "P8",
-      "status": "planned"
+      "status": "ported",
+      "note": "24 of 24 tests: harness.generation.* (24 cases) on MemoryStorage, plus harness.generation.jsonl.* and harness.generation.sqlite.* (22 each: the two storage-free cases run once). Adapted: scripted streams are ChatTests.ScriptedStream through ModelsOverride (an empty start frame then the text, for upstream's start event that carries it); the faulting final message carries a non-finite usage count instead of a function, so the fault detail contains \"non-finite number\" instead of \"non-JSON function\"; the AbortSignal instance check checks a cancellable token"
     },
     {
       "upstream": "packages/durable/test/harness-inbox.test.ts",
@@ -1127,9 +1134,10 @@
       "upstream": "packages/durable/test/harness-prompt.test.ts",
       "blobSha1": "8c47b19dbcad47ab7fdeec3d5e131fe6762bd8f8",
       "lines": 274,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessPromptCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessPromptCases.cs",
       "phase": "P8",
-      "status": "planned"
+      "status": "ported",
+      "note": "9 of 9 tests: harness.prompt.* (9) on MemoryStorage, plus harness.prompt.jsonl.* and harness.prompt.sqlite.* (6 each: the three storage-free cases run once). Section maps compare as ordered (key, text) pairs"
     },
     {
       "upstream": "packages/durable/test/harness-registry.test.ts",
@@ -1147,15 +1155,16 @@
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs",
       "phase": "P7",
       "status": "in-progress",
-      "note": "41 of 51 upstream tests ported (39 of 49 it() sites; two sites are parameterized into two tests each), as harness.structured.* (41 cases) on MemoryStorage with SQLite reopen for the recovery describes, harness.structured.jsonl.* (41, JSONL reopen) and harness.structured.sqlite.* (33, no reopen); support in Harness/HarnessStructuredSupport.cs. 10 pending until P8/P9: the 5 tests of 'tool rounds' and the 5 of 'tool rounds and events' need faux models, generation and tool tasks (P8) and watchEvents (P9). Adapted: per-case Nodes fixture instead of module state; deferred barrier where a script reads the parent ID the test assigns after start(); Committed barrier for handler-assigned IDs; settled(...)=true awaits the task; a null TaskOptions ownership for upstream's {} (NullReferenceException for TypeError); Rejecting storage is a decorator"
+      "note": "42 of 51 upstream tests ported (40 of 49 it() sites; two sites are parameterized into two tests each), as harness.structured.* (42 cases) on MemoryStorage with SQLite reopen for the recovery describes, harness.structured.jsonl.* (42, JSONL reopen) and harness.structured.sqlite.* (34, no reopen); support in Harness/HarnessStructuredSupport.cs. P8 ported the 'tool rounds' test 'keeps run control with a faulted generation until its owned work drains, and retries a rejected final commit' (Harness/HarnessStructuredToolRoundsCases.cs). 9 pending: 3 'tool rounds' tests need the tool task (P9); 'ends a turn at the generation's hold, before its successor's turn starts' and the 5 'tool rounds and events' tests need the tool task and watchEvents (P9 + P10). Adapted: per-case Nodes fixture instead of module state; deferred barrier where a script reads the parent ID the test assigns after start(); Committed barrier for handler-assigned IDs; settled(...)=true awaits the task; a null TaskOptions ownership for upstream's {} (NullReferenceException for TypeError); Rejecting storage is a decorator; invalidFinalStream carries a non-finite usage count"
     },
     {
       "upstream": "packages/durable/test/harness-submissions.test.ts",
       "blobSha1": "07afaa5476ef286677ea56008e5a99486aa90f48",
       "lines": 278,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessSubmissionsCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessSubmissionsCases.cs",
       "phase": "P8",
-      "status": "planned"
+      "status": "ported",
+      "note": "10 of 10 tests: harness.submissions.* on ControlledStorage over memory (the reopen case on a SQLite file), harness.submissions.jsonl.* (10, the reopen case on a JSONL directory) and harness.submissions.sqlite.* (9, no reopen). Adapted: HeldReads is a decorator over ControlledStorage; the cancellable wait context is DurableContext.WithCancel()"
     },
     {
       "upstream": "packages/durable/test/harness-support.ts",
