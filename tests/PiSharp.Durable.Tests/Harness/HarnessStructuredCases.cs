@@ -18,13 +18,9 @@
 // until its owned work drains, and retries a rejected final commit" (generation, P8) and the three tests the tool task unblocks (P9): "owns
 // its tool tasks, waits for them, and hands the run to a conversation-owned generation"; "aborts a parallel round with its generation: tools
 // first, then the generation, with every result written"; "answers the unstarted calls of an aborted sequential round with aborted results,
-// in call order". Pending until watchEvents and the agent event stream (events.ts, P10):
-// - tool rounds (P10, it runs a tool and listens to turn events): "ends a turn at the generation's hold, before its successor's turn
-//   starts".
-// - tool rounds and events (P10): "ends an aborted sequential round's unstarted calls with their result entries, right before them";
-//   "emits one turn_end per generation, also for a stream attached while it holds"; "lets a tool that owns live work finish its call at
-//   the hold while the generation waits for its final commit"; "holds a faulted tool's slot and task_failed until the work it owns
-//   drained".
+// in call order". HarnessStructuredEventsCases.cs ports the tests that listen to agent events (watchEvents, P10): "ends a turn at the
+// generation's hold, before its successor's turn starts" (harness.structured.tool-rounds.*) and the four tests of describe "tool rounds
+// and events" (harness.structured.tool-rounds-and-events.*).
 // "reopens a checkout waiting on live payments and finishes it", the last test of upstream's recovery describe (just before "tool rounds"),
 // needs no model and is ported.
 using PiSharp.Durable;

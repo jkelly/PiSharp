@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/types.ts. The parts the openable Harness (P6) and the
 // task runtime (P7) need are complete; later-phase shapes keep upstream's names and carry TODO markers where their final C# signatures
-// join (views P10, compaction and the task graph P11). Submissions and the generation hooks are final (P8); tools are final (P9).
+// join (compaction and the task graph, P11). Submissions and the generation hooks are final (P8); tools are final (P9); views are final (P10).
 //
 // Mappings: upstream's `Tool` generic (a host's own ToolRegistration subtype) becomes record inheritance, so `{ ...tool, x }` is
 // `tool with { X = ... }` and keeps the subtype; pi-ai messages and tool calls are wire JSON (JsonValue); a field that may be given,

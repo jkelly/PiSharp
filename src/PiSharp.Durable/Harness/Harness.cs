@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
 // upstream's HarnessImpl extends SessionImpl. Placeholders for later phases fail with NotImplementedException naming their phase:
-// views (P10), compaction and the task graph (P11).
+// compaction and the task graph (P11).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;

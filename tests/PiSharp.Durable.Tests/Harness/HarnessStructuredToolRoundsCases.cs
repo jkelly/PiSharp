@@ -3,7 +3,7 @@
 // parallel round with its generation: tools first, then the generation, with every result written" and "answers the unstarted calls of an
 // aborted sequential round with aborted results, in call order", and the one generation alone (P8) unblocked, "keeps run control with a
 // faulted generation until its owned work drains, and retries a rejected final commit". "ends a turn at the generation's hold, before its
-// successor's turn starts" and the "tool rounds and events" tests need watchEvents (P10) and are pending (see HarnessStructuredCases.cs).
+// successor's turn starts" and the "tool rounds and events" tests listen to agent events and are in HarnessStructuredEventsCases.cs.
 // Adaptations beyond those of HarnessStructuredSupport.cs and ChatSupport.cs: invalidFinalStream is GenerationTests.InvalidFinalStream (a
 // non-finite usage count instead of a function, see HarnessGenerationCases.cs); upstream's module-level blockingTool and toolCalls are
 // BlockingRoundTool and ToolCalls below; `Promise.all([one.started, two.started])` is Task.WhenAll; "aborts a parallel round ..." orders the

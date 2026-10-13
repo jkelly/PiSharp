@@ -10,7 +10,6 @@
 //   enqueued before the barrier has run when it completes (the listeners here complete synchronously).
 // - A held commit is a commit whose callback awaits a deferred; an aborted controller is a DurableCancellation cancelled with
 //   Exception("cancelled"), which is what the acquisition rejects with.
-//
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
