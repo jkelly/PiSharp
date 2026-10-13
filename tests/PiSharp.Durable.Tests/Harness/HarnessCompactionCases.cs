@@ -2058,8 +2058,15 @@ internal static class CompactionTests
             var submission = await SubmissionFor(chat, queued);
             Equal(SubmissionStatus.Queued, (await submission.StatusAsync(Context)).Status, "queued");
             chat.Setup.Compaction = Background with { ReserveTokens = 1500, KeepRecentTokens = 50 };
-            time.Advance(TimeSpan.FromMilliseconds(300));
-            Equal(SubmissionStatus.Done, (await input.WaitAsync(Context)).Status, "input");
+            // The retry's backoff timer may not exist yet when the live retry status is visible (a loaded macos-14 runner advanced the
+            // clock first, so the timer was due 300 ms after the advanced time and never fired). Advance until the input settles.
+            var settled = input.WaitAsync(Context);
+            for (var step = 0; !settled.IsCompleted && step < 400; step++)
+            {
+                time.Advance(TimeSpan.FromMilliseconds(300));
+                await Task.WhenAny(settled, Task.Delay(50));
+            }
+            Equal(SubmissionStatus.Done, (await settled).Status, "input");
             Check(FirstUserText(chat.Faux.AgentRequests.Snapshot()[^1].Messages).Contains("BLOCKING", StringComparison.Ordinal), "blocking first");
             MatchJson("""{"status":"unanswered","reason":"stale"}""", (await submission.WaitAsync(Context)).ToJson(), "stale");
             await chat.Harness.CloseAsync(Context);

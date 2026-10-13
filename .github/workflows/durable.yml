@@ -43,6 +43,7 @@ jobs:
             -- --report "$RUNNER_TEMP/durable-${{ matrix.os }}.json"
 
       - name: Run PiSharp.DurableCli.Tests
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
