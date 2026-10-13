@@ -1,7 +1,11 @@
+using System.Text;
 using PiSharp.Durable.Examples;
 
+// 23-subagent-background prints an arrow; a Windows console otherwise encodes its OEM code page.
+Console.OutputEncoding = Encoding.UTF8;
+
 // Usage: Durable.Examples [--storage memory|jsonl|sqlite] [--dir <directory>] [example ...]
-// Examples are named by number (00-15, 17, 20, 22, 25, 29, 30, 31) or file name (00-conversation). File storage goes under --dir, or a fresh temporary directory.
+// Examples are named by number (00-18, 20-31) or file name (00-conversation). File storage goes under --dir, or a fresh temporary directory.
 var storage = ExampleStorage.Memory;
 string? root = null;
 var only = new List<string>();

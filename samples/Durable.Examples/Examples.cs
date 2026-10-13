@@ -61,6 +61,7 @@ public static partial class Examples
         ("20-inbox", InboxAsync),
         ("21-late-join", LateJoinAsync),
         ("22-subagent-foreground", SubagentForegroundAsync),
+        ("23-subagent-background", SubagentBackgroundAsync),
         ("24-child-tasks", ChildTasksAsync),
         ("25-compaction", CompactionAsync),
         ("26-coding-agent", CodingAgentAsync),
