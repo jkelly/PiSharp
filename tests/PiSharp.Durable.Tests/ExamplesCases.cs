@@ -130,10 +130,52 @@ internal static partial class Program
         "note: done ",
         "withdrawn: unanswered aborted",
         InboxTranscript,
+        "== 21-late-join",
+        // Upstream's util.inspect prints [ 'pi.user', 'pi.system', 'pi.assistant' ] and [ 'count running' ].
+        """view entries: ["pi.user","pi.system","pi.assistant"]""",
+        @"view tool slot: running ""1\n2\n3\n4\n5\n""",
+        @"view output now: ""1\n2\n3\n4\n5\n""",
+        """snapshot tools: ["count running"]""",
+        .. LateJoinOutput(6, "view output now: ", "event output now: "),
+        "event: tool_execution_end",
+        "event: message_start",
+        "event: message_end",
+        "event: turn_end",
+        "event: turn_start",
+        "event: message_start",
+        "event text delta: \"en, and this ans\"",
+        "event text delta: \"wer streams slow\"",
+        "event: message_end",
+        "event: turn_end",
+        "event: run_end",
+        "event: submission",
+        LateJoinLastLine,
         "== 22-subagent-foreground",
         "tool subagent({\"task\":\"Name three prime numbers.\"})",
         "  assistant: 2, 3, and 5.",
         SubagentAnswer,
+        "== 24-child-tasks",
+        "One card is declined:",
+        "  payment visa-1 aborted, refunded",
+        "  payment visa-3 aborted, refunded",
+        "  payment visa-4 aborted, refunded",
+        "  payments: aborted, failed, aborted, aborted",
+        "  checkout: failed",
+        "The customer cancels:",
+        "  example.checkout 12: waiting on 13, 14, 15, 16",
+        "    example.payment 13: running",
+        "    example.payment 14: running",
+        "    example.payment 15: running",
+        "    example.payment 16: running",
+        "  payment visa-5 aborted, refunded",
+        "  payment visa-6 aborted, refunded",
+        "  payment visa-7 aborted, refunded",
+        "  payment visa-8 aborted, refunded",
+        "  checkout aborted",
+        "  checkout: aborted",
+        "The process stops while the payments run, and a new one continues:",
+        "  payments: completed, completed, completed, completed",
+        "  checkout: completed",
         "== 25-compaction",
         "after \"Where should we stay?\" (answered): 2 messages in context, 2 entries stored",
         "  user      Where should we stay?",
@@ -235,6 +277,19 @@ internal static partial class Program
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
 
+    private const string LateJoinLastLine = "event: usage_changed";
+
+    // The output lines 21-late-join prints once the client joined: each committed line, first from the view, then from the event stream.
+    private static IEnumerable<string> LateJoinOutput(int from, string view, string events)
+    {
+        for (var n = from; n <= 10; n++)
+        {
+            var text = string.Concat(Enumerable.Range(1, n).Select(line => line + @"\n"));
+            yield return $"{view}\"{text}\"";
+            yield return $"{events}\"{text}\"";
+        }
+    }
+
     private const string PrintAnswer = "This directory holds the durable package sources, tests, and docs.";
     private const string CodingAgentLastLine = "bash ran in: <workspace>/app";
     private const string PlanSteps = """plan: ["Read PORT from the environment","Default to 3000"]""";
@@ -291,6 +346,7 @@ internal static partial class Program
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
         [PrintAnswer] = [PrintAnswer],
+        [LateJoinLastLine] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
         [CodingAgentLastLine] = ["bash ran in: <workspace>", CodingAgentLastLine],
         [PlanModeLastLine] = [PlanSteps],
         [ReviewerTranscript[^1]] = ReviewerTranscript,
