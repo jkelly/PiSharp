@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
 // upstream's HarnessImpl extends SessionImpl. Placeholders for later phases fail with NotImplementedException naming their phase:
-// reset, views and usage totals (P10), compaction and the task graph (P11).
+// views (P10), compaction and the task graph (P11).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -174,9 +174,19 @@ internal sealed class DurableHarness : Session, IHarness
         return scheduler.WaitForIdleAsync(null, context);
     }
 
-    /// <summary>TODO(P10): the Session usage total.</summary>
-    public Task<JsonObjectValue> UsageAsync(DurableContext context) =>
-        Task.FromException<JsonObjectValue>(Harness.NotPorted("Harness.UsageAsync", "P10"));
+    /// <summary>Sums every conversation's committed <c>pi.usage</c>. Each document is read at its own point; totals only grow.</summary>
+    public async Task<JsonObjectValue> UsageAsync(DurableContext context)
+    {
+        var conversations = await ReadOnLineAsync(() => HarnessUtil.ScanAll(cursor =>
+            storage.ScanConversationsAsync(new ConversationQuery(), ScanPageSize, cursor, context))).ConfigureAwait(false);
+        var total = UsageLedger.UsageDoc.Definition.Initial();
+        foreach (var conversation in conversations)
+        {
+            var state = await SnapshotAsync(UsageLedger.UsageDoc, conversation.Id, context).ConfigureAwait(false);
+            if (state is not null) total = UsageLedger.AddUsageState(total, state);
+        }
+        return total;
+    }
 
     /// <summary>TODO(P11): the task graph.</summary>
     public Task<AttachedReplicatedState<JsonObjectValue>> TaskGraphAsync(DurableContext context) =>
@@ -276,8 +286,18 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
 
     public Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context) => harness.Submissions.SubmitAsync(Id, submission, context);
 
-    /// <summary>TODO(P10): a reset is a write submission placed through the inbox.</summary>
-    public Task ResetAsync(string? handoff, DurableContext context) => Task.FromException(Harness.NotPorted("Conversation.ResetAsync", "P10"));
+    /// <summary>Admits a write of a <c>pi.reset</c> entry with <c>head: "self"</c>, carrying <paramref name="handoff"/> as a user message when
+    /// given; a busy conversation places it at its next boundary.</summary>
+    public async Task ResetAsync(string? handoff, DurableContext context)
+    {
+        var model = handoff is null ? null : JsonValue.Array(JsonValue.Object([
+            KeyValuePair.Create("role", (JsonValue)"user"),
+            KeyValuePair.Create("content", (JsonValue)handoff),
+            KeyValuePair.Create("timestamp", (JsonValue)harness.Now()),
+        ]));
+        var entry = new EntryDraft { Kind = Entries.ResetEntry.Kind, Head = EntryHead.Self, Model = model };
+        await harness.Submissions.SubmitAsync(Id, SubmissionDraft.Write(entry), context).ConfigureAwait(false);
+    }
 
     /// <summary>TODO(P11): manual compaction.</summary>
     public Task<TaskId> CompactAsync(string? instructions, DurableContext context) =>

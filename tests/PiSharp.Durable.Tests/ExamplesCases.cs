@@ -7,6 +7,7 @@ using PiSharp.Durable.Examples;
 // timestamps come from the clock, so both sides compare them as <time>. The file backends also reopen each example's storage in a new
 // Session and read it back. P9 adds 17-coding-tools, 29-sandbox-per-conversation and 30-tool-override, whose tools run over LocalExecutionEnv
 // in temporary directories (Git Bash on Windows); 17's timing of `cat /tmp/1gb.txt` compares as <ms> and its storage directory as <dir>.
+// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -61,6 +62,17 @@ internal static partial class Program
         "answer: [{\"type\":\"text\",\"text\":\"The file now greets durable.\"}]",
         "file: \"hello durable\\n\"",
         CodingToolsStorage,
+        "== 20-inbox",
+        "rejected: Conversation 1 is busy",
+        "withdraw: aborted",
+        """inbox: ["10 followUp","11 steer","12 write"]""",
+        // Upstream prints an empty reason after a settled done.
+        "first: done ",
+        "follow-up: done ",
+        "steer: done ",
+        "note: done ",
+        "withdrawn: unanswered aborted",
+        InboxTranscript,
         "== 29-sandbox-per-conversation",
         "alice's sandbox: from alice",
         BobsSandbox,
@@ -71,6 +83,7 @@ internal static partial class Program
     ];
 
     private const string CodingToolsStorage = "storage: <dir>";
+    private const string InboxTranscript = """transcript: ["pi.user","pi.assistant","app.note","pi.user","pi.user","pi.assistant"]""";
     private const string BobsSandbox = "bob's sandbox: from bob";
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
@@ -109,6 +122,7 @@ internal static partial class Program
         [ChatTranscript] = [ChatTranscript, ChatAnswer],
         [RootAfterCwdChange] = [RootAfterCwdChange],
         [CodingToolsStorage] = CodingToolsTranscript,
+        [InboxTranscript] = [InboxTranscript, "inbox: []"],
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
     };

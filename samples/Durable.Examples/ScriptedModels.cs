@@ -1,7 +1,7 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/faux.ts, reduced to what the examples use: the model faux/faux-1
 // answering each request with the next scripted reply, a text streamed as one text block or tool calls streamed as tool-call blocks with
-// stop reason toolUse (upstream fauxAssistantMessage([fauxToolCall(...)], { stopReason: "toolUse" })). A real host passes its IDurableModels
-// over PiSharp.AI instead.
+// stop reason toolUse (upstream fauxAssistantMessage([fauxToolCall(...)], { stopReason: "toolUse" })); a held reply first waits for its
+// release, as a faux response factory awaiting a promise does. A real host passes its IDurableModels over PiSharp.AI instead.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -13,7 +13,7 @@ namespace PiSharp.Durable.Examples;
 /// <summary>One scripted answer: a text, or tool calls.</summary>
 public sealed record ScriptedReply
 {
-    private ScriptedReply(string? text, ImmutableArray<ToolCallContent> calls) { Text = text; Calls = calls; }
+    private ScriptedReply(string? text, ImmutableArray<ToolCallContent> calls, Task? release = null) { Text = text; Calls = calls; Release = release; }
 
     /// <summary>The text of a text answer.</summary>
     public string? Text { get; }
@@ -23,6 +23,14 @@ public sealed record ScriptedReply
 
     /// <summary>A text answer.</summary>
     public static ScriptedReply Answer(string text) => new(text ?? throw new ArgumentNullException(nameof(text)), default);
+
+    /// <summary>A text answer that waits for <paramref name="release"/> before it streams, so the conversation stays busy until then
+    /// (upstream's faux response factory awaiting a promise).</summary>
+    public static ScriptedReply Held(string text, Task release) =>
+        new(text ?? throw new ArgumentNullException(nameof(text)), default, release ?? throw new ArgumentNullException(nameof(release)));
+
+    /// <summary>What the reply waits for before it streams; null streams at once.</summary>
+    public Task? Release { get; }
 
     /// <summary>An answer that calls one tool (upstream <c>fauxToolCall(name, args, { id })</c>).</summary>
     public static ScriptedReply ToolCall(string name, JsonObjectValue arguments, string? id = null) =>
@@ -70,6 +78,7 @@ public sealed class ScriptedModels : IDurableModels
             yield return new StreamError(StopReason.Error, error);
             yield break;
         }
+        if (reply.Release is { } release) await release.WaitAsync(cancellationToken);
         yield return new StreamStarted(partial);
         if (reply.Text is { } text)
         {
