@@ -81,8 +81,10 @@ internal static class ConversationContext
     public static async Task<ContextView> ReadContextAsync(Session session, IStorage storage, ConversationId conversationId, DurableContext context,
         EntryId? at = null)
     {
-        var bounds = await session.ReadOnLineAsync(() => CaptureContextBoundsAsync(storage, conversationId, context, at)).ConfigureAwait(false);
-        return await DeriveContextAsync(storage, conversationId, bounds, context).ConfigureAwait(false);
+        // The lease keeps Storage open for the off-line derive when close follows the bounds job on the line.
+        var (bounds, lease) = await session.ReadOnLineAsync(async () =>
+            (await CaptureContextBoundsAsync(storage, conversationId, context, at).ConfigureAwait(false), session.HoldStorageOpen())).ConfigureAwait(false);
+        using (lease) return await DeriveContextAsync(storage, conversationId, bounds, context).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -42,6 +42,9 @@ public class Session : ISession
     // Deliveries scheduled while a job publishes; run by that job right after publication. Guarded by deferGate.
     private readonly Lock deferGate = new();
     private List<Action>? deferred;
+    // Reads that captured their bounds on the line and still read Storage off it (see HoldStorageOpen). Guarded by closingGate.
+    private int offLineReads;
+    private TaskCompletionSource? offLineReadsDrained;
 
     /// <summary>Opens a Session kernel over <paramref name="storage"/>; <paramref name="now"/> is the wall clock for task times in milliseconds
     /// (default: the system clock).</summary>
@@ -365,6 +368,7 @@ public class Session : ISession
                     {
                         lock (listenersGate) commitListeners.Clear();
                         lock (documentsGate) documents.Clear();
+                        await OffLineReadsDrainedAsync().ConfigureAwait(false);
                         await storage.CloseAsync(cleanup).ConfigureAwait(false);
                         return true;
                     }).ConfigureAwait(false);
@@ -410,6 +414,39 @@ public class Session : ISession
         {
             lock (listenersGate) closeListeners.Remove(entry);
         });
+    }
+
+    /// <summary>
+    /// Internal: called from a line job by a read that continues off the line, such as <c>Conversation.ContextAsync</c>; Storage stays open
+    /// until the returned lease is disposed. Close then lets a read queued on the line at its seal complete (spec 2.2), which upstream's
+    /// single thread gives for free: the read's off-line part runs before the closing line job.
+    /// </summary>
+    internal IDisposable HoldStorageOpen()
+    {
+        lock (closingGate) offLineReads++;
+        return new Unsubscriber(() =>
+        {
+            TaskCompletionSource? drained = null;
+            lock (closingGate)
+            {
+                if (--offLineReads == 0)
+                {
+                    drained = offLineReadsDrained;
+                    offLineReadsDrained = null;
+                }
+            }
+            drained?.TrySetResult();
+        });
+    }
+
+    private Task OffLineReadsDrainedAsync()
+    {
+        lock (closingGate)
+        {
+            if (offLineReads == 0) return Task.CompletedTask;
+            offLineReadsDrained ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            return offLineReadsDrained.Task;
+        }
     }
 
     /// <summary>Internal: drops every loaded tracker on the mutation line; later access cold-loads from Storage.</summary>

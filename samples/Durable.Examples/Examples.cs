@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts (14-chat.ts
 // and 15-system-prompt.ts are in ExamplesChat.cs; 17-coding-tools.ts, 29-sandbox-per-conversation.ts and 30-tool-override.ts are in
-// ExamplesTools.cs; 20-inbox.ts is in ExamplesInbox.cs).
+// ExamplesTools.cs; 20-inbox.ts is in ExamplesInbox.cs; 31-reload-and-restart.ts is in ExamplesReload.cs).
 // Each example prints what upstream's console.log prints, as JSON. Upstream runs every example on a fresh MemoryStorage; here each one
 // can also run on its own JSONL directory or SQLite file, and then the storage is reopened in a new Session and read back (milestone M0
 // of decision 0005: the examples survive close and reopen).
@@ -22,7 +22,7 @@ public enum ExampleStorage
     Sqlite,
 }
 
-/// <summary>Upstream durable examples 00-05, 14, 15, 17, 20, 29 and 30.</summary>
+/// <summary>Upstream durable examples 00-05, 14, 15, 17, 20, 29, 30 and 31.</summary>
 public static partial class Examples
 {
     // Every Session call takes a context, which is used for cancellation. Background means "never cancel".
@@ -50,6 +50,7 @@ public static partial class Examples
         ("20-inbox", InboxAsync),
         ("29-sandbox-per-conversation", SandboxPerConversationAsync),
         ("30-tool-override", ToolOverrideAsync),
+        ("31-reload-and-restart", ReloadAndRestartAsync),
     ];
 
     /// <summary>The example names, in order.</summary>

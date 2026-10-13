@@ -7,7 +7,8 @@ using PiSharp.Durable.Examples;
 // timestamps come from the clock, so both sides compare them as <time>. The file backends also reopen each example's storage in a new
 // Session and read it back. P9 adds 17-coding-tools, 29-sandbox-per-conversation and 30-tool-override, whose tools run over LocalExecutionEnv
 // in temporary directories (Git Bash on Windows); 17's timing of `cat /tmp/1gb.txt` compares as <ms> and its storage directory as <dir>.
-// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held.
+// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held. P11 adds 31-reload-and-restart, which restarts on its own storage (a
+// temporary SQLite file on the memory run, as upstream), so it has no separate read-back.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -80,6 +81,12 @@ internal static partial class Program
         "plain conversation: venv:",
         PythonConversation,
         TimedBashCalls,
+        "== 31-reload-and-restart",
+        "call running during the reload: v1",
+        "next call: v2",
+        "after restart, before install: []",
+        // Upstream's util.inspect prints [ 'version' ].
+        "after install: [\"version\"]",
     ];
 
     private const string CodingToolsStorage = "storage: <dir>";
