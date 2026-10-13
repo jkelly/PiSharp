@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Decision 0005, milestone M1: one prompt answered headless through a real provider (NativeDurableModels), on SQLite by default, and
-       still there after reopen. The PiSharp counterpart of Pi v1.1.0 packages/durable/test/examples/16-real-model.ts. -->
+  <!-- Decision 0005, milestones M1 and M2: one prompt answered headless through a real provider (NativeDurableModels), on SQLite by
+       default, and still there after reopen; with the tools option the model reads, edits and runs commands through the durable coding tools.
+       The PiSharp counterpart of Pi v1.1.0 packages/durable/test/examples/16-real-model.ts and 17-coding-tools.ts. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>Durable.Chat</AssemblyName>
@@ -11,5 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
   </ItemGroup>
 </Project>
