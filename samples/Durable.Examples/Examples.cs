@@ -1,7 +1,10 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts (06-harness.ts
-// through 13-recovery.ts are in ExamplesHarness.cs; 14-chat.ts and 15-system-prompt.ts are in ExamplesChat.cs; 17-coding-tools.ts,
-// 29-sandbox-per-conversation.ts and 30-tool-override.ts are in ExamplesTools.cs; 20-inbox.ts is in ExamplesInbox.cs; 22-subagent-foreground.ts
-// is in ExamplesSubagent.cs; 25-compaction.ts is in ExamplesCompaction.cs; 31-reload-and-restart.ts is in ExamplesReload.cs).
+// through 13-recovery.ts are in ExamplesHarness.cs; 14-chat.ts and 15-system-prompt.ts are in ExamplesChat.cs; 16-real-model.ts, 18-print.ts,
+// 26-coding-agent.ts, 27-plan-mode.ts and 28-reviewer.ts are in ExamplesAgents.cs; 17-coding-tools.ts, 29-sandbox-per-conversation.ts and
+// 30-tool-override.ts are in ExamplesTools.cs; 19-json.ts is in ExamplesJson.cs; 20-inbox.ts is in ExamplesInbox.cs; 21-late-join.ts is in
+// ExamplesLateJoin.cs; 22-subagent-foreground.ts is in ExamplesSubagent.cs; 23-subagent-background.ts is in ExamplesBackground.cs;
+// 24-child-tasks.ts is in ExamplesChildTasks.cs; 25-compaction.ts is in ExamplesCompaction.cs; 31-reload-and-restart.ts is in
+// ExamplesReload.cs).
 // Each example prints what upstream's console.log prints, as JSON. Upstream runs every example on a fresh MemoryStorage; here each one
 // can also run on its own JSONL directory or SQLite file, and then the storage is reopened in a new Session and read back (milestone M0
 // of decision 0005: the examples survive close and reopen).
@@ -23,7 +26,7 @@ public enum ExampleStorage
     Sqlite,
 }
 
-/// <summary>Upstream durable examples 00-15, 17, 20, 22, 25, 29, 30 and 31.</summary>
+/// <summary>Upstream durable examples 00-31.</summary>
 public static partial class Examples
 {
     // Every Session call takes a context, which is used for cancellation. Background means "never cancel".
@@ -55,10 +58,19 @@ public static partial class Examples
         ("13-recovery", RecoveryAsync),
         ("14-chat", ChatAsync),
         ("15-system-prompt", SystemPromptAsync),
+        ("16-real-model", RealModelAsync),
         ("17-coding-tools", CodingToolsAsync),
+        ("18-print", PrintAsync),
+        ("19-json", JsonModeAsync),
         ("20-inbox", InboxAsync),
+        ("21-late-join", LateJoinAsync),
         ("22-subagent-foreground", SubagentForegroundAsync),
+        ("23-subagent-background", SubagentBackgroundAsync),
+        ("24-child-tasks", ChildTasksAsync),
         ("25-compaction", CompactionAsync),
+        ("26-coding-agent", CodingAgentAsync),
+        ("27-plan-mode", PlanModeAsync),
+        ("28-reviewer", ReviewerAsync),
         ("29-sandbox-per-conversation", SandboxPerConversationAsync),
         ("30-tool-override", ToolOverrideAsync),
         ("31-reload-and-restart", ReloadAndRestartAsync),
@@ -72,9 +84,12 @@ public static partial class Examples
     /// <param name="root">The directory file backends store each example under; required unless <paramref name="storage"/> is memory.</param>
     /// <param name="output">Where the examples print.</param>
     /// <param name="only">Example numbers (<c>00</c>) or names (<c>00-conversation</c>).</param>
-    public static async Task RunAsync(ExampleStorage storage, string? root, TextWriter output, IReadOnlyCollection<string>? only = null)
+    /// <param name="environment">Reads environment variables (16-real-model's OPENAI_API_KEY); default the process environment.</param>
+    public static async Task RunAsync(ExampleStorage storage, string? root, TextWriter output, IReadOnlyCollection<string>? only = null,
+        Func<string, string?>? environment = null)
     {
         ArgumentNullException.ThrowIfNull(output);
+        Examples.environment = environment ?? Environment.GetEnvironmentVariable;
         if (storage != ExampleStorage.Memory && string.IsNullOrEmpty(root)) throw new ArgumentException("File storage needs a root directory.", nameof(root));
         var selected = All.Where(example => only is null || only.Count == 0 ||
             only.Any(name => name == example.Name || name == example.Name[..2])).ToArray();

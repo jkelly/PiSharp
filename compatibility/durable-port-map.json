@@ -17,7 +17,7 @@
       "pisharp": "src/PiSharp.Durable/Documents.cs",
       "phase": "P2",
       "status": "ported",
-      "note": "defineDoc/defineDocFamily as one factory per scope (Documents.DefineSessionDoc ... DefineTaskDocFamily) returning scope-typed tokens; DocDefinition is the erased definition; address, scope, version and migration checks are internal for the Session (P3). Values are JsonObjectValue (no static T). Tests: documents.* (authored); Session-level coverage ports with session-definitions/session-checkpoints-migrations (P3)"
+      "note": "defineDoc/defineDocFamily as one factory per scope (Documents.DefineSessionDoc ... DefineTaskDocFamily) returning scope-typed tokens; DocDefinition is the erased definition; address, scope, version and migration checks are internal for the Session (P3). Values are JsonObjectValue (no static T). Tests: documents.* (authored); Session-level coverage: session.definitions.* and session.checkpoints-migrations.*"
     },
     {
       "upstream": "packages/durable/src/entries.ts",
@@ -160,8 +160,8 @@
       "lines": 31,
       "pisharp": "src/PiSharp.Durable/Harness/Json.cs",
       "phase": "P6",
-      "status": "in-progress",
-      "note": "Code complete: HarnessJson.AssignJson over DraftObject/DraftArray. Its first user and its tests come with live partials (P8)"
+      "status": "ported",
+      "note": "HarnessJson.AssignJson over DraftObject/DraftArray, used by generation (pi.live.generation.message partials) and the tool task (slot details), as upstream. Upstream has no test of its own; covered by harness.live-deltas.* (streams-partial-text-as-appends, diffs-details-leaf-by-leaf-and-appends-diagnostics)"
     },
     {
       "upstream": "packages/durable/src/harness/live.ts",
@@ -250,8 +250,8 @@
       "lines": 679,
       "pisharp": "src/PiSharp.Durable/Harness/Types.cs",
       "phase": "P6",
-      "status": "in-progress",
-      "note": "P6/P7 shapes complete: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi. SubmissionDraft/ISubmission and GenerationHooks are final (P8); ITaskRuntime extends IHookApi. IConversation.ViewStateAsync/WatchAsync are typed by ConversationView (P10, Harness/View.cs). Later-phase shapes keep upstream names with TODO markers: IToolExecutionApi and ToolHooks (P9), CompactionResult/CompactionHooks and the task graph (P11). The pi-ai Models seam is IDurableModels in Harness/Models.cs (DurableModel, DurableStreamOptions, DurableDeferredHandle, EmptyDurableModels)"
+      "status": "ported",
+      "note": "All shapes final: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings (HarnessSettings with virtual getters for live values) and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi, SubmissionDraft/ISubmission, GenerationHooks, ToolHooks, IToolExecutionApi (DelegatingToolExecutionApi for wrappers), CompactionHooks/CompactionResult. Type-level helpers map as in index.ts's row (AnyTask, HooksOf, HookResult, UserInput, InputSubmissionDraft; ConversationWatch is IWatchHandle<ConversationView>); tasks are JsonValue-typed (see types.ts). The pi-ai Models seam is IDurableModels in Harness/Models.cs. Tests: harness.*, types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions"
     },
     {
       "upstream": "packages/durable/src/harness/usage.ts",
@@ -287,15 +287,16 @@
       "pisharp": "src/PiSharp.Durable/Ids.cs",
       "phase": "P2",
       "status": "ported",
-      "note": "Also holds the Id/Seq/ROOT_CONVERSATION_ID declarations of types.ts: one readonly record struct per kind (ConversationId, EntryId, TaskId, SubmissionId, DocumentId) over long, IDurableId<TSelf>.FromNumber, Seq (not an ID), Ids.FromNumber/SeqFromNumber/RootConversationId. TaskId<Result> typing joins with P7. Tests: types.brands-numeric-ids-by-record-kind-and-carries-task-result-types"
+      "note": "Also holds the Id/Seq/ROOT_CONVERSATION_ID declarations of types.ts: one readonly record struct per kind (ConversationId, EntryId, TaskId, SubmissionId, DocumentId) over long, IDurableId<TSelf>.FromNumber, Seq (not an ID), Ids.FromNumber/SeqFromNumber/RootConversationId. TaskId is not generic: upstream's phantom result type is erased, as task records are JsonValue-typed (types.ts row). Tests: types.brands-numeric-ids-by-record-kind-and-carries-task-result-types"
     },
     {
       "upstream": "packages/durable/src/index.ts",
       "blobSha1": "2b1dc30371f88417d809d69af123129af9ff45d0",
       "lines": 185,
-      "pisharp": "src/PiSharp.Durable/Exports.cs",
+      "pisharp": "src/PiSharp.Durable/DurableUpstream.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "Only re-exports; the PiSharp.Durable namespace is the package root (header in DurableUpstream.cs). Type-only exports map to erased or existing types: task inputs, checkpoints and results and document states (LiveState, InboxState, ProviderState) are JSON values; AnyTask, HooksOf, HookResult, UserInput and InputSubmissionDraft become DurableTask, a task's hook class, the hook delegates' return types and SubmissionDraft; the watch types are IWatchHandle<T>; the document definition and semantics types are Documents.cs's scope-typed tokens; TableCommitChange is ICommitChange"
     },
     {
       "upstream": "packages/durable/src/session/forks.ts",
@@ -483,7 +484,8 @@
       "lines": 489,
       "pisharp": "src/PiSharp.Durable/Testing/StorageBenchmark.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "StorageBenchmark: StorageBenchmarkScale, MemoryScales (STORAGE_MEMORY_SCALES), TimingScale, PrimaryRecordCount, SeedAsync, ReadBenchmarks (12 checked read scenarios), SeedWriteAsync and WriteBenchmarks (3), seeding only through IStorage. Timed by benchmarks/PiSharp.Durable.Benchmarks; tests: benchmarks.smoke"
     },
     {
       "upstream": "packages/durable/src/testing/storage-conformance.ts",
@@ -608,8 +610,8 @@
       "lines": 1107,
       "pisharp": "src/PiSharp.Durable/Types.cs",
       "phase": "P2",
-      "status": "in-progress",
-      "note": "Records and storage contract ported, split across Types.cs (conversation, entry, submission and task records), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd/IWatchHandle, IDocumentReader/IDocumentObserver, ISession, ITx; P3) and Ids.cs; JSON via ToJson/FromJson with fixed key orders. TypesTasks.cs holds ITaskRuntime and IHookRunner (P7); the executable TaskDefinition, RunningTask and NextTaskState are in Tasks.cs. Still to come: TaskId<Result> and typed task records (TaskRecord stays JsonValue-typed). Tests: types.*, storage.memory.*, session.*"
+      "status": "ported",
+      "note": "Records and storage contract, split across Types.cs (conversation, entry, submission and task records), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd/IWatchHandle, IDocumentReader/IDocumentObserver, ISession, ITx), TypesTasks.cs (ITaskRuntime, IHookRunner) and Ids.cs; JSON via ToJson/FromJson in upstream's key order (EntryRecord and SubmissionRecord keep the order they were created or decoded with, KeyOrder), pinned against upstream-written sessions by compat.*. Intentional mapping: TypeScript's phantom type parameters are erased, as documents are JsonObjectValue-typed (Documents.cs row): TaskId<Result>, TaskRecord<Input, Checkpoint, Result> and SettledTask<Result> are TaskId and TaskRecord over JsonValue, so a task's result type, typed input and exhaustive phase map are not checked at compile time (types.test.ts row). The document definition and semantics types (CommonDocDefinition, DocFamilyDefinition, DocumentSemantics and its conversation variants) are Documents.cs's scope-typed tokens, DocumentWatch is IWatchHandle<JsonObjectValue?> and TableCommitChange is ICommitChange. Tests: types.*, storage.*, session.*, compat.*"
     },
     {
       "upstream": "packages/chord/src/context/index.ts",
@@ -716,8 +718,8 @@
       "lines": 394,
       "pisharp": "tests/PiSharp.Durable.Tests/Session/ChordGuideCases.cs",
       "phase": "P3",
-      "status": "in-progress",
-      "note": "session.chord-guide.* (3 cases): the guide's documents, commits, document states and watch on a Session; facets, services and the wire are excluded (decision 0005) and replaced by direct subscriptions. The job example's task runtime (runtime.commit, waitForTask, resume) is replaced by task-attributed Session commits until P7"
+      "status": "ported",
+      "note": "session.chord-guide.* (3 cases, on every session backend): the guide's documents, commits, document states and watches. The canvas and diff-review runs drop the Chord facet host, services and wire (excluded by decision 0005) for direct subscriptions to the same document states, disposed before close as the guide's shutdown order requires; the job-output run is upstream's, on a Harness with the task runtime (runtime.CommitAsync, WaitForTaskAsync, Resume)"
     },
     {
       "upstream": "packages/durable/test/env-line-scan.test.ts",
@@ -912,9 +914,10 @@
       "upstream": "packages/durable/test/examples/16-real-model.ts",
       "blobSha1": "00ce628565d0672e97df29b7707c33062cf8e8b4",
       "lines": 69,
-      "pisharp": "tests/PiSharp.Durable.Tests/16RealModelCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesAgents.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 16-real-model: env-gated; without OPENAI_API_KEY (read through the runner's environment reader) it prints upstream's skip line, otherwise it streams gpt-6-sol through NativeDurableModels. examples.* runs it without the key and pins the skip line"
     },
     {
       "upstream": "packages/durable/test/examples/17-coding-tools.ts",
@@ -929,17 +932,19 @@
       "upstream": "packages/durable/test/examples/18-print.ts",
       "blobSha1": "2438efbb8813163925360b48ba8afece9d8b47ee",
       "lines": 53,
-      "pisharp": "tests/PiSharp.Durable.Tests/18PrintCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesAgents.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 18-print with ScriptedModels (upstream's faux branch; no OpenAI branch) and LocalExecutionEnv in the current directory, on memory, JSONL and SQLite with reopen (the answer read back); examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/19-json.ts",
       "blobSha1": "95a894f1d85d86f487192dad8ad33ca1c0f1a176",
       "lines": 103,
-      "pisharp": "tests/PiSharp.Durable.Tests/19JsonCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesJson.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 19-json, both modes (events on the runner's storage, ops on MemoryStorage as upstream --storage memory) with PacedModels (faux pacing at 200 tokens/s, token size fixed at 4, the faux usage estimate with its prompt cache) on an ExampleClock that also drives the Harness throttles, and `ls` (LC_ALL=C) in a stand-in for packages/durable. Under Node the first partial varies with the random token size; the C# run equals captured Node runs (Fixtures/examples-19-json-*.upstream.jsonl). examples.* compares them as text, key order included, with timestamps, durations, the faux API name and the provider session ID as placeholders; file backends read the transcript back"
     },
     {
       "upstream": "packages/durable/test/examples/20-inbox.ts",
@@ -954,9 +959,10 @@
       "upstream": "packages/durable/test/examples/21-late-join.ts",
       "blobSha1": "da65dd01b896dce65cc0ba06754991d994ff7b43",
       "lines": 100,
-      "pisharp": "tests/PiSharp.Durable.Tests/21LateJoinCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesLateJoin.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 21-late-join on an ExampleClock: the Harness clock and throttles (HarnessOptions.TimeProvider), the tool's 100 ms pauses and PacedModels' 40 tokens/s streaming run on it, and the example fires one timer at a time and settles the thread pool before the next, as Node's event loop orders them; memory, JSONL and SQLite with reopen (transcript read back); examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/22-subagent-foreground.ts",
@@ -971,17 +977,19 @@
       "upstream": "packages/durable/test/examples/23-subagent-background.ts",
       "blobSha1": "261a4e7e45c4b93f3060c43544ba59a423d40cc6",
       "lines": 363,
-      "pisharp": "tests/PiSharp.Durable.Tests/23SubagentBackgroundCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesBackground.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 23-subagent-background with PacedModels (upstream's faux route at 50 tokens/s, token size 4) on an ExampleClock driven like Node's event loop; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; the runner's JSONL directory or SQLite file otherwise). Printed without ANSI colors, as upstream prints when stdout is not a terminal; examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/24-child-tasks.ts",
       "blobSha1": "e1b49defe1ab44e47b0c40c0e4716048b5279251",
       "lines": 141,
-      "pisharp": "tests/PiSharp.Durable.Tests/24ChildTasksCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesChildTasks.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 24-child-tasks on an ExampleClock (payments sleep on the Harness clock); barriers stand in for Node's event-loop order: a declined card is declined after the checkout's other payments were charged, the graph is printed and the process stopped once all four were charged (upstream waits 20 ms), and abort handlers print in task order. Restarts on its own storage as 13 does; examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/25-compaction.ts",
@@ -996,25 +1004,28 @@
       "upstream": "packages/durable/test/examples/26-coding-agent.ts",
       "blobSha1": "d5b0e7c479759a90902a916e2fa076a24473ea0f",
       "lines": 81,
-      "pisharp": "tests/PiSharp.Durable.Tests/26CodingAgentCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesAgents.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 26-coding-agent with ScriptedModels, CodingTools over LocalExecutionEnv following the conversation's cwd, and HarnessSettings with live getters for parallel tools and retries; memory, JSONL and SQLite with reopen (both bash results read back); examples.* pins upstream's Node output, the pwd output compared as <workspace>"
     },
     {
       "upstream": "packages/durable/test/examples/27-plan-mode.ts",
       "blobSha1": "05c621cd15362fea8c0949013c06e2018be23c56",
       "lines": 115,
-      "pisharp": "tests/PiSharp.Durable.Tests/27PlanModeCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesAgents.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 27-plan-mode with ScriptedModels; plan mode as an AgentChange selecting the plan extension and read+submit_plan, left with Clear patches; memory, JSONL and SQLite with reopen (the plan document read back); the system lines print as JSON (util.inspect's `removed: undefined` is dropped); examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/28-reviewer.ts",
       "blobSha1": "f219aa9e070f30215be4e81477231a7276732273",
       "lines": 111,
-      "pisharp": "tests/PiSharp.Durable.Tests/28ReviewerCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesAgents.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "samples/Durable.Examples 28-reviewer with ScriptedModels serving faux/big and faux/small and a GenerationHooks.OnYield review loop; memory, JSONL and SQLite with reopen (the reviewer transcript read back); examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/29-sandbox-per-conversation.ts",
@@ -1425,9 +1436,10 @@
       "upstream": "packages/durable/test/storage-memory.ts",
       "blobSha1": "0e105fdc8b042757ec3341363959be7162f8d2d8",
       "lines": 238,
-      "pisharp": "tests/PiSharp.Durable.Tests/StorageMemoryCases.cs",
+      "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/StorageMemory.cs",
       "phase": "P2",
-      "status": "planned"
+      "status": "ported",
+      "note": "benchmarks/PiSharp.Durable.Benchmarks `storage-memory`: one child process per backend and scale; heap is the GC heap after forced full collections, RSS the working set (Node's external has no .NET counterpart); SQLite pages/freelist and JSONL file counts as upstream. Report only (docs/durable-benchmarks.md). Tests: benchmarks.smoke (the worker in-process at a tiny scale)"
     },
     {
       "upstream": "packages/durable/test/storage-runtime-boundary.test.ts",
@@ -1442,9 +1454,10 @@
       "upstream": "packages/durable/test/storage.bench.ts",
       "blobSha1": "f24e915eb3d4a478041ce1068a9d4314e811ad45",
       "lines": 191,
-      "pisharp": "tests/PiSharp.Durable.Tests/StorageBenchCases.cs",
+      "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/StorageBench.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "benchmarks/PiSharp.Durable.Benchmarks `storage`: every read, write and reopen scenario on memory, SQLite and JSONL with upstream's Vitest bench options, sampled by BenchLoop.cs (tinybench 2's loop; no benchmark library). Report only: docs/durable-benchmarks.md has the results next to upstream's under Node. Tests: benchmarks.smoke (one sample each at a tiny scale; completion only)"
     },
     {
       "upstream": "packages/durable/test/system-order-cache-e2e.test.ts",
@@ -1468,9 +1481,10 @@
       "upstream": "packages/durable/test/tool-output-bench.ts",
       "blobSha1": "040c3c7b41a42016f8cd67bed2c715515952fa32",
       "lines": 301,
-      "pisharp": "tests/PiSharp.Durable.Tests/ToolOutputBenchCases.cs",
+      "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/ToolOutputBench.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "benchmarks/PiSharp.Durable.Benchmarks `tool-output`: upstream's 50 scenarios (rate, firehose, repetitive firehose, 30 s round, bash cat of 1 GiB), each in a child process, with live-commit, op-size, output-set, commit-latency, replay and footprint metrics. setImmediate is Task.Yield, maxRSS the peak working set; the cat names the file with forward slashes (upstream's backslash path fails under Git Bash on Windows) and deletes the env's spill. Report only (docs/durable-benchmarks.md, which also states the 0.4 s cat target). Tests: benchmarks.smoke (six scenarios at 1 MiB and 0.2 s)"
     },
     {
       "upstream": "packages/durable/test/tools-read-differential.test.ts",
@@ -1496,8 +1510,8 @@
       "lines": 346,
       "pisharp": "tests/PiSharp.Durable.Tests/TypesCases.cs",
       "phase": "P2",
-      "status": "in-progress",
-      "note": "Runtime parts ported: ID kinds, and every @ts-expect-error shape rejected by FromJson/Validate. The Harness typing test (submissions, task waits, compaction, extensions) joins with P6-P8. Tests: types.*"
+      "status": "ported",
+      "note": "3 of 3 tests. types.brands-numeric-ids-by-record-kind-and-carries-task-result-types and types.encodes-discriminator-dependent-fields: ID kinds, and every @ts-expect-error record shape rejected by FromJson/Validate. types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions (TypesHarnessCases.cs): compile-checked typed waits, compaction and hooks (EachAsync's selector types the handler) plus run-time checks that the rejected submission shapes cannot be built. Not expressible in C#: the phantom task result type, typed task input and the exhaustive phase map (tasks are JsonValue-typed; see types.ts). types.record-json-key-order is authored"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/harness-setup.ts",

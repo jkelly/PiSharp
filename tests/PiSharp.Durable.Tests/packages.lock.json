@@ -93,6 +93,14 @@
           "PiSharp.Contracts": "[1.1.0.6, )"
         }
       },
+      "pisharp.durable.benchmarks": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Durable": "[1.1.0.6, )",
+          "PiSharp.Durable.Sqlite": "[1.1.0.6, )",
+          "PiSharp.Durable.Tools": "[1.1.0.6, )"
+        }
+      },
       "pisharp.durable.sqlite": {
         "type": "Project",
         "dependencies": {

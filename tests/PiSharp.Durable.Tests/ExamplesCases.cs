@@ -12,6 +12,12 @@ using PiSharp.Durable.Examples;
 // ScriptedModels; 13 keeps its storage in a temporary SQLite file on memory, as upstream does, and reopens the runner's storage otherwise),
 // 25-compaction, whose model reports the faux provider's usage estimate (its file backends read back the stored entries and summaries),
 // and 31-reload-and-restart, which restarts on its own storage the same way as 13, so it has no separate read-back.
+// P13 adds the rest. 16-real-model runs with an environment without OPENAI_API_KEY and prints upstream's skip line. 18-print, 26-coding-agent
+// (pwd compares as <workspace>), 27-plan-mode and 28-reviewer use ScriptedModels. 21-late-join, 23-subagent-background and 24-child-tasks run
+// on an ExampleClock driven like Node's event loop (24 and 23 restart on their own storage, as 13 does). 19-json prints both modes; its
+// lines are upstream's captured output (Fixtures/examples-19-json-*.upstream.jsonl, from one run of each mode under Node) and compare as
+// text, key order included, with timestamps, durations, the faux API name and the provider session ID as placeholders: those are random
+// or clock values.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -27,6 +33,17 @@ internal static partial class Program
         "pi.assistant",
         "pi.tool-result bash: \"cat: /tmp/1gb.txt: No such file or directory\\n<harness>\\n[error] Command exited with code 1\\n</harness>\"",
         "pi.assistant",
+    ];
+
+    // Declared before ExamplesUpstreamOutput, which spreads them.
+    private static readonly string[] JsonModeEvents = JsonModeFixture("events");
+    private static readonly string[] JsonModeOps = JsonModeFixture("ops");
+    private static readonly string[] ReviewerTranscript =
+    [
+        "> Review user.ts.",
+        "reviewer: 1. `name` does not handle a missing user.",
+        "> Look again for anything you missed. Say \"No further findings.\" when there is nothing left.",
+        "reviewer: 2. `user` has no type. No further findings.",
     ];
 
     private static readonly string[] ExamplesUpstreamOutput =
@@ -98,6 +115,9 @@ internal static partial class Program
         "root system prompt: [" + RootPrompt + "]",
         """subagent system prompt: [{"role":"system","content":"","sections":{"preamble":"You are a coding agent. Be terse.","cwd":"<cwd>\n/repo\n</cwd>","instructions":"<instructions>\nOnly read; never edit files.\n</instructions>"},"timestamp":<time>}]""",
         RootAfterCwdChange,
+        "== 16-real-model",
+        // The tests run the examples with an environment that has no OPENAI_API_KEY.
+        "skipped: OPENAI_API_KEY is not set",
         "== 17-coding-tools",
         "cat /tmp/1gb.txt took <ms> ms",
         "status: done",
@@ -105,6 +125,13 @@ internal static partial class Program
         "answer: [{\"type\":\"text\",\"text\":\"The file now greets durable.\"}]",
         "file: \"hello durable\\n\"",
         CodingToolsStorage,
+        "== 18-print",
+        PrintAnswer,
+        "== 19-json",
+        "mode: events",
+        .. JsonModeEvents,
+        "mode: ops",
+        .. JsonModeOps,
         "== 20-inbox",
         "rejected: Conversation 1 is busy",
         "withdraw: aborted",
@@ -116,10 +143,79 @@ internal static partial class Program
         "note: done ",
         "withdrawn: unanswered aborted",
         InboxTranscript,
+        "== 21-late-join",
+        // Upstream's util.inspect prints [ 'pi.user', 'pi.system', 'pi.assistant' ] and [ 'count running' ].
+        """view entries: ["pi.user","pi.system","pi.assistant"]""",
+        @"view tool slot: running ""1\n2\n3\n4\n5\n""",
+        @"view output now: ""1\n2\n3\n4\n5\n""",
+        """snapshot tools: ["count running"]""",
+        .. LateJoinOutput(6, "view output now: ", "event output now: "),
+        "event: tool_execution_end",
+        "event: message_start",
+        "event: message_end",
+        "event: turn_end",
+        "event: turn_start",
+        "event: message_start",
+        "event text delta: \"en, and this ans\"",
+        "event text delta: \"wer streams slow\"",
+        "event: message_end",
+        "event: turn_end",
+        "event: run_end",
+        "event: submission",
+        LateJoinLastLine,
         "== 22-subagent-foreground",
         "tool subagent({\"task\":\"Name three prime numbers.\"})",
         "  assistant: 2, 3, and 5.",
         SubagentAnswer,
+        "== 23-subagent-background",
+        // Upstream prints a blank line before each message and the restart; the comparison skips blank lines.
+        "> Start a subagent named reader that summarizes Moby Dick.",
+        "  subagent spawn reader \"Summarize the plot of Moby Dick.\"",
+        "  → Started reader.",
+        "OK. Started reader.",
+        "> reader: A whale, a captain, an obsession.",
+        "Noted.",
+        "> Ask reader to summarize every chapter.",
+        "  subagent send reader \"Now go through all chapters in detail.\"",
+        "  → Sent to reader.",
+        "OK. Sent to reader.",
+        "> Stop reader.",
+        "  subagent stop reader",
+        "  → Stopped reader.",
+        "OK. Stopped reader.",
+        "> What are my subagents doing?",
+        "  subagent status",
+        "  → reader: idle",
+        "OK. reader: idle",
+        "> Ask reader for the whale's name.",
+        "  subagent send reader \"What is the whale called?\"",
+        "  → Sent to reader.",
+        "  (process restarts)",
+        "OK. Sent to reader.",
+        "> reader: Moby Dick.",
+        "Noted.",
+        "== 24-child-tasks",
+        "One card is declined:",
+        "  payment visa-1 aborted, refunded",
+        "  payment visa-3 aborted, refunded",
+        "  payment visa-4 aborted, refunded",
+        "  payments: aborted, failed, aborted, aborted",
+        "  checkout: failed",
+        "The customer cancels:",
+        "  example.checkout 12: waiting on 13, 14, 15, 16",
+        "    example.payment 13: running",
+        "    example.payment 14: running",
+        "    example.payment 15: running",
+        "    example.payment 16: running",
+        "  payment visa-5 aborted, refunded",
+        "  payment visa-6 aborted, refunded",
+        "  payment visa-7 aborted, refunded",
+        "  payment visa-8 aborted, refunded",
+        "  checkout aborted",
+        "  checkout: aborted",
+        "The process stops while the payments run, and a new one continues:",
+        "  payments: completed, completed, completed, completed",
+        "  checkout: completed",
         "== 25-compaction",
         "after \"Where should we stay?\" (answered): 2 messages in context, 2 entries stored",
         "  user      Where should we stay?",
@@ -174,6 +270,21 @@ internal static partial class Program
         "  assistant A detailed answer to \"What should we pack?\": details details details d",
         "  user      Summarize the plan for my partner",
         CompactionLastLine,
+        "== 26-coding-agent",
+        // pwd prints the temporary workspace; both sides compare it as <workspace>.
+        "bash ran in: <workspace>",
+        CodingAgentLastLine,
+        "== 27-plan-mode",
+        """tools: ["read","write","edit","bash"]""",
+        """plan mode tools: ["read","submit_plan"]""",
+        PlanSteps,
+        """tools again: ["read","write","edit","bash"]""",
+        // Upstream's util.inspect prints `removed: undefined`; JSON drops the undefined field.
+        """system: {"sections":{"plan_mode":"<plan_mode>\nYou are in plan mode. Read the code, then call submit_plan. Change nothing.\n</plan_mode>"},"added":["read","submit_plan"]}""",
+        PlanModeLastLine,
+        "== 28-reviewer",
+        """reviewer: small ["coding-tools","reviewer"] ["read"] true""",
+        .. ReviewerTranscript,
         "== 29-sandbox-per-conversation",
         "alice's sandbox: from alice",
         BobsSandbox,
@@ -205,6 +316,27 @@ internal static partial class Program
     private const string BobsSandbox = "bob's sandbox: from bob";
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
+
+    private static string[] JsonModeFixture(string mode) => File.ReadAllLines(
+        Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", $"examples-19-json-{mode}.upstream.jsonl"));
+
+    private const string LateJoinLastLine = "event: usage_changed";
+
+    // The output lines 21-late-join prints once the client joined: each committed line, first from the view, then from the event stream.
+    private static IEnumerable<string> LateJoinOutput(int from, string view, string events)
+    {
+        for (var n = from; n <= 10; n++)
+        {
+            var text = string.Concat(Enumerable.Range(1, n).Select(line => line + @"\n"));
+            yield return $"{view}\"{text}\"";
+            yield return $"{events}\"{text}\"";
+        }
+    }
+
+    private const string PrintAnswer = "This directory holds the durable package sources, tests, and docs.";
+    private const string CodingAgentLastLine = "bash ran in: <workspace>/app";
+    private const string PlanSteps = """plan: ["Read PORT from the environment","Default to 3000"]""";
+    private const string PlanModeLastLine = """system: {"sections":{"plan_mode":null},"added":["write","edit","bash"],"removed":["submit_plan"]}""";
 
     private const string ChatAnswer = """answer: [{"type":"text","text":"Paris."}]""";
     private const string ChatTranscript = """transcript: ["pi.user","pi.system","pi.assistant"]""";
@@ -256,6 +388,12 @@ internal static partial class Program
         [CompactionLastLine] = ["24 entries stored, summaries: [\"threshold\",\"threshold\",\"manual\",\"threshold\"]"],
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
+        [PrintAnswer] = [PrintAnswer],
+        [JsonModeOps[^1]] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
+        [LateJoinLastLine] = ["""transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]"""],
+        [CodingAgentLastLine] = ["bash ran in: <workspace>", CodingAgentLastLine],
+        [PlanModeLastLine] = [PlanSteps],
+        [ReviewerTranscript[^1]] = ReviewerTranscript,
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()
@@ -285,17 +423,27 @@ internal static partial class Program
     private static async Task<string> RunExamplesAsync(ExampleStorage storage, string? root, params string[] only)
     {
         var output = new StringWriter();
-        await Examples.RunAsync(storage, root, output, only);
+        await Examples.RunAsync(storage, root, output, only, environment: _ => null);
         return output.ToString();
     }
 
     private static void Lines(string output, IReadOnlyList<string> expected)
     {
-        var actual = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => Regex.Replace(line.TrimEnd('\r'), "\"timestamp\":[0-9]+", "\"timestamp\":<time>"))
-            .Select(line => Regex.Replace(line, "^cat /tmp/1gb.txt took [0-9]+ ms$", "cat /tmp/1gb.txt took <ms> ms"))
-            .Select(line => Regex.Replace(line, "^storage: .+$", "storage: <dir>")).ToArray();
+        var actual = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(Normalize).ToArray();
         for (var index = 0; index < Math.Max(actual.Length, expected.Count); index++)
-            Equal(index < expected.Count ? expected[index] : "<end>", index < actual.Length ? actual[index] : "<end>", "line " + (index + 1));
+            Equal(index < expected.Count ? Normalize(expected[index]) : "<end>", index < actual.Length ? actual[index] : "<end>", "line " + (index + 1));
+    }
+
+    // Clock and random values as placeholders. Expected lines go through the same steps, which leave the placeholders already in them alone.
+    private static string Normalize(string line)
+    {
+        line = line.TrimEnd('\r');
+        line = Regex.Replace(line, "\"timestamp\":[0-9]+", "\"timestamp\":<time>");
+        line = Regex.Replace(line, "\"durationMs\":[0-9]+", "\"durationMs\":<ms>");
+        line = Regex.Replace(line, "\"faux:[0-9]+:[a-z0-9]+\"", "\"faux:<api>\"");
+        line = Regex.Replace(line, "\"sessionId\":\"[^\"]+\"", "\"sessionId\":\"<session>\"");
+        line = Regex.Replace(line, "^cat /tmp/1gb.txt took [0-9]+ ms$", "cat /tmp/1gb.txt took <ms> ms");
+        line = Regex.Replace(line, "^storage: .+$", "storage: <dir>");
+        return Regex.Replace(line, "^bash ran in: .*/pi-durable-agent-[A-Za-z0-9]+", "bash ran in: <workspace>");
     }
 }

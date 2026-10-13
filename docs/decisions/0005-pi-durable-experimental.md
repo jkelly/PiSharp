@@ -42,3 +42,45 @@ Decision 0002 left both out of the native port. The owner now wants them in PiSh
 ## Crash tests
 
 The `crash.<backend>.<scenario>.<checkpoint>` cases in `tests/PiSharp.Durable.Tests/Crash` kill a real process. The test executable relaunches itself as a child (`--crash-child <scenario> <backend> <storage path> <checkpoint>`), using the same `dotnet` host and test DLL or the same apphost. The child opens a Harness on a SQLite file or JSONL directory, runs a scripted chat, tool, follow-up, request-id or abort scenario, and prints `CHECKPOINT <name>` when it reaches the checkpoint. The parent then kills the child's process tree and reopens the storage the plain way `pisharp durable --continue` will, with no cleanup step. It checks the guarantees of upstream `spec.md`: a turn finishes with exactly one answer and one user entry, a non-replay-safe tool interrupted after intent is answered with the interrupted result and never rerun, a replay-safe tool reruns exactly once, queued input and request ids are never duplicated, and an abort mark completes bottom-up. Checkpoints sit in every generation phase (prepare, request, streaming partial, retry, tools) and on both sides of selected commits. MemoryStorage has no crash cases, because its data does not survive a kill. These tests are authored, not ported, so they have no port-map row.
+
+## Port status
+
+At the end of P13, `compatibility/durable-port-map.json` maps 174 upstream files:
+
+| status | files |
+|---|---:|
+| ported | 168 |
+| excluded | 2 |
+| skipped | 4 |
+
+None is planned or in progress.
+
+**Test cases.** `tests/PiSharp.Durable.Tests` has 2485 cases:
+- 2411 authored natively (ported upstream tests, examples, crash and smoke cases);
+- 73 upstream-capture cases (`compat.*`), which open, read, resume and rewrite sessions the pinned upstream wrote, and replay its ops corpus;
+- 1 reverse case, `compat.reverse.upstream-reads-pisharp-sessions`, which runs only when `PISHARP_DURABLE_UPSTREAM` points at an upstream checkout and is skipped otherwise.
+
+`tests/PiSharp.DurableCli.Tests` has 57 cases.
+
+**Excluded (by this decision):**
+- `src/storage/sqlite/cloudflare.ts` and `test/sqlite-cloudflare.test.ts`. The Cloudflare Durable Object SQLite adapter is out of scope.
+- These have no rows: the `vacation` demo, `pi-env`, and Chord's facets, services and wire. Instead:
+  - `test/chord-guide.test.ts`'s canvas and diff-review runs use direct subscriptions to the same document states.
+  - Its job-output run is upstream's, on the task runtime.
+
+**Skipped:**
+- `test/provider-session-cache-e2e.test.ts` and `test/system-order-cache-e2e.test.ts` need live provider credentials.
+- `test/fixtures/delete-buffer.ts` and `test/fixtures/utf8-byte-length-without-buffer.ts` check behavior without Node's global `Buffer`. .NET has no such global; `TruncateCases` checks `Truncation.Utf8ByteLength` against .NET's UTF-8 encoding instead.
+
+**Intentional mappings recorded in the map:**
+- **Erased type parameters.** TypeScript's phantom type parameters have no C# counterpart: `TaskId<Result>`, typed task input and checkpoints, `SettledTask<Result>`, and a document's value type. Tasks are JSON-typed, as documents are. Exhaustive phase maps and typed task input are checked at run time, not compile time. `types.test.ts`'s Harness typing test is a compile-checked case of the C# surface.
+- **`16-real-model`** runs only with `OPENAI_API_KEY`. The tests run it without the key and pin upstream's skip line.
+- **`19-json`'s first streamed partial** varies between Node runs, with pi-ai's random faux token size. PiSharp's run is fixed and equals captured Node runs. They compare as JSON with sorted keys, with clock and random values as placeholders.
+- **Examples 19, 21, 23 and 24** run on a manual example clock that is driven like Node's event loop.
+
+**Benchmarks** (`benchmarks/PiSharp.Durable.Benchmarks`) are report only; see `docs/durable-benchmarks.md`.
+- On the one Windows machine measured, neither runtime meets upstream's 0.4 s target for `cat` of 1 GiB:
+  - upstream under Node: about 1.75 s;
+  - PiSharp: 2.25 to 2.57 s.
+- PiSharp's `api.output` firehose is about 3 times slower than Node's.
+- Its on-disk footprint for the seeded benchmark data matches upstream's byte for byte.
