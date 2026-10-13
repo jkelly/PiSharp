@@ -273,23 +273,30 @@ public abstract class DocumentContent : DurableValue
         if (RecordJson.Enum<DocumentContentKind>(value, "kind", what) == DocumentContentKind.Base)
         {
             RecordJson.OnlyKeys(value, what, "version", "kind", "value");
-            return new DocumentBase(version, RecordJson.Object(RecordJson.Required(value, "value", what), what));
+            return new DocumentBase(version, RecordJson.Object(RecordJson.Required(value, "value", what), what))
+            {
+                KindFirst = value.Keys.Count > 0 && value.Keys[0] == "kind",
+            };
         }
         RecordJson.OnlyKeys(value, what, "version", "kind", "ops");
         return new DocumentDelta(version, [.. RecordJson.Array(RecordJson.Required(value, "ops", what), "ops", what).Select(Op.FromJson)]);
     }
 }
 
-/// <summary><c>{version, kind: "base", value}</c>: a complete value.</summary>
+/// <summary><c>{version, kind: "base", value}</c>: a complete value. A base storage builds itself from a stored document (a fork copy, a
+/// reclaimed creation) is <c>{kind: "base", version, value}</c> upstream (<see cref="KindFirst"/>).</summary>
 public sealed class DocumentBase(int version, JsonObjectValue value) : DocumentContent(version)
 {
     /// <inheritdoc/>
     public override DocumentContentKind Kind => DocumentContentKind.Base;
     /// <summary>The value.</summary>
     public JsonObjectValue Value { get; } = value ?? throw new ArgumentNullException(nameof(value));
+    /// <summary>Whether the JSON leads with <c>kind</c>: upstream storage's own <c>{ kind: "base", version, value }</c> literals.</summary>
+    internal bool KindFirst { get; init; }
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() =>
-        new RecordJson.Writer().Number("version", Version).Add("kind", "base").Add("value", Value).Build();
+    public override JsonObjectValue ToJson() => KindFirst
+        ? new RecordJson.Writer().Add("kind", "base").Number("version", Version).Add("value", Value).Build()
+        : new RecordJson.Writer().Number("version", Version).Add("kind", "base").Add("value", Value).Build();
 }
 
 /// <summary><c>{version, kind: "delta", ops}</c>: a Chord operation batch.</summary>

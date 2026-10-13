@@ -1,0 +1,406 @@
+{
+ "description": "Durable sessions written by the pinned upstream pi-durable with pi-ai's faux provider, and a Chord tracker ops corpus. Captured upstream evidence for PiSharp's compat.* cases; regenerate with the command below, never edit by hand.",
+ "upstream": {
+  "package": "@earendil-works/pi-durable@1.1.0 (sources)",
+  "release": "Pi v1.1.0",
+  "commit": "abe508e1b89912adde45528136c3221eb69acdd7",
+  "piAi": "@earendil-works/pi-ai 1.1.0 (published build)"
+ },
+ "node": "v22.18.0",
+ "sqlite": "3.50.2",
+ "command": "node --no-warnings --conditions=source --experimental-strip-types tools/DurableFixtures/capture.mjs <pi checkout at the commit>",
+ "clock": {
+  "harnessNow": 1767225600000,
+  "fauxTimestamp": 1000
+ },
+ "varies": [
+  {
+   "field": "sessionId in pi.provider documents",
+   "why": "pi-ai uuidv7() on first use: random bits and Date.now(); upstream takes no seed"
+  },
+  {
+   "field": "durationMs of tool result messages",
+   "why": "performance.now() around the tool call"
+  },
+  {
+   "field": "SQLite page layout and file bytes",
+   "why": "SQLite; the records, not the pages, are the evidence"
+  }
+ ],
+ "normalized": "compat.* replaces every sessionId string with \"<session>\" and every durationMs number with \"<duration>\", on both sides; nothing else",
+ "scenarios": [
+  {
+   "name": "chat",
+   "description": "One input answered: tagged and untagged prompt sections, an offered tool, a request ID.",
+   "resumable": false
+  },
+  {
+   "name": "tool-interrupted",
+   "description": "A call to an unsafe (not replay-safe) tool, closed while the tool runs after writing output and details: the file holds the execute checkpoint. Resumed: the call settles as interrupted with its durable partial output, then the model answers.",
+   "resumable": true
+  },
+  {
+   "name": "follow-up",
+   "description": "An input whose generation is in flight and a follow-up queued behind it, closed while the model is still answering. Resumed: the generation reruns and answers, then the queued follow-up runs.",
+   "resumable": true
+  },
+  {
+   "name": "compaction",
+   "description": "Three turns, a manual compaction placed at once while idle, then one more turn over the compacted context.",
+   "resumable": false
+  },
+  {
+   "name": "subagent",
+   "description": "A foreground subagent tool (upstream example 22): the call creates a child conversation its task owns, runs one input there, and returns the child's answer to the parent, which answers.",
+   "resumable": false
+  },
+  {
+   "name": "fork",
+   "description": "Two turns, an ownerless fork at the first answer, and a turn in the fork.",
+   "resumable": false
+  },
+  {
+   "name": "task-graph",
+   "description": "A conversation-owned task that creates a conversation it owns and a child task it owns; the child creates a grandchild task it owns and waits for it; each waits (allSettled) and completes once its owned work is done.",
+   "resumable": false
+  }
+ ],
+ "files": [
+  {
+   "path": "chat/jsonl/doc-2.jsonl",
+   "bytes": 135
+  },
+  {
+   "path": "chat/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "chat/jsonl/doc-4.jsonl",
+   "bytes": 310
+  },
+  {
+   "path": "chat/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "chat/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "chat/jsonl/main.jsonl",
+   "bytes": 2847
+  },
+  {
+   "path": "chat/opened.json",
+   "bytes": 7784
+  },
+  {
+   "path": "chat/records.json",
+   "bytes": 7784
+  },
+  {
+   "path": "chat/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "compaction/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "compaction/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "compaction/jsonl/doc-4.jsonl",
+   "bytes": 316
+  },
+  {
+   "path": "compaction/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "compaction/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "compaction/jsonl/main.jsonl",
+   "bytes": 11290
+  },
+  {
+   "path": "compaction/opened.json",
+   "bytes": 23112
+  },
+  {
+   "path": "compaction/records.json",
+   "bytes": 23112
+  },
+  {
+   "path": "compaction/sqlite/session.sqlite",
+   "bytes": 126976
+  },
+  {
+   "path": "follow-up/jsonl/doc-2.jsonl",
+   "bytes": 334
+  },
+  {
+   "path": "follow-up/jsonl/doc-3.jsonl",
+   "bytes": 344
+  },
+  {
+   "path": "follow-up/jsonl/doc-4.jsonl",
+   "bytes": 157
+  },
+  {
+   "path": "follow-up/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "follow-up/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "follow-up/jsonl/main.jsonl",
+   "bytes": 1740
+  },
+  {
+   "path": "follow-up/jsonl/task-9.jsonl",
+   "bytes": 970
+  },
+  {
+   "path": "follow-up/opened.json",
+   "bytes": 5494
+  },
+  {
+   "path": "follow-up/records.json",
+   "bytes": 5494
+  },
+  {
+   "path": "follow-up/resumed.json",
+   "bytes": 9472
+  },
+  {
+   "path": "follow-up/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "fork/jsonl/doc-16.jsonl",
+   "bytes": 183
+  },
+  {
+   "path": "fork/jsonl/doc-17.jsonl",
+   "bytes": 137
+  },
+  {
+   "path": "fork/jsonl/doc-18.jsonl",
+   "bytes": 147
+  },
+  {
+   "path": "fork/jsonl/doc-19.jsonl",
+   "bytes": 312
+  },
+  {
+   "path": "fork/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "fork/jsonl/doc-20.jsonl",
+   "bytes": 187
+  },
+  {
+   "path": "fork/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "fork/jsonl/doc-4.jsonl",
+   "bytes": 309
+  },
+  {
+   "path": "fork/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "fork/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "fork/jsonl/main.jsonl",
+   "bytes": 6616
+  },
+  {
+   "path": "fork/opened.json",
+   "bytes": 17792
+  },
+  {
+   "path": "fork/records.json",
+   "bytes": 17792
+  },
+  {
+   "path": "fork/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "ops-corpus.json",
+   "bytes": 208950
+  },
+  {
+   "path": "subagent/jsonl/doc-14.jsonl",
+   "bytes": 137
+  },
+  {
+   "path": "subagent/jsonl/doc-15.jsonl",
+   "bytes": 146
+  },
+  {
+   "path": "subagent/jsonl/doc-16.jsonl",
+   "bytes": 310
+  },
+  {
+   "path": "subagent/jsonl/doc-17.jsonl",
+   "bytes": 186
+  },
+  {
+   "path": "subagent/jsonl/doc-18.jsonl",
+   "bytes": 219
+  },
+  {
+   "path": "subagent/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "subagent/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "subagent/jsonl/doc-4.jsonl",
+   "bytes": 316
+  },
+  {
+   "path": "subagent/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "subagent/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "subagent/jsonl/main.jsonl",
+   "bytes": 8153
+  },
+  {
+   "path": "subagent/opened.json",
+   "bytes": 19335
+  },
+  {
+   "path": "subagent/records.json",
+   "bytes": 19335
+  },
+  {
+   "path": "subagent/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "task-graph/jsonl/doc-10.jsonl",
+   "bytes": 146
+  },
+  {
+   "path": "task-graph/jsonl/doc-11.jsonl",
+   "bytes": 158
+  },
+  {
+   "path": "task-graph/jsonl/doc-12.jsonl",
+   "bytes": 186
+  },
+  {
+   "path": "task-graph/jsonl/doc-13.jsonl",
+   "bytes": 182
+  },
+  {
+   "path": "task-graph/jsonl/doc-2.jsonl",
+   "bytes": 135
+  },
+  {
+   "path": "task-graph/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "task-graph/jsonl/doc-4.jsonl",
+   "bytes": 157
+  },
+  {
+   "path": "task-graph/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "task-graph/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "task-graph/jsonl/doc-9.jsonl",
+   "bytes": 135
+  },
+  {
+   "path": "task-graph/jsonl/main.jsonl",
+   "bytes": 3689
+  },
+  {
+   "path": "task-graph/opened.json",
+   "bytes": 9072
+  },
+  {
+   "path": "task-graph/records.json",
+   "bytes": 9072
+  },
+  {
+   "path": "task-graph/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-2.jsonl",
+   "bytes": 753
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-4.jsonl",
+   "bytes": 310
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "tool-interrupted/jsonl/main.jsonl",
+   "bytes": 2901
+  },
+  {
+   "path": "tool-interrupted/jsonl/task-12.jsonl",
+   "bytes": 973
+  },
+  {
+   "path": "tool-interrupted/jsonl/task-9.jsonl",
+   "bytes": 1329
+  },
+  {
+   "path": "tool-interrupted/opened.json",
+   "bytes": 9138
+  },
+  {
+   "path": "tool-interrupted/records.json",
+   "bytes": 9138
+  },
+  {
+   "path": "tool-interrupted/resumed.json",
+   "bytes": 12446
+  },
+  {
+   "path": "tool-interrupted/sqlite/session.sqlite",
+   "bytes": 118784
+  }
+ ]
+}

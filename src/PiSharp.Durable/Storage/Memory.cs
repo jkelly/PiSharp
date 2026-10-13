@@ -140,7 +140,8 @@ public sealed class MemoryStorage : IStorage
                 var stored = MaterializeDocument(sourceId, copy.Source.At) ??
                     throw new InvalidOperationException($"Fork source document {sourceId} cannot be read");
                 StorageRules.CheckCopySource(stored, copy.Record);
-                return (StorageWrite)new DocumentCreateWrite(copy.Record, DocumentContent.Base(stored.Version, stored.Value));
+                // Upstream memory.ts: { kind: "base", version, value }, which a JSONL sidecar persists as written.
+                return (StorageWrite)new DocumentCreateWrite(copy.Record, new DocumentBase(stored.Version, stored.Value) { KindFirst = true });
             }
             catch (StorageRejectedException) { throw; }
             catch (Exception error) { throw new StorageRejectedException($"Document copy {copy.Record.Id} was rejected", error); }

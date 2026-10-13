@@ -446,7 +446,7 @@ public sealed partial class JsonlStorage : IStorage
                                 if (record is not null && record.ContentKind != "base")
                                     throw new JsonlCorruptionException($"Document creation lacks a confirmed base in commit {marker.Seq}");
                                 var content = reclaimed || record is null
-                                    ? DocumentContent.Base(1, JsonObjectValue.Empty)
+                                    ? new DocumentBase(1, JsonObjectValue.Empty) { KindFirst = true }
                                     : (DocumentBase)DocumentContent.FromJson(record.Payload);
                                 writes.Add(new DocumentCreateWrite(operation.Record!, content));
                             }
