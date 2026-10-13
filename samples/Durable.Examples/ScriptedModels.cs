@@ -58,8 +58,12 @@ public sealed class ScriptedModels : IDurableModels
         ContextWindow = 128000, MaxTokens = 16384,
     };
 
+    /// <summary>The faux model IDs this provider serves (upstream <c>fauxProvider({ models: [...] })</c>); default <c>faux-1</c>.</summary>
+    public IReadOnlyList<string> ModelIds { get; init; } = ["faux-1"];
+
     /// <inheritdoc/>
-    public DurableModel? GetModel(string provider, string modelId) => provider == Model.Provider && modelId == Model.Id ? Model : null;
+    public DurableModel? GetModel(string provider, string modelId) =>
+        provider == Model.Provider && ModelIds.Contains(modelId) ? Model with { Id = modelId, Name = modelId == Model.Id ? Model.Name : modelId } : null;
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,

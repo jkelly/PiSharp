@@ -29,6 +29,15 @@ internal static partial class Program
         "pi.assistant",
     ];
 
+    // Declared before ExamplesUpstreamOutput, which spreads it.
+    private static readonly string[] ReviewerTranscript =
+    [
+        "> Review user.ts.",
+        "reviewer: 1. `name` does not handle a missing user.",
+        "> Look again for anything you missed. Say \"No further findings.\" when there is nothing left.",
+        "reviewer: 2. `user` has no type. No further findings.",
+    ];
+
     private static readonly string[] ExamplesUpstreamOutput =
     [
         "== 00-conversation",
@@ -98,6 +107,9 @@ internal static partial class Program
         "root system prompt: [" + RootPrompt + "]",
         """subagent system prompt: [{"role":"system","content":"","sections":{"preamble":"You are a coding agent. Be terse.","cwd":"<cwd>\n/repo\n</cwd>","instructions":"<instructions>\nOnly read; never edit files.\n</instructions>"},"timestamp":<time>}]""",
         RootAfterCwdChange,
+        "== 16-real-model",
+        // The tests run the examples with an environment that has no OPENAI_API_KEY.
+        "skipped: OPENAI_API_KEY is not set",
         "== 17-coding-tools",
         "cat /tmp/1gb.txt took <ms> ms",
         "status: done",
@@ -105,6 +117,8 @@ internal static partial class Program
         "answer: [{\"type\":\"text\",\"text\":\"The file now greets durable.\"}]",
         "file: \"hello durable\\n\"",
         CodingToolsStorage,
+        "== 18-print",
+        PrintAnswer,
         "== 20-inbox",
         "rejected: Conversation 1 is busy",
         "withdraw: aborted",
@@ -174,6 +188,21 @@ internal static partial class Program
         "  assistant A detailed answer to \"What should we pack?\": details details details d",
         "  user      Summarize the plan for my partner",
         CompactionLastLine,
+        "== 26-coding-agent",
+        // pwd prints the temporary workspace; both sides compare it as <workspace>.
+        "bash ran in: <workspace>",
+        CodingAgentLastLine,
+        "== 27-plan-mode",
+        """tools: ["read","write","edit","bash"]""",
+        """plan mode tools: ["read","submit_plan"]""",
+        PlanSteps,
+        """tools again: ["read","write","edit","bash"]""",
+        // Upstream's util.inspect prints `removed: undefined`; JSON drops the undefined field.
+        """system: {"sections":{"plan_mode":"<plan_mode>\nYou are in plan mode. Read the code, then call submit_plan. Change nothing.\n</plan_mode>"},"added":["read","submit_plan"]}""",
+        PlanModeLastLine,
+        "== 28-reviewer",
+        """reviewer: small ["coding-tools","reviewer"] ["read"] true""",
+        .. ReviewerTranscript,
         "== 29-sandbox-per-conversation",
         "alice's sandbox: from alice",
         BobsSandbox,
@@ -205,6 +234,11 @@ internal static partial class Program
     private const string BobsSandbox = "bob's sandbox: from bob";
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
+
+    private const string PrintAnswer = "This directory holds the durable package sources, tests, and docs.";
+    private const string CodingAgentLastLine = "bash ran in: <workspace>/app";
+    private const string PlanSteps = """plan: ["Read PORT from the environment","Default to 3000"]""";
+    private const string PlanModeLastLine = """system: {"sections":{"plan_mode":null},"added":["write","edit","bash"],"removed":["submit_plan"]}""";
 
     private const string ChatAnswer = """answer: [{"type":"text","text":"Paris."}]""";
     private const string ChatTranscript = """transcript: ["pi.user","pi.system","pi.assistant"]""";
@@ -256,6 +290,10 @@ internal static partial class Program
         [CompactionLastLine] = ["24 entries stored, summaries: [\"threshold\",\"threshold\",\"manual\",\"threshold\"]"],
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
+        [PrintAnswer] = [PrintAnswer],
+        [CodingAgentLastLine] = ["bash ran in: <workspace>", CodingAgentLastLine],
+        [PlanModeLastLine] = [PlanSteps],
+        [ReviewerTranscript[^1]] = ReviewerTranscript,
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()
@@ -285,7 +323,7 @@ internal static partial class Program
     private static async Task<string> RunExamplesAsync(ExampleStorage storage, string? root, params string[] only)
     {
         var output = new StringWriter();
-        await Examples.RunAsync(storage, root, output, only);
+        await Examples.RunAsync(storage, root, output, only, environment: _ => null);
         return output.ToString();
     }
 
@@ -294,7 +332,8 @@ internal static partial class Program
         var actual = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(line => Regex.Replace(line.TrimEnd('\r'), "\"timestamp\":[0-9]+", "\"timestamp\":<time>"))
             .Select(line => Regex.Replace(line, "^cat /tmp/1gb.txt took [0-9]+ ms$", "cat /tmp/1gb.txt took <ms> ms"))
-            .Select(line => Regex.Replace(line, "^storage: .+$", "storage: <dir>")).ToArray();
+            .Select(line => Regex.Replace(line, "^storage: .+$", "storage: <dir>"))
+            .Select(line => Regex.Replace(line, "^bash ran in: .*/pi-durable-agent-[A-Za-z0-9]+", "bash ran in: <workspace>")).ToArray();
         for (var index = 0; index < Math.Max(actual.Length, expected.Count); index++)
             Equal(index < expected.Count ? expected[index] : "<end>", index < actual.Length ? actual[index] : "<end>", "line " + (index + 1));
     }

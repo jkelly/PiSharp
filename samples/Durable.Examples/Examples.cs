@@ -55,10 +55,15 @@ public static partial class Examples
         ("13-recovery", RecoveryAsync),
         ("14-chat", ChatAsync),
         ("15-system-prompt", SystemPromptAsync),
+        ("16-real-model", RealModelAsync),
         ("17-coding-tools", CodingToolsAsync),
+        ("18-print", PrintAsync),
         ("20-inbox", InboxAsync),
         ("22-subagent-foreground", SubagentForegroundAsync),
         ("25-compaction", CompactionAsync),
+        ("26-coding-agent", CodingAgentAsync),
+        ("27-plan-mode", PlanModeAsync),
+        ("28-reviewer", ReviewerAsync),
         ("29-sandbox-per-conversation", SandboxPerConversationAsync),
         ("30-tool-override", ToolOverrideAsync),
         ("31-reload-and-restart", ReloadAndRestartAsync),
@@ -72,9 +77,12 @@ public static partial class Examples
     /// <param name="root">The directory file backends store each example under; required unless <paramref name="storage"/> is memory.</param>
     /// <param name="output">Where the examples print.</param>
     /// <param name="only">Example numbers (<c>00</c>) or names (<c>00-conversation</c>).</param>
-    public static async Task RunAsync(ExampleStorage storage, string? root, TextWriter output, IReadOnlyCollection<string>? only = null)
+    /// <param name="environment">Reads environment variables (16-real-model's OPENAI_API_KEY); default the process environment.</param>
+    public static async Task RunAsync(ExampleStorage storage, string? root, TextWriter output, IReadOnlyCollection<string>? only = null,
+        Func<string, string?>? environment = null)
     {
         ArgumentNullException.ThrowIfNull(output);
+        Examples.environment = environment ?? Environment.GetEnvironmentVariable;
         if (storage != ExampleStorage.Memory && string.IsNullOrEmpty(root)) throw new ArgumentException("File storage needs a root directory.", nameof(root));
         var selected = All.Where(example => only is null || only.Count == 0 ||
             only.Any(name => name == example.Name || name == example.Name[..2])).ToArray();
