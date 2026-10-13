@@ -21,14 +21,11 @@ public interface IHookRunner
 
 /// <summary>
 /// Operations of one task invocation (upstream <c>TaskRuntime</c>). Every operation rejects after the invocation ends; watches acquired
-/// through it stop at invocation end.
+/// through it stop at invocation end. A runtime is the <see cref="IHookApi"/> its task passes to hooks, as upstream's structurally is; the task
+/// and conversation IDs, <c>Models</c> and the memo reads and writes are the inherited <see cref="IHookApi"/> members.
 /// </summary>
-public interface ITaskRuntime : IDocumentObserver, IDocumentReader
+public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
 {
-    /// <summary>The task.</summary>
-    TaskId TaskId { get; }
-    /// <summary>The task's conversation.</summary>
-    ConversationId ConversationId { get; }
     /// <summary>
     /// Cancelled when the run is signalled by <c>AbortTaskAsync</c>, the Harness closes, or the invocation ends (upstream <c>signal</c>).
     /// The handler's context carries the same signal. Work still using it after the invocation ended is cancelled; it could not write
@@ -41,8 +38,6 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader
     Task<Agent> AgentAsync(DurableContext context);
     /// <summary><c>HarnessOptions.Settings</c>, resolved at each access.</summary>
     Settings Settings { get; }
-    /// <summary><c>HarnessOptions.Models</c>.</summary>
-    IDurableModels Models { get; }
     /// <summary>Calls <c>HarnessOptions.Env</c> for the task's conversation; rejects with its error.</summary>
     Task<IExecutionEnv?> EnvAsync(DurableContext context);
     /// <summary>Handlers of this task's name from the extensions its conversation selects, in extension order.</summary>
@@ -63,10 +58,6 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader
     /// state unchanged.</summary>
     Task CommitAsync(Action<ITx, RunningTask> change, DurableContext context);
 
-    /// <summary>Reads a durable memo of this task; null when absent.</summary>
-    Task<JsonValue?> MemoAsync(string name, DurableContext context);
-    /// <summary>Stores <paramref name="candidate"/> unless a memo already exists; returns the durable winner.</summary>
-    Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context);
     /// <summary>The committed task record.</summary>
     Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context);
     /// <summary>Resolves with the task's terminal receipt (upstream <c>SettledTask</c>); rejects when the invocation ends.</summary>

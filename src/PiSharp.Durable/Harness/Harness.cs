@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
 // upstream's HarnessImpl extends SessionImpl. Placeholders for later phases fail with NotImplementedException naming their phase:
-// submissions (P8), reset, views and usage totals (P10), compaction and the task graph (P11).
+// reset, views and usage totals (P10), compaction and the task graph (P11).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -60,6 +60,7 @@ internal sealed class DurableHarness : Session, IHarness
     private readonly HarnessOptions options;
     private readonly Action<Exception> report;
     private readonly DurableTaskScheduler scheduler;
+    private readonly Submissions submissions;
     private volatile bool closed;
 
     public DurableHarness(IStorage storage, HarnessOptions options, DurableContext context)
@@ -86,10 +87,11 @@ internal sealed class DurableHarness : Session, IHarness
             Conversation = async (id, binding, callContext) =>
             {
                 var record = await ReadOnLineAsync(() => storage.GetConversationAsync(id, callContext)).ConfigureAwait(false);
-                return record is null ? null : new BoundConversation(id, binding, scheduler!);
+                return record is null ? null : new BoundConversation(id, binding, scheduler!, submissions!);
             },
             Context = context.WithoutCancellation(),
         });
+        submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(options.Settings), () => scheduler.Resume());
     }
 
     /// <summary>The Harness clock.</summary>
@@ -98,6 +100,8 @@ internal sealed class DurableHarness : Session, IHarness
     internal IStorage Storage => storage;
 
     internal DurableTaskScheduler Scheduler => scheduler;
+
+    internal Submissions Submissions => submissions;
 
     private static Func<double> Clock(HarnessOptions options)
     {
@@ -146,13 +150,10 @@ internal sealed class DurableHarness : Session, IHarness
         return new HarnessInspection(scheduling, tasks, submissions);
     });
 
-    /// <summary>TODO(P8): submissions.</summary>
-    public Task<ISubmission?> SubmissionAsync(SubmissionId id, DurableContext context) =>
-        Task.FromException<ISubmission?>(Harness.NotPorted("Harness.SubmissionAsync", "P8"));
+    public Task<ISubmission?> SubmissionAsync(SubmissionId id, DurableContext context) => submissions.GetAsync(id, context);
 
-    /// <summary>TODO(P8): submissions.</summary>
     public Task<SubmissionAbortResult> AbortSubmissionAsync(SubmissionId id, DurableContext context, ConversationId? conversationId = null) =>
-        Task.FromException<SubmissionAbortResult>(Harness.NotPorted("Harness.AbortSubmissionAsync", "P8"));
+        submissions.AbortAsync(id, context, conversationId);
 
     public Task<TaskAbortResult> AbortTaskAsync(TaskId id, DurableContext context) => scheduler.AbortAsync(id, context);
 
@@ -268,9 +269,7 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
         return harness.CommitWithAsync(tx => Agents.ConfigureAsync(tx, Id, change), context);
     }
 
-    /// <summary>TODO(P8): admission joins with the submissions port.</summary>
-    public Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context) =>
-        Task.FromException<ISubmission>(Harness.NotPorted("Conversation.SubmitAsync", "P8"));
+    public Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context) => harness.Submissions.SubmitAsync(Id, submission, context);
 
     /// <summary>TODO(P10): a reset is a write submission placed through the inbox.</summary>
     public Task ResetAsync(string? handoff, DurableContext context) => Task.FromException(Harness.NotPorted("Conversation.ResetAsync", "P10"));
@@ -346,16 +345,17 @@ internal sealed class ConversationImpl(ConversationId id, DurableHarness harness
 /// Invocation-bound handle for tasks and tools (upstream <c>boundConversation</c>). Every operation first checks the invocation and runs under
 /// its signal, so it rejects once the invocation ends; admitted work stays durable.
 /// </summary>
-internal sealed class BoundConversation(ConversationId id, InvocationBinding binding, DurableTaskScheduler scheduler) : IConversationHandle
+internal sealed class BoundConversation(ConversationId id, InvocationBinding binding, DurableTaskScheduler scheduler, Submissions submissions)
+    : IConversationHandle
 {
     public ConversationId Id { get; } = id;
 
-    /// <summary>TODO(P8): admission joins with the submissions port; its submissions are bound to the invocation too.</summary>
+    /// <summary>Admits user input; the returned submission's operations are bound to the invocation too.</summary>
     public async Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context)
     {
         binding.Check();
-        await Task.CompletedTask.ConfigureAwait(false);
-        throw Harness.NotPorted("ConversationHandle.SubmitAsync", "P8");
+        var admitted = await submissions.SubmitAsync(Id, submission, context.WithSignal(binding.Signal)).ConfigureAwait(false);
+        return new BoundSubmission(admitted, binding);
     }
 
     public async Task AbortAsync(DurableContext context, ConversationAbortOptions? options = null)

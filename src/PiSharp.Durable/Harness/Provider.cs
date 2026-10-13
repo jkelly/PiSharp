@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/provider.ts. pi-ai's uuidv7 is Guid.CreateVersion7 in its
-// lowercase hyphenated form.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/provider.ts. pi-ai's uuidv7 is PiAiUuid.UuidV7
+// (Guid.CreateVersion7 in its lowercase hyphenated form).
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Internal.PiAi;
 
 namespace PiSharp.Durable;
 
@@ -10,7 +11,7 @@ public static class ProviderIdentity
     /// <summary>Stable provider-facing identity of one conversation, <c>{sessionId}</c>; every fork starts with a fresh identity instead of
     /// copying its parent (upstream <c>ProviderDoc</c>).</summary>
     public static ConversationDocToken ProviderDoc { get; } = Documents.DefineConversationDoc("pi.provider", 1, DocumentFork.Initial,
-        () => JsonValue.Object([KeyValuePair.Create("sessionId", (JsonValue)Guid.CreateVersion7().ToString())]), checkpointWhen: (_, _, _) => true);
+        () => JsonValue.Object([KeyValuePair.Create("sessionId", (JsonValue)PiAiUuid.UuidV7())]), checkpointWhen: (_, _, _) => true);
 
     /// <summary>
     /// Returns the persisted identity without writing in the normal path (upstream <c>ensureProviderSessionId</c>). A legacy conversation
