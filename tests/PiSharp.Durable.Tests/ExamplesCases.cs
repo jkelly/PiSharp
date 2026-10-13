@@ -7,7 +7,8 @@ using PiSharp.Durable.Examples;
 // timestamps come from the clock, so both sides compare them as <time>. The file backends also reopen each example's storage in a new
 // Session and read it back. P9 adds 17-coding-tools, 29-sandbox-per-conversation and 30-tool-override, whose tools run over LocalExecutionEnv
 // in temporary directories (Git Bash on Windows); 17's timing of `cat /tmp/1gb.txt` compares as <ms> and its storage directory as <dir>.
-// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held. P11 adds 06-harness through 13-recovery (11's faux provider is
+// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held. P12 adds 22-subagent-foreground, whose held child and parent answers
+// keep Node's order of the UI attaching to the child and printing; its file backends read back the child conversation and both transcripts. P11 adds 06-harness through 13-recovery (11's faux provider is
 // ScriptedModels; 13 keeps its storage in a temporary SQLite file on memory, as upstream does, and reopens the runner's storage otherwise),
 // 25-compaction, whose model reports the faux provider's usage estimate (its file backends read back the stored entries and summaries),
 // and 31-reload-and-restart, which restarts on its own storage the same way as 13, so it has no separate read-back.
@@ -115,6 +116,10 @@ internal static partial class Program
         "note: done ",
         "withdrawn: unanswered aborted",
         InboxTranscript,
+        "== 22-subagent-foreground",
+        "tool subagent({\"task\":\"Name three prime numbers.\"})",
+        "  assistant: 2, 3, and 5.",
+        SubagentAnswer,
         "== 25-compaction",
         "after \"Where should we stay?\" (answered): 2 messages in context, 2 entries stored",
         "  user      Where should we stay?",
@@ -193,6 +198,7 @@ internal static partial class Program
         """system messages: [{"toolsAdded":["todo"]},{"sections":{"todos":"<todos>\nfix the build\n</todos>"}}]""";
     private const string PaymentOutcome = """payment outcome: {"status":"completed","result":{"receipt":500}}""";
     private const string CodingToolsStorage = "storage: <dir>";
+    private const string SubagentAnswer = "assistant: The subagent says: 2, 3, and 5.";
     private const string InboxTranscript = """transcript: ["pi.user","pi.assistant","app.note","pi.user","pi.user","pi.assistant"]""";
     // Repeated within 25-compaction's output; the read-back follows its last occurrence, the example's last line.
     private const string CompactionLastLine = "  system    (system prompt)";
@@ -241,6 +247,12 @@ internal static partial class Program
         [RootAfterCwdChange] = [RootAfterCwdChange],
         [CodingToolsStorage] = CodingToolsTranscript,
         [InboxTranscript] = [InboxTranscript, "inbox: []"],
+        [SubagentAnswer] =
+        [
+            """child conversation: {"id":13,"owner":{"conversationId":1,"taskId":12}}""",
+            """parent transcript: ["pi.user","pi.system","pi.assistant","pi.tool-result","pi.assistant"]""",
+            """child transcript: ["pi.user","pi.assistant"]""",
+        ],
         [CompactionLastLine] = ["24 entries stored, summaries: [\"threshold\",\"threshold\",\"manual\",\"threshold\"]"],
         [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
         [TimedBashCalls] = [PythonConversation],
