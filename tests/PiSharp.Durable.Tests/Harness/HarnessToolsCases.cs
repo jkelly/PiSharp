@@ -10,9 +10,8 @@
 // - "drops control keys set to undefined instead of faulting": a C# ToolControl has no undefined fields; the case returns
 //   `{addTools: ["extra"]}` with Terminate unset and checks the same stored filter.
 // - "uses explicit null details": `details: null` is JsonValue.Null (a C# null is upstream's undefined).
-// - The two "coding tools" cases need the coding tools (createBashTool, createReadTool, createEditTool) and a real file system and shell
-//   (NodeExecutionEnv); they are pending until the execution environment and the coding tools land: "answers a failing command with its
-//   retained tail and diagnostics in order", "reads, edits, and runs a command in one run, then answers".
+// - The two "coding tools" cases run CodingTools over a LocalExecutionEnv (upstream NodeExecutionEnv) in a fresh directory, on each backend
+//   (upstream: MemoryStorage only); the shell is Git Bash on Windows.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable;
@@ -21,6 +20,8 @@ using PiSharp.Durable.Env;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Storage.Jsonl;
+using PiSharp.Durable.Tools;
+using PiSharp.Durable.Tools.Env;
 using static ChatTests;
 using static HarnessTests;
 using static Program;
@@ -854,6 +855,66 @@ internal static class ToolsTests
             // Each preparation reports the failure and renders without an environment.
             Equal(2, setup.Reports.Snapshot().Count(error => error.Message == "no sandbox"), "reports");
             await ran.Harness.CloseAsync(Context);
+        });
+
+        // ─── coding tools ───────────────────────────────────────────────────
+
+        yield return Case(prefix + "answers-a-failing-command-with-its-retained-tail-and-diagnostics-in-order", async () =>
+        {
+            var directory = Temp("coding");
+            try
+            {
+                var setup = Setup();
+                AddTool(setup.Registry, CodingTools.CreateBashTool());
+                const string command = "i=1; while [ $i -le 3000 ]; do echo line-$i; i=$((i + 1)); done; exit 7";
+                setup.Faux.SetResponses(Calls(("bash", Obj(("command", command)), "b")), Done);
+                var env = new LocalExecutionEnv(directory);
+                var (harness, root) = await OpenChat(fresh(), setup, (_, _) => Task.FromResult<IExecutionEnv?>(env));
+                await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+                var entry = (await AllEntries(root)).First(candidate => Entries.ToolResultEntry.Is(candidate));
+                var result = Results([entry])[0];
+                Check(IsError(result), "isError");
+                var text = ResultText(result);
+                Check(text.StartsWith("line-1001\n", StringComparison.Ordinal), "retained tail: " + text[..Math.Min(40, text.Length)]);
+                Seq(["full_output", "tool_error", "truncated"], ((JsonArrayValue)((JsonObjectValue)entry.Data!)["diagnostics"])
+                    .Select(diagnostic => ((JsonObjectValue)diagnostic).TryGetValue("code", out var code) ? S(code) : null), "diagnostic codes");
+                Check(text.Contains("line-3000\n|<harness>\n[info] Full output: ", StringComparison.Ordinal), "spill notice: " + text[^300..]);
+                Check(text.Contains("\n[error] Command exited with code 7\n[warn] Output truncated to its end: 1000 lines, ", StringComparison.Ordinal),
+                    "error and truncation: " + text[^300..]);
+                await harness.CloseAsync(Context);
+            }
+            finally { await RemoveTempDirAsync(directory); }
+        });
+
+        yield return Case(prefix + "reads-edits-and-runs-a-command-in-one-run-then-answers", async () =>
+        {
+            var directory = Temp("coding");
+            try
+            {
+                await File.WriteAllTextAsync(Path.Combine(directory, "notes.txt"), "hello world\n");
+                var setup = Setup();
+                setup.Registry.Install(Define.Extension(new Extension
+                {
+                    Name = "coding",
+                    Tools = [CodingTools.CreateReadTool(), CodingTools.CreateEditTool(), CodingTools.CreateBashTool()],
+                }));
+                setup.Faux.SetResponses(
+                    Calls(("read", Obj(("path", "notes.txt")), "r")),
+                    Calls(("edit", O("""{"path":"notes.txt","edits":[{"oldText":"world","newText":"durable"}]}"""), "e")),
+                    Calls(("bash", Obj(("command", "cat notes.txt")), "b")),
+                    Done);
+                var env = new LocalExecutionEnv(directory);
+                var (harness, root) = await OpenChat(fresh(), setup, (_, _) => Task.FromResult<IExecutionEnv?>(env));
+                var settled = await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+                Equal(SubmissionStatus.Done, settled.Status, "status");
+                var entries = await AllEntries(root);
+                Seq(["read|False|hello world\n", "edit|False|Successfully replaced 1 block(s) in notes.txt.", "bash|False|hello durable\n"],
+                    Results(entries).Select(result => $"{S(result["toolName"])}|{IsError(result)}|{ResultText(result)}"), "results");
+                Equal("pi.assistant", entries[^1].Kind, "last entry");
+                Equal("hello durable\n", await File.ReadAllTextAsync(Path.Combine(directory, "notes.txt")), "file");
+                await harness.CloseAsync(Context);
+            }
+            finally { await RemoveTempDirAsync(directory); }
         });
 
         // ─── tool progress and lifetime ─────────────────────────────────────

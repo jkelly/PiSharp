@@ -1,7 +1,7 @@
 // The one execution environment the tool-task cases build (upstream's `new NodeExecutionEnv({ cwd })` where a test reads only `env.cwd`).
 // It is the only test class implementing IExecutionEnv directly, so when the execution environment adds members (text line readers, watch,
 // temp files, cleanup and the Shell half) this file is the one place to update. Its file operations reject: no harness.tools case touches a
-// file system or a shell; the cases that do (the coding tools and the real bash interruption) are pending until the coding tools land.
+// file system or a shell; the cases that do (the coding tools and the real bash interruption) use LocalExecutionEnv.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;

@@ -7,13 +7,15 @@
 // - "lets context derivation answer a faulted tool": upstream's result carries a function in `details`, which is not strict JSON, so the
 //   result commit throws. A C# result holds only JSON values; the case's result carries a null tool name in `control.addTools`, which is not
 //   strict JSON either and makes the same commit throw.
-// - "answers a real bash command interrupted by close and reopen, then finishes the run" needs the bash tool and a real shell
-//   (NodeExecutionEnv); it is pending until the execution environment and the coding tools land.
+// - "answers a real bash command interrupted by close and reopen, then finishes the run" runs CodingTools' bash over a LocalExecutionEnv
+//   (upstream NodeExecutionEnv) in its own fresh directory (upstream: the SQLite file's directory); the shell is Git Bash on Windows.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Storage.Jsonl;
+using PiSharp.Durable.Tools;
+using PiSharp.Durable.Tools.Env;
 using static ChatTests;
 using static HarnessTests;
 using static Program;
@@ -327,6 +329,37 @@ internal static class ToolsRecoveryTests
             var faulted = tasks.Items.First(task => task.Kind == "pi.tool");
             MatchJson("""{"status":"terminal","outcome":{"status":"faulted"}}""", faulted.State.ToJson(), "state");
             await opened.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "answers-a-real-bash-command-interrupted-by-close-and-reopen-then-finishes-the-run", async () =>
+        {
+            var open = location();
+            var directory = Temp("tools-recovery-bash");
+            try
+            {
+                var env = new LocalExecutionEnv(directory);
+                Task<IExecutionEnv?> Env(EnvTarget target, DurableContext envContext) => Task.FromResult<IExecutionEnv?>(env);
+                var setup = Setup();
+                AddTool(setup.Registry, CodingTools.CreateBashTool());
+                setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("bash", Obj(("command", "echo started; sleep 30")), "b")], stopReason: "toolUse"),
+                    Done);
+                var opened = await Open(open, setup, Env);
+                var id = (await opened.Root.SubmitAsync(SubmissionDraft.Input("go"), Context)).Id;
+                await Eventually(async () =>
+                {
+                    var live = await opened.Harness.SnapshotAsync(Live.LiveDoc, opened.Root.Id, Context);
+                    return live is not null && live.TryGetValue("tools", out var tools) && tools is JsonArrayValue { Count: > 0 } slots &&
+                        ((JsonObjectValue)slots[0]).TryGetValue("output", out var output) && output is JsonStringValue { Value: "started\n" };
+                });
+                await opened.Harness.CloseAsync(Context);
+
+                opened = await Open(open, setup, Env);
+                Equal(SubmissionStatus.Done, (await WaitFor(opened.Harness, id)).Status, "status");
+                Equal("started\n|<harness>\n[error] Tool bash was interrupted and may have partially run\n</harness>",
+                    Text(Results(await AllEntries(opened.Root))[0]), "text");
+                await opened.Harness.CloseAsync(Context);
+            }
+            finally { await RemoveTempDirAsync(directory); }
         });
 
         yield return Case(prefix + "clears-the-interrupted-attempt-s-progress-before-a-safe-rerun", async () =>
