@@ -81,27 +81,8 @@ internal sealed class PiSettings
     private readonly HashSet<PiSettingsError> loadFailures = [];
 
     /// <summary>proper-lockfile's lockSync as SettingsManager retries it: an exclusive <c>mkdir</c> of <c>&lt;file&gt;.lock</c>, ten
-    /// attempts 20 ms apart, stale after 10 s.</summary>
-    private static void WithFileLock(string path, Action run)
-    {
-        var lockPath = path + ".lock";
-        for (var attempt = 1; ; attempt++)
-        {
-            try
-            {
-                if (Directory.Exists(lockPath))
-                {
-                    if (DateTime.UtcNow - Directory.GetLastWriteTimeUtc(lockPath) > TimeSpan.FromSeconds(10)) Directory.Delete(lockPath);
-                    else throw new IOException("Lock file is already being held");
-                }
-                Directory.CreateDirectory(lockPath);
-                break;
-            }
-            catch (IOException) when (attempt < 10) { Thread.Sleep(20); }
-        }
-        try { run(); }
-        finally { try { Directory.Delete(lockPath); } catch (IOException) { } }
-    }
+    /// attempts 20 ms apart, stale after 10 s (<see cref="PiLockfile.WithLock"/>).</summary>
+    private static void WithFileLock(string path, Action run) => PiLockfile.WithLock(path, run);
 
     private static JsonObject LoadLayer(string path, string scope, List<PiSettingsError> errors)
     {

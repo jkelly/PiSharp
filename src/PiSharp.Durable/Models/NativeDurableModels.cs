@@ -39,6 +39,17 @@ public sealed record NativeDurableModelsOptions
     /// <summary>The HTTP handler every request is sent through; caller-owned. Null: a handler owned by the instance (redirects off).</summary>
     public HttpMessageHandler? HttpHandler { get; init; }
 
+    /// <summary>
+    /// The host's own route for a request (the CLI adapter's live routes: per-request auth such as GitHub Copilot token exchange, OpenAI
+    /// Codex OAuth, Amazon Bedrock and Google Vertex ambient credentials, Azure endpoint configuration, stored OAuth, models.json providers
+    /// and headers), consulted before the native routes and before the provider check. A returned transport streams the request with this
+    /// adapter's request shaping (the transcript, the thinking level clamped to the transport's <see cref="IThinkingLevelTransport"/> levels,
+    /// the session ID) and its <c>TimeoutMs</c> idle deadline; the host applies the other options when it builds the transport (an output cap
+    /// or cache retention other than the model's main request selects its summary route). Null falls back to the native routes. The
+    /// transport stays host-owned; a throw is the stream's setup error.
+    /// </summary>
+    public Func<DurableModel, DurableStreamOptions?, CancellationToken, ValueTask<IChatTransport?>>? HostTransport { get; init; }
+
     /// <summary>Clock of request timestamps, <c>durationMs</c> and the <c>timeoutMs</c> deadline; default <see cref="TimeProvider.System"/>.</summary>
     public TimeProvider? TimeProvider { get; init; }
 }
@@ -53,7 +64,8 @@ public sealed record NativeDurableModelsOptions
 /// <para>Streams <c>openai-completions</c>, <c>openai-responses</c>, <c>anthropic-messages</c>, <c>google-generative-ai</c>,
 /// <c>mistral-conversations</c> and <c>pi-messages</c> models. Providers whose auth resolves per request (github-copilot, openai-codex,
 /// amazon-bedrock, google-vertex, cloudflare-workers-ai, cloudflare-ai-gateway, azure) and Anthropic OAuth or auth tokens need the
-/// host's authentication (the CLI adapter, P12); their requests end with an error naming the gap.</para>
+/// host's authentication: a host routes them with <see cref="NativeDurableModelsOptions.HostTransport"/> (PiSharp.Cli's durable adapter
+/// does, P12); without a host route their requests end with an error naming the gap.</para>
 /// <para><see cref="DurableStreamOptions"/> mapping. Supported: <c>Reasoning</c> (clamped to the model's levels; null is <c>off</c>),
 /// <c>SessionId</c>, <c>Headers</c>, <c>CacheRetention</c>, <c>MaxTokens</c> (default the model's <c>maxTokens</c>), <c>Metadata.user_id</c>
 /// (anthropic-messages), and <c>TimeoutMs</c>, which this adapter enforces as an idle deadline (no event for that long ends the request
@@ -68,6 +80,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     private readonly ImmutableDictionary<string, FrozenModelCatalog?> providers;
     private readonly Func<string, string?> environment;
     private readonly Func<DurableModel, CancellationToken, ValueTask<string?>>? resolveApiKey;
+    private readonly Func<DurableModel, DurableStreamOptions?, CancellationToken, ValueTask<IChatTransport?>>? hostTransport;
     private readonly HttpMessageHandler handler;
     private readonly bool ownsHandler;
     private readonly TimeProvider time;
@@ -93,6 +106,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         providers = builder.ToImmutable();
         environment = options.Environment ?? (_ => null);
         resolveApiKey = options.ResolveApiKey;
+        hostTransport = options.HostTransport;
         handler = options.HttpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false };
         ownsHandler = options.HttpHandler is null;
         time = options.TimeProvider ?? TimeProvider.System;
@@ -186,7 +200,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
         var idle = options?.TimeoutMs is { } milliseconds && double.IsFinite(milliseconds) && milliseconds > 0
             ? TimeSpan.FromMilliseconds(Math.Min(milliseconds, int.MaxValue)) : (TimeSpan?)null;
-        var client = new ChatClient(provider.Transport) { TimeProvider = time };
+        var client = new ChatClient(prepared.Transport) { TimeProvider = time };
         await using var run = await client.StartWithAbortSettlementAsync(prepared.Request, linked.Token, timestamp).ConfigureAwait(false);
         await using var events = run.ReadEventsAsync().GetAsyncEnumerator(CancellationToken.None);
         while (true)
@@ -214,12 +228,20 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         return new StreamError(StopReason.Error, terminal.Message with { StopReason = StopReason.Error, ExtraProperties = properties });
     }
 
-    private sealed record Prepared(NativeHttpModelProvider Provider, ChatRequest Request);
+    /// <summary>A prepared request: the transport it streams through, the native provider that owns it (null for a host route) and the
+    /// request.</summary>
+    private sealed record Prepared(IChatTransport Transport, NativeHttpModelProvider? Provider, ChatRequest Request);
 
     /// <summary>pi-ai <c>applyAuth</c> and the provider's <c>streamSimple</c> setup: provider, catalog row, key, binding, level.</summary>
     private async Task<Prepared> PrepareAsync(DurableModel model, ImmutableArray<Chord.JsonValue> messages, DurableStreamOptions? options,
         long timestamp, CancellationToken cancellationToken)
     {
+        if (hostTransport is not null && await hostTransport(model, options, cancellationToken).ConfigureAwait(false) is { } routed)
+        {
+            var levels = routed is IThinkingLevelTransport capability ? capability.GetSupportedThinkingLevels(model.Descriptor) : ["off"];
+            var hosted = ThinkingLevels.Clamp(levels, options?.Reasoning ?? "off");
+            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp) { ThinkingLevel = hosted, SessionId = options?.SessionId });
+        }
         if (!providers.ContainsKey(model.Provider)) throw new InvalidOperationException($"Unknown provider: {model.Provider}");
         var metadata = Metadata(model);
         var descriptor = model.Descriptor;
@@ -245,7 +267,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
                 provider = NativeModelRoutes.Bind(descriptor, metadata, key, settings with { MaxTokens = thinkingCap }, handler);
             }
             var request = new ChatRequest(descriptor, transcript, timestamp) { ThinkingLevel = level, SessionId = options?.SessionId };
-            return new(provider, request);
+            return new(provider.Transport, provider, request);
         }
         catch
         {
