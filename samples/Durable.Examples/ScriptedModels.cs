@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/faux.ts, reduced to what examples 14 and 15 use: the model
-// faux/faux-1 answering each request with the next scripted text, streamed as one text block. A real host passes its IDurableModels over
-// PiSharp.AI instead.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/faux.ts, reduced to what the examples use: the model faux/faux-1
+// answering each request with the next scripted reply, a text streamed as one text block or tool calls streamed as tool-call blocks with
+// stop reason toolUse (upstream fauxAssistantMessage([fauxToolCall(...)], { stopReason: "toolUse" })). A real host passes its IDurableModels
+// over PiSharp.AI instead.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -9,10 +10,38 @@ using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Examples;
 
-/// <summary>Model access that answers each request with the next scripted text (pi-ai's faux provider, reduced).</summary>
-public sealed class ScriptedModels(params string[] replies) : IDurableModels
+/// <summary>One scripted answer: a text, or tool calls.</summary>
+public sealed record ScriptedReply
 {
-    private readonly ConcurrentQueue<string> replies = new(replies);
+    private ScriptedReply(string? text, ImmutableArray<ToolCallContent> calls) { Text = text; Calls = calls; }
+
+    /// <summary>The text of a text answer.</summary>
+    public string? Text { get; }
+
+    /// <summary>The tool calls of a tool-calling answer; default for a text answer.</summary>
+    public ImmutableArray<ToolCallContent> Calls { get; }
+
+    /// <summary>A text answer.</summary>
+    public static ScriptedReply Answer(string text) => new(text ?? throw new ArgumentNullException(nameof(text)), default);
+
+    /// <summary>An answer that calls one tool (upstream <c>fauxToolCall(name, args, { id })</c>).</summary>
+    public static ScriptedReply ToolCall(string name, JsonObjectValue arguments, string? id = null) =>
+        new(null, [new ToolCallContent(id ?? "tool:" + Guid.NewGuid().ToString("N")[..12], name, JsonData.Parse(arguments.ToJson()))]);
+
+    /// <summary>A text answer.</summary>
+    public static implicit operator ScriptedReply(string text) => Answer(text);
+}
+
+/// <summary>Model access that answers each request with the next scripted reply (pi-ai's faux provider, reduced).</summary>
+public sealed class ScriptedModels : IDurableModels
+{
+    private readonly ConcurrentQueue<ScriptedReply> replies;
+
+    /// <summary>Text answers.</summary>
+    public ScriptedModels(params string[] replies) : this(replies.Select(ScriptedReply.Answer).ToArray()) { }
+
+    /// <summary>Text and tool-calling answers.</summary>
+    public ScriptedModels(params ScriptedReply[] replies) => this.replies = new(replies);
 
     /// <summary>The scripted model.</summary>
     public DurableModel Model { get; } = new()
@@ -31,7 +60,7 @@ public sealed class ScriptedModels(params string[] replies) : IDurableModels
         await Task.Yield();
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var partial = new AssistantMessage(model.Api, model.Provider, model.Id, timestamp, [], TokenUsage.Zero, StopReason.Pending);
-        if (!replies.TryDequeue(out var text))
+        if (!replies.TryDequeue(out var reply))
         {
             var error = partial with
             {
@@ -42,10 +71,22 @@ public sealed class ScriptedModels(params string[] replies) : IDurableModels
             yield break;
         }
         yield return new StreamStarted(partial);
-        yield return new TextStarted(0, new TextContent(""));
-        yield return new TextDelta(0, text);
-        yield return new TextEnded(0, text);
-        yield return new StreamDone(StopReason.Stop, partial with { Content = [new TextContent(text)], StopReason = StopReason.Stop });
+        if (reply.Text is { } text)
+        {
+            yield return new TextStarted(0, new TextContent(""));
+            yield return new TextDelta(0, text);
+            yield return new TextEnded(0, text);
+            yield return new StreamDone(StopReason.Stop, partial with { Content = [new TextContent(text)], StopReason = StopReason.Stop });
+            yield break;
+        }
+        for (var index = 0; index < reply.Calls.Length; index++)
+        {
+            var call = reply.Calls[index];
+            yield return new ToolCallStarted(index, call with { Arguments = JsonData.Parse("{}") });
+            yield return new ToolCallDelta(index, call.Arguments.ToString());
+            yield return new ToolCallEnded(index, call);
+        }
+        yield return new StreamDone(StopReason.ToolUse, partial with { Content = [.. reply.Calls], StopReason = StopReason.ToolUse });
     }
 
     /// <inheritdoc/>

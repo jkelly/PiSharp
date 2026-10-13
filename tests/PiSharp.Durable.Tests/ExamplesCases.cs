@@ -5,9 +5,25 @@ using PiSharp.Durable.Examples;
 // 15-system-prompt, with a scripted model in place of pi-ai's faux provider. The printed values are the ones the pinned upstream prints
 // under Node (node --conditions=source --experimental-strip-types test/examples/<name>.ts), as JSON in place of util.inspect; message
 // timestamps come from the clock, so both sides compare them as <time>. The file backends also reopen each example's storage in a new
-// Session and read it back.
+// Session and read it back. P9 adds 17-coding-tools, 29-sandbox-per-conversation and 30-tool-override, whose tools run over LocalExecutionEnv
+// in temporary directories (Git Bash on Windows); 17's timing of `cat /tmp/1gb.txt` compares as <ms> and its storage directory as <dir>.
 internal static partial class Program
 {
+    private static readonly string[] CodingToolsTranscript =
+    [
+        "pi.user",
+        "pi.system",
+        "pi.assistant",
+        "pi.tool-result read: \"hello world\\n\"",
+        "pi.assistant",
+        "pi.tool-result edit: \"Successfully replaced 1 block(s) in notes.txt.\"",
+        "pi.assistant",
+        "pi.tool-result bash: \"hello durable\\n\"",
+        "pi.assistant",
+        "pi.tool-result bash: \"cat: /tmp/1gb.txt: No such file or directory\\n<harness>\\n[error] Command exited with code 1\\n</harness>\"",
+        "pi.assistant",
+    ];
+
     private static readonly string[] ExamplesUpstreamOutput =
     [
         "== 00-conversation",
@@ -38,7 +54,26 @@ internal static partial class Program
         "root system prompt: [" + RootPrompt + "]",
         """subagent system prompt: [{"role":"system","content":"","sections":{"preamble":"You are a coding agent. Be terse.","cwd":"<cwd>\n/repo\n</cwd>","instructions":"<instructions>\nOnly read; never edit files.\n</instructions>"},"timestamp":<time>}]""",
         RootAfterCwdChange,
+        "== 17-coding-tools",
+        "cat /tmp/1gb.txt took <ms> ms",
+        "status: done",
+        .. CodingToolsTranscript,
+        "answer: [{\"type\":\"text\",\"text\":\"The file now greets durable.\"}]",
+        "file: \"hello durable\\n\"",
+        CodingToolsStorage,
+        "== 29-sandbox-per-conversation",
+        "alice's sandbox: from alice",
+        BobsSandbox,
+        "== 30-tool-override",
+        "plain conversation: venv:",
+        PythonConversation,
+        TimedBashCalls,
     ];
+
+    private const string CodingToolsStorage = "storage: <dir>";
+    private const string BobsSandbox = "bob's sandbox: from bob";
+    private const string PythonConversation = "python conversation: venv: <project>/.venv";
+    private const string TimedBashCalls = "timed bash calls: 2";
 
     private const string ChatAnswer = """answer: [{"type":"text","text":"Paris."}]""";
     private const string ChatTranscript = """transcript: ["pi.user","pi.system","pi.assistant"]""";
@@ -73,6 +108,9 @@ internal static partial class Program
         ["watch update: {\"text\":\"observed asynchronously\"}"] = ["watch baseline: {\"text\":\"observed asynchronously\"}"],
         [ChatTranscript] = [ChatTranscript, ChatAnswer],
         [RootAfterCwdChange] = [RootAfterCwdChange],
+        [CodingToolsStorage] = CodingToolsTranscript,
+        [BobsSandbox] = ["alice's write: Successfully wrote to note.txt", "bob's write: Successfully wrote to note.txt"],
+        [TimedBashCalls] = [PythonConversation],
     };
 
     private static IEnumerable<(string, Func<Task>)> ExamplesCases()
@@ -106,7 +144,9 @@ internal static partial class Program
     private static void Lines(string output, IReadOnlyList<string> expected)
     {
         var actual = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => Regex.Replace(line.TrimEnd('\r'), "\"timestamp\":[0-9]+", "\"timestamp\":<time>")).ToArray();
+            .Select(line => Regex.Replace(line.TrimEnd('\r'), "\"timestamp\":[0-9]+", "\"timestamp\":<time>"))
+            .Select(line => Regex.Replace(line, "^cat /tmp/1gb.txt took [0-9]+ ms$", "cat /tmp/1gb.txt took <ms> ms"))
+            .Select(line => Regex.Replace(line, "^storage: .+$", "storage: <dir>")).ToArray();
         for (var index = 0; index < Math.Max(actual.Length, expected.Count); index++)
             Equal(index < expected.Count ? expected[index] : "<end>", index < actual.Length ? actual[index] : "<end>", "line " + (index + 1));
     }
