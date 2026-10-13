@@ -868,10 +868,12 @@ public interface IHarness : ISession
     Task WaitForIdleAsync(DurableContext context);
     /// <summary>Session total: every conversation's <c>pi.usage</c> summed (upstream <c>UsageState</c> JSON).</summary>
     Task<JsonObjectValue> UsageAsync(DurableContext context);
-    /// <summary>Every live task with its owner edge, status, and owned conversations (spec §9.5). TODO(P11).</summary>
-    Task<AttachedReplicatedState<JsonObjectValue>> TaskGraphAsync(DurableContext context);
-    /// <summary>The task graph as a serialized exact-frame watch. TODO(P11).</summary>
-    Task<IWatchHandle<JsonObjectValue>> WatchTaskGraphAsync(DurableContext context);
+    /// <summary>Every live task with its owner edge, status, and owned conversations, as a disposable read-only Chord state (spec §9.5).
+    /// Reads only: it does not enable scheduling.</summary>
+    Task<AttachedReplicatedState<TaskGraph>> TaskGraphAsync(DurableContext context);
+    /// <summary>The task graph as a serialized exact-frame watch whose operations address <see cref="TaskGraph.ToJson"/>; cancelling
+    /// <paramref name="context"/> stops it (spec §9.5).</summary>
+    Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context);
 }
 
 /// <summary>Result of <see cref="IHarness.AbortTaskAsync"/>.</summary>

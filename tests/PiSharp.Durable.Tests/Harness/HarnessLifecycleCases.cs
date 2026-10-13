@@ -10,12 +10,8 @@
 //   acquisitions; it reads the same thing: no observer subscription outlives a cancelled acquisition.
 // - `/closed/.test(String(error))` tests the exception's message.
 //
-// Pending (written in full, but not run until the parallel P11 work they need merges; see Pending below):
-// - "publishes no frame to states and watches from a commit that settles during close": Harness.taskGraph and watchTaskGraph.
-// - "rejects conversation and Harness operations once close begins; inspect queued before reports closing": Conversation.compact,
-//   Harness.taskGraph and watchTaskGraph.
-// - "completes reads queued at the seal and rejects queued waits and acquisitions that would follow commits": Harness.taskGraph.
-// - "never schedules from a read-only viewer": Harness.taskGraph and watchTaskGraph.
+// Pending (written in full, but not run until the parallel P11 compaction work merges; see Pending below):
+// - "rejects conversation and Harness operations once close begins; inspect queued before reports closing": Conversation.compact.
 // - "schedules from every progress call": Conversation.compact.
 using System.Reflection;
 using PiSharp.Durable;
@@ -59,15 +55,11 @@ internal static class LifecycleTests
 
     /// <summary>
     /// Case names (without prefix) written in full but not run yet, with what they wait for. TODO(P11 merge): remove an entry once the
-    /// compaction or task-graph work it names has merged, and the case runs.
+    /// compaction work it names has merged, and the case runs.
     /// </summary>
     internal static readonly IReadOnlyDictionary<string, string> Pending = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["publishes-no-frame-to-states-and-watches-from-a-commit-that-settles-during-close"] = "Harness.TaskGraphAsync and WatchTaskGraphAsync (task graph)",
-        ["rejects-conversation-and-harness-operations-once-close-begins-inspect-queued-before-reports-closing"] =
-            "Conversation.CompactAsync (compaction), Harness.TaskGraphAsync and WatchTaskGraphAsync (task graph)",
-        ["completes-reads-queued-at-the-seal-and-rejects-queued-waits-and-acquisitions-that-would-follow-commits"] = "Harness.TaskGraphAsync (task graph)",
-        ["never-schedules-from-a-read-only-viewer"] = "Harness.TaskGraphAsync and WatchTaskGraphAsync (task graph)",
+        ["rejects-conversation-and-harness-operations-once-close-begins-inspect-queued-before-reports-closing"] = "Conversation.CompactAsync (compaction)",
         ["schedules-from-every-progress-call"] = "Conversation.CompactAsync (compaction)",
     };
 
@@ -415,7 +407,7 @@ internal static class LifecycleTests
             Seq([], frames.Snapshot(), "frames");
             Same(docValue, docState.Value, "doc state value");
             Same(viewValue, viewState.Value, "view state value");
-            SameJson("""{"tasks":{}}""", graphState.Value, "graph state value");
+            SameJson("""{"tasks":{}}""", graphState.Value.ToJson(), "graph state value");
             Equal(WatchEnd.SessionClosed, await graphWatch.Closed, "graph watch end");
             Equal(WatchEnd.SessionClosed, await docWatch.Closed, "doc watch end");
             Equal(WatchEnd.SessionClosed, await viewWatch.Closed, "view watch end");
