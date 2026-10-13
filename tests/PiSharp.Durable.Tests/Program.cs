@@ -12,8 +12,11 @@ internal static partial class Program
 
     private static async Task<int> Main(string[] args)
     {
+        // The child process of the crash.* cases (Crash/CrashScenarios.cs); it never runs the case groups.
+        if (args is ["--crash-child", var scenario, var backend, var storagePath, var checkpoint])
+            return await CrashScenarios.RunChildAsync(scenario, backend, storagePath, checkpoint);
         if (args.Length != 0 && (args.Length != 2 || args[0] is not ("--report" or "--only")))
-            throw new ArgumentException("Use [--report <fresh path>] or [--only <case prefix>].");
+            throw new ArgumentException("Use [--report <fresh path>] or [--only <case prefix>] (or --crash-child <scenario> <backend> <storage path> <checkpoint>).");
         var cases = new List<(string Id, Func<Task> Run)>();
         foreach (var method in typeof(Program).GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
             .Where(method => method.Name.EndsWith("Cases", StringComparison.Ordinal) && method.GetParameters().Length == 0 &&
