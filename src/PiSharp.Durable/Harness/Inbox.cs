@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/inbox.ts. Items are stored as upstream's JSON:
 // {id, mode: "steer" | "followUp", content} or {id, mode: "write", entry}, where entry is the write's EntryDraft as plain JSON
-// {kind, model?, data?, head?, edits?} (head an entry ID or "self"). TODO(P10): the inbox views and the harness-inbox tests.
+// {kind, head?, model?, data?, edits?} (head an entry ID or "self"). The conversation view of the inbox is view.ts's.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -132,12 +132,16 @@ public static class Inbox
         }
     }
 
-    /// <summary>An entry draft as the plain JSON an inbox write item stores: <c>{kind, model?, data?, head?, edits?}</c>.</summary>
+    /// <summary>
+    /// An entry draft as the plain JSON an inbox write item stores: <c>{kind, head?, model?, data?, edits?}</c>. Upstream copies the caller's
+    /// object, keeping its key order; this is the order of upstream's own write drafts, a reset (<c>{kind, head, model}</c>) and a compaction
+    /// summary (<c>{kind, head, model, data}</c>).
+    /// </summary>
     internal static JsonObjectValue EntryDraftToJson(EntryDraft draft) => new RecordJson.Writer()
         .Add("kind", draft.Kind)
+        .Add("head", draft.Head is { } head ? head.IsSelf ? JsonValue.String("self") : head.Id!.Value.ToJson() : null)
         .Add("model", draft.Model)
         .Add("data", draft.Data)
-        .Add("head", draft.Head is { } head ? head.IsSelf ? JsonValue.String("self") : head.Id!.Value.ToJson() : null)
         .Add("edits", draft.Edits is { } edits ? JsonValue.Array(edits.Select(edit => (JsonValue)edit.ToJson())) : null)
         .Build();
 

@@ -778,7 +778,8 @@ public interface IConversation
     /// and starts a run; an idle write appends its entry.
     /// </summary>
     Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context);
-    /// <summary>Admits a write of a <c>pi.reset</c> entry that starts a new context. TODO(P10).</summary>
+    /// <summary>Admits a write of a <c>pi.reset</c> entry that starts a new context, carrying <paramref name="handoff"/> as a user message
+    /// when given.</summary>
     Task ResetAsync(string? handoff, DurableContext context);
     /// <summary>Admits a manual compaction task and returns its ID. TODO(P11).</summary>
     Task<TaskId> CompactAsync(string? instructions, DurableContext context);
@@ -864,7 +865,7 @@ public interface IHarness : ISession
     Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context);
     /// <summary>Resolves when the ordinary ownership scope of every ownerless conversation has no live non-background task.</summary>
     Task WaitForIdleAsync(DurableContext context);
-    /// <summary>Session total: every conversation's <c>pi.usage</c> summed. TODO(P10).</summary>
+    /// <summary>Session total: every conversation's <c>pi.usage</c> summed (upstream <c>UsageState</c> JSON).</summary>
     Task<JsonObjectValue> UsageAsync(DurableContext context);
     /// <summary>Every live task with its owner edge, status, and owned conversations (spec §9.5). TODO(P11).</summary>
     Task<AttachedReplicatedState<JsonObjectValue>> TaskGraphAsync(DurableContext context);
