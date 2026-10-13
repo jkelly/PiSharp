@@ -232,7 +232,8 @@
       "lines": 222,
       "pisharp": "src/PiSharp.Durable/Harness/TaskGraph.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "ported",
+      "note": "TaskGraphView (internal: one mount built on the Session line by its first observer and dropped with its last, advanced from commit publications) and the typed TaskGraph, TaskGraphNode and TaskGraphState, whose ToJson() is upstream's {tasks} object keyed by decimal ID in ascending order; frames address that JSON. IHarness.TaskGraphAsync returns an AttachedReplicatedState<TaskGraph>, WatchTaskGraphAsync an IWatchHandle<TaskGraph>. Tests: harness.task-graph.* (memory, jsonl, sqlite), harness.task-graph-differential.* (Fixtures/task-graph.upstream.json from Fixtures/capture-task-graph.mjs, on memory, jsonl and sqlite)"
     },
     {
       "upstream": "packages/durable/src/harness/tool.ts",
@@ -821,65 +822,73 @@
       "upstream": "packages/durable/test/examples/06-harness.ts",
       "blobSha1": "ef672f1537e730d36eb86df6a656151bdc8a05c4",
       "lines": 66,
-      "pisharp": "tests/PiSharp.Durable.Tests/06HarnessCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On a file backend the storage is reopened and the root notes and stored agent read back."
     },
     {
       "upstream": "packages/durable/test/examples/07-configuration.ts",
       "blobSha1": "0e760ed93acca24408103fd4710ce9db762f2c9b",
       "lines": 99,
-      "pisharp": "tests/PiSharp.Durable.Tests/07ConfigurationCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. Live settings are a HarnessSettings subclass overriding Stream; on a file backend the stored agent is read back (checked against upstream's final snapshot under Node)."
     },
     {
       "upstream": "packages/durable/test/examples/08-harness-conversations.ts",
       "blobSha1": "da07f30553381c624fa69d7f1db8fcfbc6cceca8",
       "lines": 42,
-      "pisharp": "tests/PiSharp.Durable.Tests/08HarnessConversationsCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect."
     },
     {
       "upstream": "packages/durable/test/examples/09-context.ts",
       "blobSha1": "8082b8c1ed67588d330b9967daf61617aa6a6e29",
       "lines": 136,
-      "pisharp": "tests/PiSharp.Durable.Tests/09ContextCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect."
     },
     {
       "upstream": "packages/durable/test/examples/10-registry-reload.ts",
       "blobSha1": "bf3bd4c30271cf48b69b0589a0feb392f6483c35",
       "lines": 48,
-      "pisharp": "tests/PiSharp.Durable.Tests/10RegistryReloadCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect."
     },
     {
       "upstream": "packages/durable/test/examples/11-extension-state.ts",
       "blobSha1": "3f41a3cacbbaefe9f3440fd2ffc98645152b9a3d",
       "lines": 86,
-      "pisharp": "tests/PiSharp.Durable.Tests/11ExtensionStateCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. The faux provider is ScriptedModels; on a file backend the todos are read back."
     },
     {
       "upstream": "packages/durable/test/examples/12-tasks.ts",
       "blobSha1": "26865ca97e555015c74b3f4aaa918385a5f91b8e",
       "lines": 64,
-      "pisharp": "tests/PiSharp.Durable.Tests/12TasksCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On a file backend the payment record is read back."
     },
     {
       "upstream": "packages/durable/test/examples/13-recovery.ts",
       "blobSha1": "2b3cc4116a22136ebc5b8d52b7aea649a08fbf75",
       "lines": 90,
-      "pisharp": "tests/PiSharp.Durable.Tests/13RecoveryCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On memory it keeps its storage in a temporary SQLite file, as upstream does; on a file backend it reopens the runner's storage. Upstream closes after tick 2 before that phase's next commit is admitted by microtask order; here the first run's tick hook holds the phase until close cancels it, a deterministic barrier."
     },
     {
       "upstream": "packages/durable/test/examples/14-chat.ts",
@@ -1113,9 +1122,10 @@
       "upstream": "packages/durable/test/harness-inspect.test.ts",
       "blobSha1": "78aa8f20de13813fd7b827e888a1a7947baebad9",
       "lines": 162,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessInspectCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessInspectCases.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "ported",
+      "note": "2 of 2 tests: harness.inspect.* on MemoryStorage, harness.inspect.jsonl.* and harness.inspect.sqlite.* (2 each). Adapted: toEqual on an inspection state compares Kind, Migrates, On and Reason, and error: new Error(m) compares State.Error.Message, as vitest compares an Error by its message"
     },
     {
       "upstream": "packages/durable/test/harness-lifecycle.test.ts",
@@ -1209,9 +1219,10 @@
       "upstream": "packages/durable/test/harness-task-graph.test.ts",
       "blobSha1": "3beb45e0111f2ba0711d48a404f780c36f720738",
       "lines": 358,
-      "pisharp": "tests/PiSharp.Durable.Tests/HarnessTaskGraphCases.cs",
+      "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphCases.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "ported",
+      "note": "5 of 5 tests: harness.task-graph.* on MemoryStorage with the reopen case on a SQLite file as upstream, harness.task-graph.jsonl.* (5, the reopen case reopening a JSONL directory) and harness.task-graph.sqlite.* (4: the reopen case runs in harness.task-graph.*). Adapted: a TaskGraph is a typed class (toEqual compares ToJson(), toBe is ReferenceEquals); flush() is a Session line barrier; the watch listener's replay expect is collected and asserted by the test body; statuses() is a sorted list of \"kind#id status\""
     },
     {
       "upstream": "packages/durable/test/harness-tasks-recovery.test.ts",
@@ -1363,7 +1374,8 @@
       "lines": 380,
       "pisharp": "tests/PiSharp.Durable.Tests/SpecUsageCases.cs",
       "phase": "P11",
-      "status": "planned"
+      "status": "ported",
+      "note": "1 of 1 test: harness.spec-usage.compiles-the-specs-usage-examples. The spec's usage examples written against the ported API in SpecUsage.Examples(), which compiles and is never called; the names the spec leaves to the application are SpecNames members that throw. Adapted: expectTypeOf's return-type check is a reflection check; an onYield hook returns the continuing input itself (GenerationHooks.OnYield); HarnessSettings getters are overridden properties; `delete live.generation` is DraftObject.Delete"
     },
     {
       "upstream": "packages/durable/test/sqlite-cloudflare.test.ts",

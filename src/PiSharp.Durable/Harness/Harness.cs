@@ -62,6 +62,7 @@ internal sealed class DurableHarness : Session, IHarness
     private readonly DurableTaskScheduler scheduler;
     private readonly Submissions submissions;
     private readonly ConversationViews views;
+    private readonly TaskGraphView taskGraph;
     private volatile bool closed;
 
     public DurableHarness(IStorage storage, HarnessOptions options, DurableContext context)
@@ -94,6 +95,7 @@ internal sealed class DurableHarness : Session, IHarness
         });
         submissions = new Submissions(this, storage, Now, () => Agents.ResolveSettings(options.Settings), () => scheduler.Resume());
         views = new ConversationViews(this, storage);
+        taskGraph = new TaskGraphView(this, storage);
     }
 
     /// <summary>The Harness clock.</summary>
@@ -188,13 +190,9 @@ internal sealed class DurableHarness : Session, IHarness
         return total;
     }
 
-    /// <summary>TODO(P11): the task graph.</summary>
-    public Task<AttachedReplicatedState<JsonObjectValue>> TaskGraphAsync(DurableContext context) =>
-        Task.FromException<AttachedReplicatedState<JsonObjectValue>>(Harness.NotPorted("Harness.TaskGraphAsync", "P11"));
+    public Task<AttachedReplicatedState<TaskGraph>> TaskGraphAsync(DurableContext context) => taskGraph.StateAsync(context);
 
-    /// <summary>TODO(P11): the task graph.</summary>
-    public Task<IWatchHandle<JsonObjectValue>> WatchTaskGraphAsync(DurableContext context) =>
-        Task.FromException<IWatchHandle<JsonObjectValue>>(Harness.NotPorted("Harness.WatchTaskGraphAsync", "P11"));
+    public Task<IWatchHandle<TaskGraph>> WatchTaskGraphAsync(DurableContext context) => taskGraph.WatchAsync(context);
 
     public Task<IConversation> RootAsync(DurableContext context, AgentChange? agent = null, ConversationInit? init = null) =>
         CreateAsync(CreateTarget.Root, agent, init, context);
