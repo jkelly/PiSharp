@@ -47,6 +47,13 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
+      "pisharp.agent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.AI": "[1.1.0.6, )",
+          "PiSharp.Contracts": "[1.1.0.6, )"
+        }
+      },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
@@ -72,6 +79,20 @@
           "SQLitePCLRaw.core": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.lib.e_sqlite3": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.provider.e_sqlite3": "[2.1.12, 2.1.12]"
+        }
+      },
+      "pisharp.durable.tools": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Durable": "[1.1.0.6, )",
+          "PiSharp.Tools": "[1.1.0.6, )"
+        }
+      },
+      "pisharp.tools": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.1.0.6, )",
+          "PiSharp.Contracts": "[1.1.0.6, )"
         }
       }
     }

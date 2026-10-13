@@ -1,12 +1,15 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/node.ts (the FileSystem half of NodeExecutionEnv: path
-// resolution, error mapping, the binary and directory readers and every file operation). The Shell half, watches and text-line readers
-// join as LocalExecutionEnv in the Durable tools project (P9), which builds on this class.
+// resolution, error mapping, the text-line, binary and directory readers, line scans, watches, temporary files and every file operation;
+// the watcher itself is LocalFileWatcher, node-watch.ts). The Shell half is LocalExecutionEnv in the durable tools project, which builds on
+// this class.
 //
 // This folder is the local runtime side of the storage boundary (upstream env/node.ts): it alone in PiSharp.Durable/Env uses System.IO.
 // Every handle is opened with FileShare.ReadWrite | FileShare.Delete and closed before the operation returns, so on Windows a file can be
 // renamed over, truncated or removed while another operation (or an open binary reader) has it open, as on POSIX. Flushes call
 // FileStream.Flush(true): FlushFileBuffers on Windows, fsync on Unix. Renames replace the destination (MoveFileEx with
-// MOVEFILE_REPLACE_EXISTING on Windows, rename(2) on Unix); transient sharing violations on Windows are retried briefly.
+// MOVEFILE_REPLACE_EXISTING on Windows, rename(2) on Unix); transient sharing violations on Windows are retried briefly. Upstream opens a
+// binary reader with O_NONBLOCK (and O_NOFOLLOW) so a FIFO is refused without waiting for a writer; .NET has no non-blocking open, so the
+// file's type (NativeFiles) is checked before opening, which is not race-free, as upstream's own Windows check is not.
 using System.Collections.Immutable;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
@@ -18,11 +21,21 @@ namespace PiSharp.Durable.Env.Local;
 public class LocalFileSystem : IFileSystem
 {
     private const int BinaryReadChunk = 1024 * 1024;
+    /// <summary>Chunk size of text-line reads and line scans.</summary>
+    private const int TextReadChunk = 64 * 1024;
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+    private readonly LocalWatchOptions watchOptions;
     private string cwd;
 
     /// <summary>A file system whose relative paths resolve against <paramref name="cwd"/>.</summary>
-    public LocalFileSystem(string cwd) { this.cwd = Path.GetFullPath(cwd ?? throw new ArgumentNullException(nameof(cwd))); }
+    public LocalFileSystem(string cwd) : this(cwd, null) { }
+
+    /// <summary>A file system whose relative paths resolve against <paramref name="cwd"/>, watching as <paramref name="watch"/> says.</summary>
+    public LocalFileSystem(string cwd, LocalWatchOptions? watch)
+    {
+        this.cwd = Path.GetFullPath(cwd ?? throw new ArgumentNullException(nameof(cwd)));
+        watchOptions = watch ?? new LocalWatchOptions();
+    }
 
     /// <inheritdoc/>
     /// <remarks>Every local file system sees the same files.</remarks>
@@ -50,6 +63,46 @@ public class LocalFileSystem : IFileSystem
     });
 
     /// <inheritdoc/>
+    public virtual Task<Result<ITextLineReader, FileError>> OpenTextLineReaderAsync(string path, DurableContext context) =>
+        Run<ITextLineReader>(path, context, resolved =>
+        {
+            if (Directory.Exists(resolved)) return new FileError(FileErrorCode.IsDirectory, "EISDIR: illegal operation on a directory, read", resolved);
+            var handle = File.OpenHandle(resolved, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            if (context.IsCancellationRequested)
+            {
+                handle.Dispose();
+                return Aborted(resolved);
+            }
+            return Result.Ok<ITextLineReader, FileError>(new LocalTextLineReader(this, handle, resolved));
+        });
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<ImmutableArray<string>, FileError>> ReadTextLinesAsync(string path, ReadTextLinesOptions? options, DurableContext context)
+    {
+        if (options?.MaxLines is <= 0) return ImmutableArray<string>.Empty;
+        var opened = await OpenTextLineReaderAsync(path, context).ConfigureAwait(false);
+        if (!opened.IsOk) return opened.Error;
+        var lines = ImmutableArray.CreateBuilder<string>();
+        try
+        {
+            while (options?.MaxLines is not { } max || lines.Count < max)
+            {
+                var line = await opened.Value.ReadLineAsync(context).ConfigureAwait(false);
+                if (!line.IsOk) return line.Error;
+                if (line.Value is null) break;
+                lines.Add(line.Value.Text);
+            }
+            return lines.ToImmutable();
+        }
+        finally { await opened.Value.CloseAsync(context).ConfigureAwait(false); }
+    }
+
+    /// <summary>Reads up to <paramref name="buffer"/>'s length at <paramref name="offset"/> for a text-line reader (a seam for tests that
+    /// hold a read while it is pending, as upstream's spy on FileHandle.read does).</summary>
+    internal virtual ValueTask<int> ReadTextChunkAsync(SafeFileHandle handle, Memory<byte> buffer, long offset) =>
+        RandomAccess.ReadAsync(handle, buffer, offset);
+
+    /// <inheritdoc/>
     public virtual Task<Result<byte[], FileError>> ReadBinaryFileAsync(string path, DurableContext context) =>
         Run<byte[]>(path, context, resolved => After(context, resolved, ReadAll(resolved)));
 
@@ -60,6 +113,9 @@ public class LocalFileSystem : IFileSystem
             // There is no portable O_NOFOLLOW; check the final component before opening (not race-free, as upstream on Windows).
             if (options?.NoFollow == true && IsLink(resolved)) return SymlinkRefused(resolved);
             if (Directory.Exists(resolved)) return new FileError(FileErrorCode.IsDirectory, "EISDIR: illegal operation on a directory, read", resolved);
+            // Opening a FIFO would wait for a writer; refuse what is not a regular file before opening it (Windows has no FIFOs).
+            if (!OperatingSystem.IsWindows() && NativeFiles.TryGet(resolved, follow: true) is { Type: NativeFileType.Other })
+                return new FileError(FileErrorCode.Invalid, "Not a regular file", resolved);
             var handle = File.OpenHandle(resolved, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             if (context.IsCancellationRequested)
             {
@@ -119,10 +175,14 @@ public class LocalFileSystem : IFileSystem
         Retry(() =>
         {
             using var stream = new FileStream(resolved, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 1);
-            stream.Flush(flushToDisk: true);
+            SyncFile(stream);
         });
         return After(context, resolved, Unit.Value);
     });
+
+    /// <summary>Flushes an opened file's contents and metadata to the storage device (upstream <c>FileHandle.sync</c>; a seam for tests that
+    /// observe or fail the sync, as upstream's spy does).</summary>
+    internal virtual void SyncFile(FileStream stream) => stream.Flush(flushToDisk: true);
 
     /// <inheritdoc/>
     public virtual Task<Result<Unit, FileError>> RenameFileAsync(string sourcePath, string destinationPath, DurableContext context)
@@ -233,6 +293,53 @@ public class LocalFileSystem : IFileSystem
             }
             return Unit.Value;
         });
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<IFileWatcher, FileError>> WatchAsync(IReadOnlyList<WatchTarget> targets, Action<WatchChange> onChange,
+        DurableContext context)
+    {
+        ArgumentNullException.ThrowIfNull(targets);
+        ArgumentNullException.ThrowIfNull(onChange);
+        if (context.IsCancellationRequested) return Aborted(null);
+        try
+        {
+            var watcher = await LocalFileWatcher.OpenAsync(targets, ResolvePath, onChange, watchOptions).ConfigureAwait(false);
+            if (context.IsCancellationRequested)
+            {
+                await watcher.CloseAsync(context).ConfigureAwait(false);
+                return Aborted(null);
+            }
+            return watcher;
+        }
+        catch (Exception error) { return ToFileError(error, null); }
+    }
+
+    /// <inheritdoc/>
+    public virtual Task<Result<string, FileError>> CreateTempDirAsync(string? prefix, DurableContext context)
+    {
+        if (context.IsCancellationRequested) return Task.FromResult<Result<string, FileError>>(Aborted(null));
+        // mkdtemp: the prefix followed by random characters, in the operating system's temporary directory.
+        try { return Task.FromResult<Result<string, FileError>>(Directory.CreateTempSubdirectory(prefix ?? "tmp-").FullName); }
+        catch (Exception error) { return Task.FromResult<Result<string, FileError>>(ToFileError(error, null)); }
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task<Result<string, FileError>> CreateTempFileAsync(TempFileOptions? options, DurableContext context)
+    {
+        var directory = await CreateTempDirAsync("tmp-", context).ConfigureAwait(false);
+        if (!directory.IsOk) return directory.Error;
+        var file = Path.Join(directory.Value, $"{options?.Prefix}{Guid.NewGuid():D}{options?.Suffix}");
+        try
+        {
+            using (new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 1)) { }
+            return file;
+        }
+        catch (Exception error) { return ToFileError(error, file); }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>The file system holds nothing between calls; <see cref="IFileWatcher"/>s are closed by their owners.</remarks>
+    public virtual Task CleanupAsync(DurableContext context) => Task.CompletedTask;
 
     /// <summary>Resolves <paramref name="path"/> like upstream <c>resolvePath</c>: <c>~</c> and <c>~/</c> name the home directory, a
     /// <c>file://</c> URL its local path, and relative paths resolve against <see cref="Cwd"/>.</summary>
@@ -450,6 +557,28 @@ public class LocalFileSystem : IFileSystem
             catch (Exception error) { return Task.FromResult<Result<byte[], FileError>>(ToFileError(error, path)); }
         }
 
+        public async Task<Result<LineScan, FileError>> ScanLinesAsync(long startLine, long? endLine, DurableContext context)
+        {
+            if (context.IsCancellationRequested) return Aborted(path);
+            if (closed) return Closed();
+            LineScanner scanner;
+            try { scanner = new LineScanner(startLine, endLine); }
+            catch (ArgumentOutOfRangeException) { return new FileError(FileErrorCode.Invalid, "Invalid line range", path); }
+            var chunk = new byte[TextReadChunk];
+            try
+            {
+                for (var position = 0L; ;)
+                {
+                    var read = await RandomAccess.ReadAsync(handle, chunk, position).ConfigureAwait(false);
+                    if (context.IsCancellationRequested) return Aborted(path);
+                    if (read == 0) return scanner.Finish();
+                    scanner.Push(chunk.AsSpan(0, read));
+                    position += read;
+                }
+            }
+            catch (Exception error) { return ToFileError(error, path); }
+        }
+
         public Task CloseAsync(DurableContext context)
         {
             if (!closed)
@@ -461,6 +590,83 @@ public class LocalFileSystem : IFileSystem
         }
 
         private FileError Closed() => new(FileErrorCode.Invalid, "Binary reader is closed", path);
+    }
+
+    /// <summary>Strict LF reader (upstream <c>NodeTextLineReader</c>): it reports whether its final line was newline-terminated.</summary>
+    private sealed class LocalTextLineReader(LocalFileSystem owner, SafeFileHandle handle, string path) : ITextLineReader
+    {
+        private readonly StreamDecoder decoder = new();
+        private readonly byte[] chunk = new byte[TextReadChunk];
+        /// <summary>Decoded text not yet returned starts at <see cref="start"/>; pieces of a long line wait in <see cref="pending"/>.</summary>
+        private string buffered = "";
+        private int start;
+        private readonly StringBuilder pending = new();
+        private long byteOffset;
+        private bool ended, closed;
+
+        public async Task<Result<TextLine?, FileError>> ReadLineAsync(DurableContext context)
+        {
+            if (context.IsCancellationRequested) return Aborted(path);
+            if (closed) return new FileError(FileErrorCode.Invalid, "Text line reader is closed", path);
+            try
+            {
+                while (true)
+                {
+                    var newline = buffered.IndexOf('\n', start);
+                    if (newline != -1)
+                    {
+                        var text = Take(newline);
+                        start = newline + 1;
+                        return new TextLine(text, Terminated: true);
+                    }
+                    if (ended)
+                    {
+                        var text = Take(buffered.Length);
+                        buffered = "";
+                        start = 0;
+                        if (text.Length == 0) return Result.Ok<TextLine?, FileError>(null);
+                        return new TextLine(text, Terminated: false);
+                    }
+                    // Explicit positions allow an aborted read to be retried without skipping bytes.
+                    var read = await owner.ReadTextChunkAsync(handle, chunk, byteOffset).ConfigureAwait(false);
+                    if (context.IsCancellationRequested) return Aborted(path);
+                    byteOffset += read;
+                    // The rest of the buffer belongs to a line that continues in the new text.
+                    pending.Append(buffered, start, buffered.Length - start);
+                    start = 0;
+                    if (read == 0)
+                    {
+                        buffered = decoder.Finish();
+                        ended = true;
+                    }
+                    else buffered = decoder.Decode(chunk.AsSpan(0, read));
+                }
+            }
+            catch (Exception error) { return ToFileError(error, path); }
+        }
+
+        /// <summary>The pending start of the line plus the buffer from <see cref="start"/> to <paramref name="end"/>.</summary>
+        private string Take(int end)
+        {
+            if (pending.Length == 0) return buffered[start..end];
+            pending.Append(buffered, start, end - start);
+            var text = pending.ToString();
+            pending.Clear();
+            return text;
+        }
+
+        public Task CloseAsync(DurableContext context)
+        {
+            if (!closed)
+            {
+                closed = true;
+                buffered = "";
+                pending.Clear();
+                // Closing is best-effort, including after cancellation or an earlier I/O failure.
+                handle.Dispose();
+            }
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class LocalDirReader(IEnumerator<string> entries, string path) : IDirReader

@@ -2,6 +2,9 @@
   <ItemGroup>
     <!-- The SkiaSharp image codec shares the RGBA raster, Lanczos3 resampling and EXIF orientation. -->
     <InternalsVisibleTo Include="PiSharp.Tools.Skia" />
+    <!-- Branch feature/pi-durable (decision 0005): the durable execution environment reuses the Windows job-object process lifetime and
+         the spawn preflight. Branch-only seam; flag for removal if the durable port does not merge. -->
+    <InternalsVisibleTo Include="PiSharp.Durable.Tools" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Agent/PiSharp.Agent.csproj" />

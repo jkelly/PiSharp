@@ -10107,8 +10107,8 @@
       "originalSha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9"
     },
     {
-      "currentSha256": "a5e41949a090592bf4fb3f77d2ffdcddb30a91a711b48d5329176173ff323ee7",
-      "currentBytes": 418,
+      "currentSha256": "eb1d3c1452f773691f41f6d61acdf329298cd38bbdf449efbf5d1872ecdbde40",
+      "currentBytes": 719,
       "originalBytes": 228,
       "path": "src/PiSharp.Tools/PiSharp.Tools.csproj",
       "originalSha256": "581d93dae091cda562cb6e90da12ddaf17c0045012415c1c452b5b101f152f2a"
