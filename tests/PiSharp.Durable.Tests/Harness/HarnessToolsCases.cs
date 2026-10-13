@@ -407,7 +407,9 @@ internal static class ToolsTests
             {
                 BeforeTool = async (call, _, _) =>
                 {
-                    await Sleep(100);
+                    // Upstream sleeps 100 ms here and bounds durationMs below 100. A loaded macOS runner measured a 30 ms execute at 138 ms, so
+                    // the hook delay and the bound are scaled together: a duration that included the hook would still be at least the bound.
+                    await Sleep(1000);
                     return S(call["id"]) == "blocked" ? new BeforeToolDecision(Block: "no") : null;
                 },
             });
@@ -416,7 +418,7 @@ internal static class ToolsTests
             foreach (var id in new[] { "slow", "thrower" })
             {
                 var duration = N(byId[id]["durationMs"]);
-                Check(duration >= 25 && duration < 100, $"{id} durationMs {duration}");
+                Check(duration >= 25 && duration < 1000, $"{id} durationMs {duration}");
             }
             Check(IsError(byId["thrower"]), "thrower isError");
             Check(!byId["blocked"].ContainsKey("durationMs"), "blocked has no durationMs");
