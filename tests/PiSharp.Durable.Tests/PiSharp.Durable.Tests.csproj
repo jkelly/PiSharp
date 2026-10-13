@@ -8,6 +8,8 @@
     <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
     <ProjectReference Include="../../samples/Durable.Examples/Durable.Examples.csproj" />
+    <!-- P13: the benchmark ports, run at a tiny size by the benchmarks.smoke case (BenchmarksCases.cs). -->
+    <ProjectReference Include="../../benchmarks/PiSharp.Durable.Benchmarks/PiSharp.Durable.Benchmarks.csproj" />
     <!-- M2: the Durable.Chat tools path, offline against recorded SSE (M2Cases.cs). -->
     <ProjectReference Include="../../samples/Durable.Chat/Durable.Chat.csproj" />
     <!-- Differential cases only: PiSharp.Durable's pi-ai utility ports are compared with PiSharp.CodingAgent's ports of the same functions. -->

@@ -178,6 +178,9 @@
   <Folder Name="/samples/Durable.Chat/">
     <Project Path="samples/Durable.Chat/Durable.Chat.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/PiSharp.Durable.Benchmarks/">
+    <Project Path="benchmarks/PiSharp.Durable.Benchmarks/PiSharp.Durable.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/samples/Durable.Examples/">
     <Project Path="samples/Durable.Examples/Durable.Examples.csproj" />
   </Folder>
