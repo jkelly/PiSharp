@@ -10,13 +10,9 @@
 // - Deferreds are TaskCompletionSource barriers whose waiters continue asynchronously, as a promise's then-callbacks do.
 // - aborted(signal) is Aborted(token): it rejects with OperationCanceledException (upstream's AbortError) once the runtime signal aborts.
 // - Handlers may run on different thread-pool threads at once, so lists they append to are SyncList.
-// - createModels() is EmptyDurableModels; FakeDurableModels serves scripted responses for later phases.
+// - createModels() is EmptyDurableModels; pi-ai's faux provider is FauxModels in ChatSupport.cs.
 // - vi.useFakeTimers is ManualTimeProvider passed as HarnessOptions.TimeProvider (with Now reading it); it counts live timers as
 //   vi.getTimerCount() does.
-using System.Collections.Concurrent;
-using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
-using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static Program;
@@ -364,60 +360,4 @@ internal sealed class ManualTimeProvider(DateTimeOffset start) : TimeProvider
             return ValueTask.CompletedTask;
         }
     }
-}
-
-/// <summary>
-/// Scripted model access for tests (pi-ai's faux provider, reduced): registered models, and responses served in order. Each response
-/// is a function from the request messages to the stream events to emit; the last event should be terminal.
-/// </summary>
-internal sealed class FakeDurableModels : IDurableModels
-{
-    private readonly ConcurrentDictionary<(string, string), DurableModel> catalog = new();
-    private readonly ConcurrentQueue<Func<ImmutableArray<JsonValue>, IReadOnlyList<StreamEvent>>> responses = new();
-
-    /// <summary>Requests seen, in order.</summary>
-    public SyncList<ImmutableArray<JsonValue>> Requests { get; } = new();
-
-    public FakeDurableModels Add(DurableModel model)
-    {
-        catalog[(model.Provider, model.Id)] = model;
-        return this;
-    }
-
-    public FakeDurableModels Respond(Func<ImmutableArray<JsonValue>, IReadOnlyList<StreamEvent>> response)
-    {
-        responses.Enqueue(response);
-        return this;
-    }
-
-    public DurableModel? GetModel(string provider, string modelId) => catalog.GetValueOrDefault((provider, modelId));
-
-    public async IAsyncEnumerable<StreamEvent> StreamSimple(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        Requests.Add(messages);
-        if (!responses.TryDequeue(out var response)) throw new InvalidOperationException("No scripted response left");
-        foreach (var item in response(messages))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await Task.Yield();
-            yield return item;
-        }
-    }
-
-    public async Task<AssistantMessage> CompleteSimpleAsync(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
-        CancellationToken cancellationToken)
-    {
-        StreamTerminalEvent? terminal = null;
-        await foreach (var item in StreamSimple(model, messages, options, cancellationToken)) if (item is StreamTerminalEvent end) terminal = end;
-        return terminal?.Message ?? throw new InvalidOperationException("The scripted response has no terminal event");
-    }
-
-    public IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
-        throw new NotSupportedException("Deferred responses are not scripted");
-
-    public Task<AssistantMessage> FetchDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) =>
-        Task.FromException<AssistantMessage>(new NotSupportedException("Deferred responses are not scripted"));
-
-    public Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken) => Task.CompletedTask;
 }

@@ -1173,7 +1173,7 @@
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessSupport.cs",
       "phase": "P11",
       "status": "ported",
-      "note": "HarnessTests: Tool, OpenHarness, User/Assistant/ToolResult/SystemMessage (wire JSON), DescribeMessage, Installed, AddTool/AddTask/AddHooks/AddSection; also FakeDurableModels (scripted responses) and ManualTimeProvider (vi.useFakeTimers and getTimerCount)"
+      "note": "HarnessTests: Tool, OpenHarness, User/Assistant/ToolResult/SystemMessage (wire JSON), DescribeMessage, Installed, AddTool/AddTask/AddHooks/AddSection; also ManualTimeProvider (vi.useFakeTimers and getTimerCount)"
     },
     {
       "upstream": "packages/durable/test/harness-task-graph.test.ts",
