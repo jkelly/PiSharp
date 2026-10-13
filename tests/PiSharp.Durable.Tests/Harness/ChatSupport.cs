@@ -76,10 +76,11 @@ internal static class ChatTests
     /// <summary>Opens a Harness over <paramref name="storage"/> and returns its root, configured with the faux model on first creation
     /// (upstream <c>openChat</c>).</summary>
     internal static async Task<OpenedChat> OpenChat(IStorage storage, ChatSetup setup,
-        Func<EnvTarget, DurableContext, Task<PiSharp.Durable.Env.IExecutionEnv?>>? env = null)
+        Func<EnvTarget, DurableContext, Task<PiSharp.Durable.Env.IExecutionEnv?>>? env = null, TimeProvider? timeProvider = null)
     {
         var harness = await Harness.OpenAsync(storage, new HarnessOptions
         {
+            TimeProvider = timeProvider,
             Models = setup.Models,
             Registry = setup.Registry,
             Settings = setup.Settings,

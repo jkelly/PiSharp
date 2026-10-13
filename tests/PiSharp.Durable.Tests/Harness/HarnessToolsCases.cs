@@ -1091,7 +1091,9 @@ internal static class ToolsTests
                 return new ToolExecutionResult();
             }));
             setup.Faux.SetResponses(Calls(("slow", Obj(), "c1")), Done);
-            var (harness, root) = await OpenChat(fresh(), setup);
+            // Upstream relies on the abort landing within the output throttle window. A loaded macOS runner let that window pass first and
+            // committed "buffered"; a manual clock that never advances keeps the second output buffered until the abort discards it.
+            var (harness, root) = await OpenChat(fresh(), setup, timeProvider: new ManualTimeProvider());
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             await buffered.Task;
             var live = await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context);
