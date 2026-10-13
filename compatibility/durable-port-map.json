@@ -962,9 +962,10 @@
       "upstream": "packages/durable/test/examples/22-subagent-foreground.ts",
       "blobSha1": "060ded2db22ec03f7386124e18d7d34b6b9717d4",
       "lines": 136,
-      "pisharp": "tests/PiSharp.Durable.Tests/22SubagentForegroundCases.cs",
+      "pisharp": "samples/Durable.Examples/ExamplesSubagent.cs",
       "phase": "P13",
-      "status": "planned"
+      "status": "ported",
+      "note": "Ported in P12: samples/Durable.Examples 22-subagent-foreground with ScriptedModels in place of the faux provider, on memory, JSONL and SQLite with reopen (the child conversation and both transcripts read back); two held replies keep Node's order of the UI attaching to the child and printing its answer first; examples.* pins upstream's Node output"
     },
     {
       "upstream": "packages/durable/test/examples/23-subagent-background.ts",
@@ -1504,7 +1505,8 @@
       "lines": 123,
       "pisharp": "src/PiSharp.Cli/Durable/DurableHarnessSetup.cs",
       "phase": "P12",
-      "status": "planned"
+      "status": "ported",
+      "note": "configureHarnessHttp (global httpProxy into HTTP_PROXY/HTTPS_PROXY, httpIdleTimeoutMs on the live routes' handlers via PiHttpIdleTimeout), createHarnessSettings (PiHarnessSettings over PiSettings' merged layers, read at every access: settings-manager.ts getProviderRetrySettings, getHttpIdleTimeoutMs, getCompactionSettings, getRetrySettings, getSteeringMode, getFollowUpMode), createCodingRegistry (the durable CodingTools of PiSharp.Durable.Tools, as upstream installs pi-durable's CodingTools, plus DurablePrompt), ExecutionEnvs (one LocalExecutionEnv per cwd) and findInitialAgentModel (ModelResolver.ResolveCliModel / FindInitialModel). Tests: runtime.settings.*, runtime.open.*"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/main.ts",
@@ -1512,7 +1514,8 @@
       "lines": 20,
       "pisharp": "src/PiSharp.Cli/Durable/DurableMain.cs",
       "phase": "P12",
-      "status": "planned"
+      "status": "ported",
+      "note": "parseArgs (--continue/-c, else \"Unknown argument: X\"), open, run DurableTui, close. Intentional difference (decision 0005): it runs as the hidden subcommand `pisharp durable`, dispatched in src/PiSharp.Cli/Pi/PiCommand.cs RunCoreAsync before `mcp`, and prints a one-line experimental notice to stderr; upstream runs main.ts from source. Tests: runtime.dispatch.*"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/prompt.ts",
@@ -1520,7 +1523,8 @@
       "lines": 74,
       "pisharp": "src/PiSharp.Cli/Durable/DurablePrompt.cs",
       "phase": "P12",
-      "status": "planned"
+      "status": "ported",
+      "note": "createPiPrompt: the sections preamble, tools, rules, docs, project_context, skills and cwd of OriginalSystemPromptBuilder (the port of core/system-prompt.ts buildSystemPromptSections) for the request's tools, with the read/bash/edit/write contributions (BuiltinToolPrompts), PiResources.LoadProjectContextFiles and SkillDiscovery (loadSkills with defaults and the settings' skill paths), loaded once per cwd and built once per request. Tests: runtime.prompt.*"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/runtime.ts",
@@ -1528,7 +1532,8 @@
       "lines": 367,
       "pisharp": "src/PiSharp.Cli/Durable/DurableRuntime.cs",
       "phase": "P12",
-      "status": "planned"
+      "status": "ported",
+      "note": "openDurable as DurableRuntime.OpenAsync returning DurableSession (IOpenDurable, IDurableViewSource, IDurableController): the view mirrors the shown conversation's viewState plus conversations (commit listener), models (DurableModels.GetAvailableSnapshot), notices (last 20) and the task graph while the panel is open; the controller queues submit, compact (with upstream's outcome notices), cycleThinking, setModel, toggleTasks and switchConversation, and runs abort unqueued; agentOf, firstInput and titleOf; DisposeAsync closes the Harness, the environments and the model connections and releases the lock. Model access is src/PiSharp.Cli/Durable/DurableModels.cs (model-runtime.ts over ModelRegistry with NativeDurableModels' HostTransport hook on the CLI's live routes). Listeners run on the thread pool after a burst of changes (upstream: setImmediate). Tests: runtime.* including runtime.kill-resume (M3)"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/sessions.ts",
@@ -1536,7 +1541,8 @@
       "lines": 56,
       "pisharp": "src/PiSharp.Cli/Durable/DurableSessions.cs",
       "phase": "P12",
-      "status": "planned"
+      "status": "ported",
+      "note": "selectSession: <agentDir>/experimental/durable-sessions/<sha256(realpath cwd) hex[..24]>/<13-digit ms>-<uuid>/session.sqlite, --continue picks the newest matching directory, and the proper-lockfile lock (<dir>.lock, realpath false, 12 retries 1 s apart, stale 10 s, mtime renewed every 5 s) through src/PiSharp.Cli/Pi/PiLockfile.cs, the shared port PiSettings and InteractiveSettings now take their lock step from. realpath is Node's uv_fs_realpath (GetFinalPathNameByHandleW on Windows, realpath(3) elsewhere). Verified against the pinned sessions.ts under Node: both compute the same root for the same cwd, and each continues the other's newest session. A compromised lock becomes a callback instead of proper-lockfile's default throw. Tests: sessions.* (layout, realpath, newest, none, contention, retries, stale takeover, renewal, compromise, cross-process)"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/subagent.ts",
@@ -1544,7 +1550,8 @@
       "lines": 55,
       "pisharp": "src/PiSharp.Cli/Durable/DurableSubagent.cs",
       "phase": "P12",
-      "status": "planned"
+      "status": "ported",
+      "note": "The foreground subagent tool: a child conversation owned by the call's task (configured without this extension), request id subagent:<taskId>, replay safe, details {conversationId}. Tests: runtime.subagent.*"
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/tui.ts",

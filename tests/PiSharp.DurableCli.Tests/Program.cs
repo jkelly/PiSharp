@@ -12,6 +12,10 @@ internal static partial class Program
 
     private static async Task<int> Main(string[] args)
     {
+        // The child processes of the runtime.kill-resume, runtime.e2e.tui-kill-and-continue and sessions.lock.cross-process cases.
+        if (args is ["--durable-runtime-child", var root]) return await RunRuntimeChildAsync(root);
+        if (args is ["--durable-lock-child", var agentDir, var cwd]) return await RunLockChildAsync(agentDir, cwd);
+        if (args is ["--durable-tui-child", var tuiRoot]) return await RunTuiChildAsync(tuiRoot);
         if (args.Length != 0 && (args.Length != 2 || args[0] is not ("--report" or "--only")))
             throw new ArgumentException("Use [--report <fresh path>] or [--only <case prefix>].");
         var cases = new List<(string Id, Func<Task> Run)>();
