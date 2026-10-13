@@ -39,7 +39,7 @@ public class LocalFileSystem : IFileSystem
 
     /// <inheritdoc/>
     /// <remarks>Every local file system sees the same files.</remarks>
-    public string Id => "local";
+    public virtual string Id => "local";
 
     /// <inheritdoc/>
     public string Cwd { get => cwd; set => cwd = Path.GetFullPath(value ?? throw new ArgumentNullException(nameof(value))); }
