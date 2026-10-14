@@ -58,6 +58,24 @@ internal static partial class Program
             Equal(320, entries, "every holder ran");
             Equal(1, maximum, "never two holders at once");
         }),
+        // A <file>.lock beyond MAX_PATH: the native mkdir gets the extended-length form on Windows, as the managed file APIs around it do.
+        ("lockfile.a-lock-path-longer-than-max-path-is-acquired", Sync(() =>
+        {
+            using var sandbox = new Sandbox("lockfile-long");
+            var directory = sandbox.Root;
+            while (directory.Length < 300) directory = Path.Combine(directory, new string('d', 40));
+            Directory.CreateDirectory(directory);
+            var file = Path.Combine(directory, "settings.json");
+            var ran = false;
+            PiLockfile.WithLock(file, () => ran = Directory.Exists(PiLockfile.LockPath(file)));
+            Check(ran && !Directory.Exists(PiLockfile.LockPath(file)), $"held and released a {PiLockfile.LockPath(file).Length}-character lock path");
+            if (OperatingSystem.IsWindows())
+            {
+                Equal(@"\\?\C:\a\b.lock", PiLockfile.ExtendedLengthPath(@"C:\a\b.lock"), "drive path");
+                Equal(@"\\?\UNC\server\share\b.lock", PiLockfile.ExtendedLengthPath(@"\\server\share\b.lock"), "UNC path");
+                Equal(@"\\?\C:\a\b.lock", PiLockfile.ExtendedLengthPath(@"\\?\C:\a\b.lock"), "already extended");
+            }
+        })),
         // Upstream's lockSync gives up after ten attempts 20 ms apart, so a writer may fail with ELOCKED under heavy contention; what the
         // exclusive lock guarantees is that no write that returned is lost to an overlapping read-modify-write.
         ("lockfile.concurrent-trust-writes-lose-no-completed-write", async () =>

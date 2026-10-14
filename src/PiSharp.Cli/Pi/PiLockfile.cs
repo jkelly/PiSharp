@@ -44,12 +44,18 @@ internal static class PiLockfile
     internal static void WithLock(string file, Action run, int attempts = 10, TimeSpan? delay = null, TimeSpan? stale = null)
     {
         var lockPath = LockPath(file);
+        Exception? failure = null;
         for (var attempt = 1; ; attempt++)
         {
-            // A transient failure (Windows refuses a mkdir over a directory pending deletion) is a failed attempt, as the lock being held.
-            try { if (TryAcquire(lockPath, stale ?? TimeSpan.FromSeconds(10))) break; }
-            catch (Exception error) when (error is (IOException and not DirectoryNotFoundException) or UnauthorizedAccessException) { }
-            if (attempt >= attempts) throw new IOException("Lock file is already being held");
+            // A transient failure (Windows refuses a mkdir over a directory pending deletion) is a failed attempt, as the lock being held;
+            // when the last attempt failed with an error rather than finding the lock held, that error is what the caller sees.
+            try { if (TryAcquire(lockPath, stale ?? TimeSpan.FromSeconds(10))) break; failure = null; }
+            catch (Exception error) when (error is (IOException and not DirectoryNotFoundException) or UnauthorizedAccessException) { failure = error; }
+            if (attempt >= attempts)
+            {
+                if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+                throw new IOException("Lock file is already being held");
+            }
             Thread.Sleep(delay ?? TimeSpan.FromMilliseconds(20));
         }
         try { run(); }
@@ -62,7 +68,9 @@ internal static class PiLockfile
     {
         if (OperatingSystem.IsWindows())
         {
-            if (CreateDirectoryW(path, IntPtr.Zero)) return true;
+            // The extended-length form: managed file APIs add it for long paths, but a direct CreateDirectoryW is limited to MAX_PATH
+            // unless the process opts in, so a deep agent or project directory would otherwise never get its lock.
+            if (CreateDirectoryW(ExtendedLengthPath(path), IntPtr.Zero)) return true;
             var error = Marshal.GetLastPInvokeError();
             // ERROR_ALREADY_EXISTS, and ERROR_ACCESS_DENIED for a name that exists but cannot be created over (Node maps both to EEXIST
             // when the path exists).
@@ -75,6 +83,14 @@ internal static class PiLockfile
         if (errno == 17) return false; // EEXIST on Linux and macOS.
         if (errno == 2) throw new DirectoryNotFoundException($"ENOENT: no such file or directory, mkdir '{path}'");
         throw new IOException($"mkdir '{path}' failed (errno {errno})");
+    }
+
+    /// <summary><paramref name="path"/> as a Win32 extended-length path (<c>\\?\C:\...</c>, or <c>\\?\UNC\server\share\...</c>).</summary>
+    internal static string ExtendedLengthPath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        if (full.StartsWith(@"\\?\", StringComparison.Ordinal) || full.StartsWith(@"\\.\", StringComparison.Ordinal)) return full;
+        return full.StartsWith(@"\\", StringComparison.Ordinal) ? @"\\?\UNC\" + full[2..] : @"\\?\" + full;
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
