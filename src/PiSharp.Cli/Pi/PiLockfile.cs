@@ -49,9 +49,13 @@ internal static class PiLockfile
             modified = Directory.GetLastWriteTimeUtc(lockPath);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+        // GetLastWriteTimeUtc reports 1601-01-01 instead of throwing when the path is gone: the holder released the lock in between, so
+        // try the mkdir again rather than taking a vanished (or just re-created) lock for stale.
+        if (modified == DateTime.FromFileTimeUtc(0)) return MakeDirectory(lockPath);
         if (!(modified < DateTime.UtcNow - stale)) return false;
         try { Directory.Delete(lockPath, recursive: false); }
         catch (DirectoryNotFoundException) { }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; } // Being removed or re-created.
         return MakeDirectory(lockPath);
     }
 
@@ -63,7 +67,9 @@ internal static class PiLockfile
         var lockPath = LockPath(file);
         for (var attempt = 1; ; attempt++)
         {
-            if (TryAcquire(lockPath, stale ?? TimeSpan.FromSeconds(10))) break;
+            // A transient failure (Windows refuses a mkdir over a directory pending deletion) is a failed attempt, as the lock being held.
+            try { if (TryAcquire(lockPath, stale ?? TimeSpan.FromSeconds(10))) break; }
+            catch (Exception error) when (error is (IOException and not DirectoryNotFoundException) or UnauthorizedAccessException) { }
             if (attempt >= attempts) throw new IOException("Lock file is already being held");
             Thread.Sleep(delay ?? TimeSpan.FromMilliseconds(20));
         }
@@ -84,7 +90,8 @@ internal static class PiLockfile
         for (var attempt = 0; ; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (TryAcquire(lockPath, stale)) break;
+            try { if (TryAcquire(lockPath, stale)) break; }
+            catch (Exception error) when (error is (IOException and not DirectoryNotFoundException) or UnauthorizedAccessException) { }
             if (attempt >= options.Retries) throw new IOException("Lock file is already being held");
             await Task.Delay(options.RetryDelay, cancellationToken).ConfigureAwait(false);
         }

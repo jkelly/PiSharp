@@ -85,28 +85,14 @@ internal sealed class ProjectTrustStore
         File.WriteAllText(TrustPath, PiJson.Stringify(sorted, indent: true) + "\n", new System.Text.UTF8Encoding(false));
     }
 
-    /// <summary>proper-lockfile: an exclusive <c>mkdir</c> of <c>trust.json.lock</c>, ten attempts 20 ms apart, stale after 10 s.</summary>
+    /// <summary>proper-lockfile: an exclusive <c>mkdir</c> of <c>trust.json.lock</c>, ten attempts 20 ms apart, stale after 10 s
+    /// (<see cref="PiLockfile.WithLock"/>).</summary>
     private T WithLock<T>(Func<T> run)
     {
-        var directory = Path.GetDirectoryName(TrustPath)!;
-        Directory.CreateDirectory(directory);
-        var lockPath = TrustPath + ".lock";
-        for (var attempt = 1; ; attempt++)
-        {
-            try
-            {
-                if (Directory.Exists(lockPath))
-                {
-                    if (DateTime.UtcNow - Directory.GetLastWriteTimeUtc(lockPath) > TimeSpan.FromSeconds(10)) Directory.Delete(lockPath);
-                    else throw new IOException("ELOCKED");
-                }
-                Directory.CreateDirectory(lockPath);
-                break;
-            }
-            catch (IOException) when (attempt < 10) { Thread.Sleep(20); }
-        }
-        try { return run(); }
-        finally { try { Directory.Delete(lockPath); } catch (IOException) { } }
+        Directory.CreateDirectory(Path.GetDirectoryName(TrustPath)!);
+        T result = default!;
+        PiLockfile.WithLock(TrustPath, () => result = run());
+        return result;
     }
 
     /// <summary>Source hasTrustRequiringProjectResources: trust-requiring entries under <c>cwd/.pi</c>, or <c>.agents/skills</c> in cwd or
