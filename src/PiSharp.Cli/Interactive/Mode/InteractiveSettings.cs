@@ -155,13 +155,9 @@ internal sealed class InteractiveSettings
             {
                 try
                 {
-                    if (Directory.Exists(lockPath))
-                    {
-                        // A lock older than 10 s is stale (proper-lockfile's default stale time).
-                        if (DateTime.UtcNow - Directory.GetLastWriteTimeUtc(lockPath) > TimeSpan.FromSeconds(10)) Directory.Delete(lockPath, true);
-                        else throw new IOException("ELOCKED");
-                    }
-                    Directory.CreateDirectory(lockPath); locked = true; return;
+                    // An exclusive mkdir; a lock older than 10 s is stale (proper-lockfile's default stale time).
+                    if (!PiLockfile.TryAcquire(lockPath, TimeSpan.FromSeconds(10))) throw new IOException("ELOCKED");
+                    locked = true; return;
                 }
                 catch (IOException) when (attempt < 10) { Thread.Sleep(20); }
             }

@@ -28,6 +28,7 @@ internal static partial class Program
         cases.AddRange(ResourceCases());
         cases.AddRange(SessionCases());
         cases.AddRange(TrustCases());
+        cases.AddRange(LockfileCases());
         cases.AddRange(EntryCases());
         cases.AddRange(AuthCases());
         cases.AddRange(ExtensionEventCases());
