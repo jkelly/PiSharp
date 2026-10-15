@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): support for packages/durable/test/harness-conversations.test.ts and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): support for packages/durable/test/harness-conversations.test.ts and
 // packages/durable/test/harness-context.test.ts (HarnessConversationsCases.cs, HarnessContextCases.cs). Both groups live in their own class,
 // HarnessConversationTests, so their helpers cannot collide with other HarnessTests partials; the shared helpers of HarnessSupport.cs are
 // imported with `using static HarnessTests`.

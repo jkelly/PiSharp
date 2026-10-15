@@ -1,5 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/22-subagent-foreground.ts. Its product code is the same
-// foreground subagent as packages/coding-agent/src/experimental/durable/subagent.ts (src/PiSharp.Cli/Durable/DurableSubagent.cs). Upstream
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/22-subagent-foreground.ts. Its product code is the same
+// foreground subagent as Pi v1.1.0's packages/coding-agent/src/experimental/durable/subagent.ts, which v1.2.0 deleted
+// (src/PiSharp.Cli/Durable/DurableSubagent.cs, PiSharp-only since; decision 0005). Upstream
 // uses OpenAI when OPENAI_API_KEY is set and pi-ai's faux provider otherwise; here ScriptedModels always stands in, so the example runs
 // offline. Two ordering barriers keep Node's event-loop order, under which the UI attaches to the child before the child answers and prints
 // the child's answer before the parent's: the child's reply waits until the UI attached to the child, and the parent's final reply until the

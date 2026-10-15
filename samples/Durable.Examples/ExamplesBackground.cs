@@ -5,7 +5,8 @@
 // at a time, everything it started settled before the next. So the subagent still answers while the main agent works, the long answer is
 // still stopped halfway, and the restart still lands while a subagent works. Upstream keeps the storage in a temporary SQLite file; here that
 // holds on the memory run, and a file backend restarts on the runner's storage. The transcript prints without ANSI colors, as upstream does
-// when stdout is not a terminal.
+// when stdout is not a terminal. Intentional difference (decision 0005): upstream's tool still returns its replies as v1.1.0's `content`,
+// which v1.2.0 renamed to `output`, so under v1.2.0 its replies are empty; Reply returns them as Output, as the example means.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Chord;

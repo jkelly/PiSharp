@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/ids.ts, plus the Id, Seq and ROOT_CONVERSATION_ID
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/ids.ts, plus the Id, Seq and ROOT_CONVERSATION_ID
 // declarations of packages/durable/src/types.ts. Upstream brands plain numbers at compile time only; here each kind is its own struct
 // over a long, so a conversation ID cannot be passed as a task ID or a commit sequence. Values stay ordinary JSON numbers.
 using System.Globalization;

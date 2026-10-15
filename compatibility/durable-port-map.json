@@ -1175,12 +1175,11 @@
       "lines": 66,
       "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ef672f1537e730d36eb86df6a656151bdc8a05c4",
       "changedLines": 2,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On a file backend the storage is reopened and the root notes and stored agent read back.",
-      "portedBlobSha1": "ef672f1537e730d36eb86df6a656151bdc8a05c4"
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. On a file backend the storage is reopened and the root notes and stored agent read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/07-configuration.ts",
@@ -1188,12 +1187,11 @@
       "lines": 99,
       "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "0e760ed93acca24408103fd4710ce9db762f2c9b",
       "changedLines": 2,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. Live settings are a HarnessSettings subclass overriding Stream; on a file backend the stored agent is read back (checked against upstream's final snapshot under Node).",
-      "portedBlobSha1": "0e760ed93acca24408103fd4710ce9db762f2c9b"
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. Live settings are a HarnessSettings subclass overriding Stream; on a file backend the stored agent is read back (checked against upstream's final snapshot under Node). v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/08-harness-conversations.ts",
@@ -1219,12 +1217,11 @@
       "lines": 48,
       "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "bf3bd4c30271cf48b69b0589a0feb392f6483c35",
       "changedLines": 2,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect.",
-      "portedBlobSha1": "bf3bd4c30271cf48b69b0589a0feb392f6483c35"
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/11-extension-state.ts",
@@ -1232,12 +1229,11 @@
       "lines": 86,
       "pisharp": "samples/Durable.Examples/ExamplesHarness.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "3f41a3cacbbaefe9f3440fd2ffc98645152b9a3d",
       "changedLines": 2,
-      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. The faux provider is ScriptedModels; on a file backend the todos are read back.",
-      "portedBlobSha1": "3f41a3cacbbaefe9f3440fd2ffc98645152b9a3d"
+      "note": "Ported in P11: runs on memory, JSONL and SQLite storage; tests/PiSharp.Durable.Tests/ExamplesCases.cs pins the output the pinned upstream prints under Node, as JSON in place of util.inspect. The faux provider is ScriptedModels; on a file backend the todos are read back. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/12-tasks.ts",
@@ -1335,12 +1331,11 @@
       "lines": 136,
       "pisharp": "samples/Durable.Examples/ExamplesSubagent.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "060ded2db22ec03f7386124e18d7d34b6b9717d4",
       "changedLines": 2,
-      "note": "Ported in P12: samples/Durable.Examples 22-subagent-foreground with ScriptedModels in place of the faux provider, on memory, JSONL and SQLite with reopen (the child conversation and both transcripts read back); two held replies keep Node's order of the UI attaching to the child and printing its answer first; examples.* pins upstream's Node output",
-      "portedBlobSha1": "060ded2db22ec03f7386124e18d7d34b6b9717d4"
+      "note": "Ported in P12: samples/Durable.Examples 22-subagent-foreground with ScriptedModels in place of the faux provider, on memory, JSONL and SQLite with reopen (the child conversation and both transcripts read back); two held replies keep Node's order of the UI attaching to the child and printing its answer first; examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/23-subagent-background.ts",
@@ -1349,7 +1344,7 @@
       "pisharp": "samples/Durable.Examples/ExamplesBackground.cs",
       "phase": "P13",
       "status": "ported",
-      "note": "samples/Durable.Examples 23-subagent-background with PacedModels (upstream's faux route at 50 tokens/s, token size 4) on an ExampleClock driven like Node's event loop; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; the runner's JSONL directory or SQLite file otherwise). Printed without ANSI colors, as upstream prints when stdout is not a terminal; examples.* pins upstream's Node output"
+      "note": "samples/Durable.Examples 23-subagent-background with PacedModels (upstream's faux route at 50 tokens/s, token size 4) on an ExampleClock driven like Node's event loop; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; the runner's JSONL directory or SQLite file otherwise). Printed without ANSI colors, as upstream prints when stdout is not a terminal; examples.* pins upstream's Node output. v1.2.0 (work list area h): upstream's file is unchanged and still returns the tool replies as content, which v1.2.0 renamed to output, so under v1.2.0 Node prints them empty; the C# tool returns them as Output and examples.* keeps the replies (intentional difference, decision 0005)"
     },
     {
       "upstream": "packages/durable/test/examples/24-child-tasks.ts",
@@ -1384,12 +1379,11 @@
       "lines": 115,
       "pisharp": "samples/Durable.Examples/ExamplesAgents.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "05c621cd15362fea8c0949013c06e2018be23c56",
       "changedLines": 2,
-      "note": "samples/Durable.Examples 27-plan-mode with ScriptedModels; plan mode as an AgentChange selecting the plan extension and read+submit_plan, left with Clear patches; memory, JSONL and SQLite with reopen (the plan document read back); the system lines print as JSON (util.inspect's `removed: undefined` is dropped); examples.* pins upstream's Node output",
-      "portedBlobSha1": "05c621cd15362fea8c0949013c06e2018be23c56"
+      "note": "samples/Durable.Examples 27-plan-mode with ScriptedModels; plan mode as an AgentChange selecting the plan extension and read+submit_plan, left with Clear patches; memory, JSONL and SQLite with reopen (the plan document read back); the system lines print as JSON (util.inspect's `removed: undefined` is dropped); examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged."
     },
     {
       "upstream": "packages/durable/test/examples/28-reviewer.ts",
@@ -1424,12 +1418,11 @@
       "lines": 90,
       "pisharp": "samples/Durable.Examples/ExamplesReload.cs",
       "phase": "P13",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "727c6039f8139936497ebb2550e12d3d3e0ad3ad",
       "changedLines": 2,
-      "note": "samples/Durable.Examples 31-reload-and-restart with ScriptedModels in place of the faux provider; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; a JSONL directory or SQLite file otherwise); examples.* pins upstream's Node output",
-      "portedBlobSha1": "727c6039f8139936497ebb2550e12d3d3e0ad3ad"
+      "note": "samples/Durable.Examples 31-reload-and-restart with ScriptedModels in place of the faux provider; it restarts on its own storage (a temporary SQLite file on the memory run, as upstream; a JSONL directory or SQLite file otherwise); examples.* pins upstream's Node output. v1.2.0 (work list area h): the tool result's content is output (ToolExecutionResult.Output since area a); its Node output under v1.2.0 is unchanged."
     },
     {
       "upstream": "packages/durable/test/fixtures/delete-buffer.ts",

@@ -1,8 +1,8 @@
 using PiSharp.Durable.Benchmarks;
 using PiSharp.Durable.Testing;
 
-// P13 (decision 0005): benchmarks/PiSharp.Durable.Benchmarks ports Pi v1.1.0 packages/durable/test/storage.bench.ts, test/storage-memory.ts
-// and test/tool-output-bench.ts over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts), and Pi v1.2.0
+// P13 (decision 0005): benchmarks/PiSharp.Durable.Benchmarks ports Pi packages/durable/test/storage.bench.ts, test/storage-memory.ts
+// and test/tool-output-bench.ts (ported at v1.1.0, unchanged in v1.2.0) over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts), and Pi v1.2.0
 // test/document-append-bench.ts, test/session-document-cache-bench.ts, test/scheduler-memory-bench.ts, test/scheduler-fanout-bench.ts,
 // test/nested-tools-bench.ts, test/nested-images-bench.ts and test/codemode-bench.ts, plus the PiSharp-authored scheduler-scale
 // (SchedulerScaleBench.cs). The

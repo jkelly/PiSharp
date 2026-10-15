@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/31-reload-and-restart.ts. Upstream stands in for a model
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/31-reload-and-restart.ts. Upstream stands in for a model
 // with pi-ai's faux provider; here ScriptedModels does, so the example runs offline. It prints what upstream's console.log prints, as JSON.
 // The example restarts the process itself, so it needs storage that survives close: upstream always uses a SQLite file, and so does the
 // memory run here (a temporary one); a file backend reopens its own location.

@@ -3,8 +3,8 @@ using System.Text;
 using System.Text.Json;
 using PiSharp.Durable;
 
-// The experimental pi-durable port (decision 0005). Cases are ported from Pi v1.1.0 packages/durable/test and the Chord tests it
-// relies on, by reading; compatibility/durable-port-map.json records which upstream test each case group covers. Every static
+// The experimental pi-durable port (decision 0005). Cases are ported from Pi packages/durable/test and the Chord tests it relies on, by
+// reading, at the pinned commit (DurableUpstream.Commit, v1.2.0; the port began at v1.1.0); compatibility/durable-port-map.json records which upstream test each case group covers. Every static
 // method of Program whose name ends in "Cases" and returns IEnumerable<(string, Func<Task>)> is a case group.
 internal static partial class Program
 {

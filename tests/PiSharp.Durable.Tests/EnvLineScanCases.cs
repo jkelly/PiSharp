@@ -3,9 +3,9 @@ using System.Text;
 using System.Text.Json;
 using PiSharp.Durable.Env;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/env-line-scan.test.ts, as env.line-scan.<case>. The seeded
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/env-line-scan.test.ts, as env.line-scan.<case>. The seeded
 // generator and chunking are ported exactly. Upstream compares against Node's `new TextDecoder().decode(file)`; here
-// Fixtures/env-line-scan.upstream.json (printed by Fixtures/capture-env-line-scan.mjs, which runs the pinned decode.ts and line-scan.ts under
+// Fixtures/v1.2.0/env-line-scan.upstream.json (printed by Fixtures/capture-env-line-scan.mjs, which runs the pinned decode.ts and line-scan.ts under
 // Node) holds, per seed, a digest of the file with its whole-file TextDecoder text and of upstream's LineScanner result, so each case checks
 // the C# port against Node's output as well as the test's own decode-and-split assertions. Adapted: the RangeError for LineScanner(1.5)
 // has no analogue (line numbers are longs).
@@ -20,7 +20,7 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> EnvLineScanCases()
     {
         var fixture = new Lazy<JsonElement>(() => JsonDocument.Parse(File.ReadAllText(
-            Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "env-line-scan.upstream.json"))).RootElement);
+            Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "env-line-scan.upstream.json"))).RootElement);
 
         // Node's streaming TextDecoder with BOM handling dropped this U+FEFF, which follows an invalid sequence.
         yield return Case("env.line-scan.keeps-a-u-feff-that-does-not-start-the-stream", () =>

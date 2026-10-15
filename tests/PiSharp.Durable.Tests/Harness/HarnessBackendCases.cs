@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-tasks.test.ts on the file backends. Upstream runs this
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tasks.test.ts on the file backends. Upstream runs this
 // file on MemoryStorage only; the task groups here also run on a fresh JSONL directory and a fresh SQLite file per case, as the session
 // groups do (SessionBackendCases.cs).
 using PiSharp.Durable.Chord;

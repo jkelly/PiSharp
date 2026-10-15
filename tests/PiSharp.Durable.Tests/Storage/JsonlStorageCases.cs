@@ -520,7 +520,7 @@ internal static partial class Program
         });
 
         // Authored: the exact lines upstream writes for every write kind (checked against Pi v1.1.0's JsonlStorage writing the same
-        // commits), including the {kind, version, value} base that MemoryStorage builds when it resolves a document copy. Records built here
+        // commits; v1.2.0 changed none of its line formats), including the {kind, version, value} base that MemoryStorage builds when it resolves a document copy. Records built here
         // without a Session take the key order the Session creates them in (an untyped entry draft's fields, then id and conversationId;
         // a submission's fields, then id); compat.* checks the per-path orders against sessions upstream wrote.
         yield return JsonlCase("writes-upstream-line-formats", async fixture =>

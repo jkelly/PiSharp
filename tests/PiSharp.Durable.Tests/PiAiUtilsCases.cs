@@ -1,9 +1,11 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): differential cases for PiSharp.Durable's internal ports of packages/ai/src/utils
-// (overflow.ts, retry.ts, transcript.ts, estimate.ts, uuid.ts). There is no upstream test file: Fixtures/piai-utils.upstream.json holds what
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): differential cases for PiSharp.Durable's internal ports of packages/ai/src/utils
+// (overflow.ts, retry.ts, transcript.ts, estimate.ts, uuid.ts). There is no upstream test file: Fixtures/v1.2.0/piai-utils.upstream.json holds what
 // the pinned pi-ai returns under Node for every input below (printed by Fixtures/capture-piai-utils.mjs, which runs these functions from
 // packages/ai/src), and the cases compare the ports with it. Where PiSharp already ports a function
 // outside PiSharp.Durable's references (PiSharp.CodingAgent's SessionRecoveryClassifier and AgentRetryPolicy, PiSharp.AI's internal
-// ProviderTranscript.CurrentTools), a second case compares the two ports on the same inputs.
+// ProviderTranscript.CurrentTools), a second case compares the two ports on the same inputs. Pi v1.2.0's only change to these files is
+// retry.ts' "provider returned an error" wording (#10842), which no captured input exercises; retry.provider-returned-an-error pins what the
+// pinned pi-ai returned for it under Node.
 using System.Reflection;
 using System.Text.RegularExpressions;
 using PiSharp.CodingAgent;
@@ -24,7 +26,7 @@ internal static partial class Program
 internal static class PiAiUtilsTests
 {
     private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(Program.RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "piai-utils.upstream.json"))));
+        File.ReadAllText(Path.Combine(Program.RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "piai-utils.upstream.json"))));
 
     private static IEnumerable<JsonObjectValue> Rows(string key) => ((JsonArrayValue)Upstream.Value[key]).Cast<JsonObjectValue>();
 
@@ -78,6 +80,23 @@ internal static class PiAiUtilsTests
                 var error = message.TryGetValue("errorMessage", out var text) ? S(text) : null;
                 Program.Equal(AgentRetryPolicy.IsRetryableError(stopReason, error), PiAiRetry.IsRetryableAssistantError(message),
                     $"isRetryableAssistantError({row.ToJson()})");
+            }
+        });
+
+        // Authored: Pi v1.2.0's isRetryableAssistantError (#10842) under Node gave these results; the captured inputs predate the wording.
+        yield return Program.Case(prefix + "retry.provider-returned-an-error", () =>
+        {
+            (string Error, bool Retryable)[] rows =
+            [
+                ("The upstream provider returned an error", true), ("Provider returned error", true), ("provider-returned-an-error", true),
+                ("provider returned anerror", true), ("Provider Returned An Error", true), ("provider returned a error", false),
+                ("provider returned an  error", false),
+            ];
+            foreach (var (error, retryable) in rows)
+            {
+                var message = JsonValue.Object([new("role", "assistant"), new("stopReason", "error"), new("errorMessage", error)]);
+                Program.Equal(retryable, PiAiRetry.IsRetryableAssistantError(message), $"isRetryableAssistantError({error})");
+                Program.Equal(retryable, AgentRetryPolicy.IsRetryableError(StopReason.Error, error), $"AgentRetryPolicy({error})");
             }
         });
 

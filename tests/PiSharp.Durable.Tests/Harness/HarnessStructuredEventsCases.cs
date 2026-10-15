@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-structured.test.ts, the tests that listen to agent events
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured.test.ts, the tests that listen to agent events
 // (watchEvents, P10): "ends a turn at the generation's hold, before its successor's turn starts" of describe "tool rounds", and describe
 // "tool rounds and events". Adaptations beyond those of HarnessStructuredSupport.cs, HarnessStructuredToolRoundsCases.cs and
 // HarnessEventsCases.cs:

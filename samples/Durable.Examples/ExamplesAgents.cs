@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/16-real-model.ts, 18-print.ts, 26-coding-agent.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/16-real-model.ts, 18-print.ts, 26-coding-agent.ts,
 // 27-plan-mode.ts and 28-reviewer.ts. 16 needs a real OpenAI key: without OPENAI_API_KEY (read through the environment reader the runner
 // passes, as NativeDurableModels reads keys) it prints upstream's skip line; with it, it streams the answer through NativeDurableModels.
 // 18 uses OpenAI when the key is set upstream and pi-ai's faux provider otherwise; here ScriptedModels always stands in, as in 26, 27 and

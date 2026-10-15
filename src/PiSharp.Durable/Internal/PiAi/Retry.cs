@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/retry.ts (isRetryableAssistantError, retryDelayMs) over a pi-ai
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/retry.ts (isRetryableAssistantError, retryDelayMs) over a pi-ai
 // wire assistant message. PiSharp.CodingAgent's AgentRetryPolicy ports the same classifier over PiSharp.Contracts stop reasons, but
 // PiSharp.Durable does not reference PiSharp.CodingAgent; this port uses its regex translation, and the test project compares the two on
 // shared inputs. retryAssistantCall is not ported: generation drives its own durable retry loop.
@@ -30,8 +30,9 @@ internal static class PiAiRetry
         // Generic provider load, HTTP status, and server-side transient failures.
         "overloaded", "server_busy", "servers are currently busy", "currently experiencing high demand", "model is at capacity", "rate.?limit",
         "too many requests", "429", "500", "502", "503", "504", "520", "524", "service.?unavailable", "server.?error", "internal.?error",
-        // Wrapper/provider text for transient upstream failures.
-        "provider.?returned.?error", "exceeded request buffer limit while retrying upstream",
+        // Wrapper/provider text for transient upstream failures, including gateway wording such as "The upstream provider returned an
+        // error" (Pi v1.2.0, #10842).
+        "provider.?returned.?(?:an.?)?error", "exceeded request buffer limit while retrying upstream",
         // Network, proxy, and fetch transport failures.
         "network.?error", "connection.?error", "connection.?refused", "connection.?lost", "other side closed", "fetch failed", "getaddrinfo",
         "ENOTFOUND", "EAI_AGAIN", "upstream.?connect", "reset before headers", "socket hang up", "socket connection was closed", "timed? out",

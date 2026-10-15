@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-structured.test.ts, describe "tool rounds": the three
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured.test.ts, describe "tool rounds": the three
 // tests the tool task (P9) unblocks, "owns its tool tasks, waits for them, and hands the run to a conversation-owned generation", "aborts a
 // parallel round with its generation: tools first, then the generation, with every result written" and "answers the unstarted calls of an
 // aborted sequential round with aborted results, in call order", and the one generation alone (P8) unblocked, "keeps run control with a

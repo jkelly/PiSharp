@@ -1,6 +1,6 @@
 # Experimental port of pi-durable
 
-Status: approved by the project owner on 2026-10-12, on branch `feature/pi-durable` only. It supersedes the `pi-durable` and experimental `durable` exclusions in [0002-pi-1.1.0-sync.md](0002-pi-1.1.0-sync.md) for that branch. Retargeted to Pi v1.2.0 on 2026-10-15 (see [Pi v1.2.0 retarget](#pi-v120-retarget)); the `exclude.durable` and `exclude.chord` rows of [0006-pi-1.2.0-sync.md](0006-pi-1.2.0-sync.md), and its exclusion of codemode's `sandbox.start()`, apply to `main` only (see [Codemode `Start()`](#codemode-start)).
+Status: approved by the project owner on 2026-10-12, on branch `feature/pi-durable` only. It supersedes the `pi-durable` and experimental `durable` exclusions in [0002-pi-1.1.0-sync.md](0002-pi-1.1.0-sync.md) for that branch. Retargeted to Pi v1.2.0 on 2026-10-15 (see [Pi v1.2.0 retarget](#pi-v120-retarget)), and the v1.2.0 update was completed the same day (see [Pi v1.2.0 update complete](#pi-v120-update-complete)); the `exclude.durable` and `exclude.chord` rows of [0006-pi-1.2.0-sync.md](0006-pi-1.2.0-sync.md), and its exclusion of codemode's `sandbox.start()`, apply to `main` only (see [Codemode `Start()`](#codemode-start)).
 
 ## Context
 
@@ -48,26 +48,42 @@ The `crash.<backend>.<scenario>.<checkpoint>` cases in `tests/PiSharp.Durable.Te
 
 ## Port status
 
-At the end of P13, `compatibility/durable-port-map.json` maps 174 upstream files:
+At the end of the Pi v1.2.0 update (work list area h, 2026-10-15), `compatibility/durable-port-map.json` maps 214 upstream files:
 
 | status | files |
 |---|---:|
-| ported | 168 |
-| excluded | 2 |
+| ported | 196 |
+| pisharp-only (`pisharp durable`) | 7 |
+| excluded | 5 |
 | skipped | 4 |
+| removed-upstream | 2 |
 
-None is planned or in progress.
+None is planned, in progress or `needs-sync`. Of the 196 ported files, 84 are unchanged since v1.1.0, 73 changed in v1.2.0, 1 moved (`chord/src/state.ts`) and 38 are new in v1.2.0. At the end of P13, against v1.1.0, the map had 174 files: 168 ported, 2 excluded and 4 skipped.
 
-**Test cases.** `tests/PiSharp.Durable.Tests` has 2485 cases:
-- 2411 authored natively (ported upstream tests, examples, crash and smoke cases);
-- 73 upstream-capture cases (`compat.*`), which open, read, resume and rewrite sessions the pinned upstream wrote, and replay its ops corpus;
-- 1 reverse case, `compat.reverse.upstream-reads-pisharp-sessions`, which runs only when `PISHARP_DURABLE_UPSTREAM` points at an upstream checkout and is skipped otherwise.
+**Test cases**, from the final run of the update (2026-10-15, after merging `32fcd93`; in it, `sessions.lock.cross-process` waits until it sees the lock child's renewal instead of a fixed 2.5 s delay, after that test flaked on Windows CI):
 
-`tests/PiSharp.DurableCli.Tests` has 57 cases.
+| suite | cases | authored | upstream capture | skipped |
+|---|---:|---:|---:|---:|
+| `tests/PiSharp.Durable.Tests` | 3044 | 2848 | 195 | 1 |
+| of which crash cases (`crash.*`) | 54 | 54 | - | - |
+| `tests/PiSharp.DurableCli.Tests` | 72 | 72 | - | - |
+
+- **Authored** cases are ported upstream tests, examples, crash and smoke cases, run natively.
+- **Upstream capture** cases (`compat.*`) open, read, resume and rewrite sessions the pinned upstream wrote, compare agent events and observed results, and replay its ops corpus.
+- **Skipped:** `compat.reverse.upstream-reads-pisharp-sessions` runs only when `PISHARP_DURABLE_UPSTREAM` points at an upstream checkout. Run against the pinned v1.2.0 checkout, it verified 152 of 152 checks.
+- **DurableCli:** `sessions.interop.pinned-upstream-under-node` is counted as passed, but it runs only when `PISHARP_DURABLE_UPSTREAM_V110` names a Pi v1.1.0 checkout. It is not counted as skipped.
+- The durable suite passes with no failures, both normally and with `PI_DURABLE_DOCUMENT_RETENTION_MS=0`.
+- At the end of P13 the counts were 2485 and 57.
 
 **Excluded (by this decision):**
 - `src/storage/sqlite/cloudflare.ts` and `test/sqlite-cloudflare.test.ts`. The Cloudflare Durable Object SQLite adapter is out of scope.
+- `src/images/cloudflare.ts` (the Cloudflare Images adapter) and `src/images/photon-wasm.d.ts` (type declarations for Photon's WebAssembly module, which has no C# counterpart; see Images below).
+- `chord/src/types.ts`. In v1.2.0 it holds only the types of Chord's host runtime, which is out of scope.
 - These have no rows: the `vacation` demo, `pi-env`, and Chord's facets, services and wire. `test/chord-guide.test.ts`, which used them, was ported with direct subscriptions to the same document states until upstream deleted it in v1.2.0; its cases were retired with it.
+
+**Removed upstream:**
+- `chord/src/services/state-internals.ts`, which v1.2.0 merged into `chord/src/state.ts`. `ReplicatedStateInternals.cs` was deleted with it (area f).
+- `test/chord-guide.test.ts`; its cases were retired with it.
 
 **Skipped:**
 - `test/provider-session-cache-e2e.test.ts` and `test/system-order-cache-e2e.test.ts` need live provider credentials.
@@ -76,8 +92,9 @@ None is planned or in progress.
 **Intentional mappings recorded in the map:**
 - **Erased type parameters.** TypeScript's phantom type parameters have no C# counterpart: `TaskId<Result>`, typed task input and checkpoints, `SettledTask<Result>`, and a document's value type. Tasks are JSON-typed, as documents are. Exhaustive phase maps and typed task input are checked at run time, not compile time. `types.test.ts`'s Harness typing test is a compile-checked case of the C# surface.
 - **`16-real-model`** runs only with `OPENAI_API_KEY`. The tests run it without the key and pin upstream's skip line.
-- **`19-json`'s first streamed partial** varies between Node runs, with pi-ai's random faux token size. PiSharp's run is fixed and equals captured Node runs. They compare as JSON with sorted keys, with clock and random values as placeholders.
+- **`19-json`'s streamed partials** vary between Node runs: pi-ai's faux token size is random, and a progress tick can fall inside the stream. PiSharp's run is fixed (token size 4, paced on the example clock). Both modes compare as text, key order included, with clock and random values as placeholders, against the v1.2.0 capture (`Fixtures/v1.2.0/examples-19-json-*.upstream.jsonl`). That run committed its streaming answer once mid-stream, so the comparison leaves out that ops line and expects the final message in its `message_start` (area e; see Images below).
 - **Examples 19, 21, 23 and 24** run on a manual example clock that is driven like Node's event loop.
+- **Examples under v1.2.0 (area h).** Every upstream example of the pinned v1.2.0 ran under Node without API keys, and `examples.*` pins what each printed, as JSON in place of `util.inspect`. Seven examples changed upstream, only by the tool result's `content` to `output` rename, which `ToolExecutionResult.Output` (area a) already covered; their output is unchanged. **Intentional difference:** `23-subagent-background.ts` did not change and still returns its tool replies as `content`, which v1.2.0 no longer reads, so under v1.2.0 Node prints every reply empty (`  → ` and `OK. `). The C# tool returns them as `Output`, as the example means and as v1.1.0 ran it, and `examples.*` keeps the replies.
 - **`listFiles`** is optional upstream, and only `pi-env` implements it: its local environment lists through its daemon, which walks with the Rust `ignore` crate. `pi-env` stays out of scope, but `LocalFileSystem` implements `ListFilesAsync` in process with the daemon's semantics (`Env/Local/LocalFileListing.cs` ports `list.rs` and the `ignore` 0.4.33 walk and gitignore matching it configures; no new package). So the local env conformance runs with `listFiles` on, as `pi-env`'s does, and `env.list-files.*` ports the daemon's own tests and the crate's gitignore tests.
 
 - **Storage failures (v1.2.0, area b).** As upstream's README "Errors" section has it, a storage error fails and closes the Harness, `SessionFailedException` (upstream `SessionFailed`) carries it as `InnerException`, `StorageRequestException` (upstream `StorageRequestError`) fails only an invalid read, and `ISession.Closed` settles with a `SessionEnd`. Three mappings:
@@ -106,7 +123,7 @@ None is planned or in progress.
   - `pisharp durable` only followed the `Output` rename (`DurableSubagent.cs`) until area l adapted it (see `pisharp durable` below).
 
 - **`tool_search` (v1.2.0, area k).** Upstream's `search.ts` is `Search` in `PiSharp.Durable` (internal, as upstream does not export it; code mode's `searchTools()`, area d, shares it), and the `tool-search` entry point is `ToolSearch` in `PiSharp.Durable.Tools` (`CreateTool`, `CreateExtension`). Main ports the coding agent's copy of the same ranking (`PiSharp.Extensions.Abstractions`' `ToolSearch` and `Bm25Ranker`), which `PiSharp.Durable` may not reference (section 4), so the durable package keeps its own port, as upstream durable keeps its own copy. Mappings:
-  - JavaScript's `toLowerCase()` maps U+0130 to `i` plus U+0307, and .NET's invariant lowercasing leaves it unchanged, so `Search` expands it before lowercasing; every other character either lowercases alike or is not ASCII afterwards, and only ASCII letters and digits survive the split. Main's ranker does not expand it (it tokenizes `İstanbul` as `stanbul`, upstream as `i`, `stanbul`); that is a main-line difference, recorded here and not changed on this branch.
+  - JavaScript's `toLowerCase()` maps U+0130 to `i` plus U+0307, and .NET's invariant lowercasing leaves it unchanged, so `Search` expands it before lowercasing; every other character either lowercases alike or is not ASCII afterwards, and only ASCII letters and digits survive the split. Main's ranker does not expand it (it tokenizes `İstanbul` as `stanbul`, upstream as `i`, `stanbul`); that is a main-line bug, not changed on this branch. [PR #19](https://github.com/jkelly/PiSharp/pull/19) fixes it on `main` (open, not merged at the end of the v1.2.0 update); this branch picks the fix up with its next merge of `main`.
   - Ties keep document order through LINQ's stable ordering, as through `Array.prototype.sort`.
   - Tests: `tool-search.*` ports `tool-search.test.ts`; `tool-search.errors.*` and `tool-search.search.*` compare with results the pinned upstream printed under Node; `tool-search.ranking-differential.*` compares `Search` with main's ranker over seeded random texts, queries and schemas (U+0130 left out). A one-off run of the pinned upstream tool under Node over 3000 random tool sets, queries and limits (U+0130, U+0085, U+180E and U+200B included) matched the C# tool's text, details, control and errors, and `Search.Tokenize`, in every case. The deferred-tool-search compat scenario now runs: its records match upstream's byte for byte (JSONL) and column for column (SQLite), with its events and observed tool lists.
 
@@ -158,14 +175,14 @@ None is planned or in progress.
 
 ## Pi v1.2.0 retarget
 
-Stage 3a of the v1.2.0 sync (2026-10-15) moved the branch onto `main`'s Pi v1.2.0 sync and retargeted the pin; it ports no v1.2.0 library change yet.
+Stage 3a of the v1.2.0 sync (2026-10-15) moved the branch onto `main`'s Pi v1.2.0 sync and retargeted the pin; it ported no v1.2.0 library change itself. The work list areas then did (see [v1.2.0 update complete](#pi-v120-update-complete)).
 - `sync/pi-1.2.0` was merged into the branch. The durable lock fixes in `PiLockfile` and `PiProjectTrust` were the same as `main`'s (#15), so one version stays: `PiLockfile` keeps the branch's superset (proper-lockfile `lock()`, `updateLock` and `unlock` for durable sessions).
 - `NativeDurableModels`' embedded catalog follows PiSharp.Cli's pi-ai 1.2.0 shards.
 - `DurableUpstream.Commit` and the branch CI's port-map job moved to v1.2.0. `tools/DurablePortMap/build-port-map.mjs` reads both pins from git objects and keeps recorded progress.
-- Source headers whose cited upstream files are byte-identical at both pins were re-pinned with `tools/CompatibilityReport/repin-sources.mjs --paths`; `compatibility/durable-sync-1.2.0-repin.json` lists the re-pinned, pending and historical citations. Headers that cite changed files, differential cases and captured fixtures stay on v1.1.0 until their area is synced and recaptured.
+- Source headers whose cited upstream files are byte-identical at both pins were re-pinned with `tools/CompatibilityReport/repin-sources.mjs --paths`; `compatibility/durable-sync-1.2.0-repin.json` lists the re-pinned, pending and historical citations. Headers that cite changed files, differential cases and captured fixtures stayed on v1.1.0 until their area was synced and recaptured. By the end of area h every one had moved but `PiLockfile.cs`'s citation of v1.1.0's deleted `experimental/durable/sessions.ts`, whose lock `pisharp durable` keeps (PiSharp-only); the file's authored `portedRepins` section lists the area and commit that moved each, and the two retired with deleted upstream files.
 - `compatibility/durable-sync-1.2.0-worklist.json` groups every changed, new and deleted upstream durable and Chord file and changelog item into port areas, with the PiSharp files and tests each touches, a size and dependencies.
 
-Port map against v1.2.0 (214 rows):
+Port map against v1.2.0 at the retarget (214 rows; for the final counts see [Port status](#port-status)):
 
 | status | files |
 |---|---:|
@@ -204,7 +221,7 @@ Added on 2026-10-15 as the prerequisite of work list area d (durable code mode).
 - The worker protocol gains optional fields and the `started`, `idle` and `exhausted` messages. A worker process and its host always come from the same build.
 
 **Dependencies.** No new NuGet package.
-- `PiSharp.Durable.Tools` will reference `PiSharp.Codemode`, and through it Jint 4.16.3 and Acornima 1.7.0. Decision 0003 already pins and licenses both for `PiSharp.Codemode`.
+- `PiSharp.Durable.Tools` references `PiSharp.Codemode`, and through it Jint 4.16.3 and Acornima 1.7.0. Decision 0003 already pins and licenses both for `PiSharp.Codemode`.
 - Area d adds the reference and its lock-file entries (done; see Durable code mode under Port status).
 - The reason for the reference: durable code mode replays a script from its journal, and only a deterministic engine run can do that.
 
@@ -215,3 +232,54 @@ Added on 2026-10-15 as the prerequisite of work list area d (durable code mode).
 - an authored replay of a run interrupted at several midpoints, continued on the other host;
 - authored checks of Jint's extra built-ins and of the interrupt budget;
 - a differential against the real `@earendil-works/pi-codemode` 1.2.0 `start()` over 16 scenarios (`Deterministic/deterministic-goldens.json`). It covers events, issued counts, call arguments, `Math.random` values, clock readings, outputs and outcomes.
+
+## Pi v1.2.0 update complete
+
+The update from Pi v1.1.0 to v1.2.0 (`compatibility/durable-sync-1.2.0-worklist.json`) finished on 2026-10-15 with area h. Every area landed on `feature/pi-durable` with its tests passing:
+
+| area | what | merged |
+|---|---|---|
+| a | tool task v2: nested calls, structured output, callers, `modelTools` and deferred tools | `3bea3f4` |
+| b | storage failure, Session lifecycle and document cache retention | `8b97eb5` |
+| c | scheduler: ownership indexes, `abandonOnRestart`, `abortOwned`/`ownedTasks`, wait cycles | `595864a` |
+| d | durable code mode (with the [Codemode `Start()`](#codemode-start) prerequisite, `677ea2f`) | `acfb301` |
+| e | images: `read` returns images, image processor | `d527ffd` |
+| f | Chord subset: replicated state move, delta append performance, json/context/types split | `d23494a` |
+| g | execution environment `listFiles` | `3948843` |
+| h | examples and closing bookkeeping | this change |
+| i | input entries and display-only writes | `8b97eb5` |
+| j | compaction failure visibility and blocking-threshold fix | `8b97eb5` |
+| k | `tool_search` extension and BM25 ranking | `797099e` |
+| l | `pisharp durable` adaptation (PiSharp-only mode) | `7cc49cf` |
+| m | upstream capture corpus at v1.2.0 | `14c99c1` |
+
+Area h ran every v1.2.0 example under Node and moved the seven changed examples to `ported` (see Examples under v1.2.0 above). It also re-pinned the last v1.1.0 citations whose text is current at v1.2.0 and pointed `piai.*`, `piai.validation.*` and `env.line-scan.*` at the v1.2.0 captures. One small pi-ai change was ported: the internal `Retry.cs` follows pi-ai 1.2.0's retry pattern for "provider returned an error" (#10842), and `piai.retry.provider-returned-an-error` pins upstream's results under Node. See [Port status](#port-status) for the final counts.
+
+**Citations that stay on v1.1.0:**
+- `PiLockfile.cs`' reference to the deleted `experimental/durable/sessions.ts`.
+- The `pisharp durable` sources, and `PiSharp.DurableCli.Tests`' source label (`Program.Upstream`), which stay on v1.1.0 by design (section 8).
+- `sessions.interop.pinned-upstream-under-node`, which is pinned to a v1.1.0 checkout.
+- The v1.1.0 fixtures that `compat.upgrade-from-v1.1.0.*` and example 19's line count read.
+- Historical records: this decision, the work list, the port map's previous pin and the capture tooling.
+
+`compatibility/durable-sync-1.2.0-repin.json` lists every citation and where it moved.
+
+**Intentional differences added by the update:**
+- **Code mode's engine fingerprint** names Jint, so neither side resumes the other's interrupted scripts (see Durable code mode and [Codemode `Start()`](#codemode-start)).
+- **Example 23's tool replies** are kept (see Examples under v1.2.0).
+- **`pisharp durable` stays PiSharp-only** (section 8).
+
+**Main-line seams on this branch**, flagged for `main` with the durable work:
+- `PiCommand.RunCoreAsync` dispatches the hidden `durable` subcommand.
+- `PiSystemPrompt.Skill` is internal, for `DurablePrompt`.
+- `CodemodeRenderers.FormatCall` is internal, for `pisharp durable`'s nested call rows (area l).
+- `PiSharp.Tools` exposes its internals to `PiSharp.Durable.Tools` (the job-object process lifetime and spawn preflight).
+- `PiSharp.Cli` references the durable projects and ships the SQLite license notices.
+- `PiLockfile` keeps proper-lockfile's `lock()`, `updateLock` and `unlock` for durable sessions.
+- `PiSharp.Codemode` has the additive `Start()` surface.
+
+**Open:**
+- **JSONL storage keeps the records it wrote in memory.** After the inline nested-images benchmark, PiSharp holds about 400 MiB against Node's 1 MiB, and 803 MiB against 202 MiB after reopen. SQLite keeps nothing in either runtime. Recorded in `docs/durable-benchmarks.md`, not yet addressed.
+- **Main's `tool_search` U+0130 lowercasing** is fixed by [PR #19](https://github.com/jkelly/PiSharp/pull/19) on `main`, which is open and not merged. This branch's `Search` already matches upstream (see `tool_search` above).
+- **The durable TUI's edit cards.** They use `BuiltInToolRenderers.CreateAllToolRenderers()`, while interactive mode resolves edit's own shell, so the cards differ slightly. Not in the update's scope.
+- **`Fixtures/v1.2.0/index.json`** still describes its fixtures as unread by any suite. It is written only by `tools/DurableFixtures/capture-all.mjs`, and every suite now reads the v1.2.0 set where one exists.

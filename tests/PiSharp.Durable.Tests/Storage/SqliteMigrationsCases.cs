@@ -1,6 +1,6 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/sqlite-migrations.test.ts. The two
 // storage.sqlite.migrations.initial-schema-* and contiguous-version cases are authored: the schema text must stay upstream's verbatim
-// (the hash was computed from upstream's SQLITE_MIGRATIONS and applySqliteMigrations at abe508e), and a newly created file must hold
+// (the hash was computed from upstream's SQLITE_MIGRATIONS and applySqliteMigrations at abe508e; v1.2.0 left both unchanged), and a newly created file must hold
 // exactly upstream's tables and indexes.
 using System.Security.Cryptography;
 using System.Text;
