@@ -1,11 +1,12 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): a differential check of compaction against the pinned upstream. There is no upstream test
-// file: Fixtures/compaction.upstream.json holds what the pinned pi-durable commits for the scenarios below with pi-ai's faux provider on
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): a differential check of compaction against the pinned upstream. There is no upstream test
+// file: Fixtures/v1.2.0/compaction.upstream.json holds what the pinned pi-durable commits for the scenarios below with pi-ai's faux provider on
 // MemoryStorage, as printed by Fixtures/capture-compaction.mjs: every entry, task and submission, the conversation's pi.live, pi.inbox,
 // pi.usage, pi.agent and pi.provider documents, Harness.usage(), and each summarization request's messages and options (without its
 // signal). It is normalized as HarnessChatDifferentialCases.cs's fixture is, and compared the same way: as JSON values and by their exact text, and the documents
 // built by the Harness and the usage total by their exact text. The summary's usage is the faux provider's estimate of the request, so the
 // fixture also pins the summarization prompts and the serialized conversation. The scenarios run here on memory, JSONL and SQLite and must
-// produce the same records, IDs included.
+// produce the same records, IDs included. backgroundFailure and blockingFailure (new in v1.2.0) check pi.live.compactionFailure and a
+// blocking threshold failure that fails its run without a request.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
@@ -37,7 +38,7 @@ internal static class CompactionDifferentialTests
     private static readonly CompactionSettings Manual = new() { Enabled = false, ReserveTokens = 1000, KeepRecentTokens = 150, BackgroundTokens = 0 };
 
     private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "compaction.upstream.json"))));
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "compaction.upstream.json"))));
 
     private static string Text(string label, int tokens) => CompactionTests.Text(label, tokens);
     private static JsonObjectValue Answer(string content) => FauxAssistantMessage(content, timestamp: T);
@@ -212,6 +213,59 @@ internal static class CompactionDifferentialTests
             await Turn(chat, Text("u4", 100), "fits");
             await chat.Harness.WaitForIdleAsync(Context);
             Same("overflow", await Dump(chat));
+            await chat.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "background-failure", async () =>
+        {
+            // The turn ends, the compaction fails, and pi.live keeps the failure.
+            var chat = await Open(fresh, 2000);
+            await History(chat);
+            chat.Setup.Compaction = new CompactionSettings { Enabled = true, ReserveTokens = 500, KeepRecentTokens = 150, BackgroundTokens = 1000 };
+            var held = new HarnessTests.Deferred();
+            var reached = new HarnessTests.Deferred();
+            lock (chat.Summaries)
+                chat.Summaries.Add(async () =>
+                {
+                    reached.Resolve();
+                    await held.Task;
+                    return Failure("bad request");
+                });
+            lock (chat.Agent)
+                chat.Agent.Add(async () =>
+                {
+                    await reached.Task;
+                    return Answer(Text("a4", 100));
+                });
+            Equal(SubmissionStatus.Done, (await (await chat.Root.SubmitAsync(SubmissionDraft.Input(Text("u4", 100)), Context)).WaitAsync(Context)).Status,
+                "turn u4");
+            held.Resolve();
+            await HarnessTests.Eventually(async () =>
+                (await chat.Harness.SnapshotAsync(Live.LiveDoc, chat.Root.Id, Context))?.ContainsKey("compactionFailure") == true);
+            await chat.Harness.WaitForIdleAsync(Context);
+            Same("backgroundFailure", await Dump(chat));
+            await chat.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "blocking-failure", async () =>
+        {
+            // The run fails with model_error and no agent request is sent.
+            var chat = await Open(fresh, 1000);
+            await History(chat);
+            chat.Setup.Compaction = new CompactionSettings { Enabled = true, ReserveTokens = 300, KeepRecentTokens = 150, BackgroundTokens = 0 };
+            lock (chat.Summaries) chat.Summaries.Add(Chat.Of(Failure("bad request")));
+            var settled = await (await chat.Root.SubmitAsync(SubmissionDraft.Input(Text("u4", 200)), Context)).WaitAsync(Context);
+            await chat.Harness.WaitForIdleAsync(Context);
+            int unused;
+            lock (chat.Agent) unused = chat.Agent.Count;
+            var expected = (JsonObjectValue)Upstream.Value["blockingFailure"];
+            var settledJson = ChatDifferentialTests.Normalize(settled.ToJson());
+            Check(JsonValue.DeepEquals(expected["settled"], settledJson), $"settled: expected {expected["settled"].ToJson()}, actual {settledJson.ToJson()}");
+            Equal(expected["settled"].ToJson(), settledJson.ToJson(), "settled key order");
+            Equal(N(expected["unusedAgentReplies"]), unused, "unused agent replies");
+            var done = await Dump(chat);
+            Check(JsonValue.DeepEquals(expected["done"], done), $"blockingFailure done: expected {expected["done"].ToJson()}, actual {done.ToJson()}");
+            Equal(expected["done"].ToJson(), done.ToJson(), "blockingFailure done: key order");
             await chat.Harness.CloseAsync(Context);
         });
     }

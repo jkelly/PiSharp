@@ -165,12 +165,11 @@
       "lines": 464,
       "pisharp": "src/PiSharp.Durable/Harness/Compaction.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "db700163bad025dd724bb9ffcc5801d6c8273aac",
       "changedLines": 23,
-      "note": "HarnessTasks.CompactionTask (pi.compaction v1: select, summarize, retry, abort; upstream checkpoint, input, result and live status JSON), the summarization prompts and request, the pi.compaction summary entry placed by append (blocking) or write submission (conversation-owned), CompactionHooks.BeforeCompact over CompactionRequest/CompactionDecision, Conversation.CompactAsync and CompactionResult; Compaction.CreateCompactionAsync, SelectCut, SummarizedMessages, SerializeConversation and EstimateContext. Tests: harness.compaction.*, harness.compaction-differential.* (Fixtures/compaction.upstream.json)",
-      "portedBlobSha1": "db700163bad025dd724bb9ffcc5801d6c8273aac"
+      "note": "HarnessTasks.CompactionTask (pi.compaction v1: select, summarize, retry, abort; upstream checkpoint, input, result and live status JSON), the summarization prompts and request, the pi.compaction summary entry placed by append (blocking) or write submission (conversation-owned), CompactionHooks.BeforeCompact over CompactionRequest/CompactionDecision, Conversation.CompactAsync and CompactionResult; Compaction.CreateCompactionAsync, SelectCut, SummarizedMessages, SerializeConversation and EstimateContext. Tests: harness.compaction.*, harness.compaction-differential.* (Fixtures/compaction.upstream.json) v1.2.0 (area j): a failed summarization, a missing model and the scheduler's faulted or orphaned compaction record pi.live.compactionFailure {taskId, reason, error} (Live.FailCompactionStatus), a placed summary removes it; SerializeConversation leaves thinking out. Generation.cs (area a's row) fails a generation whose blocking threshold compaction failed, faulted, was orphaned or aborted with model_error (\"Compaction failed: ...\", \"Compaction was aborted\"), its prepare checkpoint marking threshold: true; Events.cs (area a's row) adds compactionFailure to the snapshot and error to compaction_end. harness.compaction-differential.* reads Fixtures/v1.2.0/compaction.upstream.json with its backgroundFailure and blockingFailure scenarios; compat.compaction-failure.* checks the v1.2.0 capture"
     },
     {
       "upstream": "packages/durable/src/harness/context.ts",
@@ -1474,12 +1473,11 @@
       "lines": 2390,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "edd2d4bd98aa0af54ed67469f6de900e8b9df127",
       "changedLines": 162,
-      "note": "harness.compaction.* on memory (reopen cases on SQLite, as upstream), harness.compaction.jsonl.* (reopen cases on JSONL) and harness.compaction.sqlite.*; range selection and serialization run once. One adaptation: the 300 ms real retry backoff of \"keeps a background summary queued through a retry backoff...\" runs on a ManualTimeProvider advanced after the case steps",
-      "portedBlobSha1": "edd2d4bd98aa0af54ed67469f6de900e8b9df127"
+      "note": "harness.compaction.* on memory (reopen cases on SQLite, as upstream), harness.compaction.jsonl.* (reopen cases on JSONL) and harness.compaction.sqlite.*; range selection and serialization run once. One adaptation: the 300 ms real retry backoff of \"keeps a background summary queued through a retry backoff...\" runs on a ManualTimeProvider advanced after the case steps v1.2.0: never cuts at a display-only entry; serialization omits thinking; records a failure in pi.live, the snapshot and compaction_end; a failed, faulted or directly aborted blocking compaction fails the run without a request; the classifying commit's failure fails the Harness (reopened through ControlledStorage.KeepOpenForReopen). Tools keep ToolExecutionResult.Content until area a renames it to Output in every test."
     },
     {
       "upstream": "packages/durable/test/harness-context.test.ts",

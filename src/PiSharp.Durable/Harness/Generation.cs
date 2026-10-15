@@ -1,4 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/generation.ts.
+// Pi v1.2.0's area j parts of generation.ts are in (durable-sync-1.2.0-worklist.json): the prepare checkpoint's threshold flag and a
+// failed blocking threshold compaction failing the run with model_error. The header moves to v1.2.0 with area a, which owns this row.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -145,6 +147,17 @@ internal static class GenerationPhases
                 return;
             }
         }
+        // A threshold compaction that found nothing to compact or was declined leaves a request that may still fit. One that failed left a
+        // context it judged too large: sending it would at best leave no room for the answer.
+        if (compacted is { } blocking && checkpoint.TryGetValue("threshold", out var blocked) && blocked is JsonBooleanValue { Value: true })
+        {
+            var outcome = (await runtime.OutcomesAsync([blocking], context).ConfigureAwait(false))[0];
+            if (outcome is not CompletedTaskOutcome)
+            {
+                await FailModelErrorAsync(runtime, CompactionFailure(outcome), context).ConfigureAwait(false);
+                return;
+            }
+        }
         var view = await runtime.ContextAsync(conversationId, context).ConfigureAwait(false);
         var shown = HarnessPrompt.ReplaySections(view.Messages);
         void Report(Exception error) => runtime.Report(error);
@@ -168,7 +181,7 @@ internal static class GenerationPhases
             await runtime.CommitAsync(async (tx, _) =>
             {
                 var child = await Compaction.CreateCompactionAsync(tx, conversationId, "threshold", owner: runtime.TaskId).ConfigureAwait(false);
-                return (TaskState?)NextTaskState.Waiting(Prepare(attempt, child, null), [child], JoinPolicy.AllSettled);
+                return (TaskState?)NextTaskState.Waiting(Prepare(attempt, child, null, threshold: true), [child], JoinPolicy.AllSettled);
             }, context).ConfigureAwait(false);
             return;
         }
@@ -798,8 +811,18 @@ internal static class GenerationPhases
         Deferred = pinned.TryGetValue("deferred", out var deferred) ? deferred : null,
     };
 
-    private static JsonObjectValue Prepare(int attempt, TaskId? compacted, string? overflow) => new RecordJson.Writer()
-        .Add("phase", "prepare").Number("attempt", attempt).Add("compacted", compacted?.ToJson()).Add("overflow", overflow).Build();
+    private static JsonObjectValue Prepare(int attempt, TaskId? compacted, string? overflow, bool threshold = false) => new RecordJson.Writer()
+        .Add("phase", "prepare").Number("attempt", attempt).Add("compacted", compacted?.ToJson()).Add("overflow", overflow)
+        .Add("threshold", threshold ? (JsonValue)true : null).Build();
+
+    /// <summary>Error text for a generation whose blocking compaction ended without completing (upstream <c>compactionFailure</c>).</summary>
+    private static string CompactionFailure(TaskOutcome outcome) => outcome switch
+    {
+        FailedTaskOutcome failed => $"Compaction failed: {failed.Error.Message}",
+        FaultedTaskOutcome faulted => $"Compaction failed: {faulted.Error.Message}",
+        OrphanedTaskOutcome orphaned => $"Compaction failed: {orphaned.Reason}",
+        _ => "Compaction was aborted",
+    };
 
     private static JsonObjectValue ToolsCheckpoint(EntryId assistant, IEnumerable<TaskId> tools, IEnumerable<string> pending) => new RecordJson.Writer()
         .Add("phase", "tools")

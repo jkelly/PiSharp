@@ -87,6 +87,8 @@ None is planned or in progress.
 
 - **Input entries (v1.2.0, area i).** Upstream's input `entry: { kind, data }` is `InputEntry(Kind, Data)`, passed to `SubmissionDraft.Input`. It is typed, so an untyped caller's extra fields cannot reach it; only its kind is checked (non-empty, outside `pi.`). Until area a lands, `harness.inbox-differential.steer` compares the v1.2.0 capture's one `pi.tool` task in its v1 shape, after checking that version 2 and `kind: "model"` are its only differences.
 
+- **Compaction failures (v1.2.0, area j)** are ported as upstream has them: `pi.live.compactionFailure`, the snapshot's `CompactionFailure` and `CompactionEndEvent.Error`, and a generation whose blocking threshold compaction did not complete fails with `model_error` before its request. `Live.cs`, `Generation.cs` and `Events.cs` keep their v1.1.0 headers until area a, which owns their rows.
+
 **Benchmarks** (`benchmarks/PiSharp.Durable.Benchmarks`) are report only; see `docs/durable-benchmarks.md`.
 - On the one Windows machine measured, neither runtime meets upstream's 0.4 s target for `cat` of 1 GiB:
   - upstream under Node: about 1.75 s;

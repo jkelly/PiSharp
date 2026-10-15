@@ -1,10 +1,11 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/compaction.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/compaction.ts.
 //
 // Mappings:
 // - Input, checkpoints and results are upstream's JSON in its key order: input {reason, instructions?}; checkpoints {phase: "select"},
 //   {phase: "summarize", attempt, model, thinkingLevel, streamOptions, maxTokens, tail, firstKept} and the same request followed by
 //   `until` for {phase: "retry"}; the result is {entryId} (blocking), {submissionId} (conversation-owned) or {} (nothing compacted).
-// - The live status is upstream's {taskId, reason, blocking, attempt, retry?: {at, error}} in pi.live.compactions (Live.cs).
+// - The live status is upstream's {taskId, reason, blocking, attempt, retry?: {at, error}} in pi.live.compactions (Live.cs); a failure stays
+//   in pi.live.compactionFailure {taskId, reason, error} until a compaction produces a summary.
 // - The summarization request crosses IDurableModels.CompleteSimpleAsync with pi-ai wire messages; its answer comes back as a
 //   PiSharp.Contracts message and is classified as wire JSON (GenerationPhases.ToWire). `runtime.signal` is ITaskRuntime.Signal, and
 //   `signal.throwIfAborted()` throws OperationCanceledException.
@@ -253,8 +254,9 @@ internal static class Compaction
                     ]));
                 return NextTaskState.Running(request.Checkpoint("retry", until));
             }
-            Live.RemoveCompactionStatus(live, runtime.TaskId);
-            return (TaskState?)NextTaskState.Failed(SummaryFailure(message), Reason("model_error"));
+            var text = SummaryFailure(message);
+            Live.FailCompactionStatus(live, runtime.TaskId, text);
+            return (TaskState?)NextTaskState.Failed(text, Reason("model_error"));
         }, context).ConfigureAwait(false);
     }
 
@@ -442,10 +444,8 @@ internal static class Compaction
                 case "assistant":
                 {
                     var blocks = Blocks(message);
-                    var thinking = blocks.Where(content => Str(content, "type") == "thinking").Select(content => Text(content, "thinking")).ToList();
                     var text = blocks.Where(content => Str(content, "type") == "text").Select(content => Text(content, "text")).ToList();
                     var calls = blocks.Where(content => Str(content, "type") == "toolCall").Select(Call).ToList();
-                    if (thinking.Count > 0) parts.Add($"[Assistant thinking]: {string.Join("\n", thinking)}");
                     if (text.Count > 0) parts.Add($"[Assistant]: {string.Join("\n", text)}");
                     if (calls.Count > 0) parts.Add($"[Assistant tool calls]: {string.Join("; ", calls)}");
                     break;
@@ -500,6 +500,7 @@ internal static class Compaction
         string summary)
     {
         Live.RemoveCompactionStatus(live, runtime.TaskId);
+        live.Delete("compactionFailure");
         var (reason, _) = Input(current.Input);
         var entry = new EntryDraft
         {
@@ -535,7 +536,7 @@ internal static class Compaction
         var message = reference is null ? "No model is configured" : $"Model {reference.Provider}/{reference.ModelId} is not available";
         return runtime.CommitAsync(async (tx, _) =>
         {
-            Live.RemoveCompactionStatus(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId);
+            Live.FailCompactionStatus(await tx.DocAsync(Live.LiveDoc, runtime.ConversationId).ConfigureAwait(false), runtime.TaskId, message);
             return (TaskState?)NextTaskState.Failed(message, Reason("no_model"));
         }, context);
     }

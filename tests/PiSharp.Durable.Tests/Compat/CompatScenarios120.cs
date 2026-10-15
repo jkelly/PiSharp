@@ -92,6 +92,54 @@ internal static class CompatScenarios120
 
     private static InputEntry Mention(string text) => new("chat.mention", Obj(("author", "ann"), ("text", text)));
 
+    /// <summary>scenarios-v1.2.0.mjs <c>compactingChat</c>: the faux model answers agent and summarization requests from separate queues.</summary>
+    private sealed class CompactingChat
+    {
+        public CompactingChat(double contextWindow)
+        {
+            Setup = Chat(new FauxOptions { Models = [new FauxModelOptions("faux-1", contextWindow, 900)] });
+            Setup.Stream = new ConversationStreamOptions { CacheRetention = "none" };
+            Setup.Retry = new RetrySettings { Enabled = true, MaxRetries = 2, BaseDelayMs = 1 };
+            Setup.Compaction = new CompactionSettings { Enabled = false, ReserveTokens = 1000, KeepRecentTokens = 150, BackgroundTokens = 0 };
+            Setup.Registry.Install(Define.Extension(new Extension
+            {
+                Name = "section:preamble",
+                Sections = [Define.Section("preamble", (_, _) => ValueTask.FromResult<string?>("You are helpful."), false)],
+            }));
+            Setup.Faux.SetResponses([.. Enumerable.Range(0, 100).Select(_ => (FauxStep)new FauxResponseFactory(async request =>
+            {
+                var summary = request.Messages.Length > 0 && request.Messages[0] is JsonObjectValue first && first["role"] is JsonStringValue { Value: "system" } &&
+                    first["content"] is JsonStringValue { Value: var content } &&
+                    content.StartsWith("You are a context summarization assistant", StringComparison.Ordinal);
+                var queue = summary ? Summaries : Agent;
+                Func<Task<JsonObjectValue>> step;
+                lock (queue)
+                {
+                    if (queue.Count == 0) throw new InvalidOperationException($"No scripted {(summary ? "summary" : "agent")} response");
+                    step = queue[0];
+                    queue.RemoveAt(0);
+                }
+                return await step();
+            }))]);
+        }
+
+        public ChatSetup Setup { get; }
+        public List<Func<Task<JsonObjectValue>>> Agent { get; } = [];
+        public List<Func<Task<JsonObjectValue>>> Summaries { get; } = [];
+
+        public static void Push(List<Func<Task<JsonObjectValue>>> queue, Func<Task<JsonObjectValue>> step)
+        {
+            lock (queue) queue.Add(step);
+        }
+
+        public static int Count(List<Func<Task<JsonObjectValue>>> queue)
+        {
+            lock (queue) return queue.Count;
+        }
+    }
+
+    private static string Tokens(string label, int count) => $"{label} {new string('x', Math.Max(0, count * 4 - label.Length - 1))}";
+
     internal static readonly IReadOnlyList<CompatScenario120> All =
     [
         new("input-entries", ["i"], async open =>
@@ -122,6 +170,46 @@ internal static class CompatScenarios120
             await harness.WaitForIdleAsync(Context);
             await harness.CloseAsync(Context);
             return null;
+        }),
+        new("compaction-failure", ["j"], async open =>
+        {
+            var chat = new CompactingChat(2000);
+            var setup = chat.Setup;
+            JsonObjectValue Failure(string message) => FauxAssistantMessage("", stopReason: "error", errorMessage: message, timestamp: T);
+            var (harness, root) = await Open(setup, await open());
+            async Task<SubmissionRecord> Turn(string user, string? reply)
+            {
+                if (reply is not null) CompactingChat.Push(chat.Agent, () => Task.FromResult(Answer(reply)));
+                return await (await root.SubmitAsync(SubmissionDraft.Input(user), Context)).WaitAsync(Context);
+            }
+            foreach (var n in new[] { 1, 2, 3 }) await Turn(Tokens($"u{n}", 100), Tokens($"a{n}", 100));
+            setup.Compaction = new CompactionSettings { Enabled = true, ReserveTokens = 500, KeepRecentTokens = 150, BackgroundTokens = 1000 };
+            // As capture-compaction.mjs orders a background compaction: the answer waits until the summarization request is sent, and the
+            // summarization fails only once the turn has ended.
+            var reached = new HarnessTests.Deferred();
+            var held = new HarnessTests.Deferred();
+            CompactingChat.Push(chat.Summaries, async () =>
+            {
+                reached.Resolve();
+                await held.Task;
+                return Failure("bad request");
+            });
+            CompactingChat.Push(chat.Agent, async () =>
+            {
+                await reached.Task;
+                return Answer(Tokens("a4", 100));
+            });
+            var background = await Turn(Tokens("u4", 100), null);
+            held.Resolve();
+            await HarnessTests.Eventually(async () => (await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context))?.ContainsKey("compactionFailure") == true);
+            await harness.WaitForIdleAsync(Context);
+            setup.Compaction = new CompactionSettings { Enabled = true, ReserveTokens = 500, KeepRecentTokens = 150, BackgroundTokens = 0 };
+            CompactingChat.Push(chat.Summaries, () => Task.FromResult(Failure("still bad")));
+            var blocking = await Turn(Tokens("u5", 900), null);
+            await harness.WaitForIdleAsync(Context);
+            await harness.CloseAsync(Context);
+            return Obj(("background", background.ToJson()), ("blocking", blocking.ToJson()),
+                ("unusedAgentReplies", CompactingChat.Count(chat.Agent)), ("unusedSummaries", CompactingChat.Count(chat.Summaries)));
         }),
         new("display-only-write", ["i"], async open =>
         {
