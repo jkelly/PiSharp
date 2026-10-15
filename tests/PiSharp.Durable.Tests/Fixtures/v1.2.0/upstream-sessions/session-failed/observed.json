@@ -1,0 +1,68 @@
+{
+ "sqlite": {
+  "run": {
+   "failed": {
+    "error": {
+     "name": "Error",
+     "message": "disk gone"
+    }
+   },
+   "later": {
+    "error": {
+     "name": "SessionFailed",
+     "message": "Session failed after a storage error; close and reopen it",
+     "cause": "disk gone"
+    }
+   },
+   "idle": {
+    "value": null
+   },
+   "closed": {
+    "reason": "failed",
+    "error": {
+     "name": "Error",
+     "message": "disk gone"
+    }
+   },
+   "reports": [
+    {
+     "name": "Error",
+     "message": "disk gone"
+    }
+   ]
+  }
+ },
+ "jsonl": {
+  "run": {
+   "failed": {
+    "error": {
+     "name": "Error",
+     "message": "disk gone"
+    }
+   },
+   "later": {
+    "error": {
+     "name": "SessionFailed",
+     "message": "Session failed after a storage error; close and reopen it",
+     "cause": "disk gone"
+    }
+   },
+   "idle": {
+    "value": null
+   },
+   "closed": {
+    "reason": "failed",
+    "error": {
+     "name": "Error",
+     "message": "disk gone"
+    }
+   },
+   "reports": [
+    {
+     "name": "Error",
+     "message": "disk gone"
+    }
+   ]
+  }
+ }
+}

@@ -1,17 +1,20 @@
-// Prints Fixtures/env-line-scan.upstream.json: what the pinned durable env (Pi abe508e1b89912adde45528136c3221eb69acdd7,
+// Prints Fixtures/env-line-scan.upstream.json: what the pinned durable env (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs;
 // packages/durable/src/env/decode.ts and line-scan.ts) and Node's WHATWG TextDecoder produce for the 5000 seeded random files of
 // test/env-line-scan.test.ts, which EnvLineScanCases.cs replays with the same generator and chunking. Per seed, a digest of
 // "seed|file bytes (hex)|UTF-8 of new TextDecoder().decode(file) (hex)" for the decoding case, and of
 // "seed|startLine|endLine|newlines,start,end,firstLineEnd,lastLineStart,selectedBytes,firstLineBytes" from upstream's LineScanner fed in
 // the test's chunks for the scanning case (each the first 16 hex digits of its SHA-256).
-// Usage, from a Pi checkout at that commit (with its node_modules installed):
-//   node --no-warnings --conditions=source --experimental-strip-types capture-env-line-scan.mjs <pi checkout> > env-line-scan.upstream.json
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings --conditions=source --experimental-strip-types capture-env-line-scan.mjs <pi checkout> --commit <sha> > env-line-scan.upstream.json
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-env-line-scan.mjs <pi checkout>');
+import { pinnedArguments } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-env-line-scan.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
 const at = (path) => pathToFileURL(join(pi, 'packages/durable/src/env', path)).href;
 const { StreamDecoder } = await import(at('decode.ts'));
 const { LineScanner } = await import(at('line-scan.ts'));
@@ -77,7 +80,7 @@ const bom = Uint8Array.from([0xe2, 0x82, 0xef, 0xbb, 0xbf, 0x61]);
 const bomDecoder = new StreamDecoder();
 const bomText = [...bom].map((byte) => bomDecoder.decode(Uint8Array.of(byte))).join('') + bomDecoder.decode();
 process.stdout.write(JSON.stringify({
-  source: 'Pi abe508e1b89912adde45528136c3221eb69acdd7 packages/durable/src/env/{decode,line-scan}.ts under Node ' + process.version,
+  source: `Pi ${pin.commit} packages/durable/src/env/{decode,line-scan}.ts under Node ${process.version}`,
   keepsLaterBom: [...bomText].map((character) => character.codePointAt(0)),
   decode,
   scan,

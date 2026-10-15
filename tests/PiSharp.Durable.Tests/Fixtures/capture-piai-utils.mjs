@@ -1,13 +1,16 @@
-// Prints Fixtures/piai-utils.upstream.json: what the pinned pi-ai (Pi abe508e1b89912adde45528136c3221eb69acdd7, packages/ai/src/utils)
+// Prints Fixtures/piai-utils.upstream.json: what the pinned pi-ai (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs; packages/ai/src/utils)
 // returns for the inputs PiAiUtilsCases.cs replays: isContextOverflow, isRetryableAssistantError, retryDelayMs, getCurrentTools,
 // declarationsEqual/toToolDeclaration, estimateMessageTokens and calculateContextTokens.
-// Usage, from a Pi checkout at that commit:
-//   node --no-warnings --experimental-strip-types capture-piai-utils.mjs <pi checkout> > piai-utils.upstream.json
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings --experimental-strip-types capture-piai-utils.mjs <pi checkout> --commit <sha> > piai-utils.upstream.json
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-piai-utils.mjs <pi checkout>');
+import { pinnedArguments } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-piai-utils.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
 const at = (path) => pathToFileURL(join(pi, 'packages/ai/src/utils', path)).href;
 const { isContextOverflow } = await import(at('overflow.ts'));
 const { isRetryableAssistantError, retryDelayMs } = await import(at('retry.ts'));

@@ -1,0 +1,67 @@
+{
+ "description": "Every durable capture at Pi v1.2.0, made by tools/DurableFixtures/capture-all.mjs. The v1.1.0 set stays in tests/PiSharp.Durable.Tests/Fixtures (*.upstream.json(l), upstream-sessions), which the C# suites still read; each work-list area moves its suites to this set when it lands (index.json). Regenerate with the command below, never edit by hand.",
+ "upstream": {
+  "release": "Pi v1.2.0",
+  "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+  "package": "@earendil-works/pi-durable@1.2.0 (sources)",
+  "piAi": "@earendil-works/pi-ai 1.2.0 (published build)",
+  "chord": "@earendil-works/chord 1.2.0 (sources)",
+  "codemode": "@earendil-works/pi-codemode 1.2.0 (sources)"
+ },
+ "node": "v22.18.0",
+ "sqlite": "3.50.2",
+ "platform": "win32 x64",
+ "command": "node --no-warnings tools/DurableFixtures/capture-all.mjs <pi checkout at the commit> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff --check",
+ "commands": {
+  "upstream-sessions/": "node --no-warnings --conditions=source --experimental-strip-types tools/DurableFixtures/capture.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff <out>/upstream-sessions",
+  "chat-turns.upstream.json": "node --no-warnings --conditions=source --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-chat-turns.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/chat-turns.upstream.json",
+  "compaction.upstream.json": "node --no-warnings --conditions=source --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-compaction.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/compaction.upstream.json",
+  "env-line-scan.upstream.json": "node --no-warnings --conditions=source --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-env-line-scan.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/env-line-scan.upstream.json",
+  "inbox.upstream.json": "node --no-warnings --conditions=source --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-inbox.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/inbox.upstream.json",
+  "piai-utils.upstream.json": "node --no-warnings --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-piai-utils.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/piai-utils.upstream.json",
+  "piai-validation.upstream.json": "node --no-warnings tests/PiSharp.Durable.Tests/Fixtures/capture-piai-validation.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/piai-validation.upstream.json",
+  "task-graph.upstream.json": "node --no-warnings --conditions=source --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-task-graph.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/task-graph.upstream.json",
+  "tool-rounds.upstream.json": "node --no-warnings --conditions=source --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-tool-rounds.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/tool-rounds.upstream.json",
+  "tools.upstream.json": "node --no-warnings --conditions=source --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-tools.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/tools.upstream.json",
+  "views.upstream.json": "node --no-warnings --conditions=source --experimental-strip-types tests/PiSharp.Durable.Tests/Fixtures/capture-views.mjs <pi checkout> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff > <out>/views.upstream.json",
+  "examples-19-json-events.upstream.jsonl": "cd <pi checkout>/packages/durable && node --conditions=source --experimental-strip-types test/examples/19-json.ts --events > <out>/examples-19-json-events.upstream.jsonl (no OPENAI_API_KEY; the temporary SQLite file it names on stderr is removed)",
+  "examples-19-json-ops.upstream.jsonl": "cd <pi checkout>/packages/durable && node --conditions=source --experimental-strip-types test/examples/19-json.ts --ops > <out>/examples-19-json-ops.upstream.jsonl (no OPENAI_API_KEY; the temporary SQLite file it names on stderr is removed)"
+ },
+ "varies": [
+  {
+   "field": "sessionId in pi.provider documents",
+   "why": "pi-ai uuidv7() on first use: random bits and Date.now(); upstream takes no seed"
+  },
+  {
+   "field": "durationMs of tool result messages",
+   "why": "performance.now() around the tool call"
+  },
+  {
+   "field": "SQLite page layout and file bytes",
+   "why": "SQLite; the records, not the pages, are the evidence"
+  },
+  {
+   "field": "durationMs anywhere: nested call results (pi.tool.nested documents, observed results, tool events)",
+   "why": "performance.now() around each call"
+  },
+  {
+   "field": "the seconds in \"Wall time <seconds> seconds\" of codemode results",
+   "why": "the script's wall time, measured by upstream"
+  },
+  {
+   "field": "seed, startedAt and deadline of pi.codemode.run's start, and `at` of pi.codemode.journal entries",
+   "why": "code mode's own VM clock (Date.now()) and seed (crypto.getRandomValues), which it journals so a replay sees the same ones"
+  },
+  {
+   "field": "example 19: timestamps, durationMs, the faux API name (\"faux:<time>:<random>\") and the streamed partial messages",
+   "why": "the example uses the wall clock and a faux model streaming at 200 tokens per second, committed every 100 ms; ExamplesCases.cs compares them as placeholders"
+  }
+ ],
+ "normalized": "replace every sessionId string with \"<session>\", every durationMs number with \"<duration>\", the seconds of \"Wall time <seconds> seconds\" with \"<seconds>\", and code mode's clock and seed fields as listed, on both sides; nothing else (normalize() in tools/DurableFixtures/compare-captures.mjs)",
+ "determinism": {
+  "checked": "2026-10-15",
+  "files": 239,
+  "differing": [],
+  "method": "capture-all.mjs --check: a second capture compared file by file with compare-captures.mjs normalization (session.sqlite files through their records); example 19 also without its streamed partial messages and with times, durations and the faux API name as placeholders"
+ }
+}

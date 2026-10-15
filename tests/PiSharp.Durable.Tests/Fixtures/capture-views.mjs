@@ -1,16 +1,21 @@
-// Prints Fixtures/views.upstream.json: what the pinned pi-durable (Pi abe508e1b89912adde45528136c3221eb69acdd7) delivers to a conversation
+// Prints Fixtures/views.upstream.json: what the pinned pi-durable (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs) delivers to a conversation
 // watch (conversation.watch: the acquisition view, then each frame's operations) and to an agent event stream (watchEvents: the snapshot,
 // then each batch) attached before the run, for HarnessViewsDifferentialCases.cs's scenarios with pi-ai's faux provider on MemoryStorage:
 // a tool turn (one tool call that publishes running details, then the answer) and an aborted sequential round (the first tool blocks after
 // publishing details, the generation is aborted, and the unstarted calls are answered). Times and the provider session ID are normalized as
 // capture-chat-turns.mjs normalizes them.
-// Usage, from a Pi checkout at that commit with node_modules installed (pi-ai is the published 1.1.0 build):
-//   node --no-warnings --conditions=source --experimental-strip-types capture-views.mjs <pi checkout> > views.upstream.json
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings --conditions=source --experimental-strip-types capture-views.mjs <pi checkout> --commit <sha> > views.upstream.json
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-views.mjs <pi checkout>');
+import { pinnedArguments, toolResult } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-views.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
+/** A tool result in the pinned version's shape: `content` at v1.1.0, `output` from v1.2.0. */
+const result = (content, rest) => toolResult(pin, content, rest);
 const at = (path) => pathToFileURL(join(pi, path)).href;
 const { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, Type } = await import(at('node_modules/@earendil-works/pi-ai/dist/index.js'));
 const { createRegistry, defineExtension, defineTool, Harness, LiveDoc, watchEvents } = await import(at('packages/durable/src/index.ts'));
@@ -74,7 +79,7 @@ const out = {};
       parameters: Type.Object({ text: Type.String() }),
       execute: async (args, api, callContext) => {
         await api.details({ step: 1 }, callContext);
-        return { content: [{ type: 'text', text: `echo ${args.text}` }] };
+        return result([{ type: 'text', text: `echo ${args.text}` }]);
       },
     })],
   }));

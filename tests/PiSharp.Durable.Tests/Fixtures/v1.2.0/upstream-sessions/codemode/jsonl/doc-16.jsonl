@@ -1,0 +1,2 @@
+{"format":1,"type":"record","seq":13,"ordinal":1,"payload":{"type":"document","id":16,"content":{"version":1,"kind":"base","value":{"taskId":17}}}}
+{"format":1,"type":"record","seq":16,"ordinal":1,"payload":{"type":"document","id":16,"content":{"version":1,"kind":"delta","ops":[["s",["result"],{"taskId":17,"structuredOutput":"echo a","isError":false,"diagnostics":[],"durationMs":0}]]}}}

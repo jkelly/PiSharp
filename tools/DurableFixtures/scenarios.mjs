@@ -1,9 +1,9 @@
-// The scenarios capture.mjs runs on the pinned upstream pi-durable, and the storage helpers capture.mjs and verify-reverse.mjs share.
-// tests/PiSharp.Durable.Tests/Compat/CompatScenarios.cs runs the same scenarios on PiSharp; keep the two in step.
+// The scenarios capture.mjs runs on a pinned upstream pi-durable (pin.mjs), and the storage helpers capture.mjs and verify-reverse.mjs
+// share. tests/PiSharp.Durable.Tests/Compat/CompatScenarios.cs runs the same scenarios on PiSharp; keep the two in step. Tool results take
+// the pinned version's shape (`content` at v1.1.0, `output` from v1.2.0); scenarios-v1.2.0.mjs adds the scenarios only v1.2.0 has.
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-
-export const PI_COMMIT = 'abe508e1b89912adde45528136c3221eb69acdd7';
+import { toolResult } from './pin.mjs';
 /** The Harness clock (`now`), fixed so task times, user message timestamps and inbox times repeat. */
 export const NOW = 1767225600000;
 /** The timestamp of every scripted faux answer. */
@@ -13,15 +13,30 @@ let ai;
 let durable;
 let sqlite;
 let jsonl;
+let pin;
+/** Sinks for agent events: when set, open() streams the root conversation's events (watchEvents) into it until the Harness closes. */
+let eventSink;
 
-/** Loads pi-ai (the published build in node_modules) and pi-durable's sources from a Pi checkout. */
-export async function setPi(pi) {
+/** Loads pi-ai (the published build in node_modules) and pi-durable's sources from a Pi checkout at `pinned` (pin.mjs). */
+export async function setPi(pi, pinned) {
+  pin = pinned;
   const at = (path) => pathToFileURL(join(pi, path)).href;
   ai = await import(at('node_modules/@earendil-works/pi-ai/dist/index.js'));
   durable = { ...(await import(at('packages/durable/src/index.ts'))), configure: (await import(at('packages/durable/src/harness/agent.ts'))).configure };
   sqlite = await import(at('packages/durable/src/storage/sqlite/node.ts'));
   jsonl = await import(at('packages/durable/src/storage/jsonl/node.ts'));
 }
+
+/** The loaded modules, for scenarios-v1.2.0.mjs: pi-ai, pi-durable (with configure), and the pinned version. */
+export const upstream = () => ({ ai, durable, pin, at: (path) => pathToFileURL(join(pin.pi, path)).href });
+
+/** Streams the events of every root conversation open() opens into `sink` (an array), or stops when `sink` is undefined. */
+export function recordEvents(sink) {
+  eventSink = sink;
+}
+
+/** A tool result in the pinned version's shape. */
+export const result = (content, rest) => toolResult(pin, content, rest);
 
 /** Opens upstream storage: `session.sqlite` in the directory, or the directory as JSONL storage. */
 export function openBackend(backend, directory, context) {
@@ -71,9 +86,23 @@ export function createChat(options = {}) {
   return { faux, models, registry: durable.createRegistry(), settings: {} };
 }
 
-async function open(setup, storage, context) {
-  const harness = await durable.Harness.open(storage, { models: setup.models, registry: setup.registry, settings: setup.settings, now: () => NOW }, context);
+export async function open(setup, storage, context, options = {}) {
+  const harness = await durable.Harness.open(storage, { models: setup.models, registry: setup.registry, settings: setup.settings, now: () => NOW, ...options }, context);
   const root = await harness.root(context, { agent: { model: { provider: 'faux', modelId: 'faux-1' } } });
+  if (eventSink !== undefined) {
+    // Every event delivered before the Harness closes, in order; batch boundaries are left out, since they depend on timing.
+    const sink = eventSink;
+    const stream = await durable.watchEvents(harness, root.id, context);
+    // As examples/19-json.ts prints them: the snapshot first, as a `snapshot` event.
+    sink.push({ type: 'snapshot', ...stream.snapshot });
+    stream.start(async (events) => { sink.push(...events); });
+    const close = harness.close.bind(harness);
+    harness.close = async (closeContext) => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await stream.stop();
+      return close(closeContext);
+    };
+  }
   return { harness, root };
 }
 
@@ -84,18 +113,18 @@ export async function openOnly(openStorage, context) {
   await harness.close(context);
 }
 
-const deferred = () => {
+export const deferred = () => {
   let resolve;
   const promise = new Promise((r) => { resolve = r; });
   return { promise, resolve };
 };
-const aborted = (signal) => new Promise((resolve) => {
+export const aborted = (signal) => new Promise((resolve) => {
   if (signal.aborted) resolve();
   else signal.addEventListener('abort', () => resolve(), { once: true });
 });
-const answer = (text) => ai.fauxAssistantMessage(text, { timestamp: T });
-const calls = (...list) => ai.fauxAssistantMessage(list.map(([name, args, id]) => ai.fauxToolCall(name, args, { id })), { stopReason: 'toolUse', timestamp: T });
-const eventually = async (check) => {
+export const answer = (text) => ai.fauxAssistantMessage(text, { timestamp: T });
+export const calls = (...list) => ai.fauxAssistantMessage(list.map(([name, args, id]) => ai.fauxToolCall(name, args, { id })), { stopReason: 'toolUse', timestamp: T });
+export const eventually = async (check) => {
   for (let attempt = 0; attempt < 4000; attempt++) {
     if (await check()) return;
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -121,7 +150,7 @@ function workTool() {
         started.resolve();
         await aborted(callContext.abortSignal);
       }
-      return { content: [{ type: 'text', text: `finished run ${state.runs}` }] };
+      return result([{ type: 'text', text: `finished run ${state.runs}` }]);
     },
   });
   return { registration, started, state };
@@ -140,7 +169,7 @@ export const scenarios = [
       setup.registry.install(durable.defineExtension({
         name: 'base',
         sections: [durable.section('preamble', () => 'You are terse.', { tag: false }), durable.section('cwd', () => '/repo')],
-        tools: [durable.defineTool({ name: 'noop', description: 'Does nothing', parameters: ai.Type.Object({}), execute: async () => ({ content: [] }) })],
+        tools: [durable.defineTool({ name: 'noop', description: 'Does nothing', parameters: ai.Type.Object({}), execute: async () => result([]) })],
       }));
       setup.faux.setResponses([answer('Hello there')]);
       const { harness, root } = await open(setup, await openStorage(), context);
@@ -250,7 +279,7 @@ export const scenarios = [
             if (settled.status !== 'done' || settled.type !== 'input') throw new Error(`Subagent failed: ${settled.status}`);
             const entry = await api.commit((tx) => tx.entry(durable.AssistantEntry, settled.answer), callContext);
             const text = entry.model[0].content.flatMap((c) => (c.type === 'text' ? [c.text] : [])).join('');
-            return { content: [{ type: 'text', text }], details: { conversationId: child } };
+            return result([{ type: 'text', text }], { details: { conversationId: child } });
           },
         })],
       });

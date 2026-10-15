@@ -1,0 +1,80 @@
+{
+ "sqlite": {
+  "run": {
+   "noteAtOnce": {
+    "conversationId": 1,
+    "type": "write",
+    "status": "done",
+    "entry": 13,
+    "id": 14
+   },
+   "chatBehindReset": {
+    "conversationId": 1,
+    "type": "write",
+    "status": "queued",
+    "id": 16
+   },
+   "inbox": [
+    [
+     10,
+     "followUp"
+    ],
+    [
+     11,
+     "write"
+    ],
+    [
+     12,
+     "write"
+    ],
+    [
+     15,
+     "write"
+    ],
+    [
+     16,
+     "write"
+    ]
+   ]
+  }
+ },
+ "jsonl": {
+  "run": {
+   "noteAtOnce": {
+    "conversationId": 1,
+    "type": "write",
+    "status": "done",
+    "entry": 13,
+    "id": 14
+   },
+   "chatBehindReset": {
+    "conversationId": 1,
+    "type": "write",
+    "status": "queued",
+    "id": 16
+   },
+   "inbox": [
+    [
+     10,
+     "followUp"
+    ],
+    [
+     11,
+     "write"
+    ],
+    [
+     12,
+     "write"
+    ],
+    [
+     15,
+     "write"
+    ],
+    [
+     16,
+     "write"
+    ]
+   ]
+  }
+ }
+}

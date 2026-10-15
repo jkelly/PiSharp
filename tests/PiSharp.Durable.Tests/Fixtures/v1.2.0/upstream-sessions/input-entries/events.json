@@ -1,0 +1,1408 @@
+{
+ "sqlite": {
+  "run": [
+   {
+    "type": "snapshot",
+    "entries": [],
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "ann: hi",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "kind": "chat.mention",
+     "data": {
+      "author": "ann",
+      "text": "hi"
+     },
+     "model": [
+      {
+       "role": "user",
+       "content": "ann: hi",
+       "timestamp": 1767225600000
+      }
+     ],
+     "id": 7,
+     "conversationId": 1
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "requestId": "r1",
+     "type": "input",
+     "status": "placed",
+     "entry": 7,
+     "id": 8
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "hello"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 3,
+      "output": 2,
+      "cacheRead": 0,
+      "cacheWrite": 3,
+      "totalTokens": 8,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "hello"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 3,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 3,
+        "totalTokens": 8,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "requestId": "r1",
+     "type": "input",
+     "status": "done",
+     "entry": 7,
+     "id": 8,
+     "answer": 10
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 3,
+       "output": 2,
+       "cacheRead": 0,
+       "cacheWrite": 3,
+       "totalTokens": 8,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "a",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "user",
+       "content": "a",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 11,
+     "conversationId": 1
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "entry": 11,
+     "id": 12
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     12
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "queued",
+     "id": 14
+    }
+   },
+   {
+    "type": "inbox_update",
+    "items": [
+     {
+      "id": 14,
+      "mode": "steer"
+     }
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "queued",
+     "id": 15
+    }
+   },
+   {
+    "type": "inbox_update",
+    "items": [
+     {
+      "id": 14,
+      "mode": "steer"
+     },
+     {
+      "id": 15,
+      "mode": "followUp"
+     }
+    ]
+   }
+  ],
+  "resume": [
+   {
+    "type": "snapshot",
+    "entries": [
+     {
+      "kind": "chat.mention",
+      "data": {
+       "author": "ann",
+       "text": "hi"
+      },
+      "model": [
+       {
+        "role": "user",
+        "content": "ann: hi",
+        "timestamp": 1767225600000
+       }
+      ],
+      "id": 7,
+      "conversationId": 1
+     },
+     {
+      "model": [
+       {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "text",
+          "text": "hello"
+         }
+        ],
+        "api": "faux",
+        "provider": "faux",
+        "model": "faux-1",
+        "usage": {
+         "input": 3,
+         "output": 2,
+         "cacheRead": 0,
+         "cacheWrite": 3,
+         "totalTokens": 8,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "stop",
+        "timestamp": 1000
+       }
+      ],
+      "kind": "pi.assistant",
+      "id": 10,
+      "conversationId": 1,
+      "byTaskId": 9
+     },
+     {
+      "model": [
+       {
+        "role": "user",
+        "content": "a",
+        "timestamp": 1767225600000
+       }
+      ],
+      "kind": "pi.user",
+      "id": 11,
+      "conversationId": 1
+     }
+    ],
+    "run": {
+     "inputs": [
+      12
+     ]
+    },
+    "generation": {
+     "attempt": 1
+    },
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [
+     {
+      "id": 14,
+      "mode": "steer"
+     },
+     {
+      "id": 15,
+      "mode": "followUp"
+     }
+    ],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 3,
+       "output": 2,
+       "cacheRead": 0,
+       "cacheWrite": 3,
+       "totalTokens": 8,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "first again"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 10,
+      "output": 3,
+      "cacheRead": 0,
+      "cacheWrite": 10,
+      "totalTokens": 23,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "first again"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 10,
+        "output": 3,
+        "cacheRead": 0,
+        "cacheWrite": 10,
+        "totalTokens": 23,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 16,
+     "conversationId": 1,
+     "byTaskId": 13
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "s",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "kind": "p2.input",
+     "model": [
+      {
+       "role": "user",
+       "content": "s",
+       "timestamp": 1767225600000
+      }
+     ],
+     "id": 17,
+     "conversationId": 1,
+     "byTaskId": 13
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "f",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "kind": "chat.mention",
+     "data": {
+      "author": "ann",
+      "text": "f"
+     },
+     "model": [
+      {
+       "role": "user",
+       "content": "f",
+       "timestamp": 1767225600000
+      }
+     ],
+     "id": 18,
+     "conversationId": 1,
+     "byTaskId": 13
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     12
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "entry": 11,
+     "id": 12,
+     "answer": 16
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "id": 14,
+     "entry": 17
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "id": 15,
+     "entry": 18
+    }
+   },
+   {
+    "type": "inbox_update",
+    "items": []
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 13,
+       "output": 5,
+       "cacheRead": 0,
+       "cacheWrite": 13,
+       "totalTokens": 31,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     14,
+     15
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "for s"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 9,
+      "output": 2,
+      "cacheRead": 10,
+      "cacheWrite": 10,
+      "totalTokens": 31,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "for s"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 9,
+        "output": 2,
+        "cacheRead": 10,
+        "cacheWrite": 10,
+        "totalTokens": 31,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 20,
+     "conversationId": 1,
+     "byTaskId": 19
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     14,
+     15
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "id": 14,
+     "entry": 17,
+     "answer": 20
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "id": 15,
+     "entry": 18,
+     "answer": 20
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 22,
+       "output": 7,
+       "cacheRead": 10,
+       "cacheWrite": 23,
+       "totalTokens": 62,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   }
+  ]
+ },
+ "jsonl": {
+  "run": [
+   {
+    "type": "snapshot",
+    "entries": [],
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "ann: hi",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "kind": "chat.mention",
+     "data": {
+      "author": "ann",
+      "text": "hi"
+     },
+     "model": [
+      {
+       "role": "user",
+       "content": "ann: hi",
+       "timestamp": 1767225600000
+      }
+     ],
+     "id": 7,
+     "conversationId": 1
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "requestId": "r1",
+     "type": "input",
+     "status": "placed",
+     "entry": 7,
+     "id": 8
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "hello"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 3,
+      "output": 2,
+      "cacheRead": 0,
+      "cacheWrite": 3,
+      "totalTokens": 8,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "hello"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 3,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 3,
+        "totalTokens": 8,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "requestId": "r1",
+     "type": "input",
+     "status": "done",
+     "entry": 7,
+     "id": 8,
+     "answer": 10
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 3,
+       "output": 2,
+       "cacheRead": 0,
+       "cacheWrite": 3,
+       "totalTokens": 8,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "a",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "user",
+       "content": "a",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 11,
+     "conversationId": 1
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "entry": 11,
+     "id": 12
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     12
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "queued",
+     "id": 14
+    }
+   },
+   {
+    "type": "inbox_update",
+    "items": [
+     {
+      "id": 14,
+      "mode": "steer"
+     }
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "queued",
+     "id": 15
+    }
+   },
+   {
+    "type": "inbox_update",
+    "items": [
+     {
+      "id": 14,
+      "mode": "steer"
+     },
+     {
+      "id": 15,
+      "mode": "followUp"
+     }
+    ]
+   }
+  ],
+  "resume": [
+   {
+    "type": "snapshot",
+    "entries": [
+     {
+      "kind": "chat.mention",
+      "data": {
+       "author": "ann",
+       "text": "hi"
+      },
+      "model": [
+       {
+        "role": "user",
+        "content": "ann: hi",
+        "timestamp": 1767225600000
+       }
+      ],
+      "id": 7,
+      "conversationId": 1
+     },
+     {
+      "model": [
+       {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "text",
+          "text": "hello"
+         }
+        ],
+        "api": "faux",
+        "provider": "faux",
+        "model": "faux-1",
+        "usage": {
+         "input": 3,
+         "output": 2,
+         "cacheRead": 0,
+         "cacheWrite": 3,
+         "totalTokens": 8,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "stop",
+        "timestamp": 1000
+       }
+      ],
+      "kind": "pi.assistant",
+      "id": 10,
+      "conversationId": 1,
+      "byTaskId": 9
+     },
+     {
+      "model": [
+       {
+        "role": "user",
+        "content": "a",
+        "timestamp": 1767225600000
+       }
+      ],
+      "kind": "pi.user",
+      "id": 11,
+      "conversationId": 1
+     }
+    ],
+    "run": {
+     "inputs": [
+      12
+     ]
+    },
+    "generation": {
+     "attempt": 1
+    },
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [
+     {
+      "id": 14,
+      "mode": "steer"
+     },
+     {
+      "id": 15,
+      "mode": "followUp"
+     }
+    ],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 3,
+       "output": 2,
+       "cacheRead": 0,
+       "cacheWrite": 3,
+       "totalTokens": 8,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "first again"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 10,
+      "output": 3,
+      "cacheRead": 0,
+      "cacheWrite": 10,
+      "totalTokens": 23,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "first again"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 10,
+        "output": 3,
+        "cacheRead": 0,
+        "cacheWrite": 10,
+        "totalTokens": 23,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 16,
+     "conversationId": 1,
+     "byTaskId": 13
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "s",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "kind": "p2.input",
+     "model": [
+      {
+       "role": "user",
+       "content": "s",
+       "timestamp": 1767225600000
+      }
+     ],
+     "id": 17,
+     "conversationId": 1,
+     "byTaskId": 13
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "f",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "kind": "chat.mention",
+     "data": {
+      "author": "ann",
+      "text": "f"
+     },
+     "model": [
+      {
+       "role": "user",
+       "content": "f",
+       "timestamp": 1767225600000
+      }
+     ],
+     "id": 18,
+     "conversationId": 1,
+     "byTaskId": 13
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     12
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "entry": 11,
+     "id": 12,
+     "answer": 16
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "id": 14,
+     "entry": 17
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "id": 15,
+     "entry": 18
+    }
+   },
+   {
+    "type": "inbox_update",
+    "items": []
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 13,
+       "output": 5,
+       "cacheRead": 0,
+       "cacheWrite": 13,
+       "totalTokens": 31,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     14,
+     15
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "for s"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 9,
+      "output": 2,
+      "cacheRead": 10,
+      "cacheWrite": 10,
+      "totalTokens": 31,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "for s"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 9,
+        "output": 2,
+        "cacheRead": 10,
+        "cacheWrite": 10,
+        "totalTokens": 31,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 20,
+     "conversationId": 1,
+     "byTaskId": 19
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     14,
+     15
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "id": 14,
+     "entry": 17,
+     "answer": 20
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "id": 15,
+     "entry": 18,
+     "answer": 20
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 22,
+       "output": 7,
+       "cacheRead": 10,
+       "cacheWrite": 23,
+       "totalTokens": 62,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   }
+  ]
+ }
+}

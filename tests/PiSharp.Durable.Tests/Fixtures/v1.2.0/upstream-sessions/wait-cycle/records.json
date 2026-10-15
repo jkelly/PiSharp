@@ -1,0 +1,294 @@
+{
+ "sqlite": {
+  "conversations": [
+   {
+    "id": 1
+   }
+  ],
+  "entries": {
+   "1": []
+  },
+  "tasks": [
+   {
+    "id": 7,
+    "conversationId": 1,
+    "kind": "compat.cycle-b",
+    "version": 1,
+    "input": {
+     "name": "b"
+    },
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "faulted",
+      "error": {
+       "message": "Task 7 cannot wait on 8: 7 -> 8 -> 7 is a wait cycle"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 8,
+    "conversationId": 1,
+    "kind": "compat.cycle-a",
+    "version": 1,
+    "input": {
+     "name": "a"
+    },
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "a": "joined"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   }
+  ],
+  "submissions": [],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {}
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a13edc-4976-7554-b14b-65de29769761"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   }
+  ]
+ },
+ "jsonl": {
+  "conversations": [
+   {
+    "id": 1
+   }
+  ],
+  "entries": {
+   "1": []
+  },
+  "tasks": [
+   {
+    "id": 7,
+    "conversationId": 1,
+    "kind": "compat.cycle-b",
+    "version": 1,
+    "input": {
+     "name": "b"
+    },
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "faulted",
+      "error": {
+       "message": "Task 7 cannot wait on 8: 7 -> 8 -> 7 is a wait cycle"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 8,
+    "conversationId": 1,
+    "kind": "compat.cycle-a",
+    "version": 1,
+    "input": {
+     "name": "a"
+    },
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "a": "joined"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   }
+  ],
+  "submissions": [],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {}
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a13edc-4998-7554-b14b-65e1389cb96d"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   }
+  ]
+ }
+}

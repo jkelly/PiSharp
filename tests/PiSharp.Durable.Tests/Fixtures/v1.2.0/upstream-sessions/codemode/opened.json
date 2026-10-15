@@ -1,0 +1,1148 @@
+{
+ "sqlite": {
+  "conversations": [
+   {
+    "id": 1
+   }
+  ],
+  "entries": {
+   "1": [
+    {
+     "model": [
+      {
+       "role": "user",
+       "content": "go",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    },
+    {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "codemode": "<codemode>\nTools scripts can call (`await tools.<name>(args)`):\n\n### `echo`\necho\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```\n\n### `hold`\nhold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```\n</codemode>"
+       },
+       "toolsAdded": [
+        {
+         "name": "codemode",
+         "description": "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n- The script survives a restart: it resumes where it was, without running finished calls again.\n- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`\n\nGlobals:\n- `text(value)`, `image(dataUrlOrImageBlock)`, `console.log(...)`, and top-level `return` add output; `exit()` ends the script. With several text items, each starts with a `==> text N/M <==` line, and `console` lines follow the other output in one `<console_output>` block. `image()` also saves the image to a temp file and the result names its path.\n- `store(key, value)` and `load(key)` keep JSON values across codemode calls.\n- `ALL_TOOLS`, `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`: find tools the `codemode` section does not list.\n\n`models` (all functions return promises):\n- `models.getModelsOfType(type, provider?)`, `models.getAvailableOfType(type, provider?)` (configured auth only), `models.getModelOfType(type, provider, id)`: the catalog; `type` is \"chat\", \"image\", or \"classifier\".\n- `models.classify(model, { state: { ... }, images?: [{ type: \"image\", data, mimeType }], questions: { <id>: { type: \"choice\", instructions, criteria: { <label>: <meaning> } } | { type: \"score\", instructions, criteria: [<lowest level>, ..., <highest level>] } | { type: \"bool\", instructions, criteria: { true: <meaning>, false: <meaning> } } } })` resolves to `{ answers: { <id>: ... }, stopReason, errorMessage?, usage? }`.\n- `models.generateImages(model, { input: [{ type: \"text\", text: <prompt> }, ...optional { type: \"image\", data, mimeType }] })` resolves to `{ output: [image blocks], stopReason, errorMessage?, usage? }`; show each image with `image(block)`.\nAt most 4 classify/generateImages calls run at once; more wait.\n\nThe `codemode` section of the system prompt lists the tools scripts can call, by namespace, as far as space allows.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "code"
+          ],
+          "properties": {
+           "code": {
+            "type": "string",
+            "description": "Raw JavaScript source."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "grammar",
+          "variants": {
+           "openai_lark": "\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"
+          }
+         }
+        },
+        {
+         "name": "echo",
+         "description": "echo",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string"
+           },
+           "id": {
+            "type": "number"
+           }
+          }
+         }
+        },
+        {
+         "name": "hold",
+         "description": "hold",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string"
+           },
+           "id": {
+            "type": "number"
+           }
+          }
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "s1",
+         "name": "codemode",
+         "arguments": {
+          "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+         }
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 895,
+        "output": 44,
+        "cacheRead": 0,
+        "cacheWrite": 895,
+        "totalTokens": 1834,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   ]
+  },
+  "tasks": [
+   {
+    "id": 9,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "waiting",
+     "checkpoint": {
+      "phase": "tools",
+      "assistant": 11,
+      "tools": [
+       12
+      ],
+      "pending": []
+     },
+     "on": [
+      12
+     ],
+     "policy": "allSettled"
+    },
+    "startedAt": 1767225600000
+   },
+   {
+    "id": 12,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 11,
+     "callId": "s1"
+    },
+    "owner": 9,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "pending",
+     "checkpoint": {
+      "phase": "execute",
+      "arguments": {
+       "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+      },
+      "replay": "safe"
+     }
+    },
+    "startedAt": 1767225600000,
+    "memos": {
+     "pi.tool.madeNestedCalls": true
+    }
+   },
+   {
+    "id": 17,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 12,
+     "parentCallId": "s1",
+     "key": "c1",
+     "call": {
+      "type": "toolCall",
+      "id": "s1/c1",
+      "name": "echo",
+      "arguments": {
+       "text": "a"
+      }
+     }
+    },
+    "owner": 12,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 19,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 12,
+     "parentCallId": "s1",
+     "key": "c2",
+     "call": {
+      "type": "toolCall",
+      "id": "s1/c2",
+      "name": "hold",
+      "arguments": {
+       "id": 1
+      }
+     }
+    },
+    "owner": 12,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "pending",
+     "checkpoint": {
+      "phase": "execute",
+      "arguments": {
+       "id": 1
+      },
+      "replay": "safe"
+     }
+    },
+    "startedAt": 1767225600000
+   }
+  ],
+  "submissions": [
+   {
+    "conversationId": 1,
+    "type": "input",
+    "status": "placed",
+    "entry": 7,
+    "id": 8
+   }
+  ],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "run": {
+      "taskId": 9,
+      "inputs": [
+       8
+      ]
+     },
+     "tools": [
+      {
+       "callId": "s1",
+       "name": "codemode",
+       "taskId": 12,
+       "status": "running"
+      }
+     ],
+     "nestedTools": [
+      {
+       "callId": "s1/c1",
+       "parentCallId": "s1",
+       "parentTaskId": 12,
+       "name": "echo",
+       "taskId": 17,
+       "arguments": {
+        "text": "a"
+       },
+       "status": "done",
+       "summary": {
+        "isError": false,
+        "durationMs": 0
+       }
+      },
+      {
+       "callId": "s1/c2",
+       "parentCallId": "s1",
+       "parentTaskId": 12,
+       "name": "hold",
+       "taskId": 19,
+       "arguments": {
+        "id": 1
+       },
+       "status": "running"
+      }
+     ]
+    }
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {
+      "faux/faux-1": {
+       "input": 895,
+       "output": 44,
+       "cacheRead": 0,
+       "cacheWrite": 895,
+       "totalTokens": 1834,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a13edc-426c-7554-b14b-65bf301a51c2"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   },
+   {
+    "record": {
+     "id": 14,
+     "kind": "pi.codemode.store",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 9
+    },
+    "version": 1,
+    "value": {
+     "values": {}
+    }
+   },
+   {
+    "record": {
+     "id": 13,
+     "kind": "pi.codemode.run",
+     "scope": {
+      "kind": "task",
+      "taskId": 12
+     },
+     "createdAt": 9
+    },
+    "version": 1,
+    "value": {
+     "start": {
+      "version": 2,
+      "startedAt": 1792055984754,
+      "seed": 2067478043,
+      "tools": [
+       {
+        "name": "pi.codemode.models.classify",
+        "jsName": "pi_codemode_models_classify",
+        "description": "models.classify() of code mode scripts.\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { pi_codemode_models_classify(args: { context: unknown; model: unknown; }): Promise<unknown>; };\n```",
+        "structured": true,
+        "hidden": true
+       },
+       {
+        "name": "pi.codemode.models.generateImages",
+        "jsName": "pi_codemode_models_generateImages",
+        "description": "models.generateImages() of code mode scripts.\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { pi_codemode_models_generateImages(args: { context: unknown; model: unknown; }): Promise<unknown>; };\n```",
+        "structured": true,
+        "hidden": true
+       },
+       {
+        "name": "echo",
+        "jsName": "echo",
+        "description": "echo\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```"
+       },
+       {
+        "name": "hold",
+        "jsName": "hold",
+        "description": "hold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```"
+       }
+      ],
+      "namespaces": [],
+      "globals": [
+       {
+        "name": "searchTools",
+        "spread": true
+       },
+       {
+        "name": "describeTool",
+        "spread": true
+       },
+       {
+        "name": "describeNamespace",
+        "spread": true
+       },
+       {
+        "name": "models.getModelsOfType",
+        "spread": true
+       },
+       {
+        "name": "models.getAvailableOfType",
+        "spread": true
+       },
+       {
+        "name": "models.getModelOfType",
+        "spread": true
+       },
+       {
+        "name": "models.classify",
+        "spread": true
+       },
+       {
+        "name": "models.generateImages",
+        "spread": true
+       }
+      ],
+      "maxOutputTokens": 10000,
+      "store": {},
+      "fingerprint": "quickjs-wasi 3.6.2, quickjs 0.17.0, prelude 8c6c9242, deterministic 1, stack 524288, heap 67108864, budget none"
+     }
+    }
+   },
+   {
+    "record": {
+     "id": 15,
+     "kind": "pi.codemode.journal",
+     "scope": {
+      "kind": "task",
+      "taskId": 12
+     },
+     "createdAt": 9
+    },
+    "version": 1,
+    "value": {
+     "entries": [
+      {
+       "id": 1,
+       "at": 1792055984831,
+       "issuedAfter": 2
+      }
+     ],
+     "firstIssued": 1
+    }
+   },
+   {
+    "record": {
+     "id": 16,
+     "kind": "pi.tool.nested-call",
+     "key": "c1",
+     "scope": {
+      "kind": "task",
+      "taskId": 12
+     },
+     "createdAt": 13
+    },
+    "version": 1,
+    "value": {
+     "taskId": 17,
+     "result": {
+      "taskId": 17,
+      "structuredOutput": "echo a",
+      "isError": false,
+      "diagnostics": [],
+      "durationMs": 0
+     }
+    }
+   },
+   {
+    "record": {
+     "id": 18,
+     "kind": "pi.tool.nested-call",
+     "key": "c2",
+     "scope": {
+      "kind": "task",
+      "taskId": 12
+     },
+     "createdAt": 19
+    },
+    "version": 1,
+    "value": {
+     "taskId": 19
+    }
+   }
+  ]
+ },
+ "jsonl": {
+  "conversations": [
+   {
+    "id": 1
+   }
+  ],
+  "entries": {
+   "1": [
+    {
+     "model": [
+      {
+       "role": "user",
+       "content": "go",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    },
+    {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "codemode": "<codemode>\nTools scripts can call (`await tools.<name>(args)`):\n\n### `echo`\necho\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```\n\n### `hold`\nhold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```\n</codemode>"
+       },
+       "toolsAdded": [
+        {
+         "name": "codemode",
+         "description": "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n- The script survives a restart: it resumes where it was, without running finished calls again.\n- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`\n\nGlobals:\n- `text(value)`, `image(dataUrlOrImageBlock)`, `console.log(...)`, and top-level `return` add output; `exit()` ends the script. With several text items, each starts with a `==> text N/M <==` line, and `console` lines follow the other output in one `<console_output>` block. `image()` also saves the image to a temp file and the result names its path.\n- `store(key, value)` and `load(key)` keep JSON values across codemode calls.\n- `ALL_TOOLS`, `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`: find tools the `codemode` section does not list.\n\n`models` (all functions return promises):\n- `models.getModelsOfType(type, provider?)`, `models.getAvailableOfType(type, provider?)` (configured auth only), `models.getModelOfType(type, provider, id)`: the catalog; `type` is \"chat\", \"image\", or \"classifier\".\n- `models.classify(model, { state: { ... }, images?: [{ type: \"image\", data, mimeType }], questions: { <id>: { type: \"choice\", instructions, criteria: { <label>: <meaning> } } | { type: \"score\", instructions, criteria: [<lowest level>, ..., <highest level>] } | { type: \"bool\", instructions, criteria: { true: <meaning>, false: <meaning> } } } })` resolves to `{ answers: { <id>: ... }, stopReason, errorMessage?, usage? }`.\n- `models.generateImages(model, { input: [{ type: \"text\", text: <prompt> }, ...optional { type: \"image\", data, mimeType }] })` resolves to `{ output: [image blocks], stopReason, errorMessage?, usage? }`; show each image with `image(block)`.\nAt most 4 classify/generateImages calls run at once; more wait.\n\nThe `codemode` section of the system prompt lists the tools scripts can call, by namespace, as far as space allows.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "code"
+          ],
+          "properties": {
+           "code": {
+            "type": "string",
+            "description": "Raw JavaScript source."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "grammar",
+          "variants": {
+           "openai_lark": "\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"
+          }
+         }
+        },
+        {
+         "name": "echo",
+         "description": "echo",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string"
+           },
+           "id": {
+            "type": "number"
+           }
+          }
+         }
+        },
+        {
+         "name": "hold",
+         "description": "hold",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string"
+           },
+           "id": {
+            "type": "number"
+           }
+          }
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "s1",
+         "name": "codemode",
+         "arguments": {
+          "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+         }
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 895,
+        "output": 44,
+        "cacheRead": 0,
+        "cacheWrite": 895,
+        "totalTokens": 1834,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   ]
+  },
+  "tasks": [
+   {
+    "id": 9,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "waiting",
+     "checkpoint": {
+      "phase": "tools",
+      "assistant": 11,
+      "tools": [
+       12
+      ],
+      "pending": []
+     },
+     "on": [
+      12
+     ],
+     "policy": "allSettled"
+    },
+    "startedAt": 1767225600000
+   },
+   {
+    "id": 12,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 11,
+     "callId": "s1"
+    },
+    "owner": 9,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "pending",
+     "checkpoint": {
+      "phase": "execute",
+      "arguments": {
+       "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+      },
+      "replay": "safe"
+     }
+    },
+    "startedAt": 1767225600000,
+    "memos": {
+     "pi.tool.madeNestedCalls": true
+    }
+   },
+   {
+    "id": 17,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 12,
+     "parentCallId": "s1",
+     "key": "c1",
+     "call": {
+      "type": "toolCall",
+      "id": "s1/c1",
+      "name": "echo",
+      "arguments": {
+       "text": "a"
+      }
+     }
+    },
+    "owner": 12,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 19,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 12,
+     "parentCallId": "s1",
+     "key": "c2",
+     "call": {
+      "type": "toolCall",
+      "id": "s1/c2",
+      "name": "hold",
+      "arguments": {
+       "id": 1
+      }
+     }
+    },
+    "owner": 12,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "pending",
+     "checkpoint": {
+      "phase": "execute",
+      "arguments": {
+       "id": 1
+      },
+      "replay": "safe"
+     }
+    },
+    "startedAt": 1767225600000
+   }
+  ],
+  "submissions": [
+   {
+    "conversationId": 1,
+    "type": "input",
+    "status": "placed",
+    "entry": 7,
+    "id": 8
+   }
+  ],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "run": {
+      "taskId": 9,
+      "inputs": [
+       8
+      ]
+     },
+     "tools": [
+      {
+       "callId": "s1",
+       "name": "codemode",
+       "taskId": 12,
+       "status": "running"
+      }
+     ],
+     "nestedTools": [
+      {
+       "callId": "s1/c1",
+       "parentCallId": "s1",
+       "parentTaskId": 12,
+       "name": "echo",
+       "taskId": 17,
+       "arguments": {
+        "text": "a"
+       },
+       "status": "done",
+       "summary": {
+        "isError": false,
+        "durationMs": 0
+       }
+      },
+      {
+       "callId": "s1/c2",
+       "parentCallId": "s1",
+       "parentTaskId": 12,
+       "name": "hold",
+       "taskId": 19,
+       "arguments": {
+        "id": 1
+       },
+       "status": "running"
+      }
+     ]
+    }
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {
+      "faux/faux-1": {
+       "input": 895,
+       "output": 44,
+       "cacheRead": 0,
+       "cacheWrite": 895,
+       "totalTokens": 1834,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a13edc-432d-7554-b14b-65c0f58e0a27"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   },
+   {
+    "record": {
+     "id": 14,
+     "kind": "pi.codemode.store",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 9
+    },
+    "version": 1,
+    "value": {
+     "values": {}
+    }
+   },
+   {
+    "record": {
+     "id": 13,
+     "kind": "pi.codemode.run",
+     "scope": {
+      "kind": "task",
+      "taskId": 12
+     },
+     "createdAt": 9
+    },
+    "version": 1,
+    "value": {
+     "start": {
+      "version": 2,
+      "startedAt": 1792055984954,
+      "seed": 4180975542,
+      "tools": [
+       {
+        "name": "pi.codemode.models.classify",
+        "jsName": "pi_codemode_models_classify",
+        "description": "models.classify() of code mode scripts.\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { pi_codemode_models_classify(args: { context: unknown; model: unknown; }): Promise<unknown>; };\n```",
+        "structured": true,
+        "hidden": true
+       },
+       {
+        "name": "pi.codemode.models.generateImages",
+        "jsName": "pi_codemode_models_generateImages",
+        "description": "models.generateImages() of code mode scripts.\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { pi_codemode_models_generateImages(args: { context: unknown; model: unknown; }): Promise<unknown>; };\n```",
+        "structured": true,
+        "hidden": true
+       },
+       {
+        "name": "echo",
+        "jsName": "echo",
+        "description": "echo\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```"
+       },
+       {
+        "name": "hold",
+        "jsName": "hold",
+        "description": "hold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```"
+       }
+      ],
+      "namespaces": [],
+      "globals": [
+       {
+        "name": "searchTools",
+        "spread": true
+       },
+       {
+        "name": "describeTool",
+        "spread": true
+       },
+       {
+        "name": "describeNamespace",
+        "spread": true
+       },
+       {
+        "name": "models.getModelsOfType",
+        "spread": true
+       },
+       {
+        "name": "models.getAvailableOfType",
+        "spread": true
+       },
+       {
+        "name": "models.getModelOfType",
+        "spread": true
+       },
+       {
+        "name": "models.classify",
+        "spread": true
+       },
+       {
+        "name": "models.generateImages",
+        "spread": true
+       }
+      ],
+      "maxOutputTokens": 10000,
+      "store": {},
+      "fingerprint": "quickjs-wasi 3.6.2, quickjs 0.17.0, prelude 8c6c9242, deterministic 1, stack 524288, heap 67108864, budget none"
+     }
+    }
+   },
+   {
+    "record": {
+     "id": 15,
+     "kind": "pi.codemode.journal",
+     "scope": {
+      "kind": "task",
+      "taskId": 12
+     },
+     "createdAt": 9
+    },
+    "version": 1,
+    "value": {
+     "entries": [
+      {
+       "id": 1,
+       "at": 1792055985020,
+       "issuedAfter": 2
+      }
+     ],
+     "firstIssued": 1
+    }
+   },
+   {
+    "record": {
+     "id": 16,
+     "kind": "pi.tool.nested-call",
+     "key": "c1",
+     "scope": {
+      "kind": "task",
+      "taskId": 12
+     },
+     "createdAt": 13
+    },
+    "version": 1,
+    "value": {
+     "taskId": 17,
+     "result": {
+      "taskId": 17,
+      "structuredOutput": "echo a",
+      "isError": false,
+      "diagnostics": [],
+      "durationMs": 0
+     }
+    }
+   },
+   {
+    "record": {
+     "id": 18,
+     "kind": "pi.tool.nested-call",
+     "key": "c2",
+     "scope": {
+      "kind": "task",
+      "taskId": 12
+     },
+     "createdAt": 19
+    },
+    "version": 1,
+    "value": {
+     "taskId": 19
+    }
+   }
+  ]
+ }
+}

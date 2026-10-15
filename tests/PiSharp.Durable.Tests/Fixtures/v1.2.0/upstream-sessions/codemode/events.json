@@ -1,0 +1,1736 @@
+{
+ "sqlite": {
+  "run": [
+   {
+    "type": "snapshot",
+    "entries": [],
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "go",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "user",
+       "content": "go",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "entry": 7,
+     "id": 8
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "system",
+     "content": "",
+     "sections": {
+      "codemode": "<codemode>\nTools scripts can call (`await tools.<name>(args)`):\n\n### `echo`\necho\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```\n\n### `hold`\nhold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```\n</codemode>"
+     },
+     "toolsAdded": [
+      {
+       "name": "codemode",
+       "description": "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n- The script survives a restart: it resumes where it was, without running finished calls again.\n- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`\n\nGlobals:\n- `text(value)`, `image(dataUrlOrImageBlock)`, `console.log(...)`, and top-level `return` add output; `exit()` ends the script. With several text items, each starts with a `==> text N/M <==` line, and `console` lines follow the other output in one `<console_output>` block. `image()` also saves the image to a temp file and the result names its path.\n- `store(key, value)` and `load(key)` keep JSON values across codemode calls.\n- `ALL_TOOLS`, `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`: find tools the `codemode` section does not list.\n\n`models` (all functions return promises):\n- `models.getModelsOfType(type, provider?)`, `models.getAvailableOfType(type, provider?)` (configured auth only), `models.getModelOfType(type, provider, id)`: the catalog; `type` is \"chat\", \"image\", or \"classifier\".\n- `models.classify(model, { state: { ... }, images?: [{ type: \"image\", data, mimeType }], questions: { <id>: { type: \"choice\", instructions, criteria: { <label>: <meaning> } } | { type: \"score\", instructions, criteria: [<lowest level>, ..., <highest level>] } | { type: \"bool\", instructions, criteria: { true: <meaning>, false: <meaning> } } } })` resolves to `{ answers: { <id>: ... }, stopReason, errorMessage?, usage? }`.\n- `models.generateImages(model, { input: [{ type: \"text\", text: <prompt> }, ...optional { type: \"image\", data, mimeType }] })` resolves to `{ output: [image blocks], stopReason, errorMessage?, usage? }`; show each image with `image(block)`.\nAt most 4 classify/generateImages calls run at once; more wait.\n\nThe `codemode` section of the system prompt lists the tools scripts can call, by namespace, as far as space allows.",
+       "parameters": {
+        "type": "object",
+        "required": [
+         "code"
+        ],
+        "properties": {
+         "code": {
+          "type": "string",
+          "description": "Raw JavaScript source."
+         }
+        }
+       },
+       "constrainedSampling": {
+        "type": "grammar",
+        "variants": {
+         "openai_lark": "\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"
+        }
+       }
+      },
+      {
+       "name": "echo",
+       "description": "echo",
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         },
+         "id": {
+          "type": "number"
+         }
+        }
+       }
+      },
+      {
+       "name": "hold",
+       "description": "hold",
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         },
+         "id": {
+          "type": "number"
+         }
+        }
+       }
+      }
+     ],
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "codemode": "<codemode>\nTools scripts can call (`await tools.<name>(args)`):\n\n### `echo`\necho\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```\n\n### `hold`\nhold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```\n</codemode>"
+       },
+       "toolsAdded": [
+        {
+         "name": "codemode",
+         "description": "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n- The script survives a restart: it resumes where it was, without running finished calls again.\n- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`\n\nGlobals:\n- `text(value)`, `image(dataUrlOrImageBlock)`, `console.log(...)`, and top-level `return` add output; `exit()` ends the script. With several text items, each starts with a `==> text N/M <==` line, and `console` lines follow the other output in one `<console_output>` block. `image()` also saves the image to a temp file and the result names its path.\n- `store(key, value)` and `load(key)` keep JSON values across codemode calls.\n- `ALL_TOOLS`, `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`: find tools the `codemode` section does not list.\n\n`models` (all functions return promises):\n- `models.getModelsOfType(type, provider?)`, `models.getAvailableOfType(type, provider?)` (configured auth only), `models.getModelOfType(type, provider, id)`: the catalog; `type` is \"chat\", \"image\", or \"classifier\".\n- `models.classify(model, { state: { ... }, images?: [{ type: \"image\", data, mimeType }], questions: { <id>: { type: \"choice\", instructions, criteria: { <label>: <meaning> } } | { type: \"score\", instructions, criteria: [<lowest level>, ..., <highest level>] } | { type: \"bool\", instructions, criteria: { true: <meaning>, false: <meaning> } } } })` resolves to `{ answers: { <id>: ... }, stopReason, errorMessage?, usage? }`.\n- `models.generateImages(model, { input: [{ type: \"text\", text: <prompt> }, ...optional { type: \"image\", data, mimeType }] })` resolves to `{ output: [image blocks], stopReason, errorMessage?, usage? }`; show each image with `image(block)`.\nAt most 4 classify/generateImages calls run at once; more wait.\n\nThe `codemode` section of the system prompt lists the tools scripts can call, by namespace, as far as space allows.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "code"
+          ],
+          "properties": {
+           "code": {
+            "type": "string",
+            "description": "Raw JavaScript source."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "grammar",
+          "variants": {
+           "openai_lark": "\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"
+          }
+         }
+        },
+        {
+         "name": "echo",
+         "description": "echo",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string"
+           },
+           "id": {
+            "type": "number"
+           }
+          }
+         }
+        },
+        {
+         "name": "hold",
+         "description": "hold",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string"
+           },
+           "id": {
+            "type": "number"
+           }
+          }
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "toolCall",
+       "id": "s1",
+       "name": "codemode",
+       "arguments": {
+        "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+       }
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 895,
+      "output": 44,
+      "cacheRead": 0,
+      "cacheWrite": 895,
+      "totalTokens": 1834,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "toolUse",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "s1",
+         "name": "codemode",
+         "arguments": {
+          "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+         }
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 895,
+        "output": 44,
+        "cacheRead": 0,
+        "cacheWrite": 895,
+        "totalTokens": 1834,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 895,
+       "output": 44,
+       "cacheRead": 0,
+       "cacheWrite": 895,
+       "totalTokens": 1834,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "s1",
+    "toolName": "codemode",
+    "taskId": 12,
+    "args": {
+     "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "s1/c1",
+    "toolName": "echo",
+    "taskId": 17,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "args": {
+     "text": "a"
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "s1/c1",
+    "toolName": "echo",
+    "taskId": 17,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "result": {
+     "taskId": 17,
+     "structuredOutput": "echo a",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "s1/c2",
+    "toolName": "hold",
+    "taskId": 19,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "args": {
+     "id": 1
+    }
+   }
+  ],
+  "resume": [
+   {
+    "type": "snapshot",
+    "entries": [
+     {
+      "model": [
+       {
+        "role": "user",
+        "content": "go",
+        "timestamp": 1767225600000
+       }
+      ],
+      "kind": "pi.user",
+      "id": 7,
+      "conversationId": 1
+     },
+     {
+      "model": [
+       {
+        "role": "system",
+        "content": "",
+        "sections": {
+         "codemode": "<codemode>\nTools scripts can call (`await tools.<name>(args)`):\n\n### `echo`\necho\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```\n\n### `hold`\nhold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```\n</codemode>"
+        },
+        "toolsAdded": [
+         {
+          "name": "codemode",
+          "description": "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n- The script survives a restart: it resumes where it was, without running finished calls again.\n- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`\n\nGlobals:\n- `text(value)`, `image(dataUrlOrImageBlock)`, `console.log(...)`, and top-level `return` add output; `exit()` ends the script. With several text items, each starts with a `==> text N/M <==` line, and `console` lines follow the other output in one `<console_output>` block. `image()` also saves the image to a temp file and the result names its path.\n- `store(key, value)` and `load(key)` keep JSON values across codemode calls.\n- `ALL_TOOLS`, `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`: find tools the `codemode` section does not list.\n\n`models` (all functions return promises):\n- `models.getModelsOfType(type, provider?)`, `models.getAvailableOfType(type, provider?)` (configured auth only), `models.getModelOfType(type, provider, id)`: the catalog; `type` is \"chat\", \"image\", or \"classifier\".\n- `models.classify(model, { state: { ... }, images?: [{ type: \"image\", data, mimeType }], questions: { <id>: { type: \"choice\", instructions, criteria: { <label>: <meaning> } } | { type: \"score\", instructions, criteria: [<lowest level>, ..., <highest level>] } | { type: \"bool\", instructions, criteria: { true: <meaning>, false: <meaning> } } } })` resolves to `{ answers: { <id>: ... }, stopReason, errorMessage?, usage? }`.\n- `models.generateImages(model, { input: [{ type: \"text\", text: <prompt> }, ...optional { type: \"image\", data, mimeType }] })` resolves to `{ output: [image blocks], stopReason, errorMessage?, usage? }`; show each image with `image(block)`.\nAt most 4 classify/generateImages calls run at once; more wait.\n\nThe `codemode` section of the system prompt lists the tools scripts can call, by namespace, as far as space allows.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "code"
+           ],
+           "properties": {
+            "code": {
+             "type": "string",
+             "description": "Raw JavaScript source."
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "grammar",
+           "variants": {
+            "openai_lark": "\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"
+           }
+          }
+         },
+         {
+          "name": "echo",
+          "description": "echo",
+          "parameters": {
+           "type": "object",
+           "properties": {
+            "text": {
+             "type": "string"
+            },
+            "id": {
+             "type": "number"
+            }
+           }
+          }
+         },
+         {
+          "name": "hold",
+          "description": "hold",
+          "parameters": {
+           "type": "object",
+           "properties": {
+            "text": {
+             "type": "string"
+            },
+            "id": {
+             "type": "number"
+            }
+           }
+          }
+         }
+        ],
+        "timestamp": 1767225600000
+       }
+      ],
+      "kind": "pi.system",
+      "id": 10,
+      "conversationId": 1,
+      "byTaskId": 9
+     },
+     {
+      "model": [
+       {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "toolCall",
+          "id": "s1",
+          "name": "codemode",
+          "arguments": {
+           "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+          }
+         }
+        ],
+        "api": "faux",
+        "provider": "faux",
+        "model": "faux-1",
+        "usage": {
+         "input": 895,
+         "output": 44,
+         "cacheRead": 0,
+         "cacheWrite": 895,
+         "totalTokens": 1834,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1000
+       }
+      ],
+      "kind": "pi.assistant",
+      "id": 11,
+      "conversationId": 1,
+      "byTaskId": 9
+     }
+    ],
+    "run": {
+     "inputs": [
+      8
+     ]
+    },
+    "tools": [
+     {
+      "callId": "s1",
+      "name": "codemode",
+      "taskId": 12,
+      "status": "running"
+     }
+    ],
+    "nestedTools": [
+     {
+      "callId": "s1/c1",
+      "parentCallId": "s1",
+      "parentTaskId": 12,
+      "name": "echo",
+      "taskId": 17,
+      "arguments": {
+       "text": "a"
+      },
+      "status": "done",
+      "summary": {
+       "isError": false,
+       "durationMs": 0
+      }
+     },
+     {
+      "callId": "s1/c2",
+      "parentCallId": "s1",
+      "parentTaskId": 12,
+      "name": "hold",
+      "taskId": 19,
+      "arguments": {
+       "id": 1
+      },
+      "status": "running"
+     }
+    ],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 895,
+       "output": 44,
+       "cacheRead": 0,
+       "cacheWrite": 895,
+       "totalTokens": 1834,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "s1/c2",
+    "toolName": "hold",
+    "taskId": 19,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "result": {
+     "taskId": 19,
+     "structuredOutput": "held 1",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "s1/c3",
+    "toolName": "echo",
+    "taskId": 21,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "args": {
+     "text": "b"
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "s1/c3",
+    "toolName": "echo",
+    "taskId": 21,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "result": {
+     "taskId": 21,
+     "structuredOutput": "echo b",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "s1",
+    "toolName": "codemode",
+    "taskId": 12,
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "s1",
+       "toolName": "codemode",
+       "content": [
+        {
+         "type": "text",
+         "text": "Script completed\nWall time 0.2 seconds\nOutput:\n"
+        },
+        {
+         "type": "text",
+         "text": "[\"echo a\",\"held 1\",\"echo b\"]"
+        }
+       ],
+       "details": {
+        "calls": [
+         {
+          "id": 1,
+          "name": "echo",
+          "args": "{\"text\":\"a\"}",
+          "status": "ok",
+          "durationMs": 0
+         },
+         {
+          "id": 2,
+          "name": "hold",
+          "args": "{\"id\":1}",
+          "status": "ok",
+          "durationMs": 0
+         },
+         {
+          "id": 3,
+          "name": "echo",
+          "args": "{\"text\":\"b\"}",
+          "status": "ok",
+          "durationMs": 0
+         }
+        ]
+       },
+       "isError": false,
+       "durationMs": 65,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 22,
+     "conversationId": 1,
+     "byTaskId": 12
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "toolResult",
+     "toolCallId": "s1",
+     "toolName": "codemode",
+     "content": [
+      {
+       "type": "text",
+       "text": "Script completed\nWall time 0.2 seconds\nOutput:\n"
+      },
+      {
+       "type": "text",
+       "text": "[\"echo a\",\"held 1\",\"echo b\"]"
+      }
+     ],
+     "details": {
+      "calls": [
+       {
+        "id": 1,
+        "name": "echo",
+        "args": "{\"text\":\"a\"}",
+        "status": "ok",
+        "durationMs": 0
+       },
+       {
+        "id": 2,
+        "name": "hold",
+        "args": "{\"id\":1}",
+        "status": "ok",
+        "durationMs": 0
+       },
+       {
+        "id": 3,
+        "name": "echo",
+        "args": "{\"text\":\"b\"}",
+        "status": "ok",
+        "durationMs": 0
+       }
+      ]
+     },
+     "isError": false,
+     "durationMs": 65,
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "s1",
+       "toolName": "codemode",
+       "content": [
+        {
+         "type": "text",
+         "text": "Script completed\nWall time 0.2 seconds\nOutput:\n"
+        },
+        {
+         "type": "text",
+         "text": "[\"echo a\",\"held 1\",\"echo b\"]"
+        }
+       ],
+       "details": {
+        "calls": [
+         {
+          "id": 1,
+          "name": "echo",
+          "args": "{\"text\":\"a\"}",
+          "status": "ok",
+          "durationMs": 0
+         },
+         {
+          "id": 2,
+          "name": "hold",
+          "args": "{\"id\":1}",
+          "status": "ok",
+          "durationMs": 0
+         },
+         {
+          "id": 3,
+          "name": "echo",
+          "args": "{\"text\":\"b\"}",
+          "status": "ok",
+          "durationMs": 0
+         }
+        ]
+       },
+       "isError": false,
+       "durationMs": 65,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 22,
+     "conversationId": 1,
+     "byTaskId": 12
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "done"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 966,
+      "output": 1,
+      "cacheRead": 0,
+      "cacheWrite": 966,
+      "totalTokens": 1933,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "done"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 966,
+        "output": 1,
+        "cacheRead": 0,
+        "cacheWrite": 966,
+        "totalTokens": 1933,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 24,
+     "conversationId": 1,
+     "byTaskId": 23
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "entry": 7,
+     "id": 8,
+     "answer": 24
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 1861,
+       "output": 45,
+       "cacheRead": 0,
+       "cacheWrite": 1861,
+       "totalTokens": 3767,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   }
+  ]
+ },
+ "jsonl": {
+  "run": [
+   {
+    "type": "snapshot",
+    "entries": [],
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "go",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "user",
+       "content": "go",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "entry": 7,
+     "id": 8
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "system",
+     "content": "",
+     "sections": {
+      "codemode": "<codemode>\nTools scripts can call (`await tools.<name>(args)`):\n\n### `echo`\necho\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```\n\n### `hold`\nhold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```\n</codemode>"
+     },
+     "toolsAdded": [
+      {
+       "name": "codemode",
+       "description": "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n- The script survives a restart: it resumes where it was, without running finished calls again.\n- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`\n\nGlobals:\n- `text(value)`, `image(dataUrlOrImageBlock)`, `console.log(...)`, and top-level `return` add output; `exit()` ends the script. With several text items, each starts with a `==> text N/M <==` line, and `console` lines follow the other output in one `<console_output>` block. `image()` also saves the image to a temp file and the result names its path.\n- `store(key, value)` and `load(key)` keep JSON values across codemode calls.\n- `ALL_TOOLS`, `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`: find tools the `codemode` section does not list.\n\n`models` (all functions return promises):\n- `models.getModelsOfType(type, provider?)`, `models.getAvailableOfType(type, provider?)` (configured auth only), `models.getModelOfType(type, provider, id)`: the catalog; `type` is \"chat\", \"image\", or \"classifier\".\n- `models.classify(model, { state: { ... }, images?: [{ type: \"image\", data, mimeType }], questions: { <id>: { type: \"choice\", instructions, criteria: { <label>: <meaning> } } | { type: \"score\", instructions, criteria: [<lowest level>, ..., <highest level>] } | { type: \"bool\", instructions, criteria: { true: <meaning>, false: <meaning> } } } })` resolves to `{ answers: { <id>: ... }, stopReason, errorMessage?, usage? }`.\n- `models.generateImages(model, { input: [{ type: \"text\", text: <prompt> }, ...optional { type: \"image\", data, mimeType }] })` resolves to `{ output: [image blocks], stopReason, errorMessage?, usage? }`; show each image with `image(block)`.\nAt most 4 classify/generateImages calls run at once; more wait.\n\nThe `codemode` section of the system prompt lists the tools scripts can call, by namespace, as far as space allows.",
+       "parameters": {
+        "type": "object",
+        "required": [
+         "code"
+        ],
+        "properties": {
+         "code": {
+          "type": "string",
+          "description": "Raw JavaScript source."
+         }
+        }
+       },
+       "constrainedSampling": {
+        "type": "grammar",
+        "variants": {
+         "openai_lark": "\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"
+        }
+       }
+      },
+      {
+       "name": "echo",
+       "description": "echo",
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         },
+         "id": {
+          "type": "number"
+         }
+        }
+       }
+      },
+      {
+       "name": "hold",
+       "description": "hold",
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "text": {
+          "type": "string"
+         },
+         "id": {
+          "type": "number"
+         }
+        }
+       }
+      }
+     ],
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "codemode": "<codemode>\nTools scripts can call (`await tools.<name>(args)`):\n\n### `echo`\necho\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```\n\n### `hold`\nhold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```\n</codemode>"
+       },
+       "toolsAdded": [
+        {
+         "name": "codemode",
+         "description": "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n- The script survives a restart: it resumes where it was, without running finished calls again.\n- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`\n\nGlobals:\n- `text(value)`, `image(dataUrlOrImageBlock)`, `console.log(...)`, and top-level `return` add output; `exit()` ends the script. With several text items, each starts with a `==> text N/M <==` line, and `console` lines follow the other output in one `<console_output>` block. `image()` also saves the image to a temp file and the result names its path.\n- `store(key, value)` and `load(key)` keep JSON values across codemode calls.\n- `ALL_TOOLS`, `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`: find tools the `codemode` section does not list.\n\n`models` (all functions return promises):\n- `models.getModelsOfType(type, provider?)`, `models.getAvailableOfType(type, provider?)` (configured auth only), `models.getModelOfType(type, provider, id)`: the catalog; `type` is \"chat\", \"image\", or \"classifier\".\n- `models.classify(model, { state: { ... }, images?: [{ type: \"image\", data, mimeType }], questions: { <id>: { type: \"choice\", instructions, criteria: { <label>: <meaning> } } | { type: \"score\", instructions, criteria: [<lowest level>, ..., <highest level>] } | { type: \"bool\", instructions, criteria: { true: <meaning>, false: <meaning> } } } })` resolves to `{ answers: { <id>: ... }, stopReason, errorMessage?, usage? }`.\n- `models.generateImages(model, { input: [{ type: \"text\", text: <prompt> }, ...optional { type: \"image\", data, mimeType }] })` resolves to `{ output: [image blocks], stopReason, errorMessage?, usage? }`; show each image with `image(block)`.\nAt most 4 classify/generateImages calls run at once; more wait.\n\nThe `codemode` section of the system prompt lists the tools scripts can call, by namespace, as far as space allows.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "code"
+          ],
+          "properties": {
+           "code": {
+            "type": "string",
+            "description": "Raw JavaScript source."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "grammar",
+          "variants": {
+           "openai_lark": "\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"
+          }
+         }
+        },
+        {
+         "name": "echo",
+         "description": "echo",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string"
+           },
+           "id": {
+            "type": "number"
+           }
+          }
+         }
+        },
+        {
+         "name": "hold",
+         "description": "hold",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string"
+           },
+           "id": {
+            "type": "number"
+           }
+          }
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "toolCall",
+       "id": "s1",
+       "name": "codemode",
+       "arguments": {
+        "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+       }
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 895,
+      "output": 44,
+      "cacheRead": 0,
+      "cacheWrite": 895,
+      "totalTokens": 1834,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "toolUse",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "s1",
+         "name": "codemode",
+         "arguments": {
+          "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+         }
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 895,
+        "output": 44,
+        "cacheRead": 0,
+        "cacheWrite": 895,
+        "totalTokens": 1834,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 895,
+       "output": 44,
+       "cacheRead": 0,
+       "cacheWrite": 895,
+       "totalTokens": 1834,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "s1",
+    "toolName": "codemode",
+    "taskId": 12,
+    "args": {
+     "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "s1/c1",
+    "toolName": "echo",
+    "taskId": 17,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "args": {
+     "text": "a"
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "s1/c1",
+    "toolName": "echo",
+    "taskId": 17,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "result": {
+     "taskId": 17,
+     "structuredOutput": "echo a",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "s1/c2",
+    "toolName": "hold",
+    "taskId": 19,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "args": {
+     "id": 1
+    }
+   }
+  ],
+  "resume": [
+   {
+    "type": "snapshot",
+    "entries": [
+     {
+      "model": [
+       {
+        "role": "user",
+        "content": "go",
+        "timestamp": 1767225600000
+       }
+      ],
+      "kind": "pi.user",
+      "id": 7,
+      "conversationId": 1
+     },
+     {
+      "model": [
+       {
+        "role": "system",
+        "content": "",
+        "sections": {
+         "codemode": "<codemode>\nTools scripts can call (`await tools.<name>(args)`):\n\n### `echo`\necho\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { echo(args: { id?: number; text?: string; }): Promise<string>; };\n```\n\n### `hold`\nhold\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { hold(args: { id?: number; text?: string; }): Promise<string>; };\n```\n</codemode>"
+        },
+        "toolsAdded": [
+         {
+          "name": "codemode",
+          "description": "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n- The script survives a restart: it resumes where it was, without running finished calls again.\n- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`\n\nGlobals:\n- `text(value)`, `image(dataUrlOrImageBlock)`, `console.log(...)`, and top-level `return` add output; `exit()` ends the script. With several text items, each starts with a `==> text N/M <==` line, and `console` lines follow the other output in one `<console_output>` block. `image()` also saves the image to a temp file and the result names its path.\n- `store(key, value)` and `load(key)` keep JSON values across codemode calls.\n- `ALL_TOOLS`, `await searchTools(query, { limit?, namespace? })`, `await describeTool(name)`, `await describeNamespace(name)`: find tools the `codemode` section does not list.\n\n`models` (all functions return promises):\n- `models.getModelsOfType(type, provider?)`, `models.getAvailableOfType(type, provider?)` (configured auth only), `models.getModelOfType(type, provider, id)`: the catalog; `type` is \"chat\", \"image\", or \"classifier\".\n- `models.classify(model, { state: { ... }, images?: [{ type: \"image\", data, mimeType }], questions: { <id>: { type: \"choice\", instructions, criteria: { <label>: <meaning> } } | { type: \"score\", instructions, criteria: [<lowest level>, ..., <highest level>] } | { type: \"bool\", instructions, criteria: { true: <meaning>, false: <meaning> } } } })` resolves to `{ answers: { <id>: ... }, stopReason, errorMessage?, usage? }`.\n- `models.generateImages(model, { input: [{ type: \"text\", text: <prompt> }, ...optional { type: \"image\", data, mimeType }] })` resolves to `{ output: [image blocks], stopReason, errorMessage?, usage? }`; show each image with `image(block)`.\nAt most 4 classify/generateImages calls run at once; more wait.\n\nThe `codemode` section of the system prompt lists the tools scripts can call, by namespace, as far as space allows.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "code"
+           ],
+           "properties": {
+            "code": {
+             "type": "string",
+             "description": "Raw JavaScript source."
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "grammar",
+           "variants": {
+            "openai_lark": "\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"
+           }
+          }
+         },
+         {
+          "name": "echo",
+          "description": "echo",
+          "parameters": {
+           "type": "object",
+           "properties": {
+            "text": {
+             "type": "string"
+            },
+            "id": {
+             "type": "number"
+            }
+           }
+          }
+         },
+         {
+          "name": "hold",
+          "description": "hold",
+          "parameters": {
+           "type": "object",
+           "properties": {
+            "text": {
+             "type": "string"
+            },
+            "id": {
+             "type": "number"
+            }
+           }
+          }
+         }
+        ],
+        "timestamp": 1767225600000
+       }
+      ],
+      "kind": "pi.system",
+      "id": 10,
+      "conversationId": 1,
+      "byTaskId": 9
+     },
+     {
+      "model": [
+       {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "toolCall",
+          "id": "s1",
+          "name": "codemode",
+          "arguments": {
+           "code": "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\nconst b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];"
+          }
+         }
+        ],
+        "api": "faux",
+        "provider": "faux",
+        "model": "faux-1",
+        "usage": {
+         "input": 895,
+         "output": 44,
+         "cacheRead": 0,
+         "cacheWrite": 895,
+         "totalTokens": 1834,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1000
+       }
+      ],
+      "kind": "pi.assistant",
+      "id": 11,
+      "conversationId": 1,
+      "byTaskId": 9
+     }
+    ],
+    "run": {
+     "inputs": [
+      8
+     ]
+    },
+    "tools": [
+     {
+      "callId": "s1",
+      "name": "codemode",
+      "taskId": 12,
+      "status": "running"
+     }
+    ],
+    "nestedTools": [
+     {
+      "callId": "s1/c1",
+      "parentCallId": "s1",
+      "parentTaskId": 12,
+      "name": "echo",
+      "taskId": 17,
+      "arguments": {
+       "text": "a"
+      },
+      "status": "done",
+      "summary": {
+       "isError": false,
+       "durationMs": 0
+      }
+     },
+     {
+      "callId": "s1/c2",
+      "parentCallId": "s1",
+      "parentTaskId": 12,
+      "name": "hold",
+      "taskId": 19,
+      "arguments": {
+       "id": 1
+      },
+      "status": "running"
+     }
+    ],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 895,
+       "output": 44,
+       "cacheRead": 0,
+       "cacheWrite": 895,
+       "totalTokens": 1834,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "s1/c2",
+    "toolName": "hold",
+    "taskId": 19,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "result": {
+     "taskId": 19,
+     "structuredOutput": "held 1",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "s1/c3",
+    "toolName": "echo",
+    "taskId": 21,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "args": {
+     "text": "b"
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "s1/c3",
+    "toolName": "echo",
+    "taskId": 21,
+    "parentToolCallId": "s1",
+    "parentTaskId": 12,
+    "result": {
+     "taskId": 21,
+     "structuredOutput": "echo b",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "s1",
+    "toolName": "codemode",
+    "taskId": 12,
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "s1",
+       "toolName": "codemode",
+       "content": [
+        {
+         "type": "text",
+         "text": "Script completed\nWall time 0.3 seconds\nOutput:\n"
+        },
+        {
+         "type": "text",
+         "text": "[\"echo a\",\"held 1\",\"echo b\"]"
+        }
+       ],
+       "details": {
+        "calls": [
+         {
+          "id": 1,
+          "name": "echo",
+          "args": "{\"text\":\"a\"}",
+          "status": "ok",
+          "durationMs": 0
+         },
+         {
+          "id": 2,
+          "name": "hold",
+          "args": "{\"id\":1}",
+          "status": "ok",
+          "durationMs": 0
+         },
+         {
+          "id": 3,
+          "name": "echo",
+          "args": "{\"text\":\"b\"}",
+          "status": "ok",
+          "durationMs": 0
+         }
+        ]
+       },
+       "isError": false,
+       "durationMs": 71,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 22,
+     "conversationId": 1,
+     "byTaskId": 12
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "toolResult",
+     "toolCallId": "s1",
+     "toolName": "codemode",
+     "content": [
+      {
+       "type": "text",
+       "text": "Script completed\nWall time 0.3 seconds\nOutput:\n"
+      },
+      {
+       "type": "text",
+       "text": "[\"echo a\",\"held 1\",\"echo b\"]"
+      }
+     ],
+     "details": {
+      "calls": [
+       {
+        "id": 1,
+        "name": "echo",
+        "args": "{\"text\":\"a\"}",
+        "status": "ok",
+        "durationMs": 0
+       },
+       {
+        "id": 2,
+        "name": "hold",
+        "args": "{\"id\":1}",
+        "status": "ok",
+        "durationMs": 0
+       },
+       {
+        "id": 3,
+        "name": "echo",
+        "args": "{\"text\":\"b\"}",
+        "status": "ok",
+        "durationMs": 0
+       }
+      ]
+     },
+     "isError": false,
+     "durationMs": 71,
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "s1",
+       "toolName": "codemode",
+       "content": [
+        {
+         "type": "text",
+         "text": "Script completed\nWall time 0.3 seconds\nOutput:\n"
+        },
+        {
+         "type": "text",
+         "text": "[\"echo a\",\"held 1\",\"echo b\"]"
+        }
+       ],
+       "details": {
+        "calls": [
+         {
+          "id": 1,
+          "name": "echo",
+          "args": "{\"text\":\"a\"}",
+          "status": "ok",
+          "durationMs": 0
+         },
+         {
+          "id": 2,
+          "name": "hold",
+          "args": "{\"id\":1}",
+          "status": "ok",
+          "durationMs": 0
+         },
+         {
+          "id": 3,
+          "name": "echo",
+          "args": "{\"text\":\"b\"}",
+          "status": "ok",
+          "durationMs": 0
+         }
+        ]
+       },
+       "isError": false,
+       "durationMs": 71,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 22,
+     "conversationId": 1,
+     "byTaskId": 12
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "done"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 966,
+      "output": 1,
+      "cacheRead": 0,
+      "cacheWrite": 966,
+      "totalTokens": 1933,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "done"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 966,
+        "output": 1,
+        "cacheRead": 0,
+        "cacheWrite": 966,
+        "totalTokens": 1933,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 24,
+     "conversationId": 1,
+     "byTaskId": 23
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "entry": 7,
+     "id": 8,
+     "answer": 24
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 1861,
+       "output": 45,
+       "cacheRead": 0,
+       "cacheWrite": 1861,
+       "totalTokens": 3767,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   }
+  ]
+ }
+}

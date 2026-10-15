@@ -1,0 +1,4 @@
+{"format":1,"type":"record","seq":9,"ordinal":2,"payload":{"type":"document","id":15,"content":{"version":1,"kind":"base","value":{"entries":[]}}}}
+{"format":1,"type":"record","seq":11,"ordinal":0,"payload":{"type":"document","id":15,"content":{"version":1,"kind":"delta","ops":[["s",["firstIssued"],1]]}}}
+{"format":1,"type":"record","seq":17,"ordinal":0,"payload":{"type":"document","id":15,"content":{"version":1,"kind":"delta","ops":[["p",["entries"],0,0,[{"id":1,"at":1792055985020}]]]}}}
+{"format":1,"type":"record","seq":18,"ordinal":0,"payload":{"type":"document","id":15,"content":{"version":1,"kind":"delta","ops":[["s",["entries",0,"issuedAfter"],2]]}}}

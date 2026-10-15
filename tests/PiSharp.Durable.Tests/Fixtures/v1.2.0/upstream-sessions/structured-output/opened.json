@@ -1,0 +1,1388 @@
+{
+ "sqlite": {
+  "conversations": [
+   {
+    "id": 1
+   }
+  ],
+  "entries": {
+   "1": [
+    {
+     "model": [
+      {
+       "role": "user",
+       "content": "go",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    },
+    {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "toolsAdded": [
+        {
+         "name": "counter",
+         "description": "counter",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "wrong",
+         "description": "wrong",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "picture",
+         "description": "picture",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "bad",
+         "description": "bad",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "failing",
+         "description": "failing",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "probe",
+         "description": "Calls the others",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "c1",
+         "name": "counter",
+         "arguments": {}
+        },
+        {
+         "type": "toolCall",
+         "id": "c2",
+         "name": "wrong",
+         "arguments": {}
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 147,
+        "output": 5,
+        "cacheRead": 0,
+        "cacheWrite": 147,
+        "totalTokens": 299,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    },
+    {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c1",
+       "toolName": "counter",
+       "content": [
+        {
+         "type": "text",
+         "text": "3 things"
+        }
+       ],
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 13,
+     "conversationId": 1,
+     "byTaskId": 12
+    },
+    {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c2",
+       "toolName": "wrong",
+       "content": [],
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 15,
+     "conversationId": 1,
+     "byTaskId": 14
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "c3",
+         "name": "probe",
+         "arguments": {}
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 19,
+        "output": 2,
+        "cacheRead": 147,
+        "cacheWrite": 20,
+        "totalTokens": 188,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 17,
+     "conversationId": 1,
+     "byTaskId": 16
+    },
+    {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c3",
+       "toolName": "probe",
+       "content": [
+        {
+         "type": "text",
+         "text": "[{\"structuredOutput\":{\"type\":\"image\",\"data\":\"AAAA\",\"mimeType\":\"image/png\"},\"isError\":false,\"diagnostics\":[]},{\"structuredOutput\":\"bad\",\"isError\":true,\"diagnostics\":[]},{\"isError\":true,\"diagnostics\":[{\"severity\":\"error\",\"code\":\"invalid_structured_output\",\"message\":\"Tool wrong returned structuredOutput that does not match its schema: count: must be number\"}]},{\"structuredOutput\":{\"count\":0},\"isError\":true,\"diagnostics\":[]},{\"structuredOutput\":{\"count\":3},\"isError\":false,\"diagnostics\":[]}]"
+        }
+       ],
+       "isError": false,
+       "durationMs": 10,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 29,
+     "conversationId": 1,
+     "byTaskId": 18
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "done"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 133,
+        "output": 1,
+        "cacheRead": 166,
+        "cacheWrite": 133,
+        "totalTokens": 433,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 31,
+     "conversationId": 1,
+     "byTaskId": 30
+    }
+   ]
+  },
+  "tasks": [
+   {
+    "id": 9,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "entryId": 11
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 12,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 11,
+     "callId": "c1"
+    },
+    "owner": 9,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "model",
+       "entryId": 13
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 14,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 11,
+     "callId": "c2"
+    },
+    "owner": 9,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "model",
+       "entryId": 15
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 16,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "entryId": 17
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 18,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 17,
+     "callId": "c3"
+    },
+    "owner": 16,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "model",
+       "entryId": 29
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 20,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "1",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/1",
+      "name": "picture",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 22,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "2",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/2",
+      "name": "bad",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 24,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "3",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/3",
+      "name": "wrong",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 26,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "4",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/4",
+      "name": "failing",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 28,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "5",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/5",
+      "name": "counter",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 30,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "entryId": 31
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   }
+  ],
+  "submissions": [
+   {
+    "conversationId": 1,
+    "type": "input",
+    "status": "done",
+    "entry": 7,
+    "id": 8,
+    "answer": 31
+   }
+  ],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {}
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {
+      "faux/faux-1": {
+       "input": 299,
+       "output": 8,
+       "cacheRead": 313,
+       "cacheWrite": 300,
+       "totalTokens": 920,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a13edc-4110-7554-b14b-65b61a258575"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   }
+  ]
+ },
+ "jsonl": {
+  "conversations": [
+   {
+    "id": 1
+   }
+  ],
+  "entries": {
+   "1": [
+    {
+     "model": [
+      {
+       "role": "user",
+       "content": "go",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    },
+    {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "toolsAdded": [
+        {
+         "name": "counter",
+         "description": "counter",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "wrong",
+         "description": "wrong",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "picture",
+         "description": "picture",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "bad",
+         "description": "bad",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "failing",
+         "description": "failing",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        },
+        {
+         "name": "probe",
+         "description": "Calls the others",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "c1",
+         "name": "counter",
+         "arguments": {}
+        },
+        {
+         "type": "toolCall",
+         "id": "c2",
+         "name": "wrong",
+         "arguments": {}
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 147,
+        "output": 5,
+        "cacheRead": 0,
+        "cacheWrite": 147,
+        "totalTokens": 299,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    },
+    {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c1",
+       "toolName": "counter",
+       "content": [
+        {
+         "type": "text",
+         "text": "3 things"
+        }
+       ],
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 13,
+     "conversationId": 1,
+     "byTaskId": 12
+    },
+    {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c2",
+       "toolName": "wrong",
+       "content": [],
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 15,
+     "conversationId": 1,
+     "byTaskId": 14
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "c3",
+         "name": "probe",
+         "arguments": {}
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 19,
+        "output": 2,
+        "cacheRead": 147,
+        "cacheWrite": 20,
+        "totalTokens": 188,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 17,
+     "conversationId": 1,
+     "byTaskId": 16
+    },
+    {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c3",
+       "toolName": "probe",
+       "content": [
+        {
+         "type": "text",
+         "text": "[{\"structuredOutput\":{\"type\":\"image\",\"data\":\"AAAA\",\"mimeType\":\"image/png\"},\"isError\":false,\"diagnostics\":[]},{\"structuredOutput\":\"bad\",\"isError\":true,\"diagnostics\":[]},{\"isError\":true,\"diagnostics\":[{\"severity\":\"error\",\"code\":\"invalid_structured_output\",\"message\":\"Tool wrong returned structuredOutput that does not match its schema: count: must be number\"}]},{\"structuredOutput\":{\"count\":0},\"isError\":true,\"diagnostics\":[]},{\"structuredOutput\":{\"count\":3},\"isError\":false,\"diagnostics\":[]}]"
+        }
+       ],
+       "isError": false,
+       "durationMs": 32,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": []
+     },
+     "kind": "pi.tool-result",
+     "id": 29,
+     "conversationId": 1,
+     "byTaskId": 18
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "done"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 133,
+        "output": 1,
+        "cacheRead": 166,
+        "cacheWrite": 133,
+        "totalTokens": 433,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 31,
+     "conversationId": 1,
+     "byTaskId": 30
+    }
+   ]
+  },
+  "tasks": [
+   {
+    "id": 9,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "entryId": 11
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 12,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 11,
+     "callId": "c1"
+    },
+    "owner": 9,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "model",
+       "entryId": 13
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 14,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 11,
+     "callId": "c2"
+    },
+    "owner": 9,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "model",
+       "entryId": 15
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 16,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "entryId": 17
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 18,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 17,
+     "callId": "c3"
+    },
+    "owner": 16,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "model",
+       "entryId": 29
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 20,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "1",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/1",
+      "name": "picture",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 22,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "2",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/2",
+      "name": "bad",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 24,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "3",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/3",
+      "name": "wrong",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 26,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "4",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/4",
+      "name": "failing",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 28,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "nested",
+     "parent": 18,
+     "parentCallId": "c3",
+     "key": "5",
+     "call": {
+      "type": "toolCall",
+      "id": "c3/5",
+      "name": "counter",
+      "arguments": {}
+     }
+    },
+    "owner": 18,
+    "background": false,
+    "abortRequested": false,
+    "abandonOnRestart": true,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "kind": "nested"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 30,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "entryId": 31
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   }
+  ],
+  "submissions": [
+   {
+    "conversationId": 1,
+    "type": "input",
+    "status": "done",
+    "entry": 7,
+    "id": 8,
+    "answer": 31
+   }
+  ],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {}
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {
+      "faux/faux-1": {
+       "input": 299,
+       "output": 8,
+       "cacheRead": 313,
+       "cacheWrite": 300,
+       "totalTokens": 920,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a13edc-413e-7554-b14b-65b9522d0fbd"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   }
+  ]
+ }
+}

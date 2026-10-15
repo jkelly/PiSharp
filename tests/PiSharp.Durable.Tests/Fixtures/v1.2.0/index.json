@@ -1,0 +1,773 @@
+{
+ "description": "The Pi v1.2.0 fixture set: each fixture, the suites that read its v1.1.0 counterpart today, and per scenario (a top-level key of an *.upstream.json, a session scenario directory, or a whole file) the work-list areas (compatibility/durable-sync-1.2.0-worklist.json) that switch their suites to it, and whether it matches the v1.1.0 capture under the manifest's normalization (\"same\": switch at any time; \"differs\": switch with the port that changes it; \"new\": no v1.1.0 counterpart, a new case to port; \"metadata\": the captured commit, not a case). The C# suites still read the v1.1.0 set; nothing here is read by a test yet. Written by tools/DurableFixtures/capture-all.mjs; regenerate, never edit by hand.",
+ "upstream": {
+  "release": "Pi v1.2.0",
+  "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff"
+ },
+ "baseline": {
+  "release": "Pi v1.1.0",
+  "commit": "abe508e1b89912adde45528136c3221eb69acdd7",
+  "directory": "tests/PiSharp.Durable.Tests/Fixtures"
+ },
+ "switching": "An area moves a suite by pointing its fixture path at this set (for compat.*, CompatCases.Fixtures, which reads every session scenario from one directory, so it switches once every scenario it runs matches; tool-interrupted and subagent need area a's pi.tool v2) and adding the scenarios marked \"new\" to its C# port (Compat/CompatScenarios.cs for sessions). The upstream-sessions manifest lists the fields to normalize; v1.2.0 adds durations of nested calls, code mode's wall time, clock and seed.",
+ "fixtures": [
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/chat-turns.upstream.json",
+   "note": "followUp differs by the display-only write (#10407): the note is appended at once, before the first answer.",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-chat-turns.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/chat-turns.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/Harness/HarnessChatDifferentialCases.cs"
+   ],
+   "bytes": 8299,
+   "scenarios": [
+    {
+     "name": "answer",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "retry",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "unavailable",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "followUp",
+     "areas": [
+      "i"
+     ],
+     "v1.1.0": "differs"
+    },
+    {
+     "name": "noModel",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/compaction.upstream.json",
+   "note": "The v1.1.0 scenarios are unchanged; backgroundFailure and blockingFailure are new.",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-compaction.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/compaction.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionDifferentialCases.cs"
+   ],
+   "bytes": 67653,
+   "scenarios": [
+    {
+     "name": "manual",
+     "areas": [
+      "j"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "blocking",
+     "areas": [
+      "j"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "background",
+     "areas": [
+      "j"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "overflow",
+     "areas": [
+      "j"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "backgroundFailure",
+     "areas": [
+      "j"
+     ],
+     "v1.1.0": "new"
+    },
+    {
+     "name": "blockingFailure",
+     "areas": [
+      "j"
+     ],
+     "v1.1.0": "new"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/env-line-scan.upstream.json",
+   "note": "Identical to v1.1.0 but for its source line. The work list gives re-pinning EnvLineScanCases.cs to area m, which left the switch to whoever re-pins the case headers (this change switches no suite).",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-env-line-scan.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/env-line-scan.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/EnvLineScanCases.cs"
+   ],
+   "bytes": 190177,
+   "scenarios": [
+    {
+     "name": "source",
+     "areas": [],
+     "v1.1.0": "metadata"
+    },
+    {
+     "name": "keepsLaterBom",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "decode",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "scan",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/examples-19-json-events.upstream.jsonl",
+   "note": "The snapshot gains nestedTools, tool events taskId; read's new description changes the token counts.",
+   "capture": "upstream packages/durable/test/examples/19-json.ts (tools/DurableFixtures/capture-all.mjs)",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/examples-19-json-events.upstream.jsonl",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+   ],
+   "bytes": 7368,
+   "scenarios": [
+    {
+     "name": "output",
+     "areas": [
+      "h"
+     ],
+     "v1.1.0": "differs"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/examples-19-json-ops.upstream.jsonl",
+   "note": "read's new description changes the token counts.",
+   "capture": "upstream packages/durable/test/examples/19-json.ts (tools/DurableFixtures/capture-all.mjs)",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/examples-19-json-ops.upstream.jsonl",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/ExamplesCases.cs"
+   ],
+   "bytes": 5060,
+   "scenarios": [
+    {
+     "name": "output",
+     "areas": [
+      "h"
+     ],
+     "v1.1.0": "differs"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/inbox.upstream.json",
+   "note": "steer differs by the display-only write appended at once, and by pi.tool v2 (version 2, kind \"model\").",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-inbox.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/inbox.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/Harness/HarnessInboxDifferentialCases.cs"
+   ],
+   "bytes": 10692,
+   "scenarios": [
+    {
+     "name": "steer",
+     "areas": [
+      "i"
+     ],
+     "v1.1.0": "differs"
+    },
+    {
+     "name": "reset",
+     "areas": [
+      "i"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "modes",
+     "areas": [
+      "i"
+     ],
+     "v1.1.0": "same"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/piai-utils.upstream.json",
+   "note": "Identical to v1.1.0. The work list gives re-pinning PiAiUtilsCases.cs to area m; switch with the header re-pin.",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-piai-utils.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/piai-utils.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/PiAiUtilsCases.cs"
+   ],
+   "bytes": 124537,
+   "scenarios": [
+    {
+     "name": "overflow",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "retry",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "delays",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "transcripts",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "pairs",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "estimates",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "contextTokens",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "uuid",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/piai-validation.upstream.json",
+   "note": "Identical to v1.1.0. The work list gives re-pinning PiAiValidationCases.cs to area m; switch with the header re-pin.",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-piai-validation.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/piai-validation.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/PiAiValidationCases.cs"
+   ],
+   "bytes": 13807,
+   "scenarios": [
+    {
+     "name": "rows",
+     "areas": [
+      "m"
+     ],
+     "v1.1.0": "same"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/task-graph.upstream.json",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-task-graph.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/task-graph.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphDifferentialCases.cs"
+   ],
+   "bytes": 3102,
+   "scenarios": [
+    {
+     "name": "parent",
+     "areas": [
+      "c"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "initial",
+     "areas": [
+      "c"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "frames",
+     "areas": [
+      "c"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "final",
+     "areas": [
+      "c"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "snapshots",
+     "areas": [
+      "c"
+     ],
+     "v1.1.0": "same"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/tool-rounds.upstream.json",
+   "note": "pi.tool v2 (version 2, input and result kind \"model\"); round also gains pi.agent modelTools.add from the addTools control.",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-tool-rounds.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/tool-rounds.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/Harness/HarnessToolsDifferentialCases.cs"
+   ],
+   "bytes": 11926,
+   "scenarios": [
+    {
+     "name": "round",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs"
+    },
+    {
+     "name": "rejections",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs"
+    },
+    {
+     "name": "aborted",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/tools.upstream.json",
+   "note": "read's description mentions images; bash answers a nonzero exit with an error result (exit_code) and structured output instead of throwing; declarations add structuredOutputSchema, callers, deferred; images is new.",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-tools.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/tools.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/ToolsDifferentialCases.cs",
+    "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs"
+   ],
+   "bytes": 107253,
+   "scenarios": [
+    {
+     "name": "source",
+     "areas": [],
+     "v1.1.0": "metadata"
+    },
+    {
+     "name": "declarations",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs"
+    },
+    {
+     "name": "read",
+     "areas": [
+      "e"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "diffs",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "edits",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same"
+    },
+    {
+     "name": "bash",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs"
+    },
+    {
+     "name": "images",
+     "areas": [
+      "e"
+     ],
+     "v1.1.0": "new"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/views.upstream.json",
+   "note": "Tool events carry taskId and the snapshot nestedTools; pi.tool v2.",
+   "capture": "tests/PiSharp.Durable.Tests/Fixtures/capture-views.mjs",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/views.upstream.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/Harness/HarnessViewsDifferentialCases.cs"
+   ],
+   "bytes": 21149,
+   "scenarios": [
+    {
+     "name": "toolTurn",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs"
+    },
+    {
+     "name": "abortedRound",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs"
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/upstream-sessions",
+   "note": "Of the v1.1.0 scenarios, tool-interrupted and subagent differ only by pi.tool v2 (task version 2, input and result kind \"model\"); the others are identical. The new scenarios add events.json (agent events, snapshot first) and observed.json (what calls returned or rejected with). compat.reverse runs verify-reverse.mjs --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff against this set.",
+   "capture": "tools/DurableFixtures/capture.mjs (scenarios.mjs, scenarios-v1.2.0.mjs)",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs",
+    "tests/PiSharp.Durable.Tests/Compat/CompatScenarios.cs",
+    "tests/PiSharp.Durable.Tests/Compat/CompatOpsCases.cs (compat.reverse: tools/DurableFixtures/verify-reverse.mjs --commit)"
+   ],
+   "bytes": 3828402,
+   "scenarios": [
+    {
+     "name": "chat",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same",
+     "resumable": false,
+     "bytes": 138155,
+     "description": "One input answered: tagged and untagged prompt sections, an offered tool, a request ID."
+    },
+    {
+     "name": "tool-interrupted",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs",
+     "resumable": true,
+     "bytes": 156508,
+     "description": "A call to an unsafe (not replay-safe) tool, closed while the tool runs after writing output and details: the file holds the execute checkpoint. Resumed: the call settles as interrupted with its durable partial output, then the model answers."
+    },
+    {
+     "name": "follow-up",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same",
+     "resumable": true,
+     "bytes": 143155,
+     "description": "An input whose generation is in flight and a follow-up queued behind it, closed while the model is still answering. Resumed: the generation reruns and answers, then the queued follow-up runs."
+    },
+    {
+     "name": "compaction",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same",
+     "resumable": false,
+     "bytes": 185453,
+     "description": "Three turns, a manual compaction placed at once while idle, then one more turn over the compacted context."
+    },
+    {
+     "name": "subagent",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "differs",
+     "resumable": false,
+     "bytes": 167782,
+     "description": "A foreground subagent tool (upstream example 22): the call creates a child conversation its task owns, runs one input there, and returns the child's answer to the parent, which answers."
+    },
+    {
+     "name": "fork",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same",
+     "resumable": false,
+     "bytes": 162906,
+     "description": "Two turns, an ownerless fork at the first answer, and a turn in the fork."
+    },
+    {
+     "name": "task-graph",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "same",
+     "resumable": false,
+     "bytes": 142227,
+     "description": "A conversation-owned task that creates a conversation it owns and a child task it owns; the child creates a grandchild task it owns and waits for it; each waits (allSettled) and completes once its owned work is done."
+    },
+    {
+     "name": "nested-tools",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "bytes": 193810,
+     "description": "A model-issued tool makes nested calls (harness-nested-tools.test.ts, harness-callers.test.ts): two parallel calls of a tools-only echo (one under an explicit key), a schema tool, a missing tool and invalid arguments; each nested call is its own pi.tool task owned by the caller with a pi.tool.nested document, and the caller returns what it received to the model."
+    },
+    {
+     "name": "structured-output",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "bytes": 235709,
+     "description": "Structured tool output (harness-structured-output.test.ts): model-issued calls of a schema tool (its value stays out of the transcript) and of one whose value breaks its schema (the call stands, the host gets a report); then nested calls of an image tool, an error result without a schema, the broken schema tool, a schema tool's error result keeping its value, and a valid one."
+    },
+    {
+     "name": "deferred-tool-search",
+     "areas": [
+      "a",
+      "k"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "bytes": 201564,
+     "description": "Deferred tools and tool_search (tool-search.test.ts): two deferred tools stay out of the request until tool_search loads the best match, which pi.agent records in modelTools.add and a pi.system entry appends; the model then calls it."
+    },
+    {
+     "name": "codemode",
+     "areas": [
+      "d"
+     ],
+     "v1.1.0": "new",
+     "resumable": true,
+     "bytes": 282433,
+     "description": "Durable code mode (codemode.test.ts): a codemode script calls echo, then the replay-safe hold, then echo, each a nested call journaled before delivery; closed while hold runs. Resumed: the script replays from its journal without running the finished echo again, hold reruns, and the script finishes; the model answers."
+    },
+    {
+     "name": "read-image",
+     "areas": [
+      "e"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "bytes": 185702,
+     "description": "read returns images (tools-images.test.ts), without an image processor: a 1x1 PNG within the limits comes back as one image block with an info diagnostic; a BMP, which needs converting, is an unsupported_image error result."
+    },
+    {
+     "name": "input-entries",
+     "areas": [
+      "i"
+     ],
+     "v1.1.0": "new",
+     "resumable": true,
+     "bytes": 181724,
+     "description": "Input entries (harness-input-entries.test.ts): an idle input placed as a chat.mention entry carrying its data, with the content as its user message; then an input whose generation is in flight, with a steer (p2.input, no data) and a follow-up (chat.mention) queued in pi.inbox with their entries; closed. Resumed: the generation reruns, then the queued inputs are placed as their entries."
+    },
+    {
+     "name": "display-only-write",
+     "areas": [
+      "i"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "bytes": 172445,
+     "description": "Display-only writes while busy (harness-input-entries.test.ts, #10407): with a generation in flight and a follow-up queued, a write of only kind and data is appended and settled done at once, while writes with a model message or edits queue; once a reset is queued, a display-only write waits behind it. The answer, the reset, and the follow-up then run in order."
+    },
+    {
+     "name": "compaction-failure",
+     "areas": [
+      "j"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "bytes": 270879,
+     "description": "Compaction failure (harness-compaction.test.ts): three turns, then a turn whose background threshold compaction fails (pi.live.compactionFailure, compaction_end with error); then a turn over the blocking threshold whose compaction fails too, so the run fails with model_error \"Compaction failed: ...\" without sending its request."
+    },
+    {
+     "name": "session-failed",
+     "areas": [
+      "b"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "bytes": 142447,
+     "description": "Storage failure closes the Session (harness-storage-failure.test.ts): one input answered, then the storage fails the next commit; the call that hit it rejects with the storage error, later calls with SessionFailed (cause: that error), the event stream ends with session_failed and Harness.closed settles { reason: \"failed\" }. The files hold what was committed before."
+    },
+    {
+     "name": "nested-tools-restart",
+     "areas": [
+      "a",
+      "c"
+     ],
+     "v1.1.0": "new",
+     "resumable": true,
+     "bytes": 203053,
+     "description": "Nested calls across a restart (harness-nested-tools-restart.test.ts): a replay-unsafe caller makes two nested calls, a replay-safe one that publishes output and details and runs, and one a beforeTool hook holds before intent; closed. Resumed: both are abandoned (abandonOnRestart, abortReason \"restart\") before they run again, ending interrupted and abandoned, and the caller settles with an error result; the model answers."
+    },
+    {
+     "name": "abandon-on-restart",
+     "areas": [
+      "c"
+     ],
+     "v1.1.0": "new",
+     "resumable": true,
+     "bytes": 179649,
+     "description": "TaskOptions.abandonOnRestart (harness-nested-tools-restart.test.ts): a replay-unsafe tool creates a child task it owns with api.createTask() and awaits it in memory; closed while the child runs. Resumed: the child is marked with abortReason \"restart\" and its abort handler ends it aborted before any phase runs again; the tool call ends interrupted and the model answers."
+    },
+    {
+     "name": "wait-cycle",
+     "areas": [
+      "c"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "bytes": 132154,
+     "description": "Wait-cycle rejection (harness-structured.test.ts, #10411): conversation-owned task a waits on b; then b commits a wait on a, which closes the cycle a -> b -> a: runtime.commit() rejects it naming the cycle, b ends faulted, and a resumes and completes."
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/upstream-sessions/upgrade-from-v1.1.0",
+   "capture": "tools/DurableFixtures/capture.mjs (the v1.1.0 sessions opened and resumed by this version)",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions",
+   "readBy": [],
+   "bytes": 113737,
+   "scenarios": [
+    {
+     "name": "chat",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "description": "What Pi v1.2.0 reads after opening a copy of tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/chat: upgrade coverage for CompatCases, which keeps reading the v1.1.0 sessions (v1 pi.tool tasks migrate to v2 on open)."
+    },
+    {
+     "name": "tool-interrupted",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": true,
+     "description": "What Pi v1.2.0 reads after opening and after resuming a copy of tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/tool-interrupted: upgrade coverage for CompatCases, which keeps reading the v1.1.0 sessions (v1 pi.tool tasks migrate to v2 on open)."
+    },
+    {
+     "name": "follow-up",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": true,
+     "description": "What Pi v1.2.0 reads after opening and after resuming a copy of tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/follow-up: upgrade coverage for CompatCases, which keeps reading the v1.1.0 sessions (v1 pi.tool tasks migrate to v2 on open)."
+    },
+    {
+     "name": "compaction",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "description": "What Pi v1.2.0 reads after opening a copy of tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/compaction: upgrade coverage for CompatCases, which keeps reading the v1.1.0 sessions (v1 pi.tool tasks migrate to v2 on open)."
+    },
+    {
+     "name": "subagent",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "description": "What Pi v1.2.0 reads after opening a copy of tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/subagent: upgrade coverage for CompatCases, which keeps reading the v1.1.0 sessions (v1 pi.tool tasks migrate to v2 on open)."
+    },
+    {
+     "name": "fork",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "description": "What Pi v1.2.0 reads after opening a copy of tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/fork: upgrade coverage for CompatCases, which keeps reading the v1.1.0 sessions (v1 pi.tool tasks migrate to v2 on open)."
+    },
+    {
+     "name": "task-graph",
+     "areas": [
+      "a"
+     ],
+     "v1.1.0": "new",
+     "resumable": false,
+     "description": "What Pi v1.2.0 reads after opening a copy of tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/task-graph: upgrade coverage for CompatCases, which keeps reading the v1.1.0 sessions (v1 pi.tool tasks migrate to v2 on open)."
+    }
+   ]
+  },
+  {
+   "path": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/upstream-sessions/ops-corpus.json",
+   "capture": "tools/DurableFixtures/ops-corpus.mjs (through capture.mjs)",
+   "v1.1.0": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/ops-corpus.json",
+   "readBy": [
+    "tests/PiSharp.Durable.Tests/Compat/CompatOpsCases.cs"
+   ],
+   "bytes": 208950,
+   "scenarios": [
+    {
+     "name": "documents",
+     "areas": [
+      "f"
+     ],
+     "v1.1.0": "same"
+    }
+   ]
+  }
+ ]
+}
