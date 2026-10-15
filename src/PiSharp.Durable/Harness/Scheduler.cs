@@ -1194,12 +1194,16 @@ internal sealed class DurableTaskScheduler
         return null;
     }
 
-    /// <summary>Fails the Session, which reports it, for a throw in one of the scheduler's own commits; ignored once closing.</summary>
+    /// <summary>
+    /// Fails the Session, which reports it, for a throw in one of the scheduler's own commits; ignored once closing. Closing is the Session's:
+    /// upstream's close seals admission and runs <see cref="Seal"/> in one synchronous call, but here a pass on another thread can have its
+    /// commit refused ("Session is closed") before <see cref="Seal"/> has run, and that refusal must not fail the Session.
+    /// </summary>
     private void FailSession(Exception error)
     {
         bool closingNow;
         lock (gate) closingNow = closing;
-        if (!closingNow) session.Fail(error);
+        if (!closingNow && !session.Closing) session.Fail(error);
     }
 
     /// <summary>Close listener: runs synchronously once admission is sealed, before <see cref="JoinAsync"/>, or when the Session fails.</summary>
