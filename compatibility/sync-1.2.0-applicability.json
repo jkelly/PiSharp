@@ -1412,7 +1412,8 @@
           "cb4f42f",
           "403b372",
           "1340344",
-          "9f02f2f"
+          "9f02f2f",
+          "5887c7e"
         ],
         "tests": [
           "tests/PiSharp.ExtensionParity.Tests/RuntimeCases.cs",
