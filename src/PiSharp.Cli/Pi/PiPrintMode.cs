@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/print-mode.ts (runPrintMode),
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/print-mode.ts (runPrintMode),
 // packages/coding-agent/src/modes/json-event.ts and packages/coding-agent/src/modes/rpc/rpc-client.ts (waiting for agent_settled).
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -92,6 +92,12 @@ internal static class PiPrintMode
                                 if (block.TryGetProperty("type", out var blockType) && blockType.GetString() == "text" && block.TryGetProperty("text", out var blockText))
                                     await stdout.WriteAsync((PiSharp.Contracts.JsonUtf16.GetString(blockText) + "\n").AsMemory(), token).ConfigureAwait(false);
                             await stdout.FlushAsync(token).ConfigureAwait(false);
+                        }
+                        // print-mode.ts: a final response cut off at the output token limit prints its partial text, then fails.
+                        if (stop == "length")
+                        {
+                            await PiCommand.Line(stderr, "Response was truncated: the model reached its output token limit.").ConfigureAwait(false);
+                            exitCode = 1;
                         }
                     }
                 }

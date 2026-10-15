@@ -96,7 +96,7 @@ internal static class McpCommand
         "",
         "Other options:",
         "  --json                  Print the list as JSON",
-        $"  --timeout <seconds>     How long login waits for the browser (default: {DefaultLoginTimeoutSeconds})");
+        $"  --timeout <seconds>     Time limit for the whole sign-in (default: {DefaultLoginTimeoutSeconds})");
     private static readonly string HelpHint = $"Use \"{AppName} mcp --help\" for usage.";
 
     /// <summary>The agent directory: `PI_CODING_AGENT_DIR`, else `~/.pi/agent`.</summary>
