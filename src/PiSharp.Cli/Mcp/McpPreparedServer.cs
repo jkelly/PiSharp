@@ -60,7 +60,27 @@ public sealed class McpPreparedServer : IAsyncDisposable
             !captured.UsesFinalActionPolicy(policy))
             throw new ArgumentException("MCP binding requires the captured attachment generation and native final-action policy.");
         runtime = new(entry, options, channelFactory, PublishAsync); serverEntry = entry;
-        resource = owner.RegisterOwnedResource(attachment, CloseOwnedAsync, runtime.CloseAsync);
+        resource = owner.RegisterOwnedResource(attachment, CloseOwnedAsync, StopRuntimeAsync);
+    }
+
+    /// <summary>The owner's stop (the session's shutdown or retirement, or an explicit close): marks the server closing before its
+    /// runtime closes, so whatever that close fails is known to be teardown.</summary>
+    private Task StopRuntimeAsync()
+    {
+        Volatile.Write(ref stopping, 1);
+        return runtime.CloseAsync();
+    }
+    private int stopping;
+
+    /// <summary>Whether the server is being closed: its owner began stopping it (the session ends, its attachment retires, or the
+    /// server was closed during the session). A connection attempt of a closing server is no longer current (index.ts isCurrent).</summary>
+    internal bool Closing
+    {
+        get
+        {
+            if (Volatile.Read(ref stopping) != 0) return true;
+            lock (admission) return closeRequested;
+        }
     }
 
     public Task<McpRuntimeSnapshot> ConnectAsync(CancellationToken token = default)
