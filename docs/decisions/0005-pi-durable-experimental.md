@@ -1,6 +1,6 @@
 # Experimental port of pi-durable
 
-Status: approved by the project owner on 2026-10-12, on branch `feature/pi-durable` only. It supersedes the `pi-durable` and experimental `durable` exclusions in [0002-pi-1.1.0-sync.md](0002-pi-1.1.0-sync.md) for that branch. Retargeted to Pi v1.2.0 on 2026-10-15 (see [Pi v1.2.0 retarget](#pi-v120-retarget)); the `exclude.durable` and `exclude.chord` rows of [0006-pi-1.2.0-sync.md](0006-pi-1.2.0-sync.md) apply to `main` only.
+Status: approved by the project owner on 2026-10-12, on branch `feature/pi-durable` only. It supersedes the `pi-durable` and experimental `durable` exclusions in [0002-pi-1.1.0-sync.md](0002-pi-1.1.0-sync.md) for that branch. Retargeted to Pi v1.2.0 on 2026-10-15 (see [Pi v1.2.0 retarget](#pi-v120-retarget)); the `exclude.durable` and `exclude.chord` rows of [0006-pi-1.2.0-sync.md](0006-pi-1.2.0-sync.md), and its exclusion of codemode's `sandbox.start()`, apply to `main` only (see [Codemode `Start()`](#codemode-start)).
 
 ## Context
 
@@ -23,7 +23,7 @@ Pi v1.2.0 changed `pi-durable` heavily: tool task v2 with nested tool calls, str
 4. **Packages.**
    - `PiSharp.Durable` holds the core: the Chord subset, records, session, harness, memory and JSONL storage, and the conformance kits. It references only Contracts and AI.
    - `PiSharp.Durable.Sqlite` holds the SQLite storage.
-   - `PiSharp.Durable.Tools` holds the execution environment and coding tools.
+   - `PiSharp.Durable.Tools` holds the execution environment and coding tools. From work list area d it also holds durable code mode. It then references `PiSharp.Codemode`, an existing project; see [Codemode `Start()`](#codemode-start).
    - The CLI mode lives in `PiSharp.Cli/Durable`.
 5. **Storage.** Memory, JSONL and SQLite, as upstream. SQLite uses `Microsoft.Data.Sqlite` with its `SQLitePCLRaw` e_sqlite3 native assets. That makes it PiSharp's fourth external runtime dependency, scoped to `PiSharp.Durable.Sqlite` only. It is pinned exactly and needs license notices, packaging validation entries and locked restore entries before any release.
 6. **Compatibility.**
@@ -110,3 +110,40 @@ Port map against v1.2.0 (214 rows):
 | skipped | 4 |
 
 Upstream changes recorded in the map: 75 modified, 1 renamed (`chord/src/services/state.ts` to `chord/src/state.ts`), 40 added and 9 removed (the 7 experimental agent files, `chord/src/services/state-internals.ts` and `test/chord-guide.test.ts`). The added rows include `images/cloudflare.ts` and `images/photon-wasm.d.ts`, which are excluded.
+
+## Codemode `Start()`
+
+Added on 2026-10-15 as the prerequisite of work list area d (durable code mode).
+
+**What.** Pi v1.2.0's deterministic `sandbox.start()` (pi-codemode CHANGELOG 1.2.0, Added #4) is ported to `PiSharp.Codemode` as `CodemodeSandbox.Start()`. It provides:
+- a virtual clock from `startedAt`;
+- `Math.random` from `seed`;
+- UTC;
+- no `WeakRef` or `FinalizationRegistry`;
+- results applied in the order the host numbers them;
+- `OnStarted` with the engine's fingerprint, `OnCall`, `OnIdle` with the calls issued after each result, and `CodemodeRun.Deliver()` and `Finished`.
+
+[codemode-engine.md](../compatibility/codemode-engine.md#deterministic-runs-start-branch-featurepi-durable-only) describes the API, the determinism design, what it guarantees and the fingerprint.
+
+**Why on this branch.** Decision 0006 excludes `start()` on `main` (applicability row `codemode.new-sandboxes`), because the coding agent does not use it. Upstream's durable code mode is built on it, so this branch follows upstream and adds it. The branch's copy of the applicability table splits it into the row `codemode.deterministic-start` (`branch-port`). The other new sandbox hosts stay excluded: `RemoteCodemodeSandbox`, `InlineCodemodeSandbox` and the portable entry.
+
+**Additive main-line seam.** The change is flagged for upstreaming to `main` with the durable work, or when the exclusion lapses.
+- `ExecuteAsync()` behaves as before, and every existing Codemode case passes unchanged.
+- The new public surface is additive:
+  - `Start`, `CodemodeRun`, `CodemodeRunOptions`, `CodemodeHostCall`, `CodemodeCallTarget`, `CodemodeOutcome`, `CodemodeDeclaredTool`, `CodemodeDeclaredGlobal` and `CodemodeDuring`;
+  - `CodemodeResult.During`;
+  - `CodemodeSandboxOptions.InterruptBudget`, which is off by default.
+- The worker protocol gains optional fields and the `started`, `idle` and `exhausted` messages. A worker process and its host always come from the same build.
+
+**Dependencies.** No new NuGet package.
+- `PiSharp.Durable.Tools` will reference `PiSharp.Codemode`, and through it Jint 4.16.3 and Acornima 1.7.0. Decision 0003 already pins and licenses both for `PiSharp.Codemode`.
+- Area d adds the reference and its lock-file entries.
+- The reason for the reference: durable code mode replays a script from its journal, and only a deterministic engine run can do that.
+
+**Intentional difference: the fingerprint.** Upstream's fingerprint names quickjs-wasi and QuickJS. PiSharp's names Jint, Acornima, the prelude (whose FNV-1a equals upstream's), the Jint shims, the runner's deterministic version, the .NET runtime, the platform and the limits. The two never match, so durable code mode cannot move a running script between Pi and PiSharp: its fingerprint check refuses the resume instead of diverging silently. Durable sessions stay compatible in every other respect that point 6 lists.
+
+**Evidence.** Commit `ca3f1d1`. `tests/PiSharp.Codemode.Tests/DeterministicCases.cs` runs on both engine hosts (worker process and thread):
+- the `deterministic.test.ts` cases (the remote-transport case has no PiSharp host);
+- an authored replay of a run interrupted at several midpoints, continued on the other host;
+- authored checks of Jint's extra built-ins and of the interrupt budget;
+- a differential against the real `@earendil-works/pi-codemode` 1.2.0 `start()` over 16 scenarios (`Deterministic/deterministic-goldens.json`). It covers events, issued counts, call arguments, `Math.random` values, clock readings, outputs and outcomes.

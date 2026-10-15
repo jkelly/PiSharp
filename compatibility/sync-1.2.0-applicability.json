@@ -34,7 +34,7 @@
   ],
   "changelogBullets": "Bullet ids are <package>/<section>#<n>, numbered in order under ## [1.2.0] of packages/<package>/CHANGELOG.md at v1.2.0. agent has no 1.2.0 entries. \"New Features\" bullets summarise Added/Breaking bullets and map to the same rows.",
   "summary": {
-    "rows": 56,
+    "rows": 57,
     "changelogBullets": 70,
     "byStatus": {
       "ported": 38,
@@ -42,7 +42,7 @@
       "already-ported": 3,
       "exclude": 5,
       "ported-with-deferral": 2,
-      "branch-port": 1
+      "branch-port": 2
     },
     "byArea": {
       "ai": 7,
@@ -51,7 +51,7 @@
       "coding-agent-cli": 2,
       "tools": 2,
       "tui": 8,
-      "codemode": 12,
+      "codemode": 13,
       "mcp": 4,
       "node-bridge": 1,
       "docs": 3
@@ -1208,8 +1208,7 @@
       "changelog": [
         "codemode/Added#1",
         "codemode/Added#2",
-        "codemode/Added#3",
-        "codemode/Added#4"
+        "codemode/Added#3"
       ],
       "upstream": [
         "packages/codemode/src/runtime/remote.ts",
@@ -1220,10 +1219,49 @@
         "packages/codemode/src/cloudflare.ts",
         "packages/codemode/examples/cloudflare/**"
       ],
-      "change": "RemoteCodemodeSandbox (Cloudflare Durable Object), InlineCodemodeSandbox, the portable entry with CodemodeSandboxBase, and deterministic sandbox.start() runs.",
+      "change": "RemoteCodemodeSandbox (Cloudflare Durable Object), InlineCodemodeSandbox and the portable entry with CodemodeSandboxBase. On branch feature/pi-durable, deterministic sandbox.start() runs (Added#4) are split out as codemode.deterministic-start.",
       "pisharp": [],
       "release": "1.2.0",
-      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: sandbox hosting options the coding agent does not use (its codemode extension still runs CodemodeSandbox); PiSharp runs codemode on Jint."
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: sandbox hosting options the coding agent does not use (its codemode extension still runs CodemodeSandbox); PiSharp runs codemode on Jint. On main this row also excludes sandbox.start(); on feature/pi-durable that part is ported (codemode.deterministic-start, decision 0005)."
+    },
+    {
+      "id": "codemode.deterministic-start",
+      "area": "codemode",
+      "status": "branch-port",
+      "changelog": [
+        "codemode/Added#4"
+      ],
+      "upstream": [
+        "packages/codemode/src/runtime/execution.ts",
+        "packages/codemode/src/runtime/vm.ts",
+        "packages/codemode/src/runtime/protocol.ts",
+        "packages/codemode/src/types.ts",
+        "packages/codemode/test/deterministic.test.ts"
+      ],
+      "change": "Deterministic sandbox.start(): the host answers the script's calls (onCall, run.deliver()) so it can replay the script after a restart; a virtual clock from startedAt, randomness from seed, UTC, no WeakRef/FinalizationRegistry, results applied in the order the host numbers them, the VM's fingerprint (onStarted), the calls issued after each result (onIdle), run.finished and result.during. execute() is unchanged.",
+      "pisharp": [
+        "src/PiSharp.Codemode/Runtime/CodemodeSandbox.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeRun.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeEngineRunner.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeDeterministicClock.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeWorkerProtocol.cs",
+        "src/PiSharp.Codemode/CodemodeTypes.cs"
+      ],
+      "release": "experimental (branch feature/pi-durable; not released)",
+      "test": [
+        "tests/PiSharp.Codemode.Tests/DeterministicCases.cs",
+        "tests/PiSharp.Codemode.Tests/Deterministic/deterministic-goldens.json"
+      ],
+      "decision": "docs/decisions/0005-pi-durable-experimental.md (Codemode Start()): the prerequisite of durable code mode (durable work list area d), an additive seam to PiSharp.Codemode flagged for upstreaming to main; on main it stays excluded under codemode.new-sandboxes (decision 0006). Intentional difference: the fingerprint names Jint and .NET instead of QuickJS, so a run cannot move between Pi and PiSharp.",
+      "notes": "docs/compatibility/codemode-engine.md, section Deterministic runs, describes the API, the determinism design and the fingerprint. The remote-transport case of deterministic.test.ts has no PiSharp host.",
+      "evidence": {
+        "commits": [
+          "ca3f1d1"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/DeterministicCases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.node-watch-messages",
@@ -1760,7 +1798,7 @@
       "codemode.new-sandboxes"
     ],
     "codemode/Added#4": [
-      "codemode.new-sandboxes"
+      "codemode.deterministic-start"
     ],
     "codemode/Changed#1": [
       "codemode.declaration-constraints"

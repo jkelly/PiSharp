@@ -5,5 +5,7 @@
     <ProjectReference Include="../../src/PiSharp.Codemode/PiSharp.Codemode.csproj" />
     <!-- Upstream declaration goldens (regenerate with Declarations/gen-declaration-goldens.mjs). -->
     <None Include="Declarations/declaration-goldens.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Upstream deterministic-run goldens (regenerate with Deterministic/gen-deterministic-goldens.mjs). -->
+    <None Include="Deterministic/deterministic-goldens.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
