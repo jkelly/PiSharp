@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using PiSharp.Agent;
 using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Cli.Mcp;
 using PiSharp.Codemode;
@@ -201,7 +202,50 @@ internal static partial class Program
             Check(snapshot.Tools.Single(tool => tool.Name == "codemode").ReachesTools is not null, "declared reach carried");
             Check(snapshot.Tools.Single(tool => tool.Name == "plain").ReachesTools is null, "no reach");
         }),
+        // mcp/index.ts tool_call: the MCP extension is a built-in, loaded after the other extensions, so its handler waits for the
+        // servers once their tool_call handlers allowed the call, with the input they leave; a blocked call waits for nothing.
+        Case("sync120.mcp-tool-call-waits-after-the-extensions-tool-call-handlers", async () =>
+        {
+            var waits = new List<string>();
+            Func<string, JsonData, CancellationToken, Task>? handler = (tool, input, _) => { lock (waits) waits.Add(tool + " " + input); return Task.CompletedTask; };
+            static (ToolInvocation, PreparedToolAction) Call(string name, string arguments)
+            {
+                var call = new ToolCallContent("call-" + name, name, Parse(arguments));
+                var message = new AssistantMessage("anthropic-messages", "anthropic", "claude-sonnet-4-5", 0, [call], TokenUsage.Zero, StopReason.ToolUse);
+                return (new ToolInvocation(message, call, 0), new PreparedToolAction(name, "invoke", PreparedToolActionKind.Path, name, Parse(arguments), [],
+                    null, ImmutableDictionary<string, string>.Empty));
+            }
+            var (invocation, action) = Call("codemode", """{"code":"tools.mcp__docs__search()"}""");
+            // No extension handlers: the validated input.
+            var allowed = await new McpToolCallHooks(null, () => handler).BeforeAsync(invocation, action, CancellationToken.None);
+            Check(!allowed.Block && allowed.Arguments is null, "allowed unchanged");
+            // A handler that replaces the input: the MCP handler sees the replacement.
+            var replacing = new McpToolCallHooks(new Hooks(_ => new(Parse("""{"code":"tools.mcp__wiki__get()"}"""))), () => handler);
+            Check((await replacing.BeforeAsync(invocation, action, CancellationToken.None)).Arguments is { } replaced && replaced.ToString().Contains("wiki", StringComparison.Ordinal), "replacement kept");
+            // A blocking handler: no wait, and the block is returned as is.
+            var blocking = new McpToolCallHooks(new Hooks(_ => new(null, true) { Reason = "no" }), () => handler);
+            var blocked = await blocking.BeforeAsync(invocation, action, CancellationToken.None);
+            Check(blocked.Block && blocked.Reason == "no", "blocked");
+            // Before a generation binds its handler nothing waits.
+            await new McpToolCallHooks(null, () => null).BeforeAsync(invocation, action, CancellationToken.None);
+            Names(["codemode {\"code\":\"tools.mcp__docs__search()\"}", "codemode {\"code\":\"tools.mcp__wiki__get()\"}"], [.. waits], "waits");
+            // The handler's cancellation is the call's.
+            using var cancelled = new CancellationTokenSource(); await cancelled.CancelAsync();
+            Func<string, JsonData, CancellationToken, Task> observe = (_, _, token) => { token.ThrowIfCancellationRequested(); return Task.CompletedTask; };
+            Check(await Failure(new McpToolCallHooks(null, () => observe).BeforeAsync(invocation, action, cancelled.Token).AsTask()) is OperationCanceledException, "cancelled");
+            // tool_result handlers are the extensions' own.
+            Check(await new McpToolCallHooks(new Hooks(_ => new()), () => handler).AfterAsync(invocation, action, ToolResult.Success("x"), false, CancellationToken.None) is { } patch &&
+                patch.ToString() == "{\"after\":true}", "after delegated");
+        }),
     ];
+
+    private sealed class Hooks(Func<PreparedToolAction, PreparedToolCallHookResult> before) : IPreparedToolHooks
+    {
+        public ValueTask<PreparedToolCallHookResult> BeforeAsync(ToolInvocation invocation, PreparedToolAction validatedAction, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(before(validatedAction));
+        public ValueTask<JsonData?> AfterAsync(ToolInvocation invocation, PreparedToolAction finalAction, ToolResult result, bool isError, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<JsonData?>(Parse("""{"after":true}"""));
+    }
 
     private static void Contains(string text, string expected) =>
         Check(text.Contains(expected, StringComparison.Ordinal), $"expected <{expected}> in <{text}>");

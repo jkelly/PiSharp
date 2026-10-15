@@ -21,16 +21,11 @@ internal static class McpToolSearch
     internal const string Name = ToolSearch.Name, RegistrationId = "tool-search";
     private static readonly ConditionalWeakTable<PersistentAgentSession, object> Gates = [];
 
-    /// <summary>A fresh definition for one generation; each binds to exactly one attachment. With
-    /// <paramref name="waitForServers"/> (index.ts tool_call: tool_search reaches every server) a search first waits for the
-    /// servers still connecting (their tools are registered once connected, also during the run).</summary>
-    internal static McpDiscoveryExecutableDefinition Create(bool defaultActive = true, Func<CancellationToken, Task>? waitForServers = null) =>
-        McpDiscoveryExecutableDefinition.CreateToolSearch(RegistrationId, ToolSearch.Description,
-            async (query, limit, attachment, invocation, token) =>
-            {
-                if (waitForServers is not null) await waitForServers(token).ConfigureAwait(false);
-                return await ExecuteAsync(query, limit, attachment, invocation, token).ConfigureAwait(false);
-            }, null,
+    /// <summary>A fresh definition for one generation; each binds to exactly one attachment. Its <c>reachesTools</c> reaches every
+    /// tool, so before a search runs the session's MCP tool_call handler waits for the servers still connecting (their tools are
+    /// registered once connected, also during the run; see <see cref="McpToolCallHooks"/>).</summary>
+    internal static McpDiscoveryExecutableDefinition Create(bool defaultActive = true) =>
+        McpDiscoveryExecutableDefinition.CreateToolSearch(RegistrationId, ToolSearch.Description, ExecuteAsync, null,
             descriptor => descriptor with { DefaultActive = defaultActive });
 
     /// <summary>The tool's arguments as its schema admits them: a string query and an optional number limit.</summary>

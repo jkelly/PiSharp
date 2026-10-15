@@ -106,8 +106,9 @@ public sealed class McpBackgroundConnections
     }
 
     /// <summary>index.ts before_agent_start waitForDirectServers, before idle input is admitted: the first prompt waits up to
-    /// <see cref="StartupWait"/> for servers with `direct` tools, then notes that the others are still connecting. tool_search,
-    /// codemode and the resource tools wait for the servers they reach inside their calls (tool_call), not here.</summary>
+    /// <see cref="StartupWait"/> for servers with `direct` tools, then notes that the others are still connecting. Tools that reach
+    /// other tools (reachesTools), the resource tools and a server's own tools wait for the servers they reach before they run
+    /// (tool_call, <see cref="McpToolCallHooks"/>), not here.</summary>
     internal async Task BeforeInputAsync(PersistentAgentSession session, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(session);

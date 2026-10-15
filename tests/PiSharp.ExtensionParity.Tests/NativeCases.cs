@@ -276,13 +276,13 @@ internal static partial class Program
     private const string NativeLogVariable = "PISHARP_EXTENSION_PARITY_NATIVE_LOG";
 
     /// <summary>Writes an extension folder: a copy of this assembly and its manifest. Returns the manifest path.</summary>
-    private static string NativeExtensionFolder(string folder)
+    private static string NativeExtensionFolder(string folder, Type? entry = null)
     {
         Directory.CreateDirectory(folder);
         var assembly = typeof(Program).Assembly.Location;
         File.Copy(assembly, Path.Combine(folder, "ParityNative.dll"), overwrite: true);
         var manifest = Path.Combine(folder, "pisharp-extension.json");
-        File.WriteAllText(manifest, JsonSerializer.Serialize(new { assembly = "ParityNative.dll", entryType = typeof(ParityNativeExtension).FullName }));
+        File.WriteAllText(manifest, JsonSerializer.Serialize(new { assembly = "ParityNative.dll", entryType = (entry ?? typeof(ParityNativeExtension)).FullName }));
         return manifest;
     }
 

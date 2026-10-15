@@ -101,6 +101,7 @@ internal sealed partial class OfflineSessionProfile
                     throw new ArgumentException("Native and discovery resource owners must be independent.");
                 token.ThrowIfCancellationRequested();
                 var admittedBinder = acquired.BindProfileView;
+                var beforeToolCall = acquired.BeforeToolCall;
                 if (admittedBinder?.GetInvocationList().Length > 1)
                     throw new ArgumentException("One owning profile view binder is required.");
                 var ownership = CaptureInitialRuntimeViewOwnership(acquired.NativeResources, generation);
@@ -108,6 +109,8 @@ internal sealed partial class OfflineSessionProfile
                 {
                     admittedBinder?.Invoke(owner, attachment);
                     ownership.BindOwner(owner, attachment);
+                    // The bound generation's MCP tool_call handler serves the session's tool calls from now on.
+                    Volatile.Write(ref mcpBeforeToolCall, beforeToolCall);
                 }, ServersPromptSource = AdmitMcpServersPromptSource(acquired.ServersPromptSource) };
                 if (acquired.CallGrants is { } grants) _policy.AdmitMcpCalls(generation, grants);
                 // Pi 1.1.0 ignores selected names the discovered catalog does not register; they are not validated here.

@@ -34,6 +34,7 @@ internal static partial class Program
         cases.AddRange(SwitchVetoCases());
         cases.AddRange(RebuildCases());
         cases.AddRange(NativeCases());
+        cases.AddRange(ReachCases());
         cases.AddRange(OAuthCases());
         cases.AddRange(CapCases());
         cases.AddRange(JsonLeftoverCases());
@@ -126,6 +127,8 @@ internal static partial class Program
         public Dictionary<string, string?> Vars { get; } = new(StringComparer.Ordinal);
         public List<Seen> Requests { get; } = [];
         public Func<Seen, int, HttpResponseMessage> Respond { get; set; } = (_, _) => AnthropicText("ok");
+        /// <summary>The run's MCP host (by agent directory); null uses one without servers of its own.</summary>
+        public Func<string, PiSharp.Cli.Mcp.McpSessionHost>? McpHost { get; set; }
         public Sandbox(string name, bool trusted = true)
         {
             Root = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "pisharp-ext-parity", name + "-" + Guid.NewGuid().ToString("N")[..8]);
@@ -155,7 +158,7 @@ internal static partial class Program
         {
             Cwd = Cwd, Home = Home, GetEnvironment = name => Vars.GetValueOrDefault(name), SetEnvironment = (name, value) => Vars[name] = value,
             Stdout = stdout, Stderr = stderr, Stdin = new StringReader(stdin ?? ""), StdinIsTty = stdin is null, StdoutIsTty = interactive,
-            LiveRuntime = Runtime(), CreateMcpHost = agentDir => new PiSharp.Cli.Mcp.McpSessionHost(agentDir, Home, () => []),
+            LiveRuntime = Runtime(), CreateMcpHost = McpHost ?? (agentDir => new PiSharp.Cli.Mcp.McpSessionHost(agentDir, Home, () => [])),
             RunInteractive = runInteractive, OpenRpcInput = rpcInput is null ? null : () => rpcInput, OpenRpcOutput = rpcOutput is null ? null : () => rpcOutput,
             ApplicationDirectory = Path.Combine(Root, "app"), Now = () => DateTimeOffset.UtcNow
         };
@@ -180,6 +183,8 @@ internal static partial class Program
 
     internal sealed record Seen(string Method, string Url, IReadOnlyDictionary<string, string> Headers, string? Body)
     {
+        /// <summary>When the request arrived (Stopwatch timestamp).</summary>
+        public long At { get; init; } = System.Diagnostics.Stopwatch.GetTimestamp();
         public JsonElement Json => JsonDocument.Parse(Body!).RootElement;
     }
 
