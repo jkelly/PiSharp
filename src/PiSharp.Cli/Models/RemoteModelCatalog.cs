@@ -109,6 +109,8 @@ internal sealed class FileModelsStore(string path) : IModelsStore
             catch (IOException) when (File.Exists(lockPath) || Directory.Exists(lockPath))
             {
                 var stamp = Directory.Exists(lockPath) ? Directory.GetLastWriteTimeUtc(lockPath) : File.GetLastWriteTimeUtc(lockPath);
+                // 1601-01-01 means the lock vanished between the check and the read: try again, never take it for stale.
+                if (stamp == DateTime.FromFileTimeUtc(0)) continue;
                 if (DateTime.UtcNow - stamp > TimeSpan.FromSeconds(30))
                 { try { if (Directory.Exists(lockPath)) Directory.Delete(lockPath); else File.Delete(lockPath); } catch (IOException) { } continue; }
                 if (DateTime.UtcNow - started > TimeSpan.FromSeconds(30)) throw new IOException("Failed to acquire models store lock");

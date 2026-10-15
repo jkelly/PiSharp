@@ -23,6 +23,7 @@ internal static partial class Program
             ("startup.first-prompt-waits-for-direct-servers", FirstPromptWaitsForDirectServers),
             ("startup.first-prompt-waits-at-most-the-startup-cap", FirstPromptWaitCap),
             ("startup.problems-reported-once-after-all-servers-settled", ProblemsReportedOnce),
+            ("startup.server-closed-while-connecting-is-not-reported", ClosedWhileConnecting),
             ("resources.direct-server-resources-declared-and-read", DirectResources),
             ("resources.deferred-server-resources-reached-through-tool-search", DeferredResources),
             ("tool-search.registered-inactive-and-selectable-without-deferred-servers", ToolSearchInactive),
