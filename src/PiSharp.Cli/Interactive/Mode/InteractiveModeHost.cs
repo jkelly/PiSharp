@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/main.ts (the interactive branch: InteractiveMode construction
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/main.ts (the interactive branch: InteractiveMode construction
 // with InteractiveModeOptions, run, and the resume hint printed after an interactive quit) and coding-agent/src/modes/interactive/
 // interactive-mode.ts (shutdown's terminal handling). PiSharp runs the session in the in-process RPC host and drives it from the
 // interactive mode on a dedicated UI loop, on Windows, Linux and macOS.

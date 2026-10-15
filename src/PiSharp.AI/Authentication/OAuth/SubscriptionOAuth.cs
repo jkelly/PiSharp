@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/oauth/openrouter.ts, kimi-coding.ts, meta.ts, xai.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/oauth/openrouter.ts, kimi-coding.ts, meta.ts, xai.ts,
 // radius.ts (with providers/radius-config.ts normalizeRadiusGatewayUrl) and anthropic.ts (adapted to the shared interaction).
 using System.Collections.Immutable;
 using System.Text.Json;

@@ -1,10 +1,10 @@
 # PiSharp
 
-PiSharp is a native .NET 10 / C# port of the [Pi coding agent](https://github.com/earendil-works/pi). Its version names the Pi release it matches: the current baseline is Pi **v1.1.0** (commit `abe508e1b89912adde45528136c3221eb69acdd7`), and a fourth number marks a C#-only patch. The version names the porting baseline; the [Parity page](https://pisharp.ai/parity/) and [sync-1.1.0-applicability.json](compatibility/sync-1.1.0-applicability.json) record what is ported and what still differs.
+PiSharp is a native .NET 10 / C# port of the [Pi coding agent](https://github.com/earendil-works/pi). Its version names the Pi release it matches: the current baseline is Pi **v1.2.0** (commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`), and a fourth number marks a C#-only patch. The version names the porting baseline; the [Parity page](https://pisharp.ai/parity/) and [sync-1.2.0-applicability.json](compatibility/sync-1.2.0-applicability.json) record what is ported and what still differs.
 
-Install the CLI with `dotnet tool install -g PiSharp.Cli` and run `pisharp` as you would run `pi`. It takes Pi's command line and reads Pi's files in `~/.pi/agent` and `.pi`: settings, credentials, models, MCP servers, context files, skills, prompt templates, themes, extensions and sessions. It has every Pi v1.1.0 chat API and provider catalog, the built-in tools (with images), codemode and `tool_search`, Pi's interactive mode and slash commands, print, JSON and RPC modes, and Pi's TypeScript extensions and packages through a Node bridge that installs Pi's own npm packages. Native C# extensions load from the same folders. Release 1.1.0.6 is described in the [release notes](docs/release-notes/1.1.0.6.md).
+Install the CLI with `dotnet tool install -g PiSharp.Cli` and run `pisharp` as you would run `pi`. It takes Pi's command line and reads Pi's files in `~/.pi/agent` and `.pi`: settings, credentials, models, MCP servers, context files, skills, prompt templates, themes, extensions and sessions. It has every Pi v1.2.0 chat API and provider catalog, the built-in tools (with images), codemode and `tool_search`, Pi's interactive mode and slash commands, print, JSON and RPC modes, and Pi's TypeScript extensions and packages through a Node bridge that installs Pi's own npm packages. Native C# extensions load from the same folders. Release 1.2.0 is described in the [release notes](docs/release-notes/1.2.0.md).
 
-Documentation is at [pisharp.ai](https://pisharp.ai/docs/). The full-parity work is tracked in [full-parity-v1.1.0.md](docs/plans/full-parity-v1.1.0.md) and [full-parity-progress.json](docs/plans/full-parity-progress.json).
+Documentation is at [pisharp.ai](https://pisharp.ai/docs/). The full-parity work is tracked in [full-parity-v1.1.0.md](docs/plans/full-parity-v1.1.0.md) and [full-parity-progress.json](docs/plans/full-parity-progress.json), and the Pi 1.2.0 sync in [decision 0006](docs/decisions/0006-pi-1.2.0-sync.md).
 
 ## Native validation tooling
 
@@ -28,7 +28,7 @@ The CLI accepts explicit source and new destination paths. `session migrate` con
 
 ## Upstream baseline and attribution
 
-The canonical upstream is [earendil-works/pi](https://github.com/earendil-works/pi). The port is pinned to **v1.1.0**, commit [`abe508e1b89912adde45528136c3221eb69acdd7`](https://github.com/earendil-works/pi/tree/abe508e1b89912adde45528136c3221eb69acdd7); planning started from v0.99.1, commit `d86654abb8862e201933517d6f1fce9f88dd117f`.
+The canonical upstream is [earendil-works/pi](https://github.com/earendil-works/pi). The port is pinned to **v1.2.0**, commit [`06a466935536f8c9bcacb2d5efc0fc021be1bdff`](https://github.com/earendil-works/pi/tree/06a466935536f8c9bcacb2d5efc0fc021be1bdff); planning started from v0.99.1, commit `d86654abb8862e201933517d6f1fce9f88dd117f`.
 
 Upstream Pi is MIT-licensed. Its [license at the planning baseline](https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/LICENSE) identifies **Copyright (c) 2025 Mario Zechner**. Public upstream contracts and behavior inform this implementation; applicable attribution is retained in [third-party notices](THIRD-PARTY-NOTICES.md). No private project code or context is used.
 

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/resource-loader.ts (loadProjectContextFiles,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/resource-loader.ts (loadProjectContextFiles,
 // loadContextFileFromDir, findShadowedContextFile, resolvePromptInput, discoverSystemPromptFile, discoverAppendSystemPromptFile,
 // mergePaths), packages/coding-agent/src/core/package-manager.ts (resolve, addAutoDiscoveredResources, collectAncestorAgentsSkillDirs,
 // collectAutoPromptEntries, collectAutoThemeEntries) and packages/coding-agent/src/core/footer-data-provider.ts (findGitPaths).
@@ -114,7 +114,10 @@ internal sealed class PiResources
         while (true)
         {
             var context = LoadContextFileFromDir(current, warnings);
-            var isShadowed = shadowed is not null && PiPaths.Canonicalize(context?.Path ?? "") == shadowed;
+            // Compare the directory's real path, not the file's: a worktree AGENTS.md that symlinks to the main repo's file
+            // resolves to the shadowed path itself.
+            var isShadowed = shadowed is not null && context is not null &&
+                Path.Join(PiPaths.Canonicalize(current), Path.GetFileName(context.Path)) == shadowed;
             if (context is not null && !isShadowed && seen.Add(context.Path)) ancestors.Insert(0, context);
             var parent = Path.GetDirectoryName(current);
             if (parent is null || parent == current) break;

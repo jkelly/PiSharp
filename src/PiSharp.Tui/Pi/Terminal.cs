@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/terminal.ts, packages/tui/src/program-status.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/terminal.ts, packages/tui/src/program-status.ts,
 // packages/tui/src/native-modifiers.ts.
 using System.Runtime.InteropServices;
 using System.Text;

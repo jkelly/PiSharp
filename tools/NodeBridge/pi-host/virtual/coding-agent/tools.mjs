@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/{bash,powershell,read,edit,write,grep,find,ls,index}.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/tools/{bash,powershell,read,edit,write,grep,find,ls,index}.ts.
 // PiSharp host-backed built-in tool factories. Names, labels, descriptions, prompt snippets/guidelines,
 // parameter/output schemas and argument preparation are copied from upstream. `execute` delegates to
 // PiSharp's native built-in tool through the bridge hook:

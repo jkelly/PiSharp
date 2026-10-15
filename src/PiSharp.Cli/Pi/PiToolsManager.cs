@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/utils/tools-manager.ts (TOOLS, getToolPath,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/tools-manager.ts (TOOLS, getToolPath,
 // getLatestVersion, downloadTool, ensureTool) and packages/coding-agent/src/utils/management-http.ts (fetchWithRetry).
 using System.Formats.Tar;
 using System.IO.Compression;

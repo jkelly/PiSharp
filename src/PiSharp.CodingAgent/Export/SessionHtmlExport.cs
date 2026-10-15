@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/export-html/index.ts, with src/config.ts (APP_NAME,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/export-html/index.ts, with src/config.ts (APP_NAME,
 // getExportTemplateDir) and core/agent-session.ts (exportToHtml theme selection).
 
 using System.Text;
@@ -31,7 +31,7 @@ public static class SessionHtmlExport
     /// <summary>config.ts APP_NAME (package.json piConfig has no name).</summary>
     public const string AppName = "pi";
 
-    /// <summary>Upstream asset blobs at v1.1.0 (git blob SHA-1), embedded byte-for-byte under Export/Assets.</summary>
+    /// <summary>Upstream asset blobs at v1.2.0 (git blob SHA-1; the export-html files are unchanged since v1.1.0), embedded byte-for-byte under Export/Assets.</summary>
     public static readonly IReadOnlyDictionary<string, string> AssetBlobs = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["template.html"] = "c1d678a0a2fc7df8a37dc952e270dde4b9ecba6a", // packages/coding-agent/src/core/export-html/template.html
@@ -39,8 +39,8 @@ public static class SessionHtmlExport
         ["template.js"] = "71f121a6687018db62114c9aa3dd713a028630df", // packages/coding-agent/src/core/export-html/template.js
         ["vendor/marked.min.js"] = "9d79575e45d0f6b88158097f5f4622ab938d76d9", // export-html/vendor/marked.min.js (marked v18.0.5, MIT)
         ["vendor/highlight.min.js"] = "5d699ae6a4cfc9544a22a9ac394b01db2e5abd4f", // export-html/vendor/highlight.min.js (highlight.js v11.9.0, BSD-3-Clause)
-        ["dark.json"] = "499c10e3c738c3d0a7d4b55af773eeb09e1bd654", // packages/coding-agent/src/modes/interactive/theme/dark.json
-        ["light.json"] = "9d29d503d9a07fa34b7197b26c375fb4c628379d" // packages/coding-agent/src/modes/interactive/theme/light.json
+        ["dark.json"] = "0a82c289d3e6a7234cf5b738662427cf9b7cced4", // v1.2.0 packages/coding-agent/src/modes/interactive/theme/dark.json
+        ["light.json"] = "3d870c051d13ad464b777cd04cc404bfb7779914" // v1.2.0 packages/coding-agent/src/modes/interactive/theme/light.json
     };
 
     /// <summary>The embedded asset bytes (exactly the upstream blob).</summary>

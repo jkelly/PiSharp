@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/test/llama-extension.test.ts, ported against
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/test/llama-extension.test.ts, ported against
 // packages/coding-agent/src/extensions/llama/{client,provider,huggingface}.ts, plus the built-in provider's integration in the model
 // registry (auth check/resolve, the persisted catalog, the live chat route and the classifier registry).
 using System.Collections.Immutable;
@@ -486,7 +486,7 @@ internal static partial class Program
         Check(File.Exists(path), "docs/llama-cpp.md next to the CLI: " + path);
         var bytes = File.ReadAllBytes(path);
         var newline = Array.IndexOf(bytes, (byte)'\n');
-        Equal("<!-- Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->",
+        Equal("<!-- Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->",
             System.Text.Encoding.UTF8.GetString(bytes, 0, newline), "attribution line");
         var upstream = bytes[(newline + 1)..];
         var blob = Convert.ToHexStringLower(System.Security.Cryptography.SHA1.HashData([.. System.Text.Encoding.ASCII.GetBytes($"blob {upstream.Length}\0"), .. upstream]));

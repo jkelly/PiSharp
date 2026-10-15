@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/bash-execution.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/bash-execution.ts.
 // truncateTail is PiSharp.Agent's ToolOutputTruncator.Tail (the same algorithm and limits); stripAnsi is PiSharp.Tools'.
 using PiSharp.Agent.Tools;
 using PiSharp.Tools.Processes;

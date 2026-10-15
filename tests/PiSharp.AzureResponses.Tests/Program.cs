@@ -193,7 +193,7 @@ internal static class Program
         return Task.CompletedTask;
     }
 
-    // Pi abe508e1 azure-openai-responses.ts: AZURE_TOOL_CALL_PROVIDERS names "azure". The api still serves a model that keeps the
+    // Pi 06a46693 azure-openai-responses.ts: AZURE_TOOL_CALL_PROVIDERS names "azure". The api still serves a model that keeps the
     // legacy provider id; upstream neither rejects nor maps it, it just stops pairing foreign Responses call ids for it.
     private static Task RenamedProvider()
     {
@@ -213,7 +213,7 @@ internal static class Program
 
     private static Task SamplingByThinkingLevel()
     {
-        // Pi abe508e1 simple-options.ts resolveSamplingParams: model -> clamped level -> request, later keys win.
+        // Pi 06a46693 simple-options.ts resolveSamplingParams: model -> clamped level -> request, later keys win.
         AzureResponsesOptions Leveled(object? map = null) => Options(true, map, sampling: new { top_p = 0.9, temperature = 0.7 }) with
         {
             ModelMetadata = JsonData.Parse(Options(true, map, sampling: new { top_p = 0.9, temperature = 0.7 }).ModelMetadata.ToString()[..^1] +

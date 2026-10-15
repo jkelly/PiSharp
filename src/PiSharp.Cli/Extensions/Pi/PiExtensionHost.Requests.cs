@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (bindExtensions: the actions,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (bindExtensions: the actions,
 // context actions and command context actions the session gives the runner: sendMessage, sendUserMessage, appendEntry, setSessionName,
 // getSessionName, setLabel, getActiveTools, getAllTools, setActiveTools, getCommands, setModel, getThinkingLevel, setThinkingLevel,
 // isIdle, abort, hasPendingMessages, getContextUsage, compact, getSystemPrompt, waitForIdle, newSession, fork, navigateTree,
@@ -177,6 +177,7 @@ internal sealed partial class PiExtensionHost
         switch (request.Method)
         {
             case "pi.read": return PiRead(Op());
+            case "tool.reachesTools": return ToolReachOf(p.GetProperty("name").GetString()!, p.TryGetProperty("input", out var input) ? input : default);
             case "pi.setActiveTools":
             {
                 var names = p.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!).ToImmutableArray();
@@ -486,11 +487,13 @@ internal sealed partial class PiExtensionHost
                 }
             };
             if (!registered.PromptGuidelines.IsDefaultOrEmpty) info["promptGuidelines"] = new JsonArray([.. registered.PromptGuidelines.Select(text => (JsonNode)text)]);
-            if (registered.Namespace is { } space)
-                info["namespace"] = new JsonObject { ["name"] = space.Name, ["description"] = space.Description, ["instructions"] = space.Instructions };
+            if (registered.Namespace is { } space) info["namespace"] = NamespaceNode(space);
             if (registered.Annotations is { Count: > 0 } hints)
                 info["annotations"] = new JsonObject([.. hints.OrderBy(hint => Array.IndexOf(AnnotationOrder, hint.Key) is var at && at < 0 ? int.MaxValue : at)
                     .Select(hint => KeyValuePair.Create(hint.Key, (JsonNode?)hint.Value))]);
+            // ToolInfo.reachesTools: a flag here; the Node runtime turns it into the function (the tool's own for a tool of this
+            // host's extensions, otherwise a call back to the session's registered tool, see tool.reachesTools).
+            if (registered.ReachesTools is not null) info["reachesTools"] = true;
             if (annotations.TryGetValue(name, out var source) && registered.IsExtension)
             {
                 info["sourceInfo"] = SourceInfoOf(source.Extension);
@@ -502,6 +505,25 @@ internal sealed partial class PiExtensionHost
     }
 
     private static readonly string[] AnnotationOrder = ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"];
+
+    /// <summary>A ToolNamespace as extensions see it: name, aliases (when it has any), description and instructions (when set).</summary>
+    internal static JsonObject NamespaceNode(ToolNamespace space)
+    {
+        var node = new JsonObject { ["name"] = space.Name };
+        if (!space.Aliases.IsDefaultOrEmpty) node["aliases"] = new JsonArray([.. space.Aliases.Select(alias => (JsonNode)alias)]);
+        if (space.Description is not null) node["description"] = space.Description;
+        if (space.Instructions is not null) node["instructions"] = space.Instructions;
+        return node;
+    }
+
+    /// <summary>ToolInfo.reachesTools(input) of a session tool that declares it: <c>"all"</c> or the words of the input that may name
+    /// the tools a call reaches. A tool that no longer declares it reaches every tool.</summary>
+    private JsonNode? ToolReachOf(string name, JsonElement input)
+    {
+        var tool = Attached?.Session.CaptureToolCatalogRegistry().RegisteredTools.FirstOrDefault(item => item.Adapter.Name == name && item.ReachesTools is not null);
+        var reach = tool?.ReachesTools!(JsonData.Parse(input.ValueKind == JsonValueKind.Undefined ? "{}" : input.GetRawText())) ?? ToolReach.All;
+        return reach.IsAll ? "all" : new JsonArray([.. reach.Words.Select(word => (JsonNode)word)]);
+    }
 
     /// <summary>Source getCommands: extension commands (with invocation names), then prompt templates and skills (IMPL-I adds those).</summary>
     private JsonArray Commands()

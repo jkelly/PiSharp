@@ -44,9 +44,10 @@ internal static class InteractiveModeCases
             Check(pi.Terminal.Lines.Any(line => line.Contains("PiSharp v9.8.7.6", StringComparison.Ordinal)), "PiSharp and its version:\n" + pi.Terminal.Text);
             Check(!pi.Terminal.Text.Contains("v1.1.0\n", StringComparison.Ordinal), "not Pi's package version");
             Contains(pi.Terminal.Text, "PiSharp can explain its own features", "onboarding");
-            // The product version the context defaults to is the assembly's four-part version (Directory.Build.props).
+            // The product version the context defaults to is the assembly's version (Directory.Build.props): the Pi version it
+            // matches, with a fourth part for a C#-only patch.
             var version = PiSharp.Cli.Pi.PiConfig.Version;
-            Check(version.Split('.').Length == 4, "four-part product version: " + version);
+            Check(System.Text.RegularExpressions.Regex.IsMatch(version, @"^\d+\.\d+\.\d+(\.\d+)?$"), "three- or four-part product version: " + version);
             await Task.CompletedTask;
         }, harness => harness.ProductVersion = "9.8.7.6"));
 

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (describeState,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (describeState,
 // attentionRank, describeTransport, saveConfig, signIn, signOut, reconnect, setEnabled, setExposure, serversMenu, serverMenu,
 // showTools, chooseExposure, signInWithUi, runAction, manage, formatStatus, pickServer, loginCommand, reconnectSignedIn and the
 // `/mcp` command with its argument completions), packages/coding-agent/src/extensions/mcp/ui.ts (McpMenu, McpUi) and
@@ -91,8 +91,6 @@ public sealed class McpServerManager
         public string? TokensAtSignIn;
         /// <summary>Settles when the connection started for the server connected or failed.</summary>
         public Task Ready = Task.CompletedTask;
-        /// <summary>Resources the server listed when it connected, without MCP App resources.</summary>
-        public int Resources;
     }
 
     internal sealed record Dependencies(
@@ -179,6 +177,35 @@ public sealed class McpServerManager
             lock (gate)
                 if (waiting.All(row => !IsEnabled(row.Slot) || !servers.Contains(row.Slot) || ReferenceEquals(row.Ready, row.Slot.Ready))) return;
         }
+    }
+
+    /// <summary>index.ts tool_call, before any tool of the session runs (after the extensions' tool_call handlers allowed it, with the
+    /// input they leave): a tool that reaches other tools (<c>reachesTools</c>) waits for the servers it may reach, so their tools are
+    /// registered before it runs (a codemode script for the servers it names, or for every server when it searches or enumerates tools,
+    /// tool_search for every server); the resource tools reach every server, so they wait for all of them; a server's own tools wait
+    /// for that server, including a reconnect still closing its old transport. A tool the session does not register waits for nothing.
+    /// There is no time limit: a server's readiness settles when its connection attempt connects or fails (a failed server's tools are
+    /// simply not registered), and cancellation returns at once.</summary>
+    internal Task BeforeToolCallAsync(string toolName, PiSharp.Contracts.JsonData input, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(toolName); ArgumentNullException.ThrowIfNull(input);
+        if (Session() is not { } session) return Task.CompletedTask;
+        var tool = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.FirstOrDefault(candidate => candidate.Adapter.Name == toolName);
+        if (tool is null) return Task.CompletedTask;
+        Func<McpServerEntry, bool> include;
+        if (tool.ReachesTools is { } reachesTools)
+        {
+            var reach = reachesTools(input);
+            include = entry => McpCodemode.ReachesServer(reach, entry.Name);
+        }
+        else if (McpResourceToolsPublisher.ToolNames.Contains(toolName)) include = _ => true;
+        else
+        {
+            // toolOwners: the server whose tools include this one (its namespace).
+            var owner = tool.Namespace?.Name;
+            include = entry => owner is not null && McpCatalogPlanner.Namespace(entry.Name) == owner;
+        }
+        return WaitForServersAsync(include, token);
     }
 
     /// <summary>server.ready: the server's readiness follows the attempt <paramref name="start"/> begins, from before it begins;
@@ -350,7 +377,7 @@ public sealed class McpServerManager
             case "failed": return withError ? "failed: " + FirstLine(slot.Error ?? "unknown error") : "failed";
             case "connected":
                 var tools = ToolCount(slot);
-                var resources = slot.Resources > 0 ? $" · {slot.Resources} resource{(slot.Resources == 1 ? "" : "s")}" : "";
+                var resources = slot.Server?.Snapshot.Catalog.HasResources == true ? " · resources" : "";
                 return $"connected · {tools} tool{(tools == 1 ? "" : "s")}{resources}";
             case "connecting": return "connecting…";
             case var other: return other;
@@ -486,25 +513,6 @@ public sealed class McpServerManager
         if (dependencies.Resources is { } resources)
             await resources.UpdateAsync(slot.Entry.Name, server, slot.Entry.Config.Exposure, server?.Snapshot.Catalog is { Connected: true, HasResources: true }, token)
                 .ConfigureAwait(false);
-        if (server is not null) await CountResourcesAsync(slot, server, token).ConfigureAwait(false);
-    }
-
-    /// <summary>The resources a connected server lists (fetchResources at connect), for describeState.</summary>
-    internal async Task CountResourcesAsync(string name, McpPreparedServer server, CancellationToken token)
-    {
-        Slot? slot; lock (gate) slot = Find(name);
-        if (slot is null || !ReferenceEquals(slot.Server, server)) return;
-        await CountResourcesAsync(slot, server, token).ConfigureAwait(false);
-        Changed();
-    }
-
-    private async Task CountResourcesAsync(Slot slot, McpPreparedServer server, CancellationToken token)
-    {
-        var count = 0;
-        if (server.Snapshot.Catalog is { Connected: true, HasResources: true })
-            try { count = (await server.CountResourcesAsync(token).ConfigureAwait(false)).Resources; }
-            catch (Exception) when (!token.IsCancellationRequested) { /* A server whose lists fail still connects. */ }
-        lock (gate) slot.Resources = count;
     }
 
     /// <summary>saveConfig: save a change to the server's mcp.json (or a project override); returns an error message.</summary>
@@ -641,6 +649,16 @@ public sealed class McpServerManager
         return null;
     }
 
+    /// <summary>index.ts session_start: ensureDiscoveryActive from the configuration, once the session is current, so the codemode or
+    /// tool_search tool the servers need is active before they connect (another extension's tool of these names too, when it declares
+    /// reachesTools; the built-in ones are registered active for them).</summary>
+    internal void SessionStarted()
+    {
+        if (Session() is null || Interlocked.Exchange(ref sessionStarted, 1) != 0) return;
+        EnsureDiscoveryActive();
+    }
+    private int sessionStarted;
+
     /// <summary>ensureDiscoveryActive after a change: activate codemode for enabled `codemode` servers (unless autoEnableCodemode is
     /// false) and tool_search for `deferred` ones, when the session registers them and they are not active yet.</summary>
     private void EnsureDiscoveryActive()
@@ -648,7 +666,10 @@ public sealed class McpServerManager
         if (Session() is not { } session) return;
         HashSet<McpExposure> exposures;
         lock (gate) exposures = [.. servers.Where(IsEnabled).SelectMany(slot => McpConfigurationReader.ConfiguredExposures(slot.Entry.Config))];
-        var registered = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
+        // Only a tool of these names that declares reachesTools can reach MCP tools; another extension's tool of the same name
+        // without it is never activated.
+        var registered = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.Where(tool => tool.ReachesTools is not null)
+            .Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
         var active = session.Attachment.Session.GetToolActivationSelection().Names;
         var activate = new List<string>();
         if (exposures.Contains(McpExposure.Codemode) && dependencies.AutoEnableCodemode && registered.Contains(McpCodemode.Name) && !active.Contains(McpCodemode.Name))

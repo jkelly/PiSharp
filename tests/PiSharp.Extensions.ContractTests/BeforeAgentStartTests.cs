@@ -27,8 +27,209 @@ internal static class BeforeAgentStartTests
         (Prefix + "shared binding keeps prepared prompt state isolated between agents", Isolation),
         (Prefix + "once per prompt with ordered snapshots and continuation projection", Continuation),
         (Prefix + "invalid custom content and callback errors retain prior prompt and continue", Invalid),
-        (Prefix + "operation session and owner cancellation join held cleanup before any request", Cancellation)
+        (Prefix + "operation session and owner cancellation join held cleanup before any request", Cancellation),
+        (Prefix + "custom-message run fires before_agent_start as messageType custom and keeps its prompt for every request", CustomRunEvent),
+        (Prefix + "custom-message run carries pending nextTurn messages and handler messages", CustomRunMessages),
+        (Prefix + "custom message sent while before_agent_start runs is queued into the starting run", QueuedIntoStartingRun),
+        (Prefix + "custom message without triggerTurn sent while the run starts is recorded before it and in its first request", HeldWhileStarting),
+        (Prefix + "abort requested while before_agent_start runs aborts the run as it starts", AbortWhileStarting),
+        (Prefix + "user message sent while the run starts requires a delivery mode", UserMessageWhileStarting)
     ];
+
+    // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_startRun, _prepareRun,
+    // sendCustomMessage, abort) and packages/coding-agent/test/suite/agent-session-prompt.test.ts ("runs started by a custom
+    // message"), ported to the native session. Authored expectations.
+    private sealed class RunStartFixture : IAsyncDisposable
+    {
+        internal readonly Files Files = new();
+        internal readonly ExtensionRegistry Registry = new();
+        internal readonly ScriptedSource Source = new();
+        internal PersistentAgentSession Session = null!;
+        public async ValueTask DisposeAsync()
+        {
+            try { if (Session is not null) await Session.DisposeAsync(); await Registry.DisposeAsync(); }
+            finally { Files.Dispose(); }
+        }
+    }
+    private static async Task<RunStartFixture> RunStartSession(Action<IExtensionRegistry, Func<PersistentAgentSession>> register)
+    {
+        var fixture = new RunStartFixture();
+        await fixture.Registry.ActivateAsync("owner", new Plugin(registrations => register(registrations, () => fixture.Session)));
+        var binding = Binding(fixture.Registry);
+        var runtime = new SessionRuntimeRegistry([new(Model, fixture.Source, Hooks: binding.Hooks)], [], new Policy());
+        var header = new SessionEntryCodec().Parse(JsonSerializer.Serialize(new
+        { type = "session", version = 3, id = "run-start", timestamp = "2026-10-12T00:00:00.000Z", cwd = fixture.Files.Directory }));
+        fixture.Session = await PersistentAgentSession.CreateAsync(fixture.Files.Path, header, runtime, Model, () => 123, fixture.Files.Next);
+        await fixture.Session.ConfigureAsync(new(SystemMessage: Message("system", "base")));
+        return fixture;
+    }
+    private static Task<SessionCustomMessageReceipt> Send(PersistentAgentSession session, string customType, string text,
+        SessionCustomMessageDelivery delivery = SessionCustomMessageDelivery.Steer, bool? triggerTurn = true) =>
+        session.SendCustomMessageAsync(session.Snapshot.Log.Header.Id, new(customType, JsonData.Parse(JsonSerializer.Serialize(text)), true), delivery, triggerTurn);
+    private static string SystemText(ChatRequest request) => request.Messages[0].WireBody.Value.GetProperty("content").GetString()!;
+    private static string[] UserTexts(ChatRequest request) => [.. request.Messages.Where(message => message.Role == "user").Select(message =>
+    {
+        var content = message.WireBody.Value.GetProperty("content");
+        return content.ValueKind == JsonValueKind.String ? content.GetString()! : string.Concat(content.EnumerateArray()
+            .Where(part => part.GetProperty("type").GetString() == "text").Select(part => part.GetProperty("text").GetString()));
+    })];
+    private static bool Idle(PersistentAgentSession session) => session.Snapshot is var state && !state.Agent.IsRunning && !state.IsProcessingOperation;
+
+    // "keeps the same system prompt for every request of the run": before_agent_start fires for the custom run too, so its
+    // prompt holds for the request after the tool call; the events are "user" then "custom".
+    private static async Task CustomRunEvent()
+    {
+        var events = new List<ExtensionBeforeAgentStartEvent>();
+        await using var fixture = await RunStartSession((registrations, _) => registrations.RegisterBeforeAgentStartHandler(new("rules", (input, _, _) =>
+        { lock (events) events.Add(input); return ValueTask.FromResult<ExtensionBeforeAgentStartPatch?>(new(SystemPrompt: "Answer in one word.")); })));
+        var (source, session) = (fixture.Source, fixture.Session);
+        source.Responses.Enqueue(_ => Answer("hi")); source.Responses.Enqueue(_ => ToolCallAnswer()); source.Responses.Enqueue(_ => Answer("done"));
+        await session.PromptAsync(Message("user", "hello")).WaitAsync(TimeSpan.FromSeconds(30));
+        var receipt = await Send(session, "task-done", "background task finished").WaitAsync(TimeSpan.FromSeconds(30));
+        Check(receipt.Disposition == SessionCustomMessageDisposition.Started && source.Requests.Count == 3);
+        Check(source.Requests.All(request => SystemText(request) == "Answer in one word."));
+        Check(events.Select(e => e.MessageType).SequenceEqual([ExtensionBeforeAgentStartMessageType.User, ExtensionBeforeAgentStartMessageType.Custom]));
+        Check(events[0].Prompt == "hello" && events[0].Message is null && events[1].Prompt == "" && events[1].Images is null);
+        var message = events[1].Message!.Value;
+        Check(message.GetProperty("role").GetString() == "custom" && message.GetProperty("customType").GetString() == "task-done" &&
+            message.GetProperty("content").GetString() == "background task finished" && message.GetProperty("display").GetBoolean() &&
+            message.TryGetProperty("timestamp", out _));
+        Check(events[1].SystemPrompt == "base");
+    }
+
+    // _prepareRun: the starting custom message, then pending nextTurn messages (consumed), then the handlers' messages.
+    private static async Task CustomRunMessages()
+    {
+        await using var fixture = await RunStartSession((registrations, _) => registrations.RegisterBeforeAgentStartHandler(new("context", (input, _, _) =>
+            ValueTask.FromResult<ExtensionBeforeAgentStartPatch?>(input.MessageType == ExtensionBeforeAgentStartMessageType.Custom
+                ? new(new("from-handler", false, JsonData.Parse(JsonSerializer.Serialize("handler context")))) : null))));
+        var (source, session) = (fixture.Source, fixture.Session);
+        Check((await Send(session, "note", "next turn note", SessionCustomMessageDelivery.NextTurn)).Disposition == SessionCustomMessageDisposition.Queued);
+        await Send(session, "task-done", "background task finished").WaitAsync(TimeSpan.FromSeconds(30));
+        Check(UserTexts(source.Requests.Single()).SequenceEqual(["background task finished", "next turn note", "handler context"]));
+        Check(!session.HasPendingCustomMessages);
+        Check(session.Snapshot.Log.Entries.Where(entry => entry.Kind == SessionEntryKind.CustomMessage)
+            .Select(entry => entry.WireBody.Value.GetProperty("customType").GetString()).SequenceEqual(["task-done", "note", "from-handler"]));
+    }
+
+    // "queues a custom message sent while before_agent_start runs into the starting run": the session is busy while the run starts,
+    // so a second triggerTurn message is steered into it and both reach the one request.
+    private static async Task QueuedIntoStartingRun()
+    {
+        var entered = Gate(); var release = Gate();
+        await using var fixture = await RunStartSession((registrations, _) => registrations.RegisterBeforeAgentStartHandler(new("wait", async (input, _, _) =>
+        {
+            if (input.Message?.Value.GetProperty("customType").GetString() != "first") return null;
+            entered.TrySetResult(); await release.Task; return null;
+        })));
+        var (source, session) = (fixture.Source, fixture.Session);
+        try
+        {
+            var first = Send(session, "first", "task one finished");
+            await Reach(entered.Task, first);
+            Check(!Idle(session));
+            var second = await Send(session, "second", "task two finished").WaitAsync(TimeSpan.FromSeconds(30));
+            Check(second.Disposition == SessionCustomMessageDisposition.Queued);
+            release.TrySetResult();
+            Check((await first.WaitAsync(TimeSpan.FromSeconds(30))).Disposition == SessionCustomMessageDisposition.Started);
+            Check(source.Requests.Count == 1 && UserTexts(source.Requests[0]).SequenceEqual(["task one finished", "task two finished"]));
+            Check(Idle(session));
+        }
+        finally { release.TrySetResult(); }
+    }
+
+    // "includes a custom message sent without triggerTurn while the run starts in its first request": held while the run starts,
+    // it is recorded before the starting messages, as it would have been while idle.
+    private static async Task HeldWhileStarting()
+    {
+        SessionCustomMessageReceipt? held = null;
+        await using var fixture = await RunStartSession((registrations, session) => registrations.RegisterBeforeAgentStartHandler(new("note", async (input, _, _) =>
+        {
+            if (input.MessageType == ExtensionBeforeAgentStartMessageType.User)
+                held = await Send(session(), "note", "context from handler", triggerTurn: false);
+            return null;
+        })));
+        var (source, session) = (fixture.Source, fixture.Session);
+        await session.PromptAsync(Message("user", "hello")).WaitAsync(TimeSpan.FromSeconds(30));
+        Check(held?.Disposition == SessionCustomMessageDisposition.Queued);
+        Check(source.Requests.Count == 1 && UserTexts(source.Requests[0]).SequenceEqual(["context from handler", "hello"]));
+        var entries = session.Snapshot.Log.Entries;
+        var note = entries.IndexOf(entries.Single(entry => entry.Kind == SessionEntryKind.CustomMessage));
+        var user = entries.IndexOf(entries.Single(entry => entry.Kind == SessionEntryKind.Message &&
+            entry.WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "user"));
+        Check(note + 1 == user);
+    }
+
+    // "aborts a run when abort is requested while before_agent_start runs": the handler is not cancelled; the run starts, records
+    // its starting message and ends with an aborted assistant message, and the session is idle again.
+    private static async Task AbortWhileStarting()
+    {
+        var entered = Gate(); var release = Gate(); var cancelled = false;
+        await using var fixture = await RunStartSession((registrations, _) => registrations.RegisterBeforeAgentStartHandler(new("wait", async (_, _, token) =>
+        {
+            entered.TrySetResult(); await release.Task; cancelled = token.IsCancellationRequested; return null;
+        })));
+        var (source, session) = (fixture.Source, fixture.Session);
+        try
+        {
+            source.Responses.Enqueue(_ => Answer("should not complete"));
+            var run = Send(session, "task-done", "background task finished");
+            await Reach(entered.Task, run);
+            Check(session.Abort());
+            release.TrySetResult();
+            var receipt = await run.WaitAsync(TimeSpan.FromSeconds(30));
+            Check(!cancelled && receipt.Disposition == SessionCustomMessageDisposition.Started);
+            var messages = session.Snapshot.Agent.Messages;
+            Check(messages[^2].Role == "custom" && messages[^1].Role == "assistant" &&
+                messages[^1].WireBody.Value.GetProperty("stopReason").GetString() == "aborted");
+            Check(!messages.Any(message => message.Role == "assistant" && message.WireBody.ToString().Contains("should not complete", StringComparison.Ordinal)));
+            await session.WaitForIdleAsync().WaitAsync(TimeSpan.FromSeconds(30));
+            Check(Idle(session));
+        }
+        finally { release.TrySetResult(); }
+    }
+
+    // sendUserMessage while the run starts: the session is busy, so a message without deliverAs fails with prompt()'s error and a
+    // steered one goes into the starting run.
+    private static async Task UserMessageWhileStarting()
+    {
+        string? error = null; SubmittedInputResult? steered = null;
+        await using var fixture = await RunStartSession((registrations, session) => registrations.RegisterBeforeAgentStartHandler(new("send", async (input, _, _) =>
+        {
+            if (input.Prompt != "hello") return null;
+            try { await session().SubmitInputAsync(new("no mode", PromptInputSource.Extension)); }
+            catch (InvalidOperationException failure) { error = failure.Message; }
+            steered = await session().SubmitInputAsync(new("steered", PromptInputSource.Extension, StreamingBehavior: PromptInputStreamingBehavior.Steer));
+            return null;
+        })));
+        var (source, session) = (fixture.Source, fixture.Session);
+        var result = await session.SubmitInputAsync(new("hello")).WaitAsync(TimeSpan.FromSeconds(30));
+        Check(result.Disposition == SubmittedInputDisposition.Started);
+        Check(error == "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.");
+        Check(steered?.Disposition == SubmittedInputDisposition.Queued);
+        Check(source.Requests.Count == 1 && UserTexts(source.Requests[0]).SequenceEqual(["hello", "steered"]));
+    }
+
+    private static AssistantMessage Answer(string text) =>
+        new(Model.Api, Model.Provider, Model.Id, 123, [new TextContent(text)], TokenUsage.Zero, StopReason.Stop);
+    private static AssistantMessage ToolCallAnswer() =>
+        new(Model.Api, Model.Provider, Model.Id, 123, [new ToolCallContent("call-1", "noop", JsonData.EmptyObject)], TokenUsage.Zero, StopReason.ToolUse);
+    /// <summary>Records requests and answers from a script (default: "done"), text or one tool call.</summary>
+    private sealed class ScriptedSource : IChatTransport
+    {
+        internal readonly List<ChatRequest> Requests = [];
+        internal readonly Queue<Func<ChatRequest, AssistantMessage>> Responses = new();
+        public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
+        {
+            await Task.CompletedTask; token.ThrowIfCancellationRequested();
+            AssistantMessage final;
+            lock (Requests) { Requests.Add(request); final = Responses.Count == 0 ? Answer("done") : Responses.Dequeue()(request); }
+            yield return new StreamStarted(final with { Content = [], StopReason = StopReason.Pending });
+            if (final.Content[0] is ToolCallContent call) { yield return new ToolCallStarted(0, call); yield return new ToolCallEnded(0, call); }
+            else { var text = ((TextContent)final.Content[0]).Text; yield return new TextStarted(0, new("")); yield return new TextEnded(0, text); }
+            yield return new StreamDone(final.StopReason, final);
+        }
+    }
 
     private static async Task RestoredCustomTail()
     {

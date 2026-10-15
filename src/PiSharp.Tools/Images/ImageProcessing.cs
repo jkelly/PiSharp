@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/utils/image-process.ts, utils/image-resize.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/image-process.ts, utils/image-resize.ts,
 // utils/image-resize-core.ts, utils/image-convert.ts (convertImageBytesToPng) and utils/tool-result-images.ts.
 using System.Buffers.Binary;
 using System.Collections.Immutable;

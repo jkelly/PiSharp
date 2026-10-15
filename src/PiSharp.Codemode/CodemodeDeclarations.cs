@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/codemode/src/declarations.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/declarations.ts.
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -13,90 +13,20 @@ public static partial class CodemodeDeclarations
     public const int DefaultInputSchemaMaxChars = 16_000;
     /// <summary>Local <c>$ref</c> expansions per rendered schema.</summary>
     private const int MaxRefExpansions = 32;
-    private static readonly JsonElement True = JsonDocument.Parse("true").RootElement.Clone();
 
     [GeneratedRegex("\r?\n")] private static partial Regex LineBreak();
+    /// <summary>Characters that end a <c>//</c> comment.</summary>
+    [GeneratedRegex("[\r\n\u2028\u2029]")] private static partial Regex LineTerminators();
     [GeneratedRegex(@"\s+")] private static partial Regex Whitespace();
 
-    /// <summary>TypeScript types for MCP results, from the MCP <c>CallToolResult</c> schema.</summary>
-    public const string McpTypeScriptPreamble = """
-        type Role = "user" | "assistant";
-        type MetaObject = Record<string, unknown>;
-        type Annotations = {
-          audience?: Role[];
-          priority?: number;
-          lastModified?: string;
-        };
-        type Icon = {
-          src: string;
-          mimeType?: string;
-          sizes?: string[];
-          theme?: "light" | "dark";
-        };
-        type TextResourceContents = {
-          uri: string;
-          mimeType?: string;
-          _meta?: MetaObject;
-          text: string;
-        };
-        type BlobResourceContents = {
-          uri: string;
-          mimeType?: string;
-          _meta?: MetaObject;
-          blob: string;
-        };
-        type TextContent = {
-          type: "text";
-          text: string;
-          annotations?: Annotations;
-          _meta?: MetaObject;
-        };
-        type ImageContent = {
-          type: "image";
-          data: string;
-          mimeType: string;
-          annotations?: Annotations;
-          _meta?: MetaObject;
-        };
-        type AudioContent = {
-          type: "audio";
-          data: string;
-          mimeType: string;
-          annotations?: Annotations;
-          _meta?: MetaObject;
-        };
-        type ResourceLink = {
-          icons?: Icon[];
-          name: string;
-          title?: string;
-          uri: string;
-          description?: string;
-          mimeType?: string;
-          annotations?: Annotations;
-          size?: number;
-          _meta?: MetaObject;
-          type: "resource_link";
-        };
-        type EmbeddedResource = {
-          type: "resource";
-          resource: TextResourceContents | BlobResourceContents;
-          annotations?: Annotations;
-          _meta?: MetaObject;
-        };
-        type ContentBlock =
-          | TextContent
-          | ImageContent
-          | AudioContent
-          | ResourceLink
-          | EmbeddedResource;
-        type CallToolResult<TStructured = { [key: string]: unknown }> = {
-          _meta?: MetaObject;
-          content: ContentBlock[];
-          isError?: boolean;
-          structuredContent?: TStructured;
-          [key: string]: unknown;
-        };
-        """;
+    /// <summary>JSON Schema keywords with a number or string value shown as <c>@keyword value</c> property tags.</summary>
+    private static readonly string[] TagKeywords =
+        ["minimum", "exclusiveMinimum", "maximum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "pattern", "format", "minItems", "maxItems"];
+    /// <summary>Tag keywords whose values all hold at once, so only the largest (lower) or smallest (upper) matters.</summary>
+    private static readonly HashSet<string> LowerBounds = new(StringComparer.Ordinal) { "minimum", "exclusiveMinimum", "minLength", "minItems" };
+    private static readonly HashSet<string> UpperBounds = new(StringComparer.Ordinal) { "maximum", "exclusiveMaximum", "maxLength", "maxItems" };
+    /// <summary>Longest property tag; longer ones (large defaults, long patterns) are left out.</summary>
+    private const int MaxTagChars = 80;
 
     /// <summary>Tools become members of <c>declare const tools</c>, globals <c>declare function</c> statements, and
     /// <c>ns.member</c> globals members of <c>declare const ns</c>.</summary>
@@ -131,35 +61,20 @@ public static partial class CodemodeDeclarations
     public static string RenderToolSample(CodemodeTool tool, int inputMaxChars = DefaultInputSchemaMaxChars) =>
         $"{(tool.Description is null ? "" : Js.Trim(tool.Description))}\n\ncodemode tool declaration:\n```ts\ndeclare const tools: {{ {RenderToolSignature(tool, inputMaxChars)} }};\n```";
 
-    /// <summary>The <c>structuredContent</c> schema of an MCP <c>CallToolResult</c> output schema, <c>true</c> when it declares
-    /// none, or null when the schema is not a <c>CallToolResult</c>.</summary>
-    public static JsonElement? McpStructuredContentSchema(JsonElement? schema)
-    {
-        if (schema is not { ValueKind: JsonValueKind.Object } value || !Get(value, "properties", out var properties) || properties.ValueKind != JsonValueKind.Object) return null;
-        if (!Get(properties, "content", out var content) || content.ValueKind != JsonValueKind.Object || !TypeIs(content, "array") ||
-            !Get(content, "items", out var items) || items.ValueKind != JsonValueKind.Object || !TypeIs(items, "object")) return null;
-        if (!Get(properties, "isError", out var isError) || isError.ValueKind != JsonValueKind.Object || !TypeIs(isError, "boolean") ||
-            !Get(properties, "_meta", out var meta) || meta.ValueKind != JsonValueKind.Object || !TypeIs(meta, "object")) return null;
-        return Get(properties, "structuredContent", out var structured) && structured.ValueKind is JsonValueKind.Object or JsonValueKind.True or JsonValueKind.False
-            ? structured : True;
-    }
+    /// <summary>The type a tool call resolves to: the output schema's type, and <c>unknown</c> without a schema.</summary>
+    public static string RenderToolOutputType(JsonElement? schema) => schema is null ? "unknown" : SchemaToType(schema.Value);
 
-    /// <summary><c>CallToolResult&lt;T&gt;</c> for MCP output schemas, the schema's type otherwise, <c>unknown</c> without one.</summary>
-    public static string RenderToolOutputType(JsonElement? schema)
-    {
-        if (McpStructuredContentSchema(schema) is { } structured)
-        {
-            var type = SchemaToType(structured);
-            return type == "unknown" ? "CallToolResult" : $"CallToolResult<{type}>";
-        }
-        return schema is null ? "unknown" : SchemaToType(schema.Value);
-    }
-
-    /// <summary>A JSON Schema as a TypeScript type expression. A result longer than <paramref name="maxChars"/> is <c>unknown</c>.</summary>
+    /// <summary>A JSON Schema as a TypeScript type expression: objects on one line, or one property per line with <c>//</c> comments
+    /// when a property has a description or constraints the type cannot express (<c>// @integer @minimum 1 @default 20</c>). A result
+    /// longer than <paramref name="maxChars"/> is rendered again without the constraint tags, and is <c>unknown</c> if it is still
+    /// too long.</summary>
     public static string SchemaToType(JsonElement schema, int? maxChars = null)
     {
-        var type = ToType(schema, new Context(schema));
-        return maxChars is { } max && type.Length > max ? "unknown" : type;
+        string Render(bool tags) => ToType(schema, new Context(schema, tags));
+        var type = Render(true);
+        if (maxChars is not { } max || type.Length <= max) return type;
+        var untagged = Render(false);
+        return untagged.Length <= max ? untagged : "unknown";
     }
 
     /// <summary>The output type collapsed to one line (tool.ts describeOutput's fallback).</summary>
@@ -212,9 +127,11 @@ public static partial class CodemodeDeclarations
         return unique.Count == 0 ? "never" : string.Join(" | ", unique);
     }
 
-    private sealed class Context(JsonElement root)
+    private sealed class Context(JsonElement root, bool tags)
     {
         public JsonElement Root { get; } = root;
+        /// <summary>Whether property comments include constraint tags.</summary>
+        public bool Tags { get; } = tags;
         public HashSet<string> Resolving { get; } = new(StringComparer.Ordinal);
         public int Expansions { get; set; }
     }
@@ -299,6 +216,66 @@ public static partial class CodemodeDeclarations
         property.ValueKind == JsonValueKind.Object && Get(property, "description", out var description) && description.ValueKind == JsonValueKind.String
             ? Js.Trim(description.GetString()!) : "";
 
+    /// <summary>Constraints of a property that its TypeScript type cannot express, as JSDoc-style tags:
+    /// <c>@integer @minimum 1 @maximum 100 @default 20</c>. Empty when there are none.</summary>
+    private static string ConstraintTags(JsonElement property)
+    {
+        if (property.ValueKind != JsonValueKind.Object) return "";
+        // Optional fields such as Pydantic's `int | None` keep their constraints in the non-null branch.
+        // The branch's constraints apply together with the property's, so both are read.
+        JsonElement? variants = Get(property, "anyOf", out var anyOf) && anyOf.ValueKind == JsonValueKind.Array ? anyOf
+            : Get(property, "oneOf", out var oneOf) ? oneOf : null;
+        var nonNull = variants is { ValueKind: JsonValueKind.Array } list
+            ? list.EnumerateArray().Where(variant => !(Get(variant, "type", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "null")).ToList()
+            : [];
+        JsonElement[] branches = nonNull.Count == 1 && nonNull[0].ValueKind == JsonValueKind.Object ? [property, nonNull[0]] : [property];
+        // Draft-04 and OpenAPI 3.0 make `minimum`/`maximum` exclusive with a boolean `exclusiveMinimum`/`exclusiveMaximum`.
+        var schemas = branches.Select(schema =>
+        {
+            var view = new Dictionary<string, JsonElement?>(StringComparer.Ordinal);
+            foreach (var key in TagKeywords.Append("type").Append("uniqueItems")) view[key] = Get(schema, key, out var value) ? value : null;
+            if (view["exclusiveMinimum"] is { ValueKind: JsonValueKind.True }) { view["exclusiveMinimum"] = view["minimum"]; view["minimum"] = null; }
+            if (view["exclusiveMaximum"] is { ValueKind: JsonValueKind.True }) { view["exclusiveMaximum"] = view["maximum"]; view["maximum"] = null; }
+            return view;
+        }).ToList();
+
+        var tags = new List<string>();
+        static bool IsInteger(JsonElement? type) => type is { ValueKind: JsonValueKind.String } name ? name.GetString() == "integer"
+            : type is { ValueKind: JsonValueKind.Array } names && names.EnumerateArray().Any(entry => entry.ValueKind == JsonValueKind.String && entry.GetString() == "integer");
+        if (schemas.Any(schema => IsInteger(schema["type"]))) tags.Add("@integer");
+        foreach (var keyword in TagKeywords)
+        {
+            var values = schemas.Select(schema => schema[keyword]).ToList();
+            if (LowerBounds.Contains(keyword) || UpperBounds.Contains(keyword))
+            {
+                var numbers = values.Where(value => value is { ValueKind: JsonValueKind.Number }).Select(value => Js.NumberOf(value!.Value)).ToList();
+                if (numbers.Count == 0) continue;
+                tags.Add($"@{keyword} {Js.NumberText(LowerBounds.Contains(keyword) ? numbers.Aggregate(Math.Max) : numbers.Aggregate(Math.Min))}");
+                continue;
+            }
+            // new Set(values): numbers by value, strings by content, in first-seen order.
+            var seen = new List<object>();
+            foreach (var value in values)
+            {
+                object? item = value switch
+                {
+                    { ValueKind: JsonValueKind.Number } numberValue => Js.NumberOf(numberValue),
+                    { ValueKind: JsonValueKind.String } text => text.GetString()!,
+                    _ => null
+                };
+                if (item is null || seen.Any(existing => existing.Equals(item))) continue;
+                seen.Add(item);
+                tags.Add($"@{keyword} {(item is double number ? Js.NumberText(number) : (string)item)}");
+            }
+        }
+        if (schemas.Any(schema => schema["uniqueItems"] is { ValueKind: JsonValueKind.True })) tags.Add("@uniqueItems");
+        // Annotations, unlike constraints, come from the property itself.
+        if (Get(property, "default", out var fallback) && fallback.ValueKind != JsonValueKind.Null) tags.Add($"@default {Js.Stringify(fallback)}");
+        if (Get(property, "deprecated", out var deprecated) && deprecated.ValueKind == JsonValueKind.True) tags.Add("@deprecated");
+        return string.Join(" ", tags.Where(tag => tag.Length <= MaxTagChars)
+            .Select(tag => LineTerminators().Replace(tag, match => "\\u" + ((int)match.Value[0]).ToString("x4", System.Globalization.CultureInfo.InvariantCulture))));
+    }
+
     private static string ObjectType(JsonElement schema, Context context)
     {
         var properties = Get(schema, "properties", out var declared) && declared.ValueKind == JsonValueKind.Object ? Properties(declared) : [];
@@ -313,12 +290,18 @@ public static partial class CodemodeDeclarations
             members.Add($"[key: string]: {(additional.ValueKind == JsonValueKind.True ? "unknown" : ToType(additional, context))};");
         else if (!hasAdditional && names.Count == 0) members.Add("[key: string]: unknown;");
         if (members.Count == 0) return "{}";
-        if (!names.Any(name => DescriptionOf(Property(name)).Length > 0)) return "{ " + string.Join(" ", members) + " }";
+        var comments = names.Select(name =>
+        {
+            var lines = LineTerminators().Split(DescriptionOf(Property(name))).Select(Js.Trim).Where(line => line.Length > 0).ToList();
+            var tags = context.Tags ? ConstraintTags(Property(name)) : "";
+            if (tags.Length > 0) lines.Add(tags);
+            return lines;
+        }).ToList();
+        if (!comments.Any(comment => comment.Count > 0)) return "{ " + string.Join(" ", members) + " }";
         var lines = new List<string> { "{" };
         for (var index = 0; index < names.Count; index++)
         {
-            foreach (var line in LineBreak().Split(DescriptionOf(Property(names[index]))))
-                if (Js.Trim(line).Length > 0) lines.Add($"{Indent}// {Js.Trim(line)}");
+            foreach (var line in comments[index]) lines.Add($"{Indent}// {line}");
             lines.Add(Indent + members[index].Replace("\n", "\n" + Indent, StringComparison.Ordinal));
         }
         foreach (var member in members.Skip(names.Count)) lines.Add(Indent + member);

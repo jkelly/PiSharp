@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/oauth/flow.ts runFlow/authorizeMcp.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/mcp/src/oauth/flow.ts runFlow/authorizeMcp.
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
@@ -220,12 +220,13 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
         var context = new McpOAuthOrchestrationContext(options, discovered, client, resource, scope, RedirectUrl: document?.RedirectUrl);
         if (options.AuthorizationCode is { Length: > 0 } code)
         {
-            // RFC 9207: never send a code from another authorization server to this one.
-            if (metadata is { } issuerMetadata && (options.Iss is not null || issuerMetadata.Value.ValueKind == JsonValueKind.Object &&
-                issuerMetadata.Value.TryGetProperty("authorization_response_iss_parameter_supported", out var promised) && promised.ValueKind == JsonValueKind.True))
+            // RFC 9207: never send a code from another authorization server to this one. Without metadata there is no issuer to
+            // compare with, so any `iss` is rejected.
+            var issuerMetadata = metadata is { Value.ValueKind: JsonValueKind.Object } discoveredMetadata ? discoveredMetadata.Value : (JsonElement?)null;
+            if (options.Iss is not null || issuerMetadata is { } promising &&
+                promising.TryGetProperty("authorization_response_iss_parameter_supported", out var promised) && promised.ValueKind == JsonValueKind.True)
             {
-                var issuer = issuerMetadata.Value.ValueKind == JsonValueKind.Object && issuerMetadata.Value.TryGetProperty("issuer", out var named) &&
-                    named.ValueKind == JsonValueKind.String ? named.GetString()! : "";
+                var issuer = issuerMetadata is { } named && named.TryGetProperty("issuer", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
                 if (!string.Equals(options.Iss, issuer, StringComparison.Ordinal)) throw new McpOAuthIssuerMismatchException(issuer, options.Iss);
             }
             var verifier = await Work("read-verifier", () => dependencies.ReadVerifier(token), originals, token).ConfigureAwait(false);

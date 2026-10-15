@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts (McpOAuthSettings,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts (McpOAuthSettings,
 // callbackSettings, mergeScopes, signInMcpServer, waitForAuthorizationResponse, responseFromRedirectUrl, listenForCallback),
 // packages/coding-agent/src/extensions/mcp/runtime.ts oauthSettings and packages/mcp/src/oauth/provider.ts state().
 using System.Collections.Immutable;

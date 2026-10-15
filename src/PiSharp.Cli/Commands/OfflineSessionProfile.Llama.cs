@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/llama/index.ts (the /llama command outside
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/llama/index.ts (the /llama command outside
 // interactive mode: ctx.ui.notify("/llama is available in interactive mode", "warning")) and packages/coding-agent/src/extensions/index.ts
 // (llama.cpp is a built-in extension: not loaded, it registers no /llama).
 using System.Text.Json;

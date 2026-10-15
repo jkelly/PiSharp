@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/oauth/callback.ts OAuthCallbackServer,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/mcp/src/oauth/callback.ts OAuthCallbackServer,
 // packages/coding-agent/src/extensions/mcp/oauth.ts listenForCallback (pages from packages/ai/src/utils/oauth-page.ts, text only).
 using System.Net;
 using System.Net.Sockets;

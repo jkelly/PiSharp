@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/session-manager.ts (createSessionId,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/session-manager.ts (createSessionId,
 // assertValidSessionId, getDefaultSessionDir, readSessionHeader, findMostRecentSession, buildSessionInfo, SessionManager.create, open,
 // continueRecent, forkFrom, findById, list, listAll) and packages/coding-agent/src/core/session-cwd.ts; getBranch with packages/coding-agent/src/core/virtual-models.ts getBranchSelection.
 using System.Collections.Immutable;

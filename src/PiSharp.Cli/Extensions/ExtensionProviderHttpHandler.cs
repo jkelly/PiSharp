@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/sdk.ts (transformHeaders ->
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/sdk.ts (transformHeaders ->
 // before_provider_headers, onPayload -> before_provider_request, onResponse -> after_provider_response, onProviderStreamEvent ->
 // provider_stream_event) and core/extensions/runner.ts (emitBeforeProviderHeaders, emitBeforeProviderRequest, emit).
 using System.Net.Http.Headers;

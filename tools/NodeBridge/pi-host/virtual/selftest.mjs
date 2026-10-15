@@ -3,6 +3,8 @@
 //   node selftest.mjs                      run all checks
 //   node selftest.mjs --upstream <dir>     also parse upstream Pi `packages/` sources (default: $PI_UPSTREAM_PACKAGES)
 //   node selftest.mjs --write-snapshot     regenerate upstream-exports.json from the upstream sources
+//   node selftest.mjs --packages <dir>     also check the shims against the installed Pi npm packages in <dir> (a node_modules
+//                                          folder such as PiNodeRuntime's; default: $PISHARP_PI_NODE_MODULES)
 //
 // (a) every runtime export name of the upstream entry points exists on the matching shim module
 //     (parsed from upstream when available, otherwise from the upstream-exports.json snapshot);
@@ -22,6 +24,7 @@ const argValue = (flag) => {
 	return i >= 0 ? args[i + 1] : undefined;
 };
 const upstreamDir = argValue("--upstream") ?? process.env.PI_UPSTREAM_PACKAGES;
+const packagesDir = argValue("--packages") ?? process.env.PISHARP_PI_NODE_MODULES;
 const snapshotPath = path.join(here, "upstream-exports.json");
 
 let failures = 0;
@@ -147,7 +150,7 @@ const coverage = [];
 const expected = expectedExports();
 if (args.includes("--write-snapshot")) {
 	assert.ok(expected.source.startsWith("upstream"), "--write-snapshot needs --upstream <dir>");
-	fs.writeFileSync(snapshotPath, `${JSON.stringify({ commit: "abe508e1b89912adde45528136c3221eb69acdd7", exports: expected.exports }, null, "\t")}\n`);
+	fs.writeFileSync(snapshotPath, `${JSON.stringify({ commit: "06a466935536f8c9bcacb2d5efc0fc021be1bdff", exports: expected.exports }, null, "\t")}\n`);
 	console.log(`wrote ${snapshotPath}`);
 }
 for (const [mod, names] of Object.entries(expected.exports)) {
@@ -636,7 +639,7 @@ await test("pi-coding-agent: defineTool, guards, truncation, frontmatter, config
 	assert.equal(fm.body, "Body text");
 	assert.equal(ca.stripFrontmatter("---\na: 1\n---\nrest"), "rest");
 	assert.equal(ca.CONFIG_DIR_NAME, ".pi");
-	assert.equal(ca.VERSION, "1.1.0");
+	assert.equal(ca.VERSION, "1.2.0");
 	const previous = process.env.PI_CODING_AGENT_DIR;
 	process.env.PI_CODING_AGENT_DIR = path.join(here, "agent-dir-test");
 	assert.equal(ca.getAgentDir(), path.join(here, "agent-dir-test"));
@@ -702,6 +705,122 @@ await test("pi-coding-agent built-in tools: upstream metadata and host-backed ex
 		delete globalThis.__pisharpBridge;
 	}
 });
+
+// ---------------------------------------------------------------------------------------------
+// Pi 1.2.0 behaviour carried by the regenerated modules
+// ---------------------------------------------------------------------------------------------
+
+await test("(1.2.0) tui fake cursor: Input draws it with renderFakeCursor and the TUI resolves the markers", () => {
+	assert.equal(tui.renderFakeCursor("x"), "_pi:fcx_pi:/fc");
+	const input = new tui.Input();
+	input.focused = true;
+	input.setValue("ab");
+	const [line] = input.render(WIDTH);
+	assert.ok(line.includes(`${tui.CURSOR_MARKER}${tui.renderFakeCursor("a")}`), JSON.stringify(line));
+	const resolve = tui.TuiMainScreen.prototype.resolveFakeCursors;
+	// Without the hardware cursor the fake cursor is drawn reversed; with it, the focused fake cursor disappears.
+	assert.deepEqual(resolve.call({ showHardwareCursor: false }, [line, "plain"]), [line.replace("_pi:fc", "[7m").replace("_pi:/fc", "[27m"), "plain"]);
+	assert.equal(resolve.call({ showHardwareCursor: true }, [line])[0], line.replace("_pi:fca_pi:/fc", "a"));
+});
+
+await test("(1.2.0) ai retry: 'provider returned an error' is retryable", () => {
+	const ai = mods["pi-ai.mjs"];
+	const failed = (errorMessage) => ({ role: "assistant", stopReason: "error", errorMessage, content: [] });
+	assert.ok(ai.isRetryableAssistantError(failed("Provider returned an error")));
+	assert.ok(ai.isRetryableAssistantError(failed("provider returned error")));
+	assert.ok(!ai.isRetryableAssistantError(failed("Invalid API key")));
+});
+
+await test("(1.2.0) keybindings.json: $schema is skipped and values are checked against KeybindingValueSchema", async () => {
+	const { KeybindingsManager } = await import(pathToFileURL(path.join(here, "coding-agent/core/keybindings.mjs")).href);
+	const dir = fs.mkdtempSync(path.join(here, "kb-test-"));
+	try {
+		const file = path.join(dir, "keybindings.json");
+		fs.writeFileSync(file, JSON.stringify({
+			$schema: "https://pi.dev/schemas/keybindings.schema.json",
+			"app.interrupt": "ctrl+q",
+			"app.exit": ["ctrl+d", "alt+x"],
+			"tui.select.cancel": 42,
+			"tui.select.confirm": "ctrl+ctrl+a",
+		}));
+		assert.deepEqual(KeybindingsManager.loadFromFile(file), { "app.interrupt": "ctrl+q", "app.exit": ["ctrl+d", "alt+x"] });
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+await test("(1.2.0) compaction serializeConversation leaves out thinking", () => {
+	const ca = mods["pi-coding-agent.mjs"];
+	const text = ca.serializeConversation([
+		{ role: "user", content: "question", timestamp: 0 },
+		{ role: "assistant", content: [{ type: "thinking", thinking: "secret reasoning" }, { type: "text", text: "answer" }], timestamp: 0 },
+	]);
+	assert.ok(text.includes("answer") && text.includes("question"), text);
+	assert.ok(!text.includes("secret reasoning") && !text.includes("[Assistant thinking]"), text);
+});
+
+await test("(1.2.0) themes: built-in $schema URL and strict theme JSON validation", () => {
+	const source = fs.readFileSync(path.join(here, "theme.mjs"), "utf8");
+	assert.equal(source.split('"$schema": "https://pi.dev/schemas/theme.schema.json"').length, 3, "dark and light carry the pi.dev schema URL");
+	const dark = JSON.parse(source.slice(source.indexOf("const PISHARP_BUILTIN_DARK_THEME = ") + "const PISHARP_BUILTIN_DARK_THEME = ".length, source.indexOf(";\n\nconst PISHARP_BUILTIN_LIGHT_THEME")));
+	assert.ok(themeMod.createTheme({ ...dark, name: "copy" }), "a complete theme loads");
+	assert.throws(() => themeMod.createTheme({ ...dark, name: "extra", colors: { ...dark.colors, bogus: "#000000" } }), /Invalid theme "<inline>"/);
+	assert.throws(() => themeMod.createTheme({ ...dark, name: "a/b" }), /theme names cannot contain "\/"/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// The installed Pi npm packages (--packages): every runtime export of the package entry points that
+// extensions import exists on the matching shim, and the shims identify as the installed version.
+// Runs last: importing the real coding agent initializes its own globals.
+// ---------------------------------------------------------------------------------------------
+
+const PACKAGE_ENTRIES = {
+	"pi-tui.mjs": ["@earendil-works/pi-tui"],
+	"pi-ai.mjs": ["@earendil-works/pi-ai/compat", "@earendil-works/pi-ai"],
+	"pi-ai-oauth.mjs": ["@earendil-works/pi-ai/oauth"],
+	"pi-ai-providers.mjs": ["@earendil-works/pi-ai/providers/all"],
+	"pi-agent-core.mjs": ["@earendil-works/pi-agent-core"],
+	"pi-coding-agent.mjs": ["@earendil-works/pi-coding-agent"],
+};
+
+/** The ESM entry of `@scope/name[/subpath]` in a node_modules folder (package.json `exports`, `import` condition). */
+function packageEntry(root, spec) {
+	const [scope, name, ...rest] = spec.split("/");
+	const dir = path.join(root, scope, name);
+	const manifest = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
+	const subpath = rest.length ? `./${rest.join("/")}` : ".";
+	const pick = (target) => (typeof target === "string" ? target : (target?.import?.default ?? target?.import ?? target?.default));
+	let target = manifest.exports ? pick(manifest.exports[subpath]) : undefined;
+	if (!target && manifest.exports) {
+		for (const [key, value] of Object.entries(manifest.exports)) {
+			if (!key.endsWith("*") || !subpath.startsWith(key.slice(0, -1))) continue;
+			target = pick(value)?.replace("*", subpath.slice(key.length - 1));
+		}
+	}
+	if (!target && subpath === ".") target = manifest.module ?? manifest.main;
+	assert.ok(target, `${spec} has no ESM entry`);
+	return { file: path.join(dir, target), version: manifest.version };
+}
+
+if (packagesDir) {
+	for (const [mod, specs] of Object.entries(PACKAGE_ENTRIES)) {
+		await test(`(a) ${mod} exports every runtime name of the installed ${specs.join(" + ")} (${packagesDir})`, async () => {
+			const names = new Set();
+			for (const spec of specs) {
+				const real = await import(pathToFileURL(packageEntry(packagesDir, spec).file).href);
+				for (const name of Object.keys(real)) if (name !== "default") names.add(name);
+			}
+			const missing = [...names].filter((n) => !(n in mods[mod])).sort();
+			assert.deepEqual(missing, [], `missing exports: ${missing.join(", ")}`);
+		});
+	}
+	await test("the shims identify as the installed Pi version", () => {
+		const installed = packageEntry(packagesDir, "@earendil-works/pi-coding-agent").version;
+		assert.equal(mods["pi-coding-agent.mjs"].VERSION, installed);
+		for (const spec of ["@earendil-works/pi-ai", "@earendil-works/pi-tui", "@earendil-works/pi-agent-core"])
+			assert.equal(packageEntry(packagesDir, spec).version, installed, spec);
+	});
+}
 
 // ---------------------------------------------------------------------------------------------
 // Summary

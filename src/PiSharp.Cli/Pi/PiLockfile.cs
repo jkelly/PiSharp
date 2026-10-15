@@ -1,7 +1,9 @@
 // proper-lockfile 4.1.2 (MIT) lib/lockfile.js (lock, acquireLock, isLockStale, removeLock, updateLock, unlock) and lib/mtime-precision.js
-// (probe, getMtime), as Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT) packages/coding-agent uses it: core/settings-manager.ts and
-// core/project-trust.ts (lockSync: ten attempts 20 ms apart) and src/experimental/durable/sessions.ts (lock with retries and mtime
-// updates). PiSettings' and InteractiveSettings' locks take their acquisition step from here.
+// (probe, getMtime), as Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT) packages/coding-agent uses it in core/settings-manager.ts and
+// core/project-trust.ts (lockSync: ten attempts 20 ms apart, stale after 10 s), and as Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT)
+// packages/coding-agent src/experimental/durable/sessions.ts used it (lock with retries and mtime updates; upstream removed that agent in
+// 1.2.0, PiSharp's `pisharp durable` keeps it). PiSettings', InteractiveSettings' and PiProjectTrust's locks take their acquisition step
+// from here.
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 

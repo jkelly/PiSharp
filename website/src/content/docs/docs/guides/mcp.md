@@ -3,7 +3,7 @@ title: MCP servers
 description: Connect MCP servers, sign in with OAuth, and reach their tools directly, through tool_search or from codemode.
 ---
 
-PiSharp connects to MCP servers over stdio or streamable HTTP, as Pi does. It uses the same files, so servers you set up for Pi work in PiSharp. Pi's [MCP Servers](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/mcp.md) page describes the format in full.
+PiSharp connects to MCP servers over stdio or streamable HTTP, as Pi does. It uses the same files, so servers you set up for Pi work in PiSharp. Pi's [MCP Servers](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/mcp.md) page describes the format in full.
 
 ## Add a server
 
@@ -49,7 +49,7 @@ Servers that offer resources get the `list_mcp_resources`, `list_mcp_resource_te
 
 `codemode` runs a JavaScript script the model writes. The script calls other tools with `tools.<name>(args)`, so it can run calls in parallel and filter large results before they reach the model. Pi runs these scripts in QuickJS. PiSharp runs them in [Jint](https://github.com/sebastienros/jint), a JavaScript engine for .NET, in a separate worker process per script.
 
-The script API, the `store()` and `models` globals and the limits are Pi's. The [codemode guide](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/codemode.md) ships with PiSharp as `docs/codemode.md`. Differences scripts can see:
+The script API, the `store()` and `models` globals and the limits are Pi's. The [codemode guide](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/codemode.md) ships with PiSharp as `docs/codemode.md`. Differences scripts can see:
 
 - Each script pays a process start, about 100 to 300 ms.
 - The deadline starts when the script starts running in its worker, not when the worker launches.

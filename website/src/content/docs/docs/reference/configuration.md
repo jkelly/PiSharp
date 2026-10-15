@@ -3,7 +3,7 @@ title: Files and settings
 description: Where PiSharp finds its configuration, resources and sessions, and how project trust and the tool policy work.
 ---
 
-PiSharp reads the same files as Pi v1.1.0, in the same places. If you already use Pi, PiSharp picks up your setup. Pi's [Configuration](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/configuration.md) and [Settings](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/settings.md) pages apply.
+PiSharp reads the same files as Pi v1.2.0, in the same places. If you already use Pi, PiSharp picks up your setup. Pi's [Configuration](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/configuration.md) and [Settings](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/settings.md) pages apply.
 
 ## The agent folder
 
@@ -24,6 +24,8 @@ The agent folder is `~/.pi/agent`. Set `PI_CODING_AGENT_DIR` to move it.
 | `bin/` | `rg` and `fd`, if PiSharp downloaded them. |
 
 Pi and PiSharp share these files. A sign-in with one works in the other.
+
+`settings.json`, `models.json`, `keybindings.json` and theme files accept a `$schema` key, so editors can check them against Pi's published schemas, for example `"$schema": "https://pi.dev/schemas/models.schema.json"`. PiSharp checks `models.json`, key bindings and themes against the same schemas. A theme may only use the documented fields; put your own colors under `vars`.
 
 ## The project `.pi` folder
 

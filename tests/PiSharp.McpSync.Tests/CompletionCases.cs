@@ -381,7 +381,8 @@ internal static partial class Program
             Equal(help, await Mcp(options)); Equal(help, await Mcp(options, "--help")); Equal(help, await Mcp(options, "login", "docs", "-h"));
             Check(McpCommand.Help.StartsWith("Usage:\n  PiSharp.Cli mcp add <server> [options] -- <command> [args...]\n  PiSharp.Cli mcp add <server> [options] --url <url>\n" +
                 "  PiSharp.Cli mcp remove <server> [-l]\n  PiSharp.Cli mcp list [--json]\n  PiSharp.Cli mcp login <server> [--timeout <seconds>]\n  PiSharp.Cli mcp logout <server>\n", StringComparison.Ordinal));
-            Check(McpCommand.Help.EndsWith("  --timeout <seconds>     How long login waits for the browser (default: 300)", StringComparison.Ordinal));
+            // Pi 1.2.0 mcp/cli.ts (#10636): --timeout limits the whole sign-in.
+            Check(McpCommand.Help.EndsWith("  --timeout <seconds>     Time limit for the whole sign-in (default: 300)", StringComparison.Ordinal));
             const string Hint = "Use \"PiSharp.Cli mcp --help\" for usage.\n";
             Equal((1, "", "Unknown mcp command \"bogus\".\n" + Hint), await Mcp(options, "bogus"));
             Equal((1, "", "Usage: PiSharp.Cli mcp login <server>\n" + Hint), await Mcp(options, "login"));

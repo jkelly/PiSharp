@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui-alt-screen.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { AltScreenSearchComponent, AltScreenSearchIndex, getAltScreenSearchMatchKey } from "./alt-screen-search.mjs";
 import { AltScreenFlashContainer } from "./components/alt-screen-flash.mjs";
@@ -209,7 +209,7 @@ export class TuiAltScreen extends TuiBase {
             this.terminal.write(`${BEGIN_SYNCHRONIZED_OUTPUT}${EXIT_ALT_SCREEN}\x1b[?25h${END_SYNCHRONIZED_OUTPUT}`);
         } else {
             const width = Math.max(1, this.terminal.columns);
-            const documentLines = this.render(width).map((line)=>line.replace(OSC133_ZONE_PREFIX, ""));
+            const documentLines = this.resolveFakeCursors(this.render(width)).map((line)=>line.replace(OSC133_ZONE_PREFIX, ""));
             this.lastDocument = this.applyLineResets(documentLines.map((line)=>line.replaceAll(CURSOR_MARKER, ""))).map((line)=>isImageLine(line) || visibleWidth(line) <= width ? line : sliceByColumn(line, 0, width, true));
             let buffer = `${BEGIN_SYNCHRONIZED_OUTPUT}${EXIT_ALT_SCREEN}${DISABLE_AUTOWRAP}`;
             for(let row = 0; row < this.lastDocument.length; row++){
@@ -481,7 +481,6 @@ export class TuiAltScreen extends TuiBase {
                     consume: true
                 };
             }
-            if (this.shouldDeferViewportInputToOverlay()) return undefined;
             this.routeWheel(wheelEvent, wheelDelta);
             return {
                 consume: true
@@ -1357,7 +1356,7 @@ export class TuiAltScreen extends TuiBase {
         if (this.refreshSearch(nextLayout)) {
             nextLayout = renderLayoutFrame(root, width, height, ()=>this.requestRender());
         }
-        let screen = nextLayout.lines.map((line)=>line.replace(OSC133_ZONE_PREFIX, ""));
+        let screen = this.resolveFakeCursors(nextLayout.lines.map((line)=>line.replace(OSC133_ZONE_PREFIX, "")));
         screen = this.applySearchHighlights(screen, nextLayout);
         screen = this.compositeScrollToEndIndicator(screen, nextLayout, width);
         screen = this.compositeOverlays(screen, width, height);

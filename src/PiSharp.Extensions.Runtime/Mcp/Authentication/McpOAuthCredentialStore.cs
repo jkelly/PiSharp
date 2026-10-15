@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts McpOAuthCredentialStore,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts McpOAuthCredentialStore,
 // packages/mcp/src/oauth/provider.ts McpOAuthState.
 using System.Text.Encodings.Web;
 using System.Text.Json;

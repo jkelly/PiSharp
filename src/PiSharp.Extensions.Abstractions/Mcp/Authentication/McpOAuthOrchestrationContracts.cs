@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/oauth/flow.ts, packages/mcp/src/oauth/errors.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/mcp/src/oauth/flow.ts, packages/mcp/src/oauth/errors.ts.
 using System.Collections.Immutable;
 using PiSharp.Contracts;
 
@@ -24,17 +24,19 @@ public sealed record McpOAuthOrchestrationContext(McpOAuthOrchestrationOptions O
     McpOAuthDiscoveredServer Discovery, McpOAuthAdmittedClient Client, string? Resource, string? Scope, string? State = null,
     string? RedirectUrl = null)
 { public override string ToString() => nameof(McpOAuthOrchestrationContext); }
-/// <summary>An authorization response came from another authorization server than the metadata names, or lacks the
-/// `iss` parameter its server promised (RFC 9207). Raised before the code is sent anywhere.</summary>
-public sealed class McpOAuthIssuerMismatchException(string expected, string? received)
-    : IOException($"OAuth issuer mismatch: expected {Quote(expected)}, received {(received is null ? "none" : Quote(received))}")
+/// <summary>An authorization response came from another authorization server than the metadata names, lacks the `iss`
+/// parameter its server promised, or carries an `iss` that cannot be checked because no authorization server metadata was
+/// discovered (RFC 9207). Raised before the code is sent anywhere.</summary>
+public sealed class McpOAuthIssuerMismatchException(string? expected, string? received)
+    : IOException($"OAuth issuer mismatch: expected {Format(expected)}, received {Format(received)}")
 {
-    public string Expected { get; } = expected;
+    /// <summary>Null when no authorization server metadata was discovered.</summary>
+    public string? Expected { get; } = expected;
     /// <summary>Null when the response lacks the `iss` parameter its server promised.</summary>
     public string? Received { get; } = received;
     private static readonly System.Text.Json.JsonSerializerOptions JsonStringify =
         new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-    private static string Quote(string value) => System.Text.Json.JsonSerializer.Serialize(value, JsonStringify);
+    private static string Format(string? issuer) => issuer is null ? "none" : System.Text.Json.JsonSerializer.Serialize(issuer, JsonStringify);
 }
 /// <summary>Scope arithmetic of the original flow.</summary>
 public static class McpOAuthScope

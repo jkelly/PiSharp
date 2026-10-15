@@ -52,9 +52,8 @@ public sealed class McpPreparedDiscoveryIdentity
         if (!ReferenceEquals(snapshot, admittedBinding.Snapshot) || !ReferenceEquals(snapshot, semantic.Snapshot)) throw new InvalidOperationException("Discovery requires the exact current semantic/prepared snapshot.");
         var name = kind == McpDiscoveryKind.Codemode ? McpDiscoveryToolIdentity.CodemodeName : McpDiscoveryToolIdentity.ToolSearchName;
         var tool = snapshot.Tools.SingleOrDefault(tool => tool.Name == name && tool.OwnerId == scope.OwnerId && tool.OwnerGeneration == scope.OwnerGeneration && tool.RegistrationId == semantic.RegistrationId);
-        if (tool is null || tool.Exposure != PiSharp.Contracts.ToolExposure.ModelOnly ||
-            !(kind == McpDiscoveryKind.Codemode ? McpDiscoveryToolIdentity.IsCodemodeTool(tool.Name, tool.Parameters) :
-                McpDiscoveryToolIdentity.IsToolSearchTool(tool.Name, tool.Parameters)))
+        // index.ts ensureDiscoveryActive: only a tool of these names that declares reachesTools can reach MCP tools.
+        if (tool is null || tool.Exposure != PiSharp.Contracts.ToolExposure.ModelOnly || tool.ReachesTools is null)
             throw new InvalidOperationException("Discovery metadata is foreign, ordinary or an impostor.");
         var adapter = admittedBinding.Adapters.SingleOrDefault(adapter => adapter.Name == name)
             ?? throw new InvalidOperationException("Discovery requires an actual admitted prepared adapter.");
@@ -88,11 +87,16 @@ public sealed class McpPreparedDiscoveryIdentity
             ArgumentNullException.ThrowIfNull(identity); identity.Validate(current);
             if (!kinds.Add(identity.Kind)) throw new ArgumentException("Duplicate discovery identity.", nameof(admitted));
         }
-        if (NeedsCodemode(plan, current) && !kinds.Contains(McpDiscoveryKind.Codemode))
+        if (NeedsCodemode(plan, current) && !kinds.Contains(McpDiscoveryKind.Codemode) && !Reaching(current, McpDiscoveryToolIdentity.CodemodeName))
             throw new InvalidOperationException("MCP exposure requires an admitted executable codemode implementation.");
-        if (NeedsToolSearch(plan, current) && !kinds.Contains(McpDiscoveryKind.ToolSearch))
+        if (NeedsToolSearch(plan, current) && !kinds.Contains(McpDiscoveryKind.ToolSearch) && !Reaching(current, McpDiscoveryToolIdentity.ToolSearchName))
             throw new InvalidOperationException("MCP exposure requires an admitted executable tool_search implementation.");
     }
+
+    /// <summary>index.ts ensureDiscoveryActive: without the built-in implementation (its extension is disabled), another extension's
+    /// tool of the name reaches the MCP tools when it declares reachesTools; the MCP integration activates it and waits by its reach.</summary>
+    private static bool Reaching(SessionRuntimeRegistry current, string name) =>
+        current.RegisteredTools.Any(tool => tool.Adapter.Name == name && tool.ReachesTools is not null);
 
     /// <summary>`deferred` tools need tool_search unless the tool selection (--tools/--exclude-tools) leaves it out, which leaves
     /// them unreachable as in the original, where tool_search is then not registered.</summary>
@@ -115,8 +119,8 @@ public sealed class McpPreparedDiscoveryIdentity
                 throw new InvalidOperationException("Discovery reserved generation does not match the actual attachment.");
             identity.Validate(current, bound: true);
         }
-        if (NeedsCodemode(plan, current) && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.Codemode) ||
-            NeedsToolSearch(plan, current) && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.ToolSearch))
+        if (NeedsCodemode(plan, current) && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.Codemode) && !Reaching(current, McpDiscoveryToolIdentity.CodemodeName) ||
+            NeedsToolSearch(plan, current) && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.ToolSearch) && !Reaching(current, McpDiscoveryToolIdentity.ToolSearchName))
             throw new InvalidOperationException("Bound MCP exposure requires its actual discovery implementations.");
     }
     internal void BindSemanticOwner(ReplaceableAgentSession owner, AgentSessionAttachment attachment) => semantic.Bind(owner, attachment);

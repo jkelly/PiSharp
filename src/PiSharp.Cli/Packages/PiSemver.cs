@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/package-manager.ts (isExactNpmVersion,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/package-manager.ts (isExactNpmVersion,
 // getNpmVersionRange, the semver calls valid, validRange, satisfies, maxSatisfying, gt and rcompare of semver 7.8.5).
 using System.Globalization;
 using System.Text.RegularExpressions;

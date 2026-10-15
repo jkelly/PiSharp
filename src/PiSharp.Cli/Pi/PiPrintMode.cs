@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/print-mode.ts (runPrintMode),
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/print-mode.ts (runPrintMode),
 // packages/coding-agent/src/modes/json-event.ts and packages/coding-agent/src/modes/rpc/rpc-client.ts (waiting for agent_settled).
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -29,9 +29,32 @@ internal static class PiPrintMode
         }
         var records = Channel.CreateUnbounded<JsonData>(new() { SingleReader = true });
         var outputGate = new SemaphoreSlim(1, 1);
+        // print-mode.ts writes events only until the last prompt resolves (or one fails): disposeRuntime then unsubscribes before it
+        // disposes the session, so nothing a run still starting at exit emits is written. The host's records arrive in order here, so
+        // the record that resolves the last prompt (as PromptAsync decides) closes the stream for every later one.
+        var promptGate = new object();
+        string? lastPromptId = null; bool lastResponded = false, lastWaitSettled = true, eventsClosed = false;
         var connection = new BoundedRpcConnection(async (record, recordToken) =>
         {
             var type = record.Value.TryGetProperty("type", out var kind) ? kind.GetString() : null;
+            bool closed, closeAfter = false;
+            lock (promptGate)
+            {
+                closed = eventsClosed;
+                if (!closed && type == "response")
+                {
+                    var responseId = record.Value.TryGetProperty("id", out var idValue) && idValue.ValueKind == JsonValueKind.String ? idValue.GetString() : null;
+                    if (record.Value.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.False) closeAfter = true;
+                    else if (responseId is not null && responseId == lastPromptId)
+                    {
+                        lastResponded = true;
+                        lastWaitSettled = !(record.Value.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object &&
+                            data.TryGetProperty("disposition", out var disposition) && disposition.GetString() == "handled");
+                        closeAfter = !lastWaitSettled;
+                    }
+                }
+                else if (!closed && type == "agent_settled" && lastResponded && lastWaitSettled) closeAfter = true;
+            }
             if (type == "extension_error")
             {
                 // print-mode.ts bindExtensions onError: `Extension error (<path>): <error>` on stderr; RPC mode alone emits the record.
@@ -41,7 +64,7 @@ internal static class PiPrintMode
                 return;
             }
             // Session events only: command responses and PiSharp's own RPC records (pisharp_*) are not part of Pi's JSON stream.
-            if (json && type != "response" && type?.StartsWith("pisharp_", StringComparison.Ordinal) != true)
+            if (json && !closed && type != "response" && type?.StartsWith("pisharp_", StringComparison.Ordinal) != true)
             {
                 await outputGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
                 // print-mode.ts writes JSON.stringify(event): non-ASCII and ' raw, JavaScript number text.
@@ -49,6 +72,7 @@ internal static class PiPrintMode
                 try { await stdout.WriteAsync(line.AsMemory(), CancellationToken.None).ConfigureAwait(false); await stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false); }
                 finally { outputGate.Release(); }
             }
+            if (closeAfter) lock (promptGate) eventsClosed = true;
             records.Writer.TryWrite(record);
         });
         using var hostStop = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -65,10 +89,11 @@ internal static class PiPrintMode
         var exitCode = 0; var sequence = 0;
         try
         {
+            var prompts = (options.InitialMessage is null ? 0 : 1) + options.InitialMessages.Length;
             if (options.InitialMessage is { } initial)
-                exitCode = await PromptAsync(initial, options.InitialImages.IsDefaultOrEmpty ? null : options.InitialImages).ConfigureAwait(false);
+                exitCode = await PromptAsync(initial, options.InitialImages.IsDefaultOrEmpty ? null : options.InitialImages, --prompts == 0).ConfigureAwait(false);
             foreach (var message in options.InitialMessages)
-                if (exitCode == 0) exitCode = await PromptAsync(message, null).ConfigureAwait(false);
+                if (exitCode == 0) exitCode = await PromptAsync(message, null, --prompts == 0).ConfigureAwait(false);
             if (exitCode == 0 && !json)
             {
                 // print-mode.ts reads session.state.messages directly; a host that cannot answer is a failure, never a silent success.
@@ -93,6 +118,12 @@ internal static class PiPrintMode
                                     await stdout.WriteAsync((PiSharp.Contracts.JsonUtf16.GetString(blockText) + "\n").AsMemory(), token).ConfigureAwait(false);
                             await stdout.FlushAsync(token).ConfigureAwait(false);
                         }
+                        // print-mode.ts: a final response cut off at the output token limit prints its partial text, then fails.
+                        if (stop == "length")
+                        {
+                            await PiCommand.Line(stderr, "Response was truncated: the model reached its output token limit.").ConfigureAwait(false);
+                            exitCode = 1;
+                        }
                     }
                 }
             }
@@ -110,11 +141,12 @@ internal static class PiPrintMode
         await stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false);
         return exitCode != 0 ? exitCode : hostExit;
 
-        async Task<int> PromptAsync(string message, System.Collections.Immutable.ImmutableArray<JsonData>? images)
+        async Task<int> PromptAsync(string message, System.Collections.Immutable.ImmutableArray<JsonData>? images, bool last)
         {
             var command = new JsonObject { ["type"] = "prompt", ["message"] = message };
             if (images is { } attached) command["images"] = new JsonArray([.. attached.Select(image => JsonNode.Parse(image.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions))]);
             var id = "pi-print-" + ++sequence; command["id"] = id;
+            if (last) lock (promptGate) lastPromptId = id;
             await connection.SendAsync(JsonData.Parse(command.ToJsonString()), token).ConfigureAwait(false);
             var responded = false; var waitSettled = true;
             while (true)

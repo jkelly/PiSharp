@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts
 // (session_start startConnection/reportProblems, waitForDirectServers, tool_call waits, session_shutdown) and
 // packages/coding-agent/docs/mcp.md.
 using System.Collections.Immutable;
@@ -106,8 +106,9 @@ public sealed class McpBackgroundConnections
     }
 
     /// <summary>index.ts before_agent_start waitForDirectServers, before idle input is admitted: the first prompt waits up to
-    /// <see cref="StartupWait"/> for servers with `direct` tools, then notes that the others are still connecting. tool_search,
-    /// codemode and the resource tools wait for the servers they reach inside their calls (tool_call), not here.</summary>
+    /// <see cref="StartupWait"/> for servers with `direct` tools, then notes that the others are still connecting. Tools that reach
+    /// other tools (reachesTools), the resource tools and a server's own tools wait for the servers they reach before they run
+    /// (tool_call, <see cref="McpToolCallHooks"/>), not here.</summary>
     internal async Task BeforeInputAsync(PersistentAgentSession session, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(session);

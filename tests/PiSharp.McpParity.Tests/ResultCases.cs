@@ -26,6 +26,12 @@ internal static partial class Program
                 "binary" => """{"content":[{"type":"resource","resource":{"uri":"docs://host/file.pdf","mimeType":"application/pdf","blob":"JVBERg=="}},{"type":"resource","resource":{"uri":"docs://data","mimeType":"application/json","blob":"eyJhIjoxfQ=="}},{"type":"audio","data":"AA==","mimeType":"audio/wav"}]}""",
                 "error" => """{"content":[],"isError":true,"_meta":{"trace":"x"}}""",
                 "structured" => """{"content":[],"structuredContent":{"rows":[1,2]}}""",
+                // MCP 2026-07-28: structured content may be any JSON value (Pi 1.2.0 #10416).
+                "array" => """{"content":[],"structuredContent":[{"id":1},{"id":2}]}""",
+                "null" => """{"content":[],"structuredContent":null}""",
+                "string" => """{"content":[],"structuredContent":"text"}""",
+                "number" => """{"content":[],"structuredContent":3}""",
+                "false" => """{"content":[],"structuredContent":false}""",
                 _ => "{\"content\":[{\"type\":\"text\",\"text\":\"" + new string('a', 15000) + "\"},{\"type\":\"text\",\"text\":\"" + new string('b', 15000) + "\"}]}"
             },
             _ => throw new IOException("Unexpected MCP method " + method)
@@ -61,5 +67,29 @@ internal static partial class Program
         var saved = System.Text.RegularExpressions.Regex.Match(truncated, @"\[Full output: (.*) \(read it with offset/limit\)\]$").Groups[1].Value;
         Equal(30001, File.ReadAllText(saved).Length, "the full text is saved");
         File.Delete(saved);
+    });
+
+    // Pi 1.2.0 client.ts validateCallToolResult and content.ts toLlmContent (#10416): tools/call accepts any JSON value as
+    // structured content (arrays, null, primitives) instead of failing with "Invalid MCP tools/call structured content", and a result
+    // without content blocks shows it as JSON.
+    private static Task StructuredContentAnyJson() => WithRoot("results-any-json", DirectDocs, async fixture =>
+    {
+        string[] cases = ["array", "null", "string", "number", "false"];
+        var steps = cases.Select((name, index) => (Func<HttpResponseMessage>)(() => Call("s" + index, "mcp__docs__get", new { @case = name }))).Append(() => Text("done")).ToArray();
+        var provider = new Endpoint(steps);
+        var host = fixture.Host() with { CreateChannel = entry => (actual, token) => ValueTask.FromResult<IMcpAdmittedRequestChannel>(new ResultServer()) };
+        await using (var rpc = new Rpc(Args(fixture.Root, "new-memory"), provider, host))
+        {
+            await rpc.Prompt("p1", "convert");
+            Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
+        }
+        var requests = provider.Snapshot();
+        string[] expected = ["[\n  {\n    \"id\": 1\n  },\n  {\n    \"id\": 2\n  }\n]", "null", "\"text\"", "3", "false"];
+        for (var index = 0; index < cases.Length; index++)
+        {
+            Names([expected[index]], ToolResults(requests[index + 1]), cases[index] + " structured content as JSON");
+            var result = JsonDocument.Parse(requests[index + 1].Body!).RootElement.GetProperty("messages").EnumerateArray().Last().GetProperty("content")[0];
+            Check(!result.TryGetProperty("is_error", out var isError) || !isError.GetBoolean(), cases[index] + " is not an error: " + result);
+        }
     });
 }

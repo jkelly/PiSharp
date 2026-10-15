@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (_installAgentBoundaryHooks,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_installAgentBoundaryHooks,
 // _dispatchTurnEndBoundary, _runBeforeSettleBoundary, _applyBoundaryDrafts, _createBoundaryPreviewManager, _buildBoundaryContext,
 // _commitBoundaryDrafts, _reportInvalidBoundaryContinuation, and the message_end replacement in _handleAgentEvent) and
 // core/extensions/types.ts (SessionBoundaryDraft, BoundaryContextPreview, BoundaryResult, MessageEndEventResult).

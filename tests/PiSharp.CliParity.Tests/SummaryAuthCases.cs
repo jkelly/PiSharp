@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (compact,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (compact,
 // _getSummarizationRequestAuth), packages/coding-agent/src/core/model-runtime.ts (prepareRequest: "Unknown provider", "Provider is not
 // configured") and packages/coding-agent/src/core/compaction/compaction.ts (getSummarizationFailure).
 using System.Text.Json.Nodes;

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session-runtime.ts (switchSession:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session-runtime.ts (switchSession:
 // SessionManager.open(sessionPath)) and packages/coding-agent/src/core/session-manager.ts (open, _setSessionFile, newSession).
 using System.Text.Json.Nodes;
 

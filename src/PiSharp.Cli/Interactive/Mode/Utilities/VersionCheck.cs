@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/utils/version-check.ts, with management-http.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/utils/version-check.ts, with management-http.ts
 // (fetchWithRetry). Owner decision 12 (docs/decisions/0004-full-parity-owner-decisions.md): PiSharp keeps Pi's timing, gates and
 // error handling but asks NuGet for the latest PiSharp.Cli instead of pi.dev for Pi's version. The HTTP client, NuGet base URL and
 // environment are injectable.

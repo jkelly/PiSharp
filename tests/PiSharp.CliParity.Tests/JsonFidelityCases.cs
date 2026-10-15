@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts, packages/coding-agent/src/core/session-manager.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts, packages/coding-agent/src/core/session-manager.ts,
 // packages/ai/src/utils/json-parse.ts, packages/ai/src/utils/sanitize-unicode.ts, packages/ai/src/api/anthropic-messages.ts and
 // packages/coding-agent/src/core/tools/write.ts.
 using System.Text;

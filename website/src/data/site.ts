@@ -63,7 +63,7 @@ export const versions = {
 	/** The Pi release the port is currently being synced to. */
 	target: target.tag.replace(/^v/, ''),
 	/** Update by hand when Pi ships a new release. */
-	latestPi: '1.1.0',
+	latestPi: '1.2.0',
 };
 
 export const inSync = versions.baseline === versions.latestPi;

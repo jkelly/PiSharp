@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/config.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/config.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged except for the marked PiSharp adaptations).
 import { accessSync, constants, existsSync, readFileSync, realpathSync } from "fs";
 import { createRequire } from "module";
@@ -463,7 +463,7 @@ export function detectInstallChange(packageJsonPath = startupPackageJsonPath) {
 }
 let pkg = {
     name: "@earendil-works/pi-coding-agent",
-    version: "1.1.0"
+    version: "1.2.0"
 };
 let startupPackageJsonPath;
 startupPackageJsonPath = undefined;

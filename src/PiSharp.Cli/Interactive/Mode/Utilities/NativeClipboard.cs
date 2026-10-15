@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): tui/src/native-platform.ts (NativeClipboard, getNativeClipboard).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): tui/src/native-platform.ts (NativeClipboard, getNativeClipboard).
 // DEVIATION: upstream loads prebuilt N-API helpers (AppKit on macOS, user32 on Windows, an X11 worker on Linux). PiSharp ships no
 // native addon and adds no packages, so the macOS and Windows helpers are replaced by the platform commands below (pbpaste,
 // osascript/JXA, PowerShell Get-Clipboard/Set-Clipboard and the System.Windows.Forms clipboard inside powershell.exe). The Linux

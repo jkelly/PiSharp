@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (serversWithResources,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (serversWithResources,
 // resourceServers, syncResourceTools), packages/coding-agent/src/extensions/mcp/resources.ts (createMcpResourceToolDefinitions) and
 // packages/coding-agent/src/utils/output-files.ts (writeOutputFile: `pi-mcp-<random hex><extension>` in the temp directory, 0600).
 using System.Collections.Immutable;
@@ -41,8 +41,6 @@ internal sealed class McpResourceToolsPublisher
     private ImmutableHashSet<string> publishedNames = ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal);
     private McpExposure? published;
     private bool closed;
-    /// <summary>index.ts tool_call: the resource tools reach every server, so a call first waits for their connections.</summary>
-    internal Func<CancellationToken, Task>? WaitForServers { get; init; }
 
     internal McpResourceToolsPublisher(ExtensionRegistry registry, RegistrationScope scope, IToolActionPolicy policy,
         ExtensionToolArgumentValidator validator, McpPreparedHookComposer composeHooks, McpCallGrants grants)
@@ -77,21 +75,6 @@ internal sealed class McpResourceToolsPublisher
             else servers.Remove(name);
         }
         await PublishAsync(token).ConfigureAwait(false);
-    }
-
-    /// <summary>The descriptor with its call waiting for the servers first (<see cref="WaitForServers"/>).</summary>
-    private ExtensionToolDescriptor Waiting(ExtensionToolDescriptor descriptor)
-    {
-        if (WaitForServers is not { } wait) return descriptor;
-        var execute = descriptor.ExecuteAsync;
-        return descriptor with
-        {
-            ExecuteAsync = async (arguments, context, token) =>
-            {
-                await wait(token).ConfigureAwait(false);
-                return await execute(arguments, context, token).ConfigureAwait(false);
-            }
-        };
     }
 
     /// <summary>The widest exposure of the servers the tools reach; null (hidden) when there are none.</summary>
@@ -140,7 +123,7 @@ internal sealed class McpResourceToolsPublisher
             var next = withdrawal is null ? Widest() : null;
             if (next == published) return;
             ImmutableArray<ExtensionToolDescriptor> descriptors = next is { } exposure
-                ? [.. dispatch.CreateDescriptors(RegistrationPrefix, McpCatalogPlanner.ToToolExposure(exposure)).Select(Waiting)] : [];
+                ? [.. dispatch.CreateDescriptors(RegistrationPrefix, McpCatalogPlanner.ToToolExposure(exposure))] : [];
             ValueTask<PreparedSessionToolCatalog> Prepare(SessionRuntimeRegistry expected, ImmutableArray<string> activeNames, CancellationToken cancellation)
             {
                 cancellation.ThrowIfCancellationRequested();

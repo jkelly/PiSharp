@@ -10,17 +10,17 @@ using static Expect;
 /// R cache read, W cache write, CH latest cache hit rate, $ cost), context usage, model and thinking level follow each appended
 /// entry, model change, thinking change, session switch and compaction. Expectations are written from footer.ts (formatTokens,
 /// toFixed), core/usage-totals.ts, agent-session.ts getContextUsage/getSessionStats and models.ts calculateCost with the catalog
-/// prices of claude-sonnet-4-5 (3/15/0.3/3.75 per million, 1M window) and claude-haiku-4-5 (1/5/0.1/1.25, 200k window).
+/// prices of claude-sonnet-4-6 (3/15/0.3/3.75 per million, 1M window) and claude-haiku-4-5 (1/5/0.1/1.25, 200k window).
 /// </summary>
 internal static class FooterUsageCases
 {
-    private static readonly string[] Regular = ["--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular"];
+    private static readonly string[] Regular = ["--provider", "anthropic", "--model", "claude-sonnet-4-6", "--tui-mode", "regular"];
 
     private static string Frame(string type, object value) => "event: " + type + "\ndata: " + JsonSerializer.Serialize(value) + "\n\n";
     private static HttpResponseMessage Sse(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "text/event-stream") };
     private static string Start(int input, int cacheRead, int cacheWrite) => Frame("message_start", new
     {
-        type = "message_start", message = new { id = "msg_u", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(),
+        type = "message_start", message = new { id = "msg_u", role = "assistant", model = "claude-sonnet-4-6", content = Array.Empty<object>(),
             usage = new { input_tokens = input, output_tokens = 0, cache_read_input_tokens = cacheRead, cache_creation_input_tokens = cacheWrite } }
     });
 
@@ -114,17 +114,17 @@ internal static class FooterUsageCases
             };
             pi.Start(Regular);
             await pi.WaitFor("escape interrupt");
-            await WaitForFooter(pi, "0.0%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "0.0%/1.0M (auto)", "claude-sonnet-4-6 • medium");
 
             await pi.Submit("one");
             await pi.WaitFor("first answer");
             // 1200*3 + 250*15 + 3000*0.3 + 500*3.75 = 10125 µ$; CH 3000/4700; context 4950/1M.
-            await WaitForFooter(pi, "↑1.2k ↓250 R3.0k W500 CH63.8% $0.010 0.5%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑1.2k ↓250 R3.0k W500 CH63.8% $0.010 0.5%/1.0M (auto)", "claude-sonnet-4-6 • medium");
 
             await pi.Submit("two");
             await pi.WaitFor("second answer");
             // + 800*3 + 150*15 + 14500*0.3 = 9000 µ$; CH 14500/15300; context 15450/1M.
-            await WaitForFooter(pi, "↑2.0k ↓400 R18k W500 CH94.8% $0.019 1.5%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑2.0k ↓400 R18k W500 CH94.8% $0.019 1.5%/1.0M (auto)", "claude-sonnet-4-6 • medium");
 
             // get_session_stats and /session use the same totals (agent-session.ts getSessionStats).
             var stats = await Stats(pi);
@@ -143,7 +143,7 @@ internal static class FooterUsageCases
             pi.Type("\r");
             await Task.Delay(300);
             pi.Type("\r");
-            await WaitForFooter(pi, "↑2.0k ↓400 R18k W500 CH94.8% $0.019 1.5%/1.0M (auto)", "claude-sonnet-4-5 • high");
+            await WaitForFooter(pi, "↑2.0k ↓400 R18k W500 CH94.8% $0.019 1.5%/1.0M (auto)", "claude-sonnet-4-6 • high");
 
             await Model(pi, "/model claude-haiku-4-5");
             // The same 15450 context tokens in haiku's 200k window.
@@ -178,7 +178,7 @@ internal static class FooterUsageCases
             Check(footerBeforeSecondRequest?.StartsWith("↑1.0k ↓50 W2.0k CH0.0% $0.011 ", StringComparison.Ordinal) == true,
                 "footer after the tool call message, before the next request: " + footerBeforeSecondRequest);
             // + 500*3 + 80*15 + 3000*0.3 = 3600 µ$; CH 3000/3500; context 3580/1M.
-            await WaitForFooter(pi, "↑1.5k ↓130 R3.0k W2.0k CH85.7% $0.015 0.4%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑1.5k ↓130 R3.0k W2.0k CH85.7% $0.015 0.4%/1.0M (auto)", "claude-sonnet-4-6 • medium");
             Equal(0, await pi.Quit(), "exit code");
         });
 
@@ -191,18 +191,18 @@ internal static class FooterUsageCases
             await pi.WaitFor("escape interrupt");
             await pi.Submit("one");
             await pi.WaitFor("first answer");
-            await WaitForFooter(pi, "↑1.2k ↓250 R3.0k W500 CH63.8% $0.010 0.5%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑1.2k ↓250 R3.0k W500 CH63.8% $0.010 0.5%/1.0M (auto)", "claude-sonnet-4-6 • medium");
             Equal(true, (await pi.Mode!.Rpc.RequestAsync(new JsonObject { ["type"] = "get_state" }))?["autoCompactionEnabled"]?.GetValue<bool>(),
                 "the session's automatic compaction follows compaction.enabled (default true)");
             await pi.Submit("/new");
             await pi.WaitFor("✓ New session started");
-            await WaitForFooter(pi, "0.0%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "0.0%/1.0M (auto)", "claude-sonnet-4-6 • medium");
             Equal(true, (await pi.Mode!.Rpc.RequestAsync(new JsonObject { ["type"] = "get_state" }))?["autoCompactionEnabled"]?.GetValue<bool>(),
                 "a new session's automatic compaction follows compaction.enabled too");
             await pi.Submit("other");
             await pi.WaitFor("other answer");
             // 100*3 + 10*15 = 450 µ$.
-            await WaitForFooter(pi, "↑100 ↓10 $0.000 0.0%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑100 ↓10 $0.000 0.0%/1.0M (auto)", "claude-sonnet-4-6 • medium");
             await pi.Submit("/resume");
             await pi.WaitFor("Resume Session");
             await pi.WaitFor("one");
@@ -210,7 +210,7 @@ internal static class FooterUsageCases
             pi.Type("\u001b[B");
             await Task.Delay(300);
             pi.Type("\r");
-            await WaitForFooter(pi, "↑1.2k ↓250 R3.0k W500 CH63.8% $0.010 0.5%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑1.2k ↓250 R3.0k W500 CH63.8% $0.010 0.5%/1.0M (auto)", "claude-sonnet-4-6 • medium");
             Equal(0, await pi.Quit(), "exit code");
         });
 
@@ -257,19 +257,19 @@ internal static class FooterUsageCases
             await pi.WaitFor("first answer");
             await pi.Submit("two");
             await pi.WaitFor("second answer");
-            await WaitForFooter(pi, "↑2.0k ↓400 R18k W500 CH94.8% $0.019 1.5%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑2.0k ↓400 R18k W500 CH94.8% $0.019 1.5%/1.0M (auto)", "claude-sonnet-4-6 • medium");
             compacting = true;
             await pi.Submit("/compact");
             // keepRecentTokens 1 cuts inside the last turn: a history summary and a turn-prefix summary, whose usages the compaction
             // entry combines (combineUsage): + 2 * (5000*3 + 400*15) = 42000 µ$. The cache hit rate stays the latest assistant
             // message's, and the context is unknown until an assistant responds after the compaction.
-            await WaitForFooter(pi, "↑12k ↓1.2k R18k W500 CH94.8% $0.061 ?/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑12k ↓1.2k R18k W500 CH94.8% $0.061 ?/1.0M (auto)", "claude-sonnet-4-6 • medium");
             Equal(4, pi.Requests.Count, "two summary requests");
             compacting = false;
             await pi.Submit("three");
             await pi.WaitFor("after answer");
             // + 3000*3 + 100*15 = 10500 µ$; CH 0/3000; context 3100/1M.
-            await WaitForFooter(pi, "↑15k ↓1.3k R18k W500 CH0.0% $0.072 0.3%/1.0M (auto)", "claude-sonnet-4-5 • medium");
+            await WaitForFooter(pi, "↑15k ↓1.3k R18k W500 CH0.0% $0.072 0.3%/1.0M (auto)", "claude-sonnet-4-6 • medium");
             Equal(0, await pi.Quit(), "exit code");
         });
     }

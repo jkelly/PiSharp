@@ -4,6 +4,12 @@
 // --add paths, and hashes every row under the unchanged hashPolicy. Never touches fixtures.
 // Usage: node refreeze-baseline.mjs --upstream <checkout> --tag <vX.Y.Z> --previous <lock>
 //          --previous-path <repo path of preserved lock> [--add a,b,c] --out <new lock>
+//          [--decision <repo path of the decision record>]
+//          [--evidence <evidence lock> --evidence-path <repo path of the evidence lock>]
+// --previous supplies the carried-forward paths, hashPolicy, runtime and gaps. previousBaseline names the
+// evidence lock that historical fixtures stay validated against: --evidence when given (a re-freeze of an
+// earlier target lock, such as v1.1.0 -> v1.2.0), else --previous (the first re-freeze, v0.99.1 -> v1.1.0).
+// With --evidence, the previous target lock is recorded as previousTarget.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -25,6 +31,10 @@ if (text("rev-parse", `${args.tag}^{commit}`) !== commit) throw new Error(`${arg
 const tree = text("rev-parse", `${commit}^{tree}`);
 
 const previous = JSON.parse(readFileSync(resolve(args.previous), "utf8"));
+if (Boolean(args.evidence) !== Boolean(args["evidence-path"])) throw new Error("--evidence and --evidence-path go together");
+const evidence = args.evidence ? JSON.parse(readFileSync(resolve(args.evidence), "utf8")) : previous;
+const evidencePath = args["evidence-path"] ?? args["previous-path"];
+const decision = args.decision ?? "docs/decisions/0002-pi-1.1.0-sync.md";
 const acquiredAt = new Date().toISOString().slice(0, 10);
 const origin = path => `https://github.com/earendil-works/pi/blob/${commit}/${path}`;
 const exists = path => { try { execFileSync("git", ["-C", upstream, "cat-file", "-e", `${commit}:${path}`], { stdio: "ignore" }); return true; } catch { return false; } };
@@ -51,12 +61,16 @@ const version = path => JSON.parse(git("show", `${commit}:${path}`).toString()).
 
 const lock = {
   schemaVersion: 1,
-  status: "Source-level re-freeze per docs/decisions/0002-pi-1.1.0-sync.md; Phase 1 gate open",
+  status: `Source-level re-freeze per ${decision}; Phase 1 gate open`,
   source: { repository: previous.source.repository, tag: args.tag, commit, tree, tagResolvedCommit: commit, acquiredAt,
     acquisition: "Public git checkout of the tagged release; no private code used" },
-  previousBaseline: { tag: previous.source.tag, commit: previous.source.commit, lock: args["previous-path"],
+  previousBaseline: { tag: evidence.source.tag, commit: evidence.source.commit, lock: evidencePath,
     note: "Historical fixtures and captures remain pinned to this baseline and are validated against the preserved lock." },
-  packageVersions: { root: version("package.json"), codingAgent: version("packages/coding-agent/package.json"), ai: version("packages/ai/package.json") },
+  ...(args.evidence ? { previousTarget: { tag: previous.source.tag, commit: previous.source.commit, tree: previous.source.tree,
+    lock: args["previous-path"], note: "The previous target lock, preserved byte-for-byte; inventories generated for that target stay validated against it." } } : {}),
+  packageVersions: { root: version("package.json"), codingAgent: version("packages/coding-agent/package.json"), ai: version("packages/ai/package.json"),
+    ...Object.fromEntries([["agent", "agent"], ["tui", "tui"], ["codemode", "codemode"], ["mcp", "mcp"]]
+      .filter(([, dir]) => args.evidence && exists(`packages/${dir}/package.json`)).map(([key, dir]) => [key, version(`packages/${dir}/package.json`)])) },
   hashPolicy: previous.hashPolicy,
   referenceRuntime: previous.referenceRuntime,
   artifacts: [

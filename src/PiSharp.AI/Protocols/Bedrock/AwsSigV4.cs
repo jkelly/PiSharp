@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/bedrock-converse-stream.ts (SigV4 through the AWS SDK's
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/bedrock-converse-stream.ts (SigV4 through the AWS SDK's
 // default signer). Native port of the AWS Signature Version 4 algorithm as @smithy/signature-v4 applies it: path normalization and
 // double URI escaping for non-S3 services, sorted escaped query, trimmed lower-cased headers, x-amz-content-sha256 (applyChecksum).
 using System.Globalization;

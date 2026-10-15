@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/utils/clipboard-command.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/utils/clipboard-command.ts.
 // A clipboard command is spawned without a shell. Its result is the captured standard output, or null when it could not start,
 // exited non-zero, timed out or exceeded the output limit (the source's undefined). An empty array is a successful empty result.
 using System.ComponentModel;

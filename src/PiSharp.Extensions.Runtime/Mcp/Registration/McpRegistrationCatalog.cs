@@ -168,7 +168,7 @@ public sealed class McpRegistrationCatalog
         lock (gate) { CheckOwner(owner); return Snapshot(entries); }
     }
 
-    // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts registerMcpServer.
+    // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts registerMcpServer.
     // Names that differ only in `-` and `_` would share a namespace.
     private static void ThrowIfConflicting(ImmutableArray<Entry> rows, string name)
     {

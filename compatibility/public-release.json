@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "product": "PiSharp",
-  "version": "1.1.0.6",
-  "proposedReleaseTag": "v1.1.0.6",
+  "version": "1.2.0",
+  "proposedReleaseTag": "v1.2.0",
   "upstream": {
     "repository": "https://github.com/earendil-works/pi",
-    "tag": "v1.1.0",
-    "commit": "abe508e1b89912adde45528136c3221eb69acdd7"
+    "tag": "v1.2.0",
+    "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff"
   },
   "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
-  "productAndPackageVersion": "1.1.0.6",
+  "productAndPackageVersion": "1.2.0",
   "assemblyIdentityPolicy": {
-    "defaultSdkDerivedVersion": "1.1.0.6",
+    "defaultSdkDerivedVersion": "1.2.0.0",
     "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
     "fixedSupervisorAssemblyVersion": "1.0.0.0",
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
@@ -21,7 +21,14 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Version metadata prepared; fresh versioned lock, build, package and consumer evidence required."
+    "status": "Release candidate on sync/pi-1.2.0: the sync is complete and the offline suites pass, but nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release, with the owner's go-ahead."
+  },
+  "releaseCandidate": {
+    "branch": "sync/pi-1.2.0",
+    "decision": "docs/decisions/0006-pi-1.2.0-sync.md",
+    "applicability": "compatibility/sync-1.2.0-applicability.json",
+    "notes": "docs/release-notes/1.2.0.md",
+    "changelog": "website/src/content/changelog/1.2.0.md"
   },
   "publication": {
     "tagCreated": false,
@@ -98,6 +105,28 @@
       "githubReleasePublished": true,
       "nugetPackagesPublished": true,
       "publishedOn": "2026-10-10"
+    },
+    {
+      "version": "1.1.0.6",
+      "tag": "v1.1.0.6",
+      "upstreamTag": "v1.1.0",
+      "upstreamCommit": "abe508e1b89912adde45528136c3221eb69acdd7",
+      "tagCreated": true,
+      "githubReleasePublished": true,
+      "nugetPackagesPublished": true,
+      "publishedOn": "2026-10-11"
+    },
+    {
+      "version": "1.1.0.7",
+      "tag": "v1.1.0.7",
+      "upstreamTag": "v1.1.0",
+      "upstreamCommit": "abe508e1b89912adde45528136c3221eb69acdd7",
+      "tagCreated": true,
+      "githubReleasePublished": true,
+      "nugetPackagesPublished": true,
+      "publishedOn": "2026-10-14",
+      "tagCommit": "cb057c77d195007e13a4de491f29a2f6cfbb3252",
+      "releaseRun": "38672066567"
     }
   ],
   "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled."

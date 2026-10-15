@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/provider-composer.ts (ExtensionOAuthConfig,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/provider-composer.ts (ExtensionOAuthConfig,
 // adaptOAuth: login callbacks onAuth/onDeviceCode/onPrompt/onProgress/onManualCodeInput/onSelect over the auth interaction, refresh,
 // toAuth through getApiKey; composeOAuthAuth; the provider name falls back to oauth.name; getAllModels applies modifyModels with the
 // OAuth credential) and packages/coding-agent/src/core/extensions/types.ts (ProviderConfig.oauth).

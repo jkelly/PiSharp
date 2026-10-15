@@ -1,6 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/keybindings.ts (KEYBINDINGS, migrations,
-// KeybindingsManager.create/reload) and src/modes/interactive/components/keybinding-hints.ts (keyText, keyDisplayText, keyHint,
-// rawKeyHint).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/keybindings.ts (KEYBINDINGS, migrations,
+// KeybindingsManager.create/reload, toKeybindingsConfig), src/core/key-id-schema.ts (KeybindingValueSchema) and
+// src/modes/interactive/components/keybinding-hints.ts (keyText, keyDisplayText, keyHint, rawKeyHint).
 using System.Text.Json.Nodes;
 using PiSharp.Tui.Pi;
 using TuiKeybindingsManager = PiSharp.Tui.Pi.KeybindingsManager;
@@ -128,6 +128,8 @@ internal static class AppKeybindings
             if (JsonNode.Parse(text) is not JsonObject raw) return result;
             foreach (var (key, value) in MigrateKeybindingsConfig(raw).Config)
             {
+                // Pi 1.2.0 toKeybindingsConfig: $schema is not an action, and a value must be a valid key id (or an array of them).
+                if (key == "$schema" || !PiSharp.CodingAgent.Configuration.PiConfigurationSchemas.KeybindingValue.Check(value)) continue;
                 if (value is JsonValue single && single.TryGetValue<string>(out var key1)) result[key] = [key1];
                 else if (value is JsonArray array && array.All(entry => entry is JsonValue v && v.TryGetValue<string>(out _)))
                     result[key] = array.Select(entry => entry!.GetValue<string>()).ToList();

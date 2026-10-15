@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (durationMs, agent_settled.aborted).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (durationMs, agent_settled.aborted).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -130,6 +130,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         public TaskCompletionSource? CancelIdle;
         public int CancelUsers;
         public bool Releasing;
+        /// <summary>The input became a run (<c>_active</c>): input submitted while it starts is busy input, not a second admission.</summary>
+        public bool RunStarted;
     }
 
     private sealed class Bridge : IAgentEventSink
@@ -1011,7 +1013,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             {
                 ThrowAvailable();
                 if (_active is null) ThrowUserBashMutationLocked();
-                if (_configuring || _inputSubmission is not null) throw new InvalidOperationException("Session input admission is already processing.");
+                // Pi 1.2.0 _startRun: once an input has become a run the session is busy, so input sent while that run starts (from its
+                // before_agent_start handlers) is admitted as busy input and must say how it is delivered.
+                if (_configuring || _inputSubmission is { RunStarted: false }) throw new InvalidOperationException("Session input admission is already processing.");
                 cancellationToken.ThrowIfCancellationRequested();
                 _inputSubmission = reservation; _inputTriggeredRun = null;
                 // Like source prompt(), idle handlers see no streaming behavior.
@@ -1021,6 +1025,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         catch { reservation.Abort.Dispose(); throw; }
         return SubmitInputCoreAsync(input, admission, options, cancellationToken, reservation);
     }
+
+    /// <summary>Source prompt(): busy input without a delivery mode fails with this message.</summary>
+    public const string BusyInputMessage = "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.";
 
     /// <summary>The host's prompt validation (<see cref="PersistentAgentSessionOptions.PromptPreflight"/>).</summary>
     public Func<ModelDescriptor, CancellationToken, ValueTask>? PromptPreflight { get; private init; }
@@ -1074,7 +1081,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             {
                 ThrowAvailable(); work.ThrowIfCancellationRequested();
                 if (_active is not null && input.StreamingBehavior is null)
-                    throw new InvalidOperationException("Active input requires steering or follow-up delivery.");
+                    throw new InvalidOperationException(BusyInputMessage);
             }
             // agent-session.ts prompt: an idle prompt validates the model and its provider's auth before anything is persisted.
             bool idlePrompt; lock (_gate) idlePrompt = _active is null && options?.QueueOnly != true;
@@ -1110,7 +1117,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     {
                         RejectSettlementQueue();
                         if (input.StreamingBehavior is null)
-                            throw new InvalidOperationException("Active input requires steering or follow-up delivery.");
+                            throw new InvalidOperationException(BusyInputMessage);
                         captured = _agent.GetPendingInputQueueSnapshot(work);
                     }
                 }
@@ -1128,7 +1135,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     if (_active is not null || options?.QueueOnly == true)
                     {
                         if (input.StreamingBehavior is null)
-                            throw new InvalidOperationException("Active input requires steering or follow-up delivery.");
+                            throw new InvalidOperationException(BusyInputMessage);
                         var current = _agent.GetPendingInputQueueSnapshot(work);
                         RejectSettlementQueue();
                         if (captured is null || !QueueCanOnlyShrink(captured, current))
@@ -1144,7 +1151,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     var runCancellation = new ContextEditCancellation();
                     generation = new(TaskCreationOptions.RunContinuationsAsynchronously);
                     _operationGeneration = operation; _runCancellation = runCancellation;
-                    _operationPhase = SessionOperationPhase.Provider; _active = generation;
+                    _operationPhase = SessionOperationPhase.Provider; _active = generation; reservation.RunStarted = true;
                     break;
                 }
             }
@@ -1202,7 +1209,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             token.ThrowIfCancellationRequested();
             if (injectNextTurnCustom) inputs = InjectNextTurnCustomLocked(inputs);
             _operationGeneration = checked(_operationGeneration + 1);
-            // Source _runAgentPrompt: the run records the loadout; restored tools that did not register by now are dropped.
+            // Source _startRun: the run records the loadout; restored tools that did not register by now are dropped.
             _pendingToolNames = [];
             _runCancellation = new(); _operationPhase = SessionOperationPhase.Provider;
             idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle;

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/tui.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui.ts.
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -174,6 +174,17 @@ public interface IViewportTui : ITui { void SetLayoutRoot(IComponent? component)
 public abstract partial class TuiBase : Container, ITui
 {
     public const string CursorMarker = "\u001b_pi:c\u0007";
+    /// <summary>Fake cursor markers: zero-width APC sequences around the text drawn as the cursor. See <see cref="ResolveFakeCursors"/>.</summary>
+    public const string FakeCursorStart = "\u001b_pi:fc\u0007";
+    public const string FakeCursorEnd = "\u001b_pi:/fc\u0007";
+    // CursorMarker + FakeCursorStart + text + FakeCursorEnd. Truncating the line right after the cursor cell drops the end.
+    private static readonly Regex FocusedFakeCursor = new("(\u001b_pi:c\u0007)\u001b_pi:fc\u0007(.*?)(?:\u001b_pi:/fc\u0007|$)",
+        RegexOptions.Singleline | RegexOptions.CultureInvariant);
+
+    /// <summary>Wraps text in fake cursor markers. The TUI draws it in reverse video, or omits it after <see cref="CursorMarker"/>
+    /// when <see cref="ShowHardwareCursor"/> is enabled. Code that renders components outside a TUI must strip the markers, for
+    /// example with <see cref="TextUtils.StripTerminalSequences"/>.</summary>
+    public static string RenderFakeCursor(string text) => FakeCursorStart + text + FakeCursorEnd;
     public const string SegmentReset = "\u001b[0m\u001b]8;;\u0007";
     public abstract TuiMode Mode { get; }
     public ITerminal Terminal { get; }
@@ -665,7 +676,7 @@ public abstract partial class TuiBase : Container, ITui
         foreach (var entry in overlayStack.Where(IsOverlayVisible).OrderBy(entry => entry.FocusOrder).ToList())
         {
             var (width, _, _, maxHeight) = ResolveOverlayLayout(entry.Options, 0, termWidth, termHeight);
-            var overlayLines = entry.Component.Render(width);
+            var overlayLines = ResolveFakeCursors(entry.Component.Render(width));
             if (maxHeight is { } mh && overlayLines.Count > mh) overlayLines = overlayLines.Take(mh).ToList();
             var (_, row, col, _) = ResolveOverlayLayout(entry.Options, overlayLines.Count, termWidth, termHeight);
             entry.Bounds = new(row, col, width, overlayLines.Count);
@@ -684,6 +695,21 @@ public abstract partial class TuiBase : Container, ITui
                 var line = TextUtils.VisibleWidth(overlayLines[i]) > w ? TextUtils.SliceByColumn(overlayLines[i], 0, w, true) : overlayLines[i];
                 result[index] = CompositeLine(result[index], line, col, w, termWidth);
             }
+        return result;
+    }
+
+    /// <summary>Resolves fake cursor markers to reverse video. When the hardware cursor is shown, a fake cursor directly after
+    /// <see cref="CursorMarker"/> is dropped because the terminal cursor is drawn there. Fake cursors of components without focus
+    /// have no <see cref="CursorMarker"/> and stay visible.</summary>
+    protected List<string> ResolveFakeCursors(List<string> lines)
+    {
+        var result = new List<string>(lines.Count);
+        foreach (var line in lines)
+        {
+            if (!line.Contains(FakeCursorStart, StringComparison.Ordinal)) { result.Add(line); continue; }
+            var resolved = showHardwareCursor ? FocusedFakeCursor.Replace(line, "$1$2", 1) : line;
+            result.Add(resolved.Replace(FakeCursorStart, "\u001b[7m", StringComparison.Ordinal).Replace(FakeCursorEnd, "\u001b[27m", StringComparison.Ordinal));
+        }
         return result;
     }
 

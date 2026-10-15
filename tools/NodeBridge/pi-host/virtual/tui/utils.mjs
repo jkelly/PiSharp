@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/utils.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/utils.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { eastAsianWidth } from "../vendor/east-asian-width.mjs";
 const graphemeSegmenter = new Intl.Segmenter(undefined, {
@@ -1011,7 +1011,7 @@ export function extractSegments(line, beforeEnd, afterStart, afterLen, strictAft
             pooledStyleTracker.process(ansi.code);
             if (currentCol < beforeEnd) {
                 pendingAnsiBefore += ansi.code;
-            } else if (currentCol >= afterStart && currentCol < afterEnd && afterStarted) {
+            } else if (currentCol >= afterStart && currentCol < afterEnd && (afterStarted || ansi.code.startsWith("\x1b_"))) {
                 after += ansi.code;
             }
             i += ansi.length;

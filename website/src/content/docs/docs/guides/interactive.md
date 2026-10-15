@@ -3,7 +3,7 @@ title: Interactive mode
 description: The terminal UI, slash commands, key bindings and themes.
 ---
 
-`pisharp` opens Pi's terminal UI on Windows, Linux and macOS. It works as Pi's [terminal UI](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/tui.md) does: the same editor, key bindings, selectors, footer, fullscreen and regular modes, inline images, Mermaid diagrams and syntax highlighting.
+`pisharp` opens Pi's terminal UI on Windows, Linux and macOS. It works as Pi's [terminal UI](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/tui.md) does: the same editor, key bindings, selectors, footer, fullscreen and regular modes, inline images, Mermaid diagrams and syntax highlighting.
 
 ## Slash commands
 
@@ -17,7 +17,7 @@ Type `/` to search the commands of the current session. PiSharp has all of Pi's 
 | Runtime and project | `/trust`, `/reload`, `/hotkeys`, `/changelog`, `/quit` |
 | Built-in extensions | `/mcp` and [`/llama`](/docs/guides/llama-cpp/), while those [built-in extensions](/docs/reference/configuration/#built-in-extensions) are on |
 
-Extensions, prompt templates and skills add their own commands, as in Pi. Pi's [Slash commands](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/slash-commands.md) page describes each one.
+Extensions, prompt templates and skills add their own commands, as in Pi. Pi's [Slash commands](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/slash-commands.md) page describes each one.
 
 :::note[/bug]
 `/bug` builds Pi's report, with the same prompts, zip and optional model-written summary, but never uploads it. Choose **Open GitHub Issue**: PiSharp writes `pi-bug-report-<id>.zip` to the current folder and opens a prefilled issue on [PiSharp's GitHub](https://github.com/jkelly/PiSharp/issues) with your description, the summary and your PiSharp version, OS, runtime and model. Attach the zip to the issue before you submit it, since a link can't carry files. If no browser can open, for example over SSH, PiSharp prints the zip's path and the issue link instead. **Export as Zip** writes only the zip.
@@ -31,7 +31,7 @@ Extensions, prompt templates and skills add their own commands, as in Pi. Pi's [
 
 ## Key bindings
 
-Key bindings follow Pi v1.1.0. Change them in `~/.pi/agent/keybindings.json`. `/hotkeys` lists the ones in effect.
+Key bindings follow Pi v1.2.0. Change them in `~/.pi/agent/keybindings.json`. `/hotkeys` lists the ones in effect.
 
 ## Themes
 
@@ -39,7 +39,7 @@ PiSharp ships Pi's `system`, `dark` and `light` themes. `system` is the default 
 
 Custom themes are JSON files in Pi's format, in `~/.pi/agent/themes/` or the project's `.pi/themes/`. Choose one in `/settings`, with the `theme` setting, or with `--use-theme <name>` for one run. `--theme <path>` loads a theme file for one run. PiSharp reloads the current custom theme when you save its file.
 
-See Pi's [Themes](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/themes.md) page for the format.
+See Pi's [Themes](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/themes.md) page for the format.
 
 ## Clipboard
 

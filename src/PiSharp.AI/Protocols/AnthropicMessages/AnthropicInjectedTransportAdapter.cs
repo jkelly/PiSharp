@@ -23,7 +23,7 @@ public sealed class AnthropicInjectedAuthenticationBinding
         Authentication = authentication;
         if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation)
         {
-            // Pi abe508e1 anthropic-messages.ts getAnthropicFederation: the ids travel in the resolved env.
+            // Pi 06a46693 anthropic-messages.ts getAnthropicFederation: the ids travel in the resolved env.
             Headers = ImmutableDictionary<string, string>.Empty;
             Federation = AnthropicWorkloadIdentityFederation.Configure("anthropic", null, null, authentication.CredentialEnvironment ?? new());
         }

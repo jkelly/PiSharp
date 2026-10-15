@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/index.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/index.ts.
 // PiSharp shim for `@earendil-works/pi-coding-agent` as seen by extensions. Every runtime export of
 // upstream index.ts is present:
 //  - pure helpers, components, theme, config, compaction, session-entry helpers, skills, frontmatter,
@@ -26,7 +26,7 @@ export {
 // Agent session (host-owned)
 export const AgentSession = unavailableClass("AgentSession");
 
-// Pi abe508e1 (MIT): packages/coding-agent/src/core/agent-session.ts parseSkillBlock.
+// Pi 06a46693 (MIT): packages/coding-agent/src/core/agent-session.ts parseSkillBlock.
 export function parseSkillBlock(text) {
 	const match = text.match(/^<skill name="([^"]+)" location="([^"]+)">\n([\s\S]*?)\n<\/skill>(?:\n\n([\s\S]+))?$/);
 	if (!match) return null;
@@ -81,7 +81,7 @@ export const ModelRegistry = unavailableClass("ModelRegistry");
 export const resolveCliModel = hostFunction("resolveCliModel");
 export const resolveModelScopeWithDiagnostics = hostFunction("resolveModelScopeWithDiagnostics");
 
-// Pi abe508e1 (MIT): packages/coding-agent/src/core/model-runtime.ts CredentialSynchronizationError.
+// Pi 06a46693 (MIT): packages/coding-agent/src/core/model-runtime.ts CredentialSynchronizationError.
 /** Credentials changed successfully, but the local model/auth snapshot could not be synchronized. */
 export class CredentialSynchronizationError extends Error {
 	providerId;
@@ -224,7 +224,7 @@ export const copyToClipboard = hostFunction("copyToClipboard");
 export { parseFrontmatter, stripFrontmatter } from "./coding-agent/utils/frontmatter.mjs";
 export const convertToPng = hostFunction("convertToPng");
 
-// Pi abe508e1 (MIT): packages/coding-agent/src/utils/image-resize.ts formatDimensionNote.
+// Pi 06a46693 (MIT): packages/coding-agent/src/utils/image-resize.ts formatDimensionNote.
 /**
  * Format a dimension note for resized images.
  * This helps the model understand the coordinate mapping.

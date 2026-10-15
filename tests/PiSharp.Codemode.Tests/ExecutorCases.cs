@@ -174,7 +174,8 @@ internal static partial class Program
             }),
             Case("executor.discovery-globals", async () =>
             {
-                var docs = new ToolNamespace("mcp__dev-radius", "Radius dev tools") { Instructions = "Use search first." };
+                // Pi 1.2.0: namespaces are looked up by name or alias (MCP namespaces carry the server name), no longer by the part after `__`.
+                var docs = new ToolNamespace("mcp__dev-radius", "Radius dev tools") { Aliases = ["dev-radius"], Instructions = "Use search first." };
                 var host = new FakeHost([Nested("read", "Read a file.", guidelines: "Use read to examine files instead of cat or sed."),
                     Nested("mcp__dev_radius__search", "Search the radius documentation.", ns: docs), Nested("mcp__dev_radius__fetch", "Fetch a page.", ns: docs)]);
                 var result = await Execute("return [await searchTools(\"documentation search\", { limit: 1 }), (await searchTools(\"page\", { namespace: \"dev-radius\" })).map((t) => t.name), await describeNamespace(\"dev_radius\"), await describeTool(\"nothing\")];", host);

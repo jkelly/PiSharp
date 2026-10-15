@@ -33,3 +33,15 @@ Required next evidence: compile under the pinned SDK, execute focused contract a
 ## Custom-tail continuation review correction
 
 Both Agent and AgentLoopRunner admit a validated custom message as the tail of a context-only continuation. The pinned [Agent.continue](https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/agent/src/agent.ts) rejects empty/system-only history and requires queued input for an assistant tail; a custom tail is allowed. The native subset now includes that role without broadening message validation. Two additional authored regressions exercise a durable custom-only reopen and real overflow omission/compaction/internal retry, checking custom preservation, request projection, and no duplicate before-start invocation. Neither regression has been executed.
+
+## Pi 1.2.0: runs started by a custom message, and the busy start
+
+Target: Pi v1.2.0, commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff` ([decision 0006](../decisions/0006-pi-1.2.0-sync.md)), from `agent-session.ts` (`_startRun`, `_prepareRun`, `sendCustomMessage`, `abort`) and `extensions/runner.ts` (`emitBeforeAgentStart` with a `BeforeAgentStartTrigger`).
+
+- `before_agent_start` also fires for a run started by a custom message that triggers a turn while the session is idle. `ExtensionBeforeAgentStartEvent.MessageType` says what started the run: `User` (a prompt: `Prompt` and `Images`) or `Custom` (`Message` is the starting custom message as Pi's `CustomMessage`, `Prompt` is empty and there are no images). Handlers that should act only on user prompts check `MessageType`.
+- A handler's returned message is added to both kinds of run, and pending next-turn messages go with the custom-message run, after its starting message.
+- The session counts as busy while a run starts, including while `before_agent_start` handlers run: the session is not idle, a custom message that triggers a turn is steered into the starting run, one that does not trigger a turn is held and recorded before the run's starting messages, and user input must say how it is delivered (`steer` or `followUp`); without it it fails with "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.".
+- Handlers run before the run exists, so their cancellation token follows only the session's lifetime. An abort requested meanwhile aborts the run as it starts: its starting messages are recorded and it ends with an aborted assistant message.
+- Each request of a custom-message run keeps the run's forced prompt, as each request of a prompt's run does.
+
+The native `sendUserMessage` action follows `prompt({ streamingBehavior: deliverAs })`: without `DeliverAs` it starts a run while idle and fails while the session is busy, where it used to steer.

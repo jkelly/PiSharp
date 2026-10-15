@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/stdin-buffer.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/stdin-buffer.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { EventEmitter } from "events";
 const ESC = "\x1b";
@@ -6,6 +6,10 @@ const DEFAULT_SEQUENCE_TIMEOUT_MS = 50;
 const DEFAULT_ESCAPE_TIMEOUT_MS = 10;
 const BRACKETED_PASTE_START = "\x1b[200~";
 const BRACKETED_PASTE_END = "\x1b[201~";
+const TERMINAL_REPLY_HEADER_PATTERN = /^\x1b(?:\](?:1[01];|4;\d{1,3};|7501;\?)|P>\||_G(?:[a-z]=\d+,)*[a-z]=\d+;)/;
+function isControlString(data) {
+    return data.startsWith(`${ESC}]`) || data.startsWith(`${ESC}P`) || data.startsWith(`${ESC}_`);
+}
 function isCompleteSequence(data) {
     if (!data.startsWith(ESC)) {
         return "not-escape";
@@ -104,8 +108,20 @@ function extractCompleteSequences(buffer) {
     while(pos < buffer.length){
         const remaining = buffer.slice(pos);
         if (remaining.startsWith(ESC)) {
+            const terminalReply = isControlString(remaining) && TERMINAL_REPLY_HEADER_PATTERN.test(remaining);
             let seqEnd = 1;
             while(seqEnd <= remaining.length){
+                if (terminalReply && seqEnd > 2) {
+                    const char = remaining[seqEnd - 1];
+                    if (char === "\x18" || char === "\x1a") {
+                        pos += seqEnd;
+                        break;
+                    }
+                    if (char === ESC && seqEnd < remaining.length && remaining[seqEnd] !== "\\") {
+                        pos += seqEnd - 1;
+                        break;
+                    }
+                }
                 const candidate = remaining.slice(0, seqEnd);
                 const status = isCompleteSequence(candidate);
                 if (status === "complete") {
@@ -229,11 +245,17 @@ export class StdinBuffer extends EventEmitter {
             this.emitDataSequence(sequence);
         }
         if (this.buffer.length > 0) {
+            if (TERMINAL_REPLY_HEADER_PATTERN.test(this.buffer)) return;
             const timeoutMs = this.buffer === ESC ? this.escapeTimeoutMs : this.timeoutMs;
             this.timeout = setTimeout(()=>{
                 const flushed = this.flush();
                 for (const sequence of flushed){
-                    this.emitDataSequence(sequence);
+                    if (sequence.length > 2 && isControlString(sequence)) {
+                        this.emitDataSequence(sequence.slice(0, 2));
+                        this.process(sequence.slice(2));
+                    } else {
+                        this.emitDataSequence(sequence);
+                    }
                 }
             }, timeoutMs);
         }

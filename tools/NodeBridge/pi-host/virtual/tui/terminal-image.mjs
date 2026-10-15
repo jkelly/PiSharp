@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/terminal-image.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/terminal-image.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -55,7 +55,7 @@ function detectCapabilitiesFromEnvironment(tmuxForwardsHyperlink) {
     }
     if (termProgram === "herdr") {
         return {
-            images: null,
+            images: "kitty",
             trueColor: hasTrueColorHint,
             hyperlinks: true
         };

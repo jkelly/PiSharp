@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (reload: session_shutdown with reason
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (reload: session_shutdown with reason
 // "reload", the extension runner invalidated and reloaded, settingsManager.reload(), resourceLoader.reload() for skills, prompt templates
 // and context files, the system prompt rebuilt, then session_start with reason "reload") and packages/coding-agent/src/modes/
 // interactive/interactive-mode.ts (handleReloadCommand) and packages/coding-agent/src/core/resource-loader.ts (reload: the built-in

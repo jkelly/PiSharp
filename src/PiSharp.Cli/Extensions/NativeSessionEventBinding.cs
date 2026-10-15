@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (_emitExtensionEvent,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_emitExtensionEvent,
 // _dispatchTurnEndBoundary, _buildBoundaryContext, setThinkingLevel, _emitModelSelect, _emitSessionCompactFailed) and
 // packages/coding-agent/src/core/extensions/types.ts (AgentStartEvent ... ToolExecutionEndEvent, ModelSelectEvent,
 // ThinkingLevelSelectEvent, SessionCompactFailedEvent).

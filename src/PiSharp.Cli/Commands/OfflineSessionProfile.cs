@@ -294,6 +294,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                     DefaultActive = extension.EnabledRegistrations[index].DefaultActive,
                     PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines, Annotations = extension.EnabledRegistrations[index].Annotations,
                     PromptSnippet = extension.EnabledRegistrations[index].PromptSnippet, OutputSchema = extension.EnabledRegistrations[index].OutputSchema,
+                    ReachesTools = extension.EnabledRegistrations[index].ReachesTools,
                     PrepareLoadout = extension.Binding.GetLoadoutPreparation(adapter.Name) }));
         }
         if (toolSelection is not null)

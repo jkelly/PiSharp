@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/core/tools/renderers/read.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/tools/renderers/read.ts.
 // getReadmePath (coding-agent/src/config.ts) is PiSharp's documentation location (PiSystemPrompt.Documentation).
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Pi;

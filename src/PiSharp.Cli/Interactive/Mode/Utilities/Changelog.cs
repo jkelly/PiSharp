@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/utils/changelog.ts (and config.ts getChangelogPath/getPackageDir).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/utils/changelog.ts (and config.ts getChangelogPath/getPackageDir).
 // PiSharp's changelog is CHANGELOG.md next to the executable (AppContext.BaseDirectory), or under PI_PACKAGE_DIR when set. PiSharp
 // versions have a fourth part (1.1.0.1, a PiSharp release on a Pi baseline): headers, comparisons and the last-seen version accept it.
 using System.Globalization;

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts ("bash": emitUserBash
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts ("bash": emitUserBash
 // before executeBash), packages/coding-agent/src/core/agent-session.ts (_emitModelSelect, _afterToolCall image normalization)
 // and packages/coding-agent/src/core/sdk.ts (convertToLlmWithBlockImages).
 using PiSharp.Agent;
@@ -12,9 +12,14 @@ internal sealed partial class OfflineSessionProfile
     /// <summary>The session's image settings (<c>images.autoResize</c>, <c>images.blockImages</c>), read per request.</summary>
     internal BuiltinToolSettings ImageSettings { get; set; } = BuiltinToolSettings.Default;
 
-    /// <summary>Tool results' image blocks are normalized after the extension tool_result hook, as Pi does.</summary>
+    /// <summary>The bound MCP generation's tool_call handler (<see cref="PiSharp.Cli.Mcp.McpSessionRuntimeAdmission.BeforeToolCall"/>).</summary>
+    private Func<string, PiSharp.Contracts.JsonData, CancellationToken, Task>? mcpBeforeToolCall;
+
+    /// <summary>Tool results' image blocks are normalized after the extension tool_result hook, as Pi does. The MCP extension's
+    /// tool_call handler runs after the extensions' handlers (<see cref="PiSharp.Cli.Mcp.McpToolCallHooks"/>).</summary>
     private IPreparedToolHooks NormalizedToolHooks(IPreparedToolHooks? extensionHooks) =>
-        new ImageNormalizingToolHooks(extensionHooks, () => ImageSettings.AutoResizeImages, PiSharp.Tools.Skia.SkiaImageCodec.Instance);
+        new ImageNormalizingToolHooks(new PiSharp.Cli.Mcp.McpToolCallHooks(extensionHooks, () => Volatile.Read(ref mcpBeforeToolCall)),
+            () => ImageSettings.AutoResizeImages, PiSharp.Tools.Skia.SkiaImageCodec.Instance);
 
     /// <summary>The current session as a virtual selection's routing target (IMPL-E seam: hosts that admit registerVirtualModel route
     /// through <see cref="PiSharp.Cli.Models.VirtualModelRoutingTransport"/> with this session).</summary>

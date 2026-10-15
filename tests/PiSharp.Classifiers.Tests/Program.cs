@@ -16,7 +16,7 @@ using PiSharp.Contracts.ModelOperations;
 // live credentials are used.
 internal static partial class Program
 {
-    private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
     private static int bodyComparisons;
 
     private static async Task<int> Main(string[] args)

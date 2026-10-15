@@ -64,6 +64,29 @@ internal static partial class Program
             var result = ToolResultTexts(provider.Snapshot()[1]).Single();
             Check(result.StartsWith("Script completed", StringComparison.Ordinal) && result.EndsWith("Found: install guide.", StringComparison.Ordinal), "the first prompt's script reached the server: " + result);
         })),
+        // index.ts tool_call (Pi 1.2.0 reachesTools): before codemode runs, the session waits for the servers its call may reach and no
+        // others: a script that names mcp__docs waits for docs but not for a slower server; a script that uses a discovery global
+        // (searchTools) reaches every tool, so it waits for every server. The prompt itself waits for neither (codemode exposure).
+        Case("session.codemode-waits-only-for-the-servers-its-call-reaches", () => WithSessionRoot("reach", """{"mcpServers":{"docs":{"command":"docs-server"},"slow":{"command":"slow-server"}}}""", async (root, fixture) =>
+        {
+            fixture.Delays["docs"] = TimeSpan.FromSeconds(1); fixture.Delays["slow"] = TimeSpan.FromSeconds(6);
+            var provider = new Endpoint(
+                () => CallReply("toolu_docs", "codemode", new { code = "const r = await tools.mcp__docs__search({ query: \"install\" });\ntext(r.content[0].text);" }),
+                () => CallReply("toolu_all", "codemode", new { code = "text(typeof searchTools);" }),
+                () => TextReply("done"));
+            await using var rpc = new Rpc(SessionArgs(root, "new-memory"), provider, fixture.Host());
+            await rpc.Prompt("p1", "right away");
+            Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
+            var requests = provider.Snapshot();
+            Equal(3, requests.Length, "requests");
+            var docs = fixture.Servers.Single(server => server.Name == "docs"); var slow = fixture.Servers.Single(server => server.Name == "slow");
+            var first = ToolResultTexts(requests[1]).Single();
+            Check(first.StartsWith("Script completed", StringComparison.Ordinal) && first.EndsWith("Found: install guide.", StringComparison.Ordinal), "the script reached docs: " + first);
+            Check(docs.ListedAt != 0 && requests[0].At < docs.ListedAt, "the prompt did not wait for the codemode server");
+            Check(slow.ListedAt == 0 || slow.ListedAt > requests[1].At, "the docs script did not wait for slow");
+            Check(slow.ListedAt != 0 && slow.ListedAt < requests[2].At, "the searchTools script waited for slow");
+            Check(ToolResultTexts(requests[2]).Single().EndsWith("function", StringComparison.Ordinal), "second script: " + ToolResultTexts(requests[2]).Single());
+        })),
         // agent-session-codemode.test.ts: bash resolves to its structured result, also for a non-zero exit code; read resolves to the
         // text of a text file and to an image block that image() shows.
         Case("session.read-and-bash-resolve-to-structured-values", () => WithSessionRoot("structured", null, async (root, fixture) =>

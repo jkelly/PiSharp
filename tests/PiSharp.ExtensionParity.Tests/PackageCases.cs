@@ -24,6 +24,7 @@ internal static partial class Program
         ("package.resolve.extension-sources", PackageResolveExtensionSources),
         ("package.resolve.manifest-globs", PackageResolveManifestGlobs),
         ("package.resolve.top-level-patterns", PackageResolveTopLevelPatterns),
+        ("package.resolve.tilde-in-exclusion-and-exact-patterns-10765", PackageResolveTildePatterns),
         ("package.resolve.package-filters", PackageResolvePackageFilters),
         ("package.resolve.dedupe", PackageResolveDedupe),
         ("package.resolve.multi-file-extensions", PackageResolveMultiFileExtensions),
@@ -479,6 +480,26 @@ internal static partial class Program
             result.Extensions.Select(r => Path.GetRelativePath(semantics, r.Path)), "sorted glob matches; exact entries reach dot paths");
         Check(result.Skills.Any(r => Norm(r.Path).EndsWith("local-skill/SKILL.md", StringComparison.Ordinal)), "local plugin skill");
         if (linked) Check(result.Skills.Any(r => Norm(r.Path).EndsWith("linked-skill/SKILL.md", StringComparison.Ordinal)), "exact entry through a link");
+    }
+
+    // Pi 1.2.0 package-manager.ts (#10765), ported from test/package-manager.test.ts "should expand ~ in exclusion and exact patterns":
+    // matchesAnyPattern and normalizeExactPattern expand ~ (normalizePath), so !~/..., +~/... and -~/... entries match.
+    private static async Task PackageResolveTildePatterns()
+    {
+        using var sandbox = new Sandbox("pkg-tilde");
+        var skillsDir = Path.Combine(sandbox.Home, "extra", "skills");
+        foreach (var name in new[] { "keep", "glob-excluded", "exact-excluded", "forced" })
+            Skill(sandbox, Path.Combine(skillsDir, name, "SKILL.md"), name, name);
+        var result = await Manager(sandbox, J("""{"skills":["~/extra/skills","!~/extra/skills/glob-*","-~/extra/skills/exact-excluded"]}""")).ResolveAsync();
+        Check(Enabled(result.Skills, "keep/SKILL.md"), "keep enabled");
+        Check(Disabled(result.Skills, "glob-excluded/SKILL.md"), "!~ glob exclusion");
+        Check(Disabled(result.Skills, "exact-excluded/SKILL.md"), "-~ exact exclusion");
+        result = await Manager(sandbox, J("""{"skills":["~/extra/skills","!~/extra/skills/*","+~/extra/skills/forced"]}""")).ResolveAsync();
+        Check(Disabled(result.Skills, "keep/SKILL.md") && Enabled(result.Skills, "forced/SKILL.md"), "+~ exact force-include");
+        var ext = Path.Combine(sandbox.Home, "extra", "extensions");
+        foreach (var name in new[] { "keep.ts", "remove.ts" }) sandbox.Write(Path.Combine(ext, name), "x");
+        result = await Manager(sandbox, J("""{"extensions":["~/extra/extensions","!~/extra/extensions/remove.ts"]}""")).ResolveAsync();
+        Check(Enabled(result.Extensions, "keep.ts") && Disabled(result.Extensions, "remove.ts"), "!~ extension exclusion");
     }
 
     private static async Task PackageResolveTopLevelPatterns()

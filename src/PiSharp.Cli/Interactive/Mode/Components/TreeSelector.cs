@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/tree-selector.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/tree-selector.ts.
 // Session entries are Pi's JSON session entries (type message/compaction/branch_summary/custom_message/custom/label/model_change/
 // thinking_level_change/session_info/context_edit/usage, id, parentId, timestamp, ...) as JsonObject; SessionTreeNode is the
 // source core/session-manager.ts SessionTreeNode.

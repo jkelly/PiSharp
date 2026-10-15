@@ -37,7 +37,7 @@ internal sealed record InteractiveModeContext
     public required InteractiveStartup Startup { get; init; }
     public required ITerminal Terminal { get; init; }
     public required UiLoop Loop { get; init; }
-    public string Version { get; init; } = "1.1.0";
+    public string Version { get; init; } = "1.2.0";
     public string DocsPath { get; init; } = Path.Join(AppContext.BaseDirectory, "docs");
     public Func<string, string?> GetEnvironment { get; init; } = Environment.GetEnvironmentVariable;
     /// <summary>console.log before the TUI starts (written after the TUI stops, like other startup output).</summary>

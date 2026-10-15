@@ -69,7 +69,7 @@ internal static partial class Program
             Check(handshake.Header("authorization") == "Bearer " + CodexToken && handshake.Header("chatgpt-account-id") == "acct-123" &&
                 handshake.Header("openai-beta") == "responses_websockets=2026-02-06" && handshake.Header("session-id") == "sess-ws-handshake" &&
                 handshake.Header("x-client-request-id") == "sess-ws-handshake" && handshake.Header("originator") == "pi" &&
-                handshake.Header("user-agent") == "pi/1.1.0" && handshake.Header("accept") is null && handshake.Header("content-type") is null &&
+                handshake.Header("user-agent") == "pi/1.2.0" && handshake.Header("accept") is null && handshake.Header("content-type") is null &&
                 handshake.Header("upgrade")?.Equals("websocket", StringComparison.OrdinalIgnoreCase) == true &&
                 handshake.Header("sec-websocket-version") == "13" &&
                 handshake.Header("sec-websocket-extensions")?.StartsWith("permessage-deflate", StringComparison.Ordinal) == true,

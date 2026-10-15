@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/session-manager.ts (appendUsage) and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/session-manager.ts (appendUsage) and
 // core/cache-warmer.ts (a successful refresh persists its usage; agent-session.ts emits entry_appended for it).
 using PiSharp.Contracts;
 using PiSharp.Sessions.Serialization;

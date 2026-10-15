@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/runner.ts (bind: the MCP server registry's
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/runner.ts (bind: the MCP server registry's
 // change listener emits mcp_servers_change with every registered server) and core/extensions/types.ts (McpServersChangeEvent).
 namespace PiSharp.Cli.Extensions;
 

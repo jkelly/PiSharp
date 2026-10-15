@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (session start: load the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (session start: load the
 // config, connect every enabled server in the background, the first prompt waiting for servers with direct tools,
 // ensureDiscoveryActive, reportProblems, describeState), packages/coding-agent/src/extensions/tool-search/index.ts (tool_search
 // registered inactive), packages/coding-agent/src/extensions/mcp/runtime.ts (createDefaultTransport, usesOAuth, auth.provider,
@@ -42,7 +42,7 @@ namespace PiSharp.Cli.Mcp;
 /// </summary>
 internal sealed record McpSessionHost(string AgentDirectory, string HomeDirectory, Func<IEnumerable<KeyValuePair<string, string>>> ProcessEnvironment)
 {
-    internal const string ClientVersion = "1.1.0";
+    internal const string ClientVersion = "1.2.0";
     /// <summary>mcp/index.ts registers every tool of every server (runtime.ts lists every page) and calls any number of them at once;
     /// a tool schema or description is bounded only by its 16 MiB tools/list message (transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES).</summary>
     internal static ExtensionRegistryOptions RegistryOptions { get; } = new()
@@ -211,20 +211,14 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 var resourceRegistry = owned.Track(new ExtensionRegistry(RegistryOptions));
                 var resourceScope = await resourceRegistry.ActivateAsync("mcp-resources", new EmptyExtension(), token).ConfigureAwait(false);
                 McpServerManager? manager = null;
-                // index.ts tool_call: tool_search and the resource tools reach every server, so they wait for all of them; a codemode
-                // script waits for the servers it needs. They wait inside the call, so a prompt never waits for them.
-                Task WaitForServers(Func<McpServerEntry, bool> include, CancellationToken cancellation) =>
-                    manager?.WaitForServersAsync(include, cancellation) ?? Task.CompletedTask;
-                var resources = new McpResourceToolsPublisher(resourceRegistry, resourceScope, exactPolicy, ValidateArguments, ComposeHooks, grants)
-                { WaitForServers = cancellation => WaitForServers(_ => true, cancellation) };
+                var resources = new McpResourceToolsPublisher(resourceRegistry, resourceScope, exactPolicy, ValidateArguments, ComposeHooks, grants);
                 async ValueTask<McpPreparedServer> Bind(McpServerEntry actual, ReplaceableAgentSession owner, AgentSessionAttachment attachment, CancellationToken cancellation)
                 {
                     var registry = owned.Track(new ExtensionRegistry(RegistryOptions));
                     var scope = await registry.ActivateAsync("mcp-" + actual.Name, new EmptyExtension(), cancellation).ConfigureAwait(false);
                     grants.AdmitServer(scope);
                     McpPreparedServer? prepared = null;
-                    var notifications = Notifications(actual.Name, serverLog, () => Volatile.Read(ref prepared), (name, error) => manager?.RefreshFailed(name, error),
-                        (name, server, cancellation) => manager?.CountResourcesAsync(name, server, cancellation) ?? Task.CompletedTask);
+                    var notifications = Notifications(actual.Name, serverLog, () => Volatile.Read(ref prepared), (name, error) => manager?.RefreshFailed(name, error));
                     // The original records nothing at session_shutdown, so a resumed session declares the tools again once the server connects.
                     var server = new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual, notifications),
                         new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks)
@@ -247,6 +241,10 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 var exposures = admitted.SelectMany(entry => McpConfigurationReader.ConfiguredExposures(entry.Config)).ToHashSet();
                 var selection = nativeRegistry.LifetimeToolSelection;
                 bool Named(string name) => selection?.IsNamed(name) == true || selection?.InitialNames.Contains(name) == true;
+                // index.ts ensureDiscoveryActive: another extension's tool of these names reaches MCP tools when it declares reachesTools;
+                // it is active by default, selected, or activated for the servers that need it.
+                bool Reaching(string name, bool activated) => selection?.IsAllowed(name) != false && nativeRegistry.RegisteredTools.Any(tool =>
+                    tool.Adapter.Name == name && tool.ReachesTools is not null && (activated || tool.DefaultActive || Named(name)));
                 // The original registers codemode (inactive) with every session; the MCP extension activates it for `codemode`
                 // servers unless autoEnableCodemode is false. --tools, --exclude-tools and defaultTools select it like any tool.
                 var codemodeActivated = exposures.Contains(McpExposure.Codemode) && autoEnableCodemode;
@@ -254,10 +252,11 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 bool codemodeReachable;
                 if (codemodeLoaded && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode) && selection?.IsAllowed(McpCodemode.Name) != false)
                 {
-                    definitions = definitions.Add(McpCodemode.Create(codemodeMode, inlineBudget, codemodeModels, codemodeActivated, WaitForServers));
+                    definitions = definitions.Add(McpCodemode.Create(codemodeMode, inlineBudget, codemodeModels, codemodeActivated));
                     codemodeReachable = codemodeActivated || Named(McpCodemode.Name);
                 }
-                else codemodeReachable = definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode);
+                else codemodeReachable = definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode) ||
+                    Reaching(McpCodemode.Name, exposures.Contains(McpExposure.Codemode) && autoEnableCodemode);
                 var codemodeOff = codemodeLoaded && exposures.Contains(McpExposure.Codemode) && !autoEnableCodemode && selection?.IsAllowed(McpCodemode.Name) != false;
                 // tool-search/index.ts registers tool_search inactive with every session; ensureDiscoveryActive activates it for
                 // `deferred` servers. A tool selection that leaves it out leaves their tools unreachable.
@@ -266,10 +265,11 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 if (Loaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.ToolSearch) && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch) &&
                     selection?.IsAllowed(McpToolSearch.Name) != false)
                 {
-                    definitions = definitions.Add(McpToolSearch.Create(toolSearchActivated, cancellation => WaitForServers(_ => true, cancellation)));
+                    definitions = definitions.Add(McpToolSearch.Create(toolSearchActivated));
                     toolSearchReachable = toolSearchActivated || Named(McpToolSearch.Name);
                 }
-                else toolSearchReachable = definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch);
+                else toolSearchReachable = definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch) ||
+                    Reaching(McpToolSearch.Name, toolSearchActivated);
                 // ensureDiscoveryActive: tools that are not declared need codemode or tool_search; warn once when neither is active.
                 if (generation == 1 && (exposures.Contains(McpExposure.Codemode) || exposures.Contains(McpExposure.Deferred)) && !codemodeReachable && !toolSearchReachable)
                     reporter.Notice($"MCP tools are only reachable from the codemode or tool_search tool, but neither is active{(codemodeOff ? " (autoEnableCodemode is false)" : "")}; they cannot be called.");
@@ -299,6 +299,9 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     autoEnableCodemode, prepare)
                 {
                     BackgroundServers = background, CallGrants = grants,
+                    // index.ts tool_call: a tool that reaches other tools (reachesTools), the resource tools and a server's own tools wait
+                    // for the servers the call may reach before they run; prompts never wait for them (see McpToolCallHooks).
+                    BeforeToolCall = (tool, input, cancellation) => manager.BeforeToolCallAsync(tool, input, cancellation),
                     // The first generation's background servers wait until the host started dispatching; later generations (reload)
                     // open on a running host.
                     ConnectAfter = generation == 1 ? hostStarted.Task : null,
@@ -316,7 +319,6 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     {
                         try { await resources.UpdateAsync(entry.Name, server, entry.Config.Exposure, snapshot.Catalog.HasResources, cancellation).ConfigureAwait(false); }
                         catch (Exception) when (!cancellation.IsCancellationRequested) { /* The resource tools follow on the next change. */ }
-                        await manager.CountResourcesAsync(entry.Name, server, cancellation).ConfigureAwait(false);
                     },
                     BindManager = (owner, attachment, connections) =>
                     {
@@ -326,9 +328,15 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                         var gate = attachment.Session.BeforeInputAdmission;
                         attachment.Session.BeforeInputAdmission = async cancellation =>
                         {
+                            manager.SessionStarted();
                             await manager.ReconnectSignedInAsync(cancellation).ConfigureAwait(false);
                             if (gate is not null) await gate(cancellation).ConfigureAwait(false);
                         };
+                        // index.ts session_start ensureDiscoveryActive: once the host started dispatching (a reload's generation at its
+                        // first input), activate the codemode or tool_search tool the configured servers need.
+                        if (generation == 1)
+                            _ = hostStarted.Task.ContinueWith(_ => manager.SessionStarted(), CancellationToken.None,
+                                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
                         // index.ts mcp_servers_change: servers registered or unregistered during the session connect or close right away.
                         if (!mcpOff)
                         {
@@ -395,22 +403,15 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         CreateNotifyingChannel?.Invoke(entry, notification) ?? CreateChannel?.Invoke(entry) ?? (entry.Config.Transport == McpTransportKind.Http
             ? HttpChannel(entry, options, client(), notification, challenge) : StdioChannel(entry, cwd, inherited ?? InheritedEnvironment(), notification));
 
-    /// <summary>runtime.ts connectOnce notification handlers: <c>notifications/message</c> goes to the server log,
-    /// <c>notifications/tools/list_changed</c> refreshes the server's tools (new tools are added, withdrawn ones become unreachable)
-    /// and <c>notifications/resources/list_changed</c> refreshes its resource count (refreshResources).</summary>
-    private static McpNotificationHandler Notifications(string server, McpServerLog log, Func<McpPreparedServer?> target, Action<string, Exception>? refreshFailed,
-        Func<string, McpPreparedServer, CancellationToken, Task>? resourcesChanged = null) =>
+    /// <summary>runtime.ts connectOnce notification handlers: <c>notifications/message</c> goes to the server log and
+    /// <c>notifications/tools/list_changed</c> refreshes the server's tools (new tools are added, withdrawn ones become unreachable).
+    /// Resources are not listed at connect (listing every one can take long), so <c>notifications/resources/list_changed</c> changes
+    /// nothing; the resource tools list them on demand.</summary>
+    private static McpNotificationHandler Notifications(string server, McpServerLog log, Func<McpPreparedServer?> target, Action<string, Exception>? refreshFailed) =>
         async (method, parameters, token) =>
         {
             if (method == "notifications/message") { log.Write(server, parameters); return; }
             if (target() is not { } prepared) return;
-            if (method == "notifications/resources/list_changed")
-            {
-                if (resourcesChanged is not null)
-                    try { await resourcesChanged(server, prepared, token).ConfigureAwait(false); }
-                    catch (Exception) when (!token.IsCancellationRequested) { /* The count follows on the next change. */ }
-                return;
-            }
             if (method != "notifications/tools/list_changed") return;
             try { await prepared.RefreshToolsAsync(token).ConfigureAwait(false); }
             catch (Exception error) when (!token.IsCancellationRequested) { refreshFailed?.Invoke(server, error); }

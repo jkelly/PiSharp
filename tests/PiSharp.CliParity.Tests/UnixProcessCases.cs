@@ -57,6 +57,19 @@ internal static partial class Program
             Equal("err\n", await stderr, "stderr");
             Equal(true, await lease.StopGroupAsync(), "the group is stopped and confirmed gone after a natural exit");
         }),
+        // The parent's pipe ends are close-on-exec, so a child never holds the write end of its own input: `cat` sees EOF and exits.
+        // fcntl is variadic, and on Apple arm64 a fixed-argument P/Invoke never set FD_CLOEXEC, so stdin-transport commands hung there.
+        ("unix.posix-spawn-children-see-stdin-eof-and-inherit-no-parent-pipe-ends", async () =>
+        {
+            UnixOnly();
+            using var sandbox = new Sandbox("unix-cloexec");
+            var request = new ProcessRequest("/bin/cat", [], sandbox.Cwd, UnixEnvironment(), Path.Combine(sandbox.Root, "spill.log"))
+                { StandardInput = "line one\nline two without newline"u8.ToArray() };
+            await using var lease = await new PosixSpawnProcessAdmission().LaunchAsync(request, CancellationToken.None);
+            var stdout = Task.Run(() => new StreamReader(lease.StandardOutput).ReadToEndAsync());
+            Equal(0, await lease.Exit.WaitAsync(TimeSpan.FromSeconds(30)), "cat exits once its input reaches EOF");
+            Equal("line one\nline two without newline", await stdout.WaitAsync(TimeSpan.FromSeconds(30)), "stdout");
+        }),
         ("unix.runner-timeout-and-cancel-kill-the-whole-process-group", async () =>
         {
             UnixOnly();

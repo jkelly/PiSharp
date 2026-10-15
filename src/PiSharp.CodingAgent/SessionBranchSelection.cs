@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/virtual-models.ts (getBranchSelection,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/virtual-models.ts (getBranchSelection,
 // findLastModelChange, isVirtualModel) as sdk.ts uses it to restore a session's model.
 using System.Collections.Immutable;
 using System.Text.Json;

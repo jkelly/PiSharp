@@ -259,6 +259,32 @@ internal static class UtilityCases
             Equal(1, f.Osc.Count, "one OSC after");
             Equal(0, f.Calls.Count, "no commands");
         });
+        // Pi 1.2.0 clipboard.ts isRemoteSession (#10826, #10835, #10114): PI_CLIPBOARD_OSC52=1 also sends the copy with OSC 52 after a
+        // successful local write, for remote clients without SSH markers.
+        foreach (var (platform, display) in new[] { ("darwin", (string?)null), ("win32", null), ("linux", ":99") })
+            yield return ($"util.copy.pi-clipboard-osc52-after-successful-{platform}-copy", async () =>
+            {
+                var f = new ClipFixture { Platform = platform };
+                if (display is not null) f.Env["DISPLAY"] = display;
+                f.Env["PI_CLIPBOARD_OSC52"] = "1";
+                await Clipboard.CopyToClipboard("hello", f.Build());
+                if (platform == "linux")
+                {
+                    Equal("xclip", f.Calls.Single().Command, "xclip");
+                    Seq(["-selection", "clipboard"], f.Calls[0].Args, "args");
+                    Equal(new ClipboardCommandOptions(Input: "hello", TimeoutMs: 5000), f.Calls[0].Options, "options");
+                }
+                else Seq(["hello"], f.Native!.Written, "native write");
+                Seq([$"\u001b]52;c;{Convert.ToBase64String(B("hello"))}\u0007"], f.Osc, "OSC 52 payload");
+            });
+        yield return ("util.copy.pi-clipboard-osc52-only-for-1", async () =>
+        {
+            var f = new ClipFixture();
+            f.Env["PI_CLIPBOARD_OSC52"] = "true";
+            await Clipboard.CopyToClipboard("hello", f.Build());
+            Seq(["hello"], f.Native!.Written, "native write");
+            Equal(0, f.Osc.Count, "only \"1\" enables OSC 52");
+        });
         yield return ("util.copy.rejected-native-falls-back-to-pbcopy", async () =>
         {
             var f = new ClipFixture();
@@ -408,6 +434,33 @@ internal static class UtilityCases
             f.Handler = (_, _, _) => Task.FromResult<byte[]?>(null);
             await Clipboard.CopyToClipboard("hello", f.Build());
             Equal(1, f.Osc.Count, "OSC");
+        });
+        // Pi 1.2.0 clipboard.ts: PI_CLIPBOARD_OSC52=1 counts as a remote session, so the copy also goes out with OSC 52 after the
+        // local clipboard write; any other value does not.
+        yield return ("util.copy.pi-clipboard-osc52-env-emits-after-native", async () =>
+        {
+            var f = new ClipFixture();
+            f.Env["PI_CLIPBOARD_OSC52"] = "1";
+            var gate = new TaskCompletionSource();
+            f.Native!.SetText = _ => gate.Task;
+            var copy = Clipboard.CopyToClipboard("hello", f.Build());
+            Equal(0, f.Osc.Count, "no OSC before native completes");
+            gate.SetResult();
+            await copy;
+            Seq(["hello"], f.Native.Written, "native write");
+            Equal(1, f.Osc.Count, "one OSC after the native write");
+            Equal("\u001b]52;c;aGVsbG8=\u0007", f.Osc[0], "OSC 52 payload");
+        });
+        yield return ("util.copy.pi-clipboard-osc52-env-other-values-local-only", async () =>
+        {
+            foreach (var value in new[] { "0", "true", "" })
+            {
+                var f = new ClipFixture();
+                f.Env["PI_CLIPBOARD_OSC52"] = value;
+                await Clipboard.CopyToClipboard("hello", f.Build());
+                Seq(["hello"], f.Native!.Written, $"native write ({value})");
+                Equal(0, f.Osc.Count, $"no OSC for PI_CLIPBOARD_OSC52={value}");
+            }
         });
         yield return ("util.copy.oversized-osc52-refused", async () =>
         {
@@ -1422,7 +1475,7 @@ internal static class UtilityCases
                     ui.Status, label + ": status");
                 var (title, body) = IssueQuery(url);
                 Equal("Bug report from PiSharp 1.1.0.2", title, label + ": title without a description");
-                Contains(body, "## Description\n\n_No description given._\n\n## Environment\n\n- PiSharp: 1.1.0.2\n- Pi baseline: 1.1.0\n- OS: unknown (unknown unknown)\n- Runtime: unknown\n- Model: none\n", label + ": body");
+                Contains(body, "## Description\n\n_No description given._\n\n## Environment\n\n- PiSharp: 1.1.0.2\n- Pi baseline: 1.2.0\n- OS: unknown (unknown unknown)\n- Runtime: unknown\n- Model: none\n", label + ": body");
                 Contains(body, "(report.json, diagnostics.json, session.jsonl) on the reporter's machine. Attach it to this issue: GitHub cannot attach files from a link. It contains the session transcript; review it before attaching.\n", label + ": transcript warning");
                 Check(!body.Contains("{\"type\":\"session\"}", StringComparison.Ordinal), label + ": transcript stays out of the link");
                 Equal(1, session.SerializeCalls, label + ": transcript in the zip");

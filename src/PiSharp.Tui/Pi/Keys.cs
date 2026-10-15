@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/keys.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/keys.ts.
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -19,6 +19,8 @@ public static partial class Keys
 
     private static readonly HashSet<string> SymbolKeys = ["`", "-", "=", "[", "]", "\\", ";", "'", ",", ".", "/", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "+", "|", "~", "{", "}", ":", "<", ">", "?"];
     internal static bool IsSymbolKey(string key) => SymbolKeys.Contains(key);
+    private static readonly HashSet<string> ShiftedSymbolKeys = [.. "~!@#$%^&*()_+|{}:<>?".Select(c => c.ToString())];
+    private static readonly string[] ModifierNames = ["shift", "alt", "ctrl", "super"];
     private const int Shift = 1, Alt = 2, Ctrl = 4, Super = 8, LockMask = 64 + 128;
     private const int CpEscape = 27, CpTab = 9, CpEnter = 13, CpSpace = 32, CpBackspace = 127, CpKpEnter = 57414;
     private const int ArrowUp = -1, ArrowDown = -2, ArrowRight = -3, ArrowLeft = -4;
@@ -119,14 +121,36 @@ public static partial class Keys
     }
 
     private static string CharOf(int codepoint) => codepoint is >= 0 and <= 0xffff ? ((char)codepoint).ToString() : "";
+    /// <summary>JavaScript <c>String.fromCharCode</c>: the UTF-16 code unit of the codepoint truncated to 16 bits.</summary>
+    private static string FromCharCode(int codepoint) => ((char)(ushort)codepoint).ToString();
+
+    /// <summary>A key reported as Shift plus the key that produces a shifted symbol (Kitty's shifted key, or the modifyOtherKeys
+    /// keycode): the symbol and the modifiers without that implicit Shift.</summary>
+    private static (int Codepoint, int Modifier)? LogicalShiftedSymbolCandidate(int? codepoint, int modifier, HashSet<string> allowedSymbols)
+    {
+        if (codepoint is not { } value || (modifier & Shift) == 0) return null;
+        var normalized = NormalizeKittyFunctional(value);
+        if (!allowedSymbols.Contains(FromCharCode(normalized))) return null;
+        return (normalized, modifier & ~Shift);
+    }
+
     private static bool MatchesKitty(string data, int expectedCodepoint, int expectedModifier)
     {
         var parsed = ParseKitty(data);
         if (parsed is null) return false;
-        if ((parsed.Modifier & ~LockMask) != (expectedModifier & ~LockMask)) return false;
+        var actualMod = parsed.Modifier & ~LockMask;
+        var expectedMod = expectedModifier & ~LockMask;
         var normalized = NormalizeShiftedLetter(NormalizeKittyFunctional(parsed.Codepoint), parsed.Modifier);
         var expected = NormalizeShiftedLetter(NormalizeKittyFunctional(expectedCodepoint), expectedModifier);
-        if (normalized == expected) return true;
+        // Physical match: primary codepoint and every reported modifier match.
+        if (actualMod == expectedMod && normalized == expected) return true;
+        // Logical match: Kitty reports symbols such as "+" as Shift plus the physical "=" key. Bindings name the produced symbol,
+        // so consume that implicit Shift while preserving Ctrl, Alt, and Super. The physical "shift+=" spelling remains valid
+        // through the match above.
+        if (LogicalShiftedSymbolCandidate(parsed.ShiftedKey, actualMod, SymbolKeys) is { } logical &&
+            (logical.Modifier & ~LockMask) == expectedMod && logical.Codepoint == NormalizeKittyFunctional(expectedCodepoint))
+            return true;
+        if (actualMod != expectedMod) return false;
         if (parsed.BaseLayoutKey is { } baseKey && baseKey == expectedCodepoint)
         {
             var latin = normalized is >= 97 and <= 122;
@@ -157,9 +181,26 @@ public static partial class Keys
     }
     private static bool MatchesPrintableModifyOtherKeys(string data, int keycode, int modifier)
     {
-        if (modifier == 0) return false;
-        if (ParseModifyOtherKeys(data) is not { } parsed || parsed.Modifier != modifier) return false;
-        return NormalizeShiftedLetter(parsed.Codepoint, parsed.Modifier) == NormalizeShiftedLetter(keycode, modifier);
+        if (ParseModifyOtherKeys(data) is not { } parsed) return false;
+        if (parsed.Modifier == modifier && NormalizeShiftedLetter(parsed.Codepoint, parsed.Modifier) == NormalizeShiftedLetter(keycode, modifier)) return true;
+        return LogicalShiftedSymbolCandidate(parsed.Codepoint, parsed.Modifier, ShiftedSymbolKeys) is { } logical &&
+            logical.Modifier == modifier && logical.Codepoint == keycode;
+    }
+
+    /// <summary>Parses a key identifier modifier by modifier, so <c>ctrl++</c> names Ctrl and "+"; duplicate modifiers are invalid.</summary>
+    private static (string Key, bool Ctrl, bool Shift, bool Alt, bool Super)? ParseKeyId(string keyId)
+    {
+        var key = keyId.ToLowerInvariant();
+        var modifiers = new HashSet<string>(StringComparer.Ordinal);
+        while (true)
+        {
+            var modifier = ModifierNames.FirstOrDefault(name => key.StartsWith(name + "+", StringComparison.Ordinal));
+            if (modifier is null) break;
+            if (!modifiers.Add(modifier)) return null;
+            key = key[(modifier.Length + 1)..];
+        }
+        if (key.Length == 0 || key.Contains('+') && key != "+") return null;
+        return (key, modifiers.Contains("ctrl"), modifiers.Contains("shift"), modifiers.Contains("alt"), modifiers.Contains("super"));
     }
     private static string? FormatWithModifiers(string keyName, int modifier)
     {
@@ -176,14 +217,13 @@ public static partial class Keys
     /// <summary>Matches raw terminal input against a key identifier such as <c>ctrl+c</c> or <c>shift+tab</c>.</summary>
     public static bool Matches(string data, string keyId)
     {
-        var parts = keyId.ToLowerInvariant().Split('+');
-        var key = parts[^1];
-        if (key.Length == 0) return false;
+        if (ParseKeyId(keyId) is not { } parsedKey) return false;
+        var key = parsedKey.Key;
         var modifier = 0;
-        if (parts.Contains("shift")) modifier |= Shift;
-        if (parts.Contains("alt")) modifier |= Alt;
-        if (parts.Contains("ctrl")) modifier |= Ctrl;
-        if (parts.Contains("super")) modifier |= Super;
+        if (parsedKey.Shift) modifier |= Shift;
+        if (parsedKey.Alt) modifier |= Alt;
+        if (parsedKey.Ctrl) modifier |= Ctrl;
+        if (parsedKey.Super) modifier |= Super;
         var kitty = kittyProtocolActive;
         switch (key)
         {
@@ -263,7 +303,8 @@ public static partial class Keys
             if (modifier == Shift)
                 return isLetter && data == key.ToUpperInvariant() || MatchesKitty(data, codepoint, Shift) || MatchesPrintableModifyOtherKeys(data, codepoint, Shift);
             if (modifier != 0) return MatchesKitty(data, codepoint, modifier) || MatchesPrintableModifyOtherKeys(data, codepoint, modifier);
-            return data == key || MatchesKitty(data, codepoint, 0);
+            // Check both raw char and Kitty sequence (needed for release events)
+            return data == key || MatchesKitty(data, codepoint, 0) || MatchesPrintableModifyOtherKeys(data, codepoint, 0);
         }
         return false;
 
@@ -294,8 +335,16 @@ public static partial class Keys
     /// <summary>The key identifier of raw input, or null when it is not a recognized key.</summary>
     public static string? Parse(string data)
     {
-        if (ParseKitty(data) is { } kittySequence) return FormatParsedKey(kittySequence.Codepoint, kittySequence.Modifier, kittySequence.BaseLayoutKey);
-        if (ParseModifyOtherKeys(data) is { } other) return FormatParsedKey(other.Codepoint, other.Modifier, null);
+        if (ParseKitty(data) is { } kittySequence)
+        {
+            var logical = LogicalShiftedSymbolCandidate(kittySequence.ShiftedKey, kittySequence.Modifier, SymbolKeys);
+            return FormatParsedKey(logical?.Codepoint ?? kittySequence.Codepoint, logical?.Modifier ?? kittySequence.Modifier, kittySequence.BaseLayoutKey);
+        }
+        if (ParseModifyOtherKeys(data) is { } other)
+        {
+            var logical = LogicalShiftedSymbolCandidate(other.Codepoint, other.Modifier, ShiftedSymbolKeys);
+            return FormatParsedKey(logical?.Codepoint ?? other.Codepoint, logical?.Modifier ?? other.Modifier, null);
+        }
         var kitty = kittyProtocolActive;
         if (kitty && data is "\u001b\r" or "\n") return "shift+enter";
         if (LegacySequenceKeyIds.TryGetValue(data, out var legacy)) return legacy;

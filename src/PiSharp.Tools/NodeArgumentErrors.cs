@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/read.ts, write.ts, edit.ts, bash.ts, grep.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/tools/read.ts, write.ts, edit.ts, bash.ts, grep.ts
 // and find.ts reach Node's fs and child_process with the model's strings; a NUL byte makes Node throw ERR_INVALID_ARG_VALUE, whose
 // message the tool result carries.
 using System.Text;

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts (bash, abort_bash)
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts (bash, abort_bash)
 // and packages/coding-agent/src/core/agent-session.ts (executeBash, bash_execution_update).
 using System.Runtime.CompilerServices;
 using PiSharp.CodingAgent;

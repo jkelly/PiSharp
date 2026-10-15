@@ -1,9 +1,9 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/components/input.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/input.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getKeybindings } from "../keybindings.mjs";
 import { decodeKittyPrintable } from "../keys.mjs";
 import { KillRing } from "../kill-ring.mjs";
-import { CURSOR_MARKER } from "../tui.mjs";
+import { CURSOR_MARKER, renderFakeCursor } from "../tui.mjs";
 import { UndoStack } from "../undo-stack.mjs";
 import { getGraphemeSegmenter, isWhitespaceChar, sliceByColumn, truncateToWidth, visibleWidth } from "../utils.mjs";
 import { findWordBackward, findWordForward } from "../word-navigation.mjs";
@@ -335,7 +335,7 @@ export class Input {
             const atCursor = graphemes[0]?.segment ?? " ";
             const afterCursor = placeholder.slice(atCursor.length);
             const marker = this.focused ? CURSOR_MARKER : "";
-            const cursorChar = `\x1b[7m${this.placeholderStyle(atCursor)}\x1b[27m`;
+            const cursorChar = renderFakeCursor(this.placeholderStyle(atCursor));
             const textWithCursor = marker + cursorChar + this.placeholderStyle(afterCursor);
             const padding = " ".repeat(Math.max(0, availableWidth - visibleWidth(textWithCursor)));
             return [
@@ -378,7 +378,7 @@ export class Input {
         const atCursor = cursorGrapheme?.segment ?? " ";
         const afterCursor = visibleText.slice(cursorDisplay + atCursor.length);
         const marker = this.focused ? CURSOR_MARKER : "";
-        const cursorChar = `\x1b[7m${atCursor}\x1b[27m`;
+        const cursorChar = renderFakeCursor(atCursor);
         const textWithCursor = beforeCursor + marker + cursorChar + afterCursor;
         const visualLength = visibleWidth(textWithCursor);
         const padding = " ".repeat(Math.max(0, availableWidth - visualLength));

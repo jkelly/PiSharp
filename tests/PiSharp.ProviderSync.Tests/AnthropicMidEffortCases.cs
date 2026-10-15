@@ -8,7 +8,7 @@ using PiSharp.AI.Protocols.AnthropicMessages;
 using PiSharp.AI.Providers;
 using PiSharp.Contracts;
 
-// Authored expectations derived by reading Pi v1.1.0 (abe508e1b89912adde45528136c3221eb69acdd7) source text, not captured:
+// Authored expectations derived by reading Pi v1.2.0 (06a466935536f8c9bcacb2d5efc0fc021be1bdff) source text, not captured:
 // packages/ai/src/api/anthropic-messages.ts (stream, streamSimple, mapThinkingLevelToEffort, getBetaFeatures, buildParams,
 // convertMessages, insertThinkingLevelMessages, the input_transformations diagnostic), packages/ai/src/models.ts
 // (getSupportedThinkingLevels) and the pinned anthropic.json catalog rows. Fake HTTP only.

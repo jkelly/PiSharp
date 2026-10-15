@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/core/tools/render-utils.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/tools/render-utils.ts.
 // Also the rendering parts of coding-agent/src/core/tools/truncate.ts (DEFAULT_MAX_LINES, DEFAULT_MAX_BYTES, formatSize),
 // coding-agent/src/core/tools/path-utils.ts (resolveToCwd) and coding-agent/src/utils/paths.ts (resolvePath,
 // getCwdRelativePath, formatPathRelativeToCwdOrAbsolute), plus the JavaScript value semantics (JSON.stringify, template
@@ -16,6 +16,73 @@ namespace PiSharp.Cli.Interactive.Mode.Components;
 
 internal static partial class RenderUtils
 {
+    /// <summary>The clock and timers of the tool timers (Date.now() and setInterval); tests may replace it.</summary>
+    public static TimeProvider Time { get; set; } = TimeProvider.System;
+
+    private static double Now() => Time.GetUtcNow().ToUnixTimeMilliseconds();
+
+    /// <summary>formatToolDuration: <c>4.2s</c> below a minute, then <c>1m 30s</c> and <c>2h 3m 4s</c>.</summary>
+    public static string FormatToolDuration(double ms)
+    {
+        var seconds = ms / 1000;
+        if (seconds < 60) return seconds.ToString("F1", CultureInfo.InvariantCulture) + "s";
+
+        var totalSeconds = (long)Math.Floor(seconds);
+        var minutes = totalSeconds / 60;
+        var remainder = totalSeconds % 60;
+        if (minutes < 60) return $"{minutes}m {remainder}s";
+
+        return $"{minutes / 60}h {minutes % 60}m {remainder}s";
+    }
+
+    /// <summary>startToolTimer: start the row's clock once execution starts. Call from renderCall. The state lives in
+    /// <see cref="ToolRenderContext.State"/> (<c>startedAt</c>, <c>endedAt</c>, <c>interval</c>).</summary>
+    public static void StartToolTimer(ToolRenderContext context)
+    {
+        var state = context.State;
+        if (context.ExecutionStarted && state.GetValueOrDefault("startedAt") is null)
+        {
+            state["startedAt"] = Now();
+            state["endedAt"] = null;
+        }
+    }
+
+    /// <summary>toolTimerText: the row's timing line, from renderResult: <c>Elapsed 4.2s</c> while the result is partial, redrawn
+    /// every second, and <c>Took 4.2s</c> once it is final. Null when the row has no start time and no recorded duration.</summary>
+    public static string? ToolTimerText(ToolRenderContext context, bool isPartial)
+    {
+        var state = context.State;
+        if (state.GetValueOrDefault("startedAt") is not null && isPartial && state.GetValueOrDefault("interval") is null)
+            state["interval"] = SetInterval(context.Invalidate, 1000);
+        if (!isPartial || context.IsError)
+        {
+            if (state.GetValueOrDefault("endedAt") is null) state["endedAt"] = Now();
+            if (state.GetValueOrDefault("interval") is IDisposable interval)
+            {
+                interval.Dispose();
+                state["interval"] = null;
+            }
+        }
+        // A final result's recorded duration wins: it is monotonic and survives reloads. The renderer's own clock is the
+        // fallback for live progress and for results stored without one.
+        if (!isPartial && context.DurationMs is { } recorded) return $"Took {FormatToolDuration(recorded)}";
+        if (state.GetValueOrDefault("startedAt") is not double started) return null;
+        var endTime = state.GetValueOrDefault("endedAt") as double? ?? Now();
+        return $"{(isPartial ? "Elapsed" : "Took")} {FormatToolDuration(endTime - started)}";
+    }
+
+    /// <summary>setInterval: the callback runs on the synchronization context current at the call (the TUI loop), if any.</summary>
+    private static IDisposable SetInterval(Action callback, double milliseconds)
+    {
+        var context = SynchronizationContext.Current;
+        var period = TimeSpan.FromMilliseconds(milliseconds);
+        return Time.CreateTimer(_ =>
+        {
+            if (context is not null) context.Post(_ => callback(), null);
+            else callback();
+        }, null, period, period);
+    }
+
     /// <summary>os.homedir() (tests may replace it).</summary>
     public static Func<string> HomeDirectory { get; set; } = () => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
