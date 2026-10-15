@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-conversations.test.ts. Verbatim apart from the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-conversations.test.ts. Verbatim apart from the
 // adaptations in HarnessSupport.cs and HarnessConversationsSupport.cs, and these:
 // - Every case runs on the storage the group is given (ControlledStorage-wrapped where upstream uses ControlledStorage); "keeps root and
 //   conversation identity and state across reopen" runs on a reopenable store (a SQLite file, as upstream, and a JSONL directory), and is
@@ -385,9 +385,9 @@ internal static partial class HarnessConversationTests
             Check(!ReferenceEquals(again, root), "a new handle");
             Equal(root.Id, again.Id, "same id");
             await harness.CloseAsync(Context);
-            await RejectsAsync(() => harness.RootAsync(Context), "Harness is closed", "root");
-            await RejectsAsync(() => harness.CreateConversationAsync(Ownerless, Context), "Harness is closed", "create");
-            await RejectsAsync(() => harness.ConversationAsync(root.Id, Context), "Harness is closed", "conversation");
+            await RejectsAsync(() => harness.RootAsync(Context), "is closed", "root");
+            await RejectsAsync(() => harness.CreateConversationAsync(Ownerless, Context), "is closed", "create");
+            await RejectsAsync(() => harness.ConversationAsync(root.Id, Context), "is closed", "conversation");
         });
 
         yield return Case(prefix + "forwards-generic-session-document-apis", async () =>

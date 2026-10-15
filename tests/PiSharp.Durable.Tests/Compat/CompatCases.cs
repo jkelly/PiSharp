@@ -11,6 +11,7 @@
 // - written: PiSharp runs the same scenario (CompatScenarios.cs) and writes the same records; the JSONL files are byte for byte upstream's,
 //   and the SQLite record, revision and metadata columns hold upstream's text.
 // Only the fields manifest.json lists under "varies" are normalized: sessionId strings and durationMs numbers.
+// The scenarios new in Pi v1.2.0 (CompatScenarios120.cs) run the same checks against Fixtures/v1.2.0/upstream-sessions, plus observed.
 // compat.ops.* replays the ops corpus (CompatOpsCases.cs); compat.reverse.* has the pinned upstream read PiSharp's sessions under Node.
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
@@ -25,7 +26,7 @@ using static SessionTests;
 
 internal static partial class Program
 {
-    private static IEnumerable<(string, Func<Task>)> CompatCases() => CompatTests.Cases();
+    private static IEnumerable<(string, Func<Task>)> CompatCases() => [.. CompatTests.Cases(), .. CompatTests.Cases120()];
 }
 
 /// <summary>The compat.* session cases.</summary>
@@ -36,9 +37,13 @@ internal static partial class CompatTests
 
     internal static string Fixtures => Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "upstream-sessions");
 
+    /// <summary>The Pi v1.2.0 capture (Fixtures/v1.2.0/index.json), read by the scenarios new in v1.2.0.</summary>
+    internal static string Fixtures120 => Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "upstream-sessions");
+
     private static readonly Lazy<JsonObjectValue> Manifest = new(() => Load("manifest.json"));
 
-    internal static JsonObjectValue Load(string path) => (JsonObjectValue)JsonValue.Parse(File.ReadAllText(Path.Combine(Fixtures, path)));
+    internal static JsonObjectValue Load(string path, string? root = null) =>
+        (JsonObjectValue)JsonValue.Parse(File.ReadAllText(Path.Combine(root ?? Fixtures, path)));
 
     /// <summary>The fields that vary between captures (manifest.json "varies"), on both sides.</summary>
     internal static JsonValue Normalize(JsonValue value, string? key = null) => value switch
@@ -102,10 +107,10 @@ internal static partial class CompatTests
     };
 
     /// <summary>A fresh copy of a captured session, so no case changes the fixtures.</summary>
-    internal static string CopyFixture(string scenario, string backend)
+    internal static string CopyFixture(string scenario, string backend, string? root = null)
     {
         var target = Temp($"compat-{scenario}-{backend}");
-        foreach (var file in Directory.GetFiles(Path.Combine(Fixtures, scenario, backend)))
+        foreach (var file in Directory.GetFiles(Path.Combine(root ?? Fixtures, scenario, backend)))
             File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
         return target;
     }
@@ -160,7 +165,7 @@ internal static partial class CompatTests
         }
     }
 
-    private static JsonValue Expected(string scenario, string file, string backend) => Load(Path.Combine(scenario, file))[backend];
+    private static JsonValue Expected(string scenario, string file, string backend, string? root = null) => Load(Path.Combine(scenario, file), root)[backend];
 
     internal static IEnumerable<(string, Func<Task>)> Cases()
     {
@@ -207,6 +212,67 @@ internal static partial class CompatTests
         }
     }
 
+    /// <summary>The compat.* cases of the scenarios new in Pi v1.2.0 (CompatScenarios120.cs), against Fixtures/v1.2.0/upstream-sessions.</summary>
+    internal static IEnumerable<(string, Func<Task>)> Cases120()
+    {
+        var root = Fixtures120;
+        var captured = ((JsonArrayValue)Load("manifest.json", root)["scenarios"]).Select(item => S(((JsonObjectValue)item)["name"])).ToHashSet();
+        foreach (var scenario in CompatScenarios120.All)
+        {
+            Check(captured.Contains(scenario.Name), $"Fixtures/v1.2.0 captures {scenario.Name}");
+            foreach (var backend in Backends)
+            {
+                var prefix = $"compat.{scenario.Name}.{backend}.";
+                yield return Case(prefix + "read", async () =>
+                    SameJson(Expected(scenario.Name, "records.json", backend, root),
+                        await Dump(await OpenBackend(backend, CopyFixture(scenario.Name, backend, root))), "records"));
+                yield return Case(prefix + "raw", () =>
+                {
+                    var directory = CopyFixture(scenario.Name, backend, root);
+                    var checkedTexts = backend == "sqlite" ? RawSqlite(Path.Combine(directory, "session.sqlite")) : RawJsonl(directory);
+                    Check(checkedTexts > 0, "persisted texts were checked");
+                });
+                yield return Case(prefix + "harness", () => HarnessReads(scenario.Name, backend, root));
+                if (scenario.Resume is { } resume)
+                    yield return Case(prefix + "resume", async () =>
+                    {
+                        var directory = CopyFixture(scenario.Name, backend, root);
+                        await resume(() => OpenBackend(backend, directory));
+                        SameJson(Expected(scenario.Name, "resumed.json", backend, root), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                    });
+                yield return Case(prefix + "written", async () =>
+                {
+                    var directory = Temp($"compat-written-{scenario.Name}-{backend}");
+                    var observed = await scenario.Run(() => OpenBackend(backend, directory));
+                    SameJson(Expected(scenario.Name, "records.json", backend, root), await Dump(await OpenBackend(backend, directory)), "records");
+                    var upstream = Path.Combine(root, scenario.Name, backend);
+                    if (backend == "jsonl") SameFiles(upstream, directory);
+                    else SameColumns(Path.Combine(CopyFixture(scenario.Name, backend, root), "session.sqlite"), Path.Combine(directory, "session.sqlite"));
+                    var observedFile = Path.Combine(root, scenario.Name, "observed.json");
+                    JsonObjectValue? expectedObserved = File.Exists(observedFile) ? (JsonObjectValue)Expected(scenario.Name, "observed.json", backend, root) : null;
+                    if (expectedObserved?.TryGetValue("run", out var run) == true)
+                        SameObserved(run, observed ?? throw new InvalidOperationException("the run observed nothing"), scenario.UnobservedFields, "observed run");
+                    if (scenario.Resume is { } resume)
+                    {
+                        var resumed = await resume(() => OpenBackend(backend, directory));
+                        SameJson(Expected(scenario.Name, "resumed.json", backend, root), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                        if (expectedObserved?.TryGetValue("resume", out var onResume) == true)
+                            SameObserved(onResume, resumed ?? throw new InvalidOperationException("the resume observed nothing"), scenario.UnobservedFields,
+                                "observed resume");
+                    }
+                });
+            }
+        }
+    }
+
+    /// <summary>What a scenario observed equals upstream's, apart from the top-level fields it cannot observe (see CompatScenarios120.cs).</summary>
+    private static void SameObserved(JsonValue expected, JsonValue actual, IReadOnlyList<string>? skipped, string what)
+    {
+        JsonValue Without(JsonValue value) => skipped is null || value is not JsonObjectValue properties ? value
+            : JsonValue.Object(properties.Where(property => !skipped.Contains(property.Key)));
+        SameJson(Without(expected), Without(actual), what);
+    }
+
     // ─── harness ────────────────────────────────────────────────────────────────
 
     private static readonly (string Name, ConversationDocToken Doc)[] PiDocuments =
@@ -216,10 +282,10 @@ internal static partial class CompatTests
     ];
 
     /// <summary>A Harness that is never resumed reads upstream's transcripts, tasks and pi.* documents, and closes with upstream's records.</summary>
-    private static async Task HarnessReads(string scenario, string backend)
+    private static async Task HarnessReads(string scenario, string backend, string? root = null)
     {
-        var expected = (JsonObjectValue)Expected(scenario, "opened.json", backend);
-        var directory = CopyFixture(scenario, backend);
+        var expected = (JsonObjectValue)Expected(scenario, "opened.json", backend, root);
+        var directory = CopyFixture(scenario, backend, root);
         var setup = new ChatSetup(new FauxModels(new FauxOptions { Api = "faux" }));
         var harness = await Harness.OpenAsync(await OpenBackend(backend, directory),
             new HarnessOptions { Models = setup.Models, Registry = setup.Registry, Now = () => CompatScenarios.Now }, Context);

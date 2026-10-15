@@ -2,7 +2,7 @@
 
 Report only. These numbers are a snapshot of one machine; nothing in CI passes or fails on them. The `benchmarks.smoke` case in `tests/PiSharp.Durable.Tests` runs every benchmark at a tiny size so the ports keep working, and asserts completion only.
 
-PiSharp ports four upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
+PiSharp ports five upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
 
 | upstream | PiSharp | what it measures |
 |---|---|---|
@@ -10,8 +10,9 @@ PiSharp ports four upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5ef
 | `test/storage-memory.ts` (`npm run bench:storage:memory`) | `StorageMemory.cs` (`storage-memory`) | heap, RSS and disk footprint after the seed, one child process per backend and scale |
 | `test/tool-output-bench.ts` (`npm run bench:tool-output`) | `ToolOutputBench.cs` (`tool-output`) | the tool task, progress throttle and `pi.live` commits at low, normal and high output rates, the 1 GiB firehose and `cat` |
 | `test/document-append-bench.ts` (`npm run bench:document-append`, new in v1.2.0) | `DocumentAppendBench.cs` (`document-append [N,...]`) | one commit per appended item: one array in one document against one family member per item |
+| `test/session-document-cache-bench.ts` (`npm run bench:document-cache`, new in v1.2.0) | `SessionDocumentCacheBench.cs` (`document-cache [N,...]`), with `HeapRetained.cs` (`test/heap-retained.ts`) | the Session document cache at four retentions: cached documents, retained bytes per conversation and the cost of reading an old conversation's document again |
 
-Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
 
 ## Machine
 
@@ -204,6 +205,27 @@ Measured on 2026-10-15, same machine, memory storage, one run each. Before is th
 
 - **32,000 appends are about 6 times faster.** Before, every append made an entry for each element of the array, walked them to plan the operations and copied them into the next value.
 - **The remaining cost is the .NET runtime's large object heap, not the tracker.** Each revision of an array of more than about 10,600 elements is a new large object, and the background GC throttles large allocations while it runs. With `DOTNET_gcConcurrent=0`, 32,000 appends take 1.81 s after (27.4 s before), close to upstream's 1.4 s, and the microseconds per append grow in step with the array (15, 32 and 57 µs at 8,000, 16,000 and 32,000), the one copy per append.
+
+## Document cache (`session-document-cache-bench.ts`)
+
+Pi v1.2.0 bounded the Session's document cache: a loaded document that no watch or document state observes leaves memory once it was not read or written for `documentRetentionMs` (default ten minutes, `0` drops it right after use) and loads from Storage again on its next access. A Harness on SQLite creates N conversations and runs one short task in each, after 200 warm-up cycles. Retained bytes are the growth over those N conversations: Node sums a heap snapshot's self sizes, PiSharp reads the managed heap after a blocking, compacting full collection (`HeapRetained.cs`). The old-document read is the mean of 100 reads of the first conversation's `pi.live`.
+
+Measured on 2026-10-15, same machine, one run each.
+
+| conversations | retention | Node ms | PiSharp ms | cached docs (both) | Node retained | PiSharp retained | Node read | PiSharp read |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 1,000 | infinite | 827 | 1,285 | 6,000 | 4.4 MiB, 4,610 B/conv | 4.6 MiB, 4,804 B/conv | 2 µs | 8 µs |
+| 1,000 | 10 min | 930 | 1,060 | 6,000 | 3.9 MiB, 4,131 B/conv | 4.6 MiB, 4,802 B/conv | 1 µs | 1 µs |
+| 1,000 | 50 ms | 910 | 1,009 | 0 | -0.4 MiB | -0.2 MiB | 9 µs | 45 µs |
+| 1,000 | 0 | 955 | 880 | 0 | 0.4 MiB, 384 B/conv | 0.1 MiB, 54 B/conv | 30 µs | 28 µs |
+| 5,000 | infinite | 4,329 | 3,943 | 26,000 | 18.4 MiB, 3,865 B/conv | 23.1 MiB, 4,845 B/conv | 1 µs | 0 µs |
+| 5,000 | 10 min | 4,508 | 3,971 | 26,000 | 18.4 MiB, 3,850 B/conv | 23.1 MiB, 4,845 B/conv | 1 µs | 1 µs |
+| 5,000 | 50 ms | 4,599 | 3,954 | 0 | 0.1 MiB, 27 B/conv | 0.0 MiB, 4 B/conv | 6 µs | 4 µs |
+| 5,000 | 0 | 4,765 | 4,067 | 0 | 0.4 MiB, 92 B/conv | 0.3 MiB, 58 B/conv | 30 µs | 28 µs |
+
+- **The cache behaves as upstream's.** Kept documents leave the same 6,000 and 26,000 documents (the five built-in documents of each conversation, warm-up ones included), and both evicting retentions leave none. Upstream's changelog reports 26,000 documents and about 3.8 KB each for 5,000 conversations without eviction.
+- **A kept conversation costs about 4.8 KB in PiSharp, about 3.9 to 4.6 KB under Node.** With eviction, a conversation retains well under 100 bytes in both.
+- **Reading an evicted document costs about 30 µs in both**, a SQLite reload; a cached read costs a few microseconds. The 50 ms rows read after the timer evicted.
 
 ## Throughput target
 

@@ -127,7 +127,7 @@ internal static class StorageRules
         foreach (var (id, action) in actions)
         {
             if (action.Copy is { } copy && actions.ContainsKey(copy.Id.Value))
-                throw new StorageRejectedException($"Document copy {id} source is changed in the copy batch");
+                throw new InvalidOperationException($"Document copy {id} source is changed in the copy batch");
             var existing = stored(id);
             if (action.Create is null && existing is null) throw new InvalidOperationException($"Unknown document: {id}");
             if (action.Create is not null && existing is not null) throw new InvalidOperationException($"Document {id} already exists");
@@ -211,7 +211,7 @@ internal static class StorageRules
     {
         if (cursor is null || !cursor.TryGetValue("after", out var after)) return null;
         if (after is not JsonNumberValue { Value: var number } || Math.Floor(number) != number || Math.Abs(number) > Ids.MaxSafeInteger)
-            throw new ArgumentException("Invalid storage cursor");
+            throw new StorageRequestException("Invalid storage cursor");
         return (long)number;
     }
 

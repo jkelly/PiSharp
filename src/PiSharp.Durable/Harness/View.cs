@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/view.ts (ConversationView, ConversationViews,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/view.ts (ConversationView, ConversationViews,
 // conversationViews, advance, prefixed).
 //
 // Upstream's ConversationView is a plain JSON object {conversation, entries, docs}; here it is a typed immutable class whose ToJson() is
@@ -82,8 +82,8 @@ internal abstract class ViewObserver
     public virtual void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, CommitPublication publication,
         DurableContext context) { }
 
-    /// <summary>The Session closes.</summary>
-    public abstract void CloseSession();
+    /// <summary>The Session closes; <paramref name="failure"/> is what failed it, when it failed.</summary>
+    public abstract void CloseSession(Exception? failure);
 }
 
 /// <summary>A view observer forwarding revisions to a committed state source or watch.</summary>
@@ -91,7 +91,7 @@ internal sealed class CommittedViewObserver(ICommittedObserver<ConversationView>
 {
     public override void Advance(ConversationView value, ImmutableArray<Op> ops, DurableContext context) => target.Advance(value, ops, context);
 
-    public override void CloseSession() => target.CloseSession();
+    public override void CloseSession(Exception? failure) => target.CloseSession(failure);
 }
 
 /// <summary>
@@ -116,11 +116,11 @@ internal sealed class ConversationViews
     {
         this.session = session;
         this.storage = storage;
-        session.SubscribeCommits((publication, context) =>
+        session.ObserveCommits((publication, context) =>
         {
             KeyValuePair<ConversationId, Mount>[] current;
             lock (gate) current = [.. mounts];
-            foreach (var (id, mount) in current) AdvanceMount(id, mount, publication, context);
+            foreach (var (id, mount) in current) AdvanceMount(id, mount, publication, context, Report);
         });
         session.SubscribeClose(() =>
         {
@@ -131,10 +131,14 @@ internal sealed class ConversationViews
                 current = [.. mounts.Values];
                 mounts.Clear();
             }
+            var failure = session.Failure;
             foreach (var mount in current)
-                foreach (var observer in mount.Snapshot(gate)) observer.CloseSession();
+                foreach (var observer in mount.Snapshot(gate)) Session.Contained(() => observer.CloseSession(failure), Report);
         });
     }
+
+    /// <summary>Reports an observer's listener error through the Harness (upstream <c>report</c>).</summary>
+    public void Report(Exception error) => session.Report(error);
 
     /// <summary>The observation scheduler of the Session (upstream <c>queueMicrotask</c>).</summary>
     public ObservationScheduler Schedule => session.Defer;
@@ -153,7 +157,7 @@ internal sealed class ConversationViews
         }, context).ConfigureAwait(false);
         try
         {
-            return ReplicatedState.Attach<ConversationView>(source);
+            return ReplicatedState.Attach<ConversationView>(source, new ReplicatedStateSourceOptions { OnError = Report });
         }
         catch
         {
@@ -167,7 +171,7 @@ internal sealed class ConversationViews
     {
         var (watch, _) = await AttachAsync(id, (value, release, _) =>
         {
-            var created = new CommittedWatch<ConversationView>(value, release, Schedule, json: view => view.ToJson());
+            var created = new CommittedWatch<ConversationView>(value, release, Schedule, Report, json: view => view.ToJson());
             return Task.FromResult((created, (ViewObserver)new CommittedViewObserver(created)));
         }, context).ConfigureAwait(false);
         if (context.IsCancellationRequested)
@@ -205,7 +209,7 @@ internal sealed class ConversationViews
             lock (gate)
             {
                 // Close or cancellation may begin while the mount hydrates; register nothing then.
-                if (closed) throw HarnessUtil.ClosedError();
+                if (closed) throw HarnessUtil.ClosedError(session);
                 context.ThrowIfCancellationRequested();
                 mounts[id] = mount;
                 mount.Observers.Add(observer);
@@ -230,9 +234,9 @@ internal sealed class ConversationViews
         return new Mount(new ConversationView(conversation, entries, JsonObjectValue.From(docs)), incarnations);
     }
 
-    /// <summary>Derives the mount's operations from one publication, applies them, and hands the revision to every observer (upstream
-    /// <c>advance</c>). Runs on the Session line.</summary>
-    private void AdvanceMount(ConversationId id, Mount mount, CommitPublication publication, DurableContext context)
+    /// <summary>Derives the mount's operations from one publication, applies them, and hands the revision to every observer; one that throws
+    /// is reported through <paramref name="report"/>, and the others still get it (upstream <c>advance</c>). Runs on the Session line.</summary>
+    private void AdvanceMount(ConversationId id, Mount mount, CommitPublication publication, DurableContext context, Action<Exception> report)
     {
         var docOps = new List<Op>();
         var entryOps = new List<Op>();
@@ -292,9 +296,10 @@ internal sealed class ConversationViews
             // Document operations address ["docs", kind, ...]; Docs is the "docs" object itself.
             var docs = docOps.Count == 0 ? before.Docs : (JsonObjectValue)DeltaApplyTrusted.Apply(before.Docs, docOps.Select(Unprefixed));
             mount.Value = new ConversationView(before.Conversation, entries, docs);
-            foreach (var observer in mount.Snapshot(gate)) observer.Advance(mount.Value, ops, frameContext);
+            foreach (var observer in mount.Snapshot(gate)) Session.Contained(() => observer.Advance(mount.Value, ops, frameContext), report);
         }
-        foreach (var observer in mount.Snapshot(gate)) observer.Publication(before, mount.Value, ops, publication, frameContext);
+        foreach (var observer in mount.Snapshot(gate))
+            Session.Contained(() => observer.Publication(before, mount.Value, ops, publication, frameContext), report);
     }
 
     /// <summary><paramref name="op"/> moved under <paramref name="prefix"/>; a root replacement becomes a set of the prefix (upstream

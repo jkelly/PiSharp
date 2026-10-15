@@ -9,6 +9,8 @@
 //   and then lets the tool queue its submit. Handlers here run on other threads, so the case waits until the mark is queued on the Session
 //   line (Session.LineBacklog, a deterministic barrier) before it lets the tool go.
 // - Tools and supervisors append the IDs they see from other threads, so those lists are SyncLists.
+// - Pi v1.2.0's queuedNote: writes queued while busy carry a model message, as a data-only write is appended at once (area i; the rest
+//   of this file follows with area c).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -46,6 +48,11 @@ internal static partial class Program
 
 internal static partial class OwnershipTests
 {
+    /// <summary>A write that affects model context, so it queues while busy; a data-only write would be appended at once (upstream v1.2.0
+    /// <c>queuedNote</c>).</summary>
+    private static EntryDraft QueuedNote(string text) =>
+        new() { Kind = "note", Model = JsonValue.Array(Obj(("role", "user"), ("content", text), ("timestamp", 0))) };
+
     /// <summary>
     /// The harness.ownership.* cases on storages from <paramref name="fresh"/>; reopen cases use locations from <paramref name="reopenable"/>
     /// and are left out without one.
@@ -149,7 +156,7 @@ internal static partial class OwnershipTests
             var background = await holds.OwnedChild(root, "background", background: true);
             await Busy(root, foreground.Owner);
             var input = (await root.SubmitAsync(SubmissionDraft.Input("later"), Context)).Id;
-            var write = (await root.SubmitAsync(SubmissionDraft.Write(new EntryDraft { Kind = "note" }), Context)).Id;
+            var write = (await root.SubmitAsync(SubmissionDraft.Write(QueuedNote("w")), Context)).Id;
             await root.AbortAsync(Context);
             foreach (var id in new[] { foreground.Owner, foreground.Inner })
                 Equal(DurableTaskStatus.Terminal, await StatusOf(harness, id), $"task {id}");
@@ -192,7 +199,7 @@ internal static partial class OwnershipTests
             await Busy(child, tree.Inner);
             var own = (await root.SubmitAsync(SubmissionDraft.Input("own"), Context)).Id;
             var below = (await child.SubmitAsync(SubmissionDraft.Input("below"), Context)).Id;
-            var write = (await child.SubmitAsync(SubmissionDraft.Write(new EntryDraft { Kind = "note" }), Context)).Id;
+            var write = (await child.SubmitAsync(SubmissionDraft.Write(QueuedNote("w")), Context)).Id;
             await harness.AbortTaskAsync(tree.Owner, Context);
             await harness.WaitForTaskAsync(tree.Inner, Context);
             Equal(SubmissionStatus.Queued, (await RecordOf(harness, own)).Status, "own");
@@ -304,22 +311,24 @@ internal static partial class OwnershipTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "retries-a-cascade-whose-commit-the-storage-rejected", async () =>
+        // Pi v1.2.0 replaced "retries a cascade whose commit the Storage rejected": a failed commit is final (area b of the sync).
+        yield return Case(prefix + "fails-the-harness-on-a-failed-cascade-commit-and-reopening-applies-the-cascade", async () =>
         {
             var holds = new Holds();
-            var storage = new MarkRejectingStorage(await fresh());
+            var controlled = new ControlledStorage(await fresh()) { KeepOpenForReopen = true };
+            var storage = new MarkFailingStorage(controlled);
             var (harness, root, _, reports) = await holds.OpenHarness(storage);
             var tree = await holds.OwnedChild(root, "owner");
-            storage.Reject = tree.Inner;
+            storage.Fail = tree.Inner;
             holds.Open("owner", Ending.Failed);
-            await Eventually(() => reports.Snapshot().Any(error => error is StorageRejectedException));
-            Equal(DurableTaskStatus.Completing, await StatusOf(harness, tree.Owner), "owner status");
-            Check(await StatusOf(harness, tree.Inner) != DurableTaskStatus.Terminal, "inner live");
-            // The next commit retries the cascade.
-            await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" }), Context);
-            Equal("aborted", await OutcomeOf(harness, tree.Inner), "inner");
-            Equal("failed", await OutcomeOf(harness, tree.Owner), "owner");
+            Equal(new SessionEnd(SessionEndReason.Failed, storage.Failure), await harness.Closed, "closed");
+            Seq([storage.Failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
+            controlled.Reopen();
+            var reopened = await holds.OpenHarness(storage);
+            Equal("aborted", await OutcomeOf(reopened.Harness, tree.Inner), "inner");
+            await reopened.Harness.CloseAsync(Context);
+            await controlled.Inner.CloseAsync(Context);
         });
     }
 
@@ -411,7 +420,8 @@ internal static partial class OwnershipTests
             await opened.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "retries-marks-found-through-an-edge-loaded-after-reopen-when-their-commit-is-rejected", async () =>
+        // Pi v1.2.0 replaced "retries marks found through an edge loaded after reopen when their commit is rejected".
+        yield return Case(prefix + "applies-marks-found-through-an-edge-loaded-after-reopen-once-a-failed-cascade-commit-is-reopened", async () =>
         {
             var holds = new Holds();
             var location = reopenable();
@@ -422,19 +432,23 @@ internal static partial class OwnershipTests
             await opened.Harness.AbortTaskAsync(tree.Owner, Context);
             await opened.Harness.CloseAsync(Context);
 
-            var storage = new MarkRejectingStorage(await location());
+            var storage = new MarkFailingStorage(await location());
             opened = await holds.OpenHarness(storage);
             var child = (await opened.Harness.ConversationAsync(tree.Child, Context))!;
             var late = await child.CommitAsync(async tx =>
             {
                 var id = await tx.CreateTaskAsync(holds.Hold, Holds.Input("late"), OwnConversation());
-                storage.Reject = id;
+                storage.Fail = id;
                 return id;
             }, Context);
-            await Eventually(() => storage.Reject is null);
-            // Any later commit, here the reservation of the new task, retries the cascade.
-            Equal("aborted", await OutcomeOf(opened.Harness, late), "late");
+            // The failed cascade commit fails the Harness. Closed settles once its invocations have ended, and the owner's abort handler
+            // ignores its signal: let it return.
             holds.Open("abort.owner");
+            Equal(SessionEndReason.Failed, (await opened.Harness.Closed).Reason, "closed");
+            await opened.Harness.CloseAsync(Context);
+            // Reopening derives the mark again.
+            opened = await holds.OpenHarness(await location());
+            Equal("aborted", await OutcomeOf(opened.Harness, late), "late");
             await opened.Harness.CloseAsync(Context);
         });
     }

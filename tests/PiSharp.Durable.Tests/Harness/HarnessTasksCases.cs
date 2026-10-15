@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-tasks.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tasks.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and these:
 // - Upstream runs this file on MemoryStorage (ControlledStorage where it holds commits); here every case runs on the storage the group is
 //   given, wrapped in ControlledStorage where upstream uses it (HarnessBackendCases.cs adds JSONL and SQLite passes).
@@ -727,7 +727,7 @@ internal static partial class HarnessTests
 
         // ─── task scheduling ───
 
-        yield return Case(prefix + "task-scheduling.retries-reservation-on-the-next-wakeup-after-a-rejected-reservation-commit", async () =>
+        yield return Case(prefix + "task-scheduling.fails-the-harness-on-a-failed-reservation-commit-reopening-runs-the-task", async () =>
         {
             var runs = 0;
             var once = OneStep("test.once", async (_, runtime, ctx) =>
@@ -736,56 +736,61 @@ internal static partial class HarnessTests
                 await runtime.CommitAsync((_, _) => Completed(null), ctx);
             });
             var controlled = Controlled();
-            var (harness, registry, reports, root) = await OpenRoot(controlled, [once]);
+            controlled.KeepOpenForReopen = true;
+            var (harness, _, reports, root) = await OpenRoot(controlled, [once]);
             var id = await Start(root, once);
-            controlled.FailNextCommit(new StorageRejectedException("busy"));
+            // WaitForTaskAsync resumes scheduling; upstream's kick waits for a microtask, so the failure is set before the reservation commits.
+            // Here the kick runs on the thread pool at once, so the failure is set first.
+            var failure = new IOException("disk gone");
+            controlled.FailNextCommit(failure);
+            var waiting = harness.WaitForTaskAsync(id, Context);
             harness.Resume();
-            await Eventually(() => reports.Count == 1);
-            Equal(DurableTaskStatus.Pending, (await harness.GetTaskAsync(id, Context))?.State.Status, "status");
-            // Any wakeup, here a registry change, reserves again.
-            AddTool(registry, Define.Tool(new ToolRegistration { Name = "wake", Description = "wake", Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult()) }));
-            await harness.WaitForTaskAsync(id, Context);
-            Equal(1, Volatile.Read(ref runs), "runs");
+            var end = await harness.Closed;
+            Equal(new SessionEnd(SessionEndReason.Failed, failure), end, "closed");
+            Seq([failure], reports.Snapshot(), "reports");
+            // The pending wait and every later call get SessionFailed with the storage error.
+            Same(failure, (await ThrowsAsync<SessionFailedException>(() => waiting, "pending wait")).InnerException, "wait cause");
+            Same(failure, (await ThrowsAsync<SessionFailedException>(() => harness.GetTaskAsync(id, Context), "getTask")).InnerException, "getTask cause");
+            await ThrowsAsync<SessionFailedException>(() => root.SubmitAsync(SubmissionDraft.Input("x"), Context), "submit");
+            Equal(0, Volatile.Read(ref runs), "runs");
             await harness.CloseAsync(Context);
+
+            var reopened = await OpenRoot(controlled.Reopen(), [once]);
+            reopened.Harness.Resume();
+            Equal(TaskOutcomeStatus.Completed, ((SettlingTaskState)(await reopened.Harness.WaitForTaskAsync(id, Context)).State).Outcome.Status,
+                "reopened outcome");
+            Equal(1, Volatile.Read(ref runs), "runs after reopen");
+            await reopened.Harness.CloseAsync(Context);
+            await controlled.Inner.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "task-scheduling.keeps-a-wakeup-that-arrives-while-a-rejected-reservation-commit-is-in-storage", async () =>
-        {
-            var first = OneStep("test.wake-first", async (_, runtime, ctx) => await runtime.CommitAsync((_, _) => Completed(null), ctx));
-            var late = OneStep("test.wake-late", async (_, runtime, ctx) => await runtime.CommitAsync((_, _) => Completed(null), ctx));
-            var controlled = Controlled();
-            var (harness, registry, _, root) = await OpenRoot(controlled, [first]);
-            var firstId = await Start(root, first);
-            var lateId = await Start(root, late);
-            var held = controlled.HoldCommits();
-            controlled.FailNextCommit(new StorageRejectedException("busy"));
-            harness.Resume();
-            await held.Entered;
-            // Registering the missing definition wakes the scheduler while the doomed reservation is in storage.
-            AddTask(registry, late);
-            held.Release();
-            await harness.WaitForTaskAsync(firstId, Context);
-            await harness.WaitForTaskAsync(lateId, Context);
-            await harness.CloseAsync(Context);
-        });
-
-        yield return Case(prefix + "task-scheduling.reruns-a-task-whose-fault-write-was-rejected", async () =>
+        yield return Case(prefix + "task-scheduling.fails-the-harness-instead-of-running-a-task-again-when-its-fault-write-fails", async () =>
         {
             var runs = 0;
             var controlled = Controlled();
-            var throws = OneStep("test.rejected-fault", (_, _, _) =>
+            controlled.KeepOpenForReopen = true;
+            var failure = new IOException("disk gone");
+            var throws = OneStep("test.failed-fault", (_, _, _) =>
             {
                 // The next commit is the step's fault write.
-                if (Interlocked.Increment(ref runs) == 1) controlled.FailNextCommit(new StorageRejectedException("busy"));
+                if (Interlocked.Increment(ref runs) == 1) controlled.FailNextCommit(failure);
                 throw new InvalidOperationException("boom");
             });
             var (harness, _, reports, root) = await OpenRoot(controlled, [throws]);
             var id = await Start(root, throws);
             harness.Resume();
-            SameJson("""{"status":"faulted","error":{"message":"boom"}}""", Outcome(await harness.WaitForTaskAsync(id, Context)), "outcome");
-            Equal(2, Volatile.Read(ref runs), "runs");
-            Seq(["StorageRejectedException: busy"], reports.Snapshot().Select(error => $"{error.GetType().Name}: {error.Message}"), "reports");
+            Equal(new SessionEnd(SessionEndReason.Failed, failure), await harness.Closed, "closed");
+            Equal(1, Volatile.Read(ref runs), "runs");
+            Seq([failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
+
+            // Reopening recovers the task as after a crash: still running, so its phase runs again.
+            var reopened = await OpenRoot(controlled.Reopen(), [throws]);
+            reopened.Harness.Resume();
+            SameJson("""{"status":"faulted","error":{"message":"boom"}}""", Outcome(await reopened.Harness.WaitForTaskAsync(id, Context)), "outcome");
+            Equal(2, Volatile.Read(ref runs), "runs after reopen");
+            await reopened.Harness.CloseAsync(Context);
+            await controlled.Inner.CloseAsync(Context);
         });
 
         yield return Case(prefix + "task-scheduling.waits-for-harness-and-conversation-idleness-counting-blocked-work-and-ignoring-background-tasks", async () =>

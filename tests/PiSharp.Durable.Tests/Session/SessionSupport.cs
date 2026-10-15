@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/session-support.ts. ControlledStorage decorates any IStorage
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-support.ts. ControlledStorage decorates any IStorage
 // instead of subclassing MemoryStorage, so every session.* group runs on whatever backend its factory opens: SessionCases() below runs
 // them on MemoryStorage, and P4 (JSONL) and P5 (SQLite) rerun them by calling SessionTests.All with their own prefix and factory.
 //
@@ -47,7 +47,8 @@ internal static partial class SessionTests
     internal static TestSession Open(Func<IStorage> factory)
     {
         var storage = new ControlledStorage(factory());
-        var session = new Session(storage);
+        // These tests pin the cache's identities and loads, so documents stay as long as the default keeps them.
+        var session = new Session(storage, null, () => 600_000);
         var publications = new List<CommitPublication>();
         session.SubscribeCommits((publication, _) =>
         {
@@ -292,5 +293,17 @@ internal sealed class ControlledStorage(IStorage inner) : IStorage
         Inner.GetSubmissionByRequestAsync(conversationId, requestId, context);
     public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
         Inner.ScanDocumentsAsync(query, limit, cursor, context);
-    public Task CloseAsync(DurableContext context) => Inner.CloseAsync(context);
+    /// <summary>Keeps the decorated storage open when the Session closes this one, so <see cref="Reopen"/> can hand it to a new Session.</summary>
+    public bool KeepOpenForReopen { get; set; }
+
+    /// <summary>Reopens after close, as a fresh process would reopen the same database, keeping every committed record (upstream
+    /// <c>reopen()</c>, which clears MemoryStorage's closed flag). Here the decorated storage stays open from the start
+    /// (<see cref="KeepOpenForReopen"/>), on any backend.</summary>
+    public ControlledStorage Reopen()
+    {
+        if (!KeepOpenForReopen) throw new InvalidOperationException("Set KeepOpenForReopen before the Session closes this storage");
+        return this;
+    }
+
+    public Task CloseAsync(DurableContext context) => KeepOpenForReopen ? Task.CompletedTask : Inner.CloseAsync(context);
 }

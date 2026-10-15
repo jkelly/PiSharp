@@ -515,6 +515,13 @@ public class HarnessSettings
     public virtual QueueMode? FollowUpMode { get; init; }
     /// <summary>How long an idle conversation keeps its last context read in memory; 0 drops it once the conversation is idle.</summary>
     public virtual double? ContextRetentionMs { get; init; }
+    /// <summary>
+    /// How long a loaded document that no watch or document state observes stays in memory after its last read or write; the next access
+    /// loads it from Storage. Observed documents always stay. Default ten minutes; 0 drops one right after use;
+    /// <see cref="double.PositiveInfinity"/> keeps them. Anything else that is not a number of milliseconds (NaN, a negative value) means the
+    /// default.
+    /// </summary>
+    public virtual double? DocumentRetentionMs { get; init; }
 }
 
 /// <summary>Resolved settings: every field over its built-in default, object fields merged (upstream <c>Settings</c>).</summary>
@@ -538,6 +545,8 @@ public sealed record Settings
     public required QueueMode FollowUpMode { get; init; }
     /// <summary>Idle context retention.</summary>
     public required double ContextRetentionMs { get; init; }
+    /// <summary>Unobserved document retention.</summary>
+    public required double DocumentRetentionMs { get; init; }
 }
 
 /// <summary>What <c>HarnessOptions.Env</c> builds an environment for (upstream <c>EnvTarget</c>).</summary>
@@ -568,7 +577,10 @@ public sealed record HarnessOptions
     /// <summary>Timers for sleeps and idle context expiry (a .NET seam for upstream's <c>setTimeout</c>); default
     /// <see cref="System.TimeProvider.System"/>.</summary>
     public TimeProvider? TimeProvider { get; init; }
-    /// <summary>Receives extension failures that do not fail the calling operation. Must not throw.</summary>
+    /// <summary>
+    /// Receives failures that do not fail the calling operation, such as a throwing hook or listener, and the error that fails the Session,
+    /// once. Its own throw is dropped. (An <c>async void</c> handler's exception escapes to the thread pool, which no caller can contain.)
+    /// </summary>
     public Action<Exception>? OnReport { get; init; }
 }
 
@@ -690,14 +702,23 @@ public enum WhenBusy
     Reject,
 }
 
+/// <summary>
+/// The entry an input is placed as, instead of <c>pi.user</c> (upstream <c>InputEntry</c>): an application kind, and data the transcript
+/// shows, such as its author. Its model message is still the input's user message, so it has no model, head or edits of its own.
+/// </summary>
+/// <param name="Kind">The entry kind; it must be non-empty and not start with <c>pi.</c>.</param>
+/// <param name="Data">The entry data; null omits it (JSON <c>null</c> is <see cref="JsonValue.Null"/>).</param>
+public sealed record InputEntry(string Kind, JsonValue? Data = null);
+
 /// <summary>A host submission: user input that may start a run, or a passive entry write (upstream <c>SubmissionDraft</c>). A request ID
 /// deduplicates within one conversation before any write; reusing one for the other submission type rejects.</summary>
 public sealed record SubmissionDraft
 {
     private SubmissionDraft() { }
-    /// <summary>User input (pi-ai <c>UserMessage["content"]</c>, wire JSON).</summary>
-    public static SubmissionDraft Input(JsonValue content, WhenBusy? whenBusy = null, string? requestId = null) =>
-        new() { Type = SubmissionType.Input, Content = content, WhenBusy = whenBusy, RequestId = requestId };
+    /// <summary>User input (pi-ai <c>UserMessage["content"]</c>, wire JSON), placed as <paramref name="entry"/> when given, else as
+    /// <c>pi.user</c> without data.</summary>
+    public static SubmissionDraft Input(JsonValue content, WhenBusy? whenBusy = null, string? requestId = null, InputEntry? entry = null) =>
+        new() { Type = SubmissionType.Input, Content = content, WhenBusy = whenBusy, RequestId = requestId, InputEntry = entry };
     /// <summary>A passive entry write.</summary>
     public static SubmissionDraft Write(EntryDraft entry, string? requestId = null) =>
         new() { Type = SubmissionType.Write, Entry = entry, RequestId = requestId };
@@ -711,6 +732,8 @@ public sealed record SubmissionDraft
     public WhenBusy? WhenBusy { get; private init; }
     /// <summary>The written entry.</summary>
     public EntryDraft? Entry { get; private init; }
+    /// <summary>The entry an input is placed as (upstream <c>entry</c> of an input); null places it as <c>pi.user</c>.</summary>
+    public InputEntry? InputEntry { get; private init; }
 }
 
 /// <summary>Result of aborting a submission.</summary>
@@ -791,9 +814,11 @@ public interface IConversation
     Task ConfigureAsync(AgentChange change, DurableContext context);
 
     /// <summary>
-    /// Durably admits user input or a passive entry write. A busy conversation queues it in <c>pi.inbox</c>, or rejects
-    /// <see cref="WhenBusy.Reject"/> input with <see cref="ConversationBusyException"/> and writes nothing. Idle input places a user entry
-    /// and starts a run; an idle write appends its entry.
+    /// Durably admits user input or a passive entry write. A busy conversation, or one with queued items, queues input and writes that affect
+    /// model context in <c>pi.inbox</c>; <see cref="WhenBusy.Reject"/> rejects input with <see cref="ConversationBusyException"/> instead and
+    /// writes nothing. A write of only <c>Kind</c> and <c>Data</c> (no <c>Model</c>, <c>Head</c> or <c>Edits</c>) is appended at once, even
+    /// mid-run, as it changes nothing the model sees. Idle input places its entry (<c>pi.user</c>, or its <see cref="InputEntry"/>) and starts
+    /// a run; an idle write appends its entry.
     /// </summary>
     Task<ISubmission> SubmitAsync(SubmissionDraft submission, DurableContext context);
     /// <summary>Admits a write of a <c>pi.reset</c> entry that starts a new context, carrying <paramref name="handoff"/> as a user message

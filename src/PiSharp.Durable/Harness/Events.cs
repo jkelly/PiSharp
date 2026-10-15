@@ -1,5 +1,7 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/events.ts (AgentEvent, MessageChange, SnapshotEvent,
 // AgentEventStream, watchEvents, translate, messageChanges, toolUpdate).
+// Pi v1.2.0's area b and j parts of events.ts are in (durable-sync-1.2.0-worklist.json): the stream's watch reports listener errors and
+// ends with session_failed; the snapshot carries compactionFailure and compaction_end its error. The header moves to v1.2.0 with area a.
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -41,7 +43,7 @@ public sealed record QueuedItem(SubmissionId Id, string Mode)
 
 /// <summary>
 /// The current state at attachment, or after an overflow (upstream <c>SnapshotEvent</c>): <c>{type, entries, run?, generation?, tools,
-/// compactions, inbox, agent, usage}</c>. Every other event applies on top of it.
+/// compactions, compactionFailure?, inbox, agent, usage}</c>. Every other event applies on top of it.
 /// </summary>
 public sealed record SnapshotEvent : AgentEvent
 {
@@ -58,6 +60,9 @@ public sealed record SnapshotEvent : AgentEvent
     public required JsonArrayValue Tools { get; init; }
     /// <summary><c>pi.live.compactions</c>: live compactions with their attempt and retry backoff.</summary>
     public required JsonArrayValue Compactions { get; init; }
+    /// <summary><c>pi.live.compactionFailure</c> <c>{taskId, reason, error}</c>: the newest compaction failure since a compaction last produced
+    /// a summary; null when there is none.</summary>
+    public JsonObjectValue? CompactionFailure { get; init; }
     /// <summary>The queued inbox items.</summary>
     public required ImmutableArray<QueuedItem> Inbox { get; init; }
     /// <summary><c>pi.agent</c>; <c>{}</c> when absent.</summary>
@@ -69,7 +74,7 @@ public sealed record SnapshotEvent : AgentEvent
     public override JsonObjectValue ToJson() => Writer()
         .Add("entries", JsonValue.Array(Entries.Select(entry => (JsonValue)entry.ToJson())))
         .Add("run", RunInputs is { } inputs ? JsonValue.Object([KeyValuePair.Create("inputs", (JsonValue)Ids(inputs))]) : null)
-        .Add("generation", Generation).Add("tools", Tools).Add("compactions", Compactions)
+        .Add("generation", Generation).Add("tools", Tools).Add("compactions", Compactions).Add("compactionFailure", CompactionFailure)
         .Add("inbox", JsonValue.Array(Inbox.Select(item => (JsonValue)item.ToJson()))).Add("agent", Agent).Add("usage", Usage).Build();
 }
 
@@ -304,14 +309,15 @@ public sealed record CompactionStartEvent(TaskId TaskId, string Reason, bool Blo
     public override JsonObjectValue ToJson() => Writer().Add("taskId", TaskId.ToJson()).Add("reason", Reason).Add("blocking", Blocking).Build();
 }
 
-/// <summary><c>{type: "compaction_end", taskId, reason}</c>: a status left <c>pi.live.compactions</c>; the task's receipt tells whether it
-/// produced a summary, and the summary entry has its own events.</summary>
-public sealed record CompactionEndEvent(TaskId TaskId, string Reason) : AgentEvent
+/// <summary><c>{type: "compaction_end", taskId, reason, error?}</c>: a status left <c>pi.live.compactions</c>; the task's receipt tells whether
+/// it produced a summary, and the summary entry has its own events. <paramref name="Error"/> is set when the compaction failed, faulted or
+/// was orphaned, as in <c>pi.live.compactionFailure</c>.</summary>
+public sealed record CompactionEndEvent(TaskId TaskId, string Reason, string? Error = null) : AgentEvent
 {
     /// <inheritdoc/>
     public override string Type => "compaction_end";
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => Writer().Add("taskId", TaskId.ToJson()).Add("reason", Reason).Build();
+    public override JsonObjectValue ToJson() => Writer().Add("taskId", TaskId.ToJson()).Add("reason", Reason).Add("error", Error).Build();
 }
 
 /// <summary>One change to the in-flight assistant message, relative to that message (upstream <c>MessageChange</c>). Blocks and messages are
@@ -421,7 +427,7 @@ public static class AgentEvents
             var held = new HashSet<TaskId>(completing.Select(record => record.Id));
             var current = initial;
             // Batches are the watch's values; an overflow delivers a snapshot of the newest view instead.
-            var watch = new CommittedWatch<IReadOnlyList<AgentEvent>>([], release, views.Schedule, () => [SnapshotOf(current)],
+            var watch = new CommittedWatch<IReadOnlyList<AgentEvent>>([], release, views.Schedule, views.Report, () => [SnapshotOf(current)],
                 events => JsonValue.Array(events.Select(item => (JsonValue)item.ToJson())));
             var observer = new EventsObserver(watch, (before, after, ops, publication, commitContext) =>
             {
@@ -464,7 +470,7 @@ public static class AgentEvents
         public override void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, CommitPublication commit,
             DurableContext context) => publication(before, after, ops, commit, context);
 
-        public override void CloseSession() => watch.CloseSession();
+        public override void CloseSession(Exception? failure) => watch.CloseSession(failure);
     }
 
     // ─── The typed parts of a view the events read ──────────────────────────
@@ -475,6 +481,7 @@ public static class AgentEvents
         public JsonObjectValue? Generation => Live.TryGetValue("generation", out var generation) ? generation as JsonObjectValue : null;
         public JsonArrayValue? Tools => Live.TryGetValue("tools", out var tools) ? tools as JsonArrayValue : null;
         public JsonArrayValue? Compactions => Live.TryGetValue("compactions", out var compactions) ? compactions as JsonArrayValue : null;
+        public JsonObjectValue? CompactionFailure => Live.TryGetValue("compactionFailure", out var failure) ? failure as JsonObjectValue : null;
     }
 
     private static Parts PartsOf(ConversationView view) =>
@@ -490,6 +497,7 @@ public static class AgentEvents
             Generation = parts.Generation,
             Tools = parts.Tools ?? JsonArrayValue.Empty,
             Compactions = parts.Compactions ?? JsonArrayValue.Empty,
+            CompactionFailure = parts.CompactionFailure,
             Inbox = Queued(parts.Inbox),
             Agent = parts.Agent ?? Agents.AgentDoc.Definition.Initial(),
             Usage = parts.Usage ?? UsageLedger.UsageDoc.Definition.Initial(),
@@ -633,10 +641,14 @@ public static class AgentEvents
         // Compaction ends, task failures, then turn and run ends.
         var compactionsBefore = Slots(was.Compactions);
         var compactions = Slots(now.Compactions);
+        var failure = now.CompactionFailure;
         foreach (var status in compactionsBefore)
         {
             if (!compactions.Any(candidate => Same(candidate["taskId"], status["taskId"])))
-                events.Add(new CompactionEndEvent(new TaskId(Integer(status["taskId"])), Text(status["reason"])));
+            {
+                var error = failure is not null && Same(failure["taskId"], status["taskId"]) ? Text(failure["error"]) : null;
+                events.Add(new CompactionEndEvent(new TaskId(Integer(status["taskId"])), Text(status["reason"]), error));
+            }
         }
         // A generation's turn ends when its outcome is committed: at a `completing` hold or at terminal, whichever comes first, so a
         // successor created at the hold starts after it.

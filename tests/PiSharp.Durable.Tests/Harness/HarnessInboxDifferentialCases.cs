@@ -1,10 +1,12 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): a differential check of the inbox against the pinned upstream. There is no upstream test
-// file: Fixtures/inbox.upstream.json holds what the pinned pi-durable commits for the scenarios below with pi-ai's faux provider on
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): a differential check of the inbox against the pinned upstream. There is no upstream test
+// file: Fixtures/v1.2.0/inbox.upstream.json holds what the pinned pi-durable commits for the scenarios below with pi-ai's faux provider on
 // MemoryStorage, as printed by Fixtures/capture-inbox.mjs: the inbox and the submissions while the conversation is busy, then every entry,
 // task and submission, the conversation's pi.live, pi.inbox, pi.usage, pi.agent and pi.provider documents, and Harness.usage(). It is
 // normalized as HarnessChatDifferentialCases.cs's fixture is, and compared the same way: as JSON values and by their exact text, and the documents built by the
 // Harness (the busy inbox included) and the usage total by their exact text. The scenarios run here on memory, JSONL and SQLite and must
 // produce the same records, IDs included.
+// Until area a (tool task v2) lands, the steer scenario's one pi.tool task is compared in its v1 shape: PendingToolV2 checks that the captured
+// record differs from v1 exactly by version 2 and the `kind: "model"` of its input and result, and drops those; area a removes it.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -33,7 +35,27 @@ internal static class InboxDifferentialTests
     private const double T = 1000;
 
     private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "inbox.upstream.json"))));
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "inbox.upstream.json"))));
+
+    /// <summary>The captured records with each pi.tool task in its v1 shape; see the file header.</summary>
+    private static JsonValue PendingToolV2(JsonValue records)
+    {
+        if (records is not JsonObjectValue value || !value.TryGetValue("tasks", out var tasks)) return records;
+        return value.SetItem("tasks", JsonValue.Array(((JsonArrayValue)tasks).Select(item =>
+        {
+            var task = (JsonObjectValue)item;
+            if (S(task["kind"]) != "pi.tool") return item;
+            Check(N(task["version"]) == 2, "a v2 tool task");
+            var input = (JsonObjectValue)task["input"];
+            Check(S(input["kind"]) == "model", "a model-issued call");
+            var state = (JsonObjectValue)task["state"];
+            var outcome = (JsonObjectValue)state["outcome"];
+            var result = (JsonObjectValue)outcome["result"];
+            Check(S(result["kind"]) == "model", "a model-issued result");
+            return (JsonValue)task.SetItem("version", 1).SetItem("input", input.Remove("kind"))
+                .SetItem("state", state.SetItem("outcome", outcome.SetItem("result", result.Remove("kind"))));
+        })));
+    }
 
     private static ChatSetup Chat() => new(new FauxModels(new FauxOptions { Api = "faux" }));
 
@@ -79,7 +101,7 @@ internal static class InboxDifferentialTests
         var expected = (JsonObjectValue)Upstream.Value[scenario];
         foreach (var (name, actual) in new[] { ("queued", busy), ("done", done) })
         {
-            var value = expected[name];
+            var value = PendingToolV2(expected[name]);
             Check(JsonValue.DeepEquals(value, actual), $"{scenario} {name}: expected {value.ToJson()}, actual {actual.ToJson()}");
             Equal(value.ToJson(), actual.ToJson(), $"{scenario} {name}: key order");
             // The documents and the usage total are built by the Harness, so their key order is upstream's too.

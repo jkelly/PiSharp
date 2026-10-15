@@ -1,5 +1,9 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/scheduler.ts. Named DurableTaskScheduler because
 // System.Threading.Tasks.TaskScheduler is used throughout the assembly.
+// Pi v1.2.0's area b parts of scheduler.ts are in (durable-sync-1.2.0-worklist.json): its commit listener is an internal one (observeCommits),
+// a throw in its own commits (reconciliation, reservation, a step) fails the Session instead of being retried, closedError carries the
+// Session's failure, close signals invocations in join() after every close listener ran, and an abort's join ends when the Session fails.
+// The header moves to v1.2.0 with area c (the scheduler rewrite), which owns this row.
 //
 // Concurrency model. Upstream runs on one JavaScript thread: commit listeners, line callbacks and handler code never overlap, and wakeups
 // are queued microtasks. Here:
@@ -149,7 +153,7 @@ internal sealed class DurableTaskScheduler
     /// <summary>Loads live tasks and changes surviving <c>running</c> tasks back to <c>pending</c>. Dispatches nothing.</summary>
     public async Task OpenAsync(DurableContext openContext)
     {
-        session.SubscribeCommits((publication, _) => Observe(publication));
+        session.ObserveCommits((publication, _) => Observe(publication));
         session.SubscribeClose(Seal);
         registrySubscription = registry.Subscribe(Kick);
         await session.CommitWithAsync(async tx =>
@@ -192,12 +196,16 @@ internal sealed class DurableTaskScheduler
         Kick();
     }
 
-    /// <summary>Waits for every invocation signalled by <see cref="Seal"/>. Writes nothing.</summary>
+    /// <summary>
+    /// Signals every invocation and waits for them; writes nothing. Close calls this after every close listener has run, so waits, watches and
+    /// streams a task holds end with the Session's reason, not as cancelled by its signal.
+    /// </summary>
     public Task JoinAsync()
     {
-        Task[] done;
-        lock (gate) done = [.. invocations.Values.Select(invocation => invocation.Done.Task)];
-        return Task.WhenAll(done);
+        List<Invocation> signal;
+        lock (gate) signal = [.. invocations.Values];
+        foreach (var invocation in signal) Signal(invocation, null);
+        return Task.WhenAll(signal.Select(invocation => invocation.Done.Task));
     }
 
     /// <summary>
@@ -227,8 +235,9 @@ internal sealed class DurableTaskScheduler
             if (!current.AbortRequested) tx.SetTask(current with { AbortRequested = true });
             return (TaskAbortResult.Marked, invocation?.Mode == InvocationMode.Run ? invocation : null);
         }, callContext).ConfigureAwait(false);
-        // The commit listener signalled the run; join it.
-        if (run is not null) await callContext.WaitAsync(run.Done.Task).ConfigureAwait(false);
+        // The commit listener signalled the run; join it. A run that ignores its signal can outlive a failed Session, which ends the wait
+        // instead.
+        if (run is not null) await callContext.WaitAsync(Task.WhenAny(run.Done.Task, session.Failed).Unwrap()).ConfigureAwait(false);
         return result;
     }
 
@@ -239,7 +248,7 @@ internal sealed class DurableTaskScheduler
         {
             lock (gate)
             {
-                if (closing) throw HarnessUtil.ClosedError();
+                if (closing) throw HarnessUtil.ClosedError(session);
                 if (live.ContainsKey(id)) return taskWaiters.Add(id, callContext);
             }
             var record = await storage.GetTaskAsync(id, callContext).ConfigureAwait(false) ?? throw new InvalidOperationException($"Task {id} does not exist");
@@ -255,7 +264,7 @@ internal sealed class DurableTaskScheduler
         Task waiting;
         lock (gate)
         {
-            if (closing) return Task.FromException(HarnessUtil.ClosedError());
+            if (closing) return Task.FromException(HarnessUtil.ClosedError(session));
             if (Idle(conversationId)) return Task.CompletedTask;
             ScheduleReconcileLocked();
             waiting = idleWaiters.Add(conversationId, callContext);
@@ -372,7 +381,7 @@ internal sealed class DurableTaskScheduler
                 if (!ChainKnown(ParentOf(record), null)) ScheduleReconcileLocked();
                 else if (!record.Background && !record.AbortRequested && BelowCancelled(ParentOf(record))) cascadePending = true;
             }
-            // Also retries, with the next commit of any kind, a cascade whose commit failed.
+            // A cascade that a reservation or step found pending runs with the next commit of any kind.
             if (cascadePending) ScheduleReconcileLocked();
         }
         foreach (var invocation in signal) Signal(invocation, null);
@@ -500,15 +509,9 @@ internal sealed class DurableTaskScheduler
         }
         catch (Exception error)
         {
-            bool reportIt;
-            lock (gate)
-            {
-                // Any pass may have staged marks, so a failed one is retried with the next commit.
-                cascadePending = true;
-                foreach (var id in checks) failFastChecks[id] = true;
-                reportIt = !closing;
-            }
-            if (reportIt) report(error);
+            // No extension code runs in this commit: a throw is a storage failure, a host callback, or a bug. None is fixed by running the
+            // pass again, so it fails the Session, which reports it.
+            FailSession(error);
         }
         SettleIdle();
     }
@@ -737,23 +740,35 @@ internal sealed class DurableTaskScheduler
         return false;
     }
 
-    /// <summary>Close listener: runs synchronously once admission is sealed, before <see cref="JoinAsync"/>.</summary>
+    /// <summary>Fails the Session, which reports it, for a throw in one of the scheduler's own commits; ignored once closing.</summary>
+    private void FailSession(Exception error)
+    {
+        bool closingNow;
+        lock (gate) closingNow = closing;
+        if (!closingNow) session.Fail(error);
+    }
+
+    /// <summary>Close listener: runs synchronously once admission is sealed, before <see cref="JoinAsync"/>, or when the Session fails.</summary>
     private void Seal()
     {
-        List<Invocation> signal;
         lock (gate)
         {
             closing = true;
             contexts.Clear();
             expiry?.Timer.Dispose();
             expiry = null;
-            signal = [.. invocations.Values];
-            var error = HarnessUtil.ClosedError();
+            var error = HarnessUtil.ClosedError(session);
             taskWaiters.RejectAll(error);
             idleWaiters.RejectAll(error);
         }
-        registrySubscription?.Dispose();
-        foreach (var invocation in signal) Signal(invocation, null);
+        try
+        {
+            registrySubscription?.Dispose();
+        }
+        catch (Exception error)
+        {
+            report(error);
+        }
     }
 
     private void Kick()
@@ -784,9 +799,8 @@ internal sealed class DurableTaskScheduler
         }
         catch (Exception error)
         {
-            bool reportIt;
-            lock (gate) reportIt = !closing;
-            if (reportIt) report(error);
+            // As in ReconcileAsync: the reservation commit runs no extension code.
+            FailSession(error);
         }
         finally
         {
@@ -796,7 +810,7 @@ internal sealed class DurableTaskScheduler
                 draining = false;
                 again = dirty;
             }
-            // A wakeup that arrived during a failed pass still needs its pass.
+            // A wakeup that arrived after the loop's last check still needs its pass.
             if (again) Kick();
         }
     }
@@ -1095,16 +1109,16 @@ internal sealed class DurableTaskScheduler
                 if (decision.Kind == DecisionKind.Continue) return current;
                 End(invocation);
                 if (decision.Kind == DecisionKind.Fault)
-                    await TerminateAsync(tx, current!.Record, new FaultedTaskOutcome(new TaskOutcomeError(decision.Error!.Message))).ConfigureAwait(false);
+                    await TerminateAsync(tx, current!.Record, new FaultedTaskOutcome(new TaskOutcomeError(DurableErrors.MessageOf(decision.Error!)))).ConfigureAwait(false);
                 return null;
             }, context).ConfigureAwait(false);
         }
         catch (Exception error)
         {
+            // The step writes the scheduler's own decision, a fault or a terminal record; a throw there would otherwise leave the task
+            // running, to be reserved and run again.
             End(invocation);
-            bool reportIt;
-            lock (gate) reportIt = !closing;
-            if (reportIt) report(error);
+            FailSession(error);
             return null;
         }
     }
@@ -1637,7 +1651,7 @@ internal sealed class DurableTaskScheduler
                 lock (scheduler.gate)
                 {
                     if (invocation.Ended) throw EndedError(invocation);
-                    if (scheduler.closing) throw HarnessUtil.ClosedError();
+                    if (scheduler.closing) throw HarnessUtil.ClosedError(scheduler.session);
                     found = scheduler.live.GetValueOrDefault(invocation.TaskId);
                 }
                 if (found is null) throw new InvalidOperationException($"Task {invocation.TaskId} is terminal");

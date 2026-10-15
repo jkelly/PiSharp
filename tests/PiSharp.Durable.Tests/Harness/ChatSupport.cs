@@ -230,6 +230,7 @@ internal sealed class ChatSetup
     public QueueMode? SteeringMode { get => values.SteeringMode; set => values.SteeringMode = value; }
     public QueueMode? FollowUpMode { get => values.FollowUpMode; set => values.FollowUpMode = value; }
     public double? ContextRetentionMs { get => values.ContextRetentionMs; set => values.ContextRetentionMs = value; }
+    public double? DocumentRetentionMs { get => values.DocumentRetentionMs; set => values.DocumentRetentionMs = value; }
 
     /// <summary>A copy sharing the faux provider, registry, reports and settings object, with other models (upstream
     /// <c>{ ...base, models }</c>).</summary>
@@ -249,6 +250,7 @@ internal sealed class ChatSetup
         public QueueMode? SteeringMode;
         public QueueMode? FollowUpMode;
         public double? ContextRetentionMs;
+        public double? DocumentRetentionMs;
     }
 
     private sealed class LiveSettings(Values values) : HarnessSettings
@@ -262,6 +264,7 @@ internal sealed class ChatSetup
         public override QueueMode? SteeringMode { get => values.SteeringMode; init { } }
         public override QueueMode? FollowUpMode { get => values.FollowUpMode; init { } }
         public override double? ContextRetentionMs { get => values.ContextRetentionMs; init { } }
+        public override double? DocumentRetentionMs { get => values.DocumentRetentionMs; init { } }
     }
 }
 

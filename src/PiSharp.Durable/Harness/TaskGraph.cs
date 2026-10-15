@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/task-graph.ts (TaskGraphState, TaskGraphNode, TaskGraph,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/task-graph.ts (TaskGraphState, TaskGraphNode, TaskGraph,
 // TaskGraphWatch, TaskGraphView, advance, nodeOf, stateOf, phaseOf).
 //
 // Upstream's TaskGraph is a plain JSON object {tasks: {[decimal id]: node}}; here it is a typed immutable class whose ToJson() is that
@@ -210,11 +210,11 @@ internal sealed class TaskGraphView
     {
         this.session = session;
         this.storage = storage;
-        session.SubscribeCommits((publication, context) =>
+        session.ObserveCommits((publication, context) =>
         {
             Mount? current;
             lock (gate) current = mount;
-            if (current is not null) Advance(current, publication, context);
+            if (current is not null) Advance(current, publication, context, session.Report);
         });
         session.SubscribeClose(() =>
         {
@@ -226,7 +226,8 @@ internal sealed class TaskGraphView
                 mount = null;
             }
             if (current is null) return;
-            foreach (var observer in current.Snapshot(gate)) observer.CloseSession();
+            var failure = session.Failure;
+            foreach (var observer in current.Snapshot(gate)) Session.Contained(() => observer.CloseSession(failure), session.Report);
         });
     }
 
@@ -237,7 +238,7 @@ internal sealed class TaskGraphView
             .ConfigureAwait(false);
         try
         {
-            return ReplicatedState.Attach<TaskGraph>(source);
+            return ReplicatedState.Attach<TaskGraph>(source, new ReplicatedStateSourceOptions { OnError = session.Report });
         }
         catch
         {
@@ -250,7 +251,7 @@ internal sealed class TaskGraphView
     public async Task<IWatchHandle<TaskGraph>> WatchAsync(DurableContext context)
     {
         var (watch, _) = await AttachAsync(
-            (value, release) => new CommittedWatch<TaskGraph>(value, release, session.Defer, json: graph => graph.ToJson()), context)
+            (value, release) => new CommittedWatch<TaskGraph>(value, release, session.Defer, session.Report, json: graph => graph.ToJson()), context)
             .ConfigureAwait(false);
         if (context.IsCancellationRequested)
         {
@@ -283,7 +284,7 @@ internal sealed class TaskGraphView
             lock (gate)
             {
                 // Close or cancellation may begin while the mount builds; register nothing then.
-                if (closed) throw HarnessUtil.ClosedError();
+                if (closed) throw HarnessUtil.ClosedError(session);
                 context.ThrowIfCancellationRequested();
                 mount = target;
                 target.Observers.Add(observer);
@@ -310,7 +311,7 @@ internal sealed class TaskGraphView
 
     /// <summary>Derives the mount's operations from one publication, applies them, and hands the revision to every observer (upstream
     /// <c>advance</c>). Runs on the Session line.</summary>
-    private void Advance(Mount target, CommitPublication publication, DurableContext context)
+    private void Advance(Mount target, CommitPublication publication, DurableContext context, Action<Exception> report)
     {
         var ops = new List<Op>();
         // Nodes this publication set or deleted, over the mount's value.
@@ -363,7 +364,7 @@ internal sealed class TaskGraphView
         target.Value = new TaskGraph(builder.ToImmutable());
         ImmutableArray<Op> frame = [.. ops];
         var frameContext = context.WithoutCancellation();
-        foreach (var observer in target.Snapshot(gate)) observer.Advance(target.Value, frame, frameContext);
+        foreach (var observer in target.Snapshot(gate)) Session.Contained(() => observer.Advance(target.Value, frame, frameContext), report);
     }
 
     /// <summary>The mount: its current revision and its observers.</summary>

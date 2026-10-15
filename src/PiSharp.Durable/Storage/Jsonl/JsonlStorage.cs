@@ -1,4 +1,8 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/storage/jsonl/storage.ts (and its index.ts exports).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/jsonl/storage.ts (and its index.ts exports).
+//
+// Invalid read requests (an unknown conversation, a malformed or foreign cursor, history a document does not keep) are the in-memory
+// store's StorageRequestExceptions; upstream's own StorageRequestError, "Storage.entry() requires an entry ID", has no counterpart, since
+// the C# overloads of GetEntryAsync are typed. Every other exception, file failures included, fails the owning Session.
 //
 // Portable JSONL storage over IFileSystem (spec §11.3). The directory holds main.jsonl, with one commit marker line per commit, and
 // sidecars doc-<id>.jsonl (one document incarnation's bases and deltas) and task-<id>.jsonl (live task replacements). A commit appends

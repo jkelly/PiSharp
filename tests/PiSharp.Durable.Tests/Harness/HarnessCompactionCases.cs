@@ -1,5 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-compaction.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-compaction.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
+// - Tools return their results as ToolExecutionResult.Content: upstream's v1.2.0 `output` is area a's rename of that field, which renames
+//   it in every test at once.
 // - Backends. Upstream opens its chats on MemoryStorage and reopens a SQLite file for the recovery and blocked cases. harness.compaction.*
 //   does the same; harness.compaction.jsonl.* reruns every storage-backed case on a fresh JSONL directory (reopening the same directory in
 //   the reopen cases), and harness.compaction.sqlite.* reruns the cases upstream runs on MemoryStorage on a fresh SQLite file (its reopen
@@ -395,6 +397,20 @@ internal static class CompactionTests
             Equal(5, Compaction.SelectCut(View(entries), 150), "cut");
         });
 
+        yield return Case(prefix + "range-selection.never-cuts-at-a-display-only-entry-where-the-budget-is-reached-10407", () =>
+        {
+            List<EntryRecord> entries =
+            [
+                Entry("pi.user", [UserMessage(Text("u1", 100))]),
+                Entry("pi.assistant", [AssistantMessage(Text("a1", 100))]),
+                Entry("chat.message", []),
+                Entry("pi.assistant", [AssistantMessage(Text("a2", 100))]),
+            ];
+            // The budget is reached at a1; the display-only entry after it is skipped for the assistant a2.
+            Equal(1, Compaction.SelectCut(View(entries), 150), "cut at 150");
+            Equal(3, Compaction.SelectCut(View(entries), 50), "cut at 50");
+        });
+
         yield return Case(prefix + "range-selection.follows-edited-contributions-an-omitted-entry-adds-nothing-and-is-no-candidate", () =>
         {
             List<EntryRecord> entries =
@@ -454,7 +470,7 @@ internal static class CompactionTests
                 StringComparison.Ordinal), "the marker is serialized first");
         });
 
-        yield return Case(prefix + "serialization.writes-a-transcript-truncates-tool-results-and-omits-system-messages", () =>
+        yield return Case(prefix + "serialization.writes-a-transcript-truncates-tool-results-and-omits-system-messages-and-thinking", () =>
         {
             var call = FauxToolCall("read", Obj(("path", "a.ts")), "c");
             JsonValue[] messages =
@@ -467,7 +483,8 @@ internal static class CompactionTests
             var serialized = Compaction.SerializeConversation(messages);
             Check(!serialized.Contains("hidden", StringComparison.Ordinal), "system omitted");
             Check(serialized.Contains("[User]: hello", StringComparison.Ordinal), "user");
-            Check(serialized.Contains("[Assistant thinking]: hmm", StringComparison.Ordinal), "thinking");
+            Check(!serialized.Contains("hmm", StringComparison.Ordinal), "thinking omitted");
+            Check(!serialized.Contains("[Assistant thinking]", StringComparison.Ordinal), "no thinking label");
             Check(serialized.Contains("[Assistant]: sure", StringComparison.Ordinal), "text");
             Check(serialized.Contains("[Assistant tool calls]: read(path=\"a.ts\")", StringComparison.Ordinal), "calls");
             Check(serialized.Contains($"[Tool result]: {new string('y', 2000)}\n\n[... 500 more characters truncated]", StringComparison.Ordinal), "truncated");
@@ -1077,6 +1094,35 @@ internal static class CompactionTests
             await chat.Harness.CloseAsync(Context);
         });
 
+        yield return Case(prefix + "records-a-failure-in-pi-live-the-snapshot-and-compaction-end-until-a-summary-is-produced", async () =>
+        {
+            var chat = await Open(fresh, contextWindow: 2000);
+            await History(chat);
+            chat.Setup.Compaction = Background;
+            var listening = await Listen(chat);
+            chat.Faux.Summaries.Push(Failure("bad request"));
+            await Turn(chat, Text("u4", 100), Text("a4", 100));
+            await Eventually(() => listening.Types().Contains("compaction_end"));
+            var recorded = (JsonObjectValue)(await LiveOf(chat))["compactionFailure"];
+            MatchJson("""{"reason":"threshold","error":"Summarization failed: bad request"}""", recorded, "recorded");
+            SameJson($$"""{"type":"compaction_end","taskId":{{N(recorded["taskId"])}},"reason":"threshold","error":"Summarization failed: bad request"}""",
+                listening.Events().First(item => item.Type == "compaction_end").ToJson(), "compaction_end");
+            var reopened = await chat.Harness.WatchEventsAsync(chat.Root.Id, Context);
+            SameJson(recorded.ToJson(), reopened.Snapshot.CompactionFailure, "snapshot");
+            await reopened.StopAsync();
+            // A compaction that produces a summary removes the failure, and ends without an error.
+            chat.Setup.Compaction = Manual;
+            chat.Faux.Summaries.Push(Summary());
+            var manual = await Compact(chat.Root);
+            Equal("completed", S((await Result(chat, manual))["status"]), "manual");
+            Check(!(await LiveOf(chat)).ContainsKey("compactionFailure"), "failure removed");
+            await Eventually(() => listening.Events().Any(item => item is CompactionEndEvent end && end.TaskId == manual));
+            var manualEnd = (CompactionEndEvent)listening.Events().First(item => item is CompactionEndEvent end && end.TaskId == manual);
+            Check(!manualEnd.ToJson().ContainsKey("error"), "no error");
+            await listening.Stream.StopAsync();
+            await chat.Harness.CloseAsync(Context);
+        });
+
         yield return Case(prefix + "stops-through-aborttask-and-conversation-abort-with-background", async () =>
         {
             foreach (var stop in new[] { "task", "conversation" })
@@ -1147,39 +1193,56 @@ internal static class CompactionTests
             await chat.Harness.CloseAsync(Context);
         });
 
-        foreach (var (slug, prepare) in new (string, Action<Chat>)[]
+        yield return Case(prefix + "sends-the-request-anyway-when-its-compaction-declines", async () =>
         {
-            ("declines", chat => Decline(chat)),
-            ("fails", chat => chat.Faux.Summaries.Push(Failure("bad request"))),
-        })
-        {
-            yield return Case(prefix + $"sends-the-request-anyway-when-its-compaction-{slug}", async () =>
-            {
-                var chat = await Open(fresh, contextWindow: 1000);
-                await History(chat);
-                chat.Setup.Compaction = Blocking;
-                prepare(chat);
-                await Turn(chat, Text("u4", 200), "a4");
-                Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "no summary");
-                Equal(Text("u1", 100), FirstUserText(chat.Faux.AgentRequests.Snapshot()[^1].Messages), "uncompacted request");
-                await chat.Harness.CloseAsync(Context);
-            });
-        }
+            var chat = await Open(fresh, contextWindow: 1000);
+            await History(chat);
+            chat.Setup.Compaction = Blocking;
+            Decline(chat);
+            await Turn(chat, Text("u4", 200), "a4");
+            Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "no summary");
+            Equal(Text("u1", 100), FirstUserText(chat.Faux.AgentRequests.Snapshot()[^1].Messages), "uncompacted request");
+            Check(!(await LiveOf(chat)).ContainsKey("compactionFailure"), "no failure");
+            await chat.Harness.CloseAsync(Context);
+        });
 
-        yield return Case(prefix + "sends-the-request-anyway-when-its-compaction-is-aborted-directly", async () =>
+        // A failed compaction leaves a context it judged too large; sending it once filled a 1M window and got an empty `length` answer on
+        // every turn while the failure stayed invisible.
+        yield return Case(prefix + "fails-the-run-with-the-compactions-error-without-a-request-when-its-compaction-fails", async () =>
+        {
+            var chat = await Open(fresh, contextWindow: 1000);
+            await History(chat);
+            chat.Setup.Compaction = Blocking;
+            chat.Faux.Summaries.Push(Failure("bad request"));
+            var requests = chat.Faux.AgentRequests.Count;
+            var input = await Submit(chat, Text("u4", 200));
+            MatchJson("""{"status":"unanswered","reason":"model_error","detail":"Compaction failed: Summarization failed: bad request"}""",
+                (await input.WaitAsync(Context)).ToJson(), "input");
+            Equal(requests, chat.Faux.AgentRequests.Count, "no request");
+            Equal("pi.user", (await KindsOf(chat.Root))[^1], "last kind");
+            var state = await LiveOf(chat);
+            Check(!state.ContainsKey("compactions"), "no status");
+            MatchJson("""{"reason":"threshold","error":"Summarization failed: bad request"}""", state["compactionFailure"], "failure");
+            await chat.Harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "fails-the-run-when-its-compaction-is-aborted-directly", async () =>
         {
             var chat = await Open(fresh, contextWindow: 1000);
             await History(chat);
             chat.Setup.Compaction = Blocking;
             var reached = new Deferred();
             chat.Faux.Summaries.Push(Gated(new Deferred(), Summary(), reached));
-            chat.Faux.Agent.Push(Answer("a4"));
+            var requests = chat.Faux.AgentRequests.Count;
             var input = await Submit(chat, Text("u4", 200));
             await reached.Task;
             var child = Single(await CompactionTasks(chat), "blocking");
             await chat.Harness.AbortTaskAsync(child.Id, Context);
-            Equal(SubmissionStatus.Done, (await input.WaitAsync(Context)).Status, "input");
+            MatchJson("""{"status":"unanswered","reason":"model_error","detail":"Compaction was aborted"}""", (await input.WaitAsync(Context)).ToJson(), "input");
+            Equal(requests, chat.Faux.AgentRequests.Count, "no request");
             Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "no summary");
+            // Aborting is not a failure.
+            Check(!(await LiveOf(chat)).ContainsKey("compactionFailure"), "no failure");
             await chat.Harness.CloseAsync(Context);
         });
 
@@ -1941,7 +2004,7 @@ internal static class CompactionTests
             await chat.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "sends-the-request-anyway-when-its-blocking-compaction-faults", async () =>
+        yield return Case(prefix + "fails-the-run-when-its-blocking-compaction-faults-and-records-the-fault", async () =>
         {
             var setup = ChatSetupWith(1000);
             var models = new SwitchableModels(setup.Faux);
@@ -1950,10 +2013,14 @@ internal static class CompactionTests
             await History(chat);
             chat.Setup.Compaction = Blocking;
             models.CompleteSimpleOverride = () => throw new InvalidOperationException("no credentials");
-            await Turn(chat, Text("u4", 200), "a4");
+            var input = await Submit(chat, Text("u4", 200));
+            MatchJson("""{"status":"unanswered","reason":"model_error","detail":"Compaction failed: no credentials"}""", (await input.WaitAsync(Context)).ToJson(),
+                "input");
             models.CompleteSimpleOverride = null;
             Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "no summary");
-            Check(await Compactions(chat) is null, "no status");
+            var state = await LiveOf(chat);
+            Check(!state.ContainsKey("compactions"), "no status");
+            MatchJson("""{"reason":"threshold","error":"no credentials"}""", state["compactionFailure"], "failure");
             await chat.Harness.CloseAsync(Context);
         });
 
@@ -2089,26 +2156,31 @@ internal static class CompactionTests
             await chat.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "leaves-no-usage-submission-summary-or-outcome-when-the-classifying-commit-is-rejected", async () =>
+        yield return Case(prefix + "leaves-no-usage-submission-or-summary-when-the-classifying-commit-fails-which-fails-the-harness", async () =>
         {
-            var storage = new ControlledStorage(fresh());
+            var storage = new ControlledStorage(fresh()) { KeepOpenForReopen = true };
             var chat = await Open(fresh, opened: storage);
             await History(chat);
             var before = await ModelUsage(chat);
+            var failure = new IOException("disk gone");
             chat.Faux.Summaries.Push(From(_ =>
             {
-                storage.FailNextCommit(new StorageRejectedException("rejected"));
+                storage.FailNextCommit(failure);
                 return Task.FromResult(Summary());
             }));
             var id = await Compact(chat.Root);
-            var outcome = await Result(chat, id);
-            Equal("faulted", S(outcome["status"]), "outcome");
-            Check(JsonValue.DeepEquals(before, await ModelUsage(chat)), "usage unchanged");
-            Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "no summary");
-            Equal(0, (await chat.Harness.InspectAsync(Context)).Submissions.Length, "submissions");
-            Check(await storage.GetSubmissionByRequestAsync(chat.Root.Id, $"compaction:{id.Value}", Context) is null, "no summary submission");
-            Check(await Compactions(chat) is null, "no status");
+            Equal(new SessionEnd(SessionEndReason.Failed, failure), await chat.Harness.Closed, "closed");
             await chat.Harness.CloseAsync(Context);
+            // Nothing of the failed commit landed: the task is still live, without usage, entry, or submission.
+            storage.Reopen();
+            Check(await storage.GetSubmissionByRequestAsync(chat.Root.Id, $"compaction:{id.Value}", Context) is null, "no summary submission");
+            Check((await storage.GetTaskAsync(id, Context))?.State.Status != DurableTaskStatus.Terminal, "task still live");
+            var (harness, root) = await OpenChat(storage, chat.Setup);
+            var usage = (JsonObjectValue)((JsonObjectValue)(await harness.SnapshotAsync(UsageLedger.UsageDoc, root.Id, Context))!["models"])["faux/faux-1"];
+            Check(JsonValue.DeepEquals(before, usage), "usage unchanged");
+            Check(!(await KindsOf(root)).Contains("pi.compaction"), "no summary");
+            await harness.CloseAsync(Context);
+            await storage.Inner.CloseAsync(Context);
         });
     }
 

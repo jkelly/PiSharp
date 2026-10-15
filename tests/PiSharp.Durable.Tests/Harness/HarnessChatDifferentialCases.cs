@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): a differential check of chat turns against the pinned upstream. There is no upstream test
-// file: Fixtures/chat-turns.upstream.json holds the committed records (every entry, task and submission, and the conversation's pi.live,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): a differential check of chat turns against the pinned upstream. There is no upstream test
+// file: Fixtures/v1.2.0/chat-turns.upstream.json holds the committed records (every entry, task and submission, and the conversation's pi.live,
 // pi.inbox, pi.usage, pi.agent and pi.provider documents) that the pinned pi-durable writes for the scenarios below with pi-ai's faux
 // provider on MemoryStorage, as printed by Fixtures/chat-turns.upstream.ts. Times and the provider session ID are normalized; task
 // startedAt/endedAt are dropped. The scenarios run here on memory, JSONL and SQLite and must produce the same records, IDs included.
@@ -36,7 +36,7 @@ internal static class ChatDifferentialTests
     private static readonly string[] Times = ["timestamp", "at", "until", "pollAt", "startedAt", "endedAt", "durationMs"];
 
     private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "chat-turns.upstream.json"))));
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "chat-turns.upstream.json"))));
 
     internal static JsonValue Normalize(JsonValue value, string? key = null) => value switch
     {
@@ -150,7 +150,7 @@ internal static class ChatDifferentialTests
 
         yield return Case(prefix + "follow-up", async () =>
         {
-            // A follow-up queued while busy runs after the answer; a queued write is placed at the same boundary.
+            // A follow-up queued while busy runs after the answer; the data-only write is appended at once (#10407), before the first answer.
             var setup = Chat();
             var release = new HarnessTests.Deferred();
             setup.Faux.SetResponses(

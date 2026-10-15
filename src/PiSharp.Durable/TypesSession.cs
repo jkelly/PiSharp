@@ -170,11 +170,15 @@ public enum WatchEndReason
     Retired,
     /// <summary>The listener failed; <see cref="WatchEnd.Error"/> holds the failure.</summary>
     ListenerError,
+    /// <summary>The Session failed; <see cref="WatchEnd.Error"/> holds what failed it, usually a storage error (see
+    /// <see cref="SessionFailedException"/>).</summary>
+    SessionFailed,
 }
 
 /// <summary>Terminal result of one watch (upstream <c>WatchEnd</c>).</summary>
 /// <param name="Reason">Why it ended.</param>
-/// <param name="Error">The listener failure of <see cref="WatchEndReason.ListenerError"/>; otherwise null.</param>
+/// <param name="Error">The listener failure of <see cref="WatchEndReason.ListenerError"/>, or the error that failed the Session for
+/// <see cref="WatchEndReason.SessionFailed"/>; otherwise null.</param>
 public sealed record WatchEnd(WatchEndReason Reason, Exception? Error = null)
 {
     /// <summary><c>{reason: "stopped"}</c>.</summary>
@@ -185,6 +189,28 @@ public sealed record WatchEnd(WatchEndReason Reason, Exception? Error = null)
     public static WatchEnd SessionClosed { get; } = new(WatchEndReason.SessionClosed);
     /// <summary><c>{reason: "retired"}</c>.</summary>
     public static WatchEnd Retired { get; } = new(WatchEndReason.Retired);
+    /// <summary><c>{reason: "session_failed", error}</c>.</summary>
+    public static WatchEnd SessionFailed(Exception error) => new(WatchEndReason.SessionFailed, error);
+}
+
+/// <summary>Why a Session ended: <c>close()</c>, or a failed Storage call, whose error it carries (upstream <c>SessionEnd</c>).</summary>
+/// <param name="Reason"><see cref="SessionEndReason.Closed"/> or <see cref="SessionEndReason.Failed"/>.</param>
+/// <param name="Error">What failed the Session; null when it closed.</param>
+public sealed record SessionEnd(SessionEndReason Reason, Exception? Error = null)
+{
+    /// <summary><c>{reason: "closed"}</c>.</summary>
+    public static SessionEnd Closed { get; } = new(SessionEndReason.Closed);
+    /// <summary><c>{reason: "failed", error}</c>.</summary>
+    public static SessionEnd Failed(Exception error) => new(SessionEndReason.Failed, error);
+}
+
+/// <summary>Why a Session ended (upstream <c>SessionEnd["reason"]</c>).</summary>
+public enum SessionEndReason
+{
+    /// <summary><c>close()</c> closed it.</summary>
+    Closed,
+    /// <summary>A failed Storage call failed it, and it closed itself.</summary>
+    Failed,
 }
 
 /// <summary>Serialized exact-frame observation of an immutable value with bounded pending delivery (upstream <c>WatchHandle</c>).</summary>
@@ -253,7 +279,9 @@ public interface IDocumentObserver
 /// </summary>
 public interface ISession : IDocumentObserver, IDocumentReader
 {
-    /// <summary>Runs one atomic transaction on the Session mutation line and returns the callback's result.</summary>
+    /// <summary>Runs one atomic transaction on the Session mutation line and returns the callback's result. Inside the callback read only
+    /// through the transaction: <c>SnapshotAsync</c>, <c>DocumentStateAsync</c>, <c>WatchDocAsync</c> and the other Session and runtime reads
+    /// may queue on the line the callback holds, and then never complete.</summary>
     Task<T> CommitAsync<T>(Func<ITx, Task<T>> change, DurableContext context);
     /// <summary>Runs one atomic asynchronous transaction on the Session mutation line.</summary>
     Task CommitAsync(Func<ITx, Task> change, DurableContext context);
@@ -265,11 +293,26 @@ public interface ISession : IDocumentObserver, IDocumentReader
     /// <summary>Seals admission, settles admitted commits, then closes storage. Cancelling the wait does not reopen admission.</summary>
     Task CloseAsync(DurableContext context);
 
-    /// <summary>Observes complete commits synchronously after adoption. The listener must not throw, block or call Session APIs.</summary>
+    /// <summary>
+    /// Settles once the Session has closed, Storage included: after <see cref="CloseAsync"/>, or after the first failed Storage call, which
+    /// closes the Session itself. A failed Session is reopened from Storage; nothing else is left to clean up. Never faults.
+    /// </summary>
+    Task<SessionEnd> Closed { get; }
+
+    /// <summary>Observes complete commits synchronously after adoption. The listener must not block or call Session APIs; a throw, or a
+    /// faulted task it returns, is reported (<c>HarnessOptions.OnReport</c>) and the other listeners still run.</summary>
     IDisposable SubscribeCommits(Action<CommitPublication, DurableContext> listener);
 
-    /// <summary>Observes close synchronously when it begins. The listener must not throw, block or call Session APIs.</summary>
+    /// <summary>An asynchronous commit listener: it still runs synchronously after adoption, and a faulted task it returns (upstream's
+    /// rejected promise) is reported without being awaited.</summary>
+    IDisposable SubscribeCommits(Func<CommitPublication, DurableContext, Task> listener);
+
+    /// <summary>Observes close synchronously when it begins, also when a failed Storage call closes the Session. The listener must not
+    /// block or call Session APIs; a throw is reported and the other listeners still run.</summary>
     IDisposable SubscribeClose(Action listener);
+
+    /// <summary>An asynchronous close listener: a faulted task it returns is reported without being awaited.</summary>
+    IDisposable SubscribeClose(Func<Task> listener);
 
     /// <summary>A disposable read-only Chord state bound to the current incarnation of a Session singleton; null when absent.</summary>
     Task<AttachedReplicatedState<JsonObjectValue?>?> DocumentStateAsync(SessionDocToken token, DurableContext context);

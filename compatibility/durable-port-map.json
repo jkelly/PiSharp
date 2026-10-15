@@ -140,12 +140,11 @@
       "lines": 57,
       "pisharp": "src/PiSharp.Durable/Errors.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "65f1572b89254baa8c2efebae31cd0bcd928c2eb",
       "changedLines": 39,
-      "note": "ReadAfterWriteException, StorageRejectedException, ConversationBusyException with upstream messages. Tests: storage.memory.conformance.copies-stored-document-bases-independently-and-rejects-ambiguous-sources",
-      "portedBlobSha1": "65f1572b89254baa8c2efebae31cd0bcd928c2eb"
+      "note": "ReadAfterWriteException, StorageRequestException (upstream StorageRequestError: an invalid read request that fails only that read), SessionFailedException (upstream SessionFailed; InnerException and Cause are upstream's cause) and ConversationBusyException with upstream messages; StorageRejected is gone. errorMessage() is the internal DurableErrors.MessageOf (an exception whose Message getter throws falls back to its type name). Tests: storage.memory.conformance.*, harness.storage-failure.*"
     },
     {
       "upstream": "packages/durable/src/harness/agent.ts",
@@ -166,12 +165,11 @@
       "lines": 464,
       "pisharp": "src/PiSharp.Durable/Harness/Compaction.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "db700163bad025dd724bb9ffcc5801d6c8273aac",
       "changedLines": 23,
-      "note": "HarnessTasks.CompactionTask (pi.compaction v1: select, summarize, retry, abort; upstream checkpoint, input, result and live status JSON), the summarization prompts and request, the pi.compaction summary entry placed by append (blocking) or write submission (conversation-owned), CompactionHooks.BeforeCompact over CompactionRequest/CompactionDecision, Conversation.CompactAsync and CompactionResult; Compaction.CreateCompactionAsync, SelectCut, SummarizedMessages, SerializeConversation and EstimateContext. Tests: harness.compaction.*, harness.compaction-differential.* (Fixtures/compaction.upstream.json)",
-      "portedBlobSha1": "db700163bad025dd724bb9ffcc5801d6c8273aac"
+      "note": "HarnessTasks.CompactionTask (pi.compaction v1: select, summarize, retry, abort; upstream checkpoint, input, result and live status JSON), the summarization prompts and request, the pi.compaction summary entry placed by append (blocking) or write submission (conversation-owned), CompactionHooks.BeforeCompact over CompactionRequest/CompactionDecision, Conversation.CompactAsync and CompactionResult; Compaction.CreateCompactionAsync, SelectCut, SummarizedMessages, SerializeConversation and EstimateContext. Tests: harness.compaction.*, harness.compaction-differential.* (Fixtures/compaction.upstream.json) v1.2.0 (area j): a failed summarization, a missing model and the scheduler's faulted or orphaned compaction record pi.live.compactionFailure {taskId, reason, error} (Live.FailCompactionStatus), a placed summary removes it; SerializeConversation leaves thinking out. Generation.cs (area a's row) fails a generation whose blocking threshold compaction failed, faulted, was orphaned or aborted with model_error (\"Compaction failed: ...\", \"Compaction was aborted\"), its prepare checkpoint marking threshold: true; Events.cs (area a's row) adds compactionFailure to the snapshot and error to compaction_end. harness.compaction-differential.* reads Fixtures/v1.2.0/compaction.upstream.json with its backgroundFailure and blockingFailure scenarios; compat.compaction-failure.* checks the v1.2.0 capture"
     },
     {
       "upstream": "packages/durable/src/harness/context.ts",
@@ -236,12 +234,11 @@
       "lines": 168,
       "pisharp": "src/PiSharp.Durable/Harness/Inbox.cs",
       "phase": "P10",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "7ba380291faab6c289ce188e6de09c180b4494df",
       "changedLines": 52,
-      "note": "Inbox.InboxDoc (pi.inbox, a complete base exactly while empty), PrepareBoundaryAsync/ApplyBoundaryAsync/IsStale (spec §6: every write, the first or all steers, at the final boundary the first or all follow-ups, a queued reset turning postTools final, stale head writes), RemoveInboxItemAsync and WithdrawQueuedInputsAsync. Queued writes store their EntryDraft as plain JSON {kind, head?, model?, data?, edits?}, the key order of upstream's own reset and compaction drafts (upstream copies the caller's object). Steer and follow-up admission is Submissions.AdmitSubmissionAsync (submissions.ts); the conversation view of the inbox is view.ts's. Tests: harness.inbox.*, harness.inbox-differential.* (Fixtures/inbox.upstream.json, captured by Fixtures/capture-inbox.mjs: a steer mid-turn, a queued reset with handoff and a stale write, queue modes all; identical records, IDs and document key order on memory, JSONL and SQLite)",
-      "portedBlobSha1": "7ba380291faab6c289ce188e6de09c180b4494df"
+      "note": "Inbox.InboxDoc (pi.inbox, a complete base exactly while empty), PrepareBoundaryAsync/ApplyBoundaryAsync/IsStale (spec §6: every write, the first or all steers, at the final boundary the first or all follow-ups, a queued reset turning postTools final, stale head writes), RemoveInboxItemAsync and WithdrawQueuedInputsAsync. Queued writes store their EntryDraft as plain JSON {kind, head?, model?, data?, edits?}, the key order of upstream's own reset and compaction drafts (upstream copies the caller's object). Steer and follow-up admission is Submissions.AdmitSubmissionAsync (submissions.ts); the conversation view of the inbox is view.ts's. Tests: harness.inbox.*, harness.inbox-differential.* (Fixtures/inbox.upstream.json, captured by Fixtures/capture-inbox.mjs: a steer mid-turn, a queued reset with handoff and a stale write, queue modes all; identical records, IDs and document key order on memory, JSONL and SQLite) v1.2.0 (area i): a queued input item carries its InputEntry as {kind, data?} (PickInputEntry); AppendInputAsync places an input as its entry ({kind, data, model} key order) or pi.user; IsDisplayOnly and HasQueuedReset."
     },
     {
       "upstream": "packages/durable/src/harness/json.ts",
@@ -320,12 +317,11 @@
       "lines": 241,
       "pisharp": "src/PiSharp.Durable/Harness/Submissions.cs",
       "phase": "P8",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "496b6cbaa04f81be186e82c9da3d8b2fe5416dd6",
       "changedLines": 62,
-      "note": "Submissions (internal: admission in one commit with request-id idempotency, status/wait/abort, waiters resolved from submission commit changes and rejected on close), the handle behind ISubmission, BoundSubmission for invocation-bound handles, and AdmitSubmissionAsync (busy queueing, whenBusy reject with ConversationBusyException, an idle boundary behind queued items, stale head writes). Tests: harness.submissions.* (memory, jsonl, sqlite; reopen on sqlite and jsonl)",
-      "portedBlobSha1": "496b6cbaa04f81be186e82c9da3d8b2fe5416dd6"
+      "note": "Submissions (internal: admission in one commit with request-id idempotency, status/wait/abort, waiters resolved from submission commit changes and rejected on close), the handle behind ISubmission, BoundSubmission for invocation-bound handles, and AdmitSubmissionAsync (busy queueing, whenBusy reject with ConversationBusyException, an idle boundary behind queued items, stale head writes). Tests: harness.submissions.* (memory, jsonl, sqlite; reopen on sqlite and jsonl) v1.2.0 (area i): SubmissionDraft.Input takes an InputEntry (kind non-empty and outside pi., else ArgumentException with upstream's message); a display-only write (only kind and data) is appended and settled done at once unless a reset is queued; b's ObserveCommits and ClosedError(session). Tests: harness.input-entries.*, compat.input-entries.*, compat.display-only-write.*"
     },
     {
       "upstream": "packages/durable/src/harness/task-graph.ts",
@@ -333,12 +329,11 @@
       "lines": 236,
       "pisharp": "src/PiSharp.Durable/Harness/TaskGraph.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "f2065d5d01cd2e7736e258c75bf89574b46487e5",
       "changedLines": 34,
-      "note": "TaskGraphView (internal: one mount built on the Session line by its first observer and dropped with its last, advanced from commit publications) and the typed TaskGraph, TaskGraphNode and TaskGraphState, whose ToJson() is upstream's {tasks} object keyed by decimal ID in ascending order; frames address that JSON. IHarness.TaskGraphAsync returns an AttachedReplicatedState<TaskGraph>, WatchTaskGraphAsync an IWatchHandle<TaskGraph>. Tests: harness.task-graph.* (memory, jsonl, sqlite), harness.task-graph-differential.* (Fixtures/task-graph.upstream.json from Fixtures/capture-task-graph.mjs, on memory, jsonl and sqlite)",
-      "portedBlobSha1": "f2065d5d01cd2e7736e258c75bf89574b46487e5"
+      "note": "TaskGraphView (internal: one mount built on the Session line by its first observer and dropped with its last, advanced from commit publications) and the typed TaskGraph, TaskGraphNode and TaskGraphState, whose ToJson() is upstream's {tasks} object keyed by decimal ID in ascending order; frames address that JSON. IHarness.TaskGraphAsync returns an AttachedReplicatedState<TaskGraph>, WatchTaskGraphAsync an IWatchHandle<TaskGraph>. Tests: harness.task-graph.* (memory, jsonl, sqlite), harness.task-graph-differential.* (Fixtures/task-graph.upstream.json from Fixtures/capture-task-graph.mjs, on memory, jsonl and sqlite) v1.2.0: the mount follows publications through ObserveCommits; observer throws in Advance and CloseSession are reported; states and watches report through the Harness; close ends observers with session_failed when the Session failed; ClosedError carries the failure."
     },
     {
       "upstream": "packages/durable/src/harness/tool.ts",
@@ -381,12 +376,11 @@
       "lines": 61,
       "pisharp": "src/PiSharp.Durable/Harness/Util.cs",
       "phase": "P6",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "a92b9d94f71ecf59568d58646847c46093005abf",
       "changedLines": 7,
-      "note": "Waiters<TKey, T> (thread-safe; waits complete asynchronously), HarnessUtil.ScanAll and ClosedError. Tests: harness.tasks.*",
-      "portedBlobSha1": "a92b9d94f71ecf59568d58646847c46093005abf"
+      "note": "Waiters<TKey, T> (thread-safe; waits complete asynchronously), HarnessUtil.ScanAll and ClosedError. Tests: harness.tasks.* v1.2.0: ClosedError(session) is SessionFailedException with the cause once the Session failed."
     },
     {
       "upstream": "packages/durable/src/harness/view.ts",
@@ -394,12 +388,11 @@
       "lines": 267,
       "pisharp": "src/PiSharp.Durable/Harness/View.cs",
       "phase": "P10",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "1b706e4012d0276b528687d3c16e98a1e2bb7170",
       "changedLines": 47,
-      "note": "ConversationView is a typed immutable class (Conversation, Entries, Docs, Doc(kind/token)) whose ToJson() is upstream's {conversation, entries, docs}; frame operations address that JSON shape, and revisions share unchanged parts by reference. ConversationViews (internal; DurableHarness.Views, conversationViews is ConversationViews.Of): at most one mount per conversation, built on the Session line by its first observer and dropped with its last; advance/prefixed derive the mount's operations from each commit publication (entry splices, head-marker cuts, document ops under [\"docs\", kind], whole sets for a new incarnation or version, deletes on retirement). IConversation.ViewStateAsync (AttachedReplicatedState<ConversationView>) and WatchAsync (IWatchHandle<ConversationView>, overflow replaces with [[\"r\", view.ToJson()]]). The mount table is lock-guarded because close and detach run off the line. Tests: harness.view.* (memory, jsonl, sqlite), harness.views-differential.* (Fixtures/views.upstream.json, captured by Fixtures/capture-views.mjs: watch frames and event batches of a tool turn and an aborted round, identical on memory, JSONL and SQLite)",
-      "portedBlobSha1": "1b706e4012d0276b528687d3c16e98a1e2bb7170"
+      "note": "ConversationView is a typed immutable class (Conversation, Entries, Docs, Doc(kind/token)) whose ToJson() is upstream's {conversation, entries, docs}; frame operations address that JSON shape, and revisions share unchanged parts by reference. ConversationViews (internal; DurableHarness.Views, conversationViews is ConversationViews.Of): at most one mount per conversation, built on the Session line by its first observer and dropped with its last; advance/prefixed derive the mount's operations from each commit publication (entry splices, head-marker cuts, document ops under [\"docs\", kind], whole sets for a new incarnation or version, deletes on retirement). IConversation.ViewStateAsync (AttachedReplicatedState<ConversationView>) and WatchAsync (IWatchHandle<ConversationView>, overflow replaces with [[\"r\", view.ToJson()]]). The mount table is lock-guarded because close and detach run off the line. Tests: harness.view.* (memory, jsonl, sqlite), harness.views-differential.* (Fixtures/views.upstream.json, captured by Fixtures/capture-views.mjs: watch frames and event batches of a tool turn and an aborted round, identical on memory, JSONL and SQLite) v1.2.0: the mount table follows publications through ObserveCommits (a throw fails the Session); an observer that throws in Advance, Publication or CloseSession is reported and the others still get the revision; states report through the Harness (ReplicatedStateSourceOptions.OnError), watches report listener errors; close ends observers with session_failed when the Session failed; ClosedError carries the failure."
     },
     {
       "upstream": "packages/durable/src/ids.ts",
@@ -503,12 +496,11 @@
       "lines": 292,
       "pisharp": "src/PiSharp.Durable/Session/Observation.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ac74d438a825e2754bf9c2e73ca46924d0695996",
       "changedLines": 61,
-      "note": "CommittedStateSource, SessionSourceAttachment and CommittedWatch (IWatchHandle) with the 100-frame overflow; queueMicrotask becomes an ObservationScheduler (Session.Defer: deliveries a commit schedules run on the line right after its publication; a started watch delivers in its own line job, never inline). Tests: session.states.*, session.watches.*. CommittedWatch<T> takes any reference type (P10): a value that is not JSON, the conversation view, gives its JSON for the overflow replacement",
-      "portedBlobSha1": "ac74d438a825e2754bf9c2e73ca46924d0695996"
+      "note": "CommittedStateSource, SessionSourceAttachment and CommittedWatch (IWatchHandle) with the 100-frame overflow; queueMicrotask becomes an ObservationScheduler (Session.Defer: deliveries a commit schedules run on the line right after its publication; a started watch delivers in its own line job, never inline). Tests: session.states.*, session.watches.*. CommittedWatch<T> takes any reference type (P10): a value that is not JSON, the conversation view, gives its JSON for the overflow replacement v1.2.0: CommittedWatch takes a report callback (a listener's throw is reported and ends the watch with listener_error) and closeSession(failure) ends it with session_failed and the error; CommittedStateSource ends its attached states the same way on failure."
     },
     {
       "upstream": "packages/durable/src/session/session.ts",
@@ -516,12 +508,11 @@
       "lines": 1081,
       "pisharp": "src/PiSharp.Durable/Session/Session.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "571d608588bf60836e497e08e89705855962819e",
       "changedLines": 604,
-      "note": "Session (ISession, Session.Create) with SessionLine, a FIFO job queue whose order is enqueue order; no lock held across user callbacks; job results complete asynchronously. Internal CommitWithAsync/ReadOnLineAsync/ConversationDocumentOnLineAsync/UnloadDocumentsAsync/FlushLineAsync and the ConversationCreatedAsync/BeforeCloseAsync hooks for the Harness; HoldStorageOpen (P11) lets a read that captured its bounds on the line finish off it before close closes Storage, which upstream's single thread gives for free. Tests: session.*, harness.lifecycle.*",
-      "portedBlobSha1": "571d608588bf60836e497e08e89705855962819e"
+      "note": "Session (ISession, Session.Create) with SessionLine, a FIFO job queue whose order is enqueue order; no lock held across user callbacks; job results complete asynchronously. Internal CommitWithAsync/ReadOnLineAsync/ConversationDocumentOnLineAsync/UnloadDocumentsAsync/FlushLineAsync and the ConversationCreatedAsync/BeforeCloseAsync hooks for the Harness; HoldStorageOpen (P11) lets a read that captured its bounds on the line finish off it before close closes Storage, which upstream's single thread gives for free. Tests: session.*, harness.lifecycle.* v1.2.0 (area b): every Storage call goes through GuardedStorage (StorageGuard): the first exception a Storage method throws, other than a StorageRequestException or a read whose caller's context was cancelled, fails the Session (Fail: close listeners run at once, the Session closes itself, Closed settles {reason: failed}); calls underway end with SessionFailedException and close waits for them; a leased read (HoldStorageOpen, Conversation.ContextAsync's off-line scan) has its first call admitted while closing and later pages refused. Session.Closed (SessionEnd), Failed, Report, ObserveCommits (internal listeners whose throw fails the Session), contained host listeners (a throw or faulted task from the asynchronous SubscribeCommits/SubscribeClose overloads is reported), and the document cache bounded by documentRetentionMs (idle documents in use order, pinned incarnations, sweeps as line jobs on .NET timers, which never keep a process alive, and at the end of each commit; SetDefaultDocumentRetention and DocumentCacheSizes for tests). Tests: session.*, session.document-retention.*, harness.storage-failure.*, harness.lifecycle.*"
     },
     {
       "upstream": "packages/durable/src/session/transaction.ts",
@@ -560,12 +551,11 @@
       "lines": 846,
       "pisharp": "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs",
       "phase": "P4",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "a059cff8f7b9aaf0f701e22976e59b91f1942ebb",
       "changedLines": 3,
-      "note": "JsonlStorage over IFileSystem on MemoryStorage's PrepareCommit/Apply (replay passes the recorded sequence). JsonlCorruptionError/JsonlStoragePoisonedError are exceptions with upstream's messages; file failures are IOExceptions. File names and lines are byte-for-byte upstream's (checked against Pi v1.1.0 writing, fsync-writing, reopening and recovering the same commits); a resolved document copy keeps upstream's {kind, version, value} base. Tests: storage.jsonl.* P13: compat.*.jsonl.* open, read, resume and rewrite JSONL sessions the pinned upstream wrote (tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions, tools/DurableFixtures/capture.mjs): PiSharp writes the same files byte for byte, and upstream reads PiSharp's (compat.reverse.*).",
-      "portedBlobSha1": "a059cff8f7b9aaf0f701e22976e59b91f1942ebb"
+      "note": "JsonlStorage over IFileSystem on MemoryStorage's PrepareCommit/Apply (replay passes the recorded sequence). JsonlCorruptionError/JsonlStoragePoisonedError are exceptions with upstream's messages; file failures are IOExceptions. File names and lines are byte-for-byte upstream's (checked against Pi v1.1.0 writing, fsync-writing, reopening and recovering the same commits); a resolved document copy keeps upstream's {kind, version, value} base. Tests: storage.jsonl.* P13: compat.*.jsonl.* open, read, resume and rewrite JSONL sessions the pinned upstream wrote (tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions, tools/DurableFixtures/capture.mjs): PiSharp writes the same files byte for byte, and upstream reads PiSharp's (compat.reverse.*). v1.2.0: invalid read requests are the in-memory store's StorageRequestExceptions; upstream's own StorageRequestError, \"Storage.entry() requires an entry ID\", has no counterpart because the C# GetEntryAsync overloads are typed."
     },
     {
       "upstream": "packages/durable/src/storage/memory.ts",
@@ -573,12 +563,11 @@
       "lines": 864,
       "pisharp": "src/PiSharp.Durable/Storage/Memory.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "7333d37f9a075172f038e10bd1a495aa2b85db1f",
       "changedLines": 18,
-      "note": "MemoryStorage with the prepare/apply split (PrepareCommit -> PreparedMemoryCommit.Apply). Immutable records replace clone/freeze; one lock per operation. Tests: storage.memory.*",
-      "portedBlobSha1": "7333d37f9a075172f038e10bd1a495aa2b85db1f"
+      "note": "MemoryStorage with the prepare/apply split (PrepareCommit -> PreparedMemoryCommit.Apply). Immutable records replace clone/freeze; one lock per operation. Tests: storage.memory.* v1.2.0: unknown conversations, malformed cursors and history a document does not keep throw StorageRequestException; a rejected document copy throws a plain exception (StorageRejected is gone)."
     },
     {
       "upstream": "packages/durable/src/storage/scan.ts",
@@ -586,12 +575,11 @@
       "lines": 40,
       "pisharp": "src/PiSharp.Durable/Storage/Scan.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "8cbc1938c0898e7bf9084b4d7d64db47a5e8ebbc",
       "changedLines": 10,
-      "note": "StorageScan.Start/NextCursor and ScanStart. Tests: storage.memory.conformance.scans-tables-in-either-id-order-and-continues-a-cursor-in-its-order",
-      "portedBlobSha1": "8cbc1938c0898e7bf9084b4d7d64db47a5e8ebbc"
+      "note": "StorageScan.Start/NextCursor and ScanStart. Tests: storage.memory.conformance.scans-tables-in-either-id-order-and-continues-a-cursor-in-its-order v1.2.0: an invalid scan order or cursor, or a cursor of the other order, throws StorageRequestException."
     },
     {
       "upstream": "packages/durable/src/storage/sqlite/cloudflare.ts",
@@ -644,12 +632,11 @@
       "lines": 934,
       "pisharp": "src/PiSharp.Durable.Sqlite/Storage.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "90666efc2d16c6ac8e6fa9d26c381d7beb16bf04",
       "changedLines": 22,
-      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.* P13: compat.*.sqlite.* open, read, resume and rewrite SQLite sessions the pinned upstream wrote (Fixtures/upstream-sessions); PiSharp's rows and JSON columns are upstream's text, and upstream reads PiSharp's (compat.reverse.*).",
-      "portedBlobSha1": "90666efc2d16c6ac8e6fa9d26c381d7beb16bf04"
+      "note": "SqliteStorage: upstream queries, orderings and JSON columns; one SQL transaction per commit; next_id TEXT. Batch validation, addressing and paging rules are shared with MemoryStorage in src/PiSharp.Durable/Storage/StorageRules.cs. Tests: storage.sqlite.* P13: compat.*.sqlite.* open, read, resume and rewrite SQLite sessions the pinned upstream wrote (Fixtures/upstream-sessions); PiSharp's rows and JSON columns are upstream's text, and upstream reads PiSharp's (compat.reverse.*). v1.2.0: unknown conversations, malformed cursors and history a document does not keep throw StorageRequestException; rejected document copies throw plain exceptions; busy statements are retried by the connection's busy timeout (SqliteConnectionDatabase, 5 s by default), the storage's own transient retry."
     },
     {
       "upstream": "packages/durable/src/tasks.ts",
@@ -717,12 +704,11 @@
       "lines": 1663,
       "pisharp": "src/PiSharp.Durable/Testing/StorageConformance.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "753bf2395c1983f9a071f05621b8a7daaecce14d",
       "changedLines": 5,
-      "note": "Public kit: StorageConformance.Create(StorageConformanceProvider) returns 24 named cases that assert themselves (no injected runner assertions). Two detachment cases adapted for immutable values. Tests: storage.memory.conformance.*",
-      "portedBlobSha1": "753bf2395c1983f9a071f05621b8a7daaecce14d"
+      "note": "Public kit: StorageConformance.Create(StorageConformanceProvider) returns 24 named cases that assert themselves (no injected runner assertions). Two detachment cases adapted for immutable values. Tests: storage.memory.conformance.* v1.2.0: the two rejected copy batches only need to fail without effect (any exception), as StorageRejected is gone."
     },
     {
       "upstream": "packages/durable/src/testing/types.ts",
@@ -1487,12 +1473,11 @@
       "lines": 2390,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "edd2d4bd98aa0af54ed67469f6de900e8b9df127",
       "changedLines": 162,
-      "note": "harness.compaction.* on memory (reopen cases on SQLite, as upstream), harness.compaction.jsonl.* (reopen cases on JSONL) and harness.compaction.sqlite.*; range selection and serialization run once. One adaptation: the 300 ms real retry backoff of \"keeps a background summary queued through a retry backoff...\" runs on a ManualTimeProvider advanced after the case steps",
-      "portedBlobSha1": "edd2d4bd98aa0af54ed67469f6de900e8b9df127"
+      "note": "harness.compaction.* on memory (reopen cases on SQLite, as upstream), harness.compaction.jsonl.* (reopen cases on JSONL) and harness.compaction.sqlite.*; range selection and serialization run once. One adaptation: the 300 ms real retry backoff of \"keeps a background summary queued through a retry backoff...\" runs on a ManualTimeProvider advanced after the case steps v1.2.0: never cuts at a display-only entry; serialization omits thinking; records a failure in pi.live, the snapshot and compaction_end; a failed, faulted or directly aborted blocking compaction fails the run without a request; the classifying commit's failure fails the Harness (reopened through ControlledStorage.KeepOpenForReopen). Tools keep ToolExecutionResult.Content until area a renames it to Output in every test."
     },
     {
       "upstream": "packages/durable/test/harness-context.test.ts",
@@ -1509,12 +1494,11 @@
       "lines": 476,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessConversationsCases.cs",
       "phase": "P6",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "b92e46a178375e9a99abca90891eceb9dc4fa02a",
       "changedLines": 6,
-      "note": "harness.conversations.* (12 cases) on MemoryStorage, plus harness.conversations.jsonl.* (12) and harness.conversations.sqlite.* (11; the reopen case needs one reopenable location, so it runs on a SQLite file as upstream does and on a JSONL directory, closing storage before each reopen). Support in Harness/HarnessConversationsSupport.cs. Adapted: the paginates case cannot pass a foreign conversationId (EntryQueryBounds has no conversation field); expect.unreachable() init is a throwing init",
-      "portedBlobSha1": "b92e46a178375e9a99abca90891eceb9dc4fa02a"
+      "note": "harness.conversations.* (12 cases) on MemoryStorage, plus harness.conversations.jsonl.* (12) and harness.conversations.sqlite.* (11; the reopen case needs one reopenable location, so it runs on a SQLite file as upstream does and on a JSONL directory, closing storage before each reopen). Support in Harness/HarnessConversationsSupport.cs. Adapted: the paginates case cannot pass a foreign conversationId (EntryQueryBounds has no conversation field); expect.unreachable() init is a throwing init v1.2.0: closed-Harness rejections match \"is closed\" (Session is closed)."
     },
     {
       "upstream": "packages/durable/test/harness-events.test.ts",
@@ -1544,12 +1528,11 @@
       "lines": 694,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs",
       "phase": "P8",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "2e2309eedc3bf3f4991fad1146c77e9eb40d31da",
       "changedLines": 1,
-      "note": "24 of 24 tests: harness.generation.* (24 cases) on MemoryStorage, plus harness.generation.jsonl.* and harness.generation.sqlite.* (22 each: the two storage-free cases run once). Adapted: scripted streams are ChatTests.ScriptedStream through ModelsOverride (an empty start frame then the text, for upstream's start event that carries it); the faulting final message carries a non-finite usage count instead of a function, so the fault detail contains \"non-finite number\" instead of \"non-JSON function\"; the AbortSignal instance check checks a cancellable token",
-      "portedBlobSha1": "2e2309eedc3bf3f4991fad1146c77e9eb40d31da"
+      "note": "24 of 24 tests: harness.generation.* (24 cases) on MemoryStorage, plus harness.generation.jsonl.* and harness.generation.sqlite.* (22 each: the two storage-free cases run once). Adapted: scripted streams are ChatTests.ScriptedStream through ModelsOverride (an empty start frame then the text, for upstream's start event that carries it); the faulting final message carries a non-finite usage count instead of a function, so the fault detail contains \"non-finite number\" instead of \"non-JSON function\"; the AbortSignal instance check checks a cancellable token v1.2.0: resolved settings carry documentRetentionMs (any number, as the retention-0 pass changes the default)."
     },
     {
       "upstream": "packages/durable/test/harness-inbox.test.ts",
@@ -1557,12 +1540,11 @@
       "lines": 928,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs",
       "phase": "P10",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "bd8b2a6f22799133e3226ced1e4e879676891dba",
       "changedLines": 39,
-      "note": "32 of 32 tests (27 inbox, 5 usage): harness.inbox.* on MemoryStorage with the two reopen cases on a SQLite file as upstream, harness.inbox.jsonl.* (32, reopening a JSONL directory) and harness.inbox.sqlite.* (30: the reopen cases run in harness.inbox.*). Adapted: the queue-mode case waits for the answer's boundary commit to queue behind the held commit with Session.LineBacklog (a deterministic barrier for upstream's onYield + flush); the two cases that read what a commit listener recorded after a submission wait flush the Session line first (a C# wait resumes on its own listener, upstream's after all listeners); RecordingStorage is a decorator; [id, mode] inbox items compare as \"id mode\" strings",
-      "portedBlobSha1": "bd8b2a6f22799133e3226ced1e4e879676891dba"
+      "note": "32 of 32 tests (27 inbox, 5 usage): harness.inbox.* on MemoryStorage with the two reopen cases on a SQLite file as upstream, harness.inbox.jsonl.* (32, reopening a JSONL directory) and harness.inbox.sqlite.* (30: the reopen cases run in harness.inbox.*). Adapted: the queue-mode case waits for the answer's boundary commit to queue behind the held commit with Session.LineBacklog (a deterministic barrier for upstream's onYield + flush); the two cases that read what a commit listener recorded after a submission wait flush the Session line first (a C# wait resumes on its own listener, upstream's after all listeners); RecordingStorage is a decorator; [id, mode] inbox items compare as \"id mode\" strings v1.2.0: writes queued while busy are QueuedNote (a model message), as data-only writes are appended at once. Its hold tools keep ToolExecutionResult.Content until area a renames it to Output in every test. harness.inbox-differential.* reads Fixtures/v1.2.0/inbox.upstream.json; its steer scenario's pi.tool task is compared in its v1 shape until area a (PendingToolV2 checks the only differences are version 2 and kind \"model\")."
     },
     {
       "upstream": "packages/durable/test/harness-input-entries.test.ts",
@@ -1570,8 +1552,9 @@
       "lines": 456,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessInputEntriesCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "All 11 tests: harness.input-entries.* on MemoryStorage, the reopen case on a SQLite file as upstream. Adapted: an InputEntry is typed (a string kind, no model, head or edits), so the invalid kinds are null, \"\", pi.user and pi.compaction, and the untyped caller's extra fields are a check that the type carries only Kind and Data"
     },
     {
       "upstream": "packages/durable/test/harness-inspect.test.ts",
@@ -1588,12 +1571,11 @@
       "lines": 614,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "425a5f81ef8db80cdcc2b79da857bf1181fb2d0e",
       "changedLines": 7,
-      "note": "14 of 14 tests: harness.lifecycle.* (14) on MemoryStorage with the reopen case on a SQLite file as upstream, harness.lifecycle.jsonl.* (14, reopening a JSONL directory) and harness.lifecycle.sqlite.* (13, no reopen). Adapted: FailingClose is a decorator; the patched harness.subscribeCommits is a count of the Session's commit listeners; a context read queued at close's seal is held open by Session.HoldStorageOpen, which upstream's single thread does not need",
-      "portedBlobSha1": "425a5f81ef8db80cdcc2b79da857bf1181fb2d0e"
+      "note": "14 of 14 tests: harness.lifecycle.* (14) on MemoryStorage with the reopen case on a SQLite file as upstream, harness.lifecycle.jsonl.* (14, reopening a JSONL directory) and harness.lifecycle.sqlite.* (13, no reopen). Adapted: FailingClose is a decorator; the patched harness.subscribeCommits is a count of the Session's commit listeners; a context read queued at close's seal is held open by Session.HoldStorageOpen, which upstream's single thread does not need v1.2.0: \"rethrows the open error and reports it once, though closing then fails too\"; the subscription count includes the internal ObserveCommits listeners. The stubborn tool's empty result keeps ToolExecutionResult.Content until area a renames it to Output in every test."
     },
     {
       "upstream": "packages/durable/test/harness-live-deltas.test.ts",
@@ -1707,8 +1689,9 @@
       "lines": 649,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessStorageFailureCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "All 24 tests: harness.storage-failure.* on MemoryStorage (ControlledStorage and DelegatingStorage decorators for upstream's storage subclasses). Adapted: a listener's rejected promise is a faulted task from the asynchronous SubscribeCommits/SubscribeClose overloads, and an onReport that rejects is one that throws (OnReport is an Action); the thenable and other-realm cases check Session.Observe with a task completing later and a task faulted on another thread; the unformattable thrown value is an exception whose Message getter throws, faulting with DurableErrors.MessageOf's type-name fallback; unhandled rejections are TaskScheduler.UnobservedTaskException and ReplicatedState.UnhandledError"
     },
     {
       "upstream": "packages/durable/test/harness-structured-output.test.ts",
@@ -1778,12 +1761,11 @@
       "lines": 1392,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs",
       "phase": "P7",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "f88b25567b2b95d9736e642d6b09f747ed3be679",
       "changedLines": 80,
-      "note": "harness.tasks.* (39 cases) on MemoryStorage, plus harness.tasks.jsonl.* and harness.tasks.sqlite.* (Harness/HarnessBackendCases.cs). Adapted (barriers instead of microtask timing): reads-committed-documents (InvocationEnded), resumes-a-waiting-task (Eventually), does-not-signal-a-running-abort-handler and keeps-a-terminal-outcome-committed-by-an-abort-handler (run-started deferred), signals-and-joins-the-run (abort handler gated until the second abort); AbortError is OperationCanceledException",
-      "portedBlobSha1": "f88b25567b2b95d9736e642d6b09f747ed3be679"
+      "note": "harness.tasks.* (39 cases) on MemoryStorage, plus harness.tasks.jsonl.* and harness.tasks.sqlite.* (Harness/HarnessBackendCases.cs). Adapted (barriers instead of microtask timing): reads-committed-documents (InvocationEnded), resumes-a-waiting-task (Eventually), does-not-signal-a-running-abort-handler and keeps-a-terminal-outcome-committed-by-an-abort-handler (run-started deferred), signals-and-joins-the-run (abort handler gated until the second abort); AbortError is OperationCanceledException v1.2.0: \"fails the Harness on a failed reservation commit; reopening runs the task\" (the failure is set before WaitForTaskAsync resumes scheduling: the C# kick runs at once, upstream's after a microtask) and \"fails the Harness instead of running a task again when its fault write fails\", reopening through ControlledStorage.KeepOpenForReopen."
     },
     {
       "upstream": "packages/durable/test/harness-tools-recovery.test.ts",
@@ -1826,8 +1808,9 @@
       "lines": 26,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/HeapRetained.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "HeapRetained.RetainedBytesAsync: the managed heap after a blocking, compacting full collection (the large object heap included), where upstream sums a V8 heap snapshot's self sizes"
     },
     {
       "upstream": "packages/durable/test/images-wasm-module.test.ts",
@@ -1925,8 +1908,9 @@
       "lines": 105,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/SessionDocumentCacheBench.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "SessionDocumentCacheBench (`document-cache [N,...]`): N conversations with one short task each on SQLite, at retentions infinite, 10 min, 50 ms and 0; cached documents, retained bytes per conversation and the old-document read. The Session's internal FlushLineAsync and DocumentCacheSizes are reached by reflection. Results next to Node's in docs/durable-benchmarks.md; run at a tiny size by benchmarks.smoke"
     },
     {
       "upstream": "packages/durable/test/session-document-retention.test.ts",
@@ -1934,8 +1918,9 @@
       "lines": 593,
       "pisharp": "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "All 21 tests: session.document-retention.*. Adapted: a retention of the wrong type (\"soon\") is not expressible (double?), NaN and -5 are checked; \"keeps no timer where timers cannot be unreferenced\" checks eviction at the end of commits, since .NET timers never keep a process alive and the Session always keeps one; \"gives the same events ...\" flushes the Session line before it stops the stream (a C# wait resumes on its own listener)"
     },
     {
       "upstream": "packages/durable/test/session-documents.test.ts",
@@ -1943,12 +1928,11 @@
       "lines": 656,
       "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionDocumentsCases.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "c9764eac7db238bcda91e605286fb9ca957f4d9d",
       "changedLines": 6,
-      "note": "session.documents.* (27 cases). Adapted: placements are immutable (no per-placement copy to observe); a Date/undefined value cannot be JsonValue, so the initializer returns null and the placement passes null; a held line is checked with Task.Yield instead of flush",
-      "portedBlobSha1": "c9764eac7db238bcda91e605286fb9ca957f4d9d"
+      "note": "session.documents.* (27 cases). Adapted: placements are immutable (no per-placement copy to observe); a Date/undefined value cannot be JsonValue, so the initializer returns null and the placement passes null; a held line is checked with Task.Yield instead of flush v1.2.0: \"fails the Session after a Storage failure and publishes nothing\" (SessionFailedException instead of poisoned)."
     },
     {
       "upstream": "packages/durable/test/session-forks.test.ts",
@@ -1956,12 +1940,11 @@
       "lines": 698,
       "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionForksCases.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "76400af22d40a45e3001c20e9ab77a234ccc13c1",
       "changedLines": 17,
-      "note": "session.forks.* (14 cases), verbatim",
-      "portedBlobSha1": "76400af22d40a45e3001c20e9ab77a234ccc13c1"
+      "note": "session.forks.* (14 cases), verbatim; v1.2.0's \"fails the Session on a rejected fork commit, which leaves no effect\" reopens through ControlledStorage.KeepOpenForReopen/Reopen (upstream's reopen() clears MemoryStorage's closed flag), on every backend"
     },
     {
       "upstream": "packages/durable/test/session-states.test.ts",
@@ -1981,12 +1964,11 @@
       "lines": 162,
       "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionSupport.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "e8da108d8662bb9f7812164435900025367b5cb7",
       "changedLines": 9,
-      "note": "SessionTests.All(prefix, storageFactory) runs every session.* group on any IStorage (ControlledStorage decorates it); SessionCases() runs them on MemoryStorage. flush() is a Session line barrier (FlushLineAsync); deferreds are TaskCompletionSource barriers; Session/SessionLineCases.cs adds session.line.* (3 authored cases) for the .NET line guarantees: FIFO across threads, caller tasks completed off the line, watch start never inline",
-      "portedBlobSha1": "e8da108d8662bb9f7812164435900025367b5cb7"
+      "note": "SessionTests.All(prefix, storageFactory) runs every session.* group on any IStorage (ControlledStorage decorates it); SessionCases() runs them on MemoryStorage. flush() is a Session line barrier (FlushLineAsync); deferreds are TaskCompletionSource barriers; Session/SessionLineCases.cs adds session.line.* (3 authored cases) for the .NET line guarantees: FIFO across threads, caller tasks completed off the line, watch start never inline v1.2.0: openTestSession's 600 000 ms retention; ControlledStorage.Reopen with KeepOpenForReopen (upstream reopen())."
     },
     {
       "upstream": "packages/durable/test/session-tables.test.ts",
@@ -2012,8 +1994,9 @@
       "lines": 7,
       "pisharp": "tests/PiSharp.Durable.Tests/SetupDocumentRetentionCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "SetupDocumentRetention.Apply (Program.Main) reads PI_DURABLE_DOCUMENT_RETENTION_MS and sets the default document retention of every Session; the branch CI runs PiSharp.Durable.Tests a second time with it set to 0, as upstream's npm test does. Tests: setup.document-retention.*"
     },
     {
       "upstream": "packages/durable/test/spec-usage.test.ts",
@@ -2043,12 +2026,11 @@
       "lines": 372,
       "pisharp": "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs",
       "phase": "P5",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "86b2bb09671c388e272d156d62c2dd2b4b109afc",
       "changedLines": 5,
-      "note": "All 11 cases as storage.sqlite.facade.*. Microtask observations use gates; prepare counting uses the adapter counter instead of subclassing DatabaseSync",
-      "portedBlobSha1": "86b2bb09671c388e272d156d62c2dd2b4b109afc"
+      "note": "All 11 cases as storage.sqlite.facade.*. Microtask observations use gates; prepare counting uses the adapter counter instead of subclassing DatabaseSync v1.2.0: \"does not preserve the callback error when rollback itself fails\" throws a plain exception."
     },
     {
       "upstream": "packages/durable/test/sqlite-migrations.test.ts",
@@ -2175,12 +2157,11 @@
       "lines": 346,
       "pisharp": "tests/PiSharp.Durable.Tests/TypesCases.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "8a20bc07f0e6a91a7aab8b1617fa2f49a499d633",
       "changedLines": 6,
-      "note": "3 of 3 tests. types.brands-numeric-ids-by-record-kind-and-carries-task-result-types and types.encodes-discriminator-dependent-fields: ID kinds, and every @ts-expect-error record shape rejected by FromJson/Validate. types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions (TypesHarnessCases.cs): compile-checked typed waits, compaction and hooks (EachAsync's selector types the handler) plus run-time checks that the rejected submission shapes cannot be built. Not expressible in C#: the phantom task result type, typed task input and the exhaustive phase map (tasks are JsonValue-typed; see types.ts). types.record-json-key-order is authored",
-      "portedBlobSha1": "8a20bc07f0e6a91a7aab8b1617fa2f49a499d633"
+      "note": "3 of 3 tests. types.brands-numeric-ids-by-record-kind-and-carries-task-result-types and types.encodes-discriminator-dependent-fields: ID kinds, and every @ts-expect-error record shape rejected by FromJson/Validate. types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions (TypesHarnessCases.cs): compile-checked typed waits, compaction and hooks (EachAsync's selector types the handler) plus run-time checks that the rejected submission shapes cannot be built. Not expressible in C#: the phantom task result type, typed task input and the exhaustive phase map (tasks are JsonValue-typed; see types.ts). types.record-json-key-order is authored v1.2.0: an input's entry is an InputEntry with no model, head or edits (TypesHarnessCases.cs)."
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/harness-setup.ts",

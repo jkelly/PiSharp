@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/storage/memory.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/memory.ts.
 //
 // Upstream clones every retained write and every read result, and deep-freezes prepared writes, to simulate the ownership boundary that
 // serialization gives SQLite and JSONL (spec §4, §11.1). Records and JSON values here are immutable, so sharing them is already detached:
@@ -142,8 +142,7 @@ public sealed class MemoryStorage : IStorage
                 StorageRules.CheckCopySource(stored, copy.Record);
                 return (StorageWrite)new DocumentCreateWrite(copy.Record, DocumentContent.Base(stored.Version, stored.Value));
             }
-            catch (StorageRejectedException) { throw; }
-            catch (Exception error) { throw new StorageRejectedException($"Document copy {copy.Record.Id} was rejected", error); }
+            catch (Exception error) { throw new InvalidOperationException($"Document copy {copy.Record.Id} was rejected", error); }
         })];
     }
 
@@ -281,7 +280,7 @@ public sealed class MemoryStorage : IStorage
     /// <inheritdoc/>
     public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) => Read(() =>
     {
-        if (!conversations.ContainsKey(conversationId.Value)) throw new InvalidOperationException($"Unknown conversation: {conversationId}");
+        if (!conversations.ContainsKey(conversationId.Value)) throw new StorageRequestException($"Unknown conversation: {conversationId}");
         var currentId = conversationId.Value;
         var upperEntryId = atOrBeforeEntryId?.Value ?? long.MaxValue;
         while (true)
@@ -413,7 +412,7 @@ public sealed class MemoryStorage : IStorage
     {
         if (!documents.TryGetValue(id.Value, out var stored)) return null;
         if (!at.IsCurrent && StorageRules.IsCurrentOnly(stored.Record))
-            throw new InvalidOperationException($"Document {id} does not retain historical content");
+            throw new StorageRequestException($"Document {id} does not retain historical content");
         if (!StorageRules.IsAliveAt(stored.Record, at)) return null;
         var revisions = at.Seq is { } seq ? [.. stored.Revisions.Where(revision => revision.Seq <= seq)] : stored.Revisions;
         var baseIndex = revisions.Count - 1;
@@ -427,7 +426,7 @@ public sealed class MemoryStorage : IStorage
 
     private IEnumerable<EntryRecord> VisibleEntries(ConversationId conversationId, long minEntryId, long maxEntryId)
     {
-        if (!conversations.ContainsKey(conversationId.Value)) throw new InvalidOperationException($"Unknown conversation: {conversationId}");
+        if (!conversations.ContainsKey(conversationId.Value)) throw new StorageRequestException($"Unknown conversation: {conversationId}");
         return Walk();
 
         IEnumerable<EntryRecord> Walk()
@@ -455,7 +454,7 @@ public sealed class MemoryStorage : IStorage
     /// <summary>Visible entries oldest first: the fork chain's segments from the root conversation forward.</summary>
     private IEnumerable<EntryRecord> VisibleEntriesAscending(ConversationId conversationId, long minEntryId, long maxEntryId)
     {
-        if (!conversations.ContainsKey(conversationId.Value)) throw new InvalidOperationException($"Unknown conversation: {conversationId}");
+        if (!conversations.ContainsKey(conversationId.Value)) throw new StorageRequestException($"Unknown conversation: {conversationId}");
         var segments = new List<(long ConversationId, long Upper)>();
         var currentId = conversationId.Value;
         var upperEntryId = maxEntryId;

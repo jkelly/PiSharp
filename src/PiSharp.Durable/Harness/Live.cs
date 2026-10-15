@@ -2,6 +2,9 @@
 // slot lookup and finishing, and settleSchedulerOutcome, the cleanup the scheduler runs for faulted and orphaned outcomes). The state is
 // upstream's JSON: {run?: {taskId, inputs}, generation?: {attempt, message?, retry?, deferred?}, tools?: ToolSlot[], compactions?: [...]}.
 // Upstream's run writers startRun and handOver live in generation.ts, as HarnessTasks.StartRunAsync and HandOver do in Generation.cs.
+// Pi v1.2.0's area j parts of live.ts are in (durable-sync-1.2.0-worklist.json): pi.live.compactionFailure {taskId, reason, error} and
+// failCompactionStatus, also for the scheduler's faulted and orphaned compactions. The header moves to v1.2.0 with area a (nestedTools),
+// which owns this row.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
@@ -69,6 +72,22 @@ public static class Live
         if (statuses.Count == 0) live.Delete("compactions");
     }
 
+    /// <summary>
+    /// Removes the status of compaction task <paramref name="taskId"/> and records that it failed with <paramref name="error"/> as
+    /// <c>pi.live.compactionFailure</c> <c>{taskId, reason, error}</c>, the newest failure since a compaction last produced a summary (upstream
+    /// <c>failCompactionStatus</c>).
+    /// </summary>
+    public static void FailCompactionStatus(DraftObject live, TaskId taskId, string error)
+    {
+        if (CompactionStatus(live, taskId) is { } status)
+            live.Set("compactionFailure", JsonValue.Object([
+                KeyValuePair.Create("taskId", status.Get("taskId")!),
+                KeyValuePair.Create("reason", status.Get("reason")!),
+                KeyValuePair.Create("error", (JsonValue)error),
+            ]));
+        RemoveCompactionStatus(live, taskId);
+    }
+
     /// <summary>The slot of tool task <paramref name="taskId"/> in the current round, if the round still lists it (upstream
     /// <c>toolSlot</c>).</summary>
     public static DraftObject? ToolSlot(DraftObject live, TaskId taskId)
@@ -97,7 +116,8 @@ public static class Live
     /// <summary>
     /// Harness cleanup for a terminal outcome the scheduler writes itself, <c>faulted</c> or <c>orphaned</c> (upstream
     /// <c>settleSchedulerOutcome</c>). A run task ends its run; a tool task's slot is marked done without an entry, and context derivation
-    /// synthesizes the missing result; a compaction task's status is removed. Other kinds are ignored, so it never creates <c>pi.live</c>
+    /// synthesizes the missing result; a compaction task's status is removed and its failure recorded. Other kinds are ignored, so it never
+    /// creates <c>pi.live</c>
     /// elsewhere. A committed generation partial becomes an aborted assistant entry, as in the generation abort handler; the scheduler's
     /// commit has no task scope, so that entry has no <c>byTaskId</c>.
     /// </summary>
@@ -110,7 +130,13 @@ public static class Live
         }
         if (record.Kind == CompactionTaskKind)
         {
-            RemoveCompactionStatus(await tx.DocAsync(LiveDoc, record.ConversationId).ConfigureAwait(false), record.Id);
+            var error = outcome switch
+            {
+                FaultedTaskOutcome faulted => faulted.Error.Message,
+                OrphanedTaskOutcome orphaned => orphaned.Reason,
+                _ => throw new ArgumentException($"The scheduler settles faulted and orphaned outcomes, not {outcome.Status}"),
+            };
+            FailCompactionStatus(await tx.DocAsync(LiveDoc, record.ConversationId).ConfigureAwait(false), record.Id, error);
             return;
         }
         if (!RunTaskKinds.Contains(record.Kind)) return;

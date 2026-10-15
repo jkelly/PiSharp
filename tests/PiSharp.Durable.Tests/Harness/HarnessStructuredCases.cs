@@ -1076,22 +1076,26 @@ internal static partial class StructuredTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "retries-a-finalization-the-storage-rejected-with-the-next-commit", async () =>
+        // Pi v1.2.0 replaced "retries a finalization the Storage rejected with the next commit": a failed commit is final (area b).
+        yield return Case(prefix + "fails-the-harness-on-a-failed-finalization-which-reopening-applies", async () =>
         {
             var nodes = new Nodes();
-            var storage = new RejectingStorage(await fresh());
+            var controlled = new ControlledStorage(await fresh()) { KeepOpenForReopen = true };
+            var storage = new FinalizeFailingStorage(controlled);
             var (harness, root, _, reports) = await nodes.OpenNodes(storage);
-            var child = nodes.SpawnAndFinish("parent", "child");
+            nodes.SpawnAndFinish("parent", "child");
             var parent = await nodes.Start(root, "parent");
             await Eventually(async () => await StatusOf(harness, parent) == DurableTaskStatus.Completing);
-            storage.Reject = parent;
+            storage.Fail = parent;
             nodes.Open("child");
-            await harness.WaitForTaskAsync(child.Id!.Value, Context);
-            await Eventually(() => reports.Snapshot().Any(error => error is StorageRejectedException));
-            Equal(DurableTaskStatus.Completing, await StatusOf(harness, parent), "parent status");
-            await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" }), Context);
-            Equal("completed", await OutcomeOf(harness, parent), "parent outcome");
+            Equal(new SessionEnd(SessionEndReason.Failed, storage.Failure), await harness.Closed, "closed");
+            Seq([storage.Failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
+            controlled.Reopen();
+            var reopened = await nodes.OpenNodes(storage);
+            Equal("completed", await OutcomeOf(reopened.Harness, parent), "parent outcome");
+            await reopened.Harness.CloseAsync(Context);
+            await controlled.Inner.CloseAsync(Context);
         });
     }
 

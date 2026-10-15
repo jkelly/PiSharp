@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/storage/sqlite/storage.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/sqlite/storage.ts
 //
 // The queries, orderings and JSON columns are upstream's. Records are stored as their JSON text (Chord JsonValue.ToJson, which matches
 // JSON.stringify), and indexed strings (task kinds, request IDs, document kinds and keys) are stored JSON-encoded, as upstream does to
@@ -165,7 +165,7 @@ public sealed class SqliteStorage : IStorage
         if (conversationId is { } visibleIn)
         {
             conversation = await ReadConversation(visibleIn).ConfigureAwait(false) ??
-                throw new InvalidOperationException($"Unknown conversation: {visibleIn}");
+                throw new StorageRequestException($"Unknown conversation: {visibleIn}");
         }
         var row = await db.GetAsync("SELECT record, commit_seq FROM entries WHERE id = ?", id.Value).ConfigureAwait(false);
         if (row is null) return null;
@@ -187,7 +187,7 @@ public sealed class SqliteStorage : IStorage
     private async Task<EntryRecord?> ReadLatestHeadMarker(ConversationId conversationId, EntryId? atOrBeforeEntryId)
     {
         var conversation = await ReadConversation(conversationId).ConfigureAwait(false) ??
-            throw new InvalidOperationException($"Unknown conversation: {conversationId}");
+            throw new StorageRequestException($"Unknown conversation: {conversationId}");
         var upper = atOrBeforeEntryId?.Value;
         while (true)
         {
@@ -208,7 +208,7 @@ public sealed class SqliteStorage : IStorage
         var (order, after) = StorageScan.Start(query.Order, cursor, ScanOrder.Descending);
         if (order == ScanOrder.Ascending) return await ReadEntriesAscending(query, limit, after).ConfigureAwait(false);
         var conversation = await ReadConversation(query.ConversationId).ConfigureAwait(false) ??
-            throw new InvalidOperationException($"Unknown conversation: {query.ConversationId}");
+            throw new StorageRequestException($"Unknown conversation: {query.ConversationId}");
         var upper = query.MaxEntryId?.Value;
         if (after is { } last) upper = Math.Min(upper ?? Ids.MaxSafeInteger, last - 1);
         var values = new List<EntryRecord>();
@@ -243,7 +243,7 @@ public sealed class SqliteStorage : IStorage
     {
         var segments = new List<(ConversationId ConversationId, long? Upper)>();
         var conversation = await ReadConversation(query.ConversationId).ConfigureAwait(false) ??
-            throw new InvalidOperationException($"Unknown conversation: {query.ConversationId}");
+            throw new StorageRequestException($"Unknown conversation: {query.ConversationId}");
         var upper = query.MaxEntryId?.Value;
         while (true)
         {
@@ -496,7 +496,7 @@ public sealed class SqliteStorage : IStorage
         if (row is null) return null;
         var record = DocumentRecord.FromJson(Record(row));
         if (!at.IsCurrent && StorageRules.IsCurrentOnly(record))
-            throw new InvalidOperationException($"Document {id} does not retain historical content");
+            throw new StorageRequestException($"Document {id} does not retain historical content");
         if (!StorageRules.IsAliveAt(record, at)) return null;
         var upper = at.Seq?.Value ?? Ids.MaxSafeInteger;
         var documentBase = await executor.GetAsync("""
@@ -627,8 +627,7 @@ public sealed class SqliteStorage : IStorage
                     StorageRules.CheckCopySource(stored, action.Create!);
                     content = DocumentContent.Base(stored.Version, stored.Value);
                 }
-                catch (StorageRejectedException) { throw; }
-                catch (Exception error) { throw new StorageRejectedException($"Document copy {id} was rejected", error); }
+                catch (Exception error) { throw new InvalidOperationException($"Document copy {id} was rejected", error); }
             }
             DocumentRecord record;
             if (action.Create is not null)

@@ -12,6 +12,8 @@ internal static partial class Program
 
     private static async Task<int> Main(string[] args)
     {
+        // Upstream's setup-document-retention.ts: PI_DURABLE_DOCUMENT_RETENTION_MS=0 reruns the suite with documents evicted right after use.
+        SetupDocumentRetention.Apply();
         // The child process of the crash.* cases (Crash/CrashScenarios.cs); it never runs the case groups.
         if (args is ["--crash-child", var scenario, var backend, var storagePath, var checkpoint])
             return await CrashScenarios.RunChildAsync(scenario, backend, storagePath, checkpoint);
@@ -43,7 +45,7 @@ internal static partial class Program
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
         var report = new { sourceSha = Upstream, status = captured == 0 ? "AUTHORED NATIVE; NO UPSTREAM CAPTURE" : "AUTHORED NATIVE; UPSTREAM CAPTURE (compat.*)",
-            cases = cases.Count, failures, authoredCases = authored, upstreamCaptureCases = captured, skipped,
+            documentRetentionMs = SetupDocumentRetention.DefaultForRun, cases = cases.Count, failures, authoredCases = authored, upstreamCaptureCases = captured, skipped,
             genuineSourceCasesCaptured = captured, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
         if (args is ["--report", var path])

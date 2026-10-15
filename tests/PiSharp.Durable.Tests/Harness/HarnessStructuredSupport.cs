@@ -6,8 +6,8 @@
 //   fixture, whose test.node definition closes over that case's behaviors, gates and log, so cases share nothing.
 // - Phase and abort handlers run on thread-pool threads, so the log is a SyncList and the maps are concurrent.
 // - until() (chat-support's waitFor, a 5 ms poll) is Eventually.
-// - Upstream's `class Rejecting extends MemoryStorage` is RejectingStorage, a decorator over any IStorage, so the case runs on every
-//   backend.
+// - Upstream v1.2.0's `class Failing extends ControlledStorage` is FinalizeFailingStorage, a decorator over any IStorage (a ControlledStorage
+//   kept open for its reopen), so the case runs on every backend.
 // - Recovery seeds write records through a bare Session over the reopenable storage and its internal Transaction.SetTask, as upstream
 //   writes them through createSession and the internal tx.setTask.
 using System.Collections.Concurrent;
@@ -384,26 +384,29 @@ internal static partial class StructuredTests
 }
 
 /// <summary>
-/// Rejects the first commit that finalizes the task <see cref="Reject"/> names with <see cref="StorageRejectedException"/>, then clears it
-/// (upstream's <c>class Rejecting extends MemoryStorage</c>, as a decorator).
+/// Fails the first commit that finalizes the task <see cref="Fail"/> names with <see cref="Failure"/>, then clears it (upstream v1.2.0's
+/// <c>class Failing extends ControlledStorage</c>, as a decorator).
 /// </summary>
-internal sealed class RejectingStorage(IStorage inner) : IStorage
+internal sealed class FinalizeFailingStorage(IStorage inner) : IStorage
 {
-    private long reject = -1;
+    private long fail = -1;
 
-    /// <summary>The task whose next finalizing commit is rejected once.</summary>
-    public TaskId? Reject
+    /// <summary>What the failing commit throws (upstream <c>new Error("disk gone")</c>).</summary>
+    public Exception Failure { get; } = new IOException("disk gone");
+
+    /// <summary>The task whose next finalizing commit fails once.</summary>
+    public TaskId? Fail
     {
-        get => Interlocked.Read(ref reject) is var value and >= 0 ? new TaskId(value) : null;
-        set => Interlocked.Exchange(ref reject, value?.Value ?? -1);
+        get => Interlocked.Read(ref fail) is var value and >= 0 ? new TaskId(value) : null;
+        set => Interlocked.Exchange(ref fail, value?.Value ?? -1);
     }
 
     public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
     {
-        var target = Reject;
+        var target = Fail;
         var finalizes = target is { } id && writes.Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.State.Status == DurableTaskStatus.Terminal);
-        if (finalizes && Interlocked.CompareExchange(ref reject, -1, target!.Value.Value) == target.Value.Value)
-            return Task.FromException<Seq>(new StorageRejectedException("rejected once"));
+        if (finalizes && Interlocked.CompareExchange(ref fail, -1, target!.Value.Value) == target.Value.Value)
+            return Task.FromException<Seq>(Failure);
         return inner.CommitAsync(writes, context);
     }
 

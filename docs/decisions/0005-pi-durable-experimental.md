@@ -80,6 +80,15 @@ None is planned or in progress.
 - **Examples 19, 21, 23 and 24** run on a manual example clock that is driven like Node's event loop.
 - **`listFiles`** is optional upstream, and only `pi-env` implements it: its local environment lists through its daemon, which walks with the Rust `ignore` crate. `pi-env` stays out of scope, but `LocalFileSystem` implements `ListFilesAsync` in process with the daemon's semantics (`Env/Local/LocalFileListing.cs` ports `list.rs` and the `ignore` 0.4.33 walk and gitignore matching it configures; no new package). So the local env conformance runs with `listFiles` on, as `pi-env`'s does, and `env.list-files.*` ports the daemon's own tests and the crate's gitignore tests.
 
+- **Storage failures (v1.2.0, area b).** As upstream's README "Errors" section has it, a storage error fails and closes the Harness, `SessionFailedException` (upstream `SessionFailed`) carries it as `InnerException`, `StorageRequestException` (upstream `StorageRequestError`) fails only an invalid read, and `ISession.Closed` settles with a `SessionEnd`. Three mappings:
+  - A read whose bounds a line job captured continues off the line (`Conversation.ContextAsync`); upstream's single thread starts its first Storage call before the closing line job runs. That read holds a lease (`Session.HoldStorageOpen`): close admits the lease's first call and waits for it, and refuses its later pages as upstream does.
+  - A listener's rejected promise is a faulted task from the asynchronous `SubscribeCommits`/`SubscribeClose` overloads. `OnReport` stays an `Action`: its throw is dropped, but an `async void` handler's exception escapes to the thread pool, where no caller can contain it.
+  - Document cache retention sweeps with .NET timers, which never keep a process alive, so upstream's fallback for timers that cannot be unreferenced is never needed. The suite runs a second time with `PI_DURABLE_DOCUMENT_RETENTION_MS=0` in the branch CI, as upstream's `npm test` does.
+
+- **Input entries (v1.2.0, area i).** Upstream's input `entry: { kind, data }` is `InputEntry(Kind, Data)`, passed to `SubmissionDraft.Input`. It is typed, so an untyped caller's extra fields cannot reach it; only its kind is checked (non-empty, outside `pi.`). Until area a lands, `harness.inbox-differential.steer` compares the v1.2.0 capture's one `pi.tool` task in its v1 shape, after checking that version 2 and `kind: "model"` are its only differences.
+
+- **Compaction failures (v1.2.0, area j)** are ported as upstream has them: `pi.live.compactionFailure`, the snapshot's `CompactionFailure` and `CompactionEndEvent.Error`, and a generation whose blocking threshold compaction did not complete fails with `model_error` before its request. `Live.cs`, `Generation.cs` and `Events.cs` keep their v1.1.0 headers until area a, which owns their rows.
+
 **Benchmarks** (`benchmarks/PiSharp.Durable.Benchmarks`) are report only; see `docs/durable-benchmarks.md`.
 - On the one Windows machine measured, neither runtime meets upstream's 0.4 s target for `cat` of 1 GiB:
   - upstream under Node: about 1.75 s;

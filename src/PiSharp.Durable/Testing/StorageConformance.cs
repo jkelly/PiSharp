@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/testing/storage-conformance.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/storage-conformance.ts.
 // The semantic conformance suite every backend runs (spec §10), directly and after reopen. Cases keep upstream's names, inputs and
 // expected values. Two cases are adapted because records and JSON values are immutable here: "detaches retained writes and every returned
 // record" and "detaches prototype-like JSON keys ..." change the caller's own builders (and builders made from read results) where
@@ -625,7 +625,8 @@ public static class StorageConformance
         MatchDocument(await storage.GetDocumentAsync(latestCopyId, DocumentPoint.Current, Context), 4, "{\"retained\":\"copy\"}", null, "latest copy");
 
         var conflictId = await storage.MintIdAsync<DocumentId>();
-        await RejectsWith<StorageRejectedException>(() => Commit(storage,
+        // Rejected without effect: the copy and the retirement in the same batch are both absent.
+        await RejectsWith<Exception>(() => Commit(storage,
             new DocumentCopyWrite(ChildRecord(conflictId, childId), new(currentCopyId, DocumentPoint.Current)),
             new DocumentRetireWrite(currentCopyId)), "copy from a source retired in the batch");
         Null(await storage.GetDocumentAsync(conflictId, DocumentPoint.Current, Context), "rejected copy");
@@ -633,7 +634,7 @@ public static class StorageConformance
             (await storage.GetDocumentAsync(currentCopyId, DocumentPoint.Current, Context))?.Value, "source after the rejected copy");
 
         var mismatchId = await storage.MintIdAsync<DocumentId>();
-        await RejectsWith<StorageRejectedException>(() => Commit(storage,
+        await RejectsWith<Exception>(() => Commit(storage,
             new DocumentCopyWrite(ChildRecord(mismatchId, childId) with { Kind = "copy.mismatch" }, new(currentCopyId, DocumentPoint.Current))),
             "copy with a mismatched kind");
         Null(await storage.GetDocumentAsync(mismatchId, DocumentPoint.Current, Context), "mismatched copy");

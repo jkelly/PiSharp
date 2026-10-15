@@ -279,15 +279,19 @@ public sealed record DocumentRetireWrite(DocumentId Id) : StorageWrite
 /// Atomic persistence boundary for Session records (upstream <c>Storage</c>, spec §10).
 /// <para>Storage trusts the owning Session to supply semantically valid records, references, ancestry and transitions. Implementations
 /// enforce atomicity, global ID ownership, immutable conversation/entry creation, document record consistency and detached values; the
-/// Session serializes commits, so implementations add no caller-facing commit mutex. <see cref="StorageRejectedException"/> means a batch
-/// was rejected before any durable effect; any other failure after admission leaves the commit state uncertain.</para>
+/// Session serializes commits, so implementations add no caller-facing commit mutex.</para>
+/// <para>An exception a method throws is final: it fails the Session, which nothing retries, so retry transient failures inside the method.
+/// Two exceptions of a read fail only that read: a <see cref="StorageRequestException"/> for an invalid request (an unknown conversation,
+/// a foreign or malformed cursor, history a document does not keep), which must have no durable effect, and a rejection because its
+/// caller's context was cancelled. Any exception from <see cref="CommitAsync"/> or <see cref="MintIdAsync{TId}"/> is fatal.</para>
 /// </summary>
 public interface IStorage
 {
     /// <summary>Atomically persists one batch and returns its sequence. Once it completes, later reads through this storage observe it.</summary>
     Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context);
 
-    /// <summary>Returns a fresh candidate from the Session-global numeric ID namespace.</summary>
+    /// <summary>Returns a fresh candidate from the Session-global numeric ID namespace, greater than every ID minted or stored before, also
+    /// across reopen: scans order by ID as creation order, and the Harness relies on it.</summary>
     Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId>;
 
     /// <summary>Looks up one conversation by exact ID.</summary>

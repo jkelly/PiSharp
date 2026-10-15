@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/session-forks.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-forks.test.ts. Verbatim apart from the adaptations in
 // SessionSupport.cs; the 260 concurrent family acquisitions start together and are awaited together, as upstream's Promise.all does.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -339,10 +339,11 @@ internal static partial class SessionTests
             SameJson("{\"value\":\"copied\"}", await session.SnapshotAsync(copied, parentId, Context), "parent copy source");
         });
 
-        yield return Case(prefix + "rolls-back-a-guaranteed-storage-rejection-without-poisoning-the-session", async () =>
+        yield return Case(prefix + "fails-the-session-on-a-rejected-fork-commit-which-leaves-no-effect", async () =>
         {
             var doc = Documents.DefineRewindableConversationDoc("fork.storage-rejected", 1, DocumentFork.AsOf, () => O("{\"value\":\"source\"}"));
             var (storage, session, _) = Open(storageFactory);
+            storage.KeepOpenForReopen = true;
             var parentId = await CreateConversation(session);
             EntryId forkAt = default;
             await session.CommitAsync(async tx =>
@@ -351,14 +352,20 @@ internal static partial class SessionTests
                 await tx.DocAsync(doc, parentId);
             }, Context);
             ConversationId rejectedChildId = default;
-            storage.FailNextCommit(new StorageRejectedException("copy rejected"));
-            await RejectsAsync(() => session.CommitAsync(async tx =>
+            var rejection = new InvalidOperationException("copy rejected");
+            storage.FailNextCommit(rejection);
+            var error = await RejectsAsync(() => session.CommitAsync(async tx =>
             {
                 rejectedChildId = (await tx.ForkConversationAsync(parentId, forkAt, ConversationOwnership.Ownerless)).Id;
             }, Context), "copy rejected", "rejection");
-            Check(await storage.GetConversationAsync(rejectedChildId, Context) is null, "nothing committed");
-            var next = await session.CommitAsync(tx => tx.CreateConversationAsync(ConversationOwnership.Ownerless), Context);
-            Equal(next, await storage.GetConversationAsync(next.Id, Context), "not poisoned");
+            Same(rejection, error, "the storage error itself");
+            var failed = await ThrowsAsync<SessionFailedException>(() => session.CommitAsync(tx => tx.CreateConversationAsync(ConversationOwnership.Ownerless), Context),
+                "later commit");
+            Same(rejection, failed.InnerException, "cause");
+            // The failed Session closed its Storage; reopened, it holds nothing of the batch.
+            Equal(new SessionEnd(SessionEndReason.Failed, rejection), await session.Closed, "closed");
+            Check(await storage.Reopen().GetConversationAsync(rejectedChildId, Context) is null, "nothing committed");
+            await storage.Inner.CloseAsync(Context);
         });
 
         yield return Case(prefix + "retires-a-copied-document-and-can-recreate-the-address-in-the-fork-transaction", async () =>

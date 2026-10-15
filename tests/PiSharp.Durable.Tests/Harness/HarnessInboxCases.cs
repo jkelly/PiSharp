@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-inbox.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-inbox.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream opens these on MemoryStorage and reopens a SQLite file for the reopen cases. harness.inbox.* does the same;
 //   harness.inbox.jsonl.* and harness.inbox.sqlite.* rerun every case on a fresh JSONL directory and a fresh SQLite file, and
@@ -9,6 +9,8 @@
 //   answer's boundary commit has queued behind the held commit before the test changes the mode. Here the onYield hook records the Session
 //   line's backlog, and the test waits (a deterministic barrier) until a further job, the boundary commit, waits on the line.
 // - `class RecordingStorage extends MemoryStorage { override commit() }` is RecordingStorage, a decorator over the case's storage.
+// - The stubborn and handoff tools return their empty results as ToolExecutionResult.Content: upstream's v1.2.0 `output` is area a's
+//   rename of that field, which renames it in every test at once.
 // - The usage cases call UsageLedger.RecordUsageAsync for upstream's `recordUsage`, and HarnessOptions.Settings' Retry for
 //   `setup.settings.retry`.
 using PiSharp.Durable;
@@ -102,6 +104,11 @@ internal static class InboxTests
 
     private static Task<ISubmission> Write(IConversation conversation, EntryDraft entry) => conversation.SubmitAsync(SubmissionDraft.Write(entry), Context);
 
+    /// <summary>A write that affects model context, so it queues while busy; a data-only write would be appended at once (upstream
+    /// <c>queuedNote</c>).</summary>
+    private static EntryDraft QueuedNote(string text) =>
+        new() { Kind = "note", Model = JsonValue.Array(Obj(("role", "user"), ("content", text), ("timestamp", 0))) };
+
     /// <summary>Kind and text of each entry, skipping system entries (upstream <c>transcript</c>).</summary>
     private static List<string> Transcript(IEnumerable<EntryRecord> entries) =>
     [
@@ -171,7 +178,7 @@ internal static class InboxTests
             var input = await Submit(root, "a");
             await first.Reached;
             var f1 = await Submit(root, "f1");
-            var write = await Write(root, new EntryDraft { Kind = "note", Data = "w" });
+            var write = await Write(root, QueuedNote("w"));
             var f2 = await Submit(root, "f2", WhenBusy.FollowUp);
             foreach (var submission in new[] { f1, write, f2 }) Equal(SubmissionStatus.Queued, (await Status(submission)).Status, "queued");
             Seq([$"{f1.Id} followUp", $"{write.Id} write", $"{f2.Id} followUp"], await InboxItems(harness, root), "inbox");
@@ -179,7 +186,7 @@ internal static class InboxTests
 
             first.Release();
             await f2.WaitAsync(Context);
-            Seq(["pi.user:a", "pi.assistant:first", "note", "pi.user:f1", "pi.assistant:second", "pi.user:f2", "pi.assistant:third"],
+            Seq(["pi.user:a", "pi.assistant:first", "note:w", "pi.user:f1", "pi.assistant:second", "pi.user:f2", "pi.assistant:third"],
                 Transcript(await AllEntries(root)), "transcript");
             var answers = Assistants(await AllEntries(root));
             Done(await Status(input), answers[0].Id, "input");
@@ -440,7 +447,7 @@ internal static class InboxTests
             var (harness, root) = await OpenChat(fresh(), setup);
             var input = await Submit(root, "a");
             await first.Reached;
-            var kept = await Write(root, new EntryDraft { Kind = "note" });
+            var kept = await Write(root, QueuedNote("kept"));
             var withdrawn = await Submit(root, "f");
             Equal(SubmissionAbortResult.Aborted, await withdrawn.AbortAsync(Context), "abort");
             Unanswered(await withdrawn.WaitAsync(Context), "aborted", "withdrawn");
@@ -509,18 +516,19 @@ internal static class InboxTests
             });
             var input = await Submit(root, "a");
             await first.Reached;
-            var w1 = await Write(root, new EntryDraft { Kind = "note" });
+            var w1 = await Write(root, QueuedNote("w"));
             var f1 = await Submit(root, "f1");
-            var w2 = await Write(root, new EntryDraft { Kind = "note" });
+            var w2 = await Write(root, QueuedNote("w"));
             var f2 = await Submit(root, "f2");
-            var w3 = await Write(root, new EntryDraft { Kind = "note" });
+            var w3 = await Write(root, QueuedNote("w"));
+            const string note = """{"kind":"note","model":[{"role":"user","content":"w","timestamp":0}]}""";
             var pushed = ops.Snapshot();
             Equal(5, pushed.Count, "pushes");
-            SameJson($$$"""[["p",["items"],0,0,[{"id":{{{w1.Id}}},"mode":"write","entry":{"kind":"note"}}]]]""", pushed[0], "w1");
+            SameJson($$$"""[["p",["items"],0,0,[{"id":{{{w1.Id}}},"mode":"write","entry":{{{note}}}}]]]""", pushed[0], "w1");
             SameJson($$$"""[["p",["items"],1,0,[{"id":{{{f1.Id}}},"mode":"followUp","content":"f1"}]]]""", pushed[1], "f1");
-            SameJson($$$"""[["p",["items"],2,0,[{"id":{{{w2.Id}}},"mode":"write","entry":{"kind":"note"}}]]]""", pushed[2], "w2");
+            SameJson($$$"""[["p",["items"],2,0,[{"id":{{{w2.Id}}},"mode":"write","entry":{{{note}}}}]]]""", pushed[2], "w2");
             SameJson($$$"""[["p",["items"],3,0,[{"id":{{{f2.Id}}},"mode":"followUp","content":"f2"}]]]""", pushed[3], "f2");
-            SameJson($$$"""[["p",["items"],4,0,[{"id":{{{w3.Id}}},"mode":"write","entry":{"kind":"note"}}]]]""", pushed[4], "w3");
+            SameJson($$$"""[["p",["items"],4,0,[{"id":{{{w3.Id}}},"mode":"write","entry":{{{note}}}}]]]""", pushed[4], "w3");
             first.Release();
             await input.WaitAsync(Context);
             await Delivered(harness);
@@ -573,11 +581,11 @@ internal static class InboxTests
             var (harness, root) = await OpenChat(fresh(), setup);
             var input = await Submit(root, "a");
             await first.Reached;
-            var write = await Write(root, new EntryDraft { Kind = "note" });
+            var write = await Write(root, QueuedNote("w"));
             first.Release();
             await input.WaitAsync(Context);
             var entries = await AllEntries(root);
-            Seq(["pi.user:a", "pi.assistant:first", "note", "pi.user:more", "pi.assistant:second"], Transcript(entries), "transcript");
+            Seq(["pi.user:a", "pi.assistant:first", "note:w", "pi.user:more", "pi.assistant:second"], Transcript(entries), "transcript");
             Done(await Status(input), entries[^1].Id, "input");
             Done(await Status(write), null, "write");
             await harness.CloseAsync(Context);

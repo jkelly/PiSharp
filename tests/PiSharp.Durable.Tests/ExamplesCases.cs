@@ -7,7 +7,7 @@ using PiSharp.Durable.Examples;
 // timestamps come from the clock, so both sides compare them as <time>. The file backends also reopen each example's storage in a new
 // Session and read it back. P9 adds 17-coding-tools, 29-sandbox-per-conversation and 30-tool-override, whose tools run over LocalExecutionEnv
 // in temporary directories (Git Bash on Windows); 17's timing of `cat /tmp/1gb.txt` compares as <ms> and its storage directory as <dir>.
-// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held. P12 adds 22-subagent-foreground, whose held child and parent answers
+// P10 adds 20-inbox, whose held first answer is a ScriptedReply.Held (its lines are Pi v1.2.0's: the data-only note is appended at once). P12 adds 22-subagent-foreground, whose held child and parent answers
 // keep Node's order of the UI attaching to the child and printing; its file backends read back the child conversation and both transcripts. P11 adds 06-harness through 13-recovery (11's faux provider is
 // ScriptedModels; 13 keeps its storage in a temporary SQLite file on memory, as upstream does, and reopens the runner's storage otherwise),
 // 25-compaction, whose model reports the faux provider's usage estimate (its file backends read back the stored entries and summaries),
@@ -135,7 +135,8 @@ internal static partial class Program
         "== 20-inbox",
         "rejected: Conversation 1 is busy",
         "withdraw: aborted",
-        """inbox: ["10 followUp","11 steer","12 write"]""",
+        // Pi v1.2.0 (#10407): the data-only note is appended at once, not queued.
+        """inbox: ["10 followUp","11 steer"]""",
         // Upstream prints an empty reason after a settled done.
         "first: done ",
         "follow-up: done ",
@@ -310,7 +311,7 @@ internal static partial class Program
     private const string PaymentOutcome = """payment outcome: {"status":"completed","result":{"receipt":500}}""";
     private const string CodingToolsStorage = "storage: <dir>";
     private const string SubagentAnswer = "assistant: The subagent says: 2, 3, and 5.";
-    private const string InboxTranscript = """transcript: ["pi.user","pi.assistant","app.note","pi.user","pi.user","pi.assistant"]""";
+    private const string InboxTranscript = """transcript: ["pi.user","app.note","pi.assistant","pi.user","pi.user","pi.assistant"]""";
     // Repeated within 25-compaction's output; the read-back follows its last occurrence, the example's last line.
     private const string CompactionLastLine = "  system    (system prompt)";
     private const string BobsSandbox = "bob's sandbox: from bob";
