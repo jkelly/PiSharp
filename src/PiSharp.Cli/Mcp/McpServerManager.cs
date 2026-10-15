@@ -179,6 +179,35 @@ public sealed class McpServerManager
         }
     }
 
+    /// <summary>index.ts tool_call, before any tool of the session runs (after the extensions' tool_call handlers allowed it, with the
+    /// input they leave): a tool that reaches other tools (<c>reachesTools</c>) waits for the servers it may reach, so their tools are
+    /// registered before it runs (a codemode script for the servers it names, or for every server when it searches or enumerates tools,
+    /// tool_search for every server); the resource tools reach every server, so they wait for all of them; a server's own tools wait
+    /// for that server, including a reconnect still closing its old transport. A tool the session does not register waits for nothing.
+    /// There is no time limit: a server's readiness settles when its connection attempt connects or fails (a failed server's tools are
+    /// simply not registered), and cancellation returns at once.</summary>
+    internal Task BeforeToolCallAsync(string toolName, PiSharp.Contracts.JsonData input, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(toolName); ArgumentNullException.ThrowIfNull(input);
+        if (Session() is not { } session) return Task.CompletedTask;
+        var tool = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.FirstOrDefault(candidate => candidate.Adapter.Name == toolName);
+        if (tool is null) return Task.CompletedTask;
+        Func<McpServerEntry, bool> include;
+        if (tool.ReachesTools is { } reachesTools)
+        {
+            var reach = reachesTools(input);
+            include = entry => McpCodemode.ReachesServer(reach, entry.Name);
+        }
+        else if (McpResourceToolsPublisher.ToolNames.Contains(toolName)) include = _ => true;
+        else
+        {
+            // toolOwners: the server whose tools include this one (its namespace).
+            var owner = tool.Namespace?.Name;
+            include = entry => owner is not null && McpCatalogPlanner.Namespace(entry.Name) == owner;
+        }
+        return WaitForServersAsync(include, token);
+    }
+
     /// <summary>server.ready: the server's readiness follows the attempt <paramref name="start"/> begins, from before it begins;
     /// readiness never faults.</summary>
     private Task Attempt(Slot slot, Func<Task> start)
@@ -619,6 +648,16 @@ public sealed class McpServerManager
         Changed();
         return null;
     }
+
+    /// <summary>index.ts session_start: ensureDiscoveryActive from the configuration, once the session is current, so the codemode or
+    /// tool_search tool the servers need is active before they connect (another extension's tool of these names too, when it declares
+    /// reachesTools; the built-in ones are registered active for them).</summary>
+    internal void SessionStarted()
+    {
+        if (Session() is null || Interlocked.Exchange(ref sessionStarted, 1) != 0) return;
+        EnsureDiscoveryActive();
+    }
+    private int sessionStarted;
 
     /// <summary>ensureDiscoveryActive after a change: activate codemode for enabled `codemode` servers (unless autoEnableCodemode is
     /// false) and tool_search for `deferred` ones, when the session registers them and they are not active yet.</summary>
