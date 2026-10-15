@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/bedrock-converse-stream.ts (convertMessages,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/bedrock-converse-stream.ts (convertMessages,
 // sanitizeBedrockDocument) and packages/ai/src/api/openai-codex-responses.ts.
 using PiSharp.AI;
 using PiSharp.Contracts;

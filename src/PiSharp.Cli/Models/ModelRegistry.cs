@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/model-runtime.ts (provider composition,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/model-runtime.ts (provider composition,
 // availability snapshot, getError, getProviderAuthStatus, getAuth, registerVirtualModel, resolveModel),
 // packages/coding-agent/src/core/model-registry.ts (getApiKeyAndHeaders, getProviderDisplayName),
 // packages/coding-agent/src/core/provider-composer.ts (composeApiKeyAuth check/resolve) and packages/ai/src/models.ts
@@ -30,6 +30,9 @@ internal sealed record ModelRegistryOptions
     /// <summary>Whether the built-in llama.cpp extension registers its provider (false: <c>-builtin:llama.cpp</c>, <c>--no-extensions</c>);
     /// null: it does.</summary>
     internal Func<bool>? LlamaProvider { get; init; }
+    /// <summary>The access token of a provider's stored OAuth credential for a catalog refresh, refreshed when it has expired
+    /// (models.ts resolveRefreshCredential); null when it cannot be resolved. Null: OAuth credentials give catalogs no key.</summary>
+    internal Func<string, CancellationToken, Task<string?>>? ResolveOAuthKey { get; init; }
 }
 
 /// <summary>Resolved request authentication of one model (getApiKeyAndHeaders).</summary>
@@ -46,7 +49,7 @@ internal sealed class ModelRegistry
     private sealed record Registered(RegistryModel Model, VirtualModelDefinition Definition);
 
     private readonly ModelRegistryOptions options;
-    private readonly Dictionary<string, RemoteCatalogOverlay> overlays = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ICatalogOverlay> overlays = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, Registered>> virtualModels = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string?> authChecks = new(StringComparer.Ordinal);
     private ImmutableArray<RegistryModel>? radiusDynamic;
@@ -66,7 +69,12 @@ internal sealed class ModelRegistry
         var client = options.CreateCatalogClient ?? (() => new HttpClient());
         llama = PiSharp.Cli.Llama.LlamaCatalog.For(options.ModelsStore is FileModelsStore file ? file.Path : null);
         foreach (var provider in BuiltinProviders.All.Where(provider => provider.Id != "radius"))
-            overlays[provider.Id] = new(provider.Id, client, options.CatalogBaseUrl, BuiltinModelCatalog.GeneratedAtUnixMilliseconds, options.Now);
+            overlays[provider.Id] = provider.Id == "openrouter"
+                // model-runtime.ts: OpenRouter narrows the catalog to the models, limits and prices of the user's key (Pi 1.2.0).
+                ? new PersonalizedCatalogOverlay(provider.Id, client, () => BuiltinModels(provider.Id),
+                    (catalog, context) => OpenRouterUserModels.PersonalizeAsync(catalog, context.CredentialKey, context.BaseUrl, client, context.CancellationToken),
+                    options.CatalogBaseUrl, BuiltinModelCatalog.GeneratedAtUnixMilliseconds, options.Now)
+                : new RemoteCatalogOverlay(provider.Id, client, options.CatalogBaseUrl, BuiltinModelCatalog.GeneratedAtUnixMilliseconds, options.Now);
         Rebuild();
     }
 
@@ -173,14 +181,17 @@ internal sealed class ModelRegistry
                 {
                     var stored = await store.ReadAsync(id, cancellationToken).ConfigureAwait(false);
                     stored = stored is null ? null : stored with { Models = new([.. stored.Models.OfType<JsonObject>().Where(KnownType).Select(model => (JsonNode?)model.DeepClone())]) };
-                    await overlay.RefreshAsync(new(stored, allowNetwork, allowNetwork ? force : null, async publication =>
+                    // models.ts refresh: the network phase runs only with a resolved credential (for the layers that use it).
+                    var key = allowNetwork && overlay.RequiresCredential ? await RefreshKeyAsync(id, cancellationToken).ConfigureAwait(false) : null;
+                    var network = allowNetwork && (!overlay.RequiresCredential || key is not null);
+                    await overlay.RefreshAsync(new(stored, network, network ? force : null, async publication =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (publication.Delete) await store.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
                         else if (publication.Persist is { } persist) await store.WriteAsync(id, persist, cancellationToken).ConfigureAwait(false);
                         publication.Update?.Invoke();
                         return true;
-                    }, cancellationToken)).ConfigureAwait(false);
+                    }, cancellationToken, key, RefreshBaseUrl(id))).ConfigureAwait(false);
                 }
                 catch (Exception error) when (error is not OperationCanceledException || !cancellationToken.IsCancellationRequested) { errors[id] = error; }
             }
@@ -216,6 +227,31 @@ internal sealed class ModelRegistry
         return errors;
         static bool KnownType(JsonObject model) => JsonTree.String(model, "type") is null or "chat" or "image" or "classifier";
     }
+
+    /// <summary>models.ts resolveRefreshCredential for a built-in provider's catalog: a stored OAuth credential's access token (refreshed
+    /// when expired), else the composed API key (a stored api_key, then the models.json <c>apiKey</c>, then the provider's environment
+    /// variable). Null when the provider has no credential.</summary>
+    private async Task<string?> RefreshKeyAsync(string providerId, CancellationToken cancellationToken)
+    {
+        var stored = Stored(providerId);
+        if (stored?.Type == "oauth")
+            return BuiltinProviders.TryGet(providerId, out var oauthProvider) && oauthProvider.OAuthName is not null && options.ResolveOAuthKey is { } resolve
+                ? await resolve(providerId, cancellationToken).ConfigureAwait(false) : null;
+        if (stored is { Type: "api_key", Key: { Length: > 0 } storedKey }) return storedKey;
+        // composeApiKeyAuth: a stored credential (even one whose key does not resolve) skips models.json apiKey.
+        if (stored is not { Type: "api_key" } && ModelProviderComposer.ApiKey(ProviderConfig(providerId)) is { } rawKey)
+            return Values.ResolveOrThrow(rawKey, $"API key for provider \"{providerId}\"", stored?.Environment);
+        if (!BuiltinProviders.TryGet(providerId, out var builtin)) return null;
+        foreach (var name in builtin.ApiKeyVariables)
+            if (ProviderEnvironmentKeys.Value(options.Environment, name) is { Length: > 0 } value) return value;
+        return null;
+    }
+
+    /// <summary>RefreshModelsContext.baseUrl: the registered provider's base URL, an extension's over models.json's over the built-in one.</summary>
+    private string? RefreshBaseUrl(string providerId) =>
+        (extensionProviders.TryGetValue(providerId, out var extension) ? JsonTree.String(extension, "baseUrl") : null) ??
+        (config.GetProvider(providerId) is { } configured ? JsonTree.String(configured, "baseUrl") : null) ??
+        (BuiltinProviders.TryGet(providerId, out var builtin) ? builtin.BaseUrl : null);
 
     /// <summary>provider.ts refreshModels with the stored api_key credential of llama.cpp (its key resolved as a config value).</summary>
     private Task RefreshLlamaAsync(ModelsStoreEntry? stored, bool allowNetwork, IModelsStore? store, CancellationToken cancellationToken) =>

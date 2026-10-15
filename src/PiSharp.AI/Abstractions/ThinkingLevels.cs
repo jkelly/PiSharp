@@ -17,7 +17,7 @@ public static class ThinkingLevels
         return levels;
     }
 
-    /// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT) packages/ai/src/models.ts clampThinkingLevel: the requested level when
+    /// <summary>Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT) packages/ai/src/models.ts clampThinkingLevel: the requested level when
     /// supported, else the nearest supported level above it, else the nearest below, else the first supported level.</summary>
     public static string Clamp(ImmutableArray<string> available, string level)
     {

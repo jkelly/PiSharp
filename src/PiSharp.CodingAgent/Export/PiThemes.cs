@@ -1,6 +1,8 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts (Theme colors, theme loading,
-// getThemeByName, initTheme, detectTerminalTheme, resolveThemeSetting, getResolvedThemeColors, getThemeExportColors), theme/theme-json.ts
-// (validateThemeJson), theme/dark.json and theme/light.json (embedded byte-for-byte) and src/config.ts (getAgentDir, getCustomThemesDir).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts (Theme colors, theme
+// loading, getThemeByName, initTheme, detectTerminalTheme, resolveThemeSetting, getResolvedThemeColors, getThemeExportColors),
+// theme/theme-tokens.ts (token order and fallbacks), theme/theme-schema.ts (validateThemeJson), theme/dark.json and theme/light.json
+// (embedded byte-for-byte), src/main.ts (the validator is installed before any theme loads) and src/config.ts (getAgentDir,
+// getCustomThemesDir).
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -27,7 +29,8 @@ public sealed class PiTheme
         string? name, string? sourcePath, string? appearance, IEnumerable<string>? dimTokens = null)
     {
         Name = name; SourcePath = sourcePath; dim = new(dimTokens ?? [], StringComparer.Ordinal);
-        var fg = WithFallbacks(foregrounds, ("scrollbarTrack", "muted"), ("scrollbarThumb", "text"), ("thinkingMax", "thinkingXhigh"), ("searchMatchText", "text"));
+        // theme-tokens.ts THEME_TOKENS order: optional tokens fall back in token-file order.
+        var fg = WithFallbacks(foregrounds, ("scrollbarTrack", "muted"), ("scrollbarThumb", "text"), ("searchMatchText", "text"), ("thinkingMax", "thinkingXhigh"));
         var bg = WithFallbacks(backgrounds, ("searchMatchBg", "selectedBg"));
         var concreteForegrounds = new List<PiColor>(); var concreteBackgrounds = new List<PiColor>();
         void Add(string token, object value, bool background)
@@ -50,7 +53,7 @@ public sealed class PiTheme
         {
             if (result.Any(pair => pair.Key == token)) continue;
             var fallback = result.FirstOrDefault(pair => pair.Key == from);
-            if (fallback.Key is null) throw new ArgumentException($"Invalid color value: undefined");
+            if (fallback.Key is null) throw new ArgumentException($"Theme token {token} has unresolved fallback {from}");
             result.Add(new(token, fallback.Value));
         }
         return result;
@@ -218,11 +221,17 @@ public sealed class PiThemeHost
     {
         if (themeJson["colors"] is not JsObject colors) throw new ArgumentException("Invalid theme: colors must be an object.");
         var vars = themeJson["vars"] as JsObject ?? new JsObject();
-        var withFallbacks = colors.Clone();
-        foreach (var (token, from) in new[] { ("scrollbarTrack", "muted"), ("scrollbarThumb", "text"), ("thinkingMax", "thinkingXhigh"),
-            ("searchMatchBg", "selectedBg"), ("searchMatchText", "text") })
-            if (withFallbacks[token] is null or Js.UndefinedValue) withFallbacks[token] = colors[from];
-        var resolved = Js.OrderedKeys(withFallbacks).Select(key => new KeyValuePair<string, object>(key, ResolveVarRefs(withFallbacks[key], vars, []))).ToList();
+        // createTheme: withThemeTokenFallbacks(resolveThemeColors(colors, vars)), the missing optional tokens taking their fallback's
+        // resolved value in THEME_TOKENS order.
+        var resolved = Js.OrderedKeys(colors).Select(key => new KeyValuePair<string, object>(key, ResolveVarRefs(colors[key], vars, []))).ToList();
+        foreach (var (token, from) in new[] { ("scrollbarTrack", "muted"), ("scrollbarThumb", "text"), ("searchMatchBg", "selectedBg"),
+            ("searchMatchText", "text"), ("thinkingMax", "thinkingXhigh") })
+        {
+            if (resolved.Any(pair => pair.Key == token)) continue;
+            var fallback = resolved.FirstOrDefault(pair => pair.Key == from);
+            if (fallback.Key is null) throw new ArgumentException($"Theme token {token} has unresolved fallback {from}");
+            resolved.Add(new(token, fallback.Value));
+        }
         var (fg, bg) = Split(resolved);
         return new(fg, bg, themeJson["name"] as string, sourcePath, themeJson["appearance"] as string);
     }
@@ -254,7 +263,7 @@ public sealed class PiThemeHost
         object? json;
         try { json = Js.ParseJson(StripBom(content)); }
         catch (FormatException error) { throw new ArgumentException($"Failed to parse theme {label}: SyntaxError: {error.Message}", error); }
-        if (ValidateThemeJson) return ThemeJsonValidation.Validate(label, json);
+        if (ValidateThemeJson) return ThemeJsonValidation.Validate(label, json, StripBom(content));
         if (json is not JsObject obj || !obj.Has("colors")) throw new ArgumentException($"Invalid theme \"{label}\": expected an object with a \"colors\" map.");
         return obj;
     }
@@ -293,63 +302,30 @@ public sealed class PiThemeHost
     }
 }
 
-/// <summary>theme-json.ts validateThemeJson (the typebox schema pi's CLI installs).</summary>
+/// <summary>theme-schema.ts validateThemeJson: the published theme schema (strict: unknown top-level fields, color tokens and export
+/// colors are rejected), with TypeBox's messages; a name with "/" is refused first.</summary>
 internal static class ThemeJsonValidation
 {
-    private static readonly string[] Required =
-    [
-        "accent", "border", "borderAccent", "borderMuted", "success", "error", "warning", "muted", "dim", "text", "thinkingText", "selectedBg",
-        "userMessageBg", "userMessageText", "customMessageBg", "customMessageText", "customMessageLabel", "toolPendingBg", "toolSuccessBg",
-        "toolErrorBg", "toolTitle", "toolOutput", "mdHeading", "mdLink", "mdLinkUrl", "mdCode", "mdCodeBlock", "mdCodeBlockBorder", "mdQuote",
-        "mdQuoteBorder", "mdHr", "mdListBullet", "toolDiffAdded", "toolDiffRemoved", "toolDiffContext", "syntaxComment", "syntaxKeyword",
-        "syntaxFunction", "syntaxVariable", "syntaxString", "syntaxNumber", "syntaxType", "syntaxOperator", "syntaxPunctuation", "thinkingOff",
-        "thinkingMinimal", "thinkingLow", "thinkingMedium", "thinkingHigh", "thinkingXhigh", "bashMode"
-    ];
-    private static readonly string[] Optional = ["scrollbarTrack", "scrollbarThumb", "searchMatchBg", "searchMatchText", "thinkingMax"];
-
-    private static bool IsColorValue(object? value) => value is string || value is double number && number == Math.Floor(number) && number is >= 0 and <= 255;
-
-    internal static JsObject Validate(string label, object? json)
+    internal static JsObject Validate(string label, object? json, string text)
     {
-        var missing = new SortedSet<string>(StringComparer.Ordinal); var other = new List<string>();
-        if (json is not JsObject obj) throw new ArgumentException($"Invalid theme \"{label}\":\n\n\nOther errors:\n  - /: must be object");
-        if (obj.Has("$schema") && obj["$schema"] is not string) other.Add("  - /$schema: must be string");
-        if (obj["name"] is not string) other.Add(obj.Has("name") ? "  - /name: must be string" : "  - /: must have required properties name");
-        if (obj.Has("appearance") && obj["appearance"] is not ("dark" or "light")) other.Add("  - /appearance: must match a schema in anyOf");
-        if (obj.Has("vars"))
-        {
-            if (obj["vars"] is not JsObject vars) other.Add("  - /vars: must be object");
-            else foreach (var key in vars.Keys) if (!IsColorValue(vars[key])) other.Add($"  - /vars/{key}: must match a schema in anyOf");
-        }
-        if (obj["colors"] is not JsObject colors) other.Add(obj.Has("colors") ? "  - /colors: must be object" : "  - /: must have required properties colors");
-        else
-        {
-            foreach (var token in Required)
-                if (!colors.Has(token)) missing.Add(token);
-                else if (!IsColorValue(colors[token])) other.Add($"  - /colors/{token}: must match a schema in anyOf");
-            foreach (var token in Optional) if (colors.Has(token) && !IsColorValue(colors[token])) other.Add($"  - /colors/{token}: must match a schema in anyOf");
-        }
-        if (obj.Has("export"))
-        {
-            if (obj["export"] is not JsObject export) other.Add("  - /export: must be object");
-            else foreach (var key in new[] { "pageBg", "cardBg", "infoBg" })
-                if (export.Has(key) && !IsColorValue(export[key])) other.Add($"  - /export/{key}: must match a schema in anyOf");
-        }
-        if (missing.Count > 0 || other.Count > 0)
-        {
-            var message = new StringBuilder($"Invalid theme \"{label}\":\n");
-            if (missing.Count > 0)
-            {
-                message.Append("\nMissing required color tokens:\n").Append(string.Join("\n", missing.Select(color => "  - " + color)));
-                message.Append("\n\nPlease add these colors to your theme's \"colors\" object.");
-                message.Append("\nSee the built-in themes (dark.json, light.json) for reference values.");
-            }
-            if (other.Count > 0) message.Append("\n\nOther errors:\n").Append(string.Join("\n", other));
-            throw new ArgumentException(message.ToString());
-        }
-        var name = (string)obj["name"]!;
-        if (name.Contains('/'))
+        if (json is JsObject named && named["name"] is string name && name.Contains('/'))
             throw new ArgumentException($"Invalid theme name \"{name}\": theme names cannot contain \"/\" because it is reserved for automatic light/dark theme settings.");
-        return obj;
+        var schema = PiSharp.CodingAgent.Configuration.PiConfigurationSchemas.Theme;
+        if (schema.CheckJson(text)) return (JsObject)json!;
+        var missing = new SortedSet<string>(StringComparer.Ordinal); var other = new List<string>();
+        foreach (var error in schema.ErrorsJson(text))
+        {
+            if (error.Keyword == "required" && error.InstancePath == "/colors") { foreach (var color in error.RequiredProperties) missing.Add(color); continue; }
+            other.Add($"  - {(error.InstancePath.Length == 0 ? "/" : error.InstancePath)}: {error.Message}");
+        }
+        var message = new StringBuilder($"Invalid theme \"{label}\":\n");
+        if (missing.Count > 0)
+        {
+            message.Append("\nMissing required color tokens:\n").Append(string.Join("\n", missing.Select(color => "  - " + color)));
+            message.Append("\n\nPlease add these colors to your theme's \"colors\" object.");
+            message.Append("\nSee the built-in themes (dark.json, light.json) for reference values.");
+        }
+        if (other.Count > 0) message.Append("\n\nOther errors:\n").Append(string.Join("\n", other));
+        throw new ArgumentException(message.ToString());
     }
 }

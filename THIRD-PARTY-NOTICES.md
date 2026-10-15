@@ -109,6 +109,10 @@ Both MIT licenses grant the same permissions, under the same conditions, as the 
 
 The CLI ships Pi v1.1.0 `packages/coding-agent/docs/llama-cpp.md` unchanged as `docs/llama-cpp.md` (source `src/PiSharp.Cli/docs/llama-cpp.md`), under the Pi MIT notice above.
 
+## Pi v1.2.0 configuration schemas
+
+`src/PiSharp.CodingAgent/Schemas/{models,settings,keybindings,theme}.schema.json` are byte-for-byte copies of Pi v1.2.0 `packages/coding-agent/schemas/*.schema.json` (commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff`; git blobs `40e27fa3ebee59118b0db6373435479d5fc1baeb`, `81cfc5fb198d0e1bb7dd3fd782dd9553c023f97d`, `aa3b3e9be501475ce465855ee676abe32b8b9c2e` and `95350a58db931d116d982d3212dbfd2c5c946760`), embedded to validate models.json, keybindings and themes, under the Pi MIT notice above. The built-in `dark.json` and `light.json` themes are the v1.2.0 files.
+
 ## Anthropic SDK reviewed development oracle
 
 The eight exact upstream-locked packages in [the actual scoped restore receipt](compatibility/anthropic-oracle-setup.json) are development-oracle dependencies only. The receipt retains every observed packaged LICENSE/NOTICE text verbatim and its byte hash, including the SDK's root MIT license and internal qs BSD-3-Clause notice. Packages are @anthropic-ai/sdk0.124.0, @babel/runtime7.29.2, @stablelib/base641.0.1, fast-sha2561.3.0, json-schema-to-ts3.1.1, partial-json0.1.7, standardwebhooks1.1.1 and ts-algebra2.0.0. No package is bundled into the native product.

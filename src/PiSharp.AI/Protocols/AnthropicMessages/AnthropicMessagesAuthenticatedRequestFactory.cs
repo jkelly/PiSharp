@@ -29,6 +29,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
     {
         _options = options ?? new();
         _withSession = session => new(baseUri, expectedModel, projectionOptions, authentication, _options with { SessionId = session });
+        _createWithoutPreferredStrict = () => new(baseUri, expectedModel, projectionOptions with { DisablePreferredStrictTools = true }, authentication, _options);
         ArgumentNullException.ThrowIfNull(authentication); _authentication = authentication;
         if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation
                 ? authentication.Authentication.Secret.Length != 0 || authentication.Federation is null
@@ -101,6 +102,11 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         catch (ArgumentException) { throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration); }
     }
 
+    // Pi 1.2.0 buildParams(disablePreferredStrictTools): the same request with strict "prefer" tools sent non-strict (cached).
+    private readonly Func<AnthropicMessagesAuthenticatedRequestFactory> _createWithoutPreferredStrict;
+    private AnthropicMessagesAuthenticatedRequestFactory? _withoutPreferredStrict;
+    private AnthropicMessagesAuthenticatedRequestFactory WithoutPreferredStrict() =>
+        Volatile.Read(ref _withoutPreferredStrict) ?? Interlocked.CompareExchange(ref _withoutPreferredStrict, _createWithoutPreferredStrict(), null) ?? _withoutPreferredStrict!;
     // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
     private readonly Func<string, AnthropicMessagesAuthenticatedRequestFactory> _withSession;
     private sealed record SessionScoped(string Id, AnthropicMessagesAuthenticatedRequestFactory Factory);
@@ -120,16 +126,19 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         if (ScopedTo(request) is { } scoped) return scoped.Prepare(request, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
-        var projected = AnthropicMessagesPreparedRequest.Project(_projector.Project(request, cancellationToken), Raw, cancellationToken);
+        var details = _projector.ProjectWithDetails(request, cancellationToken);
+        var projected = AnthropicMessagesPreparedRequest.Project(details.Payload, Raw, cancellationToken);
         _ = PreparedHeaders(projected);
-        return new(projected, _options, (payload, token) => CreateCore(request, token, payload), cancellationToken);
+        return new(projected, _options, (payload, token) => CreateCore(request, token, payload), cancellationToken)
+        { Fallback = details.HasPreferredStrictTools ? token => WithoutPreferredStrict().Prepare(request, token) : null };
     }
 
     private HttpRequestMessage CreateCore(ChatRequest request, CancellationToken cancellationToken, JsonData? prepared)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
-        var projected = prepared ?? _projector.Project(request, cancellationToken);
+        var details = prepared is null ? _projector.ProjectWithDetails(request, cancellationToken) : null;
+        var projected = prepared ?? details!.Payload;
         CheckDepth(projected.Value, 0, cancellationToken);
         var headers = PreparedHeaders(projected);
         // Count the exact compact raw representation before allocating UTF-8 or acquiring an HTTP request/content.
@@ -164,6 +173,8 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
             foreach (var pair in headers)
                 if (pair.Key.Equals("content-type", StringComparison.OrdinalIgnoreCase)) result.Content!.Headers.ContentType = new MediaTypeHeaderValue(pair.Value);
                 else if (!result.Headers.TryAddWithoutValidation(pair.Key, pair.Value)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
+            if (details?.HasPreferredStrictTools == true)
+                result.Options.Set(AnthropicStrictToolsFallback.RequestKey, token => WithoutPreferredStrict().CreateCore(request, token, null));
             cancellationToken.ThrowIfCancellationRequested(); return result;
         }
         catch (AnthropicMessagesKeyAuthRequestException) { result?.Dispose(); content?.Dispose(); throw; }

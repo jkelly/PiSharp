@@ -63,6 +63,9 @@ public static class TerminalKeybindingConfigurationLoader
                         foreach (var key in OwnOrder(ordered))
                         {
                             var value = renamed[key]; TerminalKeybindingValue? binding = null;
+                            // Pi 1.2.0 keybindings.ts toKeybindingsConfig: $schema is skipped and values must be valid key ids.
+                            if (key == "$schema" || !PiSharp.CodingAgent.Configuration.PiConfigurationSchemas.KeybindingValue.Check(
+                                System.Text.Json.Nodes.JsonNode.Parse(value.GetRawText()))) continue;
                             if (value.ValueKind == JsonValueKind.String) binding = new(value.GetString()!);
                             else if (value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String))
                                 binding = new(value.EnumerateArray().Select(item => item.GetString()!));

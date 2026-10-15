@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/sdk.ts (createAgentSession: restore the branch's
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/sdk.ts (createAgentSession: restore the branch's
 // model, else modelFallbackMessage and findInitialModel), packages/coding-agent/src/core/virtual-models.ts (getBranchSelection) and
 // packages/coding-agent/src/main.ts (buildSessionOptions: --model wins, scoped models only for a new session).
 using System.Text.Json.Nodes;

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/resolve.ts (resolveProviderAuth),
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/resolve.ts (resolveProviderAuth),
 // packages/ai/src/providers/anthropic.ts (anthropicApiKeyAuth.resolve), packages/coding-agent/src/core/model-runtime.ts
 // (prepareRequest: auth is resolved for every request), packages/coding-agent/src/core/auth-storage.ts (read) and
 // packages/coding-agent/src/core/resolve-config-value.ts (template values).

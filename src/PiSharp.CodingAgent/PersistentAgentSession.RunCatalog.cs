@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (_refreshToolRegistry during a run:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_refreshToolRegistry during a run:
 // a tool registered while the agent runs updates the registry and the active set at once, so the next model call of the same run
 // declares it, and the change is recorded with the next request).
 using System.Collections.Immutable;

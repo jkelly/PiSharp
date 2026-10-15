@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/openai-codex.ts (api "openai-codex-responses",
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/openai-codex.ts (api "openai-codex-responses",
 // ChatGPT OAuth) and packages/ai/src/api/openai-codex-responses.ts (streamSimple).
 using PiSharp.AI.Protocols.OpenAICodexResponses;
 using PiSharp.Contracts;

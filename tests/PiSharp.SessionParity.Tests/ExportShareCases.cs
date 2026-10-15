@@ -69,8 +69,8 @@ internal static partial class Program
                 ["template.js"] = "b5bbffdf5d9ec8bb519df45c7ff953ac1969af80e8aba33331b9f87983f91fa5",
                 ["vendor/marked.min.js"] = "d5487edc7258b404bfa74c393d74a6393155f02517bd5e7e77cd64f8187f39a0",
                 ["vendor/highlight.min.js"] = "837a6fa5b0c736b52bbde2b2b6190f305da3fc9ed41681db5321507057b5c846",
-                ["dark.json"] = "c11a588b714d35300293079b425fb09a3693d4b2d453585d211b08163c648b75",
-                ["light.json"] = "f590c51c2bc8b238891efd0e983473ed2e2a6487b6692cc1d4b2845165e703f7"
+                ["dark.json"] = "e1f96982f8cb7d2a48eca7db03c9cb282cb1e14a243680cd855638ecd6a251b6", // v1.2.0: $schema is https://pi.dev/schemas/theme.schema.json
+                ["light.json"] = "2dee6a4be7f765e7fd7728166b7ebf8c29e4ce313f8ec6b38ae50699e3abc2f3" // v1.2.0
             };
             Equal(7, SessionHtmlExport.AssetBlobs.Count, "asset count");
             foreach (var (name, blob) in SessionHtmlExport.AssetBlobs)

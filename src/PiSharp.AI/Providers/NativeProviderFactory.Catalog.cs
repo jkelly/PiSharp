@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/models.ts (createProvider: one API implementation streams every
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (createProvider: one API implementation streams every
 // catalog model of that API, at the model's own baseUrl), packages/ai/src/api/{openai-completions,openai-responses,anthropic-messages,
 // google-generative-ai,mistral-conversations,pi-messages}.ts (client base URLs) and packages/ai/src/models.ts (getSupportedThinkingLevels).
 using System.Collections.Immutable;
