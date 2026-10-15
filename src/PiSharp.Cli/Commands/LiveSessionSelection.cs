@@ -464,7 +464,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             : AnthropicResolvedTransports.AcquireMainAsync(selected.Model, new Uri(definition.BaseUrl), authentication,
                 projection, options, definition.Raw, handler, token);
     }
-    /// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT) anthropic-messages.ts buildParams: a
+    /// <summary>Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT) anthropic-messages.ts buildParams: a
     /// <c>compat.supportsMidConvoEffort</c> model always sends managed adaptive thinking with its effort markers, including on the
     /// summary route, which carries no level metadata and would otherwise send disabled thinking the model cannot accept.
     /// Disabled thinking is sent only when <c>thinkingLevelMap.off !== null</c>; the metadata-free summary route of such a model

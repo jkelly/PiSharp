@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/all.ts (builtinProviders), each provider's auth
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/all.ts (builtinProviders), each provider's auth
 // (providers/*.ts: envApiKeyAuth names and variables, amazon-bedrock.ts bedrockAuth, google-vertex.ts vertexAuth,
 // cloudflare-auth.ts cloudflareWorkersAIAuth/cloudflareAIGatewayAuth, the lazyOAuth flows), auth/helpers.ts (envApiKeyAuth login)
 // and auth/oauth/load.ts; packages/coding-agent/src/extensions/llama/provider.ts (the built-in llama.cpp extension's api-key auth).

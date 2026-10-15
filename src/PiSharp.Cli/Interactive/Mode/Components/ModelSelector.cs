@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/model-selector.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/model-selector.ts.
 // Also coding-agent/src/modes/interactive/model-catalog-refresh.ts (refreshModelCatalogs) and modelsAreEqual from ai/src/models.ts.
 using System.Globalization;
 using System.Runtime.CompilerServices;

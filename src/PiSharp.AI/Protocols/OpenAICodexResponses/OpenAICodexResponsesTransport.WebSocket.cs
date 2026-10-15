@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-codex-responses.ts (the WebSocket transport of stream:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openai-codex-responses.ts (the WebSocket transport of stream:
 // the response.create frame, connectWebSocket, acquireWebSocket and the per-session connection cache with its idle and age limits,
 // parseWebSocket, the cached-context continuation with previous_response_id, the retries for websocket_connection_limit_reached and
 // previous_response_not_found, the SSE fallback with its provider_transport_failure diagnostic, and the debug stats) and

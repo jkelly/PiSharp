@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/model-runtime.ts (provider composition,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/model-runtime.ts (provider composition,
 // availability snapshot, getError, getProviderAuthStatus, getAuth, registerVirtualModel, resolveModel),
 // packages/coding-agent/src/core/model-registry.ts (getApiKeyAndHeaders, getProviderDisplayName),
 // packages/coding-agent/src/core/provider-composer.ts (composeApiKeyAuth check/resolve) and packages/ai/src/models.ts

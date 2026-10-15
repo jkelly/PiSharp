@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (stream event mapping,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/anthropic-messages.ts (stream event mapping,
 // providerThinkingLevel and the anthropic_input_transformations diagnostic).
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;

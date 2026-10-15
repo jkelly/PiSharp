@@ -18,15 +18,15 @@ using PiSharp.CodingAgent;
 using PiSharp.CodingAgent.Configuration;
 using PiSharp.Contracts;
 
-// Authored expectations derived by reading Pi v1.1.0 (abe508e1b89912adde45528136c3221eb69acdd7) source text:
+// Authored expectations derived by reading Pi v1.2.0 (06a466935536f8c9bcacb2d5efc0fc021be1bdff) source text:
 // api/anthropic-messages.ts, api/constrained-sampling.ts, api/simple-options.ts, api/openai-completions.ts,
 // api/openai-responses.ts, api/azure-openai-responses.ts, providers/azure.ts, env-api-keys.ts, utils/retry.ts,
 // utils/provider-retry.ts, utils/overflow.ts, api/mistral-conversations.ts, utils/estimate.ts, utils/pi-user-agent.ts,
-// api/openai-responses-shared.ts, utils/transcript.ts, models.ts and the @earendil-works/pi-ai@1.1.0 catalog shards. Nothing here executes upstream code or is an upstream capture;
+// api/openai-responses-shared.ts, utils/transcript.ts, models.ts and the @earendil-works/pi-ai@1.2.0 catalog shards (expectations first read at v1.1.0 and re-verified). Nothing here executes upstream code or is an upstream capture;
 // no network, provider or credential is used.
 internal static partial class Program
 {
-    private const string SourceSha = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string SourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
     private const string Key = "inert-provider-sync-key";
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
     private static int bodyComparisons;

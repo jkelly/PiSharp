@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE with the zstd
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openai-codex-responses.ts (stream over SSE with the zstd
 // request body, streamSimple, buildRequestBody, resolveCodexUrl, mapCodexEvents, normalizeCodexStatus, parseErrorResponse,
 // extractAccountId, buildSSEHeaders, the retry helpers and service tier pricing; the WebSocket transport is in the .WebSocket part) and
 // providers/openai-codex.ts. Event processing reuses the native Responses state

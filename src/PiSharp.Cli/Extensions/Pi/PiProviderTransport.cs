@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/model-runtime.ts (registerProvider with streamSimple:
-// the extension's stream implementation serves its API, with request-time authentication) and packages/ai/src/api-registry.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/model-runtime.ts (registerProvider with streamSimple:
+// the extension's stream implementation serves its API, with request-time authentication) and packages/ai/src/compat.ts
 // (registerApiProvider: an API's stream function is looked up by model.api).
 using System.Runtime.CompilerServices;
 using System.Text.Json;

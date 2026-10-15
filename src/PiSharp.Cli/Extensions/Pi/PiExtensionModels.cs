@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/model-registry.ts (ctx.modelRegistry: getAll,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/model-registry.ts (ctx.modelRegistry: getAll,
 // getAvailable, find, findOfType, getModelsOfType, getModelOfType, getAvailableOfType, hasConfiguredAuth, getProviderAuthStatus,
 // getProviderDisplayName, getApiKeyForProvider, classify, generateImages, registerProvider with ProviderConfig.images/classifiers),
 // packages/coding-agent/src/core/provider-composer.ts (an extension provider's image and classifier APIs) and
