@@ -15,9 +15,11 @@
 // - Upstream's Sets iterate in insertion order, and the order of a pass's candidates is the order of its writes; the candidate sets are
 //   insertion-ordered here (OrderedSet), so commits stage their writes in upstream's order.
 // - Upstream's queueMicrotask wakeups (#kick, #scheduleReconcile) become thread-pool work items, so nothing commits synchronously from a
-//   commit or registry listener. Invocations then run their handlers on the thread pool, possibly in parallel with each other. The sweep
-//   job (#scheduleSweep) is enqueued from the thread pool too, so it never starts inline inside the lock; it still runs after the operation
-//   underway.
+//   commit or registry listener. The commit listener's #kick for a commit by which a running task created a task and keeps running is the
+//   exception: it enqueues a reservation pass inline (the line is busy with the publishing job, so it only enqueues), which keeps
+//   upstream's order of the new task's reservation ahead of its creator's next commit (see Kick(bool)). Invocations then run their
+//   handlers on the thread pool, possibly in parallel with each other. The sweep job (#scheduleSweep) is enqueued from the thread pool
+//   too, so it never starts inline inside the lock; it still runs after the operation underway.
 // - AbortController becomes CancellationSignal (a token plus its reason); an invocation's handler context is the scheduler context bound
 //   to that signal, so waits bound to it fail with the reason (the ended error, or OperationCanceledException for an abort mark or close,
 //   upstream's AbortError).
@@ -175,6 +177,10 @@ internal sealed class DurableTaskScheduler
     private bool closing;
     private bool dirty;
     private bool draining;
+    /// <summary>Line reservation passes (<see cref="Kick(bool)"/> on the line) enqueued whose commit has not started yet.</summary>
+    private int linePassesQueued;
+    /// <summary>Line reservation passes not finished yet (their invocations not started); <see cref="QuiesceAsync"/> waits them out.</summary>
+    private int linePassesRunning;
 
     public DurableTaskScheduler(DurableTaskSchedulerOptions options)
     {
@@ -254,7 +260,7 @@ internal sealed class DurableTaskScheduler
         while (true)
         {
             await session.FlushLineAsync().ConfigureAwait(false);
-            lock (gate) if (!reconcileScheduled && reconciling == 0 && !sweepScheduled && !draining) return;
+            lock (gate) if (!reconcileScheduled && reconciling == 0 && !sweepScheduled && !draining && linePassesRunning == 0) return;
             await Task.Delay(1).ConfigureAwait(false);
         }
     }
@@ -399,6 +405,9 @@ internal sealed class DurableTaskScheduler
     {
         var signal = new List<Invocation>();
         var changed = false;
+        // Whether the commit created a task, and whether a running task that keeps running committed it; see Kick(bool).
+        var createsTask = false;
+        var keepsRunning = false;
         lock (gate)
         {
             var updated = new List<TaskRecord>();
@@ -444,6 +453,9 @@ internal sealed class DurableTaskScheduler
                 }
                 // Its owners and place never change: what is above it is checked once, when it becomes live.
                 if (previous is null) updated.Add(record);
+                if (previous is null && status == DurableTaskStatus.Pending) createsTask = true;
+                if (status == DurableTaskStatus.Running && previous?.State.Status == DurableTaskStatus.Running &&
+                    invocations.TryGetValue(record.Id, out var running) && running.Mode == InvocationMode.Run) keepsRunning = true;
             }
             foreach (var id in failed)
             {
@@ -479,7 +491,7 @@ internal sealed class DurableTaskScheduler
         foreach (var invocation in signal) Signal(invocation, null);
         if (!changed) return;
         SettleIdle();
-        Kick();
+        Kick(onLine: createsTask && keepsRunning);
     }
 
     /// <summary><c>settings.ContextRetentionMs</c>, or 0 when the host's settings throw. Kept contexts are only a cache, so dropping them is
@@ -1213,16 +1225,95 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    private void Kick()
+    /// <summary>Schedules a reservation pass on the thread pool (upstream <c>#kick</c>).</summary>
+    private void Kick() => Kick(onLine: false);
+
+    /// <summary>
+    /// Schedules a reservation pass (upstream <c>#kick</c>). From the listener of a commit by which a running task created a task and keeps
+    /// running (<paramref name="onLine"/>), a pass of its own is enqueued inline unless a line pass is already queued behind the publishing
+    /// job (it will see this commit), whether or not a drain is underway: the listener runs inside the publishing commit's line job, so the
+    /// reservation commit is only enqueued, never run, and it lands ahead of anything the committer enqueues once its commit completes.
+    /// That is upstream's order, where the listener's microtask (and a running drain's next pass, as the drain finishes on microtasks
+    /// before the line's next job) comes before the committer's continuation: a task a commit creates is reserved before its creator's next
+    /// commit. compaction-failure shows it: generation 22's prepare commit creates background compaction 23, whose reservation precedes
+    /// 22's request commit. A thread-pool drain raced that continuation, as its loop's next pass did when a drain was still underway. A
+    /// creator that waits or ends commits nothing more, so the thread-pool drain keeps its order there: its pass then usually finds the
+    /// line idle and runs each invocation's step and phase inline in reservation order, as upstream starts them (a tools round's handlers
+    /// start in call order).
+    /// </summary>
+    private void Kick(bool onLine)
     {
         lock (gate)
         {
-            dirty = true;
-            if (draining || !enabled || closing) return;
-            draining = true;
+            if (!enabled || closing)
+            {
+                dirty = true;
+                return;
+            }
+            if (onLine)
+            {
+                if (linePassesQueued > 0) return;
+                linePassesQueued++;
+                linePassesRunning++;
+            }
+            else
+            {
+                dirty = true;
+                if (draining) return;
+                draining = true;
+            }
         }
-        // Never commit synchronously from a commit or registry listener.
-        ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.DrainAsync(), this, preferLocal: false);
+        // Never commit synchronously from a commit or registry listener: on the line, the pass only enqueues its commit.
+        if (onLine) _ = ReservePassAsync();
+        else ThreadPool.UnsafeQueueUserWorkItem(static scheduler => _ = scheduler.DrainAsync(), this, preferLocal: false);
+    }
+
+    /// <summary>One reservation pass outside the drain loop, for <see cref="Kick(bool)"/> on the line.</summary>
+    private async Task ReservePassAsync()
+    {
+        try
+        {
+            List<Reservation> reservations;
+            try
+            {
+                reservations = await ReserveAsync(linePass: true).ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                // As in DrainAsync, but never from inside the publishing job.
+                await Task.Yield();
+                FailSession(error);
+                return;
+            }
+            StartPass(reservations);
+        }
+        finally
+        {
+            lock (gate) linePassesRunning--;
+        }
+        // A pass that only marked abandoned tasks asks for another (ReserveAsync sets dirty); the drain loop runs it.
+        bool again;
+        lock (gate) again = dirty;
+        if (again) Kick();
+    }
+
+    /// <summary>Starts a reservation pass's invocations.</summary>
+    private void StartPass(List<Reservation> reservations)
+    {
+        // Upstream starts every reserved invocation before any of them gets past its first await, so an abort invocation reads its record
+        // (and its abort reason) as the reservation committed it. A run invocation here may run its step and phase inline when the line is
+        // idle, and its commits could change that record first: read the abort invocations' records before any invocation starts.
+        lock (gate)
+            foreach (var reservation in reservations)
+                if (reservation.Invocation.Mode == InvocationMode.Abort) reservation.Record = live.GetValueOrDefault(reservation.Invocation.TaskId);
+        // Abort invocations first. Upstream starts each reserved invocation up to its first await, so an abort handler that commits at once
+        // (as most do) enqueues that commit before any run invocation of the pass gets past its first step. A run invocation here may run its
+        // step and phase inline when the line is idle (a tool's whole recovery, say, settling it and cascading a request mark over a `restart`
+        // mark of a task it owns), so starting it first could reorder those commits.
+        foreach (var reservation in reservations)
+            if (reservation.Invocation.Mode == InvocationMode.Abort) Start(reservation);
+        foreach (var reservation in reservations)
+            if (reservation.Invocation.Mode != InvocationMode.Abort) Start(reservation);
     }
 
     private async Task DrainAsync()
@@ -1236,22 +1327,7 @@ internal sealed class DurableTaskScheduler
                     if (!(dirty && enabled && !closing)) break;
                     dirty = false;
                 }
-                var reservations = await ReserveAsync().ConfigureAwait(false);
-                // Upstream starts every reserved invocation before any of them gets past its first await, so an abort invocation reads its
-                // record (and its abort reason) as the reservation committed it. A run invocation here may run its step and phase inline
-                // when the line is idle, and its commits could change that record first: read the abort invocations' records before any
-                // invocation starts.
-                lock (gate)
-                    foreach (var reservation in reservations)
-                        if (reservation.Invocation.Mode == InvocationMode.Abort) reservation.Record = live.GetValueOrDefault(reservation.Invocation.TaskId);
-                // Abort invocations first. Upstream starts each reserved invocation up to its first await, so an abort handler that commits at
-                // once (as most do) enqueues that commit before any run invocation of the pass gets past its first step. A run invocation here
-                // may run its step and phase inline when the line is idle (a tool's whole recovery, say, settling it and cascading a request
-                // mark over a `restart` mark of a task it owns), so starting it first could reorder those commits.
-                foreach (var reservation in reservations)
-                    if (reservation.Invocation.Mode == InvocationMode.Abort) Start(reservation);
-                foreach (var reservation in reservations)
-                    if (reservation.Invocation.Mode != InvocationMode.Abort) Start(reservation);
+                StartPass(await ReserveAsync().ConfigureAwait(false));
             }
         }
         catch (Exception error)
@@ -1276,16 +1352,20 @@ internal sealed class DurableTaskScheduler
     /// Reserves every eligible task in one commit; orphans abort-marked tasks no definition can take, unless abandoned after a restart. The
     /// first pass after open only abort-marks the abandoned tasks, so later passes see the marks.
     /// </summary>
-    private async Task<List<Reservation>> ReserveAsync()
+    private async Task<List<Reservation>> ReserveAsync(bool linePass = false)
     {
         var reservations = new List<Reservation>();
         List<TaskId> marked = [];
+        var begun = false;
         try
         {
             await session.CommitWithAsync(async tx =>
             {
                 lock (gate)
                 {
+                    // From here on, a commit's listener needs a line pass of its own again.
+                    if (linePass) linePassesQueued--;
+                    begun = true;
                     if (!enabled || closing) return;
                     foreach (var id in abandoned)
                         if (live.TryGetValue(id, out var record) && !record.AbortRequested) tx.SetTask(WithAbortMark(record, restart: true));
@@ -1349,6 +1429,7 @@ internal sealed class DurableTaskScheduler
         }
         catch
         {
+            if (linePass && !begun) lock (gate) linePassesQueued--;
             foreach (var reservation in reservations)
             {
                 lock (gate)
@@ -1573,7 +1654,7 @@ internal sealed class DurableTaskScheduler
     private async Task RunAbortAsync(Reservation reservation)
     {
         var invocation = reservation.Invocation;
-        // The record as the reservation committed it, read before any invocation of the pass started (see DrainAsync).
+        // The record as the reservation committed it, read before any invocation of the pass started (see StartPass).
         var found = reservation.Record;
         bool closingNow;
         lock (gate) closingNow = closing;
