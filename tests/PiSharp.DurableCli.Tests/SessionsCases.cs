@@ -156,7 +156,16 @@ internal static partial class Program
             {
                 var line = await child.WaitForLineAsync("LOCKED ", TimeSpan.FromSeconds(60));
                 Equal(created.Directory, line["LOCKED ".Length..], "the child locked the same session");
-                await Task.Delay(2500);
+                // Wait for a renewal rather than a fixed time: with a 1 s renewal and a 2 s stale time, a fixed wait leaves the check one
+                // second of slack, which a loaded CI runner can exceed. Right after a renewal the lock is fresh for the 2 s stale check.
+                var lockPath = created.Directory + ".lock";
+                var locked = Directory.GetLastWriteTimeUtc(lockPath);
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+                while (Directory.GetLastWriteTimeUtc(lockPath) <= locked)
+                {
+                    Check(DateTime.UtcNow < deadline, "the child renews its lock");
+                    await Task.Delay(50);
+                }
                 var error = await ThrowsAsync<DurableSessionLockedException>(() => DurableSessions.SelectAsync(agent.Cwd, true, agent.AgentDir,
                     new PiLockOptions { Stale = TimeSpan.FromSeconds(2) }), "held by the other process");
                 Check(error.Message.EndsWith(created.Directory, StringComparison.Ordinal), error.Message);
