@@ -20,6 +20,8 @@
 //   upstream's order of the new task's reservation ahead of its creator's next commit (see Kick(bool)). Invocations then run their
 //   handlers on the thread pool, possibly in parallel with each other. The sweep job (#scheduleSweep) is enqueued from the thread pool
 //   too, so it never starts inline inside the lock; it still runs after the operation underway.
+// - Two outcomes upstream gets from microtask order alone are kept explicitly: a reconciliation pass takes the pending cascade on the line
+//   (ReconcileAsync), and a context read that finishes once its task is no longer running is not kept (Runtime.ContextAsync).
 // - AbortController becomes CancellationSignal (a token plus its reason); an invocation's handler context is the scheduler context bound
 //   to that signal, so waits bound to it fail with the reason (the ended error, or OperationCanceledException for an abort mark or close,
 //   upstream's AbortError).
@@ -574,14 +576,11 @@ internal sealed class DurableTaskScheduler
     /// </summary>
     private async Task ReconcileAsync()
     {
-        bool cascade;
         List<TaskId> checks;
         lock (gate)
         {
             reconcileScheduled = false;
             reconciling++;
-            cascade = cascadePending;
-            cascadePending = false;
             checks = [.. failFastChecks];
             failFastChecks.Clear();
         }
@@ -589,7 +588,17 @@ internal sealed class DurableTaskScheduler
         {
             await session.CommitWithAsync(async tx =>
             {
-                lock (gate) if (closing) return;
+                bool cascade;
+                lock (gate)
+                {
+                    if (closing) return;
+                    // Taken on the line, not when the pass starts: upstream's pass enqueues its commit in the microtask that takes the
+                    // flag, so a commit that sets it later always has its own pass queued right behind this one. Here the pass it schedules
+                    // can reach the line much later, while this one's walk already marks below an intent that commit published, and the
+                    // owner can end before that pass withdraws the queued inputs below it.
+                    cascade = cascadePending;
+                    cascadePending = false;
+                }
                 var queued = await LoadScopesAsync(cascade).ConfigureAwait(false);
                 // A cascade from an abandoned owner passes its `restart` reason on; any other intent marks, or upgrades a `restart` mark, as
                 // a request. Collected first, so a request wins over a `restart` mark of the same pass.
@@ -2375,9 +2384,12 @@ internal sealed class DurableTaskScheduler
             var stamp = scheduler.now();
             lock (scheduler.gate)
             {
-                // Keep it unless the invocation ended or a concurrent read already kept a newer range.
+                // Keep it unless the invocation ended or a concurrent read already kept a newer range. A task no longer running ends its
+                // invocation at the next step (rule 1), which upstream's microtask order commits before any commit that follows the task's;
+                // here that step can queue behind them, so such an invocation counts as ended.
                 var kept = scheduler.contexts.GetValueOrDefault(conversationId);
-                if (range is not null && !scheduler.closing && !invocation.Ended && (kept is null || kept.Range.Bounds.Tail.Value <= range.Bounds.Tail.Value))
+                var ended = invocation.Ended || scheduler.live.GetValueOrDefault(invocation.TaskId)?.State is not RunningTaskState;
+                if (range is not null && !scheduler.closing && !ended && (kept is null || kept.Range.Bounds.Tail.Value <= range.Bounds.Tail.Value))
                 {
                     // A read of another, idle conversation starts or continues its retention period.
                     if (!scheduler.IdleLocked(conversationId)) scheduler.contexts[conversationId] = new KeptContext(range, null);

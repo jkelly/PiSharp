@@ -12,6 +12,9 @@
 // - "faults only the task ... for a thrown value that cannot be formatted": a .NET throw is an Exception, so the value is an exception whose
 //   Message getter throws, and the fault message is DurableErrors.MessageOf's fallback, the type name, where upstream's is "[object Object]".
 // - process.on("unhandledRejection") is TaskScheduler.UnobservedTaskException after a full collection.
+// - running(): upstream polls on timers, so by the time it sees the record `running` the reservation's continuations (the invocation's first
+//   step commit and its phase's start) have run as microtasks. Here they continue on the thread pool and can queue behind the next commit the
+//   test makes, so Running also awaits Waiting's phase start.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
@@ -29,8 +32,11 @@ internal static class StorageFailureTests
 {
     private static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary>Waits for its signal, records that it saw it, and ends <c>aborted</c> through its abort handler (upstream <c>Waiting</c>).</summary>
-    private static DurableTask Waiting(SyncList<string> signals) => Tasks.DefineTask(new TaskDefinition
+    /// <summary>
+    /// Waits for its signal, records that it saw it, and ends <c>aborted</c> through its abort handler (upstream <c>Waiting</c>). Resolves
+    /// <paramref name="started"/> when its phase starts (see the header).
+    /// </summary>
+    private static DurableTask Waiting(SyncList<string> signals, Deferred started) => Tasks.DefineTask(new TaskDefinition
     {
         Name = "test.waiting",
         Version = 1,
@@ -39,6 +45,7 @@ internal static class StorageFailureTests
         {
             ["work"] = async (_, runtime, _) =>
             {
+                started.Resolve();
                 try { await Aborted(runtime.Signal); }
                 catch (OperationCanceledException) { }
                 signals.Add("aborted");
@@ -47,20 +54,27 @@ internal static class StorageFailureTests
         Abort = (_, runtime, abortContext) => runtime.CommitAsync((_, _) => NextTaskState.Aborted(), abortContext),
     });
 
-    private sealed record Started(IHarness Harness, IConversation Root, SyncList<Exception> Reports, SyncList<string> Signals, DurableTask Waiting);
+    private sealed record Started(IHarness Harness, IConversation Root, SyncList<Exception> Reports, SyncList<string> Signals, DurableTask Waiting)
+    {
+        /// <summary>Resolves when Waiting's phase starts.</summary>
+        public required Deferred PhaseStarted { get; init; }
+    }
 
     private static async Task<Started> Start(IStorage storage)
     {
         var signals = new SyncList<string>();
-        var waiting = Waiting(signals);
+        var started = new Deferred();
+        var waiting = Waiting(signals, started);
         var opened = await OpenTasks(storage, [waiting]);
         var root = await opened.Harness.RootAsync(Context);
-        return new Started(opened.Harness, root, opened.Reports, signals, waiting);
+        return new Started(opened.Harness, root, opened.Reports, signals, waiting) { PhaseStarted = started };
     }
 
-    private static async Task Running(IHarness harness, TaskId id)
+    /// <summary>Upstream <c>running()</c>, and Waiting's phase has started (see the header).</summary>
+    private static async Task Running(IHarness harness, TaskId id, Deferred phaseStarted)
     {
         while ((await harness.GetTaskAsync(id, Context))?.State.Status != DurableTaskStatus.Running) await Task.Delay(1);
+        await phaseStarted.Task;
     }
 
     private static Task<EntryRecord> Note(IConversation root) => root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" }), Context);
@@ -93,10 +107,11 @@ internal static class StorageFailureTests
         yield return Case(prefix + "ends-everything-with-the-first-error-the-call-later-calls-waits-watches-streams-running-tasks", async () =>
         {
             var storage = new ControlledStorage(new MemoryStorage());
-            var (harness, root, reports, signals, waiting) = await Start(storage);
+            var started = await Start(storage);
+            var (harness, root, reports, signals, waiting) = started;
             var id = await root.CommitAsync(tx => tx.CreateTaskAsync(waiting, JsonValue.Null, OwnConversation()), Context);
             harness.Resume();
-            await Running(harness, id);
+            await Running(harness, id, started.PhaseStarted);
             var task = harness.WaitForTaskAsync(id, Context);
             var idle = harness.WaitForIdleAsync(Context);
             var watch = (await harness.WatchDocAsync(Live.LiveDoc, root.Id, Context))!;
@@ -583,7 +598,8 @@ internal static class StorageFailureTests
         yield return Case(prefix + "keeps-working-when-on-report-throws-and-falls-back-to-the-system-clock-when-the-clock-throws", async () =>
         {
             var signals = new SyncList<string>();
-            var waiting = Waiting(signals);
+            var phaseStarted = new Deferred();
+            var waiting = Waiting(signals, phaseStarted);
             var registry = Registry.Create();
             registry.Install(Define.Extension(new Extension { Name = "tasks", Tasks = [waiting] }));
             var harness = await Harness.OpenAsync(new MemoryStorage(), new HarnessOptions
@@ -596,7 +612,7 @@ internal static class StorageFailureTests
             var root = await harness.RootAsync(Context);
             var id = await root.CommitAsync(tx => tx.CreateTaskAsync(waiting, JsonValue.Null, OwnConversation()), Context);
             harness.Resume();
-            await Running(harness, id);
+            await Running(harness, id, phaseStarted);
             Check((await harness.GetTaskAsync(id, Context))?.StartedAt is double, "startedAt");
             await harness.AbortTaskAsync(id, Context);
             Equal(TaskOutcomeStatus.Aborted, ((SettlingTaskState)(await harness.WaitForTaskAsync(id, Context)).State).Outcome.Status, "outcome");
