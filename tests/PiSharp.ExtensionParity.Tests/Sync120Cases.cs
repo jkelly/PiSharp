@@ -14,6 +14,7 @@ internal static partial class Program
         ("bridge.before-agent-start-user-and-custom-message-runs", BeforeAgentStartTriggers),
         ("bridge.reaches-tools-and-namespace-aliases-in-getAllTools-and-loadouts", ReachesToolsInfo),
         ("bridge.reaches-tools-of-a-typescript-tool-reaches-all", ReachesToolsDescriptor),
+        ("bridge.print-mode-exits-while-a-command-triggered-run-starts", TriggeredRunAtPrintModeExit),
     ];
 
     private const string TriggerExtension = """
@@ -131,5 +132,42 @@ internal static partial class Program
         Check(owner.Tool(tools["thrower"]).ReachesTools!(JsonData.Parse("{}")).IsAll, "also when its own function would fail");
         Check(owner.Tool(tools["probe"]).ReachesTools is null, "no reachesTools");
         Check(owner.Tool(tools["probe"]).Namespace is null, "no namespace");
+    }
+
+    // print-mode.ts: session.prompt resolves once a command's handler returns, so a run the handler started with
+    // pi.sendMessage(..., { triggerTurn: true }) without awaiting ctx.waitForIdle() is still starting when print mode reads the last
+    // message and disposes the runtime. AgentSessionRuntime.dispose emits session_shutdown and AgentSession.dispose aborts the agent
+    // and drops the session's listeners, so Pi 1.2.0 exits 0 and prints nothing of that run: no text in text mode, the session
+    // header alone in JSON mode. (Observed with the 1.2.0 npm packages: exit 0, empty stdout and stderr, no model request.)
+    private static async Task TriggeredRunAtPrintModeExit()
+    {
+        using var sandbox = NodeSandbox("triggered-run-at-print-exit");
+        // A late answer: a run that reached the model before print mode read the last message still has no assistant text there.
+        sandbox.Respond = (_, _) => { Thread.Sleep(2000); return AnthropicText("late answer"); };
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "kick.ts"), """
+            import { appendFileSync } from "node:fs";
+            const log = (...items: unknown[]) => appendFileSync(process.cwd() + "/probe.log", JSON.stringify(items) + "\n");
+            export default function (pi: any) {
+              pi.on("session_shutdown", () => log("session_shutdown"));
+              pi.registerCommand("kick", { description: "Kick", handler: async () => {
+                pi.sendMessage({ customType: "kick", content: "go now", display: true }, { triggerTurn: true });
+                log("handler_end");
+              } });
+            }
+            """);
+        var (code, stdout, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "/kick"]);
+        Equal(0, code, "text mode exit; " + stderr);
+        Equal("", stdout, "text mode prints nothing of the run");
+        Equal("", stderr, "text mode stderr");
+        var lines = LogLines(sandbox);
+        Check(lines.Contains("""["handler_end"]""") && lines.Contains("""["session_shutdown"]"""), "handler and shutdown ran: " + string.Join(" | ", lines));
+
+        File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
+        (code, stdout, stderr) = await sandbox.Run([.. new[] { "--mode", "json" }, .. Model, "-e", extension, "/kick"]);
+        Equal(0, code, "json mode exit; " + stderr);
+        Equal("", stderr, "json mode stderr");
+        var records = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Equal(1, records.Length, "json mode prints the session header alone: " + stdout);
+        Equal("session", JsonNode.Parse(records[0])!["type"]!.GetValue<string>(), "the header");
     }
 }

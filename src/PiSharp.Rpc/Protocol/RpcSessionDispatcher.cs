@@ -394,6 +394,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         catch (Exception error) { SignalFatal(RpcDispatchFailure.SessionRunFailed, error); }
         finally { await BeginShutdown().ConfigureAwait(false); }
     }
+    private static async Task ObserveUnadoptedRunAsync(Task<AgentLoopResult> run)
+    { try { await run.ConfigureAwait(false); } catch (Exception) { /* Shutdown joins the session's idle state; the run is not this host's. */ } }
     private static async Task ObserveCommandAsync(Task command)
     { try { await command.ConfigureAwait(false); } catch (Exception) { /* HandleAsync already records fatal output failures. */ } }
 
@@ -1177,7 +1179,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 bool owns; lock (_gate) { owns = _run is null && !_closed; if (owns) _run = adopted; }
                 adopted.Ready.TrySetResult();
                 if (owns) _ = MonitorAsync(adopted, triggered, _session);
+                else _ = ObserveUnadoptedRunAsync(triggered);
             }
+            bool closing;
             lock (_gate)
             {
                 if (observation is AgentLoopStarted && _startingInput is { } starting)
@@ -1185,10 +1189,14 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                     starting.HistoryLength = _session.Snapshot.Agent.Messages.Length;
                     _run = starting; starting.Entered.TrySetResult();
                 }
-                run = _run;
+                run = _run; closing = _closed;
                 if (observation is AgentLoopStarted && run is not null)
                     run.HistoryLength = _session.Snapshot.Agent.Messages.Length;
             }
+            // print-mode.ts and rpc-mode.ts dispose the session on shutdown: agent.abort() and its listeners are removed. A run an
+            // extension started that a closing host did not adopt (a command that returned without waitForIdle) is aborted by the
+            // shutdown and settles there; none of its events are written.
+            if (run is null && closing) return;
             if (run is null && observation is AgentLoopInputMessageStarted { Message.Role: "custom" } or AgentLoopInputMessageEnded { Message.Role: "custom" })
             {
                 // agent-session.ts _appendCustomMessage: an idle session appends an extension's custom message and emits its
