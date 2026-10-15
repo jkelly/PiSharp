@@ -1836,7 +1836,7 @@
       "upstream": "packages/durable/test/heap-retained.ts",
       "blobSha1": "628058052d4f3ec4cb642220610c3fec0b64db2f",
       "lines": 26,
-      "pisharp": "tests/PiSharp.Durable.Tests/HeapRetainedCases.cs",
+      "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/HeapRetained.cs",
       "phase": "sync-1.2.0",
       "status": "planned",
       "upstreamChange": "added"

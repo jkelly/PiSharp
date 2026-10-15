@@ -699,10 +699,11 @@
       "status": "port",
       "release": "experimental (branch feature/pi-durable; not released)",
       "test": [
-        "tests/PiSharp.Durable.Tests"
+        "tests/PiSharp.Durable.Tests",
+        "tests/PiSharp.DurableCli.Tests"
       ],
       "decision": "docs/decisions/0005-pi-durable-experimental.md",
-      "notes": "Per-file progress in compatibility/durable-port-map.json."
+      "notes": "Per-file progress in compatibility/durable-port-map.json. Completed at v1.1.0 (P0-P13); retargeted to Pi v1.2.0 on 2026-10-15, tracked by the port.durable row of compatibility/sync-1.2.0-applicability.json."
     },
     {
       "id": "exclude.vacation",

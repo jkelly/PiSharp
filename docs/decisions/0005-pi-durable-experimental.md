@@ -1,6 +1,6 @@
 # Experimental port of pi-durable
 
-Status: approved by the project owner on 2026-10-12, on branch `feature/pi-durable` only. It supersedes the `pi-durable` and experimental `durable` exclusions in [0002-pi-1.1.0-sync.md](0002-pi-1.1.0-sync.md) for that branch.
+Status: approved by the project owner on 2026-10-12, on branch `feature/pi-durable` only. It supersedes the `pi-durable` and experimental `durable` exclusions in [0002-pi-1.1.0-sync.md](0002-pi-1.1.0-sync.md) for that branch. Retargeted to Pi v1.2.0 on 2026-10-15 (see [Pi v1.2.0 retarget](#pi-v120-retarget)); the `exclude.durable` and `exclude.chord` rows of [0006-pi-1.2.0-sync.md](0006-pi-1.2.0-sync.md) apply to `main` only.
 
 ## Context
 
@@ -10,10 +10,12 @@ Pi also ships an experimental agent on top of it in `packages/coding-agent/src/e
 
 Decision 0002 left both out of the native port. The owner now wants them in PiSharp.
 
+Pi v1.2.0 changed `pi-durable` heavily: tool task v2 with nested tool calls, structured output, deferred tools and `tool_search`, durable code mode, images, storage-failure and session semantics, and a rewritten scheduler. It also deleted the experimental durable agent (`packages/coding-agent/src/experimental/durable`). Chord replaced its facet and service runtime with a new host runtime; the replicated state that `pi-durable` uses moved to `chord/src/state.ts`.
+
 ## Decision
 
-1. **Scope.** Port `pi-durable` as a library, faithful to upstream `packages/durable/docs/spec.md`. Port the experimental durable agent as `pisharp durable`. The `vacation` demo, `pi-env`, Chord facets/services/wire, and the Cloudflare SQLite adapter stay out of scope.
-2. **Baseline.** Pin the port to Pi v1.1.0, commit `abe508e1b89912adde45528136c3221eb69acdd7`. Upstream durable is experimental and changed its API eight times in its first week, so it is re-synced only with PiSharp's baseline syncs. `compatibility/durable-port-map.json` maps every upstream file to its C# counterpart and status.
+1. **Scope.** Port `pi-durable` as a library, faithful to upstream `packages/durable/docs/spec.md`. Port the experimental durable agent as `pisharp durable`. The `vacation` demo, `pi-env`, Chord facets/services/wire, Chord's v1.2.0 host runtime (which replaced facets and services), and the Cloudflare adapters (the SQLite storage and, from v1.2.0, the image processor) stay out of scope. Of Chord, only what `pi-durable` imports is ported: JSON values, the delta operations and tracker, the durable context and replicated state.
+2. **Baseline.** The port was pinned to Pi v1.1.0, commit `abe508e1b89912adde45528136c3221eb69acdd7`, and is now pinned to Pi v1.2.0, commit `06a466935536f8c9bcacb2d5efc0fc021be1bdff` (`DurableUpstream.Commit`). Upstream durable is experimental and changed its API eight times in its first week, so it is re-synced only with PiSharp's baseline syncs. `compatibility/durable-port-map.json` maps every upstream file to its C# counterpart and status, and records what changed upstream since the previous pin; a file whose port has not caught up with the pinned commit is `needs-sync`, never `ported`.
 3. **Branch and release.**
    - The work lives on `feature/pi-durable` and is not merged to `main` or released until the owner decides.
    - Every public type carries `[Experimental("PISHARP_DURABLE001")]`, and the projects are not packable.
@@ -25,9 +27,10 @@ Decision 0002 left both out of the native port. The owner now wants them in PiSh
    - The CLI mode lives in `PiSharp.Cli/Durable`.
 5. **Storage.** Memory, JSONL and SQLite, as upstream. SQLite uses `Microsoft.Data.Sqlite` with its `SQLitePCLRaw` e_sqlite3 native assets. That makes it PiSharp's fourth external runtime dependency, scoped to `PiSharp.Durable.Sqlite` only. It is pinned exactly and needs license notices, packaging validation entries and locked restore entries before any release.
 6. **Compatibility.**
-   - **What matches upstream:** the SQLite schema (v1 DDL), record JSON, entry, document and task kinds, and the session directory and lock layout under `~/.pi/agent/experimental/durable-sessions`. Either tool can then continue the other's sessions.
+   - **What matches upstream:** the SQLite schema (v1 DDL), record JSON, entry, document and task kinds, and the session directory and lock layout under `~/.pi/agent/experimental/durable-sessions`. Either tool can then continue the other's sessions. Since v1.2.0 this holds for the library only: upstream has no durable agent, and v1.1.0 Pi cannot resume v1.2.0 tool records, so `pisharp durable` sessions are compatible with Pi v1.1.0's agent only until the library sync changes the records (work list area l).
    - **What may differ:** the patch operations PiSharp writes, provided both sides replay each other's operations to the same values. Upstream treats operation shape as non-canonical.
 7. **Intentional difference: the `pisharp durable` entry point.** Upstream has no CLI entry point for the durable agent; it runs `experimental/durable/main.ts` from source. PiSharp runs it as the hidden subcommand `pisharp durable [--continue|-c]`, dispatched in `PiCommand.RunCoreAsync` before `mcp`, left out of `--help`, and printing a one-line experimental notice to stderr. Any other argument fails with upstream's `Unknown argument: X`.
+8. **Intentional difference: `pisharp durable` is PiSharp-only.** Upstream deleted its experimental durable agent in v1.2.0. By owner decision on 2026-10-14, PiSharp keeps `pisharp durable` as a PiSharp-only experimental mode. It stays a port of the Pi v1.1.0 agent (its sources cite `abe508e1b89912adde45528136c3221eb69acdd7`; the port map marks those rows `pisharp-only`), and it adapts to the durable library as the library follows newer pins. Its session layout under `~/.pi/agent/experimental/durable-sessions` no longer has an upstream counterpart to stay compatible with beyond Pi v1.1.0.
 
 ## Consequences
 
@@ -37,7 +40,7 @@ Decision 0002 left both out of the native port. The owner now wants them in PiSh
 
 ## Model adapter
 
-`NativeDurableModels` in `src/PiSharp.Durable/Models` is the production `IDurableModels` (pi-ai `createModels()` with the built-in providers). It looks models up in the pi-ai 1.1.0 catalog shards, which it embeds by link from `src/PiSharp.Cli/Models` and verifies by hash, or in host catalogs, and streams them over PiSharp.AI's native transports: `openai-completions`, `openai-responses`, `anthropic-messages`, `google-generative-ai`, `mistral-conversations` and `pi-messages`. API keys come from the host's `ResolveApiKey` first, then the provider's environment variables (`ProviderEnvironmentKeys`), read through the host's `Environment` reader because the portable core never reads the process environment. Anthropic uses only `ANTHROPIC_API_KEY`. Providers whose auth resolves per request, and Anthropic OAuth or auth tokens, need the CLI adapter (P12): github-copilot, openai-codex, amazon-bedrock, google-vertex, Cloudflare and azure. `TimeoutMs` is enforced by the adapter as an idle deadline. `MaxRetries` and `MaxRetryDelayMs` reach only google-generative-ai, and durable generation owns retries. `Transport`, metadata other than `user_id`, `Deferred` and pi-ai's `clampMaxTokensToContext` are not mapped. No pi-ai 1.1.0 provider implements deferred responses. The CLI adapter (P12) is `src/PiSharp.Cli/Durable/DurableModels.cs`: models come from PiSharp.Cli's `ModelRegistry` (built-in catalogs, models.json, persisted catalogs), and `NativeDurableModelsOptions.HostTransport` lets it stream each request through the CLI's live route of the model (`LazyModelTransport`), so auth.json credentials with OAuth refresh, models.json keys and headers, GitHub Copilot token exchange, OpenAI Codex OAuth, Amazon Bedrock and Google Vertex ambient credentials, the Cloudflare providers and Azure endpoint configuration all work in `pisharp durable`; a model without a live route falls back to the native routes with the registry's key through `ResolveApiKey`. `samples/Durable.Chat` is the M1 demo (upstream `test/examples/16-real-model.ts`). Neither file is an upstream port, so neither has a port-map row.
+`NativeDurableModels` in `src/PiSharp.Durable/Models` is the production `IDurableModels` (pi-ai `createModels()` with the built-in providers). It looks models up in the pi-ai catalog shards of PiSharp's baseline (1.2.0 since the retarget), which it embeds by link from `src/PiSharp.Cli/Models` and verifies by hash, or in host catalogs, and streams them over PiSharp.AI's native transports: `openai-completions`, `openai-responses`, `anthropic-messages`, `google-generative-ai`, `mistral-conversations` and `pi-messages`. API keys come from the host's `ResolveApiKey` first, then the provider's environment variables (`ProviderEnvironmentKeys`), read through the host's `Environment` reader because the portable core never reads the process environment. Anthropic uses only `ANTHROPIC_API_KEY`. Providers whose auth resolves per request, and Anthropic OAuth or auth tokens, need the CLI adapter (P12): github-copilot, openai-codex, amazon-bedrock, google-vertex, Cloudflare and azure. `TimeoutMs` is enforced by the adapter as an idle deadline. `MaxRetries` and `MaxRetryDelayMs` reach only google-generative-ai, and durable generation owns retries. `Transport`, metadata other than `user_id`, `Deferred` and pi-ai's `clampMaxTokensToContext` are not mapped. No pi-ai 1.1.0 provider implements deferred responses. The CLI adapter (P12) is `src/PiSharp.Cli/Durable/DurableModels.cs`: models come from PiSharp.Cli's `ModelRegistry` (built-in catalogs, models.json, persisted catalogs), and `NativeDurableModelsOptions.HostTransport` lets it stream each request through the CLI's live route of the model (`LazyModelTransport`), so auth.json credentials with OAuth refresh, models.json keys and headers, GitHub Copilot token exchange, OpenAI Codex OAuth, Amazon Bedrock and Google Vertex ambient credentials, the Cloudflare providers and Azure endpoint configuration all work in `pisharp durable`; a model without a live route falls back to the native routes with the registry's key through `ResolveApiKey`. `samples/Durable.Chat` is the M1 demo (upstream `test/examples/16-real-model.ts`). Neither file is an upstream port, so neither has a port-map row.
 
 ## Crash tests
 
@@ -84,3 +87,26 @@ None is planned or in progress.
   - PiSharp: 2.25 to 2.57 s.
 - PiSharp's `api.output` firehose is about 3 times slower than Node's.
 - Its on-disk footprint for the seeded benchmark data matches upstream's byte for byte.
+
+## Pi v1.2.0 retarget
+
+Stage 3a of the v1.2.0 sync (2026-10-15) moved the branch onto `main`'s Pi v1.2.0 sync and retargeted the pin; it ports no v1.2.0 library change yet.
+- `sync/pi-1.2.0` was merged into the branch. The durable lock fixes in `PiLockfile` and `PiProjectTrust` were the same as `main`'s (#15), so one version stays: `PiLockfile` keeps the branch's superset (proper-lockfile `lock()`, `updateLock` and `unlock` for durable sessions).
+- `NativeDurableModels`' embedded catalog follows PiSharp.Cli's pi-ai 1.2.0 shards.
+- `DurableUpstream.Commit` and the branch CI's port-map job moved to v1.2.0. `tools/DurablePortMap/build-port-map.mjs` reads both pins from git objects and keeps recorded progress.
+- Source headers whose cited upstream files are byte-identical at both pins were re-pinned with `tools/CompatibilityReport/repin-sources.mjs --paths`; `compatibility/durable-sync-1.2.0-repin.json` lists the re-pinned, pending and historical citations. Headers that cite changed files, differential cases and captured fixtures stay on v1.1.0 until their area is synced and recaptured.
+- `compatibility/durable-sync-1.2.0-worklist.json` groups every changed, new and deleted upstream durable and Chord file and changelog item into port areas, with the PiSharp files and tests each touches, a size and dependencies.
+
+Port map against v1.2.0 (214 rows):
+
+| status | files |
+|---|---:|
+| ported (upstream unchanged) | 84 |
+| needs-sync (upstream changed) | 75 |
+| planned (new in v1.2.0) | 38 |
+| removed-upstream | 2 |
+| pisharp-only (`pisharp durable`) | 7 |
+| excluded | 4 |
+| skipped | 4 |
+
+Upstream changes recorded in the map: 75 modified, 1 renamed (`chord/src/services/state.ts` to `chord/src/state.ts`), 40 added and 9 removed (the 7 experimental agent files, `chord/src/services/state-internals.ts` and `test/chord-guide.test.ts`). The added rows include `images/cloudflare.ts` and `images/photon-wasm.d.ts`, which are excluded.

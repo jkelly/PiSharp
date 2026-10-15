@@ -93,7 +93,8 @@ function testPlan(path) {
     : path.includes('/examples/') || base.includes('bench') ? 'P13'
     : base.startsWith('session') ? 'P3' : base.startsWith('sqlite') ? 'P5' : base.startsWith('jsonl') ? 'P4'
     : /^(env|tools)/.test(base) ? 'P9' : /^(memory|storage|types)/.test(base) ? 'P2' : base.startsWith('chord') ? 'P3' : 'P11';
-  if (base.includes('bench')) return [`benchmarks/PiSharp.Durable.Benchmarks/${pascal(base)}.cs`, phase];
+  // heap-retained.ts is a helper of the memory benchmarks.
+  if (base.includes('bench') || base === 'heap-retained') return [`benchmarks/PiSharp.Durable.Benchmarks/${pascal(base)}.cs`, phase];
   return [`tests/PiSharp.Durable.Tests/${pascal(base)}Cases.cs`, phase];
 }
 
