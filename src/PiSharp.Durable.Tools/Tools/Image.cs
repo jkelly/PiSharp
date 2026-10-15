@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/tools/image.ts
-// Detection only: upstream's read tool reports images as unsupported and decodes none, so no image backend is involved.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/image.ts
+// Detection and header dimensions only: decoding is an image processor's (ImageProcessor.cs, Images/).
 namespace PiSharp.Durable.Tools;
 
 /// <summary>Positional reads of a file of <see cref="Size"/> bytes (upstream <c>ByteSource</c>).</summary>
@@ -83,6 +83,53 @@ internal static class ImageDetection
         return false;
     }
 
+    /// <summary>
+    /// The width and height an image of <paramref name="mimeType"/> declares in its header, without decoding it: PNG's IHDR, GIF's screen,
+    /// WebP's VP8, VP8L, or VP8X chunk, JPEG's first SOF segment. Null when the header cannot be read.
+    /// </summary>
+    public static (long Width, long Height)? ImageDimensions(ReadOnlySpan<byte> bytes, string mimeType)
+    {
+        switch (mimeType)
+        {
+            case "image/png":
+                return bytes.Length < 24 ? null : (ReadUint32BE(bytes, 16), ReadUint32BE(bytes, 20));
+            case "image/gif":
+                return bytes.Length < 10 ? null : (ReadUint16LE(bytes, 6), ReadUint16LE(bytes, 8));
+            case "image/webp":
+                if (bytes.Length < 30) return null;
+                if (StartsWithAscii(bytes, 12, "VP8 ")) return (ReadUint16LE(bytes, 26) & 0x3fff, ReadUint16LE(bytes, 28) & 0x3fff);
+                if (StartsWithAscii(bytes, 12, "VP8L"))
+                {
+                    var bits = ReadUint32LE(bytes, 21);
+                    return ((int)(bits & 0x3fff) + 1, (int)((bits >>> 14) & 0x3fff) + 1);
+                }
+                if (StartsWithAscii(bytes, 12, "VP8X"))
+                {
+                    static int Uint24(ReadOnlySpan<byte> buffer, int offset) => ReadUint16LE(buffer, offset) + (At(buffer, offset + 2) << 16);
+                    return (Uint24(bytes, 24) + 1, Uint24(bytes, 27) + 1);
+                }
+                return null;
+            case "image/jpeg":
+                for (var offset = 2; offset + 9 <= bytes.Length;)
+                {
+                    if (bytes[offset] != 0xff) return null;
+                    var marker = bytes[offset + 1];
+                    if (marker == 0xff)
+                    {
+                        offset++;
+                        continue;
+                    }
+                    // SOF0 to SOF15, except DHT (C4), JPG (C8), and DAC (CC), which share the range.
+                    if (marker is >= 0xc0 and <= 0xcf and not (0xc4 or 0xc8 or 0xcc))
+                        return (ReadUint16BE(bytes, offset + 7), ReadUint16BE(bytes, offset + 5));
+                    offset += 2 + ReadUint16BE(bytes, offset + 2);
+                }
+                return null;
+            default:
+                return null;
+        }
+    }
+
     private static bool IsBmp(ReadOnlySpan<byte> buffer)
     {
         if (buffer.Length < 26) return false;
@@ -113,6 +160,8 @@ internal static class ImageDetection
     private static int At(ReadOnlySpan<byte> buffer, int offset) => offset >= 0 && offset < buffer.Length ? buffer[offset] : 0;
 
     private static int ReadUint16LE(ReadOnlySpan<byte> buffer, int offset) => At(buffer, offset) + (At(buffer, offset + 1) << 8);
+
+    private static int ReadUint16BE(ReadOnlySpan<byte> buffer, int offset) => (At(buffer, offset) << 8) + At(buffer, offset + 1);
 
     private static long ReadUint32BE(ReadOnlySpan<byte> buffer, int offset) =>
         At(buffer, offset) * 0x1000000L + (At(buffer, offset + 1) << 16) + (At(buffer, offset + 2) << 8) + At(buffer, offset + 3);

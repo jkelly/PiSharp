@@ -12,6 +12,7 @@ using PiSharp.Durable;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Tools;
 using PiSharp.Durable.Tools.Env;
+using PiSharp.Durable.Tools.Images;
 
 namespace PiSharp.Cli.Durable;
 
@@ -136,14 +137,21 @@ internal static class DurableHarnessSetup
         return runtime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(runtime.CreateHttpHandler, idle) };
     }
 
+    /// <summary>The image processor of <c>pisharp durable</c>'s read tool: one worker thread per process, started on the first image.</summary>
+    private static readonly Lazy<IImageProcessor> CodingImages = new(() => ImageProcessors.CreateThreaded(PiSharp.Tools.Skia.SkiaImageCodec.Instance));
+
     /// <summary>Harness settings read at every use (upstream <c>createHarnessSettings</c>).</summary>
     internal static HarnessSettings CreateHarnessSettings(PiSettings settings) => new PiHarnessSettings(settings);
 
-    /// <summary>A registry with the durable coding tools and pi's system prompt (upstream <c>createCodingRegistry</c>).</summary>
+    /// <summary>
+    /// A registry with the durable coding tools and pi's system prompt (upstream <c>createCodingRegistry</c>). Since pi-durable 1.2.0 the
+    /// tools' read returns images; <c>pisharp durable</c> gives it an image processor on the coding agent's Skia codec, on a worker thread
+    /// (durable work list area e; upstream's equivalent is <c>createCodingTools({ images: await createNodePhotonImages() })</c>).
+    /// </summary>
     internal static IRegistry CreateCodingRegistry(PiSettings settings, string cwd, DurablePromptResources resources)
     {
         var registry = Registry.Create();
-        registry.Install(CodingTools.Extension);
+        registry.Install(CodingTools.CreateCodingTools(new ReadToolOptions { Images = CodingImages.Value }));
         registry.Install(DurablePrompt.Create(settings, cwd, resources));
         return registry;
     }

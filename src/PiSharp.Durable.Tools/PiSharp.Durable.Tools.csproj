@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Decision 0005: the durable execution environment and coding tools. Reuses only PiSharp.Tools' shell and process primitives. -->
+  <!-- Decision 0005: the durable execution environment and coding tools. Reuses only PiSharp.Tools' shell and process primitives and its image
+       codec seam (IImageCodec, for the read tool's image processor); the host passes a codec such as PiSharp.Tools.Skia's. -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
