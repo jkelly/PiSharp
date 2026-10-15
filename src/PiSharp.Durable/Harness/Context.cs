@@ -82,7 +82,7 @@ internal static class ConversationContext
         EntryId? at = null)
     {
         // The lease admits the off-line derive's first Storage call when close follows the bounds job on the line, as upstream's single
-        // thread starts it before the closing job runs (Session.HoldStorageOpen); a later page is refused once close reached Storage.
+        // thread starts it before the closing job runs (Session.HoldStorageOpen); a later page is refused once close has begun.
         var (bounds, lease) = await session.ReadOnLineAsync(async () =>
             (await CaptureContextBoundsAsync(storage, conversationId, context, at).ConfigureAwait(false), session.HoldStorageOpen())).ConfigureAwait(false);
         using (lease) return await DeriveContextAsync(lease.Storage, conversationId, bounds, context).ConfigureAwait(false);

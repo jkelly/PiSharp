@@ -21,8 +21,11 @@
 //   (upstream's rejected promise), is reported (or fails the Session, for the Harness's own listeners) and the others still run.
 // - GuardedStorage keeps upstream's guard. One addition stands in for upstream's single thread: a read whose bounds a line job captured
 //   continues off the line (Conversation.ContextAsync), and upstream starts its first Storage call before the closing line job runs. Such a
-//   read takes a lease on the line (HoldStorageOpen); close waits for the lease's first call, which it admits, and refuses its later pages,
-//   as upstream refuses a paged read's next page once close has reached Storage.
+//   read takes a lease on the line (HoldStorageOpen); close waits for the lease's first call, which it admits, and refuses its later pages
+//   from the moment close begins, as upstream's close reaches Storage before such a read's next page.
+// - Close keeps upstream's order: one call seals admission and runs the close listeners, then starts the scheduler's join and the closing
+//   line job inline (upstream's next microtask), so an explicit close returns with the Storage guard sealed when the line is idle. A
+//   failure starts them on the thread pool after its report, never inside the call that failed.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using PiSharp.Durable.Chord;
@@ -161,9 +164,13 @@ public class Session : ISession
         failedSource.TrySetException(new SessionFailedException(error));
         // Seal first, so a report handler that calls back finds the Session failed. Closing runs the close listeners synchronously; a
         // failing backend close is the caller's to see, and here nobody waits.
-        _ = CloseAsync(DurableContext.Background).ContinueWith(static task => _ = task.Exception, CancellationToken.None,
+        var finishClose = BeginClose(DurableContext.Background);
+        _ = closing!.ContinueWith(static task => _ = task.Exception, CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         Report(error);
+        // Upstream's next microtask: the join and the closing line job follow the listeners and the report. They start on the thread pool,
+        // not inside the call that failed, which may be a line job or a Storage call.
+        if (finishClose is not null) ThreadPool.UnsafeQueueUserWorkItem(static finish => finish(), finishClose, preferLocal: false);
     }
 
     private bool TrySetFailure(Exception error)
@@ -468,62 +475,88 @@ public class Session : ISession
     public virtual Task CloseAsync(DurableContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        Task closed;
-        Action[]? listeners = null;
+        BeginClose(context)?.Invoke();
+        return context.WaitAsync(closing!);
+    }
+
+    /// <summary>
+    /// The synchronous part of upstream's <c>close()</c>: seals admission and runs the close listeners. Returns the rest of close, which the
+    /// caller starts at once, as upstream's next microtask: the scheduler's join (<see cref="BeforeCloseAsync"/>) and the line job that
+    /// closes Storage, run inline up to their first wait, so the Storage guard refuses new calls before an explicit close returns. Null when
+    /// close had begun.
+    /// </summary>
+    private Action? BeginClose(DurableContext context)
+    {
+        Action[] listeners;
+        TaskCompletionSource closingSource;
         lock (closingGate)
         {
-            if (closing is null)
+            if (closing is not null) return null;
+            // Seal admission before anything else runs, then stop observers; admitted work settles before Storage closes.
+            closingStarted = true;
+            lock (listenersGate)
             {
-                // Seal admission before anything else runs, then stop observers; admitted work settles before Storage closes.
-                closingStarted = true;
+                listeners = [.. closeListeners];
+                closeListeners.Clear();
+            }
+            closingSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            closing = closingSource.Task;
+        }
+        NotifyClose(listeners);
+        var cleanup = context.WithoutCancellation();
+        return () => _ = SettleClosingAsync(FinishCloseAsync(cleanup), closingSource);
+    }
+
+    private static async Task SettleClosingAsync(Task finishing, TaskCompletionSource closingSource)
+    {
+        try
+        {
+            await finishing.ConfigureAwait(false);
+            closingSource.TrySetResult();
+        }
+        catch (Exception error)
+        {
+            closingSource.TrySetException(error);
+        }
+    }
+
+    /// <summary>Joins what the Session runs, then closes Storage on the line once admitted work has settled; settles <see cref="Closed"/>.</summary>
+    private async Task FinishCloseAsync(DurableContext cleanup)
+    {
+        try
+        {
+            await BeforeCloseAsync().ConfigureAwait(false);
+            await line.Enqueue(async () =>
+            {
                 lock (listenersGate)
                 {
-                    listeners = [.. closeListeners];
-                    closeListeners.Clear();
+                    commitListeners.Clear();
+                    internalListeners.Clear();
                 }
-                var cleanup = context.WithoutCancellation();
-                closing = Task.Run(async () =>
+                lock (documentsGate)
                 {
-                    try
-                    {
-                        await BeforeCloseAsync().ConfigureAwait(false);
-                        await line.Enqueue(async () =>
-                        {
-                            lock (listenersGate)
-                            {
-                                commitListeners.Clear();
-                                internalListeners.Clear();
-                            }
-                            lock (documentsGate)
-                            {
-                                documents.Clear();
-                                idleDocuments.Clear();
-                                idleIndex.Clear();
-                                attachedDocuments.Clear();
-                            }
-                            try
-                            {
-                                await storage.CloseAsync(cleanup).ConfigureAwait(false);
-                            }
-                            catch (Exception error)
-                            {
-                                // A Storage that cannot close is a failed one; an earlier failure stays the cause.
-                                if (TrySetFailure(error)) Report(error);
-                                throw;
-                            }
-                            return true;
-                        }).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        closedSource.TrySetResult(failure is { } failed ? SessionEnd.Failed(failed.Error) : SessionEnd.Closed);
-                    }
-                });
-            }
-            closed = closing;
+                    documents.Clear();
+                    idleDocuments.Clear();
+                    idleIndex.Clear();
+                    attachedDocuments.Clear();
+                }
+                try
+                {
+                    await storage.CloseAsync(cleanup).ConfigureAwait(false);
+                }
+                catch (Exception error)
+                {
+                    // A Storage that cannot close is a failed one; an earlier failure stays the cause.
+                    if (TrySetFailure(error)) Report(error);
+                    throw;
+                }
+                return true;
+            }).ConfigureAwait(false);
         }
-        if (listeners is not null) NotifyClose(listeners);
-        return context.WaitAsync(closed);
+        finally
+        {
+            closedSource.TrySetResult(failure is { } failed ? SessionEnd.Failed(failed.Error) : SessionEnd.Closed);
+        }
     }
 
     /// <summary>Runs the close listeners once, each on its own: one that fails is reported, and the rest still run.</summary>
@@ -545,7 +578,7 @@ public class Session : ISession
     /// </summary>
     internal virtual Task ConversationCreatedAsync(Transaction tx, ConversationRecord record) => Task.CompletedTask;
 
-    /// <summary>Runs after the close listeners and before the line closes Storage; must not fail.</summary>
+    /// <summary>Runs after the close listeners (and, for a failure, its report) and before the line closes Storage; must not fail.</summary>
     internal virtual Task BeforeCloseAsync() => Task.CompletedTask;
 
     /// <inheritdoc/>
@@ -607,7 +640,8 @@ public class Session : ISession
 
     /// <summary>
     /// Internal: called from a line job by a read that continues off the line, such as <c>Conversation.ContextAsync</c>; its first call through
-    /// the lease's <see cref="StorageLease.Storage"/> is admitted even once close has begun, and close waits for it. See the file header.
+    /// the lease's <see cref="StorageLease.Storage"/> is admitted even once close has begun, and close waits for it; its later calls are
+    /// refused from then on. See the file header.
     /// </summary>
     internal StorageLease HoldStorageOpen() => guard.Lease();
 
@@ -1216,7 +1250,7 @@ internal sealed class StorageGuard(IStorage storage, Session session)
     /// Runs one backend call under the guard. <paramref name="read"/> is a read's context; <c>CommitAsync</c> and <c>MintIdAsync</c> pass
     /// none, so nothing exempts their exceptions: once a batch is admitted, whether it committed is unknown. A call still underway when another
     /// fails the Session ends with <see cref="SessionFailedException"/> too, whatever it returns: nothing it read or wrote is used.
-    /// <paramref name="lease"/> admits its first call even while closing.
+    /// <paramref name="lease"/> admits its first call even while closing; its later calls are refused once the Session is closing.
     /// </summary>
     public async Task<T> CallAsync<T>(DurableContext? read, StorageLease? lease, Func<Task<T>> run)
     {
@@ -1227,7 +1261,9 @@ internal sealed class StorageGuard(IStorage storage, Session session)
         {
             var admitted = lease is not null && lease.TryStart();
             started = admitted;
-            if (closing && !admitted) throw new InvalidOperationException("Session is closed");
+            // A leased read's later pages are refused once close has begun, not only once it reached the backend: upstream's close reaches
+            // Storage before such a read continues, and here a line job still underway may hold the closing job back.
+            if (!admitted && (closing || (lease is not null && session.Closing))) throw new InvalidOperationException("Session is closed");
             underway.Add(done.Task);
         }
         if (started) StartLease();
@@ -1264,7 +1300,8 @@ internal sealed class StorageGuard(IStorage storage, Session session)
 
 /// <summary>
 /// A read's hold on Storage across the Session line (see <see cref="Session.HoldStorageOpen"/>): its first call through <see cref="Storage"/>
-/// is admitted even once close has begun, and close waits until it has started, or the lease is disposed unused.
+/// is admitted even once close has begun, and close waits until it has started, or the lease is disposed unused. Its later calls are refused
+/// once close has begun.
 /// </summary>
 internal sealed class StorageLease : IDisposable
 {

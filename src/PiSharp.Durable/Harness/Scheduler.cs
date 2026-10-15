@@ -177,6 +177,8 @@ internal sealed class DurableTaskScheduler
     private bool closing;
     private bool dirty;
     private bool draining;
+    /// <summary>Invocations live when <see cref="Seal"/> ran, which <see cref="JoinAsync"/> joins even once they have left the map.</summary>
+    private readonly List<Invocation> sealedInvocations = [];
     /// <summary>Line reservation passes (<see cref="Kick(bool)"/> on the line) enqueued whose commit has not started yet.</summary>
     private int linePassesQueued;
     /// <summary>Line reservation passes not finished yet (their invocations not started); <see cref="QuiesceAsync"/> waits them out.</summary>
@@ -293,7 +295,13 @@ internal sealed class DurableTaskScheduler
     public Task JoinAsync()
     {
         List<Invocation> signal;
-        lock (gate) signal = [.. invocations.Values];
+        lock (gate)
+        {
+            // Also those Seal saw: a close listener can end an invocation (a watch it awaited closes), and it leaves the map before End
+            // signals it, while upstream's join runs before any such continuation.
+            signal = [.. sealedInvocations.Union(invocations.Values)];
+            sealedInvocations.Clear();
+        }
         foreach (var invocation in signal) Signal(invocation, null);
         return Task.WhenAll(signal.Select(invocation => invocation.Done.Task));
     }
@@ -1212,6 +1220,7 @@ internal sealed class DurableTaskScheduler
         lock (gate)
         {
             closing = true;
+            sealedInvocations.AddRange(invocations.Values);
             contexts.Clear();
             expiry?.Timer.Dispose();
             expiry = null;
