@@ -1,0 +1,78 @@
+{
+ "sqlite": {
+  "run": {
+   "before": {
+    "offered": [
+     "alpha",
+     "omega",
+     "tool_search"
+    ],
+    "deferred": [
+     "github_get_issue",
+     "github_list_repos"
+    ],
+    "callable": [
+     "alpha",
+     "github_get_issue",
+     "github_list_repos",
+     "omega"
+    ]
+   },
+   "after": {
+    "offered": [
+     "alpha",
+     "omega",
+     "tool_search",
+     "github_get_issue"
+    ],
+    "deferred": [
+     "github_list_repos"
+    ],
+    "callable": [
+     "alpha",
+     "github_get_issue",
+     "github_list_repos",
+     "omega"
+    ]
+   }
+  }
+ },
+ "jsonl": {
+  "run": {
+   "before": {
+    "offered": [
+     "alpha",
+     "omega",
+     "tool_search"
+    ],
+    "deferred": [
+     "github_get_issue",
+     "github_list_repos"
+    ],
+    "callable": [
+     "alpha",
+     "github_get_issue",
+     "github_list_repos",
+     "omega"
+    ]
+   },
+   "after": {
+    "offered": [
+     "alpha",
+     "omega",
+     "tool_search",
+     "github_get_issue"
+    ],
+    "deferred": [
+     "github_list_repos"
+    ],
+    "callable": [
+     "alpha",
+     "github_get_issue",
+     "github_list_repos",
+     "omega"
+    ]
+   }
+  }
+ }
+}

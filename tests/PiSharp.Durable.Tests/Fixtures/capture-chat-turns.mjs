@@ -1,12 +1,17 @@
-// Prints Fixtures/chat-turns.upstream.json: the committed records the pinned pi-durable (Pi abe508e1b89912adde45528136c3221eb69acdd7) writes
+// Prints Fixtures/chat-turns.upstream.json: the committed records the pinned pi-durable (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs) writes
 // for HarnessChatDifferentialCases.cs's scenarios with pi-ai's faux provider on MemoryStorage, normalized (times, provider session ID).
-// Usage, from a Pi checkout at that commit with node_modules installed (pi-ai is the published 1.1.0 build):
-//   node --no-warnings --conditions=source --experimental-strip-types capture-chat-turns.mjs <pi checkout> > chat-turns.upstream.json
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings --conditions=source --experimental-strip-types capture-chat-turns.mjs <pi checkout> --commit <sha> > chat-turns.upstream.json
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-chat-turns.mjs <pi checkout>');
+import { pinnedArguments, toolResult } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-chat-turns.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
+/** A tool result in the pinned version's shape: `content` at v1.1.0, `output` from v1.2.0. */
+const result = (content, rest) => toolResult(pin, content, rest);
 const at = (path) => pathToFileURL(join(pi, path)).href;
 const { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } = await import(at('node_modules/@earendil-works/pi-ai/dist/index.js'));
 const { AgentDoc, createRegistry, defineExtension, defineTool, Harness, InboxDoc, LiveDoc, ProviderDoc, UsageDoc } =
@@ -64,7 +69,7 @@ const out = {};
   setup.registry.install(defineExtension({
     name: 'base',
     sections: [{ key: 'preamble', render: () => 'You are terse.', tag: false }, { key: 'cwd', render: () => '/repo' }],
-    tools: [defineTool({ name: 'noop', description: 'Does nothing', parameters: { type: 'object', properties: {} }, execute: async () => ({ content: [] }) })],
+    tools: [defineTool({ name: 'noop', description: 'Does nothing', parameters: { type: 'object', properties: {} }, execute: async () => result([]) })],
   }));
   setup.faux.setResponses([fauxAssistantMessage('Hello there', { timestamp: T })]);
   const storage = new MemoryStorage();

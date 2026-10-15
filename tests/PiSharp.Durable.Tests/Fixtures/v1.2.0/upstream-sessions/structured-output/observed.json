@@ -1,0 +1,122 @@
+{
+ "sqlite": {
+  "run": {
+   "received": [
+    {
+     "taskId": 20,
+     "structuredOutput": {
+      "type": "image",
+      "data": "AAAA",
+      "mimeType": "image/png"
+     },
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 22,
+     "structuredOutput": "bad",
+     "isError": true,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 24,
+     "isError": true,
+     "diagnostics": [
+      {
+       "severity": "error",
+       "code": "invalid_structured_output",
+       "message": "Tool wrong returned structuredOutput that does not match its schema: count: must be number"
+      }
+     ],
+     "durationMs": 0
+    },
+    {
+     "taskId": 26,
+     "structuredOutput": {
+      "count": 0
+     },
+     "isError": true,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 28,
+     "structuredOutput": {
+      "count": 3
+     },
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   ],
+   "reports": [
+    {
+     "name": "Error",
+     "message": "Tool wrong returned structuredOutput that does not match its schema: count: must be number"
+    }
+   ]
+  }
+ },
+ "jsonl": {
+  "run": {
+   "received": [
+    {
+     "taskId": 20,
+     "structuredOutput": {
+      "type": "image",
+      "data": "AAAA",
+      "mimeType": "image/png"
+     },
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 22,
+     "structuredOutput": "bad",
+     "isError": true,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 24,
+     "isError": true,
+     "diagnostics": [
+      {
+       "severity": "error",
+       "code": "invalid_structured_output",
+       "message": "Tool wrong returned structuredOutput that does not match its schema: count: must be number"
+      }
+     ],
+     "durationMs": 0
+    },
+    {
+     "taskId": 26,
+     "structuredOutput": {
+      "count": 0
+     },
+     "isError": true,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 28,
+     "structuredOutput": {
+      "count": 3
+     },
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   ],
+   "reports": [
+    {
+     "name": "Error",
+     "message": "Tool wrong returned structuredOutput that does not match its schema: count: must be number"
+    }
+   ]
+  }
+ }
+}

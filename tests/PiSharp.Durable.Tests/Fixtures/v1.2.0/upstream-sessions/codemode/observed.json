@@ -1,0 +1,34 @@
+{
+ "sqlite": {
+  "run": {
+   "echo": {
+    "a": 1
+   },
+   "holdRuns": 1,
+   "vmStarts": 1
+  },
+  "resume": {
+   "echo": {
+    "b": 1
+   },
+   "holdRuns": 1,
+   "vmStarts": 1
+  }
+ },
+ "jsonl": {
+  "run": {
+   "echo": {
+    "a": 1
+   },
+   "holdRuns": 1,
+   "vmStarts": 1
+  },
+  "resume": {
+   "echo": {
+    "b": 1
+   },
+   "holdRuns": 1,
+   "vmStarts": 1
+  }
+ }
+}

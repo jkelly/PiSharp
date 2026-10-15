@@ -1,0 +1,22 @@
+{
+ "sqlite": {
+  "run": {
+   "rejected": {
+    "error": {
+     "name": "TypeError",
+     "message": "An input entry's kind must be a non-empty string not starting with \"pi.\", got pi.custom"
+    }
+   }
+  }
+ },
+ "jsonl": {
+  "run": {
+   "rejected": {
+    "error": {
+     "name": "TypeError",
+     "message": "An input entry's kind must be a non-empty string not starting with \"pi.\", got pi.custom"
+    }
+   }
+  }
+ }
+}

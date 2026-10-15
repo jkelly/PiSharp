@@ -1,14 +1,17 @@
-// Prints Fixtures/piai-validation.upstream.json: what the pinned pi-ai's validateToolArguments (Pi abe508e1b89912adde45528136c3221eb69acdd7,
-// pi-ai 1.1.0) returns or throws for PiAiValidationCases.cs's schemas and arguments. Each schema is validated twice: as the TypeBox object
+// Prints Fixtures/piai-validation.upstream.json: what the pinned pi-ai's validateToolArguments (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs;
+// that release's published pi-ai) returns or throws for PiAiValidationCases.cs's schemas and arguments. Each schema is validated twice: as the TypeBox object
 // (origin "typebox") and as its plain JSON copy (origin "json", which drops TypeBox's hidden "~kind"). A row is {schema, origin, arguments,
 // result} or {schema, origin, arguments, error}; `result` is JSON.stringify of the returned arguments.
-// Usage, from a Pi checkout at that commit with node_modules installed:
-//   node --no-warnings capture-piai-validation.mjs <pi checkout> > piai-validation.upstream.json
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings capture-piai-validation.mjs <pi checkout> --commit <sha> > piai-validation.upstream.json
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-piai-validation.mjs <pi checkout>');
+import { pinnedArguments } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-piai-validation.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
 const at = (path) => pathToFileURL(join(pi, path)).href;
 const { Type, validateToolArguments } = await import(at('node_modules/@earendil-works/pi-ai/dist/index.js'));
 

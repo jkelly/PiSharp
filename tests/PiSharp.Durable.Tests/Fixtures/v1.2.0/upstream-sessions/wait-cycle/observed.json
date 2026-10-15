@@ -1,0 +1,34 @@
+{
+ "sqlite": {
+  "run": {
+   "a": {
+    "status": "completed",
+    "result": {
+     "a": "joined"
+    }
+   },
+   "b": {
+    "status": "faulted",
+    "error": {
+     "message": "Task 7 cannot wait on 8: 7 -> 8 -> 7 is a wait cycle"
+    }
+   }
+  }
+ },
+ "jsonl": {
+  "run": {
+   "a": {
+    "status": "completed",
+    "result": {
+     "a": "joined"
+    }
+   },
+   "b": {
+    "status": "faulted",
+    "error": {
+     "message": "Task 7 cannot wait on 8: 7 -> 8 -> 7 is a wait cycle"
+    }
+   }
+  }
+ }
+}

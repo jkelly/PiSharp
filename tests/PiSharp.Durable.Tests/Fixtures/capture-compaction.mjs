@@ -1,15 +1,20 @@
-// Prints Fixtures/compaction.upstream.json: the committed records the pinned pi-durable (Pi abe508e1b89912adde45528136c3221eb69acdd7) writes for
+// Prints Fixtures/compaction.upstream.json: the committed records the pinned pi-durable (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs) writes for
 // HarnessCompactionDifferentialCases.cs's compaction scenarios with pi-ai's faux provider on MemoryStorage, normalized as capture-chat-turns.mjs
 // normalizes them (times, provider session ID; task startedAt/endedAt dropped): a manual compaction placed at once, a blocking threshold
 // compaction during a turn, a background threshold compaction placed once its turn ended, and an overflow compaction whose request is
 // retried. Each scenario records every record once the conversation is idle, the Session usage total, and the summarization requests.
-// Usage, from a Pi checkout at that commit with node_modules installed (pi-ai is the published 1.1.0 build):
-//   node --no-warnings --conditions=source --experimental-strip-types capture-compaction.mjs <pi checkout> > compaction.upstream.json
+// From v1.2.0 two more: a background threshold compaction that fails (pi.live.compactionFailure) and a blocking threshold compaction that
+// fails, failing its run (backgroundFailure, blockingFailure).
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings --conditions=source --experimental-strip-types capture-compaction.mjs <pi checkout> --commit <sha> > compaction.upstream.json
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-compaction.mjs <pi checkout>');
+import { pinnedArguments } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-compaction.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
 const at = (path) => pathToFileURL(join(pi, path)).href;
 const { createModels, fauxAssistantMessage, fauxProvider } = await import(at('node_modules/@earendil-works/pi-ai/dist/index.js'));
 const { AgentDoc, createRegistry, defineExtension, Harness, InboxDoc, LiveDoc, ProviderDoc, section, UsageDoc } =
@@ -164,6 +169,49 @@ const out = {};
   await c.harness.waitForIdle(context);
   out.overflow = await dump(c.harness, c.storage, c.root.id, c.script.summaryRequests);
   await c.harness.close(context);
+}
+
+if (pin.output) {
+  // From v1.2.0 (harness-compaction.test.ts): a failed compaction stays visible in pi.live.compactionFailure, and a failed blocking
+  // threshold compaction fails its run instead of sending the request.
+  {
+    // Background threshold failure: the turn ends, the compaction fails, and pi.live keeps the failure.
+    const c = await chat(2000);
+    await history(c);
+    c.settings.compaction = { enabled: true, reserveTokens: 500, keepRecentTokens: 150, backgroundTokens: 1000 };
+    // Ordered as the background scenario: the answer waits for the summarization request, which fails once the turn has ended.
+    const held = gate();
+    const reached = gate();
+    c.script.summaries.push(async () => {
+      reached.release();
+      await held.promise;
+      return failure('bad request');
+    });
+    await turn(c, text('u4', 100), async () => {
+      await reached.promise;
+      return answer(text('a4', 100));
+    });
+    held.release();
+    for (let attempt = 0; (await c.harness.snapshot(LiveDoc, c.root.id, context))?.compactionFailure === undefined; attempt++) {
+      if (attempt > 1000) throw new Error('no compaction failure');
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    await c.harness.waitForIdle(context);
+    out.backgroundFailure = await dump(c.harness, c.storage, c.root.id, c.script.summaryRequests);
+    await c.harness.close(context);
+  }
+  {
+    // Blocking threshold failure: the run fails with model_error and no agent request is sent.
+    const c = await chat(1000);
+    await history(c);
+    c.settings.compaction = { enabled: true, reserveTokens: 300, keepRecentTokens: 150, backgroundTokens: 0 };
+    c.script.summaries.push(failure('bad request'));
+    const settled = await (await c.root.submit({ type: 'input', content: text('u4', 200) }, context)).wait(context);
+    await c.harness.waitForIdle(context);
+    out.blockingFailure = { settled: normalize(settled), unusedAgentReplies: c.script.agent.length,
+      done: await dump(c.harness, c.storage, c.root.id, c.script.summaryRequests) };
+    await c.harness.close(context);
+  }
 }
 
 console.log(JSON.stringify(out));

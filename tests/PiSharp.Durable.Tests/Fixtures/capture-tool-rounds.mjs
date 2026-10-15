@@ -1,13 +1,18 @@
-// Prints Fixtures/tool-rounds.upstream.json: the committed records the pinned pi-durable (Pi abe508e1b89912adde45528136c3221eb69acdd7) writes
+// Prints Fixtures/tool-rounds.upstream.json: the committed records the pinned pi-durable (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs) writes
 // for HarnessToolsDifferentialCases.cs's tool-round scenarios with pi-ai's faux provider on MemoryStorage, normalized as
 // capture-chat-turns.mjs normalizes them (times, provider session ID; task startedAt/endedAt dropped).
-// Usage, from a Pi checkout at that commit with node_modules installed (pi-ai is the published 1.1.0 build):
-//   node --no-warnings --conditions=source --experimental-strip-types capture-tool-rounds.mjs <pi checkout> > tool-rounds.upstream.json
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings --conditions=source --experimental-strip-types capture-tool-rounds.mjs <pi checkout> --commit <sha> > tool-rounds.upstream.json
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-tool-rounds.mjs <pi checkout>');
+import { pinnedArguments, toolResult } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-tool-rounds.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
+/** A tool result in the pinned version's shape: `content` at v1.1.0, `output` from v1.2.0. */
+const result = (content, rest) => toolResult(pin, content, rest);
 const at = (path) => pathToFileURL(join(pi, path)).href;
 const { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, Type } = await import(at('node_modules/@earendil-works/pi-ai/dist/index.js'));
 const { AgentDoc, createRegistry, defineExtension, defineTool, Harness, hook, InboxDoc, LiveDoc, ProviderDoc, ToolTask, UsageDoc } =
@@ -64,7 +69,7 @@ const echo = defineTool({
   name: 'echo',
   description: 'Echoes its text',
   parameters: Type.Object({ text: Type.String() }),
-  execute: async (args) => ({ content: [{ type: 'text', text: `echo ${args.text}` }], usage: USAGE }),
+  execute: async (args) => result([{ type: 'text', text: `echo ${args.text}` }], { usage: USAGE }),
 });
 
 const out = {};

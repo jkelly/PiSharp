@@ -1,17 +1,20 @@
-// Prints Fixtures/task-graph.upstream.json: what the pinned pi-durable (Pi abe508e1b89912adde45528136c3221eb69acdd7) delivers to a task
+// Prints Fixtures/task-graph.upstream.json: what the pinned pi-durable (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs) delivers to a task
 // graph watch (harness.watchTaskGraph: the acquisition graph, each frame's operations, and the last value) and what a fresh
 // harness.taskGraph() state reads at each pause, for HarnessTaskGraphDifferentialCases.cs's scenario on MemoryStorage. Only one task can
 // run at each step, so the frame sequence does not depend on scheduling order:
 //   a conversation-owned parent creates two conversations it owns, then a child task it waits for (allSettled); the child runs and
 //   completes once released; the parent wakes, creates a late child, and completes once that child's phase started, so its outcome is
 //   held as `completing`; the late child completes once released, and the parent becomes terminal.
-// Usage, from a Pi checkout at that commit with node_modules installed:
-//   node --no-warnings --conditions=source --experimental-strip-types capture-task-graph.mjs <pi checkout> > task-graph.upstream.json
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings --conditions=source --experimental-strip-types capture-task-graph.mjs <pi checkout> --commit <sha> > task-graph.upstream.json
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-task-graph.mjs <pi checkout>');
+import { pinnedArguments } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-task-graph.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
 const at = (path) => pathToFileURL(join(pi, path)).href;
 const { createModels } = await import(at('node_modules/@earendil-works/pi-ai/dist/index.js'));
 const { createRegistry, defineExtension, defineTask, Harness } = await import(at('packages/durable/src/index.ts'));

@@ -1,4 +1,4 @@
-// Prints Fixtures/tools.upstream.json: what the pinned durable coding tools (Pi abe508e1b89912adde45528136c3221eb69acdd7,
+// Prints Fixtures/tools.upstream.json: what the pinned durable coding tools (the Pi commit given with --commit, one of tools/DurableFixtures/pin.mjs;
 // packages/durable/src/tools) produce, for ToolsDifferentialCases.cs and ToolsReadDifferentialCases.cs to replay:
 // - declarations: name, description and JSON.stringify(parameters) of createReadTool, createWriteTool, createEditTool, createBashTool and
 //   createPowerShellTool, plus their outputLimits and replay;
@@ -7,16 +7,25 @@
 // - diffs: per seed of a seeded line-edit generator, a digest of generateDiffString and generateUnifiedPatch (jsdiff 8.0.4 underneath);
 // - edits: the edit tool over NodeExecutionEnv for authored cases: result text, details, the file afterwards (hex), or the error message;
 // - bash: the bash tool over NodeExecutionEnv for authored commands: streamed output, error message and diagnostics (spill paths masked).
-// Usage, from a Pi checkout at that commit (with its node_modules installed; bash needs a POSIX shell or Git Bash):
-//   node --no-warnings --conditions=source --experimental-strip-types capture-tools.mjs <pi checkout> > tools.upstream.json
+// From v1.2.0 tool results carry `output` where they carried `content`, and the file adds what is new there: each declaration's
+// structuredOutputSchema, callers and deferred; each bash case's isError and structuredOutput (its `output` digested past 400 characters,
+// a spill path masked) and the result's own diagnostics after the streamed ones; and `images`: the read tool, without an image processor,
+// over small hand-made images and their limits. The tools run with a stand-in ToolExecutionApi, not a Harness: retainedOutput() is
+// everything written so far (truncated false), agent() names no model and models resolves none, so read takes images within the default
+// limits.
+// Usage, with a Pi checkout at a pinned commit and its node_modules (pi-ai is that release's published build; see
+// tools/DurableFixtures/capture-all.mjs, which runs every capture into the commit's fixture set):
+//   node --no-warnings --conditions=source --experimental-strip-types capture-tools.mjs <pi checkout> --commit <sha> > tools.upstream.json
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const pi = process.argv[2];
-if (!pi) throw new Error('usage: capture-tools.mjs <pi checkout>');
+import { pinnedArguments } from '../../../tools/DurableFixtures/pin.mjs';
+
+const pin = pinnedArguments(process.argv.slice(2), 'capture-tools.mjs <pi checkout> --commit <sha>');
+const { pi } = pin;
 const at = (path) => pathToFileURL(join(pi, 'packages/durable/src', path)).href;
 const tools = await import(at('tools/index.ts'));
 const { generateDiffString, generateUnifiedPatch } = await import(at('tools/edit-diff.ts'));
@@ -36,7 +45,14 @@ const declarations = [tools.createReadTool(), tools.createWriteTool(), tools.cre
   outputLimits: tool.outputLimits === undefined ? null : JSON.stringify(tool.outputLimits),
   replay: tool.replay ?? null,
   prepareArguments: typeof tool.prepareArguments === 'function',
+  ...(pin.output ? {
+    structuredOutputSchema: tool.structuredOutputSchema === undefined ? null : JSON.stringify(tool.structuredOutputSchema),
+    callers: tool.callers ?? null,
+    deferred: tool.deferred ?? null,
+  } : {}),
 }));
+/** The result's content list: `content` at v1.1.0, `output` from v1.2.0. */
+const body = (outcome) => (pin.output ? outcome.output : outcome.content);
 
 // ─── read (test/tools-read-differential.test.ts, verbatim generator) ─────
 function random(seed) {
@@ -73,8 +89,8 @@ const TRUNCATION_KEYS = ['truncated', 'truncatedBy', 'totalLines', 'totalBytes',
 /** The outcome as one string: fields joined with NUL, numbers as String(n), absent values as "undefined". */
 function readOutcome(outcome) {
   if ('error' in outcome) return ['error', outcome.error].join('\0');
-  const parts = ['result', String(outcome.isError), String(outcome.content.length)];
-  for (const part of outcome.content) parts.push(part.type, part.text);
+  const parts = ['result', String(outcome.isError), String(body(outcome).length)];
+  for (const part of body(outcome)) parts.push(part.type, part.text);
   if (outcome.details === undefined) parts.push('no-details');
   else {
     parts.push('details', Object.keys(outcome.details).join(','), Object.keys(outcome.details.truncation).join(','));
@@ -91,7 +107,11 @@ async function attempt(run) {
     return { error: error.message };
   }
 }
-const api = (env) => ({ env, output: () => {}, outputWindow: undefined, diagnostic: () => {}, details: async () => {} });
+const api = (env) => ({
+  env, output: () => {}, outputWindow: undefined, diagnostic: () => {}, details: async () => {},
+  // v1.2.0 tools also use these; v1.1.0 tools never call them.
+  retainedOutput: () => ({ text: '', truncated: false }), agent: async () => ({}), models: { getModel: () => undefined },
+});
 
 const readDir = mkdtempSync(join(tmpdir(), 'pi-durable-read-capture-'));
 const read = [];
@@ -190,7 +210,7 @@ const edits = [];
       edits: args.edits,
       ...('error' in outcome
         ? { error: outcome.error }
-        : { text: outcome.content[0].text, details: outcome.details }),
+        : { text: body(outcome)[0].text, details: outcome.details }),
       after: hex(readFileSync(join(editDir, 'edit.txt'))),
     });
   }
@@ -217,7 +237,12 @@ const bash = [];
   for (const [name, args] of BASH_CASES) {
     const output = [];
     const diagnostics = [];
-    const callApi = { ...api(env), output: (chunk) => output.push(String(chunk)), diagnostic: (diagnostic) => diagnostics.push(diagnostic) };
+    const callApi = {
+      ...api(env),
+      output: (chunk) => output.push(String(chunk)),
+      diagnostic: (diagnostic) => diagnostics.push(diagnostic),
+      retainedOutput: () => ({ text: output.join(''), truncated: false }),
+    };
     const outcome = await attempt(() => tool.execute(args, callApi, BACKGROUND_CONTEXT));
     const text = output.join('');
     bash.push({
@@ -225,8 +250,9 @@ const bash = [];
       args,
       output: text.length > 400 ? { length: text.length, digest: digest(text) } : text,
       error: 'error' in outcome ? outcome.error : null,
-      content: 'error' in outcome ? null : (outcome.content ?? null),
-      diagnostics: diagnostics.map((diagnostic) => ({
+      content: 'error' in outcome ? null : (body(outcome) ?? null),
+      ...(pin.output && !('error' in outcome) ? { isError: outcome.isError ?? null, structuredOutput: shellOutput(outcome.structuredOutput) } : {}),
+      diagnostics: [...diagnostics, ...(pin.output && !('error' in outcome) ? outcome.diagnostics ?? [] : [])].map((diagnostic) => ({
         severity: diagnostic.severity,
         code: diagnostic.code ?? null,
         message: diagnostic.message.replace(/^Full output: .+$/, 'Full output: <spill>'),
@@ -236,4 +262,68 @@ const bash = [];
 }
 rmSync(bashDir, { recursive: true, force: true });
 
-console.log(JSON.stringify({ source: 'abe508e1b89912adde45528136c3221eb69acdd7', declarations, read, diffs, edits, bash }, null, 1));
+/** bash's structured output with long output digested and a spill path masked, as for the streamed output. */
+function shellOutput(value) {
+  if (value === undefined) return null;
+  const { output, fullOutputPath, ...rest } = value;
+  return {
+    output: output.length > 400 ? { length: output.length, digest: digest(output) } : output,
+    ...(fullOutputPath === undefined ? {} : { fullOutputPath: '<spill>' }),
+    ...rest,
+  };
+}
+
+// ─── images (v1.2.0): read without an image processor ───────────────────
+const u32be = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+const u32le = (n) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+const u16le = (n) => [n & 255, (n >>> 8) & 255];
+const u16be = (n) => [(n >>> 8) & 255, n & 255];
+const ascii = (text) => [...Buffer.from(text, 'latin1')];
+/** A PNG declaring `width` by `height` in its IHDR, then an IDAT of `padding` bytes and IEND (CRCs zero: read checks only the header). */
+function png(width, height, padding = 0) {
+  return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, ...ascii('IHDR'),
+    ...u32be(width), ...u32be(height), 8, 6, 0, 0, 0, 0, 0, 0, 0,
+    ...u32be(padding), ...ascii('IDAT'), ...new Array(padding).fill(0), 0, 0, 0, 0, 0, 0, 0, 0, ...ascii('IEND'), 0, 0, 0, 0]);
+}
+const IMAGE_CASES = [
+  ['png', png(2, 3)],
+  ['png-too-wide', png(2001, 10)],
+  ['png-too-tall', png(10, 2001)],
+  ['png-too-large', png(10, 10, 3_500_000)],
+  ['gif', Uint8Array.from([...ascii('GIF89a'), ...u16le(4), ...u16le(5), 0, 0, 0, 0x3b])],
+  ['jpeg', Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 11, 8, ...u16be(6), ...u16be(7), 1, 1, 0x11, 0, 0xff, 0xd9])],
+  ['jpeg-no-size', Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xd9, 0, 0, 0, 0, 0, 0, 0, 0])],
+  ['webp-vp8l', Uint8Array.from([...ascii('RIFF'), 26, 0, 0, 0, ...ascii('WEBPVP8L'), 14, 0, 0, 0, 0x2f,
+    ...u32le(((9 - 1) & 0x3fff) | (((7 - 1) & 0x3fff) << 14)), 0, 0, 0, 0, 0])],
+  ['bmp', Uint8Array.from([...ascii('BM'), 70, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0, 40, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 24, 0,
+    ...new Array(40).fill(0)])],
+  ['apng', Uint8Array.from([...png(2, 2).slice(0, 33), 0, 0, 0, 8, ...ascii('acTL'), 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0])],
+];
+const images = [];
+if (pin.output) {
+  const imageDir = mkdtempSync(join(tmpdir(), 'pi-durable-image-capture-'));
+  const env = new NodeExecutionEnv({ cwd: imageDir });
+  const tool = tools.createReadTool();
+  const long = (text) => (text.length > 400 ? { length: text.length, digest: digest(text) } : text);
+  for (const [name, bytes] of IMAGE_CASES) {
+    writeFileSync(join(imageDir, `${name}.bin`), bytes);
+    const outcome = await attempt(() => tool.execute({ path: `${name}.bin` }, api(env), BACKGROUND_CONTEXT));
+    images.push({
+      name,
+      file: long(hex(bytes)),
+      ...('error' in outcome
+        ? { error: outcome.error }
+        : {
+          isError: outcome.isError ?? false,
+          output: body(outcome).map((part) => (part.type === 'image'
+            ? { type: 'image', mimeType: part.mimeType, data: long(part.data) }
+            : { type: part.type, text: long(part.text) })),
+          diagnostics: outcome.diagnostics ?? [],
+          details: outcome.details ?? null,
+        }),
+    });
+  }
+  rmSync(imageDir, { recursive: true, force: true });
+}
+
+console.log(JSON.stringify({ source: pin.commit, declarations, read, diffs, edits, bash, ...(pin.output ? { images } : {}) }, null, 1));

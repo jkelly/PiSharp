@@ -5,15 +5,25 @@
 // reading and to upstream's captured records, key order included; a resumable session must resume under upstream to upstream's captured
 // resumed records; and PiSharp's operations must replay under upstream's applyImmutable to the corpus values. Exits non-zero on a difference.
 // Usage: node --no-warnings --conditions=source --experimental-strip-types verify-reverse.mjs <pi checkout> <pisharp sessions> <fixtures>
+//          [--commit <sha>]
+// Without --commit the checkout is taken to be Pi v1.1.0 (pin.mjs) and not checked, as the C# reverse case runs it; with --commit it must be
+// at that pinned commit with a clean tree, and the scenarios' tool results take that version's shape. Either way only the scenarios of
+// scenarios.mjs are verified, the ones PiSharp writes.
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createChat, dumpStorage, openBackend, scenarios, setPi } from './scenarios.mjs';
+import { PINS, pinnedArguments } from './pin.mjs';
 
-const [pi, sessions, fixtures] = process.argv.slice(2);
-if (!pi || !sessions || !fixtures) throw new Error('usage: verify-reverse.mjs <pi checkout> <pisharp sessions> <fixtures>');
-await setPi(pi);
+const usage = 'verify-reverse.mjs <pi checkout> <pisharp sessions> <fixtures> [--commit <sha>]';
+const pin = process.argv.includes('--commit')
+  ? pinnedArguments(process.argv.slice(2), usage)
+  : { pi: process.argv[2], commit: PINS['1.1.0'], version: '1.1.0', output: false, rest: process.argv.slice(3) };
+const pi = pin.pi;
+const [sessions, fixtures] = pin.rest;
+if (!pi || !sessions || !fixtures) throw new Error(`usage: ${usage}`);
+await setPi(pi, pin);
 const context = {};
 
 function normalize(value, key) {

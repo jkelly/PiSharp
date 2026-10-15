@@ -1,0 +1,26 @@
+{
+ "sqlite": {
+  "run": {
+   "phases": [
+    "work"
+   ]
+  },
+  "resume": {
+   "phases": [
+    "abort restart"
+   ]
+  }
+ },
+ "jsonl": {
+  "run": {
+   "phases": [
+    "work"
+   ]
+  },
+  "resume": {
+   "phases": [
+    "abort restart"
+   ]
+  }
+ }
+}
