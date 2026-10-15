@@ -515,6 +515,13 @@ public class HarnessSettings
     public virtual QueueMode? FollowUpMode { get; init; }
     /// <summary>How long an idle conversation keeps its last context read in memory; 0 drops it once the conversation is idle.</summary>
     public virtual double? ContextRetentionMs { get; init; }
+    /// <summary>
+    /// How long a loaded document that no watch or document state observes stays in memory after its last read or write; the next access
+    /// loads it from Storage. Observed documents always stay. Default ten minutes; 0 drops one right after use;
+    /// <see cref="double.PositiveInfinity"/> keeps them. Anything else that is not a number of milliseconds (NaN, a negative value) means the
+    /// default.
+    /// </summary>
+    public virtual double? DocumentRetentionMs { get; init; }
 }
 
 /// <summary>Resolved settings: every field over its built-in default, object fields merged (upstream <c>Settings</c>).</summary>
@@ -538,6 +545,8 @@ public sealed record Settings
     public required QueueMode FollowUpMode { get; init; }
     /// <summary>Idle context retention.</summary>
     public required double ContextRetentionMs { get; init; }
+    /// <summary>Unobserved document retention.</summary>
+    public required double DocumentRetentionMs { get; init; }
 }
 
 /// <summary>What <c>HarnessOptions.Env</c> builds an environment for (upstream <c>EnvTarget</c>).</summary>
@@ -568,7 +577,10 @@ public sealed record HarnessOptions
     /// <summary>Timers for sleeps and idle context expiry (a .NET seam for upstream's <c>setTimeout</c>); default
     /// <see cref="System.TimeProvider.System"/>.</summary>
     public TimeProvider? TimeProvider { get; init; }
-    /// <summary>Receives extension failures that do not fail the calling operation. Must not throw.</summary>
+    /// <summary>
+    /// Receives failures that do not fail the calling operation, such as a throwing hook or listener, and the error that fails the Session,
+    /// once. Its own throw is dropped. (An <c>async void</c> handler's exception escapes to the thread pool, which no caller can contain.)
+    /// </summary>
     public Action<Exception>? OnReport { get; init; }
 }
 

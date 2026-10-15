@@ -25,11 +25,11 @@ internal sealed class Submissions
         this.now = now;
         this.queueModes = queueModes;
         this.resume = resume;
-        session.SubscribeCommits((publication, _) => Observe(publication));
+        session.ObserveCommits((publication, _) => Observe(publication));
         session.SubscribeClose(() =>
         {
             closed = true;
-            waiters.RejectAll(HarnessUtil.ClosedError());
+            waiters.RejectAll(HarnessUtil.ClosedError(session));
         });
     }
 
@@ -64,7 +64,7 @@ internal sealed class Submissions
                 throw new InvalidOperationException($"Submission {id} does not exist");
             if (IsSettled(record)) return Task.FromResult(record);
             // Close rejects registered waiters synchronously and may begin during the read.
-            if (closed) throw HarnessUtil.ClosedError();
+            if (closed) throw HarnessUtil.ClosedError(session);
             return waiters.Add(id, context);
         }).ConfigureAwait(false);
         return await found.ConfigureAwait(false);

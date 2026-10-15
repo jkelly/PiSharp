@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/sqlite-facade.test.ts, against SqliteConnectionDatabase (the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/sqlite-facade.test.ts, against SqliteConnectionDatabase (the
 // node:sqlite adapter's counterpart). Upstream observes microtask timing with `await Promise.resolve()`; these cases use explicit gates and
 // check that the queued task has not completed. Adapted: upstream counts prepare() calls by subclassing DatabaseSync; here the adapter
 // counts the statements it prepares (SqliteConnectionDatabase.PrepareCounts).
@@ -184,17 +184,18 @@ internal static partial class Program
             await database.CloseAsync();
         });
 
-        yield return Case("storage.sqlite.facade.does-not-preserve-a-guaranteed-rejection-when-rollback-itself-fails", async () =>
+        yield return Case("storage.sqlite.facade.does-not-preserve-the-callback-error-when-rollback-itself-fails", async () =>
         {
             var database = await SqliteConnectionDatabase.OpenAsync(":memory:");
             await database.ExecAsync("CREATE TABLE rollback_probe (value INTEGER)");
+            var rejection = new InvalidOperationException("rejected after an escaped commit");
             var error = await ThrowsAsync<AggregateException>(() => database.TransactionAsync(async transaction =>
             {
                 await transaction.ExecAsync("INSERT INTO rollback_probe (value) VALUES (1)");
                 await transaction.ExecAsync("COMMIT");
-                throw new StorageRejectedException("rejected after an escaped commit");
+                throw rejection;
             }), "transaction");
-            Check(error.InnerExceptions[0] is StorageRejectedException, "the callback's rejection is the first inner exception");
+            Check(ReferenceEquals(error.InnerExceptions[0], rejection), "the callback's error is the first inner exception");
             Equal("{\"value\":1}", (await database.GetAsync("SELECT value FROM rollback_probe"))?.ToString(), "escaped commit");
             await database.CloseAsync();
         });

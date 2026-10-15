@@ -304,22 +304,24 @@ internal static partial class OwnershipTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "retries-a-cascade-whose-commit-the-storage-rejected", async () =>
+        // Pi v1.2.0 replaced "retries a cascade whose commit the Storage rejected": a failed commit is final (area b of the sync).
+        yield return Case(prefix + "fails-the-harness-on-a-failed-cascade-commit-and-reopening-applies-the-cascade", async () =>
         {
             var holds = new Holds();
-            var storage = new MarkRejectingStorage(await fresh());
+            var controlled = new ControlledStorage(await fresh()) { KeepOpenForReopen = true };
+            var storage = new MarkFailingStorage(controlled);
             var (harness, root, _, reports) = await holds.OpenHarness(storage);
             var tree = await holds.OwnedChild(root, "owner");
-            storage.Reject = tree.Inner;
+            storage.Fail = tree.Inner;
             holds.Open("owner", Ending.Failed);
-            await Eventually(() => reports.Snapshot().Any(error => error is StorageRejectedException));
-            Equal(DurableTaskStatus.Completing, await StatusOf(harness, tree.Owner), "owner status");
-            Check(await StatusOf(harness, tree.Inner) != DurableTaskStatus.Terminal, "inner live");
-            // The next commit retries the cascade.
-            await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" }), Context);
-            Equal("aborted", await OutcomeOf(harness, tree.Inner), "inner");
-            Equal("failed", await OutcomeOf(harness, tree.Owner), "owner");
+            Equal(new SessionEnd(SessionEndReason.Failed, storage.Failure), await harness.Closed, "closed");
+            Seq([storage.Failure], reports.Snapshot(), "reports");
             await harness.CloseAsync(Context);
+            controlled.Reopen();
+            var reopened = await holds.OpenHarness(storage);
+            Equal("aborted", await OutcomeOf(reopened.Harness, tree.Inner), "inner");
+            await reopened.Harness.CloseAsync(Context);
+            await controlled.Inner.CloseAsync(Context);
         });
     }
 
@@ -411,7 +413,8 @@ internal static partial class OwnershipTests
             await opened.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "retries-marks-found-through-an-edge-loaded-after-reopen-when-their-commit-is-rejected", async () =>
+        // Pi v1.2.0 replaced "retries marks found through an edge loaded after reopen when their commit is rejected".
+        yield return Case(prefix + "applies-marks-found-through-an-edge-loaded-after-reopen-once-a-failed-cascade-commit-is-reopened", async () =>
         {
             var holds = new Holds();
             var location = reopenable();
@@ -422,19 +425,23 @@ internal static partial class OwnershipTests
             await opened.Harness.AbortTaskAsync(tree.Owner, Context);
             await opened.Harness.CloseAsync(Context);
 
-            var storage = new MarkRejectingStorage(await location());
+            var storage = new MarkFailingStorage(await location());
             opened = await holds.OpenHarness(storage);
             var child = (await opened.Harness.ConversationAsync(tree.Child, Context))!;
             var late = await child.CommitAsync(async tx =>
             {
                 var id = await tx.CreateTaskAsync(holds.Hold, Holds.Input("late"), OwnConversation());
-                storage.Reject = id;
+                storage.Fail = id;
                 return id;
             }, Context);
-            await Eventually(() => storage.Reject is null);
-            // Any later commit, here the reservation of the new task, retries the cascade.
-            Equal("aborted", await OutcomeOf(opened.Harness, late), "late");
+            // The failed cascade commit fails the Harness. Closed settles once its invocations have ended, and the owner's abort handler
+            // ignores its signal: let it return.
             holds.Open("abort.owner");
+            Equal(SessionEndReason.Failed, (await opened.Harness.Closed).Reason, "closed");
+            await opened.Harness.CloseAsync(Context);
+            // Reopening derives the mark again.
+            opened = await holds.OpenHarness(await location());
+            Equal("aborted", await OutcomeOf(opened.Harness, late), "late");
             await opened.Harness.CloseAsync(Context);
         });
     }

@@ -53,6 +53,7 @@ public static class Agents
             SteeringMode = settings?.SteeringMode ?? QueueMode.OneAtATime,
             FollowUpMode = settings?.FollowUpMode ?? QueueMode.OneAtATime,
             ContextRetentionMs = settings?.ContextRetentionMs ?? DefaultContextRetentionMs,
+            DocumentRetentionMs = Session.DocumentRetention(settings?.DocumentRetentionMs),
         };
     }
 

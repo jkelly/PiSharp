@@ -3,10 +3,11 @@ using PiSharp.Durable.Testing;
 
 // P13 (decision 0005): benchmarks/PiSharp.Durable.Benchmarks ports Pi v1.1.0 packages/durable/test/storage.bench.ts, test/storage-memory.ts
 // and test/tool-output-bench.ts over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts), and Pi v1.2.0
-// test/document-append-bench.ts. The benchmarks are report only (docs/durable-benchmarks.md). This smoke case runs each of them at a tiny
-// size so they cannot rot: one sample per storage scenario on every backend (each scenario's result is checked before it is timed), the
-// footprint worker on every backend in-process, a short rate round closed mid-round and replayed, a firehose, a repetitive firehose, a
-// bash cat of 1 MiB, and 20 document appends of each kind. It asserts completion and the number of results, never a timing.
+// test/document-append-bench.ts and test/session-document-cache-bench.ts. The benchmarks are report only (docs/durable-benchmarks.md).
+// This smoke case runs each of them at a tiny size so they cannot rot: one sample per storage scenario on every backend (each scenario's
+// result is checked before it is timed), the footprint worker on every backend in-process, a short rate round closed mid-round and
+// replayed, a firehose, a repetitive firehose, a bash cat of 1 MiB, 20 document appends of each kind, and three conversations at each
+// document retention. It asserts completion and the number of results, never a timing.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> BenchmarksCases()
@@ -58,6 +59,13 @@ internal static partial class Program
             Check(appends is [{ N: 20 }], "one document-append row");
             Check(appendOutput.ToString().StartsWith("n=20: array ", StringComparison.Ordinal), "document-append line: " + appendOutput);
             Equal(DocumentAppendBench.DefaultSizes, DocumentAppendBench.ParseSizes(null), "default sizes");
+
+            var cacheOutput = new StringWriter();
+            var cacheRows = await SessionDocumentCacheBench.RunAsync([3], cacheOutput, warmup: 2, tempRoot: root);
+            Equal(SessionDocumentCacheBench.Retentions.Count, cacheRows.Count, "document-cache rows");
+            Check(cacheRows.All(row => row.Conversations == 3), "document-cache sizes");
+            Check(cacheOutput.ToString().StartsWith("conversations | retention", StringComparison.Ordinal), "document-cache table: " + cacheOutput);
+            Equal(SessionDocumentCacheBench.DefaultSizes, SessionDocumentCacheBench.ParseSizes(null), "document-cache default sizes");
             Directory.Delete(root, recursive: true);
         });
     }

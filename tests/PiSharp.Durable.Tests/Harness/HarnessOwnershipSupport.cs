@@ -198,27 +198,29 @@ internal static partial class OwnershipTests
 }
 
 /// <summary>
-/// Rejects, once, the first commit that writes the abort mark of the task <see cref="Reject"/> names with
-/// <see cref="StorageRejectedException"/>, then clears it (upstream's <c>class Rejecting extends MemoryStorage</c> and patched
-/// <c>storage.commit</c> of harness-ownership, as a decorator).
+/// Fails, once, the first commit that writes the abort mark of the task <see cref="Fail"/> names with <see cref="Failure"/>, then clears it
+/// (upstream v1.2.0's <c>class Failing extends ControlledStorage</c> and patched <c>storage.commit</c> of harness-ownership, as a decorator).
 /// </summary>
-internal sealed class MarkRejectingStorage(IStorage inner) : IStorage
+internal sealed class MarkFailingStorage(IStorage inner) : IStorage
 {
-    private long reject = -1;
+    private long fail = -1;
 
-    /// <summary>The task whose next marking commit is rejected once; null once rejected.</summary>
-    public TaskId? Reject
+    /// <summary>What the failing commit throws (upstream <c>new Error("disk gone")</c>).</summary>
+    public Exception Failure { get; } = new IOException("disk gone");
+
+    /// <summary>The task whose next marking commit fails once; null once failed.</summary>
+    public TaskId? Fail
     {
-        get => Interlocked.Read(ref reject) is var value and >= 0 ? new TaskId(value) : null;
-        set => Interlocked.Exchange(ref reject, value?.Value ?? -1);
+        get => Interlocked.Read(ref fail) is var value and >= 0 ? new TaskId(value) : null;
+        set => Interlocked.Exchange(ref fail, value?.Value ?? -1);
     }
 
     public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
     {
-        var target = Reject;
+        var target = Fail;
         var marks = target is { } id && writes.Any(write => write is TaskWrite task && task.Value.Id == id && task.Value.AbortRequested);
-        if (marks && Interlocked.CompareExchange(ref reject, -1, target!.Value.Value) == target.Value.Value)
-            return Task.FromException<Seq>(new StorageRejectedException("rejected once"));
+        if (marks && Interlocked.CompareExchange(ref fail, -1, target!.Value.Value) == target.Value.Value)
+            return Task.FromException<Seq>(Failure);
         return inner.CommitAsync(writes, context);
     }
 

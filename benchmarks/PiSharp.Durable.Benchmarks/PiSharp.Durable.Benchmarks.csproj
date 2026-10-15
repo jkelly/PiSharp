@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Decision 0005, P13: Pi packages/durable/test/storage.bench.ts, test/storage-memory.ts, test/tool-output-bench.ts and (v1.2.0)
-       test/document-append-bench.ts. Report only: nothing here passes or fails on a timing. No benchmark library; the timing loops mirror
+       test/document-append-bench.ts, test/session-document-cache-bench.ts and test/heap-retained.ts. Report only: nothing here passes or fails on a timing. No benchmark library; the timing loops mirror
        upstream's (Vitest bench's tinybench loop and the scripts' own performance.now() measurements). docs/durable-benchmarks.md has the results next to upstream's under Node. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

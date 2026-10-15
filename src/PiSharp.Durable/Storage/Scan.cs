@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/storage/scan.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/scan.ts.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Internal;
 
@@ -18,21 +18,21 @@ public static class StorageScan
     /// </summary>
     public static ScanStart Start(ScanOrder? requested, JsonObjectValue? cursor, ScanOrder fallback)
     {
-        if (requested is { } order0 && !Enum.IsDefined(order0)) throw new ArgumentException($"Invalid scan order: {(int)order0}");
+        if (requested is { } order0 && !Enum.IsDefined(order0)) throw new StorageRequestException($"Invalid scan order: {(int)order0}");
         if (cursor is null) return new(requested ?? fallback, null);
         if (!cursor.TryGetValue("after", out var afterValue) || afterValue is not JsonNumberValue { Value: var after } ||
             Math.Floor(after) != after || Math.Abs(after) > Ids.MaxSafeInteger)
-            throw new ArgumentException("Invalid storage cursor");
+            throw new StorageRequestException("Invalid storage cursor");
         ScanOrder? stored = null;
         if (cursor.TryGetValue("order", out var storedValue))
         {
             if (storedValue is not JsonStringValue { Value: var text } || !WireName.TryParse<ScanOrder>(text, out var parsed))
-                throw new ArgumentException("Invalid storage cursor");
+                throw new StorageRequestException("Invalid storage cursor");
             stored = parsed;
         }
         var order = stored ?? fallback;
         if (requested is { } asked && asked != order)
-            throw new ArgumentException($"The cursor continues a {WireName.Of(order)} scan; the query asks for {WireName.Of(asked)}");
+            throw new StorageRequestException($"The cursor continues a {WireName.Of(order)} scan; the query asks for {WireName.Of(asked)}");
         return new(order, (long)after);
     }
 

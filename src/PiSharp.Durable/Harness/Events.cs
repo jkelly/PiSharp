@@ -421,7 +421,7 @@ public static class AgentEvents
             var held = new HashSet<TaskId>(completing.Select(record => record.Id));
             var current = initial;
             // Batches are the watch's values; an overflow delivers a snapshot of the newest view instead.
-            var watch = new CommittedWatch<IReadOnlyList<AgentEvent>>([], release, views.Schedule, () => [SnapshotOf(current)],
+            var watch = new CommittedWatch<IReadOnlyList<AgentEvent>>([], release, views.Schedule, views.Report, () => [SnapshotOf(current)],
                 events => JsonValue.Array(events.Select(item => (JsonValue)item.ToJson())));
             var observer = new EventsObserver(watch, (before, after, ops, publication, commitContext) =>
             {
@@ -464,7 +464,7 @@ public static class AgentEvents
         public override void Publication(ConversationView before, ConversationView after, ImmutableArray<Op> ops, CommitPublication commit,
             DurableContext context) => publication(before, after, ops, commit, context);
 
-        public override void CloseSession() => watch.CloseSession();
+        public override void CloseSession(Exception? failure) => watch.CloseSession(failure);
     }
 
     // ─── The typed parts of a view the events read ──────────────────────────

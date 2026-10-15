@@ -2089,26 +2089,31 @@ internal static class CompactionTests
             await chat.Harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "leaves-no-usage-submission-summary-or-outcome-when-the-classifying-commit-is-rejected", async () =>
+        yield return Case(prefix + "leaves-no-usage-submission-or-summary-when-the-classifying-commit-fails-which-fails-the-harness", async () =>
         {
-            var storage = new ControlledStorage(fresh());
+            var storage = new ControlledStorage(fresh()) { KeepOpenForReopen = true };
             var chat = await Open(fresh, opened: storage);
             await History(chat);
             var before = await ModelUsage(chat);
+            var failure = new IOException("disk gone");
             chat.Faux.Summaries.Push(From(_ =>
             {
-                storage.FailNextCommit(new StorageRejectedException("rejected"));
+                storage.FailNextCommit(failure);
                 return Task.FromResult(Summary());
             }));
             var id = await Compact(chat.Root);
-            var outcome = await Result(chat, id);
-            Equal("faulted", S(outcome["status"]), "outcome");
-            Check(JsonValue.DeepEquals(before, await ModelUsage(chat)), "usage unchanged");
-            Check(!(await KindsOf(chat.Root)).Contains("pi.compaction"), "no summary");
-            Equal(0, (await chat.Harness.InspectAsync(Context)).Submissions.Length, "submissions");
-            Check(await storage.GetSubmissionByRequestAsync(chat.Root.Id, $"compaction:{id.Value}", Context) is null, "no summary submission");
-            Check(await Compactions(chat) is null, "no status");
+            Equal(new SessionEnd(SessionEndReason.Failed, failure), await chat.Harness.Closed, "closed");
             await chat.Harness.CloseAsync(Context);
+            // Nothing of the failed commit landed: the task is still live, without usage, entry, or submission.
+            storage.Reopen();
+            Check(await storage.GetSubmissionByRequestAsync(chat.Root.Id, $"compaction:{id.Value}", Context) is null, "no summary submission");
+            Check((await storage.GetTaskAsync(id, Context))?.State.Status != DurableTaskStatus.Terminal, "task still live");
+            var (harness, root) = await OpenChat(storage, chat.Setup);
+            var usage = (JsonObjectValue)((JsonObjectValue)(await harness.SnapshotAsync(UsageLedger.UsageDoc, root.Id, Context))!["models"])["faux/faux-1"];
+            Check(JsonValue.DeepEquals(before, usage), "usage unchanged");
+            Check(!(await KindsOf(root)).Contains("pi.compaction"), "no summary");
+            await harness.CloseAsync(Context);
+            await storage.Inner.CloseAsync(Context);
         });
     }
 

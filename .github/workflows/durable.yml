@@ -42,6 +42,17 @@ jobs:
             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
             -- --report "$RUNNER_TEMP/durable-${{ matrix.os }}.json"
 
+      # Upstream's `npm test` runs the suite a second time with every unobserved document evicted right after use
+      # (test/setup-document-retention.ts); SetupDocumentRetentionCases.cs reads the same variable.
+      - name: Run PiSharp.Durable.Tests with document retention 0
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          PI_DURABLE_DOCUMENT_RETENTION_MS: "0"
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-retention-0-${{ matrix.os }}.json"
+
       - name: Run PiSharp.DurableCli.Tests
         if: ${{ !cancelled() }}
         shell: bash
@@ -61,6 +72,13 @@ jobs:
         with:
           name: durable-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-retention-0-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/durable-retention-0-${{ matrix.os }}.json
           if-no-files-found: ignore
 
   sqlite-publish:

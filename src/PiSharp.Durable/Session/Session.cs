@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/session/session.ts (createSession, SessionImpl,
-// observedOperations, cancellationError).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/session/session.ts (createSession, setDefaultDocumentRetention,
+// documentRetention, SessionImpl, contained, GuardedStorage, observedOperations, cancellationError).
 //
 // Concurrency model. Upstream relies on one JavaScript thread: `#enqueue` chains every mutation and cold load onto one promise, and
 // listeners run in later microtasks. Here .NET callers may be on any thread, so:
@@ -12,7 +12,17 @@
 //   the same job right after publication, before the commit's task completes; a listener that awaits continues later on its own.
 // - A job must not wait for a later job (a commit callback that awaits another commit deadlocks, as upstream's does). Session APIs called
 //   from a listener only enqueue, so they never block the line.
-// - The loaded-document cache and the listener sets are guarded by short locks so snapshot's fast path can read them off the line.
+// - The loaded-document cache, its retention bookkeeping and the listener sets are guarded by short locks so snapshot's fast path can read
+//   them off the line; the clock and the retention setting (host code) are read outside them. Eviction itself runs only on the line.
+// - Retention timers are .NET timers, which never keep a process alive, so upstream's fallback for timers that cannot be unreferenced
+//   (sweeping only at the end of commits) is never needed; each commit still sweeps at its end, as upstream's does.
+// - A failure is latched once (first wins) and closes the Session in the background; close listeners run synchronously in the call that
+//   failed it, as upstream's do. Listener callbacks are contained: a throw, or a faulted task an asynchronous overload's listener returns
+//   (upstream's rejected promise), is reported (or fails the Session, for the Harness's own listeners) and the others still run.
+// - GuardedStorage keeps upstream's guard. One addition stands in for upstream's single thread: a read whose bounds a line job captured
+//   continues off the line (Conversation.ContextAsync), and upstream starts its first Storage call before the closing line job runs. Such a
+//   read takes a lease on the line (HoldStorageOpen); close waits for the lease's first call, which it admits, and refuses its later pages,
+//   as upstream refuses a paged read's next page once close has reached Storage.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using PiSharp.Durable.Chord;
@@ -24,40 +34,143 @@ namespace PiSharp.Durable;
 /// Session kernel over one storage backend (upstream <c>SessionImpl</c>): one mutation line, the loaded document tracker cache and
 /// committed publication. Only committed state is observable.
 /// </summary>
+/// <remarks>
+/// <para>The cache is bounded by use: a document with no watch or document state attached leaves it once it was not read or written for the
+/// retention period, and the next access loads it from Storage. Eviction runs as a job on the mutation line, so no transaction ever holds a
+/// tracker that leaves.</para>
+/// <para>Storage failures are final. Every Storage call goes through one guard: the first exception a Storage method throws, other than for
+/// a cancelled caller, fails the Session, as does a commit it cannot adopt. That call gets the exception; every later call and every Storage
+/// call still underway gets <see cref="SessionFailedException"/>; close listeners run at once, and the Session then closes itself, Storage
+/// included, and <see cref="Closed"/> settles. Nothing retries: transient errors are the Storage's to retry. Reopening recovers from what was
+/// committed.</para>
+/// </remarks>
 public class Session : ISession
 {
+    /// <summary>Default document retention: ten minutes, as for kept contexts.</summary>
+    private static double defaultRetention = 600_000;
+    /// <summary>Longest delay one retention timer waits; a longer retention waits in several steps.</summary>
+    private const double MaxTimerDelay = 2_147_483_647;
+
     private readonly IStorage storage;
+    private readonly StorageGuard guard;
     private readonly Func<double> now;
+    private readonly Func<double> clock;
+    private readonly Func<double> documentRetentionMs;
     private readonly Lock documentsGate = new();
     private readonly Dictionary<string, LoadedDocument> documents = new(StringComparer.Ordinal);
+    // Cached documents with no observer attached, by address, oldest use first, with the time of that use. Guarded by documentsGate.
+    private readonly LinkedList<(string AddressId, double Since)> idleDocuments = new();
+    private readonly Dictionary<string, LinkedListNode<(string AddressId, double Since)>> idleIndex = new(StringComparer.Ordinal);
+    // Observers attached per document incarnation (record ID); a cached incarnation with any is never evicted. Guarded by documentsGate.
+    private readonly Dictionary<DocumentId, int> attachedDocuments = [];
+    // The pending eviction: a timer for the oldest idle document, or a line job when it is already due. Guarded by documentsGate.
+    private DocumentSweep? documentSweep;
+    private int sweepJobs;
     private readonly Lock listenersGate = new();
     private readonly List<Action<CommitPublication, DurableContext>> commitListeners = [];
+    // The Session's own listeners, such as its scheduler's: they keep memory in step with storage, so a throw fails it.
+    private readonly List<Action<CommitPublication, DurableContext>> internalListeners = [];
     private readonly List<Action> closeListeners = [];
     private readonly SessionLine line = new();
     private readonly Host host;
     private readonly Lock closingGate = new();
     private Task? closing;
     private volatile bool closingStarted;
-    private volatile Exception? poison;
+    private volatile FailureBox? failure;
+    private readonly TaskCompletionSource failedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<SessionEnd> closedSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
     // Deliveries scheduled while a job publishes; run by that job right after publication. Guarded by deferGate.
     private readonly Lock deferGate = new();
     private List<Action>? deferred;
-    // Reads that captured their bounds on the line and still read Storage off it (see HoldStorageOpen). Guarded by closingGate.
-    private int offLineReads;
-    private TaskCompletionSource? offLineReadsDrained;
 
     /// <summary>Opens a Session kernel over <paramref name="storage"/>; <paramref name="now"/> is the wall clock for task times in milliseconds
-    /// (default: the system clock).</summary>
-    internal Session(IStorage storage, Func<double>? now = null)
+    /// (default: the system clock); <paramref name="documentRetentionMs"/> is read at each use (null: the default).</summary>
+    internal Session(IStorage storage, Func<double>? now = null, Func<double?>? documentRetentionMs = null)
     {
-        this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
-        this.now = now ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        ArgumentNullException.ThrowIfNull(storage);
+        // Waits race it; none has to.
+        _ = failedSource.Task.ContinueWith(static task => _ = task.Exception, CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        guard = new StorageGuard(storage, this);
+        this.storage = new GuardedStorage(guard, null);
+        var hostNow = now ?? SystemClock;
+        this.now = hostNow;
+        // Cache bookkeeping must never change the outcome of the operation it follows: a clock or a retention setting that throws counts as
+        // now, and as the default.
+        clock = () =>
+        {
+            try { return hostNow(); }
+            catch (Exception) { return SystemClock(); }
+        };
+        var retention = documentRetentionMs ?? (() => null);
+        this.documentRetentionMs = () =>
+        {
+            try { return DocumentRetention(retention()); }
+            catch (Exception) { return DocumentRetention(null); }
+        };
         host = new Host(this);
     }
 
     /// <summary>Opens a Session kernel over one storage backend (upstream <c>createSession</c>). <paramref name="now"/> is the wall clock for
-    /// task times in milliseconds; default the system clock.</summary>
-    public static ISession Create(IStorage storage, Func<double>? now = null) => new Session(storage, now);
+    /// task times in milliseconds; default the system clock. <paramref name="documentRetentionMs"/> is how long an unobserved document stays
+    /// cached after its last use (see <see cref="HarnessSettings.DocumentRetentionMs"/>); default ten minutes. The first exception a Storage
+    /// method throws fails the Session (<see cref="SessionFailedException"/>).</summary>
+    public static ISession Create(IStorage storage, Func<double>? now = null, double? documentRetentionMs = null) =>
+        new Session(storage, now, documentRetentionMs is { } retention ? () => retention : null);
+
+    /// <summary>Internal, for tests: the retention of every Session that keeps the default, as a suite run with eviction at once (upstream
+    /// <c>setDefaultDocumentRetention</c>).</summary>
+    internal static void SetDefaultDocumentRetention(double ms) => Volatile.Write(ref defaultRetention, ms);
+
+    /// <summary>A retention as given, when it is a number of milliseconds, 0 or more (<see cref="double.PositiveInfinity"/> keeps documents);
+    /// otherwise the default (upstream <c>documentRetention</c>).</summary>
+    internal static double DocumentRetention(double? ms) => ms is { } value && value >= 0 ? value : Volatile.Read(ref defaultRetention);
+
+    private static double SystemClock() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    /// <inheritdoc/>
+    public Task<SessionEnd> Closed => closedSource.Task;
+
+    /// <summary>Internal: the exception that failed the Session, if one did (upstream <c>failure</c>).</summary>
+    internal Exception? Failure => failure?.Error;
+
+    /// <summary>Internal: faults with <see cref="SessionFailedException"/> the moment the Session fails, before work underway has ended; never
+    /// completes otherwise (upstream <c>failed</c>).</summary>
+    internal Task Failed => failedSource.Task;
+
+    /// <summary>The Storage behind the failure guard; every component reads and writes through it.</summary>
+    internal IStorage GuardedStorage => storage;
+
+    // ─── Failure ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Internal: fails the Session with <paramref name="error"/>, the first wins, and reports it once. Admission ends, and close listeners run
+    /// now; they read the error from <see cref="Failure"/>. The Storage guard calls this; the Harness also calls it for a throw in its
+    /// scheduler's own commits.
+    /// </summary>
+    internal void Fail(Exception error)
+    {
+        if (!TrySetFailure(error)) return;
+        failedSource.TrySetException(new SessionFailedException(error));
+        // Seal first, so a report handler that calls back finds the Session failed. Closing runs the close listeners synchronously; a
+        // failing backend close is the caller's to see, and here nobody waits.
+        _ = CloseAsync(DurableContext.Background).ContinueWith(static task => _ = task.Exception, CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        Report(error);
+    }
+
+    private bool TrySetFailure(Exception error)
+    {
+        lock (closingGate)
+        {
+            if (failure is not null) return false;
+            failure = new FailureBox(error);
+            return true;
+        }
+    }
+
+    /// <summary>Internal: the Session's failure, and errors of listeners, which never fail what ran them. A plain Session drops them.</summary>
+    internal virtual void Report(Exception error) { }
 
     // ─── Commits ────────────────────────────────────────────────────────────
 
@@ -156,7 +269,7 @@ public class Session : ISession
     }
 
     /// <summary>Internal test and Harness barrier: completes once every job enqueued before it, and the deliveries those jobs scheduled,
-    /// have run. It works on a closed or poisoned Session.</summary>
+    /// have run. It works on a closed or failed Session.</summary>
     internal Task FlushLineAsync() => line.Enqueue(() => Task.FromResult(true));
 
     /// <summary>Internal test barrier: how many jobs wait on the line behind the running one.</summary>
@@ -188,6 +301,7 @@ public class Session : ISession
         var definition = token.Definition;
         var resolved = Documents.ResolveAddress(definition, owner, key);
         var cached = Cached(resolved.Id);
+        if (cached?.ValueVersion == definition.Version) TouchDocument(resolved.Id);
         var loaded = cached?.ValueVersion == definition.Version
             ? cached
             : await line.Enqueue(async () =>
@@ -271,7 +385,7 @@ public class Session : ISession
                     (value, release) => new CommittedStateSource<JsonObjectValue?>(value, release, Defer));
                 try
                 {
-                    return ReplicatedState.Attach<JsonObjectValue?>(source);
+                    return ReplicatedState.Attach<JsonObjectValue?>(source, new ReplicatedStateSourceOptions { OnError = Report });
                 }
                 catch
                 {
@@ -324,7 +438,7 @@ public class Session : ISession
                 var loaded = await LoadDocumentAsync(definition, resolved.Id, resolved.Address, context).ConfigureAwait(false);
                 if (Volatile.Read(ref flag.Value) != 0) context.ThrowIfCancellationRequested();
                 if (loaded is null) return null;
-                return AttachDocument(definition, loaded, (value, release) => new CommittedWatch<JsonObjectValue?>(value, release, Defer)).Observer;
+                return AttachDocument(definition, loaded, (value, release) => new CommittedWatch<JsonObjectValue?>(value, release, Defer, Report)).Observer;
             }).ConfigureAwait(false);
             if (watch is null) return null;
             if (Volatile.Read(ref flag.Value) != 0)
@@ -348,7 +462,7 @@ public class Session : ISession
     {
         ArgumentNullException.ThrowIfNull(context);
         Task closed;
-        Action[] listeners = [];
+        Action[]? listeners = null;
         lock (closingGate)
         {
             if (closing is null)
@@ -363,21 +477,59 @@ public class Session : ISession
                 var cleanup = context.WithoutCancellation();
                 closing = Task.Run(async () =>
                 {
-                    await BeforeCloseAsync().ConfigureAwait(false);
-                    await line.Enqueue(async () =>
+                    try
                     {
-                        lock (listenersGate) commitListeners.Clear();
-                        lock (documentsGate) documents.Clear();
-                        await OffLineReadsDrainedAsync().ConfigureAwait(false);
-                        await storage.CloseAsync(cleanup).ConfigureAwait(false);
-                        return true;
-                    }).ConfigureAwait(false);
+                        await BeforeCloseAsync().ConfigureAwait(false);
+                        await line.Enqueue(async () =>
+                        {
+                            lock (listenersGate)
+                            {
+                                commitListeners.Clear();
+                                internalListeners.Clear();
+                            }
+                            lock (documentsGate)
+                            {
+                                documents.Clear();
+                                idleDocuments.Clear();
+                                idleIndex.Clear();
+                                attachedDocuments.Clear();
+                            }
+                            try
+                            {
+                                await storage.CloseAsync(cleanup).ConfigureAwait(false);
+                            }
+                            catch (Exception error)
+                            {
+                                // A Storage that cannot close is a failed one; an earlier failure stays the cause.
+                                if (TrySetFailure(error)) Report(error);
+                                throw;
+                            }
+                            return true;
+                        }).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        closedSource.TrySetResult(failure is { } failed ? SessionEnd.Failed(failed.Error) : SessionEnd.Closed);
+                    }
                 });
             }
             closed = closing;
         }
-        foreach (var listener in listeners) listener();
+        if (listeners is not null) NotifyClose(listeners);
         return context.WaitAsync(closed);
+    }
+
+    /// <summary>Runs the close listeners once, each on its own: one that fails is reported, and the rest still run.</summary>
+    private void NotifyClose(Action[] listeners)
+    {
+        DocumentSweep? sweep;
+        lock (documentsGate)
+        {
+            sweep = documentSweep;
+            documentSweep = null;
+        }
+        sweep?.Timer?.Dispose();
+        foreach (var listener in listeners) Contained(listener, Report);
     }
 
     /// <summary>
@@ -386,20 +538,43 @@ public class Session : ISession
     /// </summary>
     internal virtual Task ConversationCreatedAsync(Transaction tx, ConversationRecord record) => Task.CompletedTask;
 
-    /// <summary>Runs after close seals admission and before the line closes Storage; must not fail.</summary>
+    /// <summary>Runs after the close listeners and before the line closes Storage; must not fail.</summary>
     internal virtual Task BeforeCloseAsync() => Task.CompletedTask;
 
     /// <inheritdoc/>
     public IDisposable SubscribeCommits(Action<CommitPublication, DurableContext> listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
+        return Subscribe(commitListeners, listener);
+    }
+
+    /// <inheritdoc/>
+    public IDisposable SubscribeCommits(Func<CommitPublication, DurableContext, Task> listener)
+    {
+        ArgumentNullException.ThrowIfNull(listener);
+        return Subscribe(commitListeners, (publication, context) => Observe(listener(publication, context), Report));
+    }
+
+    /// <summary>
+    /// Internal: <see cref="SubscribeCommits(Action{CommitPublication, DurableContext})"/> for the Session's own components, whose state follows
+    /// each commit (upstream <c>observeCommits</c>). A throw leaves that state behind storage, so it fails the Session instead of being
+    /// reported. They run before host listeners.
+    /// </summary>
+    internal IDisposable ObserveCommits(Action<CommitPublication, DurableContext> listener)
+    {
+        ArgumentNullException.ThrowIfNull(listener);
+        return Subscribe(internalListeners, listener);
+    }
+
+    private Unsubscriber Subscribe(List<Action<CommitPublication, DurableContext>> listeners, Action<CommitPublication, DurableContext> listener)
+    {
         AssertUsable();
         // A distinct wrapper per subscription, so two subscriptions of one delegate are independent and removal is exact.
         Action<CommitPublication, DurableContext> entry = (publication, context) => listener(publication, context);
-        lock (listenersGate) commitListeners.Add(entry);
+        lock (listenersGate) listeners.Add(entry);
         return new Unsubscriber(() =>
         {
-            lock (listenersGate) commitListeners.Remove(entry);
+            lock (listenersGate) listeners.Remove(entry);
         });
     }
 
@@ -416,45 +591,160 @@ public class Session : ISession
         });
     }
 
-    /// <summary>
-    /// Internal: called from a line job by a read that continues off the line, such as <c>Conversation.ContextAsync</c>; Storage stays open
-    /// until the returned lease is disposed. Close then lets a read queued on the line at its seal complete (spec 2.2), which upstream's
-    /// single thread gives for free: the read's off-line part runs before the closing line job.
-    /// </summary>
-    internal IDisposable HoldStorageOpen()
+    /// <inheritdoc/>
+    public IDisposable SubscribeClose(Func<Task> listener)
     {
-        lock (closingGate) offLineReads++;
-        return new Unsubscriber(() =>
-        {
-            TaskCompletionSource? drained = null;
-            lock (closingGate)
-            {
-                if (--offLineReads == 0)
-                {
-                    drained = offLineReadsDrained;
-                    offLineReadsDrained = null;
-                }
-            }
-            drained?.TrySetResult();
-        });
+        ArgumentNullException.ThrowIfNull(listener);
+        return SubscribeClose(() => Observe(listener(), Report));
     }
 
-    private Task OffLineReadsDrainedAsync()
-    {
-        lock (closingGate)
-        {
-            if (offLineReads == 0) return Task.CompletedTask;
-            offLineReadsDrained ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            return offLineReadsDrained.Task;
-        }
-    }
+    /// <summary>
+    /// Internal: called from a line job by a read that continues off the line, such as <c>Conversation.ContextAsync</c>; its first call through
+    /// the lease's <see cref="StorageLease.Storage"/> is admitted even once close has begun, and close waits for it. See the file header.
+    /// </summary>
+    internal StorageLease HoldStorageOpen() => guard.Lease();
 
     /// <summary>Internal: drops every loaded tracker on the mutation line; later access cold-loads from Storage.</summary>
     internal Task UnloadDocumentsAsync() => line.Enqueue(() =>
     {
-        lock (documentsGate) documents.Clear();
+        lock (documentsGate)
+        {
+            documents.Clear();
+            idleDocuments.Clear();
+            idleIndex.Clear();
+        }
         return Task.FromResult(true);
     });
+
+    /// <summary>Internal, for tests: how many documents the cache holds, how many are idle, how many incarnations are pinned, and how many
+    /// sweep jobs were queued on the line so far (upstream <c>documentCacheSizes</c>).</summary>
+    internal (int Cached, int Idle, int Attached, int Sweeps) DocumentCacheSizes
+    {
+        get
+        {
+            lock (documentsGate) return (documents.Count, idleDocuments.Count, attachedDocuments.Count, sweepJobs);
+        }
+    }
+
+    // ─── Document cache retention ───────────────────────────────────────────
+
+    /// <summary>Notes a use of a cached document: an unattached one becomes the newest idle one, and an eviction is scheduled.</summary>
+    private void TouchDocument(string addressId)
+    {
+        var at = clock();
+        var retention = documentRetentionMs();
+        bool schedule;
+        lock (documentsGate)
+        {
+            if (!documents.TryGetValue(addressId, out var cached) || attachedDocuments.ContainsKey(cached.Record.Id)) return;
+            // A hot document moves to the back at most once per granule, a tenth of the retention up to 1 s: it may then leave up to a
+            // granule early, which costs a reload, while a commit-heavy workload skips the reordering.
+            if (idleIndex.TryGetValue(addressId, out var node))
+            {
+                if (at - node.Value.Since < Math.Min(1_000, retention / 10)) return;
+                idleDocuments.Remove(node);
+            }
+            idleIndex[addressId] = idleDocuments.AddLast((addressId, at));
+            // A pending sweep for the oldest document comes first unless the retention was shortened since; then it moves up.
+            schedule = documentSweep is null || documentSweep.At > at + retention;
+        }
+        if (schedule) ScheduleDocumentSweep();
+    }
+
+    private void DropDocumentLocked(string addressId)
+    {
+        documents.Remove(addressId);
+        if (idleIndex.Remove(addressId, out var node)) idleDocuments.Remove(node);
+    }
+
+    /// <summary>
+    /// Schedules the eviction of the oldest idle document: on the line at once when it is due, otherwise when it expires, by a timer that
+    /// never keeps the process alive.
+    /// </summary>
+    private void ScheduleDocumentSweep()
+    {
+        var current = clock();
+        var retention = documentRetentionMs();
+        lock (documentsGate)
+        {
+            if (closingStarted) return;
+            if (idleDocuments.First is not { } oldest) return;
+            var at = oldest.Value.Since + retention;
+            if (documentSweep is { } pending && pending.At <= at) return;
+            documentSweep?.Timer?.Dispose();
+            // The pending sweep stays set until its job runs, so touches while the line is busy queue no more.
+            var sweep = new DocumentSweep(at);
+            documentSweep = sweep;
+            var delay = at - current;
+            if (delay <= 0)
+            {
+                QueueDocumentSweepLocked(sweep);
+                return;
+            }
+            sweep.Timer = TimeProvider.System.CreateTimer(static state =>
+            {
+                var (session, sweep) = ((Session, DocumentSweep))state!;
+                lock (session.documentsGate) session.QueueDocumentSweepLocked(sweep);
+            }, (this, sweep), TimeSpan.FromMilliseconds(Math.Min(delay, MaxTimerDelay)), Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    /// <summary>Queues the sweep job on the line; called under <see cref="documentsGate"/>, and never runs the job inline.</summary>
+    private void QueueDocumentSweepLocked(DocumentSweep sweep)
+    {
+        sweepJobs++;
+        _ = line.Enqueue(() =>
+        {
+            bool sweepNow;
+            lock (documentsGate)
+            {
+                if (ReferenceEquals(documentSweep, sweep)) documentSweep = null;
+                sweepNow = !closingStarted;
+            }
+            sweep.Timer?.Dispose();
+            if (sweepNow) SweepDocuments();
+            return Task.FromResult(true);
+        }, inline: false);
+    }
+
+    /// <summary>On the line: evicts the idle documents whose retention passed, oldest first, then schedules the next eviction.</summary>
+    private void SweepDocuments()
+    {
+        var expired = clock() - documentRetentionMs();
+        lock (documentsGate)
+        {
+            while (idleDocuments.First is { } oldest && oldest.Value.Since <= expired) DropDocumentLocked(oldest.Value.AddressId);
+        }
+        ScheduleDocumentSweep();
+    }
+
+    /// <summary>Pins a cached incarnation for one observer; the returned release unpins it once, idle again after the last.</summary>
+    private Action PinDocument(string addressId, DocumentId recordId)
+    {
+        lock (documentsGate)
+        {
+            attachedDocuments[recordId] = attachedDocuments.GetValueOrDefault(recordId) + 1;
+            if (idleIndex.Remove(addressId, out var node)) idleDocuments.Remove(node);
+        }
+        var pinned = 1;
+        return () =>
+        {
+            if (Interlocked.Exchange(ref pinned, 0) == 0) return;
+            bool touch;
+            lock (documentsGate)
+            {
+                var count = attachedDocuments.GetValueOrDefault(recordId, 1) - 1;
+                if (count > 0)
+                {
+                    attachedDocuments[recordId] = count;
+                    return;
+                }
+                attachedDocuments.Remove(recordId);
+                touch = documents.TryGetValue(addressId, out var cached) && cached.Record.Id == recordId;
+            }
+            if (touch) TouchDocument(addressId);
+        };
+    }
 
     // ─── The commit ─────────────────────────────────────────────────────────
 
@@ -467,16 +757,30 @@ public class Session : ISession
         try
         {
             result = await change(tx).ConfigureAwait(false);
+            // A callback that caught a failed read must not commit, nor succeed as if it had.
+            AssertHealthy();
         }
         catch
         {
             await tx.SettleFailureAsync().ConfigureAwait(false);
+            SweepDocuments();
             throw;
         }
-        var writes = await tx.SettleSuccessAsync().ConfigureAwait(false);
+        IReadOnlyList<StorageWrite> writes;
+        try
+        {
+            writes = await tx.SettleSuccessAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // Settlement aborted every change already.
+            SweepDocuments();
+            throw;
+        }
         if (writes.Count == 0)
         {
             tx.Discard();
+            SweepDocuments();
             return result;
         }
         Seq seq;
@@ -485,11 +789,10 @@ public class Session : ISession
             // Once admitted, caller cancellation does not interrupt Storage settlement.
             seq = await storage.CommitAsync(writes, context.WithoutCancellation()).ConfigureAwait(false);
         }
-        catch (Exception error)
+        catch
         {
+            // The guard has failed the Session.
             tx.Discard();
-            // Callback errors never reach this branch; StorageRejectedException alone guarantees that no batch effect committed.
-            if (error is not StorageRejectedException) poison = error;
             throw;
         }
         List<ICommitChange> documentChanges;
@@ -500,18 +803,34 @@ public class Session : ISession
         catch (Exception error)
         {
             // Storage already committed; a failed adoption leaves memory behind durable state.
-            poison = error;
+            Fail(error);
             throw;
         }
+        foreach (var adopted in documentChanges)
+        {
+            var record = adopted switch
+            {
+                DocumentCommitChange document => document.Record,
+                DocumentCopyCommitChange copy => copy.Record,
+                _ => null,
+            };
+            if (record is not null) TouchDocument(Documents.AddressId(DocumentAddress.Of(record)));
+        }
         Publish(seq, writes, documentChanges, context);
+        SweepDocuments();
         return result;
     }
 
     private void Publish(Seq seq, IReadOnlyList<StorageWrite> writes, List<ICommitChange> documentChanges, DurableContext context)
     {
+        Action<CommitPublication, DurableContext>[] internals;
         Action<CommitPublication, DurableContext>[] listeners;
-        lock (listenersGate) listeners = [.. commitListeners];
-        if (listeners.Length == 0) return;
+        lock (listenersGate)
+        {
+            internals = [.. internalListeners];
+            listeners = [.. commitListeners];
+        }
+        if (internals.Length == 0 && listeners.Length == 0) return;
         var changes = new List<ICommitChange>();
         foreach (var write in writes)
             if (write is ICommitChange change) changes.Add(change);
@@ -520,7 +839,9 @@ public class Session : ISession
         lock (deferGate) deferred = [];
         try
         {
-            foreach (var listener in listeners) listener(publication, context);
+            // The commit is durable: a failing listener neither fails the commit nor skips the others.
+            foreach (var listener in internals) Contained(() => listener(publication, context), Fail);
+            foreach (var listener in listeners) Contained(() => listener(publication, context), Report);
         }
         finally
         {
@@ -575,8 +896,35 @@ public class Session : ISession
     }
 
     /// <summary>
-    /// Attaches an observer to one committed incarnation: checks the definition, then forwards this incarnation's committed changes and
-    /// close. The returned detach removes both subscriptions.
+    /// Runs a host callback that must not fail its caller (upstream <c>contained</c>): a throw goes to <paramref name="onError"/>, which is
+    /// not awaited.
+    /// </summary>
+    internal static void Contained(Action callback, Action<Exception> onError)
+    {
+        try { callback(); }
+        catch (Exception error) { onError(error); }
+    }
+
+    /// <summary>Reports a faulted or cancelled task a host callback returned (upstream's rejected promise in <c>contained</c>), without
+    /// awaiting it.</summary>
+    internal static void Observe(Task? task, Action<Exception> onError)
+    {
+        if (task is null || task.IsCompletedSuccessfully) return;
+        task.ContinueWith(static (completed, state) =>
+        {
+            var report = (Action<Exception>)state!;
+            Exception error = completed.IsFaulted
+                ? completed.Exception!.InnerExceptions.Count == 1 ? completed.Exception.InnerException! : completed.Exception
+                : new TaskCanceledException(completed);
+            try { report(error); }
+            catch (Exception reportError) { ReplicatedState.ReportUnhandled(reportError); }
+        }, onError, CancellationToken.None, TaskContinuationOptions.NotOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Attaches an observer to one committed incarnation: checks the definition, pins the incarnation in the cache, then forwards this
+    /// incarnation's committed changes and close. The returned detach removes both subscriptions and the pin.
     /// </summary>
     private (TObserver Observer, Action Detach) AttachDocument<TObserver>(DocDefinition definition, LoadedDocument loaded,
         Func<JsonObjectValue, Action, TObserver> create) where TObserver : ICommittedObserver<JsonObjectValue?>
@@ -585,42 +933,71 @@ public class Session : ISession
         Documents.CheckRecordVersion(definition, loaded.Record, loaded.StoredVersion);
         IDisposable? commitSubscription = null;
         IDisposable? closeSubscription = null;
+        // Attached, the incarnation stays cached; once its last observer detaches, or it retires, it is idle again.
+        var unpin = PinDocument(loaded.AddressId, loaded.Record.Id);
         var detach = () =>
         {
             commitSubscription?.Dispose();
             closeSubscription?.Dispose();
+            unpin();
         };
-        var observer = create(loaded.Value, detach);
+        TObserver observer;
+        try
+        {
+            observer = create(loaded.Value, detach);
+        }
+        catch
+        {
+            unpin();
+            throw;
+        }
         var observedVersion = loaded.ValueVersion;
         var recordId = loaded.Record.Id;
         // A document state's frames carry no caller cancellation; a watch observes its own cancellation.
         var stripCancellation = observer is CommittedStateSource<JsonObjectValue?>;
-        commitSubscription = SubscribeCommits((publication, context) =>
+        try
         {
-            foreach (var change in publication.Changes)
+            commitSubscription = ObserveCommits((publication, context) =>
             {
-                if (change is not DocumentCommitChange document || document.Record.Id != recordId) continue;
-                var frameContext = stripCancellation ? context.WithoutCancellation() : context;
-                var ops = ObservedOperations(ref observedVersion, document);
-                // A migration-only base changes nothing for an observer of the new version.
-                if (ops.IsEmpty) continue;
-                observer.Advance(document.Value, ops, frameContext);
-            }
-        });
-        closeSubscription = SubscribeClose(observer.CloseSession);
+                foreach (var change in publication.Changes)
+                {
+                    if (change is not DocumentCommitChange document || document.Record.Id != recordId) continue;
+                    var frameContext = stripCancellation ? context.WithoutCancellation() : context;
+                    var ops = ObservedOperations(ref observedVersion, document);
+                    // A migration-only base changes nothing for an observer of the new version.
+                    if (ops.IsEmpty) continue;
+                    // A retired incarnation never changes again: its observers keep their last value but pin nothing.
+                    if (document.Value is null) unpin();
+                    observer.Advance(document.Value, ops, frameContext);
+                }
+            });
+            closeSubscription = SubscribeClose(() => observer.CloseSession(Failure));
+        }
+        catch
+        {
+            // Close or failure began while the document loaded: attach nothing.
+            detach();
+            throw;
+        }
         return (observer, detach);
     }
 
     private async Task<LoadedDocument?> LoadDocumentAsync(DocDefinition definition, string addressId, DocumentAddress address, DurableContext context)
     {
+        LoadedDocument? hit = null;
         lock (documentsGate)
         {
             if (documents.TryGetValue(addressId, out var cached))
             {
                 // A tracker serves only tokens of the version its value was materialized for; others reload from Storage.
-                if (cached.ValueVersion == definition.Version) return cached;
-                documents.Remove(addressId);
+                if (cached.ValueVersion == definition.Version) hit = cached;
+                else DropDocumentLocked(addressId);
             }
+        }
+        if (hit is not null)
+        {
+            TouchDocument(addressId);
+            return hit;
         }
         var record = await storage.FindDocumentAsync(address, DocumentPoint.Current, context).ConfigureAwait(false);
         if (record is null) return null;
@@ -629,6 +1006,7 @@ public class Session : ISession
         var value = Documents.MaterializeDocument(definition, stored);
         var loaded = new LoadedDocument(addressId, stored.Record, stored.Version, definition.Version, stored.DeltasSinceBase, Tracker.Track(value));
         lock (documentsGate) documents[addressId] = loaded;
+        TouchDocument(addressId);
         return loaded;
     }
 
@@ -637,16 +1015,16 @@ public class Session : ISession
         lock (documentsGate) return documents.GetValueOrDefault(addressId);
     }
 
-    private void AssertUsable()
+    /// <summary>Internal: throws <see cref="SessionFailedException"/> when failed, else an exception when closing.</summary>
+    internal void AssertUsable()
     {
-        if (closingStarted) throw new InvalidOperationException("Session is closed");
         AssertHealthy();
+        if (closingStarted) throw new InvalidOperationException("Session is closed");
     }
 
     private void AssertHealthy()
     {
-        if (poison is { } error)
-            throw new InvalidOperationException("Session is poisoned by a failed commit after storage admission; reopen it", error);
+        if (failure is { } failed) throw new SessionFailedException(failed.Error);
     }
 
     /// <summary>
@@ -661,21 +1039,35 @@ public class Session : ISession
         return [new ReplaceOp(change.Value)];
     }
 
+    private sealed record FailureBox(Exception Error);
+
+    private sealed class DocumentSweep(double at)
+    {
+        public double At { get; } = at;
+        public ITimer? Timer { get; set; }
+    }
+
     private sealed class Host(Session session) : ITransactionHost
     {
         public IStorage Storage => session.storage;
         public double Now() => session.now();
-        public LoadedDocument? Cached(string addressId) => session.Cached(addressId);
+        public LoadedDocument? Cached(string addressId)
+        {
+            var cached = session.Cached(addressId);
+            if (cached is not null) session.TouchDocument(addressId);
+            return cached;
+        }
         public Task<LoadedDocument?> LoadAsync(DocDefinition definition, string addressId, DocumentAddress address, DurableContext context) =>
             session.LoadDocumentAsync(definition, addressId, address, context);
         public void Install(LoadedDocument document)
         {
             lock (session.documentsGate) session.documents[document.AddressId] = document;
+            session.TouchDocument(document.AddressId);
         }
         public void Evict(string addressId, DocumentId recordId)
         {
             lock (session.documentsGate)
-                if (session.documents.TryGetValue(addressId, out var cached) && cached.Record.Id == recordId) session.documents.Remove(addressId);
+                if (session.documents.TryGetValue(addressId, out var cached) && cached.Record.Id == recordId) session.DropDocumentLocked(addressId);
         }
         public Task ConversationCreatedAsync(Transaction tx, ConversationRecord record) => session.ConversationCreatedAsync(tx, record);
     }
@@ -750,4 +1142,205 @@ internal sealed class SessionLine
             return;
         }
     }
+}
+
+/// <summary>
+/// The state behind the Session's Storage guard (upstream <c>GuardedStorage</c>'s fields): the backend, the Session to fail, the calls
+/// underway, and whether close has reached the backend. <see cref="GuardedStorage"/> views share it.
+/// </summary>
+internal sealed class StorageGuard(IStorage storage, Session session)
+{
+    private readonly Lock gate = new();
+    // Backend calls underway, also those off the Session line, which close waits for before it closes the backend.
+    private readonly HashSet<Task> underway = [];
+    private int unstartedLeases;
+    private TaskCompletionSource? leasesStarted;
+    private bool closing;
+
+    public IStorage Storage { get; } = storage;
+
+    /// <summary>A lease for one read that continues off the line; see <see cref="Session.HoldStorageOpen"/>.</summary>
+    public StorageLease Lease()
+    {
+        lock (gate) unstartedLeases++;
+        return new StorageLease(this);
+    }
+
+    /// <summary>Marks a lease started (its first call admitted, or the lease released unused); close waits for every lease to start.</summary>
+    internal void StartLease()
+    {
+        TaskCompletionSource? started = null;
+        lock (gate)
+        {
+            if (--unstartedLeases == 0)
+            {
+                started = leasesStarted;
+                leasesStarted = null;
+            }
+        }
+        started?.TrySetResult();
+    }
+
+    /// <summary>
+    /// Closes the backend once every lease has started and every call underway has settled, so none outlives it or fails after
+    /// <c>Closed</c> settles. New calls are refused from here on: a paged read must not start its next page while the backend closes.
+    /// </summary>
+    public async Task CloseAsync(DurableContext context)
+    {
+        Task leases;
+        lock (gate)
+        {
+            closing = true;
+            if (unstartedLeases == 0) leases = Task.CompletedTask;
+            else
+            {
+                leasesStarted ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                leases = leasesStarted.Task;
+            }
+        }
+        await leases.ConfigureAwait(false);
+        Task[] calls;
+        lock (gate) calls = [.. underway];
+        await Task.WhenAll(calls).ConfigureAwait(false);
+        await Storage.CloseAsync(context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs one backend call under the guard. <paramref name="read"/> is a read's context; <c>CommitAsync</c> and <c>MintIdAsync</c> pass
+    /// none, so nothing exempts their exceptions: once a batch is admitted, whether it committed is unknown. A call still underway when another
+    /// fails the Session ends with <see cref="SessionFailedException"/> too, whatever it returns: nothing it read or wrote is used.
+    /// <paramref name="lease"/> admits its first call even while closing.
+    /// </summary>
+    public async Task<T> CallAsync<T>(DurableContext? read, StorageLease? lease, Func<Task<T>> run)
+    {
+        AssertHealthy();
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = false;
+        lock (gate)
+        {
+            var admitted = lease is not null && lease.TryStart();
+            started = admitted;
+            if (closing && !admitted) throw new InvalidOperationException("Session is closed");
+            underway.Add(done.Task);
+        }
+        if (started) StartLease();
+        try
+        {
+            T result;
+            try
+            {
+                result = await run().ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                AssertHealthy();
+                // An invalid read, or one its caller cancelled, says nothing about the Storage; it fails that call only.
+                var exempt = read is not null && (error is StorageRequestException || read.IsCancellationRequested);
+                if (!exempt) session.Fail(error);
+                throw;
+            }
+            AssertHealthy();
+            return result;
+        }
+        finally
+        {
+            lock (gate) underway.Remove(done.Task);
+            done.TrySetResult();
+        }
+    }
+
+    private void AssertHealthy()
+    {
+        if (session.Failure is { } failure) throw new SessionFailedException(failure);
+    }
+}
+
+/// <summary>
+/// A read's hold on Storage across the Session line (see <see cref="Session.HoldStorageOpen"/>): its first call through <see cref="Storage"/>
+/// is admitted even once close has begun, and close waits until it has started, or the lease is disposed unused.
+/// </summary>
+internal sealed class StorageLease : IDisposable
+{
+    private readonly StorageGuard guard;
+    private int state;
+
+    internal StorageLease(StorageGuard guard)
+    {
+        this.guard = guard;
+        Storage = new GuardedStorage(guard, this);
+    }
+
+    /// <summary>The guarded Storage the leased read calls.</summary>
+    public IStorage Storage { get; }
+
+    /// <summary>Claims the lease's first call; true once.</summary>
+    internal bool TryStart() => Interlocked.CompareExchange(ref state, 1, 0) == 0;
+
+    /// <summary>Releases an unused lease.</summary>
+    public void Dispose()
+    {
+        if (TryStart()) guard.StartLease();
+    }
+}
+
+/// <summary>
+/// The Session's Storage behind its failure guard (upstream <c>GuardedStorage</c>); every component of the Session reads and writes through
+/// it. Before a call, a failed Session gets <see cref="SessionFailedException"/> without reaching the backend. A call that throws fails the
+/// Session and rethrows the backend's exception, unless it is a <see cref="StorageRequestException"/> or a read whose caller's context was
+/// cancelled: neither says the Storage is broken. <see cref="CloseAsync"/> always reaches the backend, so a failed Session still closes it.
+/// </summary>
+internal sealed class GuardedStorage(StorageGuard guard, StorageLease? lease) : IStorage
+{
+    private IStorage Inner => guard.Storage;
+
+    /// <summary>Never exempt, whatever it throws: once admitted, whether a failed batch committed is unknown.</summary>
+    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) =>
+        guard.CallAsync(null, lease, () => Inner.CommitAsync(writes, context));
+
+    public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => guard.CallAsync(null, lease, Inner.MintIdAsync<TId>);
+
+    public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.GetConversationAsync(id, context));
+
+    public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.ScanConversationsAsync(query, limit, cursor, context));
+
+    public Task<CommittedEntry?> GetEntryAsync(EntryId id, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.GetEntryAsync(id, context));
+
+    public Task<CommittedEntry?> GetEntryAsync(ConversationId conversationId, EntryId id, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.GetEntryAsync(conversationId, id, context));
+
+    public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.FindLatestHeadMarkerAsync(conversationId, atOrBeforeEntryId, context));
+
+    public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.ScanEntriesAsync(query, limit, cursor, context));
+
+    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.GetTaskAsync(id, context));
+
+    public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.ScanTasksAsync(query, limit, cursor, context));
+
+    public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.GetSubmissionAsync(id, context));
+
+    public Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.ScanSubmissionsAsync(query, limit, cursor, context));
+
+    public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.GetSubmissionByRequestAsync(conversationId, requestId, context));
+
+    public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.FindDocumentAsync(address, at, context));
+
+    public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.GetDocumentAsync(id, at, context));
+
+    public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        guard.CallAsync(context, lease, () => Inner.ScanDocumentsAsync(query, limit, cursor, context));
+
+    /// <summary>Closes the backend after the calls underway; see <see cref="StorageGuard.CloseAsync"/>.</summary>
+    public Task CloseAsync(DurableContext context) => guard.CloseAsync(context);
 }

@@ -15,6 +15,11 @@
 // - submit: §6 requestId deduplication: a retry with the same request id after a kill admits nothing twice.
 // - abort: §5.4 abort protocol and cascade "derived again at open", §5.5 "abort flows down" and owned work finishing first, §8.3 and
 //   §8.4 abort handlers: a durable abort mark completes bottom-up on reopen.
+// - `*-failed` (Pi v1.2.0 storage failures, README "Errors" rule 1): a batch that fails in Storage fails the Session, which closes itself
+//   and retries nothing; the commit is atomic, so reopening recovers exactly as from a kill before that batch: chat.answer-failed as
+//   chat.answer-before, tool-unsafe.intent-failed as tool-unsafe.before-tool, tool-unsafe.result-failed as tool-unsafe.execute (a
+//   non-replay-safe call that ran and lost its result is interrupted), followup.first-answer-failed as followup.first-request, and
+//   submit.admit-failed as submit.admit-before.
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
@@ -70,12 +75,17 @@ internal static class CrashTests
         new("chat", "retry", r => ChatTurn(r, fauxCalls: 1, errors: 1)),
         new("chat", "answer-before", r => ChatTurn(r, fauxCalls: 1)),
         new("chat", "answer-after", r => ChatTurn(r, fauxCalls: 0)),
+        // The answer commit fails in Storage: the Session fails, and reopening answers as after a kill before it.
+        new("chat", "answer-failed", r => ChatTurn(r, fauxCalls: 1)),
         // A non-replay-safe tool: before intent, after the intent commit, mid-execute, after the result commit, in the tools phase.
         new("tool-unsafe", "before-tool", r => ToolTurn(r, runs: 1, interrupted: false, fauxCalls: 1)),
         new("tool-unsafe", "intent-after", r => ToolTurn(r, runs: 0, interrupted: true, fauxCalls: 1)),
         new("tool-unsafe", "execute", r => ToolTurn(r, runs: 1, interrupted: true, fauxCalls: 1)),
         new("tool-unsafe", "result-after", r => ToolTurn(r, runs: 1, interrupted: false, fauxCalls: 1)),
         new("tool-unsafe", "after-tools", r => ToolTurn(r, runs: 1, interrupted: false, fauxCalls: 1)),
+        // The intent commit, or the result commit after the call ran, fails in Storage.
+        new("tool-unsafe", "intent-failed", r => ToolTurn(r, runs: 1, interrupted: false, fauxCalls: 1)),
+        new("tool-unsafe", "result-failed", r => ToolTurn(r, runs: 1, interrupted: true, fauxCalls: 1)),
         // A replay-safe tool reruns exactly once.
         new("tool-safe", "intent-after", r => ToolTurn(r, runs: 1, interrupted: false, fauxCalls: 1)),
         new("tool-safe", "execute", r => ToolTurn(r, runs: 2, interrupted: false, fauxCalls: 1)),
@@ -83,9 +93,11 @@ internal static class CrashTests
         new("followup", "first-request", r => TwoTurns(r, fauxCalls: 2)),
         new("followup", "first-answer-after", r => TwoTurns(r, fauxCalls: 1)),
         new("followup", "second-request", r => TwoTurns(r, fauxCalls: 1)),
+        new("followup", "first-answer-failed", r => TwoTurns(r, fauxCalls: 2)),
         // Submission retries with the same request id.
         new("submit", "admit-before", r => Resubmit(r, admitted: false)),
         new("submit", "admit-after", r => Resubmit(r, admitted: true)),
+        new("submit", "admit-failed", r => Resubmit(r, admitted: false)),
         new("submit", "queued-admit-after", ResubmitQueued),
         // Abort marks.
         new("abort", "task-mark", r => AbortedToolRound(r)),

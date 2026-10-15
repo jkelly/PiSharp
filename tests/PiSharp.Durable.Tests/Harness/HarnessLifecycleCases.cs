@@ -1,5 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-lifecycle.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-lifecycle.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs, ChatSupport.cs and Session/SessionSupport.cs, and these:
+// - The stubborn tool of "joins ... before closing storage" returns its empty result as ToolExecutionResult.Content: upstream's v1.2.0
+//   `output` is area a's rename of that field (compatibility/durable-sync-1.2.0-worklist.json), which renames it in every test at once.
 // - Backends. Upstream opens these on MemoryStorage (some through ControlledStorage) and reopens a SQLite file for "lets a new Harness open
 //   the same Storage once close resolved". harness.lifecycle.* does the same; harness.lifecycle.jsonl.* reruns every case on JSONL (the
 //   reopen case reopening a JSONL directory) and harness.lifecycle.sqlite.* reruns the cases that need no reopen on a fresh SQLite file.
@@ -7,7 +9,9 @@
 // - `class FailingClose extends ControlledStorage` is FailingCloseStorage, a decorator over ControlledStorage.
 // - "leaves no subscription behind ...": upstream replaces `harness.subscribeCommits` to count the subscriptions made after the patch. A
 //   C# method cannot be replaced, so the case counts the Session's commit listeners (by reflection) against the count before the cancelled
-//   acquisitions; it reads the same thing: no observer subscription outlives a cancelled acquisition.
+//   acquisitions; it reads the same thing: no observer subscription outlives a cancelled acquisition. Since v1.2.0 document observers
+//   subscribe through the internal observeCommits, which upstream's patched subscribeCommits no longer sees; the count includes those
+//   listeners, so the check still covers them.
 // - `/closed/.test(String(error))` tests the exception's message.
 using System.Reflection;
 using PiSharp.Durable;
@@ -120,9 +124,14 @@ internal static class LifecycleTests
     /// <summary>How many commit listeners the Harness's Session holds.</summary>
     private static int CommitSubscriptions(IHarness harness)
     {
-        var field = typeof(PiSharp.Durable.Session).GetField("commitListeners", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var listeners = (System.Collections.ICollection)field.GetValue(harness)!;
-        lock (listeners.SyncRoot) return listeners.Count;
+        var count = 0;
+        foreach (var name in new[] { "commitListeners", "internalListeners" })
+        {
+            var field = typeof(PiSharp.Durable.Session).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var listeners = (System.Collections.ICollection)field.GetValue(harness)!;
+            lock (listeners.SyncRoot) count += listeners.Count;
+        }
+        return count;
     }
 
     /// <summary><c>promise.then(() => "resolved", error => /closed/.test(String(error)) ? "closed" : String(error))</c>.</summary>
@@ -175,7 +184,7 @@ internal static class LifecycleTests
             Check(!await StorageOpen(storage), "storage closed");
         });
 
-        yield return Case(prefix + "reports-a-failing-close-and-still-rethrows-the-open-error", async () =>
+        yield return Case(prefix + "rethrows-the-open-error-and-reports-it-once-though-closing-then-fails-too", async () =>
         {
             var controlled = new ControlledStorage(await fresh());
             var storage = new FailingCloseStorage(controlled);
@@ -189,7 +198,8 @@ internal static class LifecycleTests
                 OnReport = reports.Add,
             }, Context);
             await RejectsAsync(() => opening, "disk full", "open");
-            Seq(["close failed"], reports.Snapshot().Select(error => error.Message), "reports");
+            // The storage failure that failed open is the cause; the close that fails after it adds no report.
+            Seq(["disk full"], reports.Snapshot().Select(error => error.Message), "reports");
         });
 
         // ─── Harness close ──────────────────────────────────────────────────

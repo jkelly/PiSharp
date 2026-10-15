@@ -2,7 +2,8 @@
 // tests the tool task (P9) unblocks, "owns its tool tasks, waits for them, and hands the run to a conversation-owned generation", "aborts a
 // parallel round with its generation: tools first, then the generation, with every result written" and "answers the unstarted calls of an
 // aborted sequential round with aborted results, in call order", and the one generation alone (P8) unblocked, "keeps run control with a
-// faulted generation until its owned work drains, and retries a rejected final commit". "ends a turn at the generation's hold, before its
+// faulted generation until its owned work drains, and retries a rejected final commit", which Pi v1.2.0 turned into "... and fails the
+// Harness on a failed final commit" (area b of the sync). "ends a turn at the generation's hold, before its
 // successor's turn starts" and the "tool rounds and events" tests listen to agent events and are in HarnessStructuredEventsCases.cs.
 // Adaptations beyond those of HarnessStructuredSupport.cs and ChatSupport.cs: invalidFinalStream is GenerationTests.InvalidFinalStream (a
 // non-finite usage count instead of a function, see HarnessGenerationCases.cs); upstream's module-level blockingTool and toolCalls are
@@ -130,7 +131,7 @@ internal static partial class StructuredTests
             await harness.CloseAsync(Context);
         });
 
-        yield return Case(prefix + "keeps-run-control-with-a-faulted-generation-until-its-owned-work-drains-and-retries-a-rejected-final-commit", async () =>
+        yield return Case(prefix + "keeps-run-control-with-a-faulted-generation-until-its-owned-work-drains-and-fails-the-harness-on-a-failed-final-commit", async () =>
         {
             var nodes = new Nodes();
             var setupBase = Setup();
@@ -153,7 +154,8 @@ internal static partial class StructuredTests
                     await runtime.CommitAsync((_, _) => NextTaskState.Aborted(), ctx);
                 },
             });
-            var storage = new RejectingStorage(await fresh());
+            var controlled = new ControlledStorage(await fresh()) { KeepOpenForReopen = true };
+            var storage = new FinalizeFailingStorage(controlled);
             var (harness, root) = await OpenChat(storage, setup);
             opened = harness;
             async Task<TaskId?> RunTask() =>
@@ -167,19 +169,22 @@ internal static partial class StructuredTests
             Equal(generation, await RunTask(), "run control");
             // The faulted outcome is cancellation intent: the hooked work is aborted, then the run settles.
             await Eventually(() => nodes.Logged("abort:hooked"));
-            storage.Reject = generation;
+            storage.Fail = generation;
             nodes.Open("abort.hooked");
-            // The final commit, with the run's cleanup, is rejected once: nothing of the cleanup lands.
-            await Eventually(() => setup.Reports.Snapshot().Any(error => error is StorageRejectedException));
-            Equal(generation, await RunTask(), "run control after the rejected commit");
-            Seq(["pi.user"], await Kinds(root), "kinds before the retry");
-            Check(!await Settled(submission.WaitAsync(Context)), "the submission still waits");
-            // The next commit retries it; the partial becomes one aborted entry.
-            await root.CommitAsync(tx => tx.AppendEntryAsync(root.Id, new EntryDraft { Kind = "note" }), Context);
-            MatchJson("""{"status":"unanswered","reason":"faulted"}""", (await submission.WaitAsync(Context)).ToJson(), "settled");
-            SameJson("{}", await harness.SnapshotAsync(Live.LiveDoc, root.Id, Context), "live");
-            Seq(["pi.user", "note", "pi.assistant"], await Kinds(root), "kinds");
+            // The final commit, with the run's cleanup, fails: nothing of the cleanup lands, and the Harness fails.
+            Equal(new SessionEnd(SessionEndReason.Failed, storage.Failure), await harness.Closed, "closed");
+            Same(storage.Failure, (await ThrowsAsync<SessionFailedException>(() => submission.WaitAsync(Context), "wait")).InnerException, "cause");
             await harness.CloseAsync(Context);
+            // Reopening finalizes the run; the partial becomes one aborted entry.
+            controlled.Reopen();
+            var (reopened, reopenedRoot) = await OpenChat(storage, setup);
+            opened = reopened;
+            var again = (await reopened.SubmissionAsync(submission.Id, Context))!;
+            MatchJson("""{"status":"unanswered","reason":"faulted"}""", (await again.WaitAsync(Context)).ToJson(), "settled");
+            SameJson("{}", await reopened.SnapshotAsync(Live.LiveDoc, reopenedRoot.Id, Context), "live");
+            Seq(["pi.user", "pi.assistant"], await Kinds(reopenedRoot), "kinds");
+            await reopened.CloseAsync(Context);
+            await controlled.Inner.CloseAsync(Context);
         });
     }
 }

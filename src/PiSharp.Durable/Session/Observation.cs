@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/session/observation.ts (CommittedStateSource,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/session/observation.ts (CommittedStateSource,
 // SessionSourceAttachment, CommittedWatch, RETIREMENT_OPERATIONS, the 100-frame watch limit).
 //
 // Upstream defers every attachment drain and watch delivery with queueMicrotask. A .NET process has no microtask queue, so the owner
@@ -21,8 +21,8 @@ internal interface ICommittedObserver<T>
     /// <summary>Forwards one committed revision; a null value retires the observer.</summary>
     void Advance(T value, ImmutableArray<Op> ops, DurableContext context);
 
-    /// <summary>Ends the observation because the Session closes.</summary>
-    void CloseSession();
+    /// <summary>Ends the observation because the Session closes; <paramref name="failure"/> is what failed it, when it failed.</summary>
+    void CloseSession(Exception? failure);
 }
 
 /// <summary>Constants shared by the observers.</summary>
@@ -91,7 +91,8 @@ internal sealed class CommittedStateSource<T> : IReplicatedStateSource<T>, IComm
         foreach (var attachment in targets) attachment.Publish(frame);
     }
 
-    public void CloseSession()
+    /// <summary>Stops publishing; the attached states keep their last value. A failure ends them the same way.</summary>
+    public void CloseSession(Exception? failure)
     {
         SessionSourceAttachment<T>[] targets;
         lock (gate)
@@ -225,6 +226,7 @@ internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T>
     private readonly Func<T>? replace;
     private readonly Func<T, JsonValue>? json;
     private readonly ObservationScheduler schedule;
+    private readonly Action<Exception> report;
     // Completed off the terminating thread, so an awaiting caller never runs inside a close listener or a line job.
     private readonly TaskCompletionSource<WatchEnd> closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly List<WatchFrame> pending = [];
@@ -239,13 +241,16 @@ internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T>
     private bool resolved;
     private CancellationTokenRegistration cancellation;
 
-    /// <summary><paramref name="replace"/> gives the value an overflow delivers; by default the newest value. <paramref name="json"/> is the
-    /// JSON form of a value that is not itself JSON, for the overflow's root replacement (a conversation view's <c>ToJson()</c>).</summary>
-    public CommittedWatch(T value, Action detach, ObservationScheduler schedule, Func<T>? replace = null, Func<T, JsonValue>? json = null)
+    /// <summary><paramref name="report"/> gets a listener's throw, which also ends the watch. <paramref name="replace"/> gives the value an
+    /// overflow delivers; by default the newest value. <paramref name="json"/> is the JSON form of a value that is not itself JSON, for the
+    /// overflow's root replacement (a conversation view's <c>ToJson()</c>).</summary>
+    public CommittedWatch(T value, Action detach, ObservationScheduler schedule, Action<Exception> report, Func<T>? replace = null,
+        Func<T, JsonValue>? json = null)
     {
         this.value = value;
         this.detach = detach;
         this.schedule = schedule;
+        this.report = report;
         this.replace = replace;
         this.json = json;
     }
@@ -296,7 +301,8 @@ internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T>
 
     public void Cancel() => Terminate(WatchEnd.Cancelled);
 
-    public void CloseSession() => Terminate(WatchEnd.SessionClosed);
+    /// <summary>Ends with <c>session_closed</c>, or with <c>session_failed</c> and the error when the Session failed.</summary>
+    public void CloseSession(Exception? failure) => Terminate(failure is null ? WatchEnd.SessionClosed : WatchEnd.SessionFailed(failure));
 
     public void Advance(T value, ImmutableArray<Op> ops, DurableContext context)
     {
@@ -375,7 +381,13 @@ internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T>
                 }
                 catch (Exception error)
                 {
-                    Terminate(new WatchEnd(WatchEndReason.ListenerError, error));
+                    bool ended;
+                    lock (gate) ended = end is not null;
+                    if (!ended)
+                    {
+                        Contained(error);
+                        Terminate(new WatchEnd(WatchEndReason.ListenerError, error));
+                    }
                     break;
                 }
                 if (frame.Value is null)
@@ -396,6 +408,12 @@ internal sealed class CommittedWatch<T> : IWatchHandle<T>, ICommittedObserver<T>
             if (again) Schedule();
             FinishIfReady();
         }
+    }
+
+    private void Contained(Exception error)
+    {
+        try { report(error); }
+        catch (Exception reportError) { ReplicatedState.ReportUnhandled(reportError); }
     }
 
     private void Terminate(WatchEnd reason)

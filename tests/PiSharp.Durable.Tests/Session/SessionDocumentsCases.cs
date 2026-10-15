@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/session-documents.test.ts. Verbatim apart from the adaptations
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-documents.test.ts. Verbatim apart from the adaptations
 // in SessionSupport.cs and these:
 // - "copies assigned values per placement": placements are immutable JsonValue trees, so a placement cannot be mutated afterwards and two
 //   placements of one value may share it; the case checks the values and that the caller's later replacement does not reach the document.
@@ -381,7 +381,7 @@ internal static partial class SessionTests
             Equal(3.0, N((await session.SnapshotAsync(counterDoc, Context))!["count"]), "count");
         });
 
-        yield return Case(prefix + "poisons-the-session-after-an-uncertain-storage-failure-and-publishes-nothing", async () =>
+        yield return Case(prefix + "fails-the-session-after-a-storage-failure-and-publishes-nothing", async () =>
         {
             var (storage, session, publications, conversationId) = await SetupLive();
             await Flush(session);
@@ -393,8 +393,8 @@ internal static partial class SessionTests
             await Flush(session);
             Equal(published, Count(publications), "publications");
             Check(!before.ContainsKey("message"), "previous revision unchanged");
-            await RejectsAsync(() => session.SnapshotAsync(liveDoc, conversationId, Context), "poisoned", "snapshot");
-            await RejectsAsync(() => session.CommitAsync(_ => { }, Context), "poisoned", "commit");
+            await ThrowsAsync<SessionFailedException>(() => session.SnapshotAsync(liveDoc, conversationId, Context), "snapshot");
+            await ThrowsAsync<SessionFailedException>(() => session.CommitAsync(_ => { }, Context), "commit");
             await session.CloseAsync(Context);
         });
 

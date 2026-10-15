@@ -1,5 +1,8 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
 // upstream's HarnessImpl extends SessionImpl.
+// Pi v1.2.0's area b parts of harness.ts are in (durable-sync-1.2.0-worklist.json): every component reads and writes through the Session's
+// Storage guard, safeReport, safeNow, documentRetentionMs, report, assertUsable, and the open failure's close; the header moves to v1.2.0 with
+// area c (the scheduler rewrite, SCHEDULER_INDEX_SIZES), which owns this row.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -33,14 +36,15 @@ public static class Harness
         }
         catch
         {
-            // The caller's context may be what failed open: close without it, and rethrow the open error.
+            // The caller's context may be what failed open: close without it, and rethrow the open error. A failing Storage close fails the
+            // Session, which reports it.
             try
             {
                 await harness.CloseAsync(context.WithoutCancellation()).ConfigureAwait(false);
             }
-            catch (Exception closeError)
+            catch (Exception)
             {
-                options.OnReport?.Invoke(closeError);
+                // Reported by the Session.
             }
             throw;
         }
@@ -60,15 +64,22 @@ internal sealed class DurableHarness : Session, IHarness
     private readonly Submissions submissions;
     private readonly ConversationViews views;
     private readonly TaskGraphView taskGraph;
-    private volatile bool closed;
 
-    public DurableHarness(IStorage storage, HarnessOptions options, DurableContext context)
-        : base(storage, Clock(options))
+    public DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context)
+        : this(rawStorage, options, context, SafeReport(options.OnReport))
     {
+    }
+
+    private DurableHarness(IStorage rawStorage, HarnessOptions options, DurableContext context, Action<Exception> report)
+        // Read at each use, as all settings are, but only this field: it is read on every commit.
+        : base(rawStorage, SafeNow(Clock(options), options.Now is not null, report), () => options.Settings?.DocumentRetentionMs)
+    {
+        // Every component reads and writes through the Session's failure guard: rawStorage serves only the base constructor.
+        var storage = GuardedStorage;
         this.storage = storage;
         this.options = options;
-        report = options.OnReport ?? (_ => { });
-        Now = Clock(options);
+        this.report = report;
+        Now = SafeNow(Clock(options), options.Now is not null, report);
         scheduler = new DurableTaskScheduler(new DurableTaskSchedulerOptions
         {
             Session = this,
@@ -114,6 +125,37 @@ internal sealed class DurableHarness : Session, IHarness
         return () => time.GetUtcNow().ToUnixTimeMilliseconds();
     }
 
+    /// <summary><c>OnReport</c> that cannot fail (upstream <c>safeReport</c>): it is the last place an error goes, so its own throw is
+    /// dropped.</summary>
+    internal static Action<Exception> SafeReport(Action<Exception>? onReport) => error => Contained(() => onReport?.Invoke(error), _ => { });
+
+    /// <summary>
+    /// The host clock, falling back to the system clock when it throws (upstream <c>safeNow</c>): a broken clock must not stop commits. The
+    /// first throw is reported; the clock is read in every task change, so later ones are not. <paramref name="host"/> is false for the
+    /// Harness's own TimeProvider clock, which needs no guard.
+    /// </summary>
+    internal static Func<double> SafeNow(Func<double> now, bool host, Action<Exception> report)
+    {
+        if (!host) return now;
+        var reported = 0;
+        return () =>
+        {
+            try
+            {
+                return now();
+            }
+            catch (Exception error)
+            {
+                // Set first: a report handler that reads the clock again must not report again.
+                if (Interlocked.Exchange(ref reported, 1) == 0) report(error);
+                return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            }
+        };
+    }
+
+    /// <summary>The Session's failure and listener errors go to <c>OnReport</c>.</summary>
+    internal override void Report(Exception error) => report(error);
+
     /// <summary>Resolves a conversation's committed <c>pi.agent</c> against <paramref name="snapshot"/>, or the current one, and the current
     /// settings.</summary>
     internal async Task<Agent> ResolveAgentAsync(ConversationId id, IRegistrySnapshot? snapshot, DurableContext context)
@@ -137,7 +179,7 @@ internal sealed class DurableHarness : Session, IHarness
 
     public void Resume()
     {
-        AssertOpen();
+        AssertUsable();
         scheduler.Resume();
     }
 
@@ -196,7 +238,7 @@ internal sealed class DurableHarness : Session, IHarness
 
     public async Task<IConversation?> ConversationAsync(ConversationId id, DurableContext context)
     {
-        AssertOpen();
+        AssertUsable();
         var record = await ReadOnLineAsync(() => storage.GetConversationAsync(id, context)).ConfigureAwait(false);
         return record is null ? null : new ConversationImpl(record.Id, this);
     }
@@ -207,18 +249,12 @@ internal sealed class DurableHarness : Session, IHarness
         return CreateAsync(CreateTarget.Independent(options.Ownership), options.Agent, options.Init, context);
     }
 
-    public override Task CloseAsync(DurableContext context)
-    {
-        closed = true;
-        return base.CloseAsync(context);
-    }
-
-    /// <summary>Joins task invocations after admission is sealed and before Storage closes; writes no task outcome.</summary>
+    /// <summary>Signals and joins task invocations after the close listeners and before Storage closes; writes no task outcome.</summary>
     internal override Task BeforeCloseAsync() => scheduler.JoinAsync();
 
     internal async Task<IConversation> CreateAsync(CreateTarget target, AgentChange? agent, ConversationInit? init, DurableContext context)
     {
-        AssertOpen();
+        AssertUsable();
         var id = await CommitWithAsync(async tx =>
         {
             if (target.Kind == CreateKind.Root && await tx.GetConversationAsync(ConversationId.Root).ConfigureAwait(false) is not null)
@@ -249,11 +285,6 @@ internal sealed class DurableHarness : Session, IHarness
         await tx.DocAsync(ProviderIdentity.ProviderDoc, record.Id).ConfigureAwait(false);
         await Agents.CreateAgentAsync(tx, record).ConfigureAwait(false);
         if (options.ConversationCreated is { } created) await created(tx, record).ConfigureAwait(false);
-    }
-
-    private void AssertOpen()
-    {
-        if (closed) throw HarnessUtil.ClosedError();
     }
 
     internal enum CreateKind { Root, Independent, Fork }

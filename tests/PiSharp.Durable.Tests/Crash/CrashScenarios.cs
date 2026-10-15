@@ -10,6 +10,10 @@
 //
 // The same scenario code runs in both processes: BuildSetup registers identical tools, hooks, sections and the deterministic faux model, as
 // a host process registers the same code again after a crash. Gates and holds only act in the child.
+//
+// Storage failures (Pi v1.2.0, area b of the sync): a `*-failed` checkpoint makes the matched batch fail in Storage instead of blocking.
+// Nothing of it lands, the Session fails and closes itself (Session.Closed settles failed with that error), and nothing is retried in the
+// process; the child prints the sentinel once the Harness has closed, and the parent reopens the storage as after a crash.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -63,14 +67,19 @@ internal sealed class CrashGate(string? target)
 }
 
 /// <summary>Kills at a commit boundary: the first batch <paramref name="matches"/> accepts blocks forever, before it reaches the inner
-/// storage or right after it landed.</summary>
-internal sealed class CrashStorage(IStorage inner, Func<IReadOnlyList<StorageWrite>, bool> matches, bool after, string checkpoint) : IStorage
+/// storage or right after it landed; with <paramref name="fail"/>, it fails before it reaches the inner storage instead.</summary>
+internal sealed class CrashStorage(IStorage inner, Func<IReadOnlyList<StorageWrite>, bool> matches, bool after, string checkpoint, bool fail = false)
+    : IStorage
 {
     private int fired;
+
+    /// <summary>What a failing batch throws.</summary>
+    public static IOException Failure(string checkpoint) => new($"crash: injected storage failure at {checkpoint}");
 
     public async Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context)
     {
         var hit = Volatile.Read(ref fired) == 0 && matches(writes) && Interlocked.Exchange(ref fired, 1) == 0;
+        if (hit && fail) throw Failure(checkpoint);
         if (hit && !after)
         {
             CrashGate.Emit("CHECKPOINT " + checkpoint);
@@ -120,8 +129,12 @@ internal static class CrashScenarios
     /// <summary>Appended to every chat answer, so the slow child stream of <c>chat.stream</c> commits many partials.</summary>
     internal static readonly string Padding = " " + new string('.', 400);
 
-    /// <summary>A commit-boundary checkpoint: the batch it matches, and whether the kill comes after the batch landed.</summary>
-    internal sealed record CommitTrigger(Func<IReadOnlyList<StorageWrite>, bool> Matches, bool After);
+    /// <summary>A commit-boundary checkpoint: the batch it matches, and whether the kill comes after the batch landed; a failing one makes
+    /// the batch fail in Storage instead.</summary>
+    internal sealed record CommitTrigger(Func<IReadOnlyList<StorageWrite>, bool> Matches, bool After, bool Fail = false);
+
+    /// <summary>Whether a checkpoint fails a batch in Storage instead of killing at it.</summary>
+    internal static bool Fails(string checkpoint) => checkpoint.EndsWith("-failed", StringComparison.Ordinal);
 
     /// <summary>Opens a backend the way a host (<c>pisharp durable --continue</c>) does: no special recovery steps.</summary>
     internal static async Task<IStorage> OpenStorage(string backend, string path) => backend switch
@@ -158,6 +171,11 @@ internal static class CrashScenarios
     internal static CommitTrigger? Trigger(string scenario, string checkpoint) => (scenario, checkpoint) switch
     {
         ("chat", "answer-before") => new(StopAnswer, false),
+        ("chat", "answer-failed") => new(StopAnswer, false, Fail: true),
+        ("tool-unsafe", "intent-failed") => new(ToolIntent, false, Fail: true),
+        ("tool-unsafe", "result-failed") => new(ToolResultEntry, false, Fail: true),
+        ("followup", "first-answer-failed") => new(StopAnswer, false, Fail: true),
+        ("submit", "admit-failed") => new(Admission("r1"), false, Fail: true),
         ("chat", "answer-after") => new(StopAnswer, true),
         ("tool-unsafe" or "tool-safe", "intent-after") => new(ToolIntent, true),
         ("tool-unsafe", "result-after") => new(ToolResultEntry, true),
@@ -293,11 +311,44 @@ internal static class CrashScenarios
             var gate = new CrashGate(checkpoint);
             var workDir = Path.GetDirectoryName(Path.GetFullPath(path))!;
             var storage = await OpenStorage(backend, path);
-            if (Trigger(scenario, checkpoint) is { } trigger) storage = new CrashStorage(storage, trigger.Matches, trigger.After, checkpoint);
+            if (Trigger(scenario, checkpoint) is { } trigger) storage = new CrashStorage(storage, trigger.Matches, trigger.After, checkpoint, trigger.Fail);
             var setup = BuildSetup(scenario, checkpoint, gate, workDir);
             var opened = await OpenChat(storage, setup);
             var (harness, root) = (opened.Harness, opened.Root);
             harness.Resume();
+            try
+            {
+                await RunScenarioAsync(scenario, checkpoint, gate, harness, root);
+                await harness.WaitForIdleAsync(Ctx);
+            }
+            catch (Exception error) when (Fails(checkpoint) && error is SessionFailedException or IOException)
+            {
+                // The failing batch failed the Session: the call that hit it got the storage error, later ones SessionFailed.
+            }
+            if (Fails(checkpoint))
+            {
+                var end = await harness.Closed.WaitAsync(TimeSpan.FromSeconds(30));
+                if (end.Reason != SessionEndReason.Failed || end.Error?.Message != CrashStorage.Failure(checkpoint).Message)
+                    throw new InvalidOperationException($"The Harness ended with {end.Reason} ({end.Error?.Message}), not with the injected failure");
+                CrashGate.Emit("CHECKPOINT " + checkpoint);
+                await CrashGate.Never();
+            }
+            CrashGate.Emit("IDLE");
+            await CrashGate.Never();
+            return 2;
+        }
+        catch (Exception error)
+        {
+            Console.Error.WriteLine(error);
+            CrashGate.Emit("ERROR " + error.GetType().Name + ": " + error.Message.ReplaceLineEndings(" "));
+            return 1;
+        }
+    }
+
+    /// <summary>The scenario's own steps in the child, up to the point where it only waits for its run.</summary>
+    private static async Task RunScenarioAsync(string scenario, string checkpoint, CrashGate gate, IHarness harness, IConversation root)
+    {
+        {
             switch (scenario)
             {
                 case "chat":
@@ -333,16 +384,6 @@ internal static class CrashScenarios
                 default:
                     throw new ArgumentException("Unknown crash scenario " + scenario);
             }
-            await harness.WaitForIdleAsync(Ctx);
-            CrashGate.Emit("IDLE");
-            await CrashGate.Never();
-            return 2;
-        }
-        catch (Exception error)
-        {
-            Console.Error.WriteLine(error);
-            CrashGate.Emit("ERROR " + error.GetType().Name + ": " + error.Message.ReplaceLineEndings(" "));
-            return 1;
         }
     }
 }

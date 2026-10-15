@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-generation.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-generation.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage (ControlledStorage over memory where it inspects commits). harness.generation.* does
 //   the same; harness.generation.jsonl.* and harness.generation.sqlite.* rerun every storage-backed case on a fresh JSONL directory and a
@@ -583,12 +583,15 @@ internal static class GenerationTests
     {
         yield return Case(prefix + "resolves-settings-over-the-built-in-defaults", () =>
         {
+            // documentRetentionMs is expect.any(Number) upstream: a suite pass with retention 0 changes the default.
+            var resolved = SettingsJson(Agents.ResolveSettings(null));
+            Check(resolved["documentRetentionMs"] is JsonNumberValue, "documentRetentionMs is a number");
             SameJson("""
                 {"stream":{},"retry":{"enabled":true,"maxRetries":3,"baseDelayMs":2000,"maxAgentDelayMs":60000},
                  "compaction":{"enabled":true,"reserveTokens":16384,"keepRecentTokens":20000,"backgroundTokens":32768},
                  "progress":{"partialIntervalMs":100,"outputIntervalMs":100},"toolExecution":"parallel","steeringMode":"one-at-a-time",
                  "followUpMode":"one-at-a-time","contextRetentionMs":600000}
-                """, SettingsJson(Agents.ResolveSettings(null)), "defaults");
+                """, JsonObjectValue.From(resolved.Where(property => property.Key != "documentRetentionMs")), "defaults");
             MatchJson("""{"retry":{"enabled":false,"maxRetries":3,"baseDelayMs":2000},"compaction":{"enabled":true,"backgroundTokens":0}}""",
                 SettingsJson(Agents.ResolveSettings(new HarnessSettings
                 {
@@ -624,6 +627,7 @@ internal static class GenerationTests
             ("steeringMode", settings.SteeringMode == QueueMode.All ? "all" : "one-at-a-time"),
             ("followUpMode", settings.FollowUpMode == QueueMode.All ? "all" : "one-at-a-time"),
             ("contextRetentionMs", settings.ContextRetentionMs),
+            ("documentRetentionMs", settings.DocumentRetentionMs),
         };
         return Obj([.. properties]);
     }

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/util.ts. Waiters are guarded by a short lock, since .NET
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/util.ts. Waiters are guarded by a short lock, since .NET
 // callers may add and resolve from any thread; a waiter's task completes asynchronously (a promise's continuation is a later microtask),
 // so resolving one never runs its caller's code under the lock or inline in a Session listener.
 using PiSharp.Durable.Chord;
@@ -93,6 +93,8 @@ internal static class HarnessUtil
         return items;
     }
 
-    /// <summary>Upstream <c>closedError()</c>.</summary>
-    public static InvalidOperationException ClosedError() => new("Harness is closed");
+    /// <summary>What a closed Harness rejects with: <see cref="SessionFailedException"/> with the cause when it closed because the Session
+    /// failed (upstream <c>closedError(session)</c>).</summary>
+    public static InvalidOperationException ClosedError(Session session) =>
+        session.Failure is { } failure ? new SessionFailedException(failure) : new InvalidOperationException("Harness is closed");
 }
