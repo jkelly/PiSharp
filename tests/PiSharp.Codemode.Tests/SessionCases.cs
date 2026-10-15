@@ -15,7 +15,11 @@ using PiSharp.Extensions.Mcp.Runtime;
 // nested calls through ctx.executeTool, codemode-store entries on the branch) and test/suite/agent-session-codemode.test.ts.
 internal static partial class Program
 {
-    private sealed record Seen(string Url, string? Body);
+    private sealed record Seen(string Url, string? Body)
+    {
+        /// <summary>When the request arrived (Stopwatch timestamp).</summary>
+        public long At { get; init; } = System.Diagnostics.Stopwatch.GetTimestamp();
+    }
 
     private sealed class Endpoint(params Func<HttpResponseMessage>[] script) : HttpMessageHandler
     {
@@ -53,6 +57,9 @@ internal static partial class Program
     {
         public readonly ConcurrentQueue<(string Call, McpInvocationIdentity? Identity)> Calls = new();
         public int Closes;
+        /// <summary>The configured server name, and when tools/list was answered (Stopwatch timestamp; 0 when it was not).</summary>
+        public string Name = "";
+        public long ListedAt;
         public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask ConfigureRootsAsync(JsonData roots, CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask NotifyAsync(string method, JsonData? parameters, CancellationToken token) => ValueTask.CompletedTask;
@@ -64,6 +71,7 @@ internal static partial class Program
                     if (initializeDelay > TimeSpan.Zero) await Task.Delay(initializeDelay, token);
                     return (JsonData.Parse("""{"protocolVersion":"2025-11-25","serverInfo":{"name":"docs","version":"1"},"capabilities":{"tools":{}},"instructions":"Search and fetch the docs."}"""));
                 case "tools/list":
+                    Interlocked.CompareExchange(ref ListedAt, System.Diagnostics.Stopwatch.GetTimestamp(), 0);
                     return (JsonData.Parse("""
                         {"tools":[
                           {"name":"search","description":"Search the documentation.","inputSchema":{"type":"object","properties":{"query":{"type":"string"}}}},
@@ -138,9 +146,11 @@ internal static partial class Program
         public readonly ConcurrentBag<DocsServer> Servers = [];
         public TaskCompletionSource Connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TimeSpan InitializeDelay;
+        /// <summary>Per-server initialize delays, overriding <see cref="InitializeDelay"/>.</summary>
+        public readonly ConcurrentDictionary<string, TimeSpan> Delays = new(StringComparer.Ordinal);
         public McpSessionHost Host() => new(Agent, Path.Combine(root, "home"), () => [KeyValuePair.Create("PATH", root)])
         {
-            CreateChannel = entry => (actual, token) => { var server = new DocsServer(InitializeDelay); Servers.Add(server); return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server); },
+            CreateChannel = entry => (actual, token) => { var server = new DocsServer(Delays.TryGetValue(entry.Name, out var delay) ? delay : InitializeDelay) { Name = entry.Name }; Servers.Add(server); return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server); },
             ObserveBackgroundConnection = report => { if (report.Failure is null) Connected.TrySetResult(); else Connected.TrySetException(report.Failure); },
             CodemodeModels = () => null
         };

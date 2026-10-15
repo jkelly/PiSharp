@@ -97,9 +97,12 @@ speaking upstream's protocol (start, call, output, done, crash, result, plus `re
 
 - `codemode` is registered with every CLI session, inactive, as upstream registers it: `--tools`, `--exclude-tools` and
   `defaultTools` select it, also with `--no-mcp`. Codemode MCP servers activate it unless `autoEnableCodemode` is false.
-- `reachesTools`: as upstream, a script waits inside its call for the servers it may reach: the servers whose namespace one of
-  its words contains, or every server when it uses `searchTools`, `describeNamespace`, `describeTool` or `ALL_TOOLS`
-  (`McpDiscoveryToolIdentity.CodemodeReach`); prompts do not wait. A server that connects meanwhile has its tools published during the run, and the
+- `reachesTools`: as upstream's MCP `tool_call` handler, before a script runs the session waits for the servers it may reach:
+  the servers whose namespace one of its words contains, or every server when it uses `searchTools`, `describeNamespace`,
+  `describeTool` or `ALL_TOOLS` (`McpDiscoveryToolIdentity.CodemodeReach`); prompts do not wait. The wait is session-wide
+  (`McpToolCallHooks`, composed over the session's tool hooks after the extensions' `tool_call` handlers), so any tool that
+  declares `reachesTools` takes part, such as another extension's `codemode`, which the MCP integration also activates for
+  `codemode` servers when the built-in one is disabled. A server that connects meanwhile has its tools published during the run, and the
   script's nested calls reach them through the invoker of that catalog until the run's next request declares it.
 
 ## Not ported

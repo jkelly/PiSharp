@@ -22,12 +22,11 @@ internal static class McpCodemode
     internal const string Name = CodemodeToolDefinition.Name, RegistrationId = "codemode";
 
     /// <summary>A fresh definition for one generation; each binds to exactly one attachment.</summary>
-    internal static McpDiscoveryExecutableDefinition Create(CodemodeMode mode, int? inlineBudget, Func<ICodemodeModelRuntime?> models, bool defaultActive = true,
-        Func<Func<PiSharp.Extensions.Mcp.Configuration.McpServerEntry, bool>, CancellationToken, Task>? waitForServers = null)
+    internal static McpDiscoveryExecutableDefinition Create(CodemodeMode mode, int? inlineBudget, Func<ICodemodeModelRuntime?> models, bool defaultActive = true)
     {
         var withModels = true;
         return McpDiscoveryExecutableDefinition.CreateCodemode(RegistrationId, CodemodeToolDefinition.CreateDescription([], withModels),
-            (code, attachment, invocation, token) => new(ExecuteAsync(code, attachment, invocation, models, waitForServers, token)),
+            (code, attachment, invocation, token) => new(ExecuteAsync(code, attachment, invocation, models, token)),
             loadout => CodemodeToolDefinition.PrepareLoadout(loadout, mode, withModels, inlineBudget, tool => tool.OutputSchema ?? OutputSchema(tool.Name, tool.Namespace)),
             descriptor => descriptor with
             {
@@ -56,16 +55,10 @@ internal static class McpCodemode
         name.StartsWith("mcp__", StringComparison.Ordinal) && toolNamespace?.Name.StartsWith("mcp__", StringComparison.Ordinal) == true;
 
     private static async Task<JsonData> ExecuteAsync(string code, AgentSessionAttachment attachment, IExtensionToolInvocationContext invocation,
-        Func<ICodemodeModelRuntime?> models, Func<Func<PiSharp.Extensions.Mcp.Configuration.McpServerEntry, bool>, CancellationToken, Task>? waitForServers,
-        CancellationToken token)
+        Func<ICodemodeModelRuntime?> models, CancellationToken token)
     {
-        // index.ts tool_call: a tool that reaches other tools waits for the servers it may reach (codemode's reachesTools: the servers
-        // its script names, or every server when it searches or enumerates tools), so their tools are registered before it runs.
-        if (waitForServers is not null)
-        {
-            var reach = PiSharp.Extensions.Mcp.Discovery.McpDiscoveryToolIdentity.ScriptReach(code);
-            await waitForServers(entry => ReachesServer(reach, entry.Name), token).ConfigureAwait(false);
-        }
+        // index.ts tool_call: before the script runs, the session's MCP tool_call handler waited for the servers its reachesTools names
+        // (the servers its script names, or every server when it searches or enumerates tools; see McpToolCallHooks).
         var host = new Host(attachment.Session, invocation, models);
         try
         {
