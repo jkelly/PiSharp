@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts (06-harness.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/00-conversation.ts through 05-watches.ts (06-harness.ts
 // through 13-recovery.ts are in ExamplesHarness.cs; 14-chat.ts and 15-system-prompt.ts are in ExamplesChat.cs; 16-real-model.ts, 18-print.ts,
 // 26-coding-agent.ts, 27-plan-mode.ts and 28-reviewer.ts are in ExamplesAgents.cs; 17-coding-tools.ts, 29-sandbox-per-conversation.ts and
 // 30-tool-override.ts are in ExamplesTools.cs; 19-json.ts is in ExamplesJson.cs; 20-inbox.ts is in ExamplesInbox.cs; 21-late-join.ts is in

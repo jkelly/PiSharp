@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Examples;
 
-// Milestone M0 (decision 0005): samples/Durable.Examples ports Pi v1.1.0 packages/durable/test/examples 00-05; P8 adds 14-chat and
+// Milestone M0 (decision 0005): samples/Durable.Examples ports Pi packages/durable/test/examples 00-05; P8 adds 14-chat and
 // 15-system-prompt, with a scripted model in place of pi-ai's faux provider. The printed values are the ones the pinned upstream prints
 // under Node (node --conditions=source --experimental-strip-types test/examples/<name>.ts), as JSON in place of util.inspect; message
 // timestamps come from the clock, so both sides compare them as <time>. The file backends also reopen each example's storage in a new
@@ -25,6 +25,8 @@ using PiSharp.Durable.Examples;
 // The comparison leaves out such ops lines (JsonModeOpsLines checks that the rest has as many lines as the v1.1.0 capture) and expects
 // the message_start of a pending message to carry the message its message_end carries, as every completed message_start of both captures
 // does (JsonModeEventsLines checks that identity on the capture's other assistant message_start lines).
+// Work list area h ran every example of the pinned Pi v1.2.0 under Node without API keys: each prints what is pinned here, but for
+// 23-subagent-background (see there).
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -176,6 +178,9 @@ internal static partial class Program
         "  assistant: 2, 3, and 5.",
         SubagentAnswer,
         "== 23-subagent-background",
+        // Pi v1.2.0's 23-subagent-background.ts, unchanged since v1.1.0, still returns its tool replies as `content`, which v1.2.0 renamed to
+        // `output`, so under v1.2.0 every reply is empty (Node prints "  → " and "OK. "). The C# tool returns them as Output, as the example
+        // means and as v1.1.0 ran it (an intentional difference, decision 0005).
         // Upstream prints a blank line before each message and the restart; the comparison skips blank lines.
         "> Start a subagent named reader that summarizes Moby Dick.",
         "  subagent spawn reader \"Summarize the plot of Moby Dick.\"",

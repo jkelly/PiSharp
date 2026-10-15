@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): the ops corpus and the reverse direction. Captured upstream evidence, like CompatCases.cs.
-// - compat.ops.document-N: Fixtures/upstream-sessions/ops-corpus.json holds seeded edits that tools/DurableFixtures/ops-corpus.mjs made through
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the ops corpus and the reverse direction. Captured upstream evidence, like CompatCases.cs.
+// - compat.ops.document-N: Fixtures/v1.2.0/upstream-sessions/ops-corpus.json holds seeded edits that tools/DurableFixtures/ops-corpus.mjs made through
 //   the pinned Chord tracker, with the operations it emitted and each resulting value. PiSharp's DeltaApply replays upstream's operations to
 //   upstream's value; PiSharp's tracker, making the same edits, reaches the same value, emits the same operations, and its operations replay
 //   on upstream's base to that value. Values compare by their JSON text, key order included.

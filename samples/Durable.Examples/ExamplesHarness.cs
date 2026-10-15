@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/06-harness.ts, 07-configuration.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/06-harness.ts, 07-configuration.ts,
 // 08-harness-conversations.ts, 09-context.ts, 10-registry-reload.ts, 11-extension-state.ts, 12-tasks.ts and 13-recovery.ts.
 // Each prints what upstream's console.log prints, with JSON in place of util.inspect (so a property whose value is undefined is absent).
 // Upstream's createModels() with no provider is EmptyDurableModels; 11's faux provider is ScriptedModels. On a file backend, 06, 07, 11 and

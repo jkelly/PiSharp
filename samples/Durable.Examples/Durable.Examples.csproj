@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Decision 0005: Pi v1.1.0 packages/durable/test/examples 00-31 (00-05 milestone M0; the rest P8-P13) on memory, JSONL and SQLite storage. -->
+  <!-- Decision 0005: Pi packages/durable/test/examples 00-31 (00-05 milestone M0; the rest P8-P13; synced to v1.2.0 in work list area h) on memory, JSONL and SQLite storage. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>Durable.Examples</AssemblyName>

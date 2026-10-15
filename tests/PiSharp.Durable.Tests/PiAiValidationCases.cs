@@ -1,6 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): differential cases for PiSharp.Durable's internal copy of packages/ai/src/utils/validation.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): differential cases for PiSharp.Durable's internal copy of packages/ai/src/utils/validation.ts
 // (Internal/PiAi/Validation.cs, copied from PiSharp.Agent's ToolArgumentValidation because the core does not reference PiSharp.Agent). There
-// is no upstream test file: Fixtures/piai-validation.upstream.json holds what the pinned pi-ai's validateToolArguments returns or throws under
+// is no upstream test file: Fixtures/v1.2.0/piai-validation.upstream.json holds what the pinned pi-ai's validateToolArguments returns or throws under
 // Node for TypeBox-built schemas and their plain JSON copies (printed by Fixtures/capture-piai-validation.mjs). The first case compares the
 // copy with it; the second compares the copy with PiSharp.Agent's port on the same inputs (the test project reaches PiSharp.Agent through
 // PiSharp.Durable.Tools).
@@ -19,7 +19,7 @@ internal static partial class Program
 internal static class PiAiValidationTests
 {
     private static readonly Lazy<JsonArrayValue> Upstream = new(() => (JsonArrayValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(Program.RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "piai-validation.upstream.json"))));
+        File.ReadAllText(Path.Combine(Program.RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "piai-validation.upstream.json"))));
 
     private static IEnumerable<(string Schema, ToolSchemaOrigin Origin, string Arguments, JsonObjectValue Row)> Rows() =>
         Upstream.Value.Cast<JsonObjectValue>().Select(row => (row["schema"].ToJson(),

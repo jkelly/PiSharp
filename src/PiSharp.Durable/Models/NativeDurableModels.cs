@@ -86,7 +86,7 @@ public sealed record NativeDurableModelsOptions
 /// (anthropic-messages), and <c>TimeoutMs</c>, which this adapter enforces as an idle deadline (no event for that long ends the request
 /// with <c>error</c> "Request timed out."). <c>MaxRetries</c> and <c>MaxRetryDelayMs</c> reach google-generative-ai only; the other
 /// native transports make one attempt, so durable generation retries own retrying. Unsupported: <c>Transport</c> (only openai-codex
-/// reads it upstream), other <c>Metadata</c> fields (no upstream provider reads them) and <c>Deferred</c> (no pi-ai 1.1.0 provider
+/// reads it upstream), other <c>Metadata</c> fields (no upstream provider reads them) and <c>Deferred</c> (no pi-ai 1.2.0 provider
 /// implements deferred responses; the request runs in the foreground, as upstream providers without deferred support do). Not mapped:
 /// pi-ai <c>clampMaxTokensToContext</c> (the cap is not reduced to the context room the transcript leaves).</para>
 /// </remarks>
@@ -438,7 +438,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         return final ?? throw new InvalidOperationException("The stream ended without a terminal event.");
     }
 
-    /// <summary>pi-ai <c>streamDeferred</c>: no PiSharp.AI transport implements deferred responses (nor does any pi-ai 1.1.0 provider), so the
+    /// <summary>pi-ai <c>streamDeferred</c>: no PiSharp.AI transport implements deferred responses (nor does any pi-ai 1.2.0 provider but the faux test provider), so the
     /// stream ends with an error message naming the gap, as pi-ai's does for a provider without <c>fetchDeferred</c>.</summary>
     public async IAsyncEnumerable<StreamEvent> StreamDeferred(DurableModel model, DurableDeferredHandle handle,
         [EnumeratorCancellation] CancellationToken cancellationToken)

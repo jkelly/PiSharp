@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/models.ts (the Models interface) and packages/ai/src/types.ts (Model,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (the Models interface) and packages/ai/src/types.ts (Model,
 // SimpleStreamOptions, DeferredHandle), reduced to what packages/durable uses: getModel, streamSimple, completeSimple, streamDeferred,
 // fetchDeferred and cancelDeferred. Catalog refresh, auth and login, images and classifiers stay with the host.
 //

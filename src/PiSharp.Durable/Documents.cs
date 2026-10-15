@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/documents.ts, plus the document definition and token types of
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/documents.ts, plus the document definition and token types of
 // packages/durable/src/types.ts (spec §3.1, §3.6). Upstream's defineDoc/defineDocFamily overloads pick the token type from the definition's
 // scope and history literals; here one factory per scope returns that token type, so the Session's typed access overloads (P3) are
 // selected by token type exactly as upstream's are. Document values are JsonObjectValue; upstream's static value type T is not carried.
