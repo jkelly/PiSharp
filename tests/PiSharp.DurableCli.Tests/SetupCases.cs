@@ -6,6 +6,7 @@ using PiSharp.Cli.Prompts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
+using PiSharp.Durable.Tools;
 using PiSharp.Durable.Tools.Env;
 
 internal static partial class Program
@@ -44,6 +45,48 @@ internal static partial class Program
                 var result = await read.Execute(JsonValue.Object([new("path", "a.bmp")]), new ReadApi(new LocalExecutionEnv(directory)), DurableContext.Background);
                 Equal("image/png", ((JsonStringValue)((JsonObjectValue)result.Output![0])["mimeType"]).Value, "converted");
                 Equal("Read image file [image/png]. Converted from image/bmp to image/png.", result.Diagnostics!.Value[0].Message, "diagnostic");
+            }
+            finally { Directory.Delete(directory, recursive: true); }
+        }),
+        // Durable work list area l: pisharp durable installs pi-durable 1.2.0's tool_search as the coding agent registers it, switched off
+        // until a tool is deferred. It defers none, so the model is offered the tools it was offered before.
+        Case("setup.tool-search.installed-off-until-a-tool-is-deferred", () =>
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "pisharp-durable-cli-tool-search-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var settings = PiSettings.FromObjects(new JsonObject());
+                var registry = DurableHarnessSetup.CreateCodingRegistry(settings, directory,
+                    new DurablePromptResources(directory, directory, new OriginalPromptDocumentation("", "", "")));
+                registry.Install(DurableSubagent.Extension);
+                var harnessSettings = DurableHarnessSetup.CreateHarnessSettings(settings, registry);
+                Agent Resolve() => Agents.ResolveAgent(null, registry.Snapshot(), Agents.ResolveSettings(harnessSettings), error => throw error);
+                static string Names(IEnumerable<ToolRegistration> tools) => string.Join(",", tools.Select(tool => tool.Name));
+
+                var installed = registry.Snapshot().GetExtension("tool-search");
+                Equal(ToolSearch.ToolName, Names(installed?.Tools ?? []), "tool_search installed");
+                var off = Resolve();
+                Equal("read,write,edit,bash,subagent", Names(off.Tools), "the tools offered without deferred tools");
+                Equal("coding-tools,pi-prompt,subagent", string.Join(",", off.Extensions.Select(extension => extension.Name)), "selected extensions");
+                Check(off.Deferred.IsEmpty, "nothing deferred");
+
+                // An extension with a deferred tool turns it on: the model is offered tool_search, which loads the deferred tool.
+                var lookup = Define.Tool(new ToolRegistration
+                {
+                    Name = "lookup_ticket",
+                    Description = "Looks up a ticket.",
+                    Deferred = true,
+                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult()),
+                });
+                var tickets = Define.Extension(new Extension { Name = "tickets", Tools = [lookup] });
+                registry.Install(tickets);
+                var on = Resolve();
+                Equal("read,write,edit,bash,tool_search,subagent", Names(on.Tools), "tool_search offered");
+                Equal("lookup_ticket", Names(on.Deferred), "the deferred tool");
+                // And off again once nothing is deferred.
+                registry.Uninstall(tickets);
+                Equal("read,write,edit,bash,subagent", Names(Resolve().Tools), "off again");
             }
             finally { Directory.Delete(directory, recursive: true); }
         }),

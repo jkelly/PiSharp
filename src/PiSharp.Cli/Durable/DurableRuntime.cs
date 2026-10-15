@@ -3,6 +3,9 @@
 // shown conversation's viewState() mirror plus the conversations, models, notices and (while the panel is open) the task graph; the
 // controller applies the TUI's requests one at a time. Upstream calls listeners with setImmediate after a burst of changes; here a thread-pool
 // work item does, so listeners run off the Harness's lines and must marshal to their own.
+// PiSharp-only since pi-durable 1.2.0 (decision 0005; durable work list area l): a failed Session (SessionFailedException, ISession.Closed
+// settling with SessionEnd.Failed) marks the view failed instead of leaving the TUI waiting, and failed compactions are reported through
+// pi.live.compactionFailure instead of from the task outcome.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Cli.Commands;
@@ -35,6 +38,9 @@ internal sealed record DurableRuntimeHost
     public IDurableModels? Streams { get; init; }
     /// <summary>The session lock's timing; null is upstream's.</summary>
     public PiLockOptions? Lock { get; init; }
+    /// <summary>Opens the session's storage from its <c>session.sqlite</c> path; null is <see cref="SqliteStorage.OpenAsync(string, SqliteStorageOptions?)"/> (tests
+    /// wrap it to fail on demand).</summary>
+    public Func<string, Task<IStorage>>? OpenStorage { get; init; }
 
     /// <summary>The host of a <c>pisharp durable</c> run.</summary>
     internal static DurableRuntimeHost FromPiHost(PiHost host) => new()
@@ -118,13 +124,15 @@ internal static partial class DurableRuntime
             var runtime = DurableHarnessSetup.ConfigureHarnessHttp(settings, host.LiveRuntime with { LlamaProvider = () => false },
                 host.GetEnvironment, host.SetEnvironment);
             models = await DurableModels.CreateAsync(runtime, host.Streams, cancellationToken).ConfigureAwait(false);
-            var harnessSettings = DurableHarnessSetup.CreateHarnessSettings(settings);
             var registry = DurableHarnessSetup.CreateCodingRegistry(settings, location.Cwd,
                 new DurablePromptResources(host.AgentDir, host.Home, PiSystemPrompt.Documentation(host.ApplicationDirectory)));
             registry.Install(DurableSubagent.Extension);
+            var harnessSettings = DurableHarnessSetup.CreateHarnessSettings(settings, registry);
 
             var reports = new DurableReports();
-            var storage = await SqliteStorage.OpenAsync(location.Database).ConfigureAwait(false);
+            var storage = host.OpenStorage is { } open
+                ? await open(location.Database).ConfigureAwait(false)
+                : await SqliteStorage.OpenAsync(location.Database).ConfigureAwait(false);
             harness = await Harness.OpenAsync(storage, new HarnessOptions
             {
                 Models = models,
@@ -210,6 +218,9 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private AttachedReplicatedState<ConversationView> conversation;
     private IDisposable unsubscribe;
     private IDisposable? unsubscribeCommits;
+    private IDisposable? unsubscribeClose;
+    /// <summary>Set when the Harness begins to close: ours, or a failed Session's.</summary>
+    private volatile bool ended;
     private AttachedReplicatedState<TaskGraph>? tasks;
     private IDisposable? unsubscribeTasks;
     private Task queue = Task.CompletedTask;
@@ -224,7 +235,17 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         this.conversation = conversation;
         state = new DurableView(new DurableSessionInfo(location.Id, location.Directory, location.Cwd), conversation.Value, [.. summaries],
             ModelSummaries(), []);
-        unsubscribe = conversation.Subscribe((value, _, _) => Update(view => view with { Conversation = value }));
+        state = WithShown(state, conversation.Value);
+        unsubscribe = conversation.Subscribe((value, _, _) => Update(view => WithShown(view, value)));
+    }
+
+    /// <summary>The view showing <paramref name="value"/>, a revision of the shown conversation, with its nested calls gathered; another
+    /// conversation's revision starts them afresh.</summary>
+    private static DurableView WithShown(DurableView view, ConversationView value)
+    {
+        var calls = view.Conversation.Conversation.Id == value.Conversation.Id ? view.NestedCalls ?? ImmutableSortedDictionary<long, DurableNestedCall>.Empty
+            : ImmutableSortedDictionary<long, DurableNestedCall>.Empty;
+        return view with { Conversation = value, NestedCalls = DurableNestedCall.Merge(calls, value) };
     }
 
     /// <summary>The label of a conversation in the switcher.</summary>
@@ -236,7 +257,15 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     {
         var view = await root.ViewStateAsync(Context).ConfigureAwait(false);
         var session = new DurableSession(location, envs, harness, models, settings, root, view, summaries);
-        reports.Attach(error => session.Notice(DurableNoticeLevel.Warning, error.Message));
+        // Since pi-durable 1.2.0 a storage error fails and closes the Harness (SessionFailed); the view then says so (durable work list area l).
+        // Close listeners run as the close begins, before the failed call's caller sees its error and before the failure is reported, so
+        // neither becomes a notice besides the failure.
+        session.unsubscribeClose = harness.SubscribeClose(() => session.ended = true);
+        _ = session.WatchClosedAsync();
+        reports.Attach(error =>
+        {
+            if (!session.ended) session.Notice(DurableNoticeLevel.Warning, error.Message);
+        });
         // Subagents appear as their conversations are created. A commit listener only records; it calls no Session API.
         session.unsubscribeCommits = harness.SubscribeCommits((publication, _) => session.OnCommit(publication));
         var saved = DurableRuntime.ModelOf(DurableRuntime.AgentOf(session.Current.Conversation));
@@ -332,7 +361,23 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         });
     }
 
-    private void Fail(Exception error) => Notice(DurableNoticeLevel.Error, error.Message);
+    /// <summary>A failed request becomes an error notice; one the failed session rejected marks the session failed instead, which the view
+    /// shows once.</summary>
+    private void Fail(Exception error)
+    {
+        if (error is SessionFailedException failed) MarkFailed(failed.Cause);
+        else if (!ended) Notice(DurableNoticeLevel.Error, error.Message);
+    }
+
+    private void MarkFailed(Exception cause) => Update(view => view.Failure is null ? view with { Failure = cause.Message } : view);
+
+    /// <summary>Marks the view failed when the Harness closes because its Session failed (<c>ISession.Closed</c> settles with
+    /// <see cref="SessionEndReason.Failed"/>). Our own close settles it with <see cref="SessionEndReason.Closed"/>.</summary>
+    private async Task WatchClosedAsync()
+    {
+        var end = await harness.Closed.ConfigureAwait(false);
+        if (end.Reason == SessionEndReason.Failed) MarkFailed(end.Error ?? new InvalidOperationException("unknown error"));
+    }
 
     private void OnCommit(CommitPublication publication)
     {
@@ -442,22 +487,12 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
                 case AbortedTaskOutcome:
                     Notice(DurableNoticeLevel.Info, "Compaction aborted.");
                     break;
-                default:
-                    var detail = outcome switch
-                    {
-                        FailedTaskOutcome failed => failed.Error.Message,
-                        FaultedTaskOutcome faulted => faulted.Error.Message,
-                        OrphanedTaskOutcome orphaned => orphaned.Reason,
-                        _ => "",
-                    };
-                    Notice(DurableNoticeLevel.Error, $"Compaction {Lower(outcome.Status.ToString())}: {detail}");
-                    break;
+                // Failed, faulted and orphaned compactions, manual or automatic, are recorded in pi.live.compactionFailure (pi-durable 1.2.0),
+                // which the TUI shows until a compaction produces a summary.
             }
         }
         catch (Exception error) { Fail(error); }
     }
-
-    private static string Lower(string name) => char.ToLowerInvariant(name[0]) + name[1..];
 
     /// <inheritdoc/>
     public async Task AbortAsync()
@@ -520,7 +555,7 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         conversation.Dispose();
         current = next;
         conversation = nextState;
-        unsubscribe = nextState.Subscribe((value, _, _) => Update(view => view with { Conversation = value }));
+        unsubscribe = nextState.Subscribe((value, _, _) => Update(view => WithShown(view, value)));
     });
 
     // ─── Close ──────────────────────────────────────────────────────────────
@@ -538,12 +573,15 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     {
         unsubscribe.Dispose();
         unsubscribeCommits?.Dispose();
+        unsubscribeClose?.Dispose();
         conversation.Dispose();
         CloseTasks();
         try
         {
-            // Close writes no outcome: a running turn resumes with --continue.
-            await harness.CloseAsync(Context).ConfigureAwait(false);
+            // Close writes no outcome: a running turn resumes with --continue. A failed session closed itself already; what its close
+            // rethrows is the failure the view shows.
+            try { await harness.CloseAsync(Context).ConfigureAwait(false); }
+            catch (Exception) when (harness.Closed is { IsCompleted: true, Result.Reason: SessionEndReason.Failed } || Current.Failure is not null) { }
             await envs.CleanupAsync(Context).ConfigureAwait(false);
             await models.DisposeAsync().ConfigureAwait(false);
         }

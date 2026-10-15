@@ -47,7 +47,20 @@ internal static class DurableMain
             await host.Stderr.FlushAsync(CancellationToken.None).ConfigureAwait(false);
             return 1;
         }
-        try { return await DurableTui.RunAsync(durable, cancellationToken).ConfigureAwait(false); }
+        int code;
+        string? failure;
+        try
+        {
+            code = await DurableTui.RunAsync(durable, cancellationToken).ConfigureAwait(false);
+            failure = durable.View.Current.Failure;
+        }
         finally { await durable.DisposeAsync().ConfigureAwait(false); }
+        // The TUI showed it on its screen, which is gone now (PiSharp-only, pi-durable 1.2.0's SessionFailed).
+        if (failure is not null)
+        {
+            await host.Stderr.WriteLineAsync(DurableFailure.Message(failure)).ConfigureAwait(false);
+            await host.Stderr.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        return code;
     }
 }

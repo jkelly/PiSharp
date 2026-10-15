@@ -61,7 +61,9 @@ internal static partial class CodemodeRenderers
         _ => "undefined"
     };
 
-    private static string FormatCall(JsonNode? call, Theme theme, bool expanded)
+    /// <summary>One nested call's row: status icon, name, arguments, duration, cost, and the error when expanded. Internal for `pisharp durable`'s
+    /// nested call rows (feature/pi-durable).</summary>
+    internal static string FormatCall(JsonNode? call, Theme theme, bool expanded)
     {
         var rawArgs = ToolJson.GetString(call, "args") ?? "";
         var args = !expanded && rawArgs.Length > CollapsedArgsChars ? rawArgs[..(CollapsedArgsChars - 3)] + "..." : rawArgs;
