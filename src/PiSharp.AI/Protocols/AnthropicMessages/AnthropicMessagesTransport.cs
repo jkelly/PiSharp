@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (stream event mapping,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/anthropic-messages.ts (stream event mapping,
 // providerThinkingLevel and the anthropic_input_transformations diagnostic).
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -31,6 +31,8 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
 {
     private readonly Func<ChatRequest, CancellationToken, IAsyncEnumerable<JsonData>> _source;
     private readonly AnthropicMessagesOptions _options;
+    /// <summary>Diagnostics the invocation's source recorded before its response (the preferred strict tool fallback).</summary>
+    internal AnthropicRequestDiagnostics? RequestDiagnostics { get; init; }
     public AnthropicMessagesTransport(Func<ChatRequest, CancellationToken, IAsyncEnumerable<JsonData>> source,
         AnthropicMessagesOptions? options = null)
     {
@@ -72,7 +74,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request); cancellationToken.ThrowIfCancellationRequested();
-        var state = new State(request, _options);
+        var state = new State(request, _options, RequestDiagnostics);
         IAsyncEnumerator<JsonData>? enumerator = null; AnthropicMessagesFailure? failure = null;
         try { enumerator = (_source(request, cancellationToken) ?? throw Protocol()).GetAsyncEnumerator(cancellationToken); }
         catch (Exception) { failure = cancellationToken.IsCancellationRequested ? AnthropicMessagesFailure.Cancelled : AnthropicMessagesFailure.SourceFailed; }
@@ -146,6 +148,8 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
     private sealed partial class State
     {
         private readonly AnthropicMessagesOptions _options;
+        private readonly AnthropicRequestDiagnostics? _requestDiagnostics;
+        private int _syncedDiagnostics;
         private readonly ImmutableArray<string> _currentToolNames;
         private AnthropicTokenRates _rates;
         private readonly AssistantStreamReducer _reducer;
@@ -166,7 +170,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private string? _stopErrorMessage;
         internal string? SourceMessage;
         public StreamStarted Start { get; }
-        public State(ChatRequest request, AnthropicMessagesOptions options)
+        public State(ChatRequest request, AnthropicMessagesOptions options, AnthropicRequestDiagnostics? requestDiagnostics = null)
         {
             if (request.Model is null || request.Model.Api != "anthropic-messages" ||
                 string.IsNullOrWhiteSpace(request.Model.Id) || string.IsNullOrWhiteSpace(request.Model.Provider)) throw Protocol();
@@ -174,8 +178,9 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             _options = options; _rates = options.Rates ?? new();
             _currentToolNames = options.OAuthToolNames ? CurrentTools(request, options) : [];
             if (options.ProviderThinkingLevel is { } level) _properties = _properties.Set("providerThinkingLevel", TextData(level));
+            _requestDiagnostics = requestDiagnostics; SyncDiagnostics();
             Start = new(new(request.Model.Api, request.Model.Provider, request.Model.Id, request.Timestamp, [], TokenUsage.Zero, StopReason.Pending,
-                options.ProviderThinkingLevel is null ? null : _properties));
+                options.ProviderThinkingLevel is null && _syncedDiagnostics == 0 ? null : _properties));
             _reducer = new(Start.Partial, new(options.MaximumContentSlots, options.MaximumContentCharacters)); _reducer.Apply(Start);
         }
         private string ResponseToolName(string wireName)
@@ -214,9 +219,17 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             }
             return order.ToImmutableArray();
         }
+        // Upstream appendAssistantMessageDiagnostic adds each diagnostic to the output when it occurs, before the response's own fields.
+        private void SyncDiagnostics()
+        {
+            var items = _requestDiagnostics?.Items;
+            if (items is null || items.Count == _syncedDiagnostics) return;
+            _syncedDiagnostics = items.Count;
+            _properties = _properties.Set("diagnostics", JsonData.Parse("[" + string.Join(",", items.Select(item => item.ToString())) + "]"));
+        }
         public List<StreamEvent> Process(JsonData data)
         {
-            if (data is null) throw Protocol(); var raw = data.ToString();
+            if (data is null) throw Protocol(); SyncDiagnostics(); var raw = data.ToString();
             if (++_events > _options.MaximumEvents || raw.Length > _options.MaximumEventCharacters ||
                 raw.Length > _options.MaximumInputCharacters - _inputCharacters) throw Limit();
             _inputCharacters += raw.Length;
@@ -355,6 +368,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 else if (_reason == StopReason.Error) failure = AnthropicMessagesFailure.ProviderError;
                 else if (_slots.Values.Any(slot => !slot.Ended)) failure = AnthropicMessagesFailure.MalformedStream;
             }
+            SyncDiagnostics();
             var snapshot = _reducer.Snapshot();
             // Signatures observed before an abort are retained in the failed message without inventing content ends.
             var content = snapshot.Content.ToBuilder();
@@ -382,7 +396,10 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 }
                 if (failure is null)
                 {
-                    var diagnostics = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "anthropic_input_transformations",
+                    // Appended after any diagnostic recorded earlier in the request (the preferred strict tool fallback).
+                    var diagnostics = properties.TryGet("diagnostics", out var earlier) && earlier is not null
+                        ? System.Text.Json.Nodes.JsonNode.Parse(earlier.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsArray() : [];
+                    diagnostics.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = "anthropic_input_transformations",
                         ["timestamp"] = _options.Clock.GetUtcNow().ToUnixTimeMilliseconds(),
                         ["details"] = new System.Text.Json.Nodes.JsonObject { ["transformations"] = transformations } });
                     properties = properties.Set("diagnostics", JsonData.Parse(diagnostics.ToJsonString()));

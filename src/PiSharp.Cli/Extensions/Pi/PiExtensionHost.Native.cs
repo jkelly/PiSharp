@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts (loadExtensions: every path in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (loadExtensions: every path in
 // order, a failure recorded and the next path loaded) and packages/coding-agent/src/core/agent-session.ts (reload, _buildRuntime:
 // the runner over the reloaded extensions). The native C# extensions of the run are PiSharp's own (owner decision 10).
 using System.Collections.Immutable;

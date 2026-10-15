@@ -1,5 +1,5 @@
 // proper-lockfile 4.1.2 (MIT) lib/lockfile.js (lockSync's acquireLock, isLockStale and removeLock), as Pi
-// abe508e1b89912adde45528136c3221eb69acdd7 (MIT) packages/coding-agent uses it in core/settings-manager.ts and core/project-trust.ts:
+// 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT) packages/coding-agent uses it in core/settings-manager.ts and core/project-trust.ts:
 // lockSync with ten attempts 20 ms apart, stale after 10 s. PiSettings', InteractiveSettings' and PiProjectTrust's locks take their
 // acquisition step from here.
 using System.ComponentModel;

@@ -1,5 +1,5 @@
 // highlight.js 10.7.3 (BSD-3-Clause) differential-test corpus builder for PiSharp's native C# port
-// (Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/utils/syntax-highlight.ts).
+// (Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/syntax-highlight.ts).
 //
 // Usage: node build-corpus.mjs <corpus-src dir> <highlight.js package dir> <out hljs-corpus.json>
 //

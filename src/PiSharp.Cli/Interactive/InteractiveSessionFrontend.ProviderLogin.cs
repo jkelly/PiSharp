@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/interactive/interactive-mode.ts (/login for
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/interactive-mode.ts (/login for
 // every provider: handleLoginCommand, startProviderLogin, showLoginAuthTypeSelector, showLoginProviderSelector, getLoginProviderOptions,
 // loginProvider, showAuthPrompt, notifyAuthDialog, completeProviderAuthentication), components/oauth-selector.ts (labels and status)
 // and components/login-dialog.ts (showAuth, showDeviceCode, showWaiting, showInfo, showProgress, showPrompt, showManualInput).

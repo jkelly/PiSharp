@@ -101,6 +101,39 @@ internal static partial class Program
             McpDiagnostics(rpc.Error.ToString()), "one report after all settled");
     });
 
+    // index.ts startConnection/isCurrent and mcp_servers_change: a server whose connection is closed while it still connects (here an
+    // extension unregisters it; the session's shutdown, which stops the servers concurrently with their connections, does the same)
+    // drops the attempt's result. reportProblems lists only the current servers, so the closed attempt's failure is never reported.
+    private static Task ClosedWhileConnecting() => WithRoot("closed-connecting",
+        """{"mcpServers":{"docs":{"command":"docs-server","exposure":"direct"},"bad":{"command":5}}}""",
+        async fixture =>
+    {
+        var initializing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.HeldUntilClosed["late"] = initializing;
+        var host = fixture.Host();
+        host.Registrations.Register("extension-owner", "late", PiSharp.Contracts.JsonData.Parse("""{"command":"late-server","exposure":"deferred"}"""));
+        var global = Path.Combine(fixture.Agent, "mcp.json");
+        await using var rpc = new Rpc(Args(fixture.Root, "new-memory"), new Endpoint(), host);
+        Check(await Task.WhenAny(initializing.Task, rpc.Completion, Task.Delay(TimeSpan.FromSeconds(30))) == initializing.Task, "late started connecting; " + rpc.Error);
+        host.Registrations.Unregister("extension-owner", "late");
+        // reportProblems runs once every background server settled; the config error makes it report.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (!McpDiagnostics(Snapshot(rpc.Error)).Any(line => line.StartsWith("MCP servers need attention", StringComparison.Ordinal)))
+        {
+            if (rpc.Completion.IsCompleted || DateTime.UtcNow > deadline) throw new TimeoutException("no report; " + Snapshot(rpc.Error));
+            await Task.Delay(20);
+        }
+        Check(fixture.Server("late").Closes > 0, "the late server's channel closed");
+        await rpc.Prompt("p1", "hello");
+        Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
+        Names([$"MCP servers need attention:\n  config: {global}: server \"bad\" needs either \"command\" (stdio) or \"url\" (streamable HTTP)"],
+            McpDiagnostics(rpc.Error.ToString()), "the closed attempt is not reported");
+        Check(fixture.Reports.All(report => report.Entry.Name != "late"), "no report of the closed attempt");
+    });
+
+    /// <summary>The diagnostics written so far (the host writes them from another thread).</summary>
+    private static string Snapshot(StringWriter writer) { try { return writer.ToString(); } catch (Exception) { return ""; } }
+
     // syncResourceTools: a direct server with resources registers the resource tools as direct, so the first request declares them,
     // and read_mcp_resource reads from the server.
     private static Task DirectResources() => WithRoot("resources-direct", DirectDocs, async fixture =>
@@ -111,8 +144,8 @@ internal static partial class Program
         await using (var rpc = new Rpc(Args(fixture.Root, "new-memory"), provider, fixture.Host()))
         {
             await rpc.Prompt("p1", "read the guide");
-            // describeState counts the resources the server listed when it connected.
-            Equal("connected · 1 tool · 1 resource · direct · global", (await fixture.Manager.Task).ServersMenu().Items.Single().Description, "state with resources");
+            // Pi 1.2.0 describeState: a server that offers resources shows "· resources" (they are not listed at connect).
+            Equal("connected · 1 tool · resources · direct · global", (await fixture.Manager.Task).ServersMenu().Items.Single().Description, "state with resources");
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
         }
         var requests = provider.Snapshot();

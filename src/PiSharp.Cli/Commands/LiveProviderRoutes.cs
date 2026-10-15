@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/model-runtime.ts (prepareRequest: auth resolved
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/model-runtime.ts (prepareRequest: auth resolved
 // before every request, a stored credential owns the provider), packages/ai/src/auth/resolve.ts, providers/amazon-bedrock.ts,
 // providers/openai-codex.ts, providers/github-copilot.ts (filterModels), providers/cloudflare-workers-ai.ts and
 // providers/cloudflare-ai-gateway.ts (resolveCloudflareModel).

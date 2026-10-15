@@ -1,4 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/codemode/src/runtime/worker.ts. One script in a fresh Jint engine:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/runtime/vm.ts (startVm, drain) and
+// packages/codemode/src/runtime/worker.ts. One script in a fresh Jint engine:
 // the prelude, the script, then settled tool results until the host ends it.
 using System.Collections.Concurrent;
 using System.Text.Json;

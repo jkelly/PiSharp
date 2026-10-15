@@ -1,6 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/core/tools/renderers/bash.ts.
-// Presentation for the shell tools. Date.now() and setInterval go through Time (a TimeProvider) so tests can drive the clock; the
-// interval's invalidate is posted to the synchronization context of the render that started it (the TUI loop).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/tools/renderers/bash.ts.
+// Presentation for the shell tools. The elapsed-time display is the shared tool timer of render-utils.ts (RenderUtils.StartToolTimer
+// and ToolTimerText); its clock is RenderUtils.Time, so tests can drive it.
 using System.Globalization;
 using System.Text.Json.Nodes;
 using PiSharp.Tui.Pi;
@@ -13,23 +13,8 @@ internal static class BashRenderers
     private const int BashPreviewLines = 5;
     public const int BashUpdateThrottleMs = 100;
 
-    /// <summary>The clock and timers of the elapsed-time display.</summary>
-    public static TimeProvider Time { get; set; } = TimeProvider.System;
-
-    private static double Now() => Time.GetUtcNow().ToUnixTimeMilliseconds();
-
-    internal static string FormatDuration(double ms)
-    {
-        var seconds = ms / 1000;
-        if (seconds < 60) return seconds.ToString("F1", CultureInfo.InvariantCulture) + "s";
-
-        var totalSeconds = (long)Math.Floor(seconds);
-        var minutes = totalSeconds / 60;
-        var remainder = totalSeconds % 60;
-        if (minutes < 60) return $"{minutes}m {remainder}s";
-
-        return $"{minutes / 60}h {minutes % 60}m {remainder}s";
-    }
+    /// <summary>The clock and timers of the elapsed-time display (the shared <see cref="RenderUtils.Time"/>).</summary>
+    public static TimeProvider Time { get => RenderUtils.Time; set => RenderUtils.Time = value; }
 
     private static string FormatShellCall(JsonNode? args, string prompt)
     {
@@ -41,7 +26,7 @@ internal static class BashRenderers
     }
 
     private static void RebuildBashResultRenderComponent(Container component, JsonObject result, ToolRenderResultOptions options, bool showImages,
-        double? startedAt, double? endedAt, double? durationMs)
+        string? timerText)
     {
         component.Clear();
 
@@ -85,64 +70,26 @@ internal static class BashRenderers
             component.AddChild(new Text("\n" + theme.Fg("warning", $"[{string.Join(". ", warnings)}]"), 0, 0));
         }
 
-        // A final result's recorded duration wins: it is monotonic and survives reloads. The renderer's own clock is the
-        // fallback for live progress and for results stored without one.
-        if (!options.IsPartial && durationMs is { } recorded)
-            component.AddChild(new Text("\n" + theme.Fg("muted", $"Took {FormatDuration(recorded)}"), 0, 0));
-        else if (startedAt is { } started)
-        {
-            var label = options.IsPartial ? "Elapsed" : "Took";
-            var endTime = endedAt ?? Now();
-            component.AddChild(new Text("\n" + theme.Fg("muted", $"{label} {FormatDuration(endTime - started)}"), 0, 0));
-        }
+        if (timerText is not null) component.AddChild(new Text("\n" + theme.Fg("muted", timerText), 0, 0));
     }
 
     /// <summary>Shell renderers are shared by bash and powershell, which differ only in the prompt they display.</summary>
     public static ToolRenderers CreateShellRenderers(string prompt) => new(
         RenderCall: (args, _, context) =>
         {
-            var state = context.State;
-            if (context.ExecutionStarted && state.GetValueOrDefault("startedAt") is null)
-            {
-                state["startedAt"] = Now();
-                state["endedAt"] = null;
-            }
+            RenderUtils.StartToolTimer(context);
             var text = context.LastComponent as Text ?? new Text("", 0, 0);
             text.SetText(FormatShellCall(args, prompt));
             return text;
         },
         RenderResult: (result, options, _, context) =>
         {
-            var state = context.State;
-            if (state.GetValueOrDefault("startedAt") is not null && options.IsPartial && state.GetValueOrDefault("interval") is null)
-                state["interval"] = SetInterval(context.Invalidate, 1000);
-            if (!options.IsPartial || context.IsError)
-            {
-                if (state.GetValueOrDefault("endedAt") is null) state["endedAt"] = Now();
-                if (state.GetValueOrDefault("interval") is IDisposable interval)
-                {
-                    interval.Dispose();
-                    state["interval"] = null;
-                }
-            }
+            var timerText = RenderUtils.ToolTimerText(context, options.IsPartial);
             var component = context.LastComponent as Container ?? new Container();
-            RebuildBashResultRenderComponent(component, result, options, context.ShowImages, state.GetValueOrDefault("startedAt") as double?,
-                state.GetValueOrDefault("endedAt") as double?, context.DurationMs);
+            RebuildBashResultRenderComponent(component, result, options, context.ShowImages, timerText);
             component.Invalidate();
             return component;
         });
-
-    /// <summary>setInterval: the callback runs on the synchronization context current at the call (the TUI loop), if any.</summary>
-    private static IDisposable SetInterval(Action callback, double milliseconds)
-    {
-        var context = SynchronizationContext.Current;
-        var period = TimeSpan.FromMilliseconds(milliseconds);
-        return Time.CreateTimer(_ =>
-        {
-            if (context is not null) context.Post(_ => callback(), null);
-            else callback();
-        }, null, period, period);
-    }
 }
 
 /// <summary>JavaScript String#trim/trimEnd.</summary>

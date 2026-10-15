@@ -1,5 +1,5 @@
 // A Markdown lexer producing marked's token shapes (marked 18.0.11, MIT, the parser Pi's Markdown component uses), with Pi's
-// strict strikethrough tokenizer and LaTeX extensions (packages/tui/src/components/markdown.ts, Pi abe508e1b89912adde45528136c3221eb69acdd7).
+// strict strikethrough tokenizer and LaTeX extensions (packages/tui/src/components/markdown.ts, Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff).
 // PiSharp has no marked dependency: this is an independent C# lexer over the same GFM rules, covering the block and inline
 // constructs Pi renders (headings, paragraphs, fenced and indented code, lists with tasks, blockquotes, tables, rules, HTML,
 // definitions, links, emphasis, code spans, strikethrough, breaks, autolinks, escapes and LaTeX).

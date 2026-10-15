@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts, openai-completions.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/anthropic-messages.ts, openai-completions.ts,
 // openai-responses-shared.ts, google-generative-ai.ts, google-vertex.ts, mistral-conversations.ts, pi-messages.ts.
 using System.Text;
 using System.Text.Json;

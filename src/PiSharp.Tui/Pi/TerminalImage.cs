@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/terminal-image.ts and packages/tui/src/terminal-colors.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/terminal-image.ts and packages/tui/src/terminal-colors.ts.
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
@@ -50,7 +50,9 @@ public static partial class TerminalImage
         var trueColorHint = colorTerm is "truecolor" or "24bit" || term.EndsWith("-direct", StringComparison.Ordinal);
         if (Has("TMUX") || term.StartsWith("tmux", StringComparison.Ordinal)) return new(ImageProtocol.None, trueColorHint, tmuxForwardsHyperlinks());
         if (term.StartsWith("screen", StringComparison.Ordinal)) return new(ImageProtocol.None, trueColorHint, false);
-        if (termProgram == "herdr") return new(ImageProtocol.None, trueColorHint, true);
+        // Herdr forwards OSC 8 hyperlinks and supports the Kitty graphics protocol. Check it before outer-terminal detection because
+        // variables like KITTY_WINDOW_ID can leak into its panes.
+        if (termProgram == "herdr") return new(ImageProtocol.Kitty, trueColorHint, true);
         if (Has("KITTY_WINDOW_ID") || termProgram == "kitty") return new(ImageProtocol.Kitty, true, true);
         if (termProgram == "ghostty" || term.Contains("ghostty", StringComparison.Ordinal) || Has("GHOSTTY_RESOURCES_DIR")) return new(ImageProtocol.Kitty, true, true);
         if (Has("WEZTERM_PANE") || termProgram == "wezterm") return new(ImageProtocol.Kitty, true, true);

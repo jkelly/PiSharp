@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/core/extensions/types.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/extensions/types.ts.
 // The rendering subset of ToolDefinition: ToolRenderResultOptions, ToolRenderContext, renderShell, renderCall, renderResult and
 // ToolRenderers. Arguments and results are JSON in Pi's shapes: a result is {content:[{type:"text",text}|{type:"image",data,
 // mimeType}], details}.

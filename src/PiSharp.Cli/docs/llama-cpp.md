@@ -1,4 +1,4 @@
-<!-- Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->
+<!-- Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT, Copyright (c) 2025 Mario Zechner): packages/coding-agent/docs/llama-cpp.md, unchanged except this comment. -->
 # Local Models with llama.cpp
 
 Pi supports the [llama.cpp](https://github.com/ggml-org/llama.cpp) router server. The router discovers multiple GGUF models and loads or unloads them on demand.

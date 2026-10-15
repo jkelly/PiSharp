@@ -133,7 +133,10 @@ const peer = await startPeer(worker, session, async (message, signal, hostCall) 
       else if (lifecycle) { validateSessionEvent(supplied, sessionSnapshot); }
       else if (kind === 'input') { assert(supplied && typeof supplied === 'object' && typeof supplied.text === 'string' && ['interactive', 'rpc', 'extension'].includes(supplied.source)); }
       else if (tool) { text(value.toolCallId); assert(supplied && typeof supplied === 'object' && !Array.isArray(supplied)); }
-      else { assert(supplied && supplied.type === 'before_agent_start' && typeof supplied.prompt === 'string' && typeof supplied.systemPrompt === 'string'); }
+      // BeforeAgentStartEvent (Pi 1.2.0): a user run's prompt, or the custom message that starts a custom run.
+      else { assert(supplied && supplied.type === 'before_agent_start' && typeof supplied.systemPrompt === 'string' && (supplied.messageType === 'custom'
+        ? supplied.message && typeof supplied.message === 'object' && !Array.isArray(supplied.message) && supplied.prompt === undefined
+        : supplied.messageType === 'user' && typeof supplied.prompt === 'string')); }
       const operation = admit(value, kind);
       const dialogGate = createDialogWorkerGate({ operationId: value.operationId, nativeSessionGeneration: capabilities.sessionGeneration,
         assertAdmission: () => { assert(operation.status === 'running'); signal.throwIfAborted(); },

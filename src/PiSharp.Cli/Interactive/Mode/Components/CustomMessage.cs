@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/custom-message.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/custom-message.ts.
 // The CustomMessage is a JsonObject in core/messages.ts's shape: { role: "custom", customType, content: string | (TextContent |
 // ImageContent)[], display, details?, timestamp }. MessageRenderOptions and MessageRenderer are declared in core/extensions/types.ts;
 // they live here until the extension runner port declares them.

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/auth-storage.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/auth-storage.ts
 // (FileAuthStorageBackend, AuthStorage.read/modify) and packages/coding-agent/src/config.ts (getAuthPath).
 using System.Collections.Concurrent;
 using System.Text;
@@ -198,18 +198,39 @@ internal sealed class AuthJsonCredentialStore : IAdmittedOAuthCredentialSource
         await stream.FlushAsync(CancellationToken.None).ConfigureAwait(false);
     }
 
-    /// <summary>Exclusive <c>auth.json.lock</c> (the path proper-lockfile uses), stale after 30 seconds, retried with backoff until then.</summary>
+    /// <summary>Creates the exclusive lock file; replaceable so tests can stand in for file-system states they cannot produce.</summary>
+    internal Func<string, IAsyncDisposable> CreateLockFile { get; init; } =
+        path => new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose);
+
+    /// <summary>Source getRetryableLockErrorCode/MAX_EPERM_RETRIES: on Windows, a just-removed lock can stay "delete pending" while
+    /// another process still has it open, and creating it fails with access denied (EPERM) until that handle closes.</summary>
+    internal const int MaxEpermRetries = 5;
+
+    /// <summary>Exclusive <c>auth.json.lock</c> (the path proper-lockfile uses), stale after 30 seconds, retried with backoff until then.
+    /// Access denied on Windows with no lock present (EPERM) is retried at most <see cref="MaxEpermRetries"/> times within that
+    /// deadline, so real permission errors still fail fast; any other error fails at once.</summary>
     private async Task<IAsyncDisposable> AcquireFileLockAsync(CancellationToken token)
     {
-        var path = AuthPath + ".lock"; var deadline = _time.GetUtcNow() + StaleLock; var retry = 0;
+        var path = AuthPath + ".lock"; var deadline = _time.GetUtcNow() + StaleLock; var retry = 0; var epermRetries = 0;
         while (true)
         {
             token.ThrowIfCancellationRequested();
-            try { return new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose); }
+            try { return CreateLockFile(path); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
-                if (!File.Exists(path) && !Directory.Exists(path)) throw;
-                var age = _time.GetUtcNow() - new DateTimeOffset(Directory.Exists(path) ? Directory.GetLastWriteTimeUtc(path) : File.GetLastWriteTimeUtc(path));
+                if (!File.Exists(path) && !Directory.Exists(path))
+                {
+                    if (!OperatingSystem.IsWindows() || error is not UnauthorizedAccessException) throw;
+                    // The 30 s deadline is for waiting on another holder; EPERM retries are capped separately.
+                    if (_time.GetUtcNow() >= deadline || ++epermRetries > MaxEpermRetries) throw;
+                    await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(10 * Math.Pow(2, retry++), 1000)), _time, token).ConfigureAwait(false);
+                    continue;
+                }
+                var stamp = Directory.Exists(path) ? Directory.GetLastWriteTimeUtc(path) : File.GetLastWriteTimeUtc(path);
+                // 1601-01-01 means the lock vanished between the check and the read (its holder released it): try again
+                // rather than treating it as stale, which could delete a lock another writer has just taken.
+                if (stamp == DateTime.FromFileTimeUtc(0)) continue;
+                var age = _time.GetUtcNow() - new DateTimeOffset(stamp);
                 if (age > StaleLock)
                 {
                     try { if (Directory.Exists(path)) Directory.Delete(path); else File.Delete(path); } catch (Exception) { }

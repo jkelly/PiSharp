@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/models.ts (Models.classify, Models.generateImages,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (Models.classify, Models.generateImages,
 // applyAuth, typed model reads, getAvailableOfType, createProvider classifier/image dispatch), utils/model-operations.ts,
 // images.ts, images-api-registry.ts, providers/images/register-builtins.ts, providers/openai.ts, providers/openrouter.ts,
 // providers/typesafe.ts, providers/cloudflare-workers-ai.ts, providers/opencode.ts, providers/vercel-ai-gateway.ts,

@@ -199,7 +199,7 @@ public sealed class ResponsesKeyAuthRequestFactory
         if (_options.ModelSamplingParams is not null || _levelSamplingParams is not null || _options.SamplingParams is not null)
         {
             var root = JsonNode.Parse(payload, documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject();
-            // Pi abe508e1b89912adde45528136c3221eb69acdd7 openai-responses.ts buildParams: model, effective level, then request keys.
+            // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff openai-responses.ts buildParams: model, effective level, then request keys.
             foreach (var sampling in new[] { _options.ModelSamplingParams, _levelSamplingParams, _options.SamplingParams })
             {
                 if (sampling is null || sampling.Value.ValueKind == JsonValueKind.Null) continue;

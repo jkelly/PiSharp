@@ -54,7 +54,7 @@ public sealed class McpRegisteredProfileDiscoveryAdmission
         var added = Binding.Registrations.Select((tool, index) =>
             new SessionRegisteredTool(Binding.RegisteredToolDeclarations[index], Binding.Adapters[index])
             { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.DefaultActive, Annotations = tool.Annotations,
-                IsExtension = true, PrepareLoadout = Binding.GetLoadoutPreparation(tool.Name) }).ToImmutableArray();
+                IsExtension = true, PrepareLoadout = Binding.GetLoadoutPreparation(tool.Name), ReachesTools = tool.ReachesTools }).ToImmutableArray();
         var final = acquiredRegistry.WithToolCatalog(acquiredRegistry.RegisteredTools.AddRange(added),
             composeHooks(acquiredRegistry, Binding));
         var identities = registrations.Select(registration =>

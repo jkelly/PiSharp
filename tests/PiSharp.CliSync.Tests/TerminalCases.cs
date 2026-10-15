@@ -6,7 +6,7 @@ using PiSharp.Tui.Input;
 using PiSharp.Tui.Rendering;
 
 // Upstream: packages/tui/src/keybindings.ts, packages/tui/src/program-status.ts, packages/tui/src/terminal.ts and
-// packages/coding-agent/src/modes/interactive/program-status-reporter.ts at abe508e1b89912adde45528136c3221eb69acdd7.
+// packages/coding-agent/src/modes/interactive/program-status-reporter.ts at 06a466935536f8c9bcacb2d5efc0fc021be1bdff.
 internal static partial class Program
 {
     private const string Esc = "\u001b";

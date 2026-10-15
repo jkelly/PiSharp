@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/utils/syntax-highlight.ts (highlight, supportsLanguage,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/syntax-highlight.ts (highlight, supportsLanguage,
 // loadAllHighlightLanguages) and theme.ts buildCliHighlightTheme (scope to theme token mapping), over the highlight.js 10.7.3 port
 // (Theme/Highlight: the engine and every lib/languages grammar, verified against the original's output).
 namespace PiSharp.Cli.Interactive.Mode;

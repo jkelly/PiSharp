@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/codemode/index.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/codemode/index.ts
 // (createCodemodeExtension: appendEntry, models, getToolNamespace, getToolGuidelines, getMode, getInlineBudget),
 // packages/coding-agent/src/extensions/codemode/execute.ts (ctx.tools, ctx.executeTool, ctx.sessionManager.getBranch,
 // ctx.modelRegistry) and packages/coding-agent/src/extensions/mcp/tools.ts (createMcpResultSchema, convertMcpResult: scripts
@@ -20,16 +20,13 @@ namespace PiSharp.Cli.Mcp;
 internal static class McpCodemode
 {
     internal const string Name = CodemodeToolDefinition.Name, RegistrationId = "codemode";
-    private static readonly JsonData McpResultSchema = JsonData.Parse(
-        """{"type":"object","properties":{"content":{"type":"array","items":{"type":"object"}},"isError":{"type":"boolean"},"_meta":{"type":"object"}},"required":["content"]}""");
 
     /// <summary>A fresh definition for one generation; each binds to exactly one attachment.</summary>
-    internal static McpDiscoveryExecutableDefinition Create(CodemodeMode mode, int? inlineBudget, Func<ICodemodeModelRuntime?> models, bool defaultActive = true,
-        Func<Func<PiSharp.Extensions.Mcp.Configuration.McpServerEntry, bool>, CancellationToken, Task>? waitForServers = null)
+    internal static McpDiscoveryExecutableDefinition Create(CodemodeMode mode, int? inlineBudget, Func<ICodemodeModelRuntime?> models, bool defaultActive = true)
     {
         var withModels = true;
         return McpDiscoveryExecutableDefinition.CreateCodemode(RegistrationId, CodemodeToolDefinition.CreateDescription([], withModels),
-            (code, attachment, invocation, token) => new(ExecuteAsync(code, attachment, invocation, models, waitForServers, token)),
+            (code, attachment, invocation, token) => new(ExecuteAsync(code, attachment, invocation, models, token)),
             loadout => CodemodeToolDefinition.PrepareLoadout(loadout, mode, withModels, inlineBudget, tool => tool.OutputSchema ?? OutputSchema(tool.Name, tool.Namespace)),
             descriptor => descriptor with
             {
@@ -39,30 +36,29 @@ internal static class McpCodemode
             });
     }
 
-    /// <summary>tool.ts toCodemodeDeclaration's output schemas as PiSharp knows them: read and bash declare theirs, MCP tools
-    /// resolve to their CallToolResult; other tools resolve to their text.</summary>
+    /// <summary>tool.ts toCodemodeDeclaration's output schemas as PiSharp knows them when a tool does not carry one: read and bash
+    /// declare theirs, MCP tools resolve to their CallToolResult (tools.ts createMcpResultSchema; the registered MCP tools carry it
+    /// with their own output schema); other tools resolve to their text.</summary>
     internal static JsonData? OutputSchema(string name, ToolNamespace? toolNamespace) => name switch
     {
         "read" => PiSharp.Tools.Files.ReadWriteTools.ReadOutputSchema,
         "bash" => PiSharp.Tools.Processes.BashTool.OutputSchema,
-        _ => IsMcpTool(name, toolNamespace) ? McpResultSchema : null
+        _ => IsMcpTool(name, toolNamespace) ? McpToolResults.ResultSchema(null) : null
     };
 
-    /// <summary>index.ts scriptNeedsServer: the script names the server's namespace, or searches, enumerates or describes tools or
-    /// namespaces, which may name the server in other forms.</summary>
-    internal static bool ScriptNeedsServer(string code, string server) =>
-        System.Text.RegularExpressions.Regex.IsMatch(code, @"\b(searchTools|describeNamespace|describeTool|ALL_TOOLS)\b", System.Text.RegularExpressions.RegexOptions.CultureInvariant) ||
-        code.Contains(PiSharp.Extensions.Mcp.Configuration.McpCatalogPlanner.Namespace(server), StringComparison.Ordinal);
+    /// <summary>index.ts reachesServer: whether a call that reaches <paramref name="reach"/> (<c>ToolDefinition.reachesTools</c>) needs
+    /// the server: it reaches every tool, or one of its words contains the server's namespace.</summary>
+    internal static bool ReachesServer(ToolReach reach, string server) =>
+        reach.Reaches(PiSharp.Extensions.Mcp.Configuration.McpCatalogPlanner.Namespace(server));
 
     private static bool IsMcpTool(string name, ToolNamespace? toolNamespace) =>
         name.StartsWith("mcp__", StringComparison.Ordinal) && toolNamespace?.Name.StartsWith("mcp__", StringComparison.Ordinal) == true;
 
     private static async Task<JsonData> ExecuteAsync(string code, AgentSessionAttachment attachment, IExtensionToolInvocationContext invocation,
-        Func<ICodemodeModelRuntime?> models, Func<Func<PiSharp.Extensions.Mcp.Configuration.McpServerEntry, bool>, CancellationToken, Task>? waitForServers,
-        CancellationToken token)
+        Func<ICodemodeModelRuntime?> models, CancellationToken token)
     {
-        // index.ts tool_call: the script waits for the servers it needs, so their tools are registered before it runs.
-        if (waitForServers is not null) await waitForServers(entry => ScriptNeedsServer(code, entry.Name), token).ConfigureAwait(false);
+        // index.ts tool_call: before the script runs, the session's MCP tool_call handler waited for the servers its reachesTools names
+        // (the servers its script names, or every server when it searches or enumerates tools; see McpToolCallHooks).
         var host = new Host(attachment.Session, invocation, models);
         try
         {

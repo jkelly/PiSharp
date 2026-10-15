@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/github-copilot.ts, api/github-copilot-headers.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/github-copilot.ts, api/github-copilot-headers.ts,
 // auth/oauth/github-copilot.ts (toAuth: per-credential baseUrl), api/anthropic-messages.ts (createClient: Copilot Bearer auth),
 // api/openai-completions.ts and api/openai-responses.ts (Copilot dynamic headers), providers/cloudflare-workers-ai.ts,
 // providers/cloudflare-ai-gateway.ts, providers/cloudflare-stream.ts (resolveCloudflareModel), providers/cloudflare-auth.ts and

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (setModel, cycleModel over
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (setModel, cycleModel over
 // modelRuntime.getAvailableSnapshot) and packages/coding-agent/src/core/model-runtime.ts (the available snapshot refreshed after
 // credentials change). PiSharp binds each available model to the session runtime lazily: a model connects its live route on its
 // first request.

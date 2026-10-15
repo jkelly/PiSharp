@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/models.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { lazyStream } from "./api/lazy.mjs";
 import { defaultProviderAuthContext as defaultAuthContext } from "./auth/context.mjs";
@@ -173,7 +173,8 @@ class ModelsImpl {
             publish: (publication)=>this.publishProviderModels(provider.id, generation, signal, publication),
             allowNetwork,
             force: allowNetwork ? force : undefined,
-            signal
+            signal,
+            baseUrl: provider.baseUrl
         });
     }
     async refresh(options = {}) {

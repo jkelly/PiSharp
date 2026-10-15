@@ -10,4 +10,7 @@ public sealed record AgentPromptStart(ImmutableArray<TranscriptEntry> History,
 public sealed record AgentPromptPreparation(ImmutableArray<TranscriptEntry> AdditionalMessages)
 {
     public Func<ImmutableArray<TranscriptEntry>, CancellationToken, ValueTask<ImmutableArray<TranscriptEntry>>>? AfterContext { get; init; }
+    /// <summary>Custom history messages that go before the run's inputs: messages held while the run was starting, recorded ahead of
+    /// its starting messages as they would have been while idle.</summary>
+    public ImmutableArray<TranscriptEntry> LeadingMessages { get; init; } = [];
 }

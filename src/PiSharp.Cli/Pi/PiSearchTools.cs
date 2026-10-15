@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/grep.ts and core/tools/find.ts (ensureTool
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/tools/grep.ts and core/tools/find.ts (ensureTool
 // at execution: "ripgrep (rg) is not available and could not be downloaded", "fd is not available and could not be downloaded").
 using PiSharp.Tools.Files;
 

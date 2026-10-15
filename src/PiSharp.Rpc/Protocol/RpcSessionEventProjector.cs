@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (AgentSessionEvent) and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (AgentSessionEvent) and
 // packages/coding-agent/src/modes/json-event.ts (toJsonEvent: session events other than message_update are emitted as is).
 using PiSharp.CodingAgent;
 using PiSharp.Contracts;

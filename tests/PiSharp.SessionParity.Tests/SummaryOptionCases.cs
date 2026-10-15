@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (_runDefaultCompaction passes the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_runDefaultCompaction passes the
 // session thinking level and `undefined, // sessionId`; branch summaries go through generateBranchSummary), compaction/compaction.ts
 // (createSummarizationOptions, completeSummarization: cacheRetention "none", sessionId ?? uuidv7()) and branch-summarization.ts.
 using System.Runtime.CompilerServices;
@@ -15,7 +15,25 @@ internal static partial class Program
         Case("summary.compaction-uses-session-thinking-level-and-fresh-uuidv7-route", CompactionSummaryOptions),
         Case("summary.branch-summary-has-no-thinking-and-a-fresh-uuidv7-route", BranchSummaryOptions),
         Case("summary.transport-generator-forwards-level-and-route-to-the-request", GeneratorForwardsOptions),
+        Case("summary.serialize-conversation-omits-thinking-blocks", SerializeOmitsThinking),
     ];
+
+    // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/compaction/utils.ts (serializeConversation).
+    // Pi 1.2.0 drops thinking blocks from the serialized conversation (compaction, branch summaries, bug reports): the
+    // "[Assistant thinking]" part is gone; visible text, tool calls and tool results remain, in order.
+    private static Task SerializeOmitsThinking()
+    {
+        const string usage = """{"input":1,"output":1,"cacheRead":0,"cacheWrite":0,"totalTokens":2,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}}""";
+        var user = new TranscriptEntry("user", JsonData.Parse("""{"role":"user","content":[{"type":"text","text":"question"}],"timestamp":1}"""));
+        var assistant = new TranscriptEntry("assistant", JsonData.Parse("""{"role":"assistant","content":[{"type":"thinking","thinking":"secret reasoning"},{"type":"text","text":"answer"},{"type":"toolCall","id":"call_1","name":"read","arguments":{"path":"a.txt"}}],"api":"anthropic-messages","provider":"anthropic","model":"m","usage":""" + usage + ""","stopReason":"toolUse","timestamp":2}"""));
+        var onlyThinking = new TranscriptEntry("assistant", JsonData.Parse("""{"role":"assistant","content":[{"type":"thinking","thinking":"only thought"}],"api":"anthropic-messages","provider":"anthropic","model":"m","usage":""" + usage + ""","stopReason":"stop","timestamp":4}"""));
+        var tool = new TranscriptEntry("toolResult", JsonData.Parse("""{"role":"toolResult","toolCallId":"call_1","toolName":"read","content":[{"type":"text","text":"file text"}],"isError":false,"timestamp":3}"""));
+        var serialized = SessionSummaryRequestBuilder.SerializeConversation([user, assistant, tool, onlyThinking]);
+        Check(serialized == "[User]: question\n\n[Assistant]: answer\n\n[Assistant tool calls]: read(path=\"a.txt\")\n\n[Tool result]: file text",
+            "serialized conversation: " + serialized);
+        Check(!serialized.Contains("thinking", StringComparison.Ordinal) && !serialized.Contains("thought", StringComparison.Ordinal), "thinking leaked");
+        return Task.CompletedTask;
+    }
 
     private sealed class RecordingSummary : ISessionSummaryGenerator
     {

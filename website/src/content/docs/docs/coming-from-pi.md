@@ -3,10 +3,10 @@ title: Coming from Pi
 description: What carries over from Pi, and what's different.
 ---
 
-PiSharp follows Pi v1.1.0 closely. Run `pisharp` where you would run `pi`. It reads the same files, takes the same flags and writes the same sessions.
+PiSharp follows Pi v1.2.0 closely. Run `pisharp` where you would run `pi`. It reads the same files, takes the same flags and writes the same sessions.
 
 :::tip
-These docs describe PiSharp's current baseline, Pi v1.1.0. Features Pi added later aren't covered until the next sync. Check [Parity](/parity/) for details.
+These docs describe PiSharp's current baseline, Pi v1.2.0. Features Pi added later aren't covered until the next sync. Check [Parity](/parity/) for details.
 :::
 
 ## What carries over

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/easter-egg-3d.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/easter-egg-3d.ts.
 // Fullscreen 3D easter eggs: the pi logo (header logo click) and Armin (/arminsayshi). Both are bitmaps built from one block per
 // pixel. The current screen dissolves into braille dust while the model spins in the center and its blocks play a sliding puzzle.
 // Leaving plays the same timeline backwards, so the screen reassembles.

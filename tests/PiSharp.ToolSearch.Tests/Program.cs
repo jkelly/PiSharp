@@ -4,10 +4,11 @@ using System.Text.Json;
 // Authored offline expectations for PiSharp 1.1.0.1: the built-in `tool_search` and `deferred` MCP exposure of Pi v1.1.0
 // (packages/coding-agent/src/extensions/tool-search, extensions/mcp/index.ts and core/agent-session.ts). They are derived
 // from the pinned upstream source and its tests (test/tool-search.test.ts) by reading, never captured from an upstream run.
-// Fake MCP servers and a fake Anthropic endpoint answer in process; no network or live credentials are used.
+// Fake MCP servers and a fake Anthropic endpoint answer in process; no network or live credentials are used. Updated to Pi v1.2.0
+// (06a46693): tool_search declares reachesTools ("all") instead of being recognized by its schema object.
 internal static partial class Program
 {
-    private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 
     private static async Task<int> Main(string[] args)
     {

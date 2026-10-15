@@ -59,6 +59,22 @@ internal static partial class Program
             Failed(await Run("while (true) await null", timeoutMs: 200), CodemodeErrorKind.Timeout, "microtask spin");
             Check(started.Elapsed < TimeSpan.FromSeconds(15), "loops terminated promptly: " + started.Elapsed);
         }),
+        // Pi 1.2.0 vm.ts drain(): the VM polls for interrupts while draining promise jobs, so a script that only queues promise jobs
+        // is stopped by the timeout or an abort like a synchronous loop. Jint checks its constraints in job execution too.
+        Case("limits.promise-job-loops-stop-like-synchronous-loops", async () =>
+        {
+            var started = Stopwatch.StartNew();
+            foreach (var spin in new[] { "while (true) await null", "for (;;) await Promise.resolve(1)",
+                "const f = () => Promise.resolve().then(f); f(); await new Promise(() => {})",
+                "let n = 0; while (true) { try { await Promise.reject(new Error(String(n++))); } catch {} }" })
+                Failed(await Run(spin, timeoutMs: 200), CodemodeErrorKind.Timeout, "timeout: " + spin);
+            Check(started.Elapsed < TimeSpan.FromSeconds(20), "promise job loops stopped promptly: " + started.Elapsed);
+            await using var sandbox = new CodemodeSandbox(new() { TimeoutMs = null });
+            using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+            var aborted = await sandbox.ExecuteAsync("text('spinning'); while (true) await null", new() { AbortMessage = "user cancelled" }, cancel.Token)
+                .WaitAsync(TimeSpan.FromSeconds(30));
+            Failed(aborted, CodemodeErrorKind.Aborted, "abort during a promise job loop", message: "user cancelled");
+        }),
         Case("limits.caller-cancellation-aborts-and-cancels-calls", async () =>
         {
             var called = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

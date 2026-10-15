@@ -9,7 +9,7 @@ using PiSharp.CodingAgent.ToolSelection;
 using PiSharp.Contracts;
 
 // Upstream: packages/coding-agent/src/cli/args.ts, core/settings-manager.ts, core/sdk.ts, core/agent-session.ts,
-// core/mcp-servers.ts and main.ts at abe508e1b89912adde45528136c3221eb69acdd7.
+// core/mcp-servers.ts and main.ts at 06a466935536f8c9bcacb2d5efc0fc021be1bdff.
 internal static partial class Program
 {
     private static ToolSelectionCliOptions Parse(params string[] args)

@@ -8,7 +8,7 @@ namespace PiSharp.Cli.Mcp.Authentication;
 
 internal sealed class McpDefaultOAuthHttp(McpDefaultOAuthHost host, McpDefaultOAuthHostResources resources)
 {
-    // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts timedFetch.
+    // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts timedFetch.
     /// <summary>Each request to the authorization server is time-limited on top of the caller's cancellation, so an
     /// unresponsive server cannot hold a refresh, delay shutdown or keep a sign-in waiting for long. A timeout is a
     /// request failure, never reported as the caller's cancellation.</summary>

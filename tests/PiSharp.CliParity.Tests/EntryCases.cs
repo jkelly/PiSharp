@@ -14,6 +14,7 @@ internal static partial class Program
         ("entry.file-arguments-stdin-and-images", FileArguments),
         ("entry.initial-message-merge-and-remaining-messages", InitialMessages),
         ("entry.print-error-stop-reason-exits-1", PrintError),
+        ("entry.print-length-stop-prints-partial-text-warns-and-exits-1", PrintTruncated),
         ("entry.rpc-mode-dispatches-on-standard-streams", RpcMode),
         ("entry.rpc-mode-switches-among-available-models", RpcModelSwitching),
         ("entry.interactive-mode-hands-the-session-to-the-frontend", Interactive),
@@ -79,6 +80,31 @@ internal static partial class Program
             .Last(line => line["type"]?.GetValue<string>() == "message_end" && line["message"]?["role"]?.GetValue<string>() == "assistant");
         Equal("error", end["message"]!["stopReason"]!.GetValue<string>(), "json carries the error stop");
         Equal(end["message"]!["errorMessage"]!.GetValue<string>() + "\n", stderr, "text mode prints the errorMessage");
+    }
+
+    // print-mode.ts (Pi 1.2.0): a final response cut off at the output token limit (stopReason "length") prints its partial text,
+    // writes the truncation warning to stderr and exits 1. JSON mode is unchanged and exits 0.
+    private static async Task PrintTruncated()
+    {
+        using var sandbox = new Sandbox("print-truncated");
+        sandbox.Vars["PI_OFFLINE"] = "1";
+        sandbox.Respond = (_, _) => AnthropicText("partial answer", "max_tokens");
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"retry":{"enabled":false},"compaction":{"enabled":false}}""");
+        var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "x");
+        Equal(1, code, "exit");
+        Equal("partial answer\n", stdout, "the partial text is printed");
+        Equal("Response was truncated: the model reached its output token limit.\n", stderr, "the warning goes to stderr");
+        (var jsonCode, var json, var jsonError) = await sandbox.Run("--mode", "json", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "x");
+        Equal(0, jsonCode, "json exit");
+        Equal("", jsonError, "json mode writes no warning");
+        var end = json.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => JsonNode.Parse(line)!)
+            .Last(line => line["type"]?.GetValue<string>() == "message_end" && line["message"]?["role"]?.GetValue<string>() == "assistant");
+        Equal("length", end["message"]!["stopReason"]!.GetValue<string>(), "json carries the length stop");
+        sandbox.Respond = (_, _) => AnthropicText("whole answer");
+        (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "x");
+        Equal(0, code, "a completed answer still exits 0; " + stderr);
+        Equal("whole answer\n", stdout, "completed text");
+        Equal("", stderr, "no warning for a completed answer");
     }
 
     // modes/rpc: --mode rpc dispatches JSON lines on stdin and writes responses and events on stdout.

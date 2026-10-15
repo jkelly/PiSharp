@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/interactive/session-share.ts (UI-free), with
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/session-share.ts (UI-free), with
 // src/config.ts (getShareViewerUrl), core/radius.ts and packages/ai/src/providers/radius-config.ts (DEFAULT_RADIUS_GATEWAY),
 // cli/auth-command.ts (getAuthCredential) and packages/tui/src/terminal-image.ts (hyperlink).
 using System.ComponentModel;

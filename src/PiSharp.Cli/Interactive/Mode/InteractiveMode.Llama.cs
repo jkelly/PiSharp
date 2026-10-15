@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/llama/index.ts (the /llama command:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/llama/index.ts (the /llama command:
 // configuredClient, syncCatalog, loadModel, unloadModel, downloadModel and the manager loop) and extensions/llama/ui.ts (LlamaView,
 // HuggingFaceSearch, showLlamaUi, runWithProgress). Upstream's view is a ctx.ui.custom() component; here it takes the editor's slot.
 using System.Text.RegularExpressions;

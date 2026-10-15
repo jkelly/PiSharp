@@ -81,7 +81,7 @@ internal static partial class Program
             var path = Path.Combine(Temp("crash"), "agent", CrashLog.FileName);
             var record = CrashLog.RecordCrash(CrashRecord.FatalError, "boom", null, "/work", path, timeProvider: DiagnosticsClock());
             Check(record is not null, "recorded");
-            Equal("[\n  {\n    \"timestamp\": \"2026-10-08T13:45:31.000Z\",\n    \"version\": \"1.1.0\",\n    \"kind\": \"fatal_error\",\n    \"message\": \"boom\",\n" +
+            Equal("[\n  {\n    \"timestamp\": \"2026-10-08T13:45:31.000Z\",\n    \"version\": \"1.2.0\",\n    \"kind\": \"fatal_error\",\n    \"message\": \"boom\",\n" +
                 "    \"stack\": null,\n    \"sessionFile\": null,\n    \"cwd\": \"/work\"\n  }\n]\n", File.ReadAllText(path), "file text");
             var thrown = CrashLog.RecordCrash(CrashRecord.UncaughtException, new InvalidOperationException("bad"), "/s.jsonl", "/work", path, timeProvider: DiagnosticsClock());
             Equal(("bad", "/s.jsonl", "uncaught_exception"), (thrown!.Message, thrown.SessionFile, thrown.Kind), "exception record");
@@ -208,7 +208,7 @@ internal static partial class Program
             }).Value;
             Equal("version,userAgent,runtime,platform,arch,osRelease,osVersion,shell,terminal,piEnvironmentVariables",
                 string.Join(",", environment.EnumerateObject().Select(property => property.Name)), "keys");
-            Equal(("1.1.0", BugReport.PiUserAgent("1.1.0"), "zsh"), (environment.GetProperty("version").GetString(), environment.GetProperty("userAgent").GetString(),
+            Equal(("1.2.0", BugReport.PiUserAgent("1.2.0"), "zsh"), (environment.GetProperty("version").GetString(), environment.GetProperty("userAgent").GetString(),
                 environment.GetProperty("shell").GetString()), "version, user agent and shell");
             Equal("""{"term":"xterm-256color","program":null,"programVersion":null,"colorterm":null,"tmux":true,"ssh":true,"ci":false}""",
                 environment.GetProperty("terminal").GetRawText(), "terminal");

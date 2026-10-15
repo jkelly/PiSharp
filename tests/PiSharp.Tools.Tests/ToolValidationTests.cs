@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/validation.ts (validateToolArguments) and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/validation.ts (validateToolArguments) and
 // packages/agent/src/agent-loop.ts (prepareToolCall). Goldens recorded from the real upstream code by
 // ToolValidation/gen-tool-validation-goldens.mjs (pi-ai 1.1.0, typebox 1.3.27).
 using System.Collections.Immutable;

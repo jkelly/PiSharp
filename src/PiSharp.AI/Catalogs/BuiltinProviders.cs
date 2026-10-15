@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/all.ts (builtinProviders order), the provider
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/all.ts (builtinProviders order), the provider
 // factories packages/ai/src/providers/*.ts (id, name, baseUrl, auth and APIs), packages/ai/src/auth/helpers.ts (envApiKeyAuth),
 // packages/ai/src/providers/{anthropic,google-vertex,amazon-bedrock,cloudflare-auth}.ts (ambient auth) and
 // packages/ai/src/models.ts (checkProviderAuth).

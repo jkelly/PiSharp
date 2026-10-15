@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/types.ts (ToolNamespace, ToolLoadout).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/types.ts (ToolNamespace, ToolLoadout).
 using System.Collections.Immutable;
 
 namespace PiSharp.Contracts;
@@ -7,9 +7,23 @@ namespace PiSharp.Contracts;
 /// Description is the short summary listed with the group.</summary>
 public sealed record ToolNamespace(string Name, string? Description = null)
 {
+    /// <summary>Other names that refer to the namespace where tools look it up by name (codemode's <c>describeNamespace()</c> and
+    /// the <c>namespace</c> option of <c>searchTools()</c>), for example <c>docs</c> for <c>mcp__docs</c>. Empty when it has none.</summary>
+    public ImmutableArray<string> Aliases { get => aliases; init => aliases = value.IsDefault ? [] : value; }
+    private readonly ImmutableArray<string> aliases = [];
     /// <summary>Longer usage guidance, such as MCP server instructions. Not part of tool listings; tools that
     /// describe the namespace on request return it.</summary>
     public string? Instructions { get; init; }
+
+    /// <summary>Value equality, with <see cref="Aliases"/> compared item by item.</summary>
+    public bool Equals(ToolNamespace? other) => other is not null && Name == other.Name && Description == other.Description &&
+        Instructions == other.Instructions && Aliases.SequenceEqual(other.Aliases, StringComparer.Ordinal);
+    public override int GetHashCode()
+    {
+        var hash = new HashCode(); hash.Add(Name, StringComparer.Ordinal); hash.Add(Description); hash.Add(Instructions);
+        foreach (var alias in Aliases) hash.Add(alias, StringComparer.Ordinal);
+        return hash.ToHashCode();
+    }
 }
 
 /// <summary>Immutable metadata only: these values carry no tool execution authority.</summary>

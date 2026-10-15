@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/bug-report.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/bug-report.ts.
 // The /bug flow: consent, optional summary, then the report. The report core is PiSharp.CodingAgent.Diagnostics (BugReport,
 // CrashLog). The overlays upstream builds (ExtensionEditorComponent, ExtensionSelectorComponent, BorderedLoader shown in the
 // editor container with focus, restored to the editor afterwards) are behind IBugReportUi; the AgentSession members behind

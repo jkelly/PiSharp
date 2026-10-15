@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/utils/git.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/utils/git.ts.
 // hosted-git-info 9.0.3 (ISC, npm) fromUrl, parse-url and the github/bitbucket/gitlab/gist/sourcehut host extractors are ported
 // below (HostedGitInfo) since parseGitUrl depends on them; WHATWG URL parsing is a local subset (UrlRecord) with the parts
 // hosted-git-info and parseGitUrl read: protocol, userinfo, hostname, port validation, pathname (dot segments, percent-encoding,

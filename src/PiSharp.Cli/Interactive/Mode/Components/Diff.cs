@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/diff.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/diff.ts.
 // Diff.diffWords is a port of jsdiff 8.0.4 (BSD-3-Clause, Copyright (c) 2009-2015 Kevin Decker and contributors):
 // libesm/diff/base.js (Myers diff with the diagonal pruning), libesm/diff/word.js (tokenizer, join, whitespace dedupe) and
 // libesm/util/string.js (prefix/suffix helpers), without the callback, timeout, segmenter and ignoreCase options.

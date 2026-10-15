@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/extensions/mcp/ui.ts (the /mcp manager view: menus rebuilt on
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/extensions/mcp/ui.ts (the /mcp manager view: menus rebuilt on
 // change, the status screen with its cancel key, the redirect-URL prompt) and the /mcp command entry of extensions/mcp/index.ts,
 // over the CLI's McpServerManager (IMPL-H).
 using PiSharp.Cli.Interactive.Mode.Components;

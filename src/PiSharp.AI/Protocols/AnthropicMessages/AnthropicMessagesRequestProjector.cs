@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (buildParams/convertMessages/convertTools,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/anthropic-messages.ts (buildParams/convertMessages/convertTools,
 // getBetaFeatures and insertThinkingLevelMessages for compat.supportsMidConvoEffort)
 // and packages/ai/src/api/constrained-sampling.ts (strict conversion with Anthropic's unsupported keywords).
 using System.Collections.Immutable;
@@ -47,7 +47,13 @@ public sealed record AnthropicMessagesRequestOptions(
 {
     /// <summary>Upstream stream(): the effort a managed (compat.supportsMidConvoEffort) response records as providerThinkingLevel.</summary>
     public string? ProviderThinkingLevel => SupportsMidConversationEffort ? Effort ?? "high" : null;
+    /// <summary>Pi 1.2.0 buildParams(disablePreferredStrictTools): strict "prefer" tools are sent non-strict (the one fallback
+    /// request after Anthropic rejects the strict tool set); strict "require" tools stay strict.</summary>
+    public bool DisablePreferredStrictTools { get; init; }
 }
+
+/// <summary>A projected request body and whether any strict "prefer" tool was sent strict (Pi 1.2.0 buildParams hasPreferredStrictTools).</summary>
+public sealed record AnthropicMessagesProjection(JsonData Payload, bool HasPreferredStrictTools);
 
 /// <summary>Pure owned transcript-to-request projection. No network, credential, clock or execution authority.</summary>
 public sealed class AnthropicMessagesRequestProjector
@@ -72,10 +78,11 @@ public sealed class AnthropicMessagesRequestProjector
             options.Effort is not (null or "low" or "medium" or "high" or "xhigh" or "max"))
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic request profile or limits.");
     }
-    public JsonData Project(ChatRequest request, CancellationToken cancellationToken = default)
+    public JsonData Project(ChatRequest request, CancellationToken cancellationToken = default) => ProjectWithDetails(request, cancellationToken).Payload;
+    public AnthropicMessagesProjection ProjectWithDetails(ChatRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request); cancellationToken.ThrowIfCancellationRequested();
-        try { return new Projection(request, _options, cancellationToken).Run(); }
+        try { var projection = new Projection(request, _options, cancellationToken); var payload = projection.Run(); return new(payload, projection.HasPreferredStrictTools); }
         catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException or ArgumentException)
         { throw Fail(AnthropicRequestFailure.InvalidTranscript); }
     }
@@ -99,6 +106,7 @@ public sealed class AnthropicMessagesRequestProjector
         private const string DeferredPlaceholderName = "__pi_deferred_placeholder__";
         private readonly List<JsonElement> _nativeDeclarations = [];
         private bool _nativeToolChanges;
+        internal bool HasPreferredStrictTools { get; private set; }
         private bool _lastWasToolResults;
         private long _retainedCharacters;
         private long _retainedBytes;
@@ -496,7 +504,9 @@ public sealed class AnthropicMessagesRequestProjector
                 if (kind == "json_schema")
                 {
                     var preference = String(config, "strict"); if (preference is not ("prefer" or "require")) throw Fail(AnthropicRequestFailure.UnsupportedContent);
-                    if (options.SupportsStrictTools)
+                    // Pi 1.2.0 convertTools(disablePreferredStrictTools): the fallback request sends "prefer" tools with their original schema.
+                    if (preference == "prefer" && options.DisablePreferredStrictTools) strict = false;
+                    else if (options.SupportsStrictTools)
                     {
                         try { var candidate = schema.DeepClone().AsObject(); MakeStrict(candidate); if (!IsType(candidate, "object")) throw new StrictSchemaException(); schema = candidate; strict = true; }
                         catch (StrictSchemaException) { if (preference == "require") throw Fail(AnthropicRequestFailure.UnsupportedStrictSchema); }
@@ -513,6 +523,7 @@ public sealed class AnthropicMessagesRequestProjector
             var tool = new JsonObject { ["name"] = name, ["description"] = String(declaration, "description"), ["input_schema"] = input };
             if (options.SupportsEagerToolInputStreaming) tool["eager_input_streaming"] = true;
             if (strict) tool["strict"] = true;
+            if (strict && declaration.GetProperty("constrainedSampling").GetProperty("strict").GetString() == "prefer") HasPreferredStrictTools = true;
             return tool;
         }
         private JsonArray Betas()

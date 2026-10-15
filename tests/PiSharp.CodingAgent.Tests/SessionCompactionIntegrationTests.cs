@@ -81,7 +81,11 @@ internal static class SessionCompactionIntegrationTests
             foreach (var call in raw.GetProperty("pureCalls").EnumerateArray())
                 CompareReferencePure(call, raw, root.GetProperty("authoredInput"));
             var serialization = raw.GetProperty("serialization").GetProperty("value");
-            Equal(serialization.GetProperty("value").GetString(),
+            // Pi 1.2.0 (compaction/utils.ts serializeConversation) omits thinking blocks. The v0.99.1 capture still holds its
+            // "[Assistant thinking]" part; the expectation is the capture without it (an authored delta, not a capture).
+            var capturedParts = serialization.GetProperty("value").GetString()!.Split("\n\n");
+            Check(capturedParts.Count(part => part.StartsWith("[Assistant thinking]: ", StringComparison.Ordinal)) <= 1, "one captured thinking part at most");
+            Equal(string.Join("\n\n", capturedParts.Where(part => !part.StartsWith("[Assistant thinking]: ", StringComparison.Ordinal))),
                 SessionSummaryRequestBuilder.SerializeConversation(ReadReferenceMessages(serialization.GetProperty("input"))));
             Equal(serialization.GetProperty("fileFormatting").GetString(),
                 SessionFileOperations.FormatFileOperations(["a.txt", "z.txt"], ["m.txt"]));

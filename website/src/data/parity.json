@@ -1,8 +1,8 @@
 {
-  "$comment": "Status per area: ported | partial | planned | wont-port | unknown. Notes and evidence are optional; evidence is a URL. Assessed against the repository, not docs claims: authored test suites, goldens captured from Pi 1.1.0, compatibility/*.v1.1.0 inventories and overlays, and compatibility/sync-1.1.0-applicability.json. deviations lists the differences that remain, intentional ones first.",
-  "assessedOn": "2026-10-10",
-  "baseline": "Pi v1.1.0",
-  "release": "1.1.0.3",
+  "$comment": "Status per area: ported | partial | planned | wont-port | unknown. Notes and evidence are optional; evidence is a URL. Assessed against the repository, not docs claims: authored test suites, goldens captured from Pi 1.1.0 with authored Pi 1.2.0 text changes, compatibility/*.v1.2.0 inventories and overlays, and compatibility/sync-1.2.0-applicability.json. deviations lists the differences that remain, intentional ones first.",
+  "assessedOn": "2026-10-15",
+  "baseline": "Pi v1.2.0",
+  "release": "1.2.0",
   "promises": [
     {
       "id": "behavior",
@@ -24,7 +24,7 @@
         {
           "area": "Providers and model selection",
           "status": "ported",
-          "notes": "All 10 of Pi's chat APIs, including Bedrock, Codex and Copilot, all 42 provider catalogs and the llama.cpp router provider, each with a live route and /login. OpenAI Codex tries a WebSocket first and compresses server-sent-event requests with zstd, as Pi does. --model patterns, --models, --list-models (with extension providers), models.json and the startup catalog refresh work. Azure resource names are taken as Pi takes them (decision 14). Differences: the websocketConnectTimeoutMs setting isn't read (the WebSocket gets 15 seconds), and models.json validation errors only approximate TypeBox's messages.",
+          "notes": "All 10 of Pi's chat APIs, including Bedrock, Codex and Copilot, all 42 provider catalogs and the llama.cpp router provider, each with a live route and /login. OpenAI Codex tries a WebSocket first and compresses server-sent-event requests with zstd, as Pi does. --model patterns, --models, --list-models (with extension providers), models.json and the startup catalog refresh work; with an OpenRouter key, the openrouter catalog lists only that key's models, with its limits and prices. models.json, keybindings and themes are validated with Pi's published schemas and TypeBox's messages. Azure resource names are taken as Pi takes them (decision 14). Difference: the websocketConnectTimeoutMs setting isn't read (the WebSocket gets 15 seconds).",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ProviderApis.Tests"
         },
         {
@@ -42,7 +42,7 @@
         {
           "area": "Sessions and branching",
           "status": "ported",
-          "notes": "Sessions in ~/.pi/agent/sessions, --continue, --resume, --session, --session-id, --fork, --session-dir and --no-session, /name, /session, /fork, /clone, /tree, /resume, HTML export and /share. Session files are compared with files Pi 1.1.0 wrote for the same scripts.",
+          "notes": "Sessions in ~/.pi/agent/sessions, --continue, --resume, --session, --session-id, --fork, --session-dir and --no-session, /name, /session, /fork, /clone, /tree, /resume, HTML export and /share. Session files are compared with files Pi 1.1.0 wrote for the same scripts, with Pi 1.2.0's text changes applied.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.CliParity.Tests/SessionFormat"
         },
         {
@@ -72,7 +72,7 @@
         {
           "area": "MCP",
           "status": "ported",
-          "notes": "Stdio and HTTP servers, ~/.pi/agent/mcp.json and the trusted project .pi/mcp.json, OAuth with refresh locks, all exposure modes, resource tools, the 10-second wait for direct servers, the mcp_servers prompt section, /mcp in every mode and pisharp mcp. MCP is a built-in extension that can be turned off. Difference: /reload keeps the servers connected and doesn't re-read mcp.json unless the mcp, codemode or tool-search built-ins changed; Pi reconnects on every reload.",
+          "notes": "Stdio and HTTP servers, ~/.pi/agent/mcp.json and the trusted project .pi/mcp.json, OAuth with refresh locks, all exposure modes, resource tools, the 10-second wait for direct servers, a wait before each tool call for the servers it may reach, the mcp_servers prompt section, /mcp in every mode and pisharp mcp. MCP is a built-in extension that can be turned off. Difference: /reload keeps the servers connected and doesn't re-read mcp.json unless the mcp, codemode or tool-search built-ins changed; Pi reconnects on every reload.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.McpParity.Tests"
         },
         {
@@ -84,7 +84,7 @@
         {
           "area": "Codemode",
           "status": "ported",
-          "notes": "Pi's prelude, script API, store, models bridge and limits, on the Jint engine. Codemode MCP servers connect. Intentional: each script runs in its own worker process (about 100 to 300 ms to start), its deadline starts when the script starts, and memory and recursion overruns end the script instead of throwing.",
+          "notes": "Pi's prelude, script API, store, models bridge and limits, on the Jint engine. Declarations show input constraints, and the row shows elapsed and total time. Codemode MCP servers connect. Intentional: each script runs in its own worker process (about 100 to 300 ms to start), its deadline starts when the script starts, and memory and recursion overruns end the script instead of throwing.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Codemode.Tests"
         }
       ]
@@ -103,7 +103,7 @@
         {
           "area": "Session file format: write",
           "status": "ported",
-          "notes": "Every line is the bytes JSON.stringify writes, in Pi's key order. Compared entry by entry with session files captured from Pi 1.1.0.",
+          "notes": "Every line is the bytes JSON.stringify writes, in Pi's key order. Compared entry by entry with session files captured from Pi 1.1.0, with Pi 1.2.0's text changes applied.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.CliParity.Tests/SessionFormat"
         },
         {
@@ -121,7 +121,7 @@
         {
           "area": "RPC commands",
           "status": "ported",
-          "notes": "All 33 Pi v1.1.0 RPC commands. A failed command answers with the error's message, thinking levels are clamped to the model, and the setters save the global settings.json, as in Pi. Under pisharp --mode rpc, bash runs in your shell with no extra options. Difference: get_session_stats fails on non-finite usage, where Pi reports null.",
+          "notes": "All 33 Pi v1.2.0 RPC commands. A failed command answers with the error's message, thinking levels are clamped to the model, and the setters save the global settings.json, as in Pi. Under pisharp --mode rpc, bash runs in your shell with no extra options. Difference: get_session_stats fails on non-finite usage, where Pi reports null.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.Rpc.Tests"
         },
         {
@@ -158,7 +158,7 @@
         {
           "area": "Pi's npm packages",
           "status": "ported",
-          "notes": "pi-coding-agent, pi-ai, pi-tui and pi-agent-core 1.1.0 are installed with your npm, checked against the registry's integrity, and loaded through Pi's jiti. Offline, or without npm, extensions fall back to built-in copies with a warning.",
+          "notes": "pi-coding-agent, pi-ai, pi-tui and pi-agent-core 1.2.0 are installed with your npm, checked against the registry's integrity, and loaded through Pi's jiti. Offline, or without npm, extensions fall back to built-in copies with a warning.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         },
         {
@@ -170,7 +170,7 @@
         {
           "area": "Event hooks",
           "status": "ported",
-          "notes": "Every v1.1.0 extension event reaches TypeScript handlers. sendMessage with triggerTurn starts its turn at once, inside a command or from a timer, as in Pi.",
+          "notes": "Every v1.2.0 extension event reaches TypeScript handlers, including before_agent_start for runs a custom message starts. sendMessage with triggerTurn starts its turn at once, inside a command or from a timer, as in Pi.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         },
         {
@@ -188,7 +188,7 @@
         {
           "area": "Native C# extensions",
           "status": "ported",
-          "notes": "A folder with a pisharp-extension.json loads from the same places as Pi extensions, without Node, and shares the session and command list with TypeScript extensions. All 41 v1.1.0 events reach native handlers, and native extensions can register classifier and image providers. Difference: a C# extension that registers codemode, tool_search or /mcp doesn't replace the built-in one; only TypeScript extensions do.",
+          "notes": "A folder with a pisharp-extension.json loads from the same places as Pi extensions, without Node, and shares the session and command list with TypeScript extensions. All 41 v1.2.0 events reach native handlers, and native extensions can register classifier and image providers. Difference: a C# extension that registers codemode, tool_search or /mcp doesn't replace the built-in one; only TypeScript extensions do.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ExtensionParity.Tests"
         }
       ]
@@ -219,7 +219,8 @@
         { "title": "JSON depth 1,000", "notes": "Session records, RPC input and other JSON values hold 1,000 levels of nesting. Pi's JSON.parse has no limit, though V8's JSON.stringify gives up at about 1,700 levels, so Pi can't store deeper values either." },
         { "title": "Explicit session verbs", "notes": "The pisharp session … and rpc verbs keep their byte bounds (64 MiB session lines and files, 32 MiB RPC records, 8 MiB tool results) and refuse lone surrogates. The Pi command line has neither limit. Provider request bodies stay limited to 64 MiB, and single request entries to 16 MiB, everywhere." },
         { "title": "Non-finite usage", "notes": "get_session_stats fails when a session holds non-finite usage numbers, where Pi reports null." },
-        { "title": "models.json errors", "notes": "models.json validation errors use TypeBox's wording but not its full list: a failed union reports only \"must match a schema in anyOf\"." },
+        { "title": "TypeScript tool reach", "notes": "A TypeScript tool that declares reachesTools reaches every tool, so its calls wait for every MCP server. Pi asks the tool which servers a call may reach." },
+        { "title": "Codemode row clock", "notes": "The plain codemode row that native renderer hosts get shows the total time once a script finished, but no live elapsed time. The interactive mode shows both." },
         { "title": "WebSocket connect timeout", "notes": "The websocketConnectTimeoutMs setting isn't read. The Codex WebSocket always gets 15 seconds to open, Pi's default." },
         { "title": "Azure resource names", "notes": "Any resource name is taken as Pi takes it (decision 14). A name that leaves credentials, a fragment or a query in the URL, or a host .NET can't hold (such as one with $ or an empty label), is refused when the session starts; Pi fails only when it sends the request." }
       ]
@@ -229,7 +230,7 @@
     {
       "title": "Freeze the compatibility target",
       "status": "partial",
-      "notes": "Pinned to Pi v1.1.0, with the command, RPC and event inventories refreshed. Release profiles (P1-04) are still open."
+      "notes": "Pinned to Pi v1.2.0, with the command, RPC and event inventories refreshed. Release profiles (P1-04) are still open."
     },
     {
       "title": "Provider layer",
@@ -270,6 +271,11 @@
       "title": "1.1.0.x gap releases",
       "status": "partial",
       "notes": "tool_search shipped in 1.1.0.1 and the rest of Pi v1.1.0 in 1.1.0.2. 1.1.0.3 fixes issue #5 and closes most of the differences 1.1.0.2 left open; 1.1.0.5 names PiSharp in the startup header and fixes lone surrogates in compaction estimates; 1.1.0.6 is tested on macOS arm64 and fixes what that found; 1.1.0.7 fixes stdin commands hanging on Apple Silicon and makes the settings and trust locks exclusive."
+    },
+    {
+      "title": "Pi 1.2.0 sync",
+      "status": "partial",
+      "notes": "Every Pi 1.2.0 change in scope is ported with tests (sync-1.2.0-applicability.json), except per-input reach for TypeScript tools and the live clock of the plain codemode row."
     }
   ]
 }

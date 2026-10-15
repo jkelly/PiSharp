@@ -1,4 +1,4 @@
-// grok-mermaid 0.2.3 (Apache-2.0): src/layout.ts — used by Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/interactive/components/mermaid.ts.
+// grok-mermaid 0.2.3 (Apache-2.0): src/layout.ts — used by Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/components/mermaid.ts.
 using static PiSharp.Cli.Interactive.Mode.Mermaid.MermaidCanvas;
 using static PiSharp.Cli.Interactive.Mode.Mermaid.MermaidJs;
 

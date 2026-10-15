@@ -3,7 +3,7 @@ title: Command line
 description: pisharp takes Pi's command line, plus a few PiSharp options.
 ---
 
-`pisharp` takes the same command line as Pi v1.1.0. Run `pisharp --help` for the exact list in your build. Pi's [Command Line](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/cli.md) reference applies; this page covers the common cases and what PiSharp adds.
+`pisharp` takes the same command line as Pi v1.2.0. Run `pisharp --help` for the exact list in your build. Pi's [Command Line](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/cli.md) reference applies; this page covers the common cases and what PiSharp adds.
 
 ```sh
 pisharp [options] [--] [@files...] [messages...]

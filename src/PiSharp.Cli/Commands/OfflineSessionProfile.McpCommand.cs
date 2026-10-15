@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (registerCommand("mcp") outside
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (registerCommand("mcp") outside
 // interactive mode: no arguments notify formatStatus(); login, logout and reconnect act on one server through ctx.ui) and
 // packages/coding-agent/src/extensions/index.ts (mcp is a built-in extension: not loaded, it registers no /mcp).
 using System.Collections.Immutable;

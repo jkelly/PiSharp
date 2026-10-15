@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/core/session-manager.ts (buildSessionPath, buildContextEntries,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/session-manager.ts (buildSessionPath, buildContextEntries,
 // sessionEntryToContextMessages, getLatestCompactionEntry), coding-agent/src/core/messages.ts (createCustomMessage,
 // createBranchSummaryMessage, createCompactionSummaryMessage) and coding-agent/src/core/agent-session.ts (parseSkillBlock).
 using System.Globalization;

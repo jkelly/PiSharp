@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (AgentSessionEvent:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (AgentSessionEvent:
 // entry_appended, thinking_level_changed, summarization_retry_*; _summarizationRetryCallbacks; setThinkingLevel; _emitModelSelect)
 // and packages/ai/src/utils/retry.ts (retryAssistantCall).
 using System.Text.Json;

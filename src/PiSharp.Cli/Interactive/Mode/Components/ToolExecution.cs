@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/tool-execution.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/tool-execution.ts.
 // ensurePngTranscoder (coding-agent/src/utils/image-convert.ts) registers PiSharp's Skia PNG conversion as the Image transcoder.
 using System.Text.Json.Nodes;
 using PiSharp.Extensions;

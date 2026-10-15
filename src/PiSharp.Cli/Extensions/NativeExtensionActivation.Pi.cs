@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (bindExtensions: the session binds
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (bindExtensions: the session binds
 // the loaded extensions' runner with its actions) and packages/coding-agent/src/core/extensions/runner.ts (bindCore).
 using System.Collections.Immutable;
 using PiSharp.Agent;
@@ -103,7 +103,7 @@ internal sealed partial class NativeExtensionActivation
                         tool.SequentialExecution ? PiSharp.Agent.ToolExecutionMode.Sequential : PiSharp.Agent.ToolExecutionMode.Parallel)
                     {
                         Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true, Annotations = tool.Annotations,
-                        PromptGuidelines = tool.PromptGuidelines, PromptSnippet = tool.PromptSnippet, OutputSchema = tool.OutputSchema,
+                        PromptGuidelines = tool.PromptGuidelines, PromptSnippet = tool.PromptSnippet, OutputSchema = tool.OutputSchema, ReachesTools = tool.ReachesTools,
                         PrepareLoadout = binding.GetLoadoutPreparation(tool.Name)
                     };
                 }).ToImmutableArray();

@@ -13,7 +13,7 @@ public sealed record McpResourceServer(string Name, long Generation, double Time
 /// The host owns path policy and file lifetime; no ambient file writer is provided.</summary>
 public delegate ValueTask<string> McpResourceOutputSaver(ReadOnlyMemory<byte> data, string extension,
     McpInvocationIdentity identity, CancellationToken cancellationToken);
-/// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/client.ts MAX_LIST_PAGES (1,000 pages) and
+/// <summary>Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/mcp/src/client.ts MAX_LIST_PAGES (1,000 pages) and
 /// transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES (16 MiB per response); resources.ts keeps every listed item, and
 /// tools.ts MCP_OUTPUT_MAX_BYTES (20 KiB) bounds only the model-facing text.</summary>
 public sealed record McpResourceLimits(int MaximumPages = 1000, int MaximumItems = int.MaxValue,

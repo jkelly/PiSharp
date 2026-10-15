@@ -175,8 +175,11 @@ export function buildInventory({ template, readOld, readNew, commit, tree, tag, 
   assert.deepEqual(before.assistantEvents.map(row => row.type), rowsOf('nested-assistant-event-declaration').map(row => row.name.split('.').pop()), 'Assistant event census differs');
   const argsModuleRows = template.rows.filter(row => row.classification.startsWith('module-') && row.source.path === ARGS).map(row => row.name);
   assert.deepEqual(before.modules, argsModuleRows, 'args.ts module export census differs');
-  for (const [key, label] of [['help', 'help subcommand'], ['entries', 'package entry'], ['modules', 'args.ts module export']])
+  for (const [key, label] of [['help', 'help subcommand'], ['modules', 'args.ts module export']])
     assert.deepEqual(after[key], before[key], label + ' set changed upstream; author rows before refreshing');
+  // A removed package entry is kept and marked, as removed root exports and flags are; an added one needs authored rows.
+  assert.deepEqual(after.entries, before.entries.filter(name => after.entries.includes(name)), 'package entry set changed upstream; author rows before refreshing');
+  const removedEntries = new Set(before.entries.filter(name => !after.entries.includes(name)));
   assert.deepEqual(after.assistantEvents.map(row => row.type), before.assistantEvents.map(row => row.type), 'Assistant event union changed upstream');
   assert.deepEqual(eventNames(after), eventNames(before), 'Session event union changed upstream');
 
@@ -231,7 +234,8 @@ export function buildInventory({ template, readOld, readNew, commit, tree, tag, 
   const removedRoot = new Set(before.root.filter(row => !after.root.some(item => item.name === row.name)).map(row => row.name));
   const removedFlags = new Set(before.flags.filter(row => !after.flags.some(item => item.spellings[0] === row.spellings[0])).map(row => row.spellings[0]));
   for (const original of template.rows) {
-    const removed = (original.classification.startsWith('public-root-') && removedRoot.has(original.name)) || (original.classification === 'built-in-parser-flag' && removedFlags.has(original.name));
+    const removed = (original.classification.startsWith('public-root-') && removedRoot.has(original.name)) || (original.classification === 'built-in-parser-flag' && removedFlags.has(original.name)) ||
+      ((original.classification === 'published-root-entry-declaration' || original.classification === 'separate-package-subpath-entry-declaration') && removedEntries.has(original.name));
     if (removed) {
       const row = structuredClone(original); row.targetStatus = { removedUpstream: true, at: commit, note: 'Absent at ' + tag + '; source anchors retained from ' + template.sourceSha + '.' };
       changes.removed.push(row.id); rows.push(row); continue;
@@ -267,6 +271,8 @@ export function buildInventory({ template, readOld, readNew, commit, tree, tag, 
 
   const inventory = {};
   for (const [key, value] of Object.entries(template)) {
+    // A refreshed template (v1.1.0 onward) carries its own refresh record; this refresh writes a new one.
+    if (!same && (key === 'sourceTag' || key === 'previousInventory' || key === 'refresh')) continue;
     inventory[key] = structuredClone(value);
     if (key === 'sourceSha' && !same) inventory.sourceTag = tag;
   }

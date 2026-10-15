@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/source-info.ts (createSourceInfo,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/source-info.ts (createSourceInfo,
 // createSyntheticSourceInfo) and packages/coding-agent/src/core/resource-loader.ts (applyExtensionSourceInfo).
 using System.Text.Json.Nodes;
 

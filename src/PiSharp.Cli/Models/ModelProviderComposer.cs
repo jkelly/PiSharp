@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/provider-composer.ts (applyModelsJson,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/provider-composer.ts (applyModelsJson,
 // modelFromJson, findModelDefaults, applyModelOverride, mergeCompat, mergeInputLimits, mergeSamplingParamsByThinkingLevel,
 // rawModelHeaders, resolveCompatibilityRequestConfig, configuredRequestAuthStatus, withConfiguredAuth).
 using System.Collections.Immutable;

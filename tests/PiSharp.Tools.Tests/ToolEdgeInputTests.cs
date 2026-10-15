@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/read.ts, write.ts, edit.ts, ls.ts and bash.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/tools/read.ts, write.ts, edit.ts, ls.ts and bash.ts.
 // Inputs upstream's validateToolArguments admits reach the tool's execute; the expected texts were captured by running the installed
 // Pi 1.1.0 tools with node (validateToolArguments, then execute) on the same files.
 using System.Collections.Immutable;

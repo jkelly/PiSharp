@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/error-body.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/error-body.ts.
 using System.Text;
 using System.Text.Json;
 using PiSharp.Contracts.Compatibility;
@@ -10,6 +10,10 @@ namespace PiSharp.AI.Protocols.ProviderShared;
 internal sealed class ProviderDisplayException(string message, bool inStream = false) : Exception(message)
 {
     internal bool InStream { get; } = inStream;
+    /// <summary>The rejected response's HTTP status (the SDK APIError.status), when known.</summary>
+    internal int? Status { get; init; }
+    /// <summary>The SDK APIError.type: the parsed body's <c>error.type</c> when it is a string.</summary>
+    internal string? ErrorType { get; init; }
 }
 
 /// <summary>
@@ -99,6 +103,11 @@ internal static class ProviderErrorText
 
     /// <summary>@anthropic-ai/sdk <c>APIError.message</c> for a non-2xx response with body <paramref name="text"/>
     /// (the whole parsed body is the SDK's <c>error</c>).</summary>
+    /// <summary>@anthropic-ai/sdk <c>APIError.generate</c>: <c>type = errorResponse?.error?.type</c> of the parsed body (a string, or null).</summary>
+    internal static string? AnthropicErrorType(string text) =>
+        SafeJson(text) is { ValueKind: JsonValueKind.Object } body && body.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object &&
+        error.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String ? type.GetString() : null;
+
     internal static string AnthropicStatus(int status, string text)
     {
         var parsed = SafeJson(text);

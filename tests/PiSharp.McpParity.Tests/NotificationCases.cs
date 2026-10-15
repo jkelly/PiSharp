@@ -8,8 +8,9 @@ using PiSharp.Extensions.Mcp.Runtime;
 using PiSharp.Extensions.Mcp.Transport;
 
 // Upstream: extensions/mcp/runtime.ts (connectOnce: notifications/message to the server log, notifications/tools/list_changed refreshes
-// the tools; fetchResources counts), extensions/mcp/log.ts (formatMcpLogMessage, rotation), extensions/mcp/cli.ts (list: resources and
-// URI templates), extensions/mcp/index.ts (describeState with resources, renderServersSection from the current servers).
+// the tools; Pi 1.2.0 lists no resources at connect), extensions/mcp/log.ts (formatMcpLogMessage, rotation), extensions/mcp/cli.ts
+// (list: "offers resources", resources: true), extensions/mcp/index.ts (describeState with resources, renderServersSection from the
+// current servers).
 internal static partial class Program
 {
     /// <summary>A fake server whose tool list can change; it reports changes through the session's notification handler.</summary>
@@ -90,26 +91,36 @@ internal static partial class Program
         finally { Directory.Delete(root, true); }
     }
 
-    // cli.ts list: servers with resources report their resource and URI template counts, without MCP App resources.
-    private static Task ListResourceCounts() => WithRoot("list-resources", """{"mcpServers":{"docs":{"command":"docs-server"}}}""", async fixture =>
+    // Pi 1.2.0 cli.ts list: a server that offers resources prints "offers resources" and reports `resources: true` in JSON; its
+    // resources are not listed (listing every one can take long), so there are no resource or URI template counts.
+    private static Task ListOffersResources() => WithRoot("list-resources", """{"mcpServers":{"docs":{"command":"docs-server"}}}""", async fixture =>
     {
-        McpAdmittedChannelFactory Channel(McpServerEntry entry) => (actual, token) => ValueTask.FromResult<IMcpAdmittedRequestChannel>(new ResourceServer());
+        var servers = new ConcurrentBag<ResourceServer>();
+        McpAdmittedChannelFactory Channel(McpServerEntry entry) => (actual, token) =>
+        {
+            var server = new ResourceServer(); servers.Add(server);
+            return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server);
+        };
         using var output = new StringWriter { NewLine = "\n" }; using var error = new StringWriter { NewLine = "\n" };
         var options = new McpCommandOptions(fixture.Project, fixture.Agent) { CreateChannel = Channel };
         Equal(0, await McpCommand.RunAsync(["list"], output, error, options), "exit code; " + error);
-        Equal($"docs: connected, 1 tool (codemode, global)\n  docs-server\n  tools: search\n  resources: 2, URI templates: 1\n", output.ToString(), "list");
+        Equal($"docs: connected, 1 tool (codemode, global)\n  docs-server\n  tools: search\n  offers resources\n", output.ToString(), "list");
         using var json = new StringWriter { NewLine = "\n" };
         Equal(0, await McpCommand.RunAsync(["list", "--json"], json, error, options), "json exit code");
         var report = JsonDocument.Parse(json.ToString()).RootElement.GetProperty("servers")[0];
-        Equal(2, report.GetProperty("resources").GetInt32(), "json resources"); Equal(1, report.GetProperty("resourceTemplates").GetInt32(), "json templates");
+        Equal(JsonValueKind.True, report.GetProperty("resources").ValueKind, "json resources: true");
+        Check(!report.TryGetProperty("resourceTemplates", out _), "no resourceTemplates count");
+        Check(servers.All(server => !server.Methods.Any(method => method.StartsWith("resources/", StringComparison.Ordinal))),
+            "no resource listing: " + string.Join(",", servers.SelectMany(server => server.Methods)));
     });
 
     private sealed class ResourceServer : IMcpAdmittedRequestChannel
     {
+        public readonly ConcurrentQueue<string> Methods = new();
         public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask ConfigureRootsAsync(JsonData roots, CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask NotifyAsync(string method, JsonData? parameters, CancellationToken token) => ValueTask.CompletedTask;
-        public ValueTask<JsonData> RequestAsync(string method, JsonData? parameters, McpRequestOptions options, CancellationToken token) => ValueTask.FromResult(JsonData.Parse(method switch
+        public ValueTask<JsonData> RequestAsync(string method, JsonData? parameters, McpRequestOptions options, CancellationToken token) => Record(method, () => JsonData.Parse(method switch
         {
             "initialize" => """{"protocolVersion":"2025-11-25","serverInfo":{"name":"docs","version":"1"},"capabilities":{"tools":{},"resources":{}}}""",
             "tools/list" => """{"tools":[{"name":"search","inputSchema":{"type":"object"}}]}""",
@@ -119,6 +130,7 @@ internal static partial class Program
             "resources/templates/list" => """{"resourceTemplates":[{"uriTemplate":"docs://{id}","name":"doc"}]}""",
             _ => throw new IOException("Unexpected MCP method " + method)
         }));
+        private ValueTask<JsonData> Record(string method, Func<JsonData> answer) { Methods.Enqueue(method); return ValueTask.FromResult(answer()); }
         public Task CloseAsync() => Task.CompletedTask;
     }
 

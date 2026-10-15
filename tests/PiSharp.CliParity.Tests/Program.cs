@@ -12,7 +12,7 @@ using PiSharp.Cli.Pi;
 // no network, no real credentials, no real home or agent directory.
 internal static partial class Program
 {
-    private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 
     private static async Task<int> Main(string[] args)
     {
@@ -179,12 +179,12 @@ internal static partial class Program
     private static HttpResponseMessage Sse(string body) => new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "text/event-stream") };
 
     /// <summary>An Anthropic Messages stream answering with one text block.</summary>
-    internal static HttpResponseMessage AnthropicText(string text) => Sse(
+    internal static HttpResponseMessage AnthropicText(string text, string stopReason = "end_turn") => Sse(
         Frame("message_start", new { type = "message_start", message = new { id = "msg_1", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
         + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "text", text = "" } })
         + Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text } })
         + Frame("content_block_stop", new { type = "content_block_stop", index = 0 })
-        + Frame("message_delta", new { type = "message_delta", delta = new { stop_reason = "end_turn" }, usage = new { output_tokens = 2 } })
+        + Frame("message_delta", new { type = "message_delta", delta = new { stop_reason = stopReason }, usage = new { output_tokens = 2 } })
         + Frame("message_stop", new { type = "message_stop" }));
 
     /// <summary>An Anthropic Messages stream calling one tool.</summary>

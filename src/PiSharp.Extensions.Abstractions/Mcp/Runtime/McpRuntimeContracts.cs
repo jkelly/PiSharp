@@ -48,7 +48,7 @@ public interface IMcpNotificationRetirementChannel
 
 /// <summary>Transfers a fresh independently closeable admitted lease, never ownership of a global client/process.</summary>
 public delegate ValueTask<IMcpAdmittedRequestChannel> McpAdmittedChannelFactory(McpServerEntry entry, CancellationToken cancellationToken);
-/// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/client.ts MAX_LIST_PAGES (1,000 tools/list pages) and
+/// <summary>Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/mcp/src/client.ts MAX_LIST_PAGES (1,000 tools/list pages) and
 /// transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES (16 MiB per message, so per response and per tool schema). The client keeps
 /// every listed tool, so the tool count and the whole catalog have no bound of their own.</summary>
 public sealed record McpRuntimeLimits(int MaximumPages = 1000, int MaximumTools = int.MaxValue,

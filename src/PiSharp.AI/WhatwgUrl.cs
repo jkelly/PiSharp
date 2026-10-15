@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): the WHATWG URL parsing Pi relies on through Node's URL
-// (coding-agent bug-report.ts redactUrl, ai api/azure-openai-config.ts normalizeAzureBaseUrl).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the WHATWG URL parsing Pi relies on through Node's URL
+// (packages/coding-agent/src/core/bug-report.ts redactUrl, packages/ai/src/api/azure-openai-config.ts normalizeAzureBaseUrl).
 using System.Globalization;
 using System.Text;
 

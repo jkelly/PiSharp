@@ -1,6 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/remote-catalog-provider.ts,
-// packages/coding-agent/src/core/models-store.ts, packages/ai/src/models-store.ts, packages/ai/src/models.ts (refresh,
-// withKnownModelTypes), packages/coding-agent/src/utils/management-http.ts (fetchWithRetry),
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/remote-catalog-provider.ts (withRemoteCatalog,
+// withPersonalizedCatalog), packages/coding-agent/src/core/models-store.ts, packages/ai/src/models-store.ts, packages/ai/src/models.ts
+// (refresh, withKnownModelTypes, RefreshModelsContext.baseUrl), packages/coding-agent/src/utils/management-http.ts (fetchWithRetry),
 // packages/coding-agent/src/utils/pi-user-agent.ts and packages/coding-agent/src/modes/interactive/model-catalog-refresh.ts.
 using System.Collections.Concurrent;
 using System.Globalization;
@@ -109,6 +109,8 @@ internal sealed class FileModelsStore(string path) : IModelsStore
             catch (IOException) when (File.Exists(lockPath) || Directory.Exists(lockPath))
             {
                 var stamp = Directory.Exists(lockPath) ? Directory.GetLastWriteTimeUtc(lockPath) : File.GetLastWriteTimeUtc(lockPath);
+                // 1601-01-01 means the lock vanished between the check and the read: try again, never take it for stale.
+                if (stamp == DateTime.FromFileTimeUtc(0)) continue;
                 if (DateTime.UtcNow - stamp > TimeSpan.FromSeconds(30))
                 { try { if (Directory.Exists(lockPath)) Directory.Delete(lockPath); else File.Delete(lockPath); } catch (IOException) { } continue; }
                 if (DateTime.UtcNow - started > TimeSpan.FromSeconds(30)) throw new IOException("Failed to acquire models store lock");
@@ -122,11 +124,23 @@ internal sealed class FileModelsStore(string path) : IModelsStore
 /// <see cref="ModelsPublication.Delete"/>) and then runs the update; it returns false when the refresh was superseded.</summary>
 internal sealed record ModelsPublication(ModelsStoreEntry? Persist = null, bool Delete = false, Action? Update = null);
 
+/// <param name="CredentialKey">The effective credential's key (an OAuth credential's access token) for the network phase.</param>
+/// <param name="BaseUrl">RefreshModelsContext.baseUrl: the registered provider's base URL, including models.json and extension overrides.</param>
 internal sealed record RemoteRefreshContext(ModelsStoreEntry? Stored, bool AllowNetwork, bool? Force,
-    Func<ModelsPublication, Task<bool>> Publish, CancellationToken CancellationToken);
+    Func<ModelsPublication, Task<bool>> Publish, CancellationToken CancellationToken, string? CredentialKey = null, string? BaseUrl = null);
+
+/// <summary>A refreshable catalog layer over one built-in provider's models.</summary>
+internal interface ICatalogOverlay
+{
+    /// <summary>The provider's models with this layer applied.</summary>
+    List<RegistryModel> Apply(IReadOnlyList<RegistryModel> baseline);
+    Task RefreshAsync(RemoteRefreshContext context);
+    /// <summary>Whether the network phase needs a resolved credential (models.ts refresh skips it without one).</summary>
+    bool RequiresCredential { get; }
+}
 
 /// <summary>Source withRemoteCatalog: a persisted pi.dev catalog overlay on one static built-in provider.</summary>
-internal sealed class RemoteCatalogOverlay
+internal sealed class RemoteCatalogOverlay : ICatalogOverlay
 {
     internal const string DefaultCatalogBaseUrl = "https://pi.dev";
     internal static readonly TimeSpan AttemptTimeout = TimeSpan.FromMilliseconds(4_000);
@@ -162,7 +176,8 @@ internal sealed class RemoteCatalogOverlay
         return merged;
     }
 
-    internal List<RegistryModel> Apply(IReadOnlyList<RegistryModel> baseline) => Merge(baseline, dynamicModels);
+    public List<RegistryModel> Apply(IReadOnlyList<RegistryModel> baseline) => Merge(baseline, dynamicModels);
+    public bool RequiresCredential => false;
 
     private static bool SupportedType(JsonObject model) =>
         !model.ContainsKey("type") || JsonTree.String(model, "type") is { } type && ModelTypes.Contains(type, StringComparer.Ordinal);
@@ -188,15 +203,15 @@ internal sealed class RemoteCatalogOverlay
         return result;
     }
 
-    /// <summary>Source remoteModels: the stored overlay only when it is newer than the built-in catalog.</summary>
-    private List<RegistryModel> RemoteModels(ModelsStoreEntry? entry)
-    {
-        if (entry is null) return [];
-        if (localGeneratedAt is { } local && (entry.LastModified is null || entry.LastModified <= local)) return [];
-        return ParseStored(entry);
-    }
+    /// <summary>Source isNewer: whether a pi.dev catalog is newer than the model data shipped with pi.</summary>
+    internal static bool IsNewer(double? lastModified, long? localGeneratedAt) =>
+        localGeneratedAt is not { } local || lastModified is { } modified && modified > local;
 
-    private List<RegistryModel> ParseStored(ModelsStoreEntry entry)
+    /// <summary>Source remoteModels: the stored overlay only when it is newer than the built-in catalog.</summary>
+    private List<RegistryModel> RemoteModels(ModelsStoreEntry? entry) =>
+        entry is not null && IsNewer(entry.LastModified, localGeneratedAt) ? ParseStored(entry) : [];
+
+    internal static List<RegistryModel> ParseStored(ModelsStoreEntry entry)
     {
         var models = new List<RegistryModel>();
         foreach (var node in entry.Models.OfType<JsonObject>())
@@ -205,7 +220,7 @@ internal sealed class RemoteCatalogOverlay
     }
 
     /// <summary>Source withRemoteCatalog refreshModels.</summary>
-    internal async Task RefreshAsync(RemoteRefreshContext context)
+    public async Task RefreshAsync(RemoteRefreshContext context)
     {
         var stored = context.Stored; var token = context.CancellationToken;
         var restored = RemoteModels(stored).Where(model => model.Provider == providerId).ToArray();
@@ -215,8 +230,7 @@ internal sealed class RemoteCatalogOverlay
             now().ToUnixTimeMilliseconds() - checkedAt < RefreshIntervalMilliseconds) return;
         // Only revalidate when a cached body backs the validator, so a 304 can never leave the overlay empty.
         var validator = stored is not null && stored.Models.Count > 0 ? stored.ETag : null;
-        var url = new Uri(new Uri(catalogBaseUrl), "/api/models/providers/" + Uri.EscapeDataString(providerId) + "?types=" + Uri.EscapeDataString(string.Join(",", ModelTypes)));
-        using var response = await FetchWithRetryAsync(url, validator, token).ConfigureAwait(false);
+        using var response = await RequestCatalogAsync(providerId, catalogBaseUrl, createClient, validator, token).ConfigureAwait(false);
         if (token.IsCancellationRequested) return;
         double checkedNow = now().ToUnixTimeMilliseconds();
         if (response.StatusCode == HttpStatusCode.NotModified && stored is not null)
@@ -232,18 +246,30 @@ internal sealed class RemoteCatalogOverlay
             await context.Publish(new(Persist: (stored ?? new([])) with { CheckedAt = checkedNow })).ConfigureAwait(false);
             throw new InvalidOperationException($"Model catalog request failed for {providerId}: {(int)response.StatusCode}");
         }
-        var body = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
-        var refreshed = ParseCatalog(providerId, JsonTree.Parse(body));
-        var lastModified = response.Content.Headers.LastModified?.ToUnixTimeMilliseconds() ?? 0;
+        var (refreshed, lastModified, etag) = await ReadCatalogAsync(providerId, response, token).ConfigureAwait(false);
         if (token.IsCancellationRequested) return;
-        var entry = new ModelsStoreEntry(new JsonArray([.. refreshed.Select(model => (JsonNode?)model.CloneJson())]), lastModified, checkedNow,
-            response.Headers.ETag?.ToString());
+        var entry = new ModelsStoreEntry(new JsonArray([.. refreshed.Select(model => (JsonNode?)model.CloneJson())]), lastModified, checkedNow, etag);
         var published = RemoteModels(entry).ToArray();
         await context.Publish(new(Persist: entry, Update: () => dynamicModels = published)).ConfigureAwait(false);
     }
 
+    /// <summary>Source readCatalog: a successful pi.dev catalog response; a missing or invalid Last-Modified header is 0.</summary>
+    internal static async Task<(List<RegistryModel> Models, double LastModified, string? ETag)> ReadCatalogAsync(string providerId,
+        HttpResponseMessage response, CancellationToken token)
+    {
+        var body = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
+        return (ParseCatalog(providerId, JsonTree.Parse(body)), response.Content.Headers.LastModified?.ToUnixTimeMilliseconds() ?? 0,
+            response.Headers.ETag?.ToString());
+    }
+
+    /// <summary>Source requestCatalog: the provider's pi.dev catalog of every supported type, revalidated with a validator when given.</summary>
+    internal static Task<HttpResponseMessage> RequestCatalogAsync(string providerId, string catalogBaseUrl, Func<HttpClient> createClient, string? validator,
+        CancellationToken token) =>
+        FetchWithRetryAsync(new Uri(new Uri(catalogBaseUrl), "/api/models/providers/" + Uri.EscapeDataString(providerId) + "?types=" +
+            Uri.EscapeDataString(string.Join(",", ModelTypes))), createClient, validator, token);
+
     /// <summary>Source fetchWithRetry with two retries on transport failures, attempt timeouts and retryable statuses.</summary>
-    private async Task<HttpResponseMessage> FetchWithRetryAsync(Uri url, string? validator, CancellationToken token)
+    private static async Task<HttpResponseMessage> FetchWithRetryAsync(Uri url, Func<HttpClient> createClient, string? validator, CancellationToken token)
     {
         for (var attempt = 0; ; attempt++)
         {
@@ -267,7 +293,49 @@ internal sealed class RemoteCatalogOverlay
 
     /// <summary>Source getPiUserAgent with the runtime field naming .NET.</summary>
     internal static string UserAgent { get; } = string.Create(CultureInfo.InvariantCulture,
-        $"pi/1.1.0 ({(OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : "linux")}; dotnet/{Environment.Version}; {RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()})");
+        $"pi/1.2.0 ({(OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : "linux")}; dotnet/{Environment.Version}; {RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()})");
+}
+
+/// <summary>
+/// Source withPersonalizedCatalog (Pi 1.2.0, used for OpenRouter): on each network refresh the catalog (built-in models plus a newer
+/// pi.dev catalog) is passed through <c>personalize</c> and the result is saved. The saved entry holds the personalized list, not the
+/// pi.dev catalog, and replaces the catalog, offline too. There is no refresh interval or etag revalidation. An empty list (nothing
+/// saved yet, or an empty catalog an older pi saved) falls back to the built-in models.
+/// </summary>
+internal sealed class PersonalizedCatalogOverlay(string providerId, Func<HttpClient> createClient, Func<IReadOnlyList<RegistryModel>> builtinModels,
+    Func<IReadOnlyList<RegistryModel>, RemoteRefreshContext, Task<IReadOnlyList<RegistryModel>>> personalize, string? catalogBaseUrl = null,
+    long? localGeneratedAt = null, Func<DateTimeOffset>? now = null) : ICatalogOverlay
+{
+    private readonly string catalogBaseUrl = catalogBaseUrl ?? RemoteCatalogOverlay.DefaultCatalogBaseUrl;
+    private readonly Func<DateTimeOffset> now = now ?? (() => DateTimeOffset.UtcNow);
+    private volatile RegistryModel[] personalModels = [];
+
+    internal IReadOnlyList<RegistryModel> Personal => personalModels;
+
+    public bool RequiresCredential => true;
+
+    public List<RegistryModel> Apply(IReadOnlyList<RegistryModel> baseline) => personalModels.Length > 0 ? [.. personalModels] : [.. baseline];
+
+    public async Task RefreshAsync(RemoteRefreshContext context)
+    {
+        var token = context.CancellationToken;
+        var restored = context.Stored is null ? [] : RemoteCatalogOverlay.ParseStored(context.Stored).Where(model => model.Provider == providerId).ToArray();
+        if (!await context.Publish(new(Update: () => personalModels = restored)).ConfigureAwait(false)) return;
+        if (!context.AllowNetwork || token.IsCancellationRequested) return;
+        using var response = await RemoteCatalogOverlay.RequestCatalogAsync(providerId, catalogBaseUrl, createClient, null, token).ConfigureAwait(false);
+        if (token.IsCancellationRequested) return;
+        IReadOnlyList<RegistryModel> remote = [];
+        if (response.StatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.NotImplemented))
+        {
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Model catalog request failed for {providerId}: {(int)response.StatusCode}");
+            var catalog = await RemoteCatalogOverlay.ReadCatalogAsync(providerId, response, token).ConfigureAwait(false);
+            if (RemoteCatalogOverlay.IsNewer(catalog.LastModified, localGeneratedAt)) remote = catalog.Models;
+        }
+        var personalized = (await personalize(RemoteCatalogOverlay.Merge(builtinModels(), remote), context).ConfigureAwait(false)).ToArray();
+        if (token.IsCancellationRequested) return;
+        await context.Publish(new(Persist: new(new JsonArray([.. personalized.Select(model => (JsonNode?)model.CloneJson())]), CheckedAt: now().ToUnixTimeMilliseconds()),
+            Update: () => personalModels = personalized)).ConfigureAwait(false);
+    }
 }
 
 /// <summary>Source refreshModelCatalogs: concurrent interactive all-catalog refreshes share one run; each caller cancels only its wait,

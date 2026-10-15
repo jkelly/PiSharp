@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (navigateTree: the leaf moves
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (navigateTree: the leaf moves
 // and the tools are restored; agent.state.model and thinkingLevel are untouched) and packages/coding-agent/src/core/session-manager.ts.
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Pi;

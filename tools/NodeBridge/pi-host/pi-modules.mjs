@@ -1,7 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases, loadExtensionModule)
-// and packages/coding-agent/src/core/extensions/jiti-loader.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases, loadExtensionModule),
+// packages/coding-agent/src/core/extensions/jiti-loader.ts and packages/coding-agent/src/main.ts (setThemeJsonValidator, initTheme).
 //
-// The real Pi packages: PiSharp installs the exact Pi 1.1.0 packages into the agent dir (PiNodeRuntime) and names their node_modules
+// The real Pi packages: PiSharp installs the exact Pi 1.2.0 packages into the agent dir (PiNodeRuntime) and names their node_modules
 // here. Extensions are then loaded as upstream's unbundled Node build loads them: jiti from Pi's own dependencies, created for the
 // installed coding agent's loader.js, `moduleCache: false`, and getAliases (the coding agent's dist index, pi-agent-core, pi-tui, the
 // pi-ai compat/oauth/providers entries, typebox, and the @mariozechner/* and @sinclair/typebox names).
@@ -59,8 +59,12 @@ export async function loadPiModules(nodeModules, themeName) {
     '@sinclair/typebox/value': typeboxValueEntry,
   };
 
-  // The coding agent's theme (main.ts calls initTheme before extensions run; ctx.ui.theme is that global theme).
-  const themes = await import(pathToFileURL(path.join(codingAgent, 'dist', 'modes', 'interactive', 'theme', 'theme.js')).href);
+  // The coding agent's theme (main.ts installs the theme JSON validator and calls initTheme before extensions run; ctx.ui.theme is that
+  // global theme).
+  const themeDir = path.join(codingAgent, 'dist', 'modes', 'interactive', 'theme');
+  const themes = await import(pathToFileURL(path.join(themeDir, 'theme.js')).href);
+  const themeSchema = await import(pathToFileURL(path.join(themeDir, 'theme-schema.js')).href);
+  themes.setThemeJsonValidator(themeSchema.validateThemeJson);
   try { themes.initTheme(themeName, false); } catch { /* the system theme stays unset only if Pi itself cannot load one */ }
   const ai = await import(pathToFileURL(piAiCompatEntry).href);
   const tui = await import(pathToFileURL(piTuiEntry).href);

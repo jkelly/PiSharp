@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (agent_settled).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (agent_settled).
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Agent;
@@ -183,7 +183,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         /// <summary>Set (under the gate) just before agent_settled is written: a client that saw it may prompt at once.</summary>
         public bool SettledPublished;
         /// <summary>A run an extension command's handler triggered: the command holds input admission while its handler runs, and the
-        /// run settles inside it (agent-session.ts _runAgentPrompt outlives the sendMessage call).</summary>
+        /// run settles inside it (agent-session.ts _startRun outlives the sendMessage call).</summary>
         public bool CommandTriggered, InputHeldByCommand, MonitorBorrowingInput, InputReleasePending;
     }
     private sealed class EventSink(RpcSessionDispatcher owner) : IAgentEventSink
@@ -394,6 +394,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         catch (Exception error) { SignalFatal(RpcDispatchFailure.SessionRunFailed, error); }
         finally { await BeginShutdown().ConfigureAwait(false); }
     }
+    private static async Task ObserveUnadoptedRunAsync(Task<AgentLoopResult> run)
+    { try { await run.ConfigureAwait(false); } catch (Exception) { /* Shutdown joins the session's idle state; the run is not this host's. */ } }
     private static async Task ObserveCommandAsync(Task command)
     { try { await command.ConfigureAwait(false); } catch (Exception) { /* HandleAsync already records fatal output failures. */ } }
 
@@ -1084,7 +1086,11 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             await run.Ready.Task.ConfigureAwait(false); var continuations = 0;
             while (true)
             {
-                var result = await processing.ConfigureAwait(false);
+                AgentLoopResult? result;
+                // agent-session.ts abort()/dispose(): a run aborted while it starts or runs settles; a run an extension started (a
+                // custom message with triggerTurn) reports that as a cancelled task. Only an abort or shutdown makes that a settlement.
+                try { result = await processing.ConfigureAwait(false); }
+                catch (OperationCanceledException) when (StopRequested(run)) { result = null; }
                 // A command's triggered run settles while the handler (the command's input) still runs.
                 await (run.CommandTriggered ? originating.WaitForTriggeredRunIdleAsync() : _session.WaitForIdleAsync()).ConfigureAwait(false);
                 var borrowed = false;
@@ -1101,7 +1107,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                         stopping = _closed || run.AbortRequested;
                     }
                     var queue = _session.GetPendingInputQueueSnapshot();
-                    if (stopping || result.Reason != AgentLoopStopReason.Completed || queue.SteeringMessages.IsEmpty && queue.FollowUpMessages.IsEmpty) break;
+                    if (stopping || result is null || result.Reason != AgentLoopStopReason.Completed || queue.SteeringMessages.IsEmpty && queue.FollowUpMessages.IsEmpty) break;
                     if (++continuations > _options.MaximumContinuationRuns) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
                     run.HistoryLength = _session.Snapshot.Agent.Messages.Length;
                     run.Ready = ready = NewGate(); // Keep callbacks out of this short transition, even for a synchronous continuation.
@@ -1128,6 +1134,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             await JoinPostOrigin("run-settled", _postRunSettlement, originating, postSlot).ConfigureAwait(false);
         }
     }
+    private bool StopRequested(RunState run) { lock (_gate) return _closed || run.AbortRequested; }
     private void ReleaseInputTurn(RunState run, bool borrowed)
     {
         if (!borrowed) { _inputCommands.Release(); return; }
@@ -1177,7 +1184,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 bool owns; lock (_gate) { owns = _run is null && !_closed; if (owns) _run = adopted; }
                 adopted.Ready.TrySetResult();
                 if (owns) _ = MonitorAsync(adopted, triggered, _session);
+                else _ = ObserveUnadoptedRunAsync(triggered);
             }
+            bool closing;
             lock (_gate)
             {
                 if (observation is AgentLoopStarted && _startingInput is { } starting)
@@ -1185,10 +1194,14 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                     starting.HistoryLength = _session.Snapshot.Agent.Messages.Length;
                     _run = starting; starting.Entered.TrySetResult();
                 }
-                run = _run;
+                run = _run; closing = _closed;
                 if (observation is AgentLoopStarted && run is not null)
                     run.HistoryLength = _session.Snapshot.Agent.Messages.Length;
             }
+            // print-mode.ts and rpc-mode.ts dispose the session on shutdown: agent.abort() and its listeners are removed. A run an
+            // extension started that a closing host did not adopt (a command that returned without waitForIdle) is aborted by the
+            // shutdown and settles there; none of its events are written.
+            if (run is null && closing) return;
             if (run is null && observation is AgentLoopInputMessageStarted { Message.Role: "custom" } or AgentLoopInputMessageEnded { Message.Role: "custom" })
             {
                 // agent-session.ts _appendCustomMessage: an idle session appends an extension's custom message and emits its

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/components/editor.ts and packages/tui/src/editor-component.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/editor.ts and packages/tui/src/editor-component.ts.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -304,11 +304,11 @@ public partial class Editor : IEditorComponent, IFocusable, IMouseHandler
                 if (after.Length > 0)
                 {
                     var first = Graphemes(after).FirstOrDefault().Text ?? "";
-                    display = before + marker + "\u001b[7m" + first + "\u001b[0m" + after[first.Length..];
+                    display = before + marker + TuiBase.RenderFakeCursor(first) + after[first.Length..];
                 }
                 else
                 {
-                    display = before + marker + "\u001b[7m \u001b[0m";
+                    display = before + marker + TuiBase.RenderFakeCursor(" ");
                     lineWidth++;
                     if (lineWidth > contentWidth && padX > 0) cursorInPadding = true;
                 }

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (showLoadedResources and its
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (showLoadedResources and its
 // path/scope formatting helpers, getAutocompleteSourceTag, createBaseAutocompleteProvider, setupAutocompleteProvider,
 // getBuiltInCommandConflictDiagnostics) and coding-agent/src/core/slash-commands.ts (BUILTIN_SLASH_COMMANDS).
 using System.Text.Json.Nodes;

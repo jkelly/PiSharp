@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): cases ported from packages/coding-agent/test/image-processing.test.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): cases ported from packages/coding-agent/test/image-processing.test.ts,
 // test/image-process.test.ts and test/tools.test.ts (read images), with real JPEG, GIF, WebP, PNG and BMP files decoded
 // through the SkiaSharp codec that stands in for Photon. Authored native expectations, not upstream captures.
 using System.Buffers.Binary;

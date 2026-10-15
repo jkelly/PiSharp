@@ -59,7 +59,7 @@ internal static partial class Program
         Check(request.Header("authorization") == "Bearer " + CodexToken && request.Header("chatgpt-account-id") == "acct-123" &&
             request.Header("openai-beta") == "responses=experimental" && request.Header("accept") == "text/event-stream" &&
             request.Header("content-type")!.StartsWith("application/json", StringComparison.Ordinal) && request.Header("session-id") == "sess-1" &&
-            request.Header("x-client-request-id") == "sess-1" && request.Header("user-agent") == "pi/1.1.0" && request.Header("x-model") == "m" &&
+            request.Header("x-client-request-id") == "sess-1" && request.Header("user-agent") == "pi/1.2.0" && request.Header("x-model") == "m" &&
             request.Header("x-extra") == "e" && request.Header("originator") is null, "codex headers");
         // compressRequestBodyZstd: the SSE body travels as one zstd frame (the body compared above is the decoded frame).
         Equal("zstd", request.Header("content-encoding"), "content-encoding");

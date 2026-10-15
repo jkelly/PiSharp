@@ -69,7 +69,7 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
             {
                 rawStop = reason;
                 Reason = reason switch { "stop" => StopReason.Stop, "length" or "model_length" => StopReason.Length, "tool_calls" => StopReason.ToolUse, _ => StopReason.Error };
-                // Pi abe508e1 mistral-conversations.ts mapChatStopReason: Mistral reports transient server failures as
+                // Pi 06a46693 mistral-conversations.ts mapChatStopReason: Mistral reports transient server failures as
                 // "error"; "server error" makes the message retryable.
                 if (Reason == StopReason.Error) ProviderError = reason == "error" ? "Provider stopped with: error (server error)" : "Provider stopped with: " + reason;
             }

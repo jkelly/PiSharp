@@ -129,8 +129,13 @@ internal static partial class Program
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.Behaviors["docs"] = (["search"], release.Task, false, null);
-        Check(McpCodemode.ScriptNeedsServer("await tools.mcp__dev_tools__search({})", "dev-tools") && McpCodemode.ScriptNeedsServer("searchTools(\"x\")", "docs") &&
-            !McpCodemode.ScriptNeedsServer("return 1", "docs"), "scriptNeedsServer");
+        // Pi 1.2.0: the wait follows codemode's reachesTools (the script's words, or "all" for a discovery global) and reachesServer.
+        static bool Needs(string code, string server) => McpCodemode.ReachesServer(PiSharp.Extensions.Mcp.Discovery.McpDiscoveryToolIdentity.ScriptReach(code), server);
+        Check(Needs("await tools.mcp__dev_tools__search({})", "dev-tools") && Needs("searchTools(\"x\")", "docs") &&
+            Needs("const name = \"search\"; await tools[\"mcp__docs__\" + name]({})", "docs") &&
+            // Words may over-match: mcp__docsearch__x contains mcp__docs.
+            Needs("await tools.mcp__docsearch__x({})", "docs"), "reachesServer");
+        Check(!Needs("return 1", "docs") && !Needs("await tools.mcp__other__search({})", "docs"), "a script that names another server");
         const string Script = "const r = await tools.mcp__docs__search({ query: \"install\" });\ntext(r.content[0].text);\nreturn 1;";
         var provider = new Endpoint(() => Call("toolu_plain", "codemode", new { code = "return 1 + 1" }), () => Text("plain"),
             () => Call("toolu_docs", "codemode", new { code = Script }), () => Text("done"));
@@ -274,6 +279,13 @@ internal static partial class Program
     private sealed class ResourceChangingServer(McpNotificationHandler? notify) : IMcpAdmittedRequestChannel
     {
         public volatile int Resources = 1;
+        public int Listings;
+        private ValueTask<JsonData> ListResources()
+        {
+            Interlocked.Increment(ref Listings);
+            return ValueTask.FromResult(JsonData.Parse(JsonSerializer.Serialize(new
+                { resources = Enumerable.Range(0, Resources).Select(index => new { uri = "docs://" + index, name = "r" + index }) })));
+        }
         public McpNotificationHandler? Notify => notify;
         public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask ConfigureRootsAsync(JsonData roots, CancellationToken token) => ValueTask.CompletedTask;
@@ -282,16 +294,16 @@ internal static partial class Program
         {
             "initialize" => ValueTask.FromResult(JsonData.Parse("""{"protocolVersion":"2025-11-25","serverInfo":{"name":"docs","version":"1"},"capabilities":{"tools":{},"resources":{"listChanged":true}}}""")),
             "tools/list" => ValueTask.FromResult(JsonData.Parse("""{"tools":[{"name":"search","inputSchema":{"type":"object"}}]}""")),
-            "resources/list" => ValueTask.FromResult(JsonData.Parse(JsonSerializer.Serialize(new
-                { resources = Enumerable.Range(0, Resources).Select(index => new { uri = "docs://" + index, name = "r" + index }) }))),
+            "resources/list" => ListResources(),
             "resources/templates/list" => ValueTask.FromResult(JsonData.Parse("""{"resourceTemplates":[]}""")),
             _ => ValueTask.FromException<JsonData>(new IOException("Unexpected MCP method " + method))
         };
         public Task CloseAsync() => Task.CompletedTask;
     }
 
-    // runtime.ts refreshResources: notifications/resources/list_changed refreshes the resources `/mcp` counts.
-    private static Task ResourceListChangesRefreshTheCount() => WithRoot("resources-changed", DirectDocs, async fixture =>
+    // Pi 1.2.0 runtime.ts: connecting lists no resources and notifications/resources/list_changed refreshes nothing; `/mcp` shows that
+    // the server offers resources (describeState "· resources") instead of a count, and the resource tools still list them on demand.
+    private static Task ResourcesAreNotListedAtConnect() => WithRoot("resources-changed", DirectDocs, async fixture =>
     {
         var servers = new ConcurrentBag<ResourceChangingServer>();
         var host = fixture.Host() with
@@ -306,14 +318,12 @@ internal static partial class Program
         await rpc.Prompt("p1", "hello");
         await Settled(fixture, rpc, 1);
         var manager = await fixture.Manager.Task;
-        Equal("connected · 1 tool · 1 resource · direct · global", manager.ServersMenu().Items.Single().Description, "before");
-        var changes = 0;
-        using var subscription = manager.Subscribe(() => Interlocked.Increment(ref changes));
+        Equal("connected · 1 tool · resources · direct · global", manager.ServersMenu().Items.Single().Description, "before");
         var server = servers.Single();
         server.Resources = 3;
         await server.Notify!("notifications/resources/list_changed", null, CancellationToken.None);
-        Equal("connected · 1 tool · 3 resources · direct · global", manager.ServersMenu().Items.Single().Description, "after the change");
-        Check(Volatile.Read(ref changes) > 0, "the manager view is told");
+        Equal("connected · 1 tool · resources · direct · global", manager.ServersMenu().Items.Single().Description, "after the change");
+        Equal(0, Volatile.Read(ref server.Listings), "no resources/list at connect or on list_changed");
         Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
     });
 

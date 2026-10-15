@@ -24,6 +24,11 @@ const target = read("compatibility/target.lock.json");
 const evidence = read(target.previousBaseline.lock);
 const sha = target.source.commit;
 check(target.previousBaseline.commit === evidence.source.commit && target.previousBaseline.tag === evidence.source.tag, "Target lock names the preserved evidence lock");
+if (target.previousTarget) {
+  const previousTarget = read(target.previousTarget.lock);
+  check(previousTarget.source.commit === target.previousTarget.commit && previousTarget.source.tag === target.previousTarget.tag && previousTarget.source.tree === target.previousTarget.tree &&
+    previousTarget.previousBaseline.commit === evidence.source.commit, "Target lock names the preserved previous target lock");
+}
 check(text("rev-parse", "HEAD") === sha && text("status", "--porcelain", "--untracked-files=all") === "", "Unmodified upstream checkout at pinned SHA");
 check(text("rev-parse", `${sha}^{tree}`) === target.source.tree && text("rev-parse", `${target.source.tag}^{commit}`) === sha, "Tree and tag resolve to locked source");
 

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/core/model-resolver.ts (findExactModelReferenceMatch,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/model-resolver.ts (findExactModelReferenceMatch,
 // resolveModelScopeFromModels) over the interactive mode's model JSON, delegating to the CLI's port (src/PiSharp.Cli/Models/ModelResolver.cs).
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Models;

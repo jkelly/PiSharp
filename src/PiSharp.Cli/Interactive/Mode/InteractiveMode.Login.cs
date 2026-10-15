@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (/login and /logout:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (/login and /logout:
 // getLoginProviderOptions, getLogoutProviderOptions, handleLoginCommand, startProviderLogin, showLoginAuthTypeSelector,
 // showLoginProviderSelector, showOAuthSelector, completeProviderAuthentication, showAmbientAuthDialog, showApiKeyLoginDialog,
 // showAuthSelect, showAuthPrompt, notifyAuthDialog, loginProvider, showLoginDialog, offerRadiusMcpServer). Credentials go through

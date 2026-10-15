@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts (createExtensionRuntime,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (createExtensionRuntime,
 // createExtensionAPI, createExtension, loadExtension, loadExtensions), packages/coding-agent/src/core/extensions/runner.ts (createContext,
 // createToolContext, createCommandContext, emit, emitToolCall, emitToolResult, emitMessageEnd, emitUserBash, emitContext,
 // emitBeforeProviderRequest, emitBeforeProviderHeaders, emitBeforeAgentStart, emitResourcesDiscover, emitInput, emitBoundary,
@@ -114,6 +114,7 @@ function describeTool(tool) {
     executionMode: tool.executionMode, renderShell: tool.renderShell, constrainedSampling: tool.constrainedSampling || undefined, outputSchema: tool.outputSchema,
     hasRenderCall: typeof tool.renderCall === 'function', hasRenderResult: typeof tool.renderResult === 'function',
     hasPrepareArguments: typeof tool.prepareArguments === 'function', hasPrepareLoadout: typeof tool.prepareLoadout === 'function',
+    hasReachesTools: typeof tool.reachesTools === 'function' || undefined,
   };
 }
 
@@ -250,7 +251,7 @@ export class ExtensionRuntime {
       setLabel(entryId, label) { assertActive(); runtime.requireBound(); bridge.notify('pi.setLabel', { entryId, label }); },
       exec(command, args, options) { assertActive(); return execCommand(command, args, options?.cwd ?? cwd, options); },
       getActiveTools() { assertActive(); runtime.requireBound(); return bridge.sync('pi.read', { op: 'getActiveTools' }); },
-      getAllTools() { assertActive(); runtime.requireBound(); return bridge.sync('pi.read', { op: 'getAllTools' }); },
+      getAllTools() { assertActive(); runtime.requireBound(); return runtime.toolInfos(bridge.sync('pi.read', { op: 'getAllTools' })); },
       getSettings() { assertActive(); runtime.requireBound(); return bridge.sync('pi.read', { op: 'getSettings' }); },
       setActiveTools(toolNames) { assertActive(); runtime.requireBound(); bridge.sync('pi.setActiveTools', { toolNames }); },
       getCommands() { assertActive(); runtime.requireBound(); return bridge.sync('pi.read', { op: 'getCommands' }); },
@@ -830,7 +831,9 @@ export class ExtensionRuntime {
         const ctxObject = context(); const messages = []; let systemPrompt;
         for (const handler of handlers) {
           try {
-            const r = await handler({ type: event, prompt: payload.prompt, images: payload.images, systemPrompt: current.systemPrompt, systemPromptOptions: payload.systemPromptOptions }, ctxObject);
+            // BeforeAgentStartEvent: the trigger (a user message's prompt and images, or the custom message that starts the run).
+            const trigger = payload.messageType === 'custom' ? { messageType: 'custom', message: payload.message } : { messageType: 'user', prompt: payload.prompt, images: payload.images };
+            const r = await handler({ ...trigger, type: event, systemPrompt: current.systemPrompt, systemPromptOptions: payload.systemPromptOptions }, ctxObject);
             if (r) { if (r.message) messages.push(r.message); if (r.systemPrompt !== undefined) { systemPrompt = r.systemPrompt; current.systemPrompt = r.systemPrompt; } }
           } catch (error) { fail(error); }
         }
@@ -895,6 +898,18 @@ export class ExtensionRuntime {
         signal: controller.signal, timeout, env: process.env,
       });
     } finally { this.shellAborts.delete(callId); }
+  }
+
+  /** agent-session.ts getAllTools: ToolInfo.reachesTools is the tool definition's function. The host reports it as a flag; a tool of
+   *  these extensions keeps its own function, any other (codemode, tool_search, a native extension's tool) asks the host. */
+  toolInfos(infos) {
+    if (!Array.isArray(infos)) return infos;
+    return infos.map((info) => {
+      if (info?.reachesTools !== true) return info;
+      const own = this.findTool(info.name)?.tool.reachesTools;
+      const reachesTools = typeof own === 'function' ? own : (input) => this.bridge.sync('tool.reachesTools', { name: info.name, input });
+      return { ...info, reachesTools };
+    });
   }
 
   findTool(name) {

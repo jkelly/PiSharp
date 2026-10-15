@@ -1,6 +1,6 @@
 {
   "kind": "STATIC SOURCE INVENTORY; NOT EXECUTED SOURCE OR GOLDEN CAPTURE",
-  "upstream": "abe508e1b89912adde45528136c3221eb69acdd7",
+  "upstream": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
   "source": {
     "relative": "packages/tui/src/keybindings.ts",
     "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keybindings.ts",
