@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/mcp-servers.ts, packages/coding-agent/src/extensions/mcp/tools.ts and packages/coding-agent/src/extensions/mcp/index.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/mcp-servers.ts, packages/coding-agent/src/extensions/mcp/tools.ts and packages/coding-agent/src/extensions/mcp/index.ts.
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,6 +14,9 @@ public sealed record McpOfferedTool(string Name, JsonData InputSchema, string? D
     /// <summary>tools.ts toToolAnnotations: the boolean hints of the tool's annotations (readOnlyHint, destructiveHint, idempotentHint,
     /// openWorldHint); null when it has none. The extension API carries them as a tool's `annotations` (getAllTools).</summary>
     public ImmutableDictionary<string, bool>? Annotations { get; init; }
+    /// <summary>The tool's own <c>outputSchema</c> as the server lists it (the shape of its <c>structuredContent</c>); null when it
+    /// declares none. tools.ts createMcpResultSchema places it under the CallToolResult scripts receive.</summary>
+    public JsonData? OutputSchema { get; init; }
 
     /// <summary>toToolAnnotations of a raw MCP tool.</summary>
     public static ImmutableDictionary<string, bool>? ToolAnnotations(System.Text.Json.JsonElement tool)
@@ -37,6 +40,8 @@ public sealed record McpPlannedTool(string Server, string OriginalName, string N
 {
     /// <summary>The offered tool's annotation hints (<see cref="McpOfferedTool.Annotations"/>).</summary>
     public ImmutableDictionary<string, bool>? Annotations { get; init; }
+    /// <summary>The offered tool's own output schema (<see cref="McpOfferedTool.OutputSchema"/>).</summary>
+    public JsonData? OutputSchema { get; init; }
 }
 public sealed record McpToolCatalogPlan(ImmutableArray<McpPlannedTool> Tools,
     ImmutableDictionary<string, string> NameOwners, bool NeedsCodemode, bool NeedsToolSearch,
@@ -114,7 +119,8 @@ public static class McpCatalogPlanner
             var configured = entry.Config.Description is { } text ? McpJson.JsTrim(text) : null;
             // Like upstream registerTools: the configured description and the server's connection instructions.
             var group = new ToolNamespace(Namespace(entry.Name), string.IsNullOrEmpty(configured) ? null : configured)
-                { Instructions = string.IsNullOrEmpty(snapshot.Instructions) ? null : snapshot.Instructions };
+                // index.ts: `describeNamespace("docs")` finds `mcp__docs`.
+                { Aliases = [entry.Name], Instructions = string.IsNullOrEmpty(snapshot.Instructions) ? null : snapshot.Instructions };
             var current = new HashSet<string>(StringComparer.Ordinal);
             // Like Codex, every tool whose name sanitizes to a shared name gets the hash suffix, so which one
             // would keep the plain name does not depend on the order of the list.
@@ -134,7 +140,7 @@ public static class McpCatalogPlanner
                 if (string.IsNullOrEmpty(description)) description = $"MCP tool {tool.Name} from server {entry.Name}";
                 tools.Add(new(entry.Name, tool.Name, name, entry.Name + "/" + tool.Name, description,
                     Parameters(tool.InputSchema), group, exposure, ToToolExposure(exposure), entry.Config.TimeoutSeconds * 1000,
-                    snapshot.Instructions) { Annotations = tool.Annotations });
+                    snapshot.Instructions) { Annotations = tool.Annotations, OutputSchema = tool.OutputSchema });
             }
         }
         McpExposure? resources = null;

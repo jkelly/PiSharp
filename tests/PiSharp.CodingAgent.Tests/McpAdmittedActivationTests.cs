@@ -45,9 +45,12 @@ internal static class McpAdmittedActivationTests
     }
     private static Task SchemaIdentity()
     {
-        Check(McpDiscoveryToolIdentity.IsCodemodeTool("codemode", McpDiscoveryToolIdentity.CodemodeSchema));
-        Check(!McpDiscoveryToolIdentity.IsCodemodeTool("codemode", JsonData.Parse(McpDiscoveryToolIdentity.CodemodeSchema.ToString())));
-        Check(!McpDiscoveryToolIdentity.IsToolSearchTool("codemode", McpDiscoveryToolIdentity.ToolSearchSchema));
+        // Pi 1.2.0: the discovery tools are recognized by reachesTools, not by their schema object.
+        var codemode = McpDiscoveryToolIdentity.CreateCodemode("codemode", "codemode", (arguments, context, token) => new(JsonData.Null));
+        var search = McpDiscoveryToolIdentity.CreateToolSearch("tool-search", "search", (arguments, context, token) => new(JsonData.Null));
+        Check(codemode.ReachesTools is not null && search.ReachesTools is not null);
+        Check(search.ReachesTools!(JsonData.Parse("{\"query\":\"x\"}")).IsAll);
+        Check(!codemode.ReachesTools!(JsonData.Parse("{\"code\":\"tools.mcp__docs__search()\"}")).IsAll);
         Check(McpDiscoveryToolIdentity.ToolSearchSchema.Value.GetProperty("properties").GetProperty("limit").GetProperty("type").GetString() == "number");
         return Task.CompletedTask;
     }

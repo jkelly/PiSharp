@@ -15,6 +15,20 @@ internal static partial class Program
             Equal(new CodemodeSourceOptions(), CodemodeSource.Parse("// just a comment\nreturn 1").Options, "comment options");
             Equal("// just a comment\nreturn 1", CodemodeSource.Parse("// just a comment\nreturn 1").Code, "comment code");
         }),
+        // Pi 1.2.0 source.test.ts (#10631): an options line after the first line used to be ignored, so its timeout never applied.
+        Case("source.options-line-must-be-first", () =>
+        {
+            Equal(new CodemodeSourceOptions(), CodemodeSource.Parse("// @optionsx {}\ntext(1)").Options, "prefix only");
+            Equal(new CodemodeSourceOptions(), CodemodeSource.Parse("text(\"// @options: {}\")").Options, "inside a string");
+            foreach (var (input, line) in new[] { ("// count things\n// @options: {\"timeout_ms\": 1000}\nwhile (true) {}", 2),
+                ("\n  // @options: {\"timeout_ms\": 1000}\nwhile (true) {}", 2), ("text(1)\r\n// @options: {\"timeout_ms\": 1}", 2),
+                ("// @options: {\"timeout_ms\": 1}\ntext(1)\n// @options: {\"timeout_ms\": 2}", 3) })
+            {
+                var error = Throws<CodemodeSourceException>(() => CodemodeSource.Parse(input), input);
+                Equal($"The // @options: line must be the first line of the input; found one on line {line}", error.Message, input);
+                Equal("CodemodeSourceError", error.Name, "error name");
+            }
+        }),
         Case("source.options-line-keeps-line-numbers", () =>
         {
             var parsed = CodemodeSource.Parse("// @options: {\"timeout_ms\": 10}\nconst a = 1;\ntext(a)");
@@ -24,9 +38,9 @@ internal static partial class Program
         }),
         Case("source.only-first-line", () =>
         {
-            var input = "text(1)\n// @options: {\"timeout_ms\": 1}";
-            Equal(input, CodemodeSource.Parse(input).Code, "later line");
+            // Pi 1.2.0: a later options line is no longer ignored but rejected (source.options-line-must-be-first).
             Equal(new CodemodeSourceOptions(), CodemodeSource.Parse("// @optionsx {}\ntext(1)").Options, "optionsx");
+            Equal(new CodemodeSourceOptions(), CodemodeSource.Parse("text(\"// @options: {}\")").Options, "inside a string");
         }),
         Case("source.rejects-empty-and-invalid-options", () =>
         {
@@ -100,7 +114,7 @@ internal static partial class Program
             var huge = Parse("{\"type\":\"object\",\"properties\":{" + string.Join(",", Enumerable.Range(0, 1200).Select(i => $"\"property_number_{i}\":{{\"type\":\"string\"}}")) + "}}");
             Equal("big(args: unknown): Promise<unknown>;", CodemodeDeclarations.RenderToolSignature(new("big") { InputSchema = huge }), "signature over 16000 chars");
         }),
-        Case("declarations.signatures-and-mcp-results", () =>
+        Case("declarations.signatures-and-plain-output-types", () =>
         {
             Equal("hidden_dynamic_tool(args: { city: string; }): Promise<{ ok: boolean; }>;", CodemodeDeclarations.RenderToolSignature(new("hidden-dynamic-tool")
             {
@@ -108,17 +122,51 @@ internal static partial class Program
                 OutputSchema = Parse("""{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"]}""")
             }), "signature");
             Equal("free(args: unknown): Promise<unknown>;", CodemodeDeclarations.RenderToolSignature(new("free")), "free");
-            var input = Parse("""{"type":"object","properties":{},"additionalProperties":false}""");
-            Equal("mcp__sample__search(args: {}): Promise<CallToolResult<{ results: Array<{ id: string; score: number; }>; }>>;", CodemodeDeclarations.RenderToolSignature(new("mcp__sample__search")
-            {
-                InputSchema = input,
-                OutputSchema = Parse("""{"type":"object","properties":{"content":{"type":"array","items":{"type":"object"}},"structuredContent":{"type":"object","properties":{"results":{"type":"array","items":{"$ref":"#/definitions/Result~1item~0v1"}}},"required":["results"],"additionalProperties":false,"definitions":{"Result/item~v1":{"type":"object","properties":{"id":{"type":"string"},"score":{"type":"number"}},"required":["id","score"],"additionalProperties":false}}},"isError":{"type":"boolean"},"_meta":{"type":"object"}},"required":["content"]}""")
-            }), "mcp structured");
-            Equal("plain(args: {}): Promise<CallToolResult>;", CodemodeDeclarations.RenderToolSignature(new("plain")
-            { InputSchema = input, OutputSchema = Parse("""{"type":"object","properties":{"content":{"type":"array","items":{"type":"object"}},"isError":{"type":"boolean"},"_meta":{"type":"object"}},"required":["content"]}""") }), "mcp plain");
-            Check(CodemodeDeclarations.McpStructuredContentSchema(Parse("""{"type":"object","properties":{"content":{"type":"array"}}}""").Value) is null, "not a CallToolResult");
+            // Pi 1.2.0 declarations.test.ts: CallToolResult<T> and the shared MCP types are gone; an output schema shaped like an MCP
+            // CallToolResult renders as its own type.
+            Equal("plain(args: { [key: string]: unknown; }): Promise<{ _meta?: { [key: string]: unknown; }; content: Array<{ [key: string]: unknown; }>; isError?: boolean; }>;",
+                CodemodeDeclarations.RenderToolSignature(new("plain")
+                {
+                    InputSchema = Parse("""{"type":"object","properties":{}}"""),
+                    OutputSchema = Parse("""{"type":"object","properties":{"content":{"type":"array","items":{"type":"object"}},"isError":{"type":"boolean"},"_meta":{"type":"object"}},"required":["content"]}""")
+                }), "CallToolResult-shaped output schema");
             Equal("bar\n\ncodemode tool declaration:\n```ts\ndeclare const tools: { foo(args: string): Promise<unknown>; };\n```",
                 CodemodeDeclarations.RenderToolSample(new("foo") { Description = "bar", InputSchema = Parse("""{"type":"string"}""") }), "sample");
+        }),
+        // Pi 1.2.0 declarations.test.ts (#10707): constraints TypeScript cannot express become @ tags on the property comment line.
+        Case("declarations.constraint-tags", () =>
+        {
+            Equal(string.Join("\n", "{", "  // @maxLength 8 @pattern ^[a-z]+$", "  id: string;", "  name?: string;", "  // @maxItems 5 @uniqueItems @deprecated",
+                "  tags?: Array<string>;", "  // Wait in milliseconds.", "  // @integer @minimum 0 @maximum 30000 @default 0", "  timeoutMs?: number;", "}"),
+                CodemodeDeclarations.SchemaToType(Parse("""{"type":"object","properties":{"timeoutMs":{"type":"integer","minimum":0,"maximum":30000,"default":0,"description":"Wait in milliseconds."},"id":{"type":"string","pattern":"^[a-z]+$","maxLength":8},"tags":{"type":"array","items":{"type":"string"},"maxItems":5,"uniqueItems":true,"deprecated":true},"name":{"type":"string"}},"required":["id"]}""").Value), "tags");
+        }),
+        Case("declarations.constraint-tags-nullable-branch", () =>
+        {
+            // Pydantic's `limit: int | None = Field(None, ge=1, le=100)`.
+            Equal("{\n  // @integer @minimum 1 @maximum 100\n  limit?: number | null;\n}", CodemodeDeclarations.SchemaToType(Parse(
+                """{"type":"object","properties":{"limit":{"anyOf":[{"type":"integer","minimum":1,"maximum":100},{"type":"null"}],"default":null,"title":"Limit"}}}""").Value), "pydantic optional");
+            // Constraints of the property and the branch both apply.
+            Equal("{\n  // @integer @minimum 10 @maximum 20 @format port @format int32\n  n?: number | null;\n}", CodemodeDeclarations.SchemaToType(Parse(
+                """{"type":"object","properties":{"n":{"anyOf":[{"type":"integer","minimum":10,"maximum":50,"format":"int32"},{"type":"null"}],"minimum":0,"maximum":20,"format":"port"}}}""").Value), "both apply");
+        }),
+        Case("declarations.constraint-tags-draft04-exclusive", () =>
+        {
+            Equal(string.Join("\n", "{", "  // @maximum 8 @exclusiveMaximum 5", "  m?: number | null;", "  // @integer @exclusiveMinimum 0 @maximum 10", "  n?: number;", "}"),
+                CodemodeDeclarations.SchemaToType(Parse("""{"type":"object","properties":{"n":{"type":"integer","minimum":0,"exclusiveMinimum":true,"maximum":10,"exclusiveMaximum":false},"m":{"anyOf":[{"type":"number","maximum":5,"exclusiveMaximum":true},{"type":"null"}],"maximum":8}}}""").Value), "draft-04");
+        }),
+        Case("declarations.constraint-tags-long-and-line-terminators", () =>
+        {
+            Equal("{ config?: { [key: string]: unknown; }; }", CodemodeDeclarations.SchemaToType(Parse(
+                "{\"type\":\"object\",\"properties\":{\"config\":{\"type\":\"object\",\"default\":{\"text\":\"" + new string('x', 100) + "\"}}}}").Value), "long default left out");
+            Equal(string.Join("\n", "{", "  // a", "  // b", "  // @pattern ^[\\u000d\\u000a\\u2028\\u2029]$ @default \"\\u2028\"", "  sep?: string;", "}"),
+                CodemodeDeclarations.SchemaToType(Parse("""{"type":"object","properties":{"sep":{"type":"string","pattern":"^[\r\n\u2028\u2029]$","default":"\u2028","description":"a\u2028b"}}}""").Value), "escaped terminators");
+        }),
+        Case("declarations.constraint-tags-dropped-before-unknown", () =>
+        {
+            var schema = Parse("""{"type":"object","properties":{"n":{"type":"integer","minimum":1}}}""").Value;
+            Equal("{\n  // @integer @minimum 1\n  n?: number;\n}", CodemodeDeclarations.SchemaToType(schema), "tagged");
+            Equal("{ n?: number; }", CodemodeDeclarations.SchemaToType(schema, 20), "untagged within budget");
+            Equal("unknown", CodemodeDeclarations.SchemaToType(schema, 10), "unknown");
         }),
         Case("declarations.render-tools-globals-namespaces", () =>
         {
@@ -137,9 +185,10 @@ internal static partial class Program
         {
             var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "PiSharp.Codemode", "Runtime", "codemode-prelude.js");
             var text = File.ReadAllText(path).Replace("\r\n", "\n", StringComparison.Ordinal);
-            Check(text.StartsWith("// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/codemode/src/runtime/prelude-source.ts", StringComparison.Ordinal), "attribution line");
+            Check(text.StartsWith("// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/runtime/prelude-source.ts", StringComparison.Ordinal), "attribution line");
             var body = text[(text.IndexOf('\n') + 1)..];
-            Equal("224cd74082a03a57105af78e1fe205bda692f096252ff4202121016dd78f6228", Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body))), "evaluated upstream PRELUDE_SOURCE hash");
+            // Re-evaluated from @earendil-works/pi-codemode 1.2.0 dist/runtime/prelude-source.js (image() errors, settle propertiesJson).
+            Equal("57c8dc8c0e812117d82167fa751bc368f249d5aaee56d321066fc5280c785281", Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body))), "evaluated upstream PRELUDE_SOURCE hash");
             foreach (var constant in new[] { "262144", "1048576", "16777216", "100000" }) Check(body.Contains(constant, StringComparison.Ordinal), "limit constant " + constant);
             await using var sandbox = new CodemodeSandbox();
             var result = await sandbox.ExecuteAsync("return [typeof tools, typeof ALL_TOOLS, typeof text, typeof image, typeof exit, typeof store, typeof load, typeof console.log, Object.isFrozen(Object.prototype)]");

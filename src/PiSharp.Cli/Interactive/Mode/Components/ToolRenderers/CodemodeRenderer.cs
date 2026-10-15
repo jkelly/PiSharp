@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/extensions/codemode/renderer.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/extensions/codemode/renderer.ts.
 // The themed presentation of the codemode tool (PiSharp.Codemode.CodemodeRenderer is the unthemed row version for the native
 // extension renderer contract). Details are CodemodeToolDetails: {calls: [{id, name, args, status, durationMs?, cost?, error?}],
 // fullOutputPath?}.
@@ -12,8 +12,9 @@ namespace PiSharp.Cli.Interactive.Mode.Components;
 /// <summary>
 /// Presentation for the codemode tool.
 /// The call shows the script; the result lists the nested tool calls with their status as they run and the cost of its model
-/// calls, followed by the script output without the "Script completed" header. Nested calls are not separate tool rows because
-/// they never reach the model as tool calls.
+/// calls, followed by the script output without the "Script completed" header, and the time the script has been running
+/// (<c>Elapsed</c>) or took (<c>Took</c>), like bash rows. Nested calls are not separate tool rows because they never reach the
+/// model as tool calls.
 /// </summary>
 internal static partial class CodemodeRenderers
 {
@@ -77,6 +78,7 @@ internal static partial class CodemodeRenderers
     public static ToolRenderers Renderers { get; } = new(
         RenderCall: (args, theme, context) =>
         {
+            RenderUtils.StartToolTimer(context);
             // The code includes the `// @options:` line, so options show as part of the script.
             var code = RenderUtils.Str(ToolJson.Get(args, "code"));
             var title = theme.Fg("toolTitle", theme.Bold("codemode"));
@@ -99,6 +101,7 @@ internal static partial class CodemodeRenderers
         },
         RenderResult: (result, options, theme, context) =>
         {
+            var timerText = RenderUtils.ToolTimerText(context, options.IsPartial);
             var component = context.LastComponent as Container ?? new Container();
             component.Clear();
             var details = ToolJson.Get(result, "details");
@@ -145,6 +148,11 @@ internal static partial class CodemodeRenderers
                     if (ToolJson.Truthy(fullOutputPath))
                         component.AddChild(new Text(theme.Fg("muted", $"Full output: {ToolJson.Template(fullOutputPath)}"), 0, 0));
                 }
+            }
+            if (timerText is not null)
+            {
+                component.AddChild(new Spacer(1));
+                component.AddChild(new Text(theme.Fg("muted", timerText), 0, 0));
             }
             return component;
         });

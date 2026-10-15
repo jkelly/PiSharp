@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (serversWithResources,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (serversWithResources,
 // resourceServers, syncResourceTools), packages/coding-agent/src/extensions/mcp/resources.ts (createMcpResourceToolDefinitions) and
 // packages/coding-agent/src/utils/output-files.ts (writeOutputFile: `pi-mcp-<random hex><extension>` in the temp directory, 0600).
 using System.Collections.Immutable;

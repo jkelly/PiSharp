@@ -10,7 +10,8 @@ using PiSharp.Extensions.Mcp.Configuration;
 using PiSharp.Extensions.Mcp.Transport;
 using PiSharp.Extensions.Runtime.Mcp.Authentication;
 
-// Authored offline expectations for the Pi v1.1.0 MCP sync (names, exposure/prompt, OAuth). They are derived from the
+// Authored offline expectations for the Pi v1.1.0 MCP sync (names, exposure/prompt, OAuth), updated to Pi v1.2.0 (the iss check
+// without metadata, namespace aliases, no dispatch after a request settles). They are derived from the
 // pinned upstream source and its tests by reading, never captured from an upstream run. Fake authorization and token
 // servers answer in process; credential stores are in memory; no network or live credentials are used.
 internal static partial class Program
@@ -38,7 +39,8 @@ internal static partial class Program
             ("oauth.cancelled-sign-in-cleans-up", CancelledSignIn),
             ("oauth.request-timeout-is-a-failure-not-cancellation", RequestTimeout),
             ("oauth.auth-server-metadata-url-replaces-discovery", MetadataUrl),
-            ("oauth.client-id-metadata-document-and-application-type", ClientMetadataDocument)
+            ("oauth.client-id-metadata-document-and-application-type", ClientMetadataDocument),
+            ("transport.no-dispatch-after-a-request-settles", NoDispatchAfterSettle)
         };
         cases.AddRange(CompletionCases());
         // Linked existing contract cases (tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs).
@@ -49,7 +51,7 @@ internal static partial class Program
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(60)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = "abe508e1b89912adde45528136c3221eb69acdd7", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
+        var report = new { sourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
             cases = cases.Count, failures, fakeHttpRequests = requests, genuineSourceCasesCaptured = 0, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = args.Length == 2 });
         if (args.Length == 2)
@@ -164,7 +166,8 @@ internal static partial class Program
         Equal("global.json: server \"bad\": description must be a string", loaded.Errors.Single());
         var plan = McpCatalogPlanner.Plan([new(loaded.Servers.Single(), [Tool("search")], "Server instructions.")]);
         // Upstream registerTools puts the connection instructions on the namespace itself.
-        Equal(new ToolNamespace("mcp__described", "Docs search") { Instructions = "Server instructions." }, plan.Tools.Single().Namespace);
+        // Pi 1.2.0 index.ts: MCP namespaces carry the server name as an alias (`describeNamespace("described")` finds `mcp__described`).
+        Equal(new ToolNamespace("mcp__described", "Docs search") { Aliases = ["described"], Instructions = "Server instructions." }, plan.Tools.Single().Namespace);
         Equal("Server instructions.", plan.Tools.Single().NamespaceInstructions);
         return Task.CompletedTask;
     }
@@ -401,6 +404,26 @@ internal static partial class Program
             Equal("read", (await plainStore.LoadAsync())!.Tokens!.Scope);
         }
         finally { await plain.DisposeAsync(); }
+        // Pi 1.2.0 flow.ts (RFC 9207): without metadata there is no issuer to compare with, so a server cannot skip the check by hiding
+        // it: any `iss` is rejected with an expected issuer of none (undefined); a response without `iss` is accepted.
+        var bareStore = new McpOAuthCredentialStore(new MemoryBackend()).ForServer("docs", Server);
+        // The cached discovery names the authorization server but has no metadata, and discovering it finds none.
+        await bareStore.SaveAsync(new(Server.AbsoluteUri, JsonData.Parse("{\"client_id\":\"admitted-client\"}"), null, CodeVerifier: "stored-verifier",
+            OAuthState: "admitted-state", Discovery: JsonData.Parse("{\"authorizationServerUrl\":\"" + Issuer + "\"}")));
+        var bareServer = new FakeServer { Respond = (request, _, _) => Task.FromResult(request.Method == HttpMethod.Post
+            ? Response(200, "{\"access_token\":\"issued\",\"token_type\":\"Bearer\"}") : Response(404, "{}")) };
+        int TokenRequests() { lock (bareServer.Log) return bareServer.Log.Count(row => row.Method == "POST"); }
+        var bare = McpDefaultOAuthHost.Install(Resources(bareStore, bareServer, (_, _) => ValueTask.CompletedTask));
+        try
+        {
+            var unverifiable = Find<McpOAuthIssuerMismatchException>(await Failure(bare.CompleteAuthorizationAsync("code", "admitted-state", iss: "https://attacker.example")));
+            Equal(null, unverifiable.Expected); Equal("https://attacker.example", unverifiable.Received);
+            Equal("OAuth issuer mismatch: expected none, received \"https://attacker.example\"", unverifiable.Message);
+            Equal(0, TokenRequests());
+            Equal(McpOAuthAuthorizationOutcome.Authorized, (await bare.CompleteAuthorizationAsync("code", "admitted-state")).Outcome);
+            Equal(1, TokenRequests());
+        }
+        finally { await bare.DisposeAsync(); }
     }
 
     private static async Task StepUpScopes()

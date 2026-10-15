@@ -52,9 +52,8 @@ public sealed class McpPreparedDiscoveryIdentity
         if (!ReferenceEquals(snapshot, admittedBinding.Snapshot) || !ReferenceEquals(snapshot, semantic.Snapshot)) throw new InvalidOperationException("Discovery requires the exact current semantic/prepared snapshot.");
         var name = kind == McpDiscoveryKind.Codemode ? McpDiscoveryToolIdentity.CodemodeName : McpDiscoveryToolIdentity.ToolSearchName;
         var tool = snapshot.Tools.SingleOrDefault(tool => tool.Name == name && tool.OwnerId == scope.OwnerId && tool.OwnerGeneration == scope.OwnerGeneration && tool.RegistrationId == semantic.RegistrationId);
-        if (tool is null || tool.Exposure != PiSharp.Contracts.ToolExposure.ModelOnly ||
-            !(kind == McpDiscoveryKind.Codemode ? McpDiscoveryToolIdentity.IsCodemodeTool(tool.Name, tool.Parameters) :
-                McpDiscoveryToolIdentity.IsToolSearchTool(tool.Name, tool.Parameters)))
+        // index.ts ensureDiscoveryActive: only a tool of these names that declares reachesTools can reach MCP tools.
+        if (tool is null || tool.Exposure != PiSharp.Contracts.ToolExposure.ModelOnly || tool.ReachesTools is null)
             throw new InvalidOperationException("Discovery metadata is foreign, ordinary or an impostor.");
         var adapter = admittedBinding.Adapters.SingleOrDefault(adapter => adapter.Name == name)
             ?? throw new InvalidOperationException("Discovery requires an actual admitted prepared adapter.");
