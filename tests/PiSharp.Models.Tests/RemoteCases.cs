@@ -62,7 +62,7 @@ internal static partial class Program
         var request = endpoint.Requests.Single();
         Equal("https://catalog.invalid/api/models/providers/groq?types=chat%2Cimage%2Cclassifier", request.Url, "catalog URL");
         Equal("application/json", request.Headers["accept"], "accept");
-        Check(System.Text.RegularExpressions.Regex.IsMatch(request.Headers["User-Agent"], @"^pi/1\.1\.0 \((win32|linux|darwin); dotnet/[0-9.]+; [a-z0-9]+\)$"), "user agent: " + request.Headers["User-Agent"]);
+        Check(System.Text.RegularExpressions.Regex.IsMatch(request.Headers["User-Agent"], @"^pi/1\.2\.0 \((win32|linux|darwin); dotnet/[0-9.]+; [a-z0-9]+\)$"), "user agent: " + request.Headers["User-Agent"]);
         Check(!request.Headers.ContainsKey("if-none-match"), "no validator without a cached body");
         Equal("GPT OSS 120B (remote)", registry.Find("groq", "openai/gpt-oss-120b")!.Name, "remote entry replaces the built-in in place");
         Equal("groq/groq-new", registry.GetAll().Where(model => model.Provider == "groq").Last().Reference, "new entries are appended");

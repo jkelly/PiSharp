@@ -617,11 +617,11 @@ internal static partial class Program
             Check(catalog.Models.All(model => model.Provider == provider), "Shard contains a foreign provider identity.");
             return catalog;
         }
-        // Byte-for-byte package/dist/providers/data shards of @earendil-works/pi-ai@1.1.0 (tarball SHA256 6caab33c...d829).
-        var anthropic = Shard("anthropic", "aa4342dfb96feb1619794113619d6630088d6ac544c547a4f9899a0a7f26419b");
+        // Byte-for-byte package/dist/providers/data shards of @earendil-works/pi-ai@1.2.0 (tarball SHA256 c3e69423...4535); the 1.1.0 additions below are still present.
+        var anthropic = Shard("anthropic", "327ea610aca64889902458243e9b6a440eb678671f5993b88ad32ac6e827b587");
         var openai = Shard("openai", "f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f");
-        var openrouter = Shard("openrouter", "c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0");
-        var mistral = Shard("mistral", "fcd37c7b178416f86954efdacbb45726d10f102fd1211062792691e62fcf327c");
+        var openrouter = Shard("openrouter", "07ad378d40ea46b78c52c80490b4cf8d5b1f4000b2e1e3e13a8c0193f5fd1e98");
+        var mistral = Shard("mistral", "27aa66c71a0504b53dc87ec194286fa7e70b99747fc8df9b709b23b3548afe50");
         Check(anthropic.TryGetModel(CatalogModelType.Chat, "claude-haiku-5-5", out var haiku), "Claude Haiku 5.5 missing.");
         Equal("anthropic-messages", haiku!.DeclaredApi);
         Equal("""[{"inputTokensAbove":100000,"input":0.5,"output":2.5,"cacheRead":0.05,"cacheWrite":0.625}]""", haiku.Cost.Value.GetProperty("tiers").GetRawText());

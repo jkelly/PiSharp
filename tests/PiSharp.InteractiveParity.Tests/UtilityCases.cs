@@ -1422,7 +1422,7 @@ internal static class UtilityCases
                     ui.Status, label + ": status");
                 var (title, body) = IssueQuery(url);
                 Equal("Bug report from PiSharp 1.1.0.2", title, label + ": title without a description");
-                Contains(body, "## Description\n\n_No description given._\n\n## Environment\n\n- PiSharp: 1.1.0.2\n- Pi baseline: 1.1.0\n- OS: unknown (unknown unknown)\n- Runtime: unknown\n- Model: none\n", label + ": body");
+                Contains(body, "## Description\n\n_No description given._\n\n## Environment\n\n- PiSharp: 1.1.0.2\n- Pi baseline: 1.2.0\n- OS: unknown (unknown unknown)\n- Runtime: unknown\n- Model: none\n", label + ": body");
                 Contains(body, "(report.json, diagnostics.json, session.jsonl) on the reporter's machine. Attach it to this issue: GitHub cannot attach files from a link. It contains the session transcript; review it before attaching.\n", label + ": transcript warning");
                 Check(!body.Contains("{\"type\":\"session\"}", StringComparison.Ordinal), label + ": transcript stays out of the link");
                 Equal(1, session.SerializeCalls, label + ": transcript in the zip");

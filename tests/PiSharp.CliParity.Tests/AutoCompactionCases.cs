@@ -61,11 +61,11 @@ internal static partial class Program
             using var sandbox = new Sandbox("auto-compaction-window");
             // keepRecentTokens 1: the first turn is summarized, as the interactive compaction cases do.
             sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"compaction":{"keepRecentTokens":1}}""");
-            // 190,000 context tokens: below claude-sonnet-4-5's threshold (1,000,000 - 16,384), above claude-haiku-4-5's (200,000 - 16,384).
+            // 190,000 context tokens: below claude-sonnet-4-6's threshold (1,000,000 - 16,384; pi-ai 1.2.0 gives claude-sonnet-4-5 a 200,000 window), above claude-haiku-4-5's (200,000 - 16,384).
             sandbox.Respond = (seen, _) => seen.Body?.Contains("<conversation>", StringComparison.Ordinal) == true
                 ? AnthropicUsageText("## Goal\nsummary", 10) : AnthropicUsageText("ok", 190_000);
             var events = new List<JsonNode>();
-            var responses = await RpcSettled(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], events,
+            var responses = await RpcSettled(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-6"], events,
                 """{"id":"1","type":"prompt","message":"on sonnet"}""",
                 """{"id":"2","type":"get_state"}""",
                 """{"id":"3","type":"set_model","provider":"anthropic","modelId":"claude-haiku-4-5"}""",
