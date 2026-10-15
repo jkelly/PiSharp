@@ -245,11 +245,24 @@
       "version": "1.1.0.6",
       "kind": "patch",
       "baseline": "v1.1.0",
-      "status": "release-candidate",
+      "status": "published",
       "branch": "release/1.1.0.6",
       "ships": "PR #10 (macOS arm64 CI, EPERM process-group stop, MCP teardown reports), PR #12 (codemode exit-wait hang), PR #11 (streaming memory; RPC prompt during settling waits)",
       "notes": "docs/release-notes/1.1.0.6.md",
       "changelog": "website/src/content/changelog/1.1.0.6.md (date 2026-10-11)",
+      "tag": "v1.1.0.6 (e82c6fe), release run 38181758278",
+      "publishedOn": "2026-10-11",
+      "blockers": []
+    },
+    "1.1.0.7": {
+      "version": "1.1.0.7",
+      "kind": "patch",
+      "baseline": "v1.1.0",
+      "status": "release-candidate",
+      "branch": "release/1.1.0.7",
+      "ships": "PR #14 (FD_CLOEXEC on posix_spawn pipes on macOS arm64), PR #15 (exclusive settings and trust locks)",
+      "notes": "docs/release-notes/1.1.0.7.md",
+      "changelog": "website/src/content/changelog/1.1.0.7.md (date 2026-10-14)",
       "blockers": []
     }
   },

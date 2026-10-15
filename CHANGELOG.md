@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0.7] - 2026-10-14
+
+A C#-only patch on the Pi v1.1.0 baseline. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.7.md).
+
+### Fixed
+
+- On Apple Silicon Macs, a command given standard input (such as `bash -s`) no longer hangs waiting for input that never ends
+- Two PiSharp processes can no longer both take the lock on `settings.json` or `trust.json` and overwrite each other's changes; the lock also works in folders whose path is longer than 260 characters on Windows
+
 ## [1.1.0.6] - 2026-10-11
 
 A C#-only patch on the Pi v1.1.0 baseline. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.6.md).
