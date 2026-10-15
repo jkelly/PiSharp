@@ -258,12 +258,28 @@
       "version": "1.1.0.7",
       "kind": "patch",
       "baseline": "v1.1.0",
-      "status": "release-candidate",
+      "status": "published",
       "branch": "release/1.1.0.7",
       "ships": "PR #14 (FD_CLOEXEC on posix_spawn pipes on macOS arm64), PR #15 (exclusive settings and trust locks)",
       "notes": "docs/release-notes/1.1.0.7.md",
       "changelog": "website/src/content/changelog/1.1.0.7.md (date 2026-10-14)",
+      "tag": "v1.1.0.7 (cb057c7, merge of PR #17), release run 38672066567",
+      "publishedOn": "2026-10-14",
       "blockers": []
+    },
+    "1.2.0": {
+      "version": "1.2.0",
+      "kind": "sync",
+      "baseline": "v1.2.0",
+      "status": "release-candidate",
+      "branch": "sync/pi-1.2.0",
+      "ships": "the Pi v1.1.0..v1.2.0 sync (decision 0006): 38 applicability rows ported, 2 ported with a deferral, 3 already in PiSharp, 7 no-op, 6 excluded; the print-mode exit with a command's triggered run still starting",
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md",
+      "applicability": "compatibility/sync-1.2.0-applicability.json",
+      "worklist": "compatibility/sync-1.2.0-worklist.json",
+      "notes": "docs/release-notes/1.2.0.md",
+      "changelog": "website/src/content/changelog/1.2.0.md (status in-progress; set the date and status at release)",
+      "blockers": ["the owner's go-ahead to merge, tag and publish"]
     }
   },
   "messageCaps": {

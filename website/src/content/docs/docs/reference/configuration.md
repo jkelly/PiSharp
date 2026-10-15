@@ -3,7 +3,7 @@ title: Files and settings
 description: Where PiSharp finds its configuration, resources and sessions, and how project trust and the tool policy work.
 ---
 
-PiSharp reads the same files as Pi v1.1.0, in the same places. If you already use Pi, PiSharp picks up your setup. Pi's [Configuration](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/configuration.md) and [Settings](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/settings.md) pages apply.
+PiSharp reads the same files as Pi v1.2.0, in the same places. If you already use Pi, PiSharp picks up your setup. Pi's [Configuration](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/configuration.md) and [Settings](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/settings.md) pages apply.
 
 ## The agent folder
 

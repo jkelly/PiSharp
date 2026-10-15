@@ -12,20 +12,20 @@
   },
   "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
   "summary": {
-    "filesWithOldCommit": 26,
+    "filesWithOldCommit": 25,
     "citations": {
       "repinned": 365,
       "pending": 0,
       "unparsed": 0,
       "nonHeader": 0,
       "excludedHistorical": 1768,
-      "releaseDocs": 3
+      "releaseDocs": 0
     },
     "files": {
       "repinned": 364,
       "pending": 0,
       "historical": 25,
-      "releaseDocs": 1,
+      "releaseDocs": 0,
       "nonHeader": 0
     },
     "pendingByArea": {}
@@ -33,13 +33,7 @@
   "pending": [],
   "unparsed": [],
   "nonHeaderCitations": [],
-  "releaseDocs": [
-    {
-      "file": "README.md",
-      "occurrences": 3,
-      "reason": "describes the published release's baseline; update with the 1.2.0 release"
-    }
-  ],
+  "releaseDocs": [],
   "excludedHistorical": [
     {
       "file": "compatibility/coding-agent-command-rpc-inventory.v1.1.0.json",
@@ -2992,7 +2986,7 @@
         ],
         "pin": "Text and links that describe the published release's baseline: Pi v1.1.0, abe508e (index.md uses the short abe508e), links to github.com/earendil-works/pi/blob/v1.1.0/..., parity.json baseline \"Pi v1.1.0\", package versions 1.1.0.7 in the extension guide.",
         "action": "Update with the PiSharp 1.2.0 release (the website reads the published version from public-release.json). Add a 1.2.0 progress record or plan if the sync is tracked like full-parity-v1.1.0.md (that plan and its progress file stay as v1.1.0 history).",
-        "result": "Prepared for the 1.2.0 release candidate in the close-out (README, website docs, parity.json, the extension guide's package versions, release notes and changelog drafts, public-release.json and full-parity-progress.json). README keeps its three v1.1.0 citations until the release; nothing is tagged or published."
+        "result": "Prepared for the 1.2.0 release candidate in the close-out: README (its three v1.1.0 citations now name v1.2.0), the website docs and parity.json, the extension guide package versions (1.2.0), release notes, CHANGELOG and website changelog drafts (status in-progress), public-release.json and full-parity-progress.json. Nothing is tagged or published."
       },
       {
         "id": "embedded-upstream-docs",

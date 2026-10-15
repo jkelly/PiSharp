@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.2.0] - Unreleased
+
+PiSharp moves to Pi v1.2.0. Update the CLI with `dotnet tool update -g PiSharp.Cli`. The full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.md).
+
+### Breaking changes
+
+- `before_agent_start` also fires for runs started by `pi.sendMessage(..., { triggerTurn: true })`; check the event's `messageType` (`user` or `custom`).
+- While a run starts the session is busy: `pi.sendUserMessage()` needs `deliverAs`, and the native `sendUserMessage` without `DeliverAs` fails instead of steering.
+- `models.json`, keybindings and themes are validated with Pi's published schemas; themes are validated strictly at startup too.
+- `pisharp mcp list --json` reports `resources: true` instead of resource counts.
+- A codemode `// @options:` line must be the first line of the script.
+- `claude-sonnet-4-5` has a 200,000-token context window in the model catalog.
+
+### New features
+
+- Per-key OpenRouter model lists, with the key's context size, max output and prices
+- `$schema` in `settings.json`, `models.json`, `keybindings.json` and themes
+- Tools declare which tools they reach; MCP waits only for the servers a call may reach, and namespaces have aliases
+- Codemode declarations show input constraints, and codemode rows show elapsed and total time
+- `PI_CLIPBOARD_OSC52=1` sends copies to remote clipboards
+- TypeScript extensions run against the Pi 1.2.0 packages
+
+### Fixed
+
+- Mistral long streams, Anthropic strict-tool rejections, OpenRouter router-model prices and "The upstream provider returned an error" retries
+- Print mode warns and exits 1 on a truncated response, and no longer exits 1 when a command's triggered run is still starting at exit
+- Symlinked `AGENTS.md` in worktrees, `~` in resource patterns, and `auth.json` locks on Windows
+- MCP structured content, resources at connect, calls after an OAuth refresh and the `iss` check
+- Terminal wheel scrolling over overlays, colour replies, Herdr images and shifted-symbol bindings
+
 ## [1.1.0.7] - 2026-10-14
 
 A C#-only patch on the Pi v1.1.0 baseline. Update the CLI with `dotnet tool update -g PiSharp.Cli`. Full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.1.0.7.md).

@@ -21,7 +21,14 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Version metadata prepared; fresh versioned lock, build, package and consumer evidence required."
+    "status": "Release candidate on sync/pi-1.2.0: the sync is complete and the offline suites pass, but nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release, with the owner's go-ahead."
+  },
+  "releaseCandidate": {
+    "branch": "sync/pi-1.2.0",
+    "decision": "docs/decisions/0006-pi-1.2.0-sync.md",
+    "applicability": "compatibility/sync-1.2.0-applicability.json",
+    "notes": "docs/release-notes/1.2.0.md",
+    "changelog": "website/src/content/changelog/1.2.0.md"
   },
   "publication": {
     "tagCreated": false,
@@ -117,7 +124,9 @@
       "tagCreated": true,
       "githubReleasePublished": true,
       "nugetPackagesPublished": true,
-      "publishedOn": "2026-10-14"
+      "publishedOn": "2026-10-14",
+      "tagCommit": "cb057c77d195007e13a4de491f29a2f6cfbb3252",
+      "releaseRun": "38672066567"
     }
   ],
   "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled."

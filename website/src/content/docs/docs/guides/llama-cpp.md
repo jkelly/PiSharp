@@ -3,7 +3,7 @@ title: Local models with llama.cpp
 description: Run local GGUF models through a llama.cpp router server, load and unload them with /llama, and use them as classifiers.
 ---
 
-PiSharp has Pi's built-in llama.cpp provider. It talks to a [llama.cpp](https://github.com/ggml-org/llama.cpp) router server, which finds the GGUF models in a folder and loads or unloads them on demand. Pi's [llama.cpp guide](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/llama-cpp.md) applies unchanged, and ships with PiSharp as `docs/llama-cpp.md` next to the tool.
+PiSharp has Pi's built-in llama.cpp provider. It talks to a [llama.cpp](https://github.com/ggml-org/llama.cpp) router server, which finds the GGUF models in a folder and loads or unloads them on demand. Pi's [llama.cpp guide](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/llama-cpp.md) applies unchanged, and ships with PiSharp as `docs/llama-cpp.md` next to the tool.
 
 ## Start the router
 

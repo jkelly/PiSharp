@@ -3,7 +3,7 @@ title: Providers and models
 description: Sign in, choose a model, and add your own endpoints.
 ---
 
-PiSharp has every provider and chat API that Pi v1.1.0 has, with Pi's model catalogs. Pi's [Providers](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/providers.md) and [Models](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/models.md) pages apply.
+PiSharp has every provider and chat API that Pi v1.2.0 has, with Pi's model catalogs. Pi's [Providers](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/providers.md) and [Models](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/models.md) pages apply.
 
 ## Sign in
 
