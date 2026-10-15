@@ -7741,8 +7741,8 @@
       "originalSha256": "defccaf82afdf65d24d8319c4d7f00bd421d5a277001a607df7b9d0c94438132"
     },
     {
-      "currentSha256": "d9070f54cedadf113ca1c293a5373d1cabb21ea47418c7b8843d12f57efd88a1",
-      "currentBytes": 7440,
+      "currentSha256": "cc0973caa1c38bfbba63c6856601ec7d4cc66357df1c5bc523a090cfa469bf0d",
+      "currentBytes": 7485,
       "originalBytes": 2182,
       "path": "src/PiSharp.Cli/packages.lock.json",
       "originalSha256": "ca172c0a806e9ff4b88220209dced5528129016f6c935b0024cb923b5b93e799"
