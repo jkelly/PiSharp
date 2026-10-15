@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (setupKeyHandlers,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (setupKeyHandlers,
 // setupEditorSubmitHandler and every built-in slash command handler: /export, /import, /share, /bug, /copy, /name, /session,
 // /changelog, /hotkeys, /clone, /new, /compact, /reload, /debug, /arminsayshi, /dementedelves, /quit, ! and !! bash; the key
 // handlers for Ctrl+C/D/Z, follow-up, dequeue, thinking and model cycling, tool expansion, external editor and clipboard paste).

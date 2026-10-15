@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/utils/clipboard.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/utils/clipboard.ts.
 // The native clipboard (getNativeClipboard) is the command-backed replacement in NativeClipboard.cs; see the deviation there.
 using System.Text;
 
@@ -8,8 +8,11 @@ internal static class Clipboard
 {
     private const int MaxOsc52EncodedLength = 100_000;
 
+    /// <summary>Remote sessions also emit OSC 52 so the client terminal receives the copy. PI_CLIPBOARD_OSC52=1 covers remote
+    /// clients that leave no SSH markers, such as multiplexer attaches or IDE daemons.</summary>
     private static bool IsRemoteSession(ClipboardEnvironment environment) =>
-        environment.HasEnv("SSH_CONNECTION") || environment.HasEnv("SSH_CLIENT") || environment.HasEnv("MOSH_CONNECTION");
+        environment.HasEnv("SSH_CONNECTION") || environment.HasEnv("SSH_CLIENT") || environment.HasEnv("MOSH_CONNECTION") ||
+        environment.Env("PI_CLIPBOARD_OSC52") == "1";
 
     private static bool EmitOsc52(ClipboardEnvironment environment, string text)
     {

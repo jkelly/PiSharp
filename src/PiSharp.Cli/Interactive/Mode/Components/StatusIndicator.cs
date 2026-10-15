@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/status-indicator.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/status-indicator.ts.
 // WorkingIndicatorOptions (core/extensions/types.ts: frames, intervalMs) is PiSharp.Tui's LoaderIndicatorOptions.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
@@ -59,8 +59,8 @@ internal sealed class RetryStatusIndicator : StatusIndicator
 /// <summary>"manual" | "threshold" | "overflow".</summary>
 internal enum CompactionStatusReason { Manual, Threshold, Overflow }
 
-internal sealed class CompactionStatusIndicator(ITui ui, CompactionStatusReason reason)
-    : StatusIndicator(StatusIndicatorKind.Compaction, ui, spinner => theme.Fg("accent", spinner), text => theme.Fg("muted", text), Label(reason))
+internal sealed class CompactionStatusIndicator(ITui ui, CompactionStatusReason reason, Func<string, string>? colorFn = null)
+    : StatusIndicator(StatusIndicatorKind.Compaction, ui, colorFn ?? (spinner => theme.Fg("accent", spinner)), colorFn ?? (text => theme.Fg("muted", text)), Label(reason))
 {
     private static string Label(CompactionStatusReason reason)
     {

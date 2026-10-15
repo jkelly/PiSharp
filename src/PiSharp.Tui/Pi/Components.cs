@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/components/text.ts, truncated-text.ts, box.ts, spacer.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/text.ts, truncated-text.ts, box.ts, spacer.ts,
 // loader.ts, cancellable-loader.ts, input.ts, select-list.ts.
 namespace PiSharp.Tui.Pi;
 
@@ -388,7 +388,7 @@ public sealed class Input : IComponent, IFocusable, IInputHandler, IMouseHandler
             var text = TextUtils.TruncateToWidth(placeholder, available, "");
             var at = FirstGrapheme(text) ?? " ";
             var after = text.Length >= at.Length ? text[Math.Min(at.Length, text.Length)..] : "";
-            var withCursor = marker + "\u001b[7m" + placeholderStyle(at) + "\u001b[27m" + placeholderStyle(after);
+            var withCursor = marker + TuiBase.RenderFakeCursor(placeholderStyle(at)) + placeholderStyle(after);
             return [prompt + withCursor + new string(' ', Math.Max(0, available - TextUtils.VisibleWidth(withCursor)))];
         }
         string visible; var cursorDisplay = cursor;
@@ -414,7 +414,8 @@ public sealed class Input : IComponent, IFocusable, IInputHandler, IMouseHandler
         var atCursor = FirstGrapheme(visible[cursorDisplay..]) ?? " ";
         var afterStart = Math.Min(visible.Length, cursorDisplay + atCursor.Length);
         var afterCursor = cursorDisplay < visible.Length ? visible[afterStart..] : "";
-        var line = before + marker + "\u001b[7m" + atCursor + "\u001b[27m" + afterCursor;
+        // TUI draws the fake cursor in reverse video, or omits it when the hardware cursor is shown
+        var line = before + marker + TuiBase.RenderFakeCursor(atCursor) + afterCursor;
         return [prompt + line + new string(' ', Math.Max(0, available - TextUtils.VisibleWidth(line)))];
     }
 }
