@@ -1,7 +1,8 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/node.ts (the FileSystem half of NodeExecutionEnv: path
 // resolution, error mapping, the text-line, binary and directory readers, line scans, watches, temporary files and every file operation;
 // the watcher itself is LocalFileWatcher, node-watch.ts). The Shell half is LocalExecutionEnv in the durable tools project, which builds on
-// this class.
+// this class. NodeExecutionEnv has no `listFiles`; this class implements the optional method as pi-env's LocalExecutionEnv does, with its
+// daemon's walk ported in LocalFileListing.cs.
 //
 // This folder is the local runtime side of the storage boundary (upstream env/node.ts): it alone in PiSharp.Durable/Env uses System.IO.
 // Every handle is opened with FileShare.ReadWrite | FileShare.Delete and closed before the operation returns, so on Windows a file can be
@@ -222,6 +223,22 @@ public class LocalFileSystem : IFileSystem
         });
 
     /// <inheritdoc/>
+    /// <remarks>Lists in process with the semantics of pi-env's daemon, which upstream's local environment lists through (LocalFileListing);
+    /// the walk runs on the thread pool and stops at the first entry after the context is cancelled.</remarks>
+    public virtual async Task<Result<FileListing, FileError>> ListFilesAsync(string path, ListFilesOptions? options, DurableContext context)
+    {
+        string resolved;
+        try { resolved = ResolvePath(path); }
+        catch (Exception error) { return ToFileError(error, path); }
+        if (LocalFileListing.Validate(options, resolved) is { } invalid) return invalid;
+        if (context.IsCancellationRequested) return Aborted(resolved);
+        Result<FileListing, FileError> listed;
+        try { listed = await Task.Run(() => LocalFileListing.List(resolved, options, () => context.IsCancellationRequested)).ConfigureAwait(false); }
+        catch (Exception error) { return ToFileError(error, resolved); }
+        return context.IsCancellationRequested ? Aborted(resolved) : listed;
+    }
+
+    /// <inheritdoc/>
     public virtual Task<Result<IDirReader, FileError>> OpenDirReaderAsync(string path, DurableContext context) => Run<IDirReader>(path, context, resolved =>
     {
         if (DirectoryProblem(resolved) is { } problem) return problem;
@@ -426,7 +443,7 @@ public class LocalFileSystem : IFileSystem
     }
 
     /// <summary>Upstream <c>realpath</c>: every link on the path resolved, component by component.</summary>
-    private static string RealPath(string resolved)
+    internal static string RealPath(string resolved)
     {
         if (!File.Exists(resolved) && !Directory.Exists(resolved))
             throw new FileNotFoundException("ENOENT: no such file or directory, realpath", resolved);

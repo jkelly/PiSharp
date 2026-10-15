@@ -78,6 +78,7 @@ None is planned or in progress.
 - **`16-real-model`** runs only with `OPENAI_API_KEY`. The tests run it without the key and pin upstream's skip line.
 - **`19-json`'s first streamed partial** varies between Node runs, with pi-ai's random faux token size. PiSharp's run is fixed and equals captured Node runs. They compare as JSON with sorted keys, with clock and random values as placeholders.
 - **Examples 19, 21, 23 and 24** run on a manual example clock that is driven like Node's event loop.
+- **`listFiles`** is optional upstream, and only `pi-env` implements it: its local environment lists through its daemon, which walks with the Rust `ignore` crate. `pi-env` stays out of scope, but `LocalFileSystem` implements `ListFilesAsync` in process with the daemon's semantics (`Env/Local/LocalFileListing.cs` ports `list.rs` and the `ignore` 0.4.33 walk and gitignore matching it configures; no new package). So the local env conformance runs with `listFiles` on, as `pi-env`'s does, and `env.list-files.*` ports the daemon's own tests and the crate's gitignore tests.
 
 **Benchmarks** (`benchmarks/PiSharp.Durable.Benchmarks`) are report only; see `docs/durable-benchmarks.md`.
 - On the one Windows machine measured, neither runtime meets upstream's 0.4 s target for `cat` of 1 GiB:

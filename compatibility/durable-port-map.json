@@ -101,12 +101,11 @@
       "lines": 376,
       "pisharp": "src/PiSharp.Durable/Env/Env.cs",
       "phase": "P4",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "31b1a5349eb0516668b1af2aaace10ad296757c4",
       "changedLines": 49,
-      "note": "Env.cs: Result<TValue, TError>/Unit, FileErrorCode/FileError, ExecutionErrorCode/ExecutionError (SpillPath), FileKind, FileMetadata (upstream FileInfo). FileSystem.cs: IFileSystem with ITextLineReader/TextLine, ReadTextLinesOptions, IBinaryReader (ScanLinesAsync, LineScan), IDirReader, WatchTarget/WatchExclusions, the WatchChange records (WatchPathsChange, WatchOverflowChange, WatchErrorChange), IFileWatcher/WatchMode, TempFileOptions, CleanupAsync. Shell.cs: ShellCommand (string or argv), ShellExecOptions, ShellSpillOptions, ShellExecResult, ShellOutputWindow/ShellOutputSkip/ShellOutputInfo/ShellStream, ShellOutputHandler, IShell, IExecutionEnv : IFileSystem, IShell. Contents are bytes with UTF-8 string overloads (FileSystemExtensions). Tests: env.*",
-      "portedBlobSha1": "31b1a5349eb0516668b1af2aaace10ad296757c4"
+      "note": "Env.cs: Result<TValue, TError>/Unit, FileErrorCode/FileError, ExecutionErrorCode/ExecutionError (SpillPath), FileKind, FileMetadata (upstream FileInfo). FileSystem.cs: IFileSystem with ITextLineReader/TextLine, ReadTextLinesOptions, IBinaryReader (ScanLinesAsync, LineScan), IDirReader, WatchTarget/WatchExclusions, the WatchChange records (WatchPathsChange, WatchOverflowChange, WatchErrorChange), IFileWatcher/WatchMode, TempFileOptions, CleanupAsync, and the optional listFiles: IFileSystem.ListFilesAsync (a default interface method failing with not_supported), ListFilesOptions (bounds as doubles, validated as non-negative safe integers), FileListing, FileListEntry; LocalFileSystem implements it with pi-env daemon semantics (Env/Local/LocalFileListing.cs, a port of packages/env/daemon/src/list.rs and the ignore crate 0.4.33 it walks with). Shell.cs: ShellCommand (string or argv), ShellExecOptions, ShellSpillOptions, ShellExecResult, ShellOutputWindow/ShellOutputSkip/ShellOutputInfo/ShellStream, ShellOutputHandler, IShell, IExecutionEnv : IFileSystem, IShell. Contents are bytes with UTF-8 string overloads (FileSystemExtensions). Tests: env.*, env.list-files.*"
     },
     {
       "upstream": "packages/durable/src/env/line-scan.ts",
@@ -676,12 +675,11 @@
       "lines": 633,
       "pisharp": "src/PiSharp.Durable/Testing/EnvConformance.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "442b9a4442f29ddb4f299ddce6782d614a94fa43",
       "changedLines": 122,
-      "note": "EnvConformance.Create(EnvConformanceOptions or provider): all 24 cases over IExecutionEnv with injected assertions (read(0, 1.5) dropped: integer offsets). Tests: env.node-conformance.conformance.* and env.node-conformance.polling.*",
-      "portedBlobSha1": "442b9a4442f29ddb4f299ddce6782d614a94fa43"
+      "note": "EnvConformance.Create(EnvConformanceOptions or provider): all 24 cases plus the 5 listFiles cases (EnvConformanceOptions.ListFiles; the symbolic link one also needs Symlinks) over IExecutionEnv with injected assertions (read(0, 1.5) dropped: integer offsets). Tests: env.node-conformance.conformance.* and env.node-conformance.polling.*"
     },
     {
       "upstream": "packages/durable/src/testing/index.ts",
@@ -698,12 +696,11 @@
       "lines": 38,
       "pisharp": "src/PiSharp.Durable/Testing/Runner.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "c7d82d83f2b2d5a43a318f81af76ce948b16948f",
       "changedLines": 2,
-      "note": "IConformanceTestRunner (Describe, It with timeout, Assertions) and ConformanceRunner.RegisterStorageConformance/RegisterEnvConformance. Tests: env.node-conformance.* register through it",
-      "portedBlobSha1": "c7d82d83f2b2d5a43a318f81af76ce948b16948f"
+      "note": "IConformanceTestRunner (Describe, It with timeout, Assertions) and ConformanceRunner.RegisterStorageConformance/RegisterEnvConformance (shell, symlinks, listFiles). Tests: env.node-conformance.* register through it"
     },
     {
       "upstream": "packages/durable/src/testing/storage-benchmark.ts",
@@ -733,12 +730,11 @@
       "lines": 46,
       "pisharp": "src/PiSharp.Durable/Testing/Types.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "1b7ec09a5496057726f1eb4fe133d2fcf74de9ca",
       "changedLines": 2,
-      "note": "IConformanceAssertions, StorageConformanceProvider/Case/Exception (the storage kit keeps asserting itself), EnvConformanceProvider over IExecutionEnv, EnvConformanceOptions (WithEnv, Assertions, Shell, Symlinks), EnvConformanceCase (TimeoutMs, Slug), EnvConformanceException",
-      "portedBlobSha1": "1b7ec09a5496057726f1eb4fe133d2fcf74de9ca"
+      "note": "IConformanceAssertions, StorageConformanceProvider/Case/Exception (the storage kit keeps asserting itself), EnvConformanceProvider over IExecutionEnv, EnvConformanceOptions (WithEnv, Assertions, Shell, Symlinks, ListFiles), EnvConformanceCase (TimeoutMs, Slug), EnvConformanceException"
     },
     {
       "upstream": "packages/durable/src/tool-search/index.ts",

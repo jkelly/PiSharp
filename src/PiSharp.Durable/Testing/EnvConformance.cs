@@ -1,7 +1,8 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/testing/env-conformance.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/env-conformance.ts.
 // Cases keep upstream's names, inputs and expected values. Adapted: upstream's read(0, 1.5) check is dropped because offsets and lengths are
 // integers here; the line-scan case's reference decoding (`new TextDecoder()`) is this port's StreamDecoder and range decoder, which the
-// env.line-scan cases pin against Node-captured output; upstream's `{ ...info }` partial matches compare the named properties.
+// env.line-scan cases pin against Node-captured output; upstream's `{ ...info }` partial matches compare the named properties; the listFiles
+// cases' `{ entries, truncated }` comparisons compare both fields.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -340,6 +341,126 @@ public static class EnvConformance
             }),
         };
 
+        if (options.ListFiles)
+        {
+            async Task WriteAll(IExecutionEnv env, params string[] files)
+            {
+                foreach (var file in files) (await env.WriteFileAsync(file, "", Context)).GetOrThrow();
+            }
+
+            cases.Add(Case("listFiles lists files and directories depth first in name order", async env =>
+            {
+                await WriteAll(env, "b.txt", "a/z.txt", "a/b/c.txt", ".hidden/x", "A.txt");
+                (await env.CreateDirAsync("empty", null, Context)).GetOrThrow();
+                var all = await Listed(env, ".");
+                assert.DeepEqual(all.Entries, new[]
+                {
+                    "d .hidden",
+                    "f .hidden/x",
+                    "f A.txt",
+                    "d a",
+                    "d a/b",
+                    "f a/b/c.txt",
+                    "f a/z.txt",
+                    "f b.txt",
+                    "d empty",
+                });
+                assert.StrictEqual(all.Truncated, false);
+                assert.DeepEqual((await Listed(env, ".", new ListFilesOptions { Hidden = false })).Entries, new[]
+                {
+                    "f A.txt",
+                    "d a",
+                    "d a/b",
+                    "f a/b/c.txt",
+                    "f a/z.txt",
+                    "f b.txt",
+                    "d empty",
+                });
+                string[] expected = ["d b", "f b/c.txt", "f z.txt"];
+                var relative = await Listed(env, "a");
+                assert.DeepEqual(relative.Entries, expected);
+                assert.StrictEqual(relative.Truncated, false);
+                var absolute = await Listed(env, (await env.AbsolutePathAsync("a", Context)).GetOrThrow());
+                assert.DeepEqual(absolute.Entries, expected);
+                assert.StrictEqual(absolute.Truncated, false);
+                var empty = await Listed(env, "empty");
+                assert.DeepEqual(empty.Entries, Array.Empty<string>());
+                assert.StrictEqual(empty.Truncated, false);
+            }));
+
+            cases.Add(Case("listFiles skips what git ignores in work trees, .git, and excluded names", async env =>
+            {
+                await WriteAll(env, "keep.txt", "out/x.js", "sub/keep.txt", "sub/drop.log", "node_modules/m/i.js");
+                (await env.WriteFileAsync(".gitignore", "out/\n*.log\n", Context)).GetOrThrow();
+                (await env.WriteFileAsync("sub/.gitignore", "!keep.txt\n", Context)).GetOrThrow();
+                // Not a work tree yet: `.gitignore` files have no effect.
+                assert.Ok((await Listed(env, ".")).Entries.Contains("f out/x.js"), "outside a work tree out/x.js is listed");
+                (await env.WriteFileAsync(".git/HEAD", "ref: refs/heads/main\n", Context)).GetOrThrow();
+                (await env.WriteFileAsync(".git/info/exclude", "keep.txt\n", Context)).GetOrThrow();
+                assert.DeepEqual((await Listed(env, ".", new ListFilesOptions { Exclude = ["node_modules"] })).Entries, new[]
+                {
+                    "f .gitignore",
+                    "d sub",
+                    "f sub/.gitignore",
+                    "f sub/keep.txt",
+                });
+                // A directory inside the work tree applies its parents' rules.
+                assert.DeepEqual((await Listed(env, "sub")).Entries, new[] { "f .gitignore", "f keep.txt" });
+                var all = (await Listed(env, ".", new ListFilesOptions { Gitignore = false })).Entries;
+                assert.Ok(all.Contains("f out/x.js") && all.Contains("f node_modules/m/i.js") && all.Contains("f keep.txt"),
+                    "without gitignore everything is listed");
+                assert.Ok(!all.Any(entry => entry.Contains(".git/", StringComparison.Ordinal) || entry == "d .git"), ".git is never listed");
+            }));
+
+            cases.Add(Case("listFiles stops at its bounds and reports truncated", async env =>
+            {
+                await WriteAll(env, "a", "b", "c");
+                var two = await Listed(env, ".", new ListFilesOptions { MaxEntries = 2 });
+                assert.DeepEqual(two.Entries, new[] { "f a", "f b" });
+                assert.StrictEqual(two.Truncated, true);
+                var three = await Listed(env, ".", new ListFilesOptions { MaxEntries = 3 });
+                assert.DeepEqual(three.Entries, new[] { "f a", "f b", "f c" });
+                assert.StrictEqual(three.Truncated, false);
+                // Each entry counts its path plus two bytes.
+                var bytes = await Listed(env, ".", new ListFilesOptions { MaxBytes = 6 });
+                assert.DeepEqual(bytes.Entries, new[] { "f a", "f b" });
+                assert.StrictEqual(bytes.Truncated, true);
+                var none = await Listed(env, ".", new ListFilesOptions { MaxEntries = 0 });
+                assert.DeepEqual(none.Entries, Array.Empty<string>());
+                assert.StrictEqual(none.Truncated, true);
+                assert.StrictEqual(Code(await env.ListFilesAsync(".", new ListFilesOptions { MaxEntries = -1 }, Context)), "invalid");
+                assert.StrictEqual(Code(await env.ListFilesAsync(".", new ListFilesOptions { TimeoutMs = 1.5 }, Context)), "invalid");
+            }));
+
+            cases.Add(Case("listFiles fails on missing directories, files, and aborts", async env =>
+            {
+                (await env.WriteFileAsync("file.txt", "", Context)).GetOrThrow();
+                assert.StrictEqual(Code(await env.ListFilesAsync("missing", null, Context)), "not_found");
+                assert.StrictEqual(Code(await env.ListFilesAsync("file.txt", null, Context)), "not_directory");
+                assert.StrictEqual(Code(await env.ListFilesAsync(".", null, AbortedContext())), "aborted");
+            }));
+        }
+
+        if (options.Symlinks && options.ListFiles)
+        {
+            cases.Add(Case("listFiles lists symbolic links without following them", async env =>
+            {
+                (await env.WriteFileAsync("dir/inner.txt", "", Context)).GetOrThrow();
+                var linked = await env.ExecAsync(Shell("ln -s dir link && ln -s missing dangling && ln -s .. dir/loop"), null, Context);
+                assert.StrictEqual(linked.GetOrThrow().ExitCode, 0);
+                assert.DeepEqual((await Listed(env, ".")).Entries, new[]
+                {
+                    "l dangling",
+                    "d dir",
+                    "f dir/inner.txt",
+                    "l dir/loop",
+                    "l link",
+                });
+                // The listed directory itself may be a link.
+                assert.DeepEqual((await Listed(env, "link")).Entries, new[] { "f inner.txt", "l loop" });
+            }));
+        }
+
         if (options.Symlinks)
         {
             cases.Add(Case("binary reader follows symlinks unless noFollow refuses the final one", async env =>
@@ -386,6 +507,15 @@ public static class EnvConformance
             }, Context);
             return (result, stdout.ToString(), stderr.ToString());
         }
+    }
+
+    /// <summary>A listing as <c>&lt;kind letter&gt; &lt;path&gt;</c> lines (<c>f</c>, <c>d</c>, <c>l</c>), with its truncation (upstream
+    /// <c>listed</c>). An environment without <see cref="IFileSystem.ListFilesAsync"/> fails with not_supported, which this throws.</summary>
+    private static async Task<(string[] Entries, bool Truncated)> Listed(IExecutionEnv env, string path, ListFilesOptions? options = null)
+    {
+        var listing = (await env.ListFilesAsync(path, options, Context)).GetOrThrow();
+        var entries = listing.Entries.Select(entry => (entry.Kind switch { FileKind.File => "f", FileKind.Directory => "d", _ => "l" }) + " " + entry.Path);
+        return ([.. entries], listing.Truncated);
     }
 
     /// <summary>The change helpers of upstream's <c>watching</c>.</summary>

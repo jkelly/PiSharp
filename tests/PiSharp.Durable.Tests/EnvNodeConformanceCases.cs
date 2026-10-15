@@ -9,7 +9,8 @@ using PiSharp.Durable.Tools.Env;
 // platform's watch mode (suite "conformance"; polling on Windows) and with polling watches every 100 ms (suite "polling"). As upstream, Windows
 // runs the kit's shell cases through Git Bash with symbolic links off (Git Bash's `ln -s` copies unless native links are enabled). The watch
 // limits case is suite "watch-limits" and the readers cases suite "readers"; "refuses a FIFO without waiting for a writer" is POSIX only, as
-// upstream (Windows has no FIFOs).
+// upstream (Windows has no FIFOs). Unlike upstream's NodeExecutionEnv, LocalExecutionEnv implements the optional listFiles (with pi-env's
+// daemon semantics, as pi-env's LocalExecutionEnv), so both suites register with listFiles on, as pi-env's conformance.test.ts does.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> EnvNodeConformanceCases()
@@ -26,13 +27,13 @@ internal static partial class Program
             var cwd = Temp("env-conformance");
             try { await use(new LocalExecutionEnv(cwd)); }
             finally { await RemoveTempDirAsync(cwd); }
-        }, shell, symlinks);
+        }, shell, symlinks, listFiles: true);
         ConformanceRunner.RegisterEnvConformance(runner, "polling", async use =>
         {
             var cwd = Temp("env-conformance");
             try { await use(new LocalExecutionEnv(new LocalExecutionEnvOptions { Cwd = cwd, Watch = new LocalWatchOptions { Mode = WatchMode.Polling, PollIntervalMs = 100 } })); }
             finally { await RemoveTempDirAsync(cwd); }
-        }, shell, symlinks);
+        }, shell, symlinks, listFiles: true);
         foreach (var testCase in runner.Cases) yield return testCase;
 
         yield return Case("env.node-conformance.watch-limits.refuses-a-tree-over-the-directory-budget-and-stops-with-an-error-when-one-grows-past-it", () =>

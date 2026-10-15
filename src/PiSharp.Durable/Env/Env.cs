@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/index.ts (results, file and execution errors, file
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/index.ts (results, file and execution errors, file
 // metadata). The FileSystem capability, its readers, line scans and watches are in FileSystem.cs; the Shell and ExecutionEnv halves in
 // Shell.cs; decode.ts and line-scan.ts, which index.ts re-exports, in Decode.cs and LineScan.cs.
 using System.Diagnostics.CodeAnalysis;
