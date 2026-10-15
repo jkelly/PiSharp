@@ -60,7 +60,7 @@ At the end of the Pi v1.2.0 update (work list area h, 2026-10-15), `compatibilit
 
 None is planned, in progress or `needs-sync`. Of the 196 ported files, 84 are unchanged since v1.1.0, 73 changed in v1.2.0, 1 moved (`chord/src/state.ts`) and 38 are new in v1.2.0. At the end of P13, against v1.1.0, the map had 174 files: 168 ported, 2 excluded and 4 skipped.
 
-**Test cases**, from the final run of the update (2026-10-15):
+**Test cases**, from the final run of the update (2026-10-15, after merging `32fcd93`; in it, `sessions.lock.cross-process` waits until it sees the lock child's renewal instead of a fixed 2.5 s delay, after that test flaked on Windows CI):
 
 | suite | cases | authored | upstream capture | skipped |
 |---|---:|---:|---:|---:|
