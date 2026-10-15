@@ -168,6 +168,7 @@
       "pisharp.durable.tools": {
         "type": "Project",
         "dependencies": {
+          "PiSharp.Codemode": "[1.1.0.6, )",
           "PiSharp.Durable": "[1.1.0.6, )",
           "PiSharp.Tools": "[1.1.0.6, )"
         }

@@ -447,6 +447,10 @@ public record ToolRegistration
     public required string Description { get; init; }
     /// <summary>JSON Schema of the arguments.</summary>
     public JsonObjectValue Parameters { get; init; } = EmptyParameters;
+    /// <summary>pi-ai <c>Tool.constrainedSampling</c> (wire JSON: <c>false</c> or a <c>ConstrainedSamplingConfig</c> such as
+    /// <c>{type: "grammar", variants: {...}}</c>): how providers that support it constrain the tool's input. Enters the transcript with the
+    /// declaration; null leaves it out.</summary>
+    public JsonValue? ConstrainedSampling { get; init; }
     /// <summary>Whether an interrupted execution may rerun on recovery. Default <see cref="ToolReplay.Unsafe"/>.</summary>
     public ToolReplay? Replay { get; init; }
     /// <summary>Default: the settings' <c>ToolExecution</c>. One sequential call makes its whole round sequential.</summary>

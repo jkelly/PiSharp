@@ -10,8 +10,8 @@
 // - resume (resumable scenarios): PiSharp resumes the copy with the scripted model and ends with upstream's own resumed records.
 // - written: PiSharp runs the same scenario (CompatScenarios.cs) and writes the same records; the JSONL files are byte for byte upstream's,
 //   and the SQLite record, revision and metadata columns hold upstream's text.
-// Only the fields manifest.json lists under "varies" are normalized: sessionId strings and durationMs numbers (code mode's clock and seed
-// and its wall time belong to the codemode scenario, work list area d, which is not run yet).
+// Only the fields manifest.json lists under "varies" are normalized: sessionId strings, durationMs numbers, and the codemode scenario's
+// wall time, clock and seed; and, PiSharp's own, code mode's engine fingerprint (QuickJS upstream, Jint here: decision 0005).
 // The scenarios new in Pi v1.2.0 (CompatScenarios120.cs) run the same checks, plus observed (observed.json: what calls returned or rejected
 // with) and events (events.json: the root conversation's agent events, the snapshot first, from the run and from the resume).
 // - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
@@ -54,21 +54,61 @@ internal static partial class CompatTests
     internal static JsonObjectValue Load(string path, string? root = null) =>
         (JsonObjectValue)JsonValue.Parse(File.ReadAllText(Path.Combine(root ?? Fixtures, path)));
 
-    /// <summary>The fields that vary between captures (manifest.json "varies"), on both sides.</summary>
+    /// <summary>The fields that vary between captures (manifest.json "varies"), on both sides (compare-captures.mjs <c>normalize</c>):
+    /// sessionId strings, durationMs numbers, the seconds of "Wall time &lt;seconds&gt; seconds", and code mode's own clock and seed (in an
+    /// object with a numeric <c>seed</c>, pi.codemode.run's start, that seed and its startedAt and deadline; the <c>at</c> of an object of only
+    /// id, at, issuedAfter and global, a pi.codemode.journal entry). PiSharp also normalizes the start's engine <c>fingerprint</c>, which names
+    /// QuickJS upstream and Jint here (an intentional difference, decision 0005), as a property and as the value of a set operation.</summary>
     internal static JsonValue Normalize(JsonValue value, string? key = null) => value switch
     {
+        JsonArrayValue { Count: 3 } items when items[0] is JsonStringValue { Value: "s" } && items[1] is JsonArrayValue { Count: > 0 } path &&
+            path[^1] is JsonStringValue { Value: "fingerprint" } && items[2] is JsonStringValue =>
+            JsonValue.Array([Normalize(items[0]), Normalize(items[1]), "<fingerprint>"]),
         JsonArrayValue items => JsonValue.Array(items.Select(item => Normalize(item))),
-        JsonObjectValue properties => JsonValue.Object(properties.Select(property => KeyValuePair.Create(property.Key, Normalize(property.Value, property.Key)))),
+        JsonObjectValue properties => NormalizeObject(properties),
         JsonStringValue when key == "sessionId" => "<session>",
+        JsonStringValue when key == "fingerprint" => "<fingerprint>",
         JsonNumberValue when key == "durationMs" => "<duration>",
+        JsonStringValue text when text.Value.Contains("Wall time ", StringComparison.Ordinal) => WallTime.Replace(text.Value, "Wall time <seconds> seconds"),
         _ => value,
     };
 
-    private static readonly Regex VaryingText = new("\"sessionId\":\"[^\"]*\"|\"durationMs\":[0-9]+", RegexOptions.CultureInvariant);
+    private static readonly HashSet<string> JournalEntryKeys = new(["id", "at", "issuedAfter", "global"], StringComparer.Ordinal);
 
-    /// <summary>The same normalization on persisted JSON text.</summary>
-    internal static string NormalizeText(string text) => VaryingText.Replace(text, match =>
-        match.Value.StartsWith("\"sessionId\"", StringComparison.Ordinal) ? "\"sessionId\":\"<session>\"" : "\"durationMs\":\"<duration>\"");
+    private static JsonObjectValue NormalizeObject(JsonObjectValue properties)
+    {
+        var seeded = properties.TryGetValue("seed", out var seed) && seed is JsonNumberValue;
+        var journalEntry = properties.TryGetValue("id", out var id) && id is JsonNumberValue && properties.TryGetValue("at", out var at) && at is JsonNumberValue &&
+            properties.Keys.All(JournalEntryKeys.Contains);
+        return JsonValue.Object(properties.Select(property => KeyValuePair.Create(property.Key, property switch
+        {
+            { Key: "seed" } when seeded => "<seed>",
+            { Key: "startedAt" or "deadline", Value: JsonNumberValue } when seeded => "<clock>",
+            { Key: "at" } when journalEntry => (JsonValue)"<clock>",
+            _ => Normalize(property.Value, property.Key),
+        })));
+    }
+
+    private static readonly Regex WallTime = new(@"Wall time [\d.]+ seconds", RegexOptions.CultureInvariant);
+
+    private static readonly Regex VaryingText = new(
+        "\"sessionId\":\"[^\"]*\"|\"durationMs\":[0-9]+|Wall time [0-9.]+ seconds|\"startedAt\":[0-9]+,\"seed\":[0-9]+(,\"deadline\":[0-9]+)?|" +
+        "\\[\"start\",\"fingerprint\"\\],\"[^\"]*\"|\"fingerprint\":\"[^\"]*\"|\\{\"id\":[0-9]+,\"at\":[0-9]+",
+        RegexOptions.CultureInvariant);
+
+    /// <summary>The same normalization on persisted JSON text. Code mode's start is matched by its key order (version, startedAt, seed,
+    /// deadline?) and a journal entry by its leading id and at, which only those objects have.</summary>
+    internal static string NormalizeText(string text) => VaryingText.Replace(text, match => match.Value switch
+    {
+        var found when found.StartsWith("\"sessionId\"", StringComparison.Ordinal) => "\"sessionId\":\"<session>\"",
+        var found when found.StartsWith("\"durationMs\"", StringComparison.Ordinal) => "\"durationMs\":\"<duration>\"",
+        var found when found.StartsWith("Wall time", StringComparison.Ordinal) => "Wall time <seconds> seconds",
+        var found when found.StartsWith("\"startedAt\"", StringComparison.Ordinal) =>
+            "\"startedAt\":\"<clock>\",\"seed\":\"<seed>\"" + (found.Contains("deadline", StringComparison.Ordinal) ? ",\"deadline\":\"<clock>\"" : ""),
+        var found when found.StartsWith("[", StringComparison.Ordinal) => "[\"start\",\"fingerprint\"],\"<fingerprint>\"",
+        var found when found.StartsWith("\"fingerprint\"", StringComparison.Ordinal) => "\"fingerprint\":\"<fingerprint>\"",
+        var found => found[..(found.IndexOf("\"at\":", StringComparison.Ordinal) + 5)] + "\"<clock>\"",
+    });
 
     /// <summary>Equal JSON text after normalization: values and key order. On a difference, names the first differing path.</summary>
     internal static void SameJson(JsonValue expected, JsonValue actual, string what)
@@ -280,6 +320,11 @@ internal static partial class CompatTests
                     yield return Case(prefix + "resume", async () =>
                     {
                         var directory = CopyFixture(scenario.Name, backend, root);
+                        if (scenario.ResumeUpstream is { } own)
+                        {
+                            await own(() => OpenBackend(backend, directory));
+                            return;
+                        }
                         var events = CompatEvents.Expect(expectedEvents, "resume");
                         await CompatEvents.Record(events, () => resume(() => OpenBackend(backend, directory)));
                         SameJson(Expected(scenario.Name, "resumed.json", backend, root), await Dump(await OpenBackend(backend, directory)), "resumed records");

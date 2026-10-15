@@ -29,8 +29,9 @@
       "lines": 1037,
       "pisharp": "src/PiSharp.Durable.Tools/Codemode/Codemode.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "Durable code mode in PiSharp.Durable.Tools: DurableCodemode (ModuleVersion, ToolName, CreateTool, CreateExtension, StoreDoc; RunDoc and JournalDoc internal), CodemodeToolOptions (Globals internal as upstream @internal; OnRunStarted is an internal test seam for upstream's sandbox.start wrapper), CodemodeGlobal; CodemodeToolDetails and CodemodeNestedCall are the details JSON. Runs scripts on PiSharp.Codemode's deterministic CodemodeSandbox.Start() (decision 0005, Codemode Start()); one call's state lives on its own exclusive TaskScheduler, as upstream's on Node's single thread, and the sandbox's callbacks are posted to it in order. Nested calls use ExecuteToolAsync with key c<VM call id>; the calls a commit covers are admitted together (ToolExecutionApi.AdmitTogether), as upstream's synchronous stretch enqueues its admissions back to back, and script arguments of any JSON kind reach the nested call (ToolExecutionApi.ExecuteToolAsync over a JsonValue). The pump yields after its commit, as a JavaScript await lets ready results join the next journal batch. Intentional difference: the fingerprint names Jint, so a script started under Pi is refused on resume here (compat.codemode.*.resume asserts it). Tests: codemode.* (32) and codemode.output.* (8), compat.codemode.* (records, events and observed of the written run and its resume equal upstream's on SQLite and JSONL, clock, seed, wall time and fingerprint normalized)"
     },
     {
       "upstream": "packages/durable/src/codemode/describe.ts",
@@ -38,8 +39,9 @@
       "lines": 157,
       "pisharp": "src/PiSharp.Durable.Tools/Codemode/Describe.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "CodemodeDescribe (internal): Description, DeclarationOf/SampleOf over PiSharp.Codemode's CodemodeDeclarations.RenderToolSample, NamespaceOf, Section with the round-robin budget selection (namespaces ordered with StringComparer.InvariantCulture for localeCompare); CodemodeNamespace is public. Tests: codemode.describe.* (5), compat.codemode.* (the section and declaration in pi.system byte for byte)"
     },
     {
       "upstream": "packages/durable/src/codemode/index.ts",
@@ -47,8 +49,9 @@
       "lines": 13,
       "pisharp": "src/PiSharp.Durable.Tools/Codemode/Codemode.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "The codemode entry point: DurableCodemode (ModuleVersion, ToolName, DefaultInlineBudget, CreateTool, CreateExtension, StoreDoc), CodemodeToolOptions, CodemodeGlobal and CodemodeNamespace in PiSharp.Durable.Tools; CodemodeToolInput is the { code } arguments, CodemodeNestedCall and CodemodeToolDetails the details JSON"
     },
     {
       "upstream": "packages/durable/src/codemode/models.ts",
@@ -56,8 +59,9 @@
       "lines": 285,
       "pisharp": "src/PiSharp.Durable.Tools/Codemode/Models.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "CodemodeModels (internal): the catalog globals, the classify/generateImages internal tools (callers tools, structured output {}), context checks and model resolution with upstream's messages. pi-ai Models is IDurableModels' new GetModelsOfType, GetAvailableOfTypeAsync, GetModelOfType, ClassifyAsync and GenerateImagesAsync over pi-ai wire JSON (default members: no models, error results; Harness/Models.cs, DurableModelOperations for the error results); NativeDurableModels serves them through PiSharp.AI's ModelOperationsRegistry. Tests: codemode.models.* (7, over a test provider) and the authored codemode.models.native-*"
     },
     {
       "upstream": "packages/durable/src/codemode/output.ts",
@@ -65,8 +69,9 @@
       "lines": 206,
       "pisharp": "src/PiSharp.Durable.Tools/Codemode/Output.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "CodemodeOutput (internal): FormatResult with the header, text item markers, console block, error with the calls made, the generated-images note, truncation to max_output_tokens within the output limits with output.txt spilled, and images saved as image-<n>.<ext> (labelled in order of first appearance, written one after another rather than in parallel). Tests: codemode.output.* (8), codemode.models.notes-generated-images-*"
     },
     {
       "upstream": "packages/durable/src/documents.ts",
@@ -339,7 +344,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "df2dac03a689dfbe3e9a6807e51eed00bbb54e12",
       "changedLines": 538,
-      "note": "HarnessTasks.ToolTask (pi.tool v2) and HarnessTasks.NestedCallDoc (pi.tool.nested-call, a task-scoped family of the caller, {taskId?, result?}): input {kind: \"model\", assistant, callId} or {kind: \"nested\", parent, parentCallId, key, call, progress?}, checkpoints {phase: call} and {phase: execute, arguments, replay}, result {kind: \"model\", entryId, control?} or {kind: \"nested\"}; Migrate turns version 1 input into {kind: \"model\", ...}. Phases call/execute and the abort handler (interrupted/abandoned after a restart), resolution among Agent.Tools or Agent.Callable, structured output checked with Validation.cs's TypeBox Compile port, settle (owned nested calls aborted first, nested results to the caller's NestedCallDoc with usage and slot summary, nested slots removed when the madeNestedCalls memo says so). IToolExecutionApi: ExecuteToolAsync (NestedCalls: keys, the memo, admissions of the synchronous prefix enqueued back to back inside the memo commit, as upstream's microtasks do), RetainedOutput, CreateTaskAsync's abandonOnRestart default (ChildTaskOptions). Tests: harness.tools.*, harness.tools-recovery.*, harness.nested-tools.*, harness.nested-tools-restart.*, harness.structured-output.*, harness.callers.*, harness.tools-differential.*, compat.* (nested-tools, structured-output, nested-tools-restart, abandon-on-restart, upgrade-from-v1.1.0)"
+      "note": "HarnessTasks.ToolTask (pi.tool v2) and HarnessTasks.NestedCallDoc (pi.tool.nested-call, a task-scoped family of the caller, {taskId?, result?}): input {kind: \"model\", assistant, callId} or {kind: \"nested\", parent, parentCallId, key, call, progress?}, checkpoints {phase: call} and {phase: execute, arguments, replay}, result {kind: \"model\", entryId, control?} or {kind: \"nested\"}; Migrate turns version 1 input into {kind: \"model\", ...}. Phases call/execute and the abort handler (interrupted/abandoned after a restart), resolution among Agent.Tools or Agent.Callable, structured output checked with Validation.cs's TypeBox Compile port, settle (owned nested calls aborted first, nested results to the caller's NestedCallDoc with usage and slot summary, nested slots removed when the madeNestedCalls memo says so). IToolExecutionApi: ExecuteToolAsync (NestedCalls: keys, the memo, admissions of the synchronous prefix enqueued back to back inside the memo commit, as upstream's microtasks do), RetainedOutput, CreateTaskAsync's abandonOnRestart default (ChildTaskOptions). Tests: harness.tools.*, harness.tools-recovery.*, harness.nested-tools.*, harness.nested-tools-restart.*, harness.structured-output.*, harness.callers.*, harness.tools-differential.*, compat.* (nested-tools, structured-output, nested-tools-restart, abandon-on-restart, upgrade-from-v1.1.0) v1.2.0 (area d): nested call arguments of any JSON kind (ToolExecutionApi.ExecuteToolAsync over a JsonValue; the public method takes objects) and ToolExecutionApi.AdmitTogether, which admits the calls a tool makes after an await in one batch, as upstream's executeTool() calls of one synchronous stretch."
     },
     {
       "upstream": "packages/durable/src/harness/types.ts",
@@ -351,7 +356,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "9e44ff89c552b4b33b2b854dab09fc90d2109942",
       "changedLines": 159,
-      "note": "All shapes final: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings (HarnessSettings with virtual getters for live values) and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi, SubmissionDraft/ISubmission, GenerationHooks, ToolHooks, IToolExecutionApi (DelegatingToolExecutionApi for wrappers), CompactionHooks/CompactionResult. Type-level helpers map as in index.ts's row (AnyTask, HooksOf, HookResult, UserInput, InputSubmissionDraft; ConversationWatch is IWatchHandle<ConversationView>); tasks are JsonValue-typed (see types.ts). The pi-ai Models seam is IDurableModels in Harness/Models.cs. Tests: harness.*, types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions v1.2.0 (area a): ToolExecutionResult.Output and StructuredOutput, NestedToolExecutionResult (ToJson is what NestedCallDoc stores), NestedCallOptions, RetainedOutput, ToolCaller, ToolRegistration.StructuredOutputSchema/Callers/Deferred, ModelToolSelection and AgentChange.ModelTools, Agent.Callable/Deferred, IToolExecutionApi.ExecuteToolAsync/RetainedOutput; a ToolHookCall is the call JSON with `parent`."
+      "note": "All shapes final: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings (HarnessSettings with virtual getters for live values) and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi, SubmissionDraft/ISubmission, GenerationHooks, ToolHooks, IToolExecutionApi (DelegatingToolExecutionApi for wrappers), CompactionHooks/CompactionResult. Type-level helpers map as in index.ts's row (AnyTask, HooksOf, HookResult, UserInput, InputSubmissionDraft; ConversationWatch is IWatchHandle<ConversationView>); tasks are JsonValue-typed (see types.ts). The pi-ai Models seam is IDurableModels in Harness/Models.cs. Tests: harness.*, types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions v1.2.0 (area a): ToolExecutionResult.Output and StructuredOutput, NestedToolExecutionResult (ToJson is what NestedCallDoc stores), NestedCallOptions, RetainedOutput, ToolCaller, ToolRegistration.StructuredOutputSchema/Callers/Deferred, ModelToolSelection and AgentChange.ModelTools, Agent.Callable/Deferred, IToolExecutionApi.ExecuteToolAsync/RetainedOutput; a ToolHookCall is the call JSON with `parent`. v1.2.0 (area d): ToolRegistration.ConstrainedSampling (pi-ai Tool.constrainedSampling, which enters the declaration)."
     },
     {
       "upstream": "packages/durable/src/harness/usage.ts",
@@ -1021,8 +1026,9 @@
       "lines": 93,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/CodemodeBench.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "CodemodeBench (codemode [N,...]) with a benchmarks.smoke row; results next to Node in docs/durable-benchmarks.md (commits per call equal but for a parallel script's journal batches, which follow timing)"
     },
     {
       "upstream": "packages/durable/test/codemode-describe.test.ts",
@@ -1030,8 +1036,9 @@
       "lines": 99,
       "pisharp": "tests/PiSharp.Durable.Tests/CodemodeDescribeCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "codemode.describe.* (5 cases)"
     },
     {
       "upstream": "packages/durable/test/codemode-models.test.ts",
@@ -1039,8 +1046,9 @@
       "lines": 271,
       "pisharp": "tests/PiSharp.Durable.Tests/CodemodeModelsCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "codemode.models.* (7 cases; createProvider's test provider is TestProviderModels, an IDurableModels decorator) and the authored codemode.models.native-models-list-every-type-and-answer-calls-without-credentials-with-an-error-result"
     },
     {
       "upstream": "packages/durable/test/codemode.test.ts",
@@ -1048,8 +1056,9 @@
       "lines": 1073,
       "pisharp": "tests/PiSharp.Durable.Tests/CodemodeCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "codemode.* (32 cases of \"durable code mode\") and codemode.output.* (8 of \"durable code mode output and tool search\"); the sandbox is CodemodeSandbox with engines on threads, upstream's sandbox.start wrapper is CodemodeToolOptions.OnRunStarted"
     },
     {
       "upstream": "packages/durable/test/document-append-bench.ts",

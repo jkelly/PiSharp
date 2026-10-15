@@ -4,13 +4,15 @@ using PiSharp.Durable.Testing;
 // P13 (decision 0005): benchmarks/PiSharp.Durable.Benchmarks ports Pi v1.1.0 packages/durable/test/storage.bench.ts, test/storage-memory.ts
 // and test/tool-output-bench.ts over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts), and Pi v1.2.0
 // test/document-append-bench.ts, test/session-document-cache-bench.ts, test/scheduler-memory-bench.ts, test/scheduler-fanout-bench.ts,
-// test/nested-tools-bench.ts and test/nested-images-bench.ts, plus the PiSharp-authored scheduler-scale (SchedulerScaleBench.cs). The
+// test/nested-tools-bench.ts, test/nested-images-bench.ts and test/codemode-bench.ts, plus the PiSharp-authored scheduler-scale
+// (SchedulerScaleBench.cs). The
 // benchmarks are report only (docs/durable-benchmarks.md).
 // This smoke case runs each of them at a tiny size so they cannot rot: one sample per storage scenario on every backend (each scenario's
 // result is checked before it is timed), the footprint worker on every backend in-process, a short rate round closed mid-round and
 // replayed, a firehose, a repetitive firehose, a bash cat of 1 MiB, 20 document appends of each kind, three conversations at each
 // document retention, three subagent cycles under a live parent, a fan-out of four child tasks and a chain of five, four nested calls, two
-// tiny nested-tools scenarios and the four nested-images variants of two images. It asserts completion,
+// tiny nested-tools scenarios, the four nested-images variants of two images, and the four code mode rows of three echo calls. It asserts
+// completion,
 // the number of results and the scheduler's bounded indexes, never a timing.
 internal static partial class Program
 {
@@ -96,6 +98,13 @@ internal static partial class Program
             var imageRows = await NestedImagesBench.RunAsync([2], imagesOutput, bytes: 1024, tempRoot: root);
             Check(imageRows.Count == 4 && imageRows.All(row => row.Result.NestedTasks == 4), "nested-images rows: 4 nested tasks each");
             Check(imagesOutput.ToString().StartsWith("Images: 1 KiB", StringComparison.Ordinal), "nested-images table: " + imagesOutput);
+            var codemodeOutput = new StringWriter();
+            var codemodeRows = await CodemodeBench.RunAsync([3], codemodeOutput, root);
+            Check(codemodeRows is [{ Shape: "sequential", N: 3 }, { Shape: "parallel", N: 3 }] &&
+                codemodeRows.All(row => row.Plain.Commits > 0 && row.Codemode.Commits > row.Plain.Commits),
+                "codemode rows: each shape plain and in code mode, code mode journaling on top");
+            Check(codemodeOutput.ToString().StartsWith("sequential n=3: plain ", StringComparison.Ordinal), "codemode lines: " + codemodeOutput);
+            Equal("100,1000", string.Join(",", CodemodeBench.ParseSizes(null)), "codemode default sizes");
             Directory.Delete(root, recursive: true);
         });
     }

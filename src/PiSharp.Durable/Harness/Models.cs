@@ -9,6 +9,11 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/model-schema.ts (ModelInputLimits, ModelImageInputLimits,
 // ModelImageResizeOptions) and types.ts (Model.inputLimits), which pi-durable 1.2.0's read tool consults for its image limits (work list
 // area e).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (getModelsOfType, getAvailableOfType, getModelOfType, classify,
+// generateImages) and packages/ai/src/utils/model-operations.ts (classifierErrorResult, imageErrorResult), which pi-durable 1.2.0's code mode
+// calls for scripts' models.* (work list area d). Models of every type are pi-ai model JSON (AnyModel); classifier and image contexts and
+// results are pi-ai wire JSON (ClassifierContext, ClassifierResult, ImagesContext, AssistantImages). The members have defaults, so a host
+// that offers no classifier or image models implements nothing: no catalog entries, and every call an error result.
 using System.Collections.Immutable;
 using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
@@ -171,6 +176,61 @@ public interface IDurableModels
 
     /// <summary>Best-effort cancellation of a deferred response (pi-ai <c>cancelDeferred</c>).</summary>
     Task CancelDeferredAsync(DurableModel model, DurableDeferredHandle handle, CancellationToken cancellationToken);
+
+    /// <summary>pi-ai <c>getModelsOfType(type, provider?)</c>: the catalog's models of one type (<c>"chat"</c>, <c>"image"</c> or
+    /// <c>"classifier"</c>) as pi-ai model JSON, of <paramref name="provider"/> or of every provider. Default: none.</summary>
+    ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) => [];
+
+    /// <summary>pi-ai <c>getAvailableOfType(type, provider?)</c>: the models of one type whose providers have complete auth. Default:
+    /// none.</summary>
+    Task<ImmutableArray<JsonObjectValue>> GetAvailableOfTypeAsync(string type, string? provider, CancellationToken cancellationToken) =>
+        Task.FromResult(ImmutableArray<JsonObjectValue>.Empty);
+
+    /// <summary>pi-ai <c>getModelOfType(type, provider, id)</c>; null when unknown. Default: the first of <see cref="GetModelsOfType"/>
+    /// with that id.</summary>
+    JsonObjectValue? GetModelOfType(string type, string provider, string id) =>
+        GetModelsOfType(type, provider).FirstOrDefault(model => model.TryGetValue("id", out var value) && value is JsonStringValue text && text.Value == id);
+
+    /// <summary>pi-ai <c>classify(model, context, { signal })</c>: a <c>ClassifierResult</c>. Never throws for a request failure: it
+    /// returns an error result (<see cref="DurableModelOperations.ClassifierError"/>), as pi-ai does. Default: the error of a provider
+    /// without classification.</summary>
+    Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
+        Task.FromResult(DurableModelOperations.ClassifierError(model,
+            $"Provider {DurableModelOperations.Field(model, "provider")} does not support classification", cancellationToken.IsCancellationRequested));
+
+    /// <summary>pi-ai <c>generateImages(model, context, { signal })</c>: an <c>AssistantImages</c>. Never throws for a request failure: it
+    /// returns an error result (<see cref="DurableModelOperations.ImagesError"/>), as pi-ai does. Default: the error of a provider without
+    /// image generation.</summary>
+    Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken) =>
+        Task.FromResult(DurableModelOperations.ImagesError(model,
+            $"Provider {DurableModelOperations.Field(model, "provider")} does not support image generation", cancellationToken.IsCancellationRequested));
+}
+
+/// <summary>pi-ai's model operation results (<c>utils/model-operations.ts</c>) as wire JSON.</summary>
+public static class DurableModelOperations
+{
+    /// <summary>A string field of a model, or <c>"undefined"</c> as a template literal prints a missing one.</summary>
+    internal static string Field(JsonObjectValue model, string name) =>
+        model.TryGetValue(name, out var value) && value is JsonStringValue text ? text.Value : "undefined";
+
+    private static JsonObjectValue Error(JsonObjectValue model, string empty, JsonValue emptyValue, string message, bool aborted) => JsonValue.Object(
+    [
+        KeyValuePair.Create("api", model.TryGetValue("api", out var api) ? api : JsonValue.Null),
+        KeyValuePair.Create("provider", model.TryGetValue("provider", out var provider) ? provider : JsonValue.Null),
+        KeyValuePair.Create("model", model.TryGetValue("id", out var id) ? id : JsonValue.Null),
+        KeyValuePair.Create(empty, emptyValue),
+        KeyValuePair.Create("stopReason", (JsonValue)(aborted ? "aborted" : "error")),
+        KeyValuePair.Create("errorMessage", (JsonValue)message),
+        KeyValuePair.Create("timestamp", (JsonValue)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+    ]);
+
+    /// <summary>pi-ai <c>classifierErrorResult</c>: <c>{api, provider, model, answers: {}, stopReason, errorMessage, timestamp}</c>.</summary>
+    public static JsonObjectValue ClassifierError(JsonObjectValue model, string message, bool aborted = false) =>
+        Error(model, "answers", JsonObjectValue.Empty, message, aborted);
+
+    /// <summary>pi-ai <c>imageErrorResult</c>: <c>{api, provider, model, output: [], stopReason, errorMessage, timestamp}</c>.</summary>
+    public static JsonObjectValue ImagesError(JsonObjectValue model, string message, bool aborted = false) =>
+        Error(model, "output", JsonArrayValue.Empty, message, aborted);
 }
 
 /// <summary>Model access without providers (pi-ai <c>createModels()</c> with nothing registered): every lookup misses and every request

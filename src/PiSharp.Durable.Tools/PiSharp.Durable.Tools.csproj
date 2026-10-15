@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Decision 0005: the durable execution environment and coding tools. Reuses only PiSharp.Tools' shell and process primitives and its image
-       codec seam (IImageCodec, for the read tool's image processor); the host passes a codec such as PiSharp.Tools.Skia's. -->
+       codec seam (IImageCodec, for the read tool's image processor); the host passes a codec such as PiSharp.Tools.Skia's. Durable code mode
+       (work list area d) runs scripts on PiSharp.Codemode's deterministic CodemodeSandbox.Start() and renders tool declarations with its
+       CodemodeDeclarations; that brings Jint, Acornima and PiSharp.Extensions.Abstractions in transitively (decision 0005, Codemode Start()). -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
@@ -12,5 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
+    <ProjectReference Include="../PiSharp.Codemode/PiSharp.Codemode.csproj" />
   </ItemGroup>
 </Project>

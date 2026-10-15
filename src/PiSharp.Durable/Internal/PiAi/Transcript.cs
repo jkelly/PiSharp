@@ -40,12 +40,14 @@ internal static class PiAiTranscript
         return JsonValue.Object(properties);
     }
 
-    /// <summary>The declaration of a registered tool: only the pi-ai <c>Tool</c> fields enter the transcript.</summary>
+    /// <summary>The declaration of a registered tool: only the pi-ai <c>Tool</c> fields enter the transcript, <c>constrainedSampling</c>
+    /// when the tool sets it.</summary>
     public static JsonObjectValue ToToolDeclaration(ToolRegistration tool) => JsonValue.Object(
     [
         KeyValuePair.Create("name", (JsonValue)tool.Name),
         KeyValuePair.Create("description", (JsonValue)tool.Description),
         KeyValuePair.Create("parameters", (JsonValue)tool.Parameters),
+        .. tool.ConstrainedSampling is { } constrained ? [KeyValuePair.Create("constrainedSampling", constrained)] : Array.Empty<KeyValuePair<string, JsonValue>>(),
     ]);
 
     /// <summary>Whether two tools declare the same interface: their serialized declarations are equal (upstream

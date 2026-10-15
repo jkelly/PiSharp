@@ -1,15 +1,21 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/models.ts (createModels, setProvider, getModels/getModel,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (createModels, setProvider, getModels/getModel,
 // applyAuth, streamSimple, completeSimple, streamDeferred, fetchDeferred, cancelDeferred), packages/ai/src/api/lazy.ts (lazyStream: setup
 // failures end the stream with an error message), packages/ai/src/auth/helpers.ts (envApiKeyAuth: a stored key, else the first set
 // variable) and packages/ai/src/env-api-keys.ts. The provider set is pi-ai's builtinProviders() with their catalog shards; requests run
 // over PiSharp.AI's native transports (see NativeModelRoutes).
+// Re-pinned from Pi v1.1.0 (abe508e1) in work list area d: models.ts' only change since, a refresh context's baseUrl, touches none of these.
+// The same file's getModelsOfType, getAvailableOfType, getModelOfType, classify and generateImages, which pi-durable 1.2.0's code mode calls
+// for scripts' models.* (work list area d), run over PiSharp.AI's ModelOperationsRegistry (the coding agent's port of the same functions) with
+// the registered providers' catalogs.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using PiSharp.AI;
 using PiSharp.AI.Catalogs;
+using PiSharp.AI.ModelOperations;
 using PiSharp.AI.Providers;
 using PiSharp.Contracts;
+using PiSharp.Contracts.ModelOperations;
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable;
@@ -52,6 +58,15 @@ public sealed record NativeDurableModelsOptions
 
     /// <summary>Clock of request timestamps, <c>durationMs</c> and the <c>timeoutMs</c> deadline; default <see cref="TimeProvider.System"/>.</summary>
     public TimeProvider? TimeProvider { get; init; }
+
+    /// <summary>
+    /// The models of every type and the classifier and image calls behind <see cref="IDurableModels.GetModelsOfType"/>,
+    /// <see cref="IDurableModels.ClassifyAsync"/> and <see cref="IDurableModels.GenerateImagesAsync"/> (code mode's <c>models.*</c>): a host's
+    /// registry, with its own credentials. Null: the registered providers' catalogs with pi-ai's built-in classifier and image APIs, whose
+    /// auth is a provider's environment variable read through <see cref="Environment"/> (<see cref="ResolveApiKey"/> resolves chat models
+    /// only).
+    /// </summary>
+    public ModelOperationsRegistry? ModelOperations { get; init; }
 }
 
 /// <summary>
@@ -85,6 +100,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     private readonly bool ownsHandler;
     private readonly TimeProvider time;
     private readonly ModelCache models = new();
+    private readonly Lazy<ModelOperationsRegistry> operations;
     private int disposed;
 
     /// <summary>Creates the collection.</summary>
@@ -110,6 +126,9 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         handler = options.HttpHandler ?? new SocketsHttpHandler { AllowAutoRedirect = false };
         ownsHandler = options.HttpHandler is null;
         time = options.TimeProvider ?? TimeProvider.System;
+        var host = options.ModelOperations;
+        operations = new(() => host ?? ModelOperationsRegistry.CreateBuiltin(
+            providers.Keys.Order(StringComparer.Ordinal).Select(Catalog).OfType<FrozenModelCatalog>(), EnvironmentAuthAsync));
     }
 
     /// <summary>The registered provider ids, in ordinal order (pi-ai <c>getProviders</c>).</summary>
@@ -170,6 +189,81 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         if (catalog is not null) return catalog;
         try { return DurableBuiltinCatalog.Get(provider); }
         catch (Exception error) when (error is InvalidOperationException or CatalogReadException) { return null; }
+    }
+
+    // ─── Models of every type, classify and generateImages (Pi v1.2.0, code mode's models.*) ───
+
+    /// <summary>models.ts auth for the classifier and image calls: an explicit key, else the provider's first environment variable that is
+    /// set; null when the provider has none (not configured).</summary>
+    private ValueTask<ProviderAuthResult?> EnvironmentAuthAsync(ProviderAuthRequest request, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!string.IsNullOrEmpty(request.ApiKey)) return ValueTask.FromResult<ProviderAuthResult?>(new ProviderAuthResult(request.ApiKey));
+        foreach (var name in ApiKeyVariables(request.Provider))
+            if (environment(name) is { Length: > 0 } key) return ValueTask.FromResult<ProviderAuthResult?>(new ProviderAuthResult(key));
+        return ValueTask.FromResult<ProviderAuthResult?>(null);
+    }
+
+    private static ModelType TypeOf(string type) => type switch
+    {
+        "chat" => ModelType.Chat,
+        "image" => ModelType.Image,
+        "classifier" => ModelType.Classifier,
+        _ => throw new ArgumentException($"Unknown model type {type}", nameof(type)),
+    };
+
+    private static JsonObjectValue Json(OperationModel model) => (JsonObjectValue)Chord.JsonValue.FromData(model.ToJson());
+
+    /// <inheritdoc/>
+    public ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) =>
+        [.. operations.Value.GetModelsOfType(TypeOf(type), provider).Select(Json)];
+
+    /// <inheritdoc/>
+    public async Task<ImmutableArray<JsonObjectValue>> GetAvailableOfTypeAsync(string type, string? provider, CancellationToken cancellationToken) =>
+        [.. (await operations.Value.GetAvailableOfTypeAsync(TypeOf(type), provider, cancellationToken).ConfigureAwait(false)).Select(Json)];
+
+    /// <inheritdoc/>
+    public JsonObjectValue? GetModelOfType(string type, string provider, string id) =>
+        operations.Value.GetModelOfType(TypeOf(type), provider, id) is { } model ? Json(model) : null;
+
+    /// <inheritdoc/>
+    public async Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(context);
+        ClassifierModel classifier;
+        ClassifierContext parsed;
+        try
+        {
+            classifier = OperationModel.FromJson(model.ToData()) as ClassifierModel ?? throw new FormatException("The model is not a classifier model.");
+            parsed = ModelOperationJson.ParseClassifierContext(context.ToData().Value);
+        }
+        catch (Exception error) when (error is FormatException or ArgumentException or InvalidOperationException)
+        {
+            return DurableModelOperations.ClassifierError(model, error.Message, cancellationToken.IsCancellationRequested);
+        }
+        var result = await operations.Value.ClassifyAsync(classifier, parsed, null, cancellationToken).ConfigureAwait(false);
+        return (JsonObjectValue)Chord.JsonValue.FromData(ModelOperationJson.WriteClassifierResult(result));
+    }
+
+    /// <inheritdoc/>
+    public async Task<JsonObjectValue> GenerateImagesAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(context);
+        ImageModel image;
+        ImagesContext parsed;
+        try
+        {
+            image = OperationModel.FromJson(model.ToData()) as ImageModel ?? throw new FormatException("The model is not an image model.");
+            parsed = ModelOperationJson.ParseImagesContext(context.ToData().Value);
+        }
+        catch (Exception error) when (error is FormatException or ArgumentException or InvalidOperationException)
+        {
+            return DurableModelOperations.ImagesError(model, error.Message, cancellationToken.IsCancellationRequested);
+        }
+        var result = await operations.Value.GenerateImagesAsync(image, parsed, null, cancellationToken).ConfigureAwait(false);
+        return (JsonObjectValue)Chord.JsonValue.FromData(ModelOperationJson.WriteAssistantImages(result));
     }
 
     /// <inheritdoc/>
