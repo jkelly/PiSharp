@@ -226,7 +226,11 @@ internal sealed class AuthJsonCredentialStore : IAdmittedOAuthCredentialSource
                     await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(10 * Math.Pow(2, retry++), 1000)), _time, token).ConfigureAwait(false);
                     continue;
                 }
-                var age = _time.GetUtcNow() - new DateTimeOffset(Directory.Exists(path) ? Directory.GetLastWriteTimeUtc(path) : File.GetLastWriteTimeUtc(path));
+                var stamp = Directory.Exists(path) ? Directory.GetLastWriteTimeUtc(path) : File.GetLastWriteTimeUtc(path);
+                // 1601-01-01 means the lock vanished between the check and the read (its holder released it): try again
+                // rather than treating it as stale, which could delete a lock another writer has just taken.
+                if (stamp == DateTime.FromFileTimeUtc(0)) continue;
+                var age = _time.GetUtcNow() - new DateTimeOffset(stamp);
                 if (age > StaleLock)
                 {
                     try { if (Directory.Exists(path)) Directory.Delete(path); else File.Delete(path); } catch (Exception) { }
