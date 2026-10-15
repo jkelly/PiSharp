@@ -1,5 +1,7 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/tools.test.ts, as tools.<group>.<case>, on LocalExecutionEnv
-// (upstream NodeExecutionEnv). Verbatim apart from these adaptations:
+// (upstream NodeExecutionEnv). Its bash and powershell cases follow Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (tool task v2, durable
+// work list area a: a nonzero exit is an error result with structured output; the fake api's retainedOutput()); the read cases (images) and
+// the header move to v1.2.0 with area e, which owns the row. Verbatim apart from these adaptations:
 // - The tools take validated JSON arguments and the api is FakeToolApi (ToolsSupport.cs), upstream's fakeApi; jsdiff's applyPatch is
 //   ToolRunner.ApplyPatch.
 // - Upstream's `Object.create(env)` override of openBinaryReader is a LocalExecutionEnv subclass wrapping the reader; `class extends
@@ -138,7 +140,7 @@ internal static partial class Program
             var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==");
             (await env.WriteFileAsync("image.txt", png, ToolContext)).GetOrThrow();
             var result = await Run(CodingTools.CreateReadTool(), ToolArgs(("path", "image.txt")), env);
-            Check(result.Result.Content is { Count: 0 } && result.Result.IsError == true, "empty error result");
+            Check(result.Result.Output is { Count: 0 } && result.Result.IsError == true, "empty error result");
             Equal("image.txt is an image (image/png); reading images is not supported", result.DiagnosticText, "diagnostic");
         });
 
@@ -357,12 +359,15 @@ internal static partial class Program
             Equal("spawn powershell ENOENT", failed.Error.Message, "last start failure");
         });
 
-        yield return ToolCase("powershell.throws-on-a-nonzero-exit-after-streaming-the-output", async root =>
+        yield return ToolCase("powershell.answers-a-nonzero-exit-with-an-error-result-carrying-the-exit-code", async root =>
         {
             var env = new ProgramsEnv(root, ["pwsh"], "partial", 3);
-            var failed = await RunFailing(CodingTools.CreatePowerShellTool(), ToolArgs(("command", "exit 3")), env);
-            Equal("Command exited with code 3", failed.Error.Message, "message");
-            Equal("partial", string.Concat(failed.Output), "output");
+            var result = await Run(CodingTools.CreatePowerShellTool(), ToolArgs(("command", "exit 3")), env);
+            Equal(true, result.Result.IsError, "isError");
+            Equal("""{"output":"partial","truncated":false,"exitCode":3}""", result.Result.StructuredOutput?.ToJson(), "structuredOutput");
+            Equal(1, result.Result.Diagnostics?.Length ?? 0, "diagnostics");
+            Equal(new ToolDiagnostic(ToolDiagnosticSeverity.Error, "Command exited with code 3", "exit_code"), result.Result.Diagnostics!.Value[0], "diagnostic");
+            Equal("partial", string.Concat(result.Output), "streamed");
         });
 
         yield return ToolEnvCase("powershell.runs-real-powershell-with-utf-8-output", async env =>
@@ -386,20 +391,26 @@ internal static partial class Program
             Equal(("tail\n", (ShellOutputSkip?)skipped), calls[0], "call");
         });
 
-        yield return ToolEnvCase("bash.streams-combined-stdout-and-stderr-and-returns-no-content-of-its-own", async env =>
+        yield return ToolEnvCase("bash.streams-combined-stdout-and-stderr-returns-no-output-of-its-own-and-repeats-it-with-the-exit-code", async env =>
         {
             var result = await Run(CodingTools.CreateBashTool(), ToolArgs(("command", "printf out; printf err >&2")), env);
             Contains(string.Concat(result.Output), "out", "stdout");
             Contains(string.Concat(result.Output), "err", "stderr");
-            Equal(null, result.Result.Content, "content");
+            Equal(null, result.Result.Output, "output");
+            Equal(ToolArgs(("output", string.Concat(result.Output)), ("truncated", false), ("exitCode", 0)).ToJson(),
+                result.Result.StructuredOutput?.ToJson(), "structuredOutput");
         });
 
-        yield return ToolEnvCase("bash.throws-on-nonzero-exits-and-timeouts-after-streaming-the-output", async env =>
+        yield return ToolEnvCase("bash.answers-a-nonzero-exit-with-an-error-result-and-throws-on-a-timeout-after-streaming-the-output", async env =>
         {
             var tool = CodingTools.CreateBashTool();
-            var failed = await RunFailing(tool, ToolArgs(("command", "printf failed; exit 7")), env);
-            Equal("Command exited with code 7", failed.Error.Message, "exit");
-            Equal("failed", string.Concat(failed.Output), "output");
+            var failed = await Run(tool, ToolArgs(("command", "printf failed; exit 7")), env);
+            Equal(true, failed.Result.IsError, "isError");
+            Equal("""{"output":"failed","truncated":false,"exitCode":7}""", failed.Result.StructuredOutput?.ToJson(), "structuredOutput");
+            Equal(1, failed.Result.Diagnostics?.Length ?? 0, "diagnostics");
+            Equal("exit_code", failed.Result.Diagnostics!.Value[0].Code, "code");
+            Equal("Command exited with code 7", failed.Result.Diagnostics!.Value[0].Message, "message");
+            Equal("failed", string.Concat(failed.Output), "streamed");
             var slow = await RunFailing(tool, ToolArgs(("command", "sleep 2"), ("timeout", 0.01)), env);
             Equal("Command timed out after 0.01 seconds", slow.Error.Message, "timeout");
         });

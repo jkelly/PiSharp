@@ -55,7 +55,7 @@ internal static class InputEntriesTests
             Execute = async (_, _, _) =>
             {
                 await gate.Task;
-                return new ToolExecutionResult { Content = JsonValue.Array(FauxText("held")) };
+                return new ToolExecutionResult { Output = JsonValue.Array(FauxText("held")) };
             },
         }));
 

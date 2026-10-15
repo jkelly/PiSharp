@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-registry.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-registry.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and these: a host tool type with an extra field is a derived ToolRegistration record (AppTool), and `{ ...tool, x }` is
 // `tool with { X = ... }`; stored agent states are pi.agent JSON; hook handler maps are the built-in hook classes; toBe is
 // ReferenceEquals.
@@ -21,7 +21,7 @@ internal static partial class HarnessTests
         Name = name,
         Description = description ?? $"{name} tool",
         Snippet = snippet,
-        Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+        Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
     };
 
     private static DurableTask RegistryTask(string name, int version = 1) => Tasks.DefineTask(new TaskDefinition

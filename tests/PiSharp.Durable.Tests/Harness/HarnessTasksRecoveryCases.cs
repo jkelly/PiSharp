@@ -432,7 +432,7 @@ internal static partial class HarnessRecoveryTests
                 {
                     Name = "unrelated",
                     Description = "unrelated",
-                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
                 }));
                 await Flush();
                 Equal(1, Volatile.Read(ref failures), "failures");

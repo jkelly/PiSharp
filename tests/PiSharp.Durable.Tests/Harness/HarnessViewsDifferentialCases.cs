@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): a differential check of conversation views and agent events against the pinned upstream.
-// There is no upstream test file: Fixtures/views.upstream.json holds what the pinned pi-durable delivers to a conversation watch (the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): a differential check of conversation views and agent events against the pinned upstream.
+// There is no upstream test file: Fixtures/v1.2.0/views.upstream.json holds what the pinned pi-durable delivers to a conversation watch (the
 // acquisition view, each frame's operations, the final view) and to an agent event stream (the snapshot and each batch), both attached
 // before the run, for the scenarios below with pi-ai's faux provider on MemoryStorage, as printed by Fixtures/capture-views.mjs. It is
 // normalized as HarnessChatDifferentialCases.cs's fixture is and compared as JSON values and by their exact text; every event's keys must
@@ -33,7 +33,7 @@ internal static class ViewsDifferentialTests
     private const double T = 1000;
 
     private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "views.upstream.json"))));
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "views.upstream.json"))));
 
     /// <summary><c>Type.Object({ text: Type.String() })</c>, as TypeBox prints it.</summary>
     private static readonly JsonObjectValue TextParameters = O("""{"type":"object","required":["text"],"properties":{"text":{"type":"string"}}}""");
@@ -113,7 +113,7 @@ internal static class ViewsDifferentialTests
                         Execute = async (args, api, callContext) =>
                         {
                             await api.DetailsAsync(Obj(("step", 1)), callContext);
-                            return new ToolExecutionResult { Content = JsonValue.Array(FauxText($"echo {S(((JsonObjectValue)args)["text"])}")) };
+                            return new ToolExecutionResult { Output = JsonValue.Array(FauxText($"echo {S(((JsonObjectValue)args)["text"])}")) };
                         },
                     }),
                 ],

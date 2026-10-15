@@ -67,7 +67,7 @@ public static partial class Examples
                         var text = await AnswerTextAsync(api, settled.Answer!.Value, callContext);
                         return new ToolExecutionResult
                         {
-                            Content = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", text)])]),
+                            Output = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", text)])]),
                             Details = JsonValue.Object([new("conversationId", child.ToJson())]),
                         };
                     },

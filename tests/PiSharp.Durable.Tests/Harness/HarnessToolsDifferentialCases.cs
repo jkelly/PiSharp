@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): a differential check of tool rounds against the pinned upstream. There is no upstream test
-// file: Fixtures/tool-rounds.upstream.json holds the committed records (every entry, task and submission, and the conversation's pi.live,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): a differential check of tool rounds against the pinned upstream. There is no upstream test
+// file: Fixtures/v1.2.0/tool-rounds.upstream.json holds the committed records (every entry, task and submission, and the conversation's pi.live,
 // pi.inbox, pi.usage, pi.agent and pi.provider documents) that the pinned pi-durable writes for the scenarios below with pi-ai's faux
 // provider on MemoryStorage, as printed by Fixtures/capture-tool-rounds.mjs. It is normalized as HarnessChatDifferentialCases.cs's fixture
 // is, and compared the same way: as JSON values and by their exact text. The scenarios run here on memory, JSONL and
@@ -32,7 +32,7 @@ internal static class ToolsDifferentialTests
     private const double T = 1000;
 
     private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "tool-rounds.upstream.json"))));
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "tool-rounds.upstream.json"))));
 
     private static readonly JsonObjectValue Usage =
         O("""{"input":1,"output":2,"cacheRead":0,"cacheWrite":0,"totalTokens":3,"cost":{"input":0.5,"output":0.25,"cacheRead":0,"cacheWrite":0,"total":0.75}}""");
@@ -47,7 +47,7 @@ internal static class ToolsDifferentialTests
         Parameters = TextParameters,
         Execute = (args, _, _) => Task.FromResult(new ToolExecutionResult
         {
-            Content = JsonValue.Array(FauxText($"echo {S(((JsonObjectValue)args)["text"])}")),
+            Output = JsonValue.Array(FauxText($"echo {S(((JsonObjectValue)args)["text"])}")),
             Usage = Usage,
         }),
     });

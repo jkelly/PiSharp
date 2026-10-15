@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-support.ts and packages/durable/test/task-support.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-support.ts and packages/durable/test/task-support.ts
 // (session-support.ts's ControlledStorage, context and helpers are in Session/SessionSupport.cs). The harness.* case groups run on any
 // storage: HarnessCases() runs them on MemoryStorage, HarnessBackendCases.cs reruns the task groups on JSONL and SQLite.
 //
@@ -39,7 +39,7 @@ internal static partial class HarnessTests
     {
         Name = name,
         Description = description ?? $"{name} tool",
-        Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+        Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
     });
 
     /// <summary>A Harness and the registry it reads.</summary>

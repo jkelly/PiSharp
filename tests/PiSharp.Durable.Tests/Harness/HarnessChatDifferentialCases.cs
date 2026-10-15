@@ -109,7 +109,7 @@ internal static class ChatDifferentialTests
                 Tools = [Define.Tool(new ToolRegistration
                 {
                     Name = "noop", Description = "Does nothing",
-                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
                 })],
             }));
             setup.Faux.SetResponses(FauxAssistantMessage("Hello there", timestamp: T));

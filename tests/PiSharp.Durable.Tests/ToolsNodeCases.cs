@@ -1,10 +1,14 @@
-// Node differentials of the coding tools against Fixtures/tools.upstream.json, which Fixtures/capture-tools.mjs prints by running the pinned
-// upstream tools (Pi abe508e1b89912adde45528136c3221eb69acdd7, packages/durable/src/tools) under Node, as tools.node.<case>:
-// - declarations: the name, description and parameters JSON each tool declares to models, its output limits and replay, byte for byte;
+// Node differentials of the coding tools against Fixtures/v1.2.0/tools.upstream.json, which Fixtures/capture-tools.mjs prints by running the
+// pinned upstream tools (Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff, packages/durable/src/tools) under Node, as tools.node.<case>:
+// - declarations: the name, description and parameters JSON each tool declares to models, its output limits, replay, structuredOutputSchema,
+//   callers and deferred, byte for byte. read's description changed in v1.2.0 with its images (work list area e), so until area e lands
+//   read's description is compared with the v1.1.0 capture (Fixtures/tools.upstream.json), after checking that it is the only field of the
+//   read declaration that differs between the two captures;
 // - diffs: generateDiffString and generateUnifiedPatch (jsdiff 8.0.4 underneath) for 600 seeded old/new texts;
 // - edits: the edit tool over a real file for authored cases (exact, CRLF, BOM, fuzzy, errors): text, details, the file afterwards;
-// - bash: the bash tool for authored commands: streamed output, error and diagnostics (spill paths masked). The fixture was captured with
-//   Git Bash on Windows; the commands print the same under any POSIX shell.
+// - bash: the bash tool for authored commands: streamed output, error, isError, structured output (long output digested, spill path masked)
+//   and diagnostics, the streamed ones then the result's (spill paths masked). The fixture was captured with Git Bash on Windows; the
+//   commands print the same under any POSIX shell.
 using System.Text;
 using System.Text.Json;
 using PiSharp.Durable;
@@ -38,6 +42,25 @@ internal static partial class Program
         return (lines.Count == 0 ? "" : string.Join("\n", lines) + oldEnd, edited.Count == 0 ? "" : string.Join("\n", edited) + newEnd);
     }
 
+    /// <summary>capture-tools.mjs's <c>shellOutput</c>: bash's structured output with long output digested and a spill path masked.</summary>
+    private static JsonValue ShellOutput(JsonValue? value)
+    {
+        if (value is not JsonObjectValue fields) return JsonValue.Null;
+        var output = ((JsonStringValue)fields["output"]).Value;
+        var properties = new List<KeyValuePair<string, JsonValue>>
+        {
+            KeyValuePair.Create("output", output.Length > 400
+                ? JsonValue.Object([KeyValuePair.Create("length", (JsonValue)output.Length), KeyValuePair.Create("digest", (JsonValue)LineScanDigest(output))])
+                : (JsonValue)output),
+        };
+        if (fields.ContainsKey("fullOutputPath")) properties.Add(KeyValuePair.Create("fullOutputPath", (JsonValue)"<spill>"));
+        properties.AddRange(fields.Where(field => field.Key is not ("output" or "fullOutputPath")));
+        return JsonValue.Object(properties);
+    }
+
+    private static JsonElement ToolsFixture120() => JsonDocument.Parse(File.ReadAllText(
+        Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "tools.upstream.json"))).RootElement;
+
     private static string? OptionalString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String ? value.GetString() : null;
 
@@ -47,14 +70,23 @@ internal static partial class Program
         {
             ToolRegistration[] tools = [CodingTools.CreateReadTool(), CodingTools.CreateWriteTool(), CodingTools.CreateEditTool(),
                 CodingTools.CreateBashTool(), CodingTools.CreatePowerShellTool()];
-            var declarations = ToolsFixture().GetProperty("declarations");
+            var declarations = ToolsFixture120().GetProperty("declarations");
+            var declarations110 = ToolsFixture().GetProperty("declarations");
             Equal(declarations.GetArrayLength(), tools.Length, "tools");
             for (var index = 0; index < tools.Length; index++)
             {
                 var tool = tools[index];
                 var upstream = declarations[index];
                 Equal(upstream.GetProperty("name").GetString(), tool.Name, "name");
-                Equal(upstream.GetProperty("description").GetString(), tool.Description, tool.Name + " description");
+                if (tool.Name == "read")
+                {
+                    // See the file header: read's images are area e's.
+                    var before = declarations110[index];
+                    foreach (var field in new[] { "name", "parameters", "outputLimits", "replay", "prepareArguments" })
+                        Equal(before.GetProperty(field).GetRawText(), upstream.GetProperty(field).GetRawText(), "read " + field + " unchanged at v1.2.0");
+                    Equal(before.GetProperty("description").GetString(), tool.Description, "read description (v1.1.0 until area e)");
+                }
+                else Equal(upstream.GetProperty("description").GetString(), tool.Description, tool.Name + " description");
                 Equal(upstream.GetProperty("parameters").GetString(), tool.Parameters.ToJson(), tool.Name + " parameters");
                 Equal(PiSharp.Contracts.ToolSchemaOrigin.TypeBox, tool.ParametersOrigin, tool.Name + " parameters origin");
                 var limits = tool.OutputLimits is null ? null
@@ -65,6 +97,11 @@ internal static partial class Program
                 // Upstream sets no replay on any coding tool: the default, unsafe.
                 Equal(OptionalString(upstream, "replay"), tool.Replay?.ToString().ToLowerInvariant(), tool.Name + " replay");
                 Equal(upstream.GetProperty("prepareArguments").GetBoolean(), tool.PrepareArguments is not null, tool.Name + " prepareArguments");
+                Equal(OptionalString(upstream, "structuredOutputSchema"), tool.StructuredOutputSchema?.ToJson(), tool.Name + " structuredOutputSchema");
+                Equal(upstream.GetProperty("callers").ValueKind == System.Text.Json.JsonValueKind.Null ? null
+                    : upstream.GetProperty("callers").GetRawText(), tool.Callers is { } callers
+                    ? JsonValue.Array(callers.Select(caller => (JsonValue)(caller == ToolCaller.Model ? "model" : "tools"))).ToJson() : null, tool.Name + " callers");
+                Equal(upstream.GetProperty("deferred").ValueKind == System.Text.Json.JsonValueKind.True, tool.Deferred, tool.Name + " deferred");
             }
             Equal("coding-tools:read,write,edit,bash", $"{CodingTools.Extension.Name}:{string.Join(",", CodingTools.Extension.Tools!.Select(tool => tool.Name))}",
                 "CodingTools");
@@ -115,7 +152,7 @@ internal static partial class Program
         {
             var env = new LocalExecutionEnv(cwd);
             var tool = CodingTools.CreateBashTool();
-            foreach (var upstream in ToolsFixture().GetProperty("bash").EnumerateArray())
+            foreach (var upstream in ToolsFixture120().GetProperty("bash").EnumerateArray())
             {
                 var name = upstream.GetProperty("name").GetString()!;
                 var api = new FakeToolApi(env);
@@ -132,8 +169,15 @@ internal static partial class Program
                     Equal(expectedOutput.GetProperty("digest").GetString(), LineScanDigest(output), name + " output digest");
                 }
                 Equal(OptionalString(upstream, "error"), error, name + " error");
-                if (error is null) Equal(null, result!.Content, name + " content");
-                var diagnostics = string.Join("|", api.Reported.Select(diagnostic =>
+                if (error is null)
+                {
+                    Equal(null, result!.Output, name + " output");
+                    var isError = upstream.GetProperty("isError");
+                    Equal(isError.ValueKind == System.Text.Json.JsonValueKind.Null ? null : isError.GetBoolean(), result.IsError, name + " isError");
+                    Equal(JsonValue.FromElement(upstream.GetProperty("structuredOutput")).ToJson(), ShellOutput(result.StructuredOutput).ToJson(),
+                        name + " structuredOutput");
+                }
+                var diagnostics = string.Join("|", api.Reported.Concat(error is null ? result!.Diagnostics ?? [] : []).Select(diagnostic =>
                     $"{diagnostic.Severity.ToString().ToLowerInvariant()} {diagnostic.Code} " +
                     (diagnostic.Message.StartsWith("Full output: ", StringComparison.Ordinal) ? "Full output: <spill>" : diagnostic.Message)));
                 Equal(string.Join("|", upstream.GetProperty("diagnostics").EnumerateArray().Select(diagnostic =>

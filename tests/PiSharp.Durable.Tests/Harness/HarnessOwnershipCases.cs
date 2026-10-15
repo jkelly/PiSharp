@@ -840,7 +840,7 @@ internal static partial class OwnershipTests
         FauxAssistantMessage([FauxToolCall(name, args, id)], stopReason: "toolUse");
 
     /// <summary>A tool result with one text block.</summary>
-    private static ToolExecutionResult TextResult(string text) => new() { Content = JsonValue.Array(FauxText(text)) };
+    private static ToolExecutionResult TextResult(string text) => new() { Output = JsonValue.Array(FauxText(text)) };
 
     /// <summary>Upstream <c>configure(tx, id, { model: { provider: "faux", modelId: "faux-1" } })</c>.</summary>
     private static Task ConfigureFaux(ITx tx, ConversationId id) => Agents.ConfigureAsync(tx, id, new AgentChange { Model = new ModelRef("faux", "faux-1") });

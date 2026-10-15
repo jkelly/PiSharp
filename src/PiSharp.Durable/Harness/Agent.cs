@@ -1,6 +1,8 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/agent.ts. The stored agent (upstream AgentState) is the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/agent.ts. The stored agent (upstream AgentState) is the
 // pi.agent document's JSON object, written with upstream's key order: fields appear in the order they were first set, as a JavaScript
-// object's do. Composition uses OrderedDictionary, whose replacement keeps a key's position as a JavaScript Map's does.
+// object's do. Composition uses OrderedDictionary, whose replacement keeps a key's position as a JavaScript Map's does. v1.2.0: the
+// modelTools filter (an array, or {remove?, add?}), ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, addTools extending
+// modelTools, and settings.documentRetentionMs (area b).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -68,13 +70,15 @@ public static class Agents
     }
 
     /// <summary>
-    /// <c>addTools</c> of a tool round (upstream <c>addTools</c>): an array gets each name it lacks appended, <c>{remove}</c> loses the names,
-    /// and unset tools already offer every tool, so nothing is written.
+    /// <c>addTools</c> of a tool round, applied to <c>tools</c> and <c>modelTools</c>, so the next request offers the tools (upstream
+    /// <c>addTools</c>): an array gets each name it lacks appended, and <c>{remove}</c> loses the names. An unset <c>tools</c> already
+    /// enables every tool, so nothing is written for it. An unset or object <c>modelTools</c> also gets each name appended to its <c>add</c>,
+    /// which loads deferred tools and has no effect for others. By name, without the registry: a tool that is not registered now is offered
+    /// once it is again.
     /// </summary>
     public static async Task AddToolsAsync(ITx tx, ConversationId conversationId, IReadOnlyList<string> added)
     {
         var state = await tx.DocAsync(AgentDoc, conversationId).ConfigureAwait(false);
-        if (!state.ContainsKey("tools")) return;
         var tools = state.Get("tools");
         if (tools is JsonArrayValue)
         {
@@ -90,6 +94,23 @@ public static class Agents
                 state.Set("tools", JsonValue.Object([KeyValuePair.Create("remove", (JsonValue)JsonValue.Array(kept))]));
             }
         }
+        var modelTools = state.Get("modelTools");
+        if (modelTools is JsonArrayValue)
+        {
+            var list = state.GetArray("modelTools");
+            foreach (var name in added)
+                if (!Enumerable.Range(0, list.Count).Any(index => list.Get(index) is JsonStringValue item && item.Value == name)) list.Add(name);
+            return;
+        }
+        // Assigned whole; a document write of an equal value records no change.
+        var edit = modelTools as JsonObjectValue;
+        var removed = Strings(Field(edit, "remove") as JsonArrayValue).Where(name => !added.Contains(name)).ToList();
+        var add = Strings(Field(edit, "add") as JsonArrayValue).ToList();
+        foreach (var name in added) if (!add.Contains(name)) add.Add(name);
+        var next = removed.Count == 0
+            ? JsonValue.Object([KeyValuePair.Create("add", (JsonValue)Names(add))])
+            : JsonValue.Object([KeyValuePair.Create("remove", (JsonValue)Names(removed)), KeyValuePair.Create("add", (JsonValue)Names(add))]);
+        if (modelTools is null || !JsonValue.DeepEquals(modelTools, next)) state.Set("modelTools", next);
     }
 
     private static void ApplyChange(DraftObject state, AgentChange change)
@@ -108,6 +129,9 @@ public static class Agents
         Set("tools", change.Tools, selection => selection.Exactly is { } exactly
             ? Names(exactly.Select(tool => tool.Name))
             : JsonValue.Object(Fields(("remove", selection.Remove!.Value.Select(tool => tool.Name)))));
+        Set("modelTools", change.ModelTools, selection => selection.Exactly is { } exactly
+            ? Names(exactly.Select(tool => tool.Name))
+            : JsonValue.Object(Fields(("remove", selection.Remove?.Select(tool => tool.Name)), ("add", selection.Add?.Select(tool => tool.Name)))));
         Set("instructions", change.Instructions, text => text);
         Set("cwd", change.Cwd, text => text);
     }
@@ -166,20 +190,13 @@ public static class Agents
             }
         }
 
-        var filter = Field(state, "tools");
-        List<ToolRegistration> tools;
-        if (filter is null) tools = [.. composed.Values];
-        else if (filter is JsonArrayValue names)
-        {
-            tools = [];
-            foreach (var name in Strings(names).Distinct(StringComparer.Ordinal))
-                if (composed.TryGetValue(name, out var tool)) tools.Add(tool);
-        }
-        else
-        {
-            var removed = Strings(Field(filter as JsonObjectValue, "remove") as JsonArrayValue).ToHashSet(StringComparer.Ordinal);
-            tools = [.. composed.Values.Where(tool => !removed.Contains(tool.Name))];
-        }
+        var enabled = FilterTools([.. composed.Values], Field(state, "tools"));
+        Func<ToolRegistration, bool> CallableBy(ToolCaller caller) => tool => tool.Callers is not { } callers || callers.Contains(caller);
+        var modelCallable = enabled.Where(CallableBy(ToolCaller.Model)).ToList();
+        var tools = OfferedTools(modelCallable, Field(state, "modelTools"));
+        var offered = new HashSet<ToolRegistration>(tools, ReferenceEqualityComparer.Instance);
+        var deferred = modelCallable.Where(tool => tool.Deferred && !offered.Contains(tool)).ToList();
+        var callable = enabled.Where(CallableBy(ToolCaller.Tools)).ToList();
 
         var instructions = (Field(state, "instructions") as JsonStringValue)?.Value;
         var agentSections = sections.Values.ToList();
@@ -192,10 +209,43 @@ public static class Agents
             ThinkingLevel = (Field(state, "thinkingLevel") as JsonStringValue)?.Value ?? "off",
             Extensions = [.. extensions],
             Tools = [.. tools],
+            Callable = [.. callable],
+            Deferred = [.. deferred],
             Sections = [.. agentSections],
             Instructions = instructions,
             Cwd = (Field(state, "cwd") as JsonStringValue)?.Value,
         };
+    }
+
+    /// <summary>The tools offered to the model, as <c>AgentState.modelTools</c> describes (upstream <c>offeredTools</c>).</summary>
+    private static List<ToolRegistration> OfferedTools(List<ToolRegistration> tools, JsonValue? filter)
+    {
+        if (filter is JsonArrayValue) return FilterTools(tools, filter);
+        var edit = filter as JsonObjectValue;
+        var removed = Strings(Field(edit, "remove") as JsonArrayValue).ToHashSet(StringComparer.Ordinal);
+        var kept = tools.Where(tool => !tool.Deferred && !removed.Contains(tool.Name));
+        // Loaded deferred tools follow in load order, so loading one appends to the declared tools.
+        var byName = new Dictionary<string, ToolRegistration>(StringComparer.Ordinal);
+        foreach (var tool in tools) byName[tool.Name] = tool;
+        var loaded = Strings(Field(edit, "add") as JsonArrayValue).Distinct(StringComparer.Ordinal)
+            .SelectMany(name => byName.TryGetValue(name, out var tool) && tool.Deferred && !removed.Contains(name) ? [tool] : Array.Empty<ToolRegistration>());
+        return [.. kept, .. loaded];
+    }
+
+    /// <summary><paramref name="tools"/> through a stored filter: an array selects exactly its names, in its order; <c>{remove}</c> drops
+    /// names (upstream <c>filterTools</c>).</summary>
+    private static List<ToolRegistration> FilterTools(List<ToolRegistration> tools, JsonValue? filter)
+    {
+        if (filter is null) return tools;
+        if (filter is JsonArrayValue names)
+        {
+            var byName = new Dictionary<string, ToolRegistration>(StringComparer.Ordinal);
+            foreach (var tool in tools) byName[tool.Name] = tool;
+            return [.. Strings(names).Distinct(StringComparer.Ordinal).SelectMany(name =>
+                byName.TryGetValue(name, out var tool) ? [tool] : Array.Empty<ToolRegistration>())];
+        }
+        var removed = Strings(Field(filter as JsonObjectValue, "remove") as JsonArrayValue).ToHashSet(StringComparer.Ordinal);
+        return [.. tools.Where(tool => !removed.Contains(tool.Name))];
     }
 
     /// <summary>Selected installed extensions: the stored array, or the default selection edited by <c>{add, remove}</c>.</summary>

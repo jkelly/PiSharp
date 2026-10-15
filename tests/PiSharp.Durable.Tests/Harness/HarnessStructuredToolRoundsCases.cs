@@ -63,7 +63,7 @@ internal static partial class StructuredTests
             {
                 Name = "noop",
                 Description = "Does nothing",
-                Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+                Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
             }));
             setup.Faux.SetResponses(ToolCalls(("noop", "c1"), ("noop", "c2")), FauxAssistantMessage("done"));
             var (harness, root) = await OpenChat(await fresh(), setup);

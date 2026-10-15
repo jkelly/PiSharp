@@ -37,13 +37,15 @@ internal sealed class FakeToolApi(IExecutionEnv? env) : DelegatingToolExecutionA
     }
     public override void Output(ReadOnlySpan<byte> chunk, ShellOutputSkip? skipped = null) => Output(Encoding.UTF8.GetString(chunk), skipped);
     public override void Diagnostic(ToolDiagnostic diagnostic) => Reported.Add(diagnostic);
+    // Upstream's fakeApi: the collected output, never truncated.
+    public override RetainedOutput RetainedOutput() => new(string.Concat(Collected), false);
     public override Task DetailsAsync(JsonValue value, DurableContext context) => Task.CompletedTask;
 }
 
 /// <summary>What one call returned, streamed and reported.</summary>
 internal sealed record ToolRun(ToolExecutionResult Result, List<string> Output, List<ToolDiagnostic> Reported)
 {
-    public string Text => string.Join("\n", (Result.Content ?? JsonArrayValue.Empty).Cast<JsonObjectValue>()
+    public string Text => string.Join("\n", (Result.Output ?? JsonArrayValue.Empty).Cast<JsonObjectValue>()
         .Where(part => part["type"] is JsonStringValue { Value: "text" }).Select(part => ((JsonStringValue)part["text"]).Value));
     public string DiagnosticText => string.Join("\n", (Result.Diagnostics ?? []).Select(diagnostic => diagnostic.Message));
 }

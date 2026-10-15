@@ -78,7 +78,7 @@ public static class SchedulerScaleBench
                     api.CreateTaskAsync(Leaf, JsonValue.Null, new TaskOptions(TaskOwnership.Task(api.TaskId)), callContext)));
                 var settled = await Task.WhenAll(ids.Select(id => api.WaitForTaskAsync(id, callContext)));
                 var failed = settled.Count(record => ((SettlingTaskState)record.State).Outcome.Status != TaskOutcomeStatus.Completed);
-                return new ToolExecutionResult { Content = JsonValue.Array(JsonValue.Object(
+                return new ToolExecutionResult { Output = JsonValue.Array(JsonValue.Object(
                     KeyValuePair.Create("type", (JsonValue)"text"), KeyValuePair.Create("text", (JsonValue)$"{failed} failed"))), IsError = failed > 0 };
             },
         });

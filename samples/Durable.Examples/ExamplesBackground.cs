@@ -116,7 +116,7 @@ public static partial class Examples
                 var followUp = call.TryGetValue("followUp", out var flag) && flag is JsonBooleanValue { Value: true };
                 ToolExecutionResult Reply(string text, ConversationId? conversationId = null) => new()
                 {
-                    Content = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", text)])]),
+                    Output = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", text)])]),
                     // A UI can attach to the subagent's conversation through the call's details.
                     Details = conversationId is { } id && name is not null ? JsonValue.Object([new("name", name), new("conversationId", id.ToJson())]) : null,
                 };

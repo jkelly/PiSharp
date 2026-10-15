@@ -60,7 +60,7 @@ internal static class CompatScenarios
                         Started.Resolve();
                         try { await Aborted(callContext.CancellationToken); } catch (OperationCanceledException) { }
                     }
-                    return new ToolExecutionResult { Content = JsonValue.Array(FauxText($"finished run {run}")) };
+                    return new ToolExecutionResult { Output = JsonValue.Array(FauxText($"finished run {run}")) };
                 },
             });
         }
@@ -109,7 +109,7 @@ internal static class CompatScenarios
                             .Where(block => S(block["type"]) == "text").Select(block => S(block["text"])));
                         return new ToolExecutionResult
                         {
-                            Content = JsonValue.Array(FauxText(text)),
+                            Output = JsonValue.Array(FauxText(text)),
                             Details = Obj(("conversationId", child.ToJson())),
                         };
                     },
@@ -133,7 +133,7 @@ internal static class CompatScenarios
                 Tools = [Define.Tool(new ToolRegistration
                 {
                     Name = "noop", Description = "Does nothing",
-                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
                 })],
             }));
             setup.Faux.SetResponses(Answer("Hello there"));

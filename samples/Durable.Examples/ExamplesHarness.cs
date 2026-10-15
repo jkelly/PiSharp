@@ -18,7 +18,7 @@ public static partial class Examples
 
     private static ToolExecutionResult TextResult(string text) => new()
     {
-        Content = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", text)])]),
+        Output = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", text)])]),
     };
 
     private static string StringArg(JsonValue args, string key) => ((JsonStringValue)((JsonObjectValue)args)[key]).Value;

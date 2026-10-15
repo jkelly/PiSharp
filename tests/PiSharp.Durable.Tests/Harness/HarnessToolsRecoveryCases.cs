@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-tools-recovery.test.ts. Verbatim apart from the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tools-recovery.test.ts. Verbatim apart from the
 // adaptations in HarnessSupport.cs, ChatSupport.cs and HarnessToolsCases.cs, and these:
 // - Backends. Upstream reopens a SQLite file; harness.tools-recovery.* does the same, and harness.tools-recovery.jsonl.* reruns every case
 //   reopening a JSONL directory.

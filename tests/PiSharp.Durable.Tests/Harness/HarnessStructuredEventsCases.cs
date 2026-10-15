@@ -42,7 +42,7 @@ internal static partial class StructuredTests
     {
         Name = "noop",
         Description = "Does nothing",
-        Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+        Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
     });
 
     /// <summary>Installs the hook that starts work owned by the generation after its tools, which the generation then holds.</summary>
@@ -152,7 +152,7 @@ internal static partial class StructuredTests
                         var child = await tx.CreateConversationAsync(ConversationOwnership.Task(api.TaskId));
                         await tx.CreateTaskAsync(nodes.Node, NodeInput("sub"), In(child.Id));
                     }, callContext);
-                    return new ToolExecutionResult { Content = JsonValue.Array(Obj(("type", "text"), ("text", "started"))) };
+                    return new ToolExecutionResult { Output = JsonValue.Array(Obj(("type", "text"), ("text", "started"))) };
                 },
             }));
             setup.Faux.SetResponses(ToolCalls(("delegate", "c1")), FauxAssistantMessage("done"));
@@ -198,7 +198,7 @@ internal static partial class StructuredTests
                 Execute = async (_, api, callContext) =>
                 {
                     await api.CommitAsync(tx => tx.CreateTaskAsync(nodes.Node, NodeInput("held"), Owned(api.TaskId)), callContext);
-                    return new ToolExecutionResult { Content = JsonArrayValue.Empty, Control = new ToolControl { AddTools = [null!] } };
+                    return new ToolExecutionResult { Output = JsonArrayValue.Empty, Control = new ToolControl { AddTools = [null!] } };
                 },
             }));
             setup.Faux.SetResponses(ToolCalls(("broken", "c1")), FauxAssistantMessage("done"));

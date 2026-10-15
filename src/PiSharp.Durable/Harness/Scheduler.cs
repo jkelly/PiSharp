@@ -1244,7 +1244,14 @@ internal sealed class DurableTaskScheduler
                 lock (gate)
                     foreach (var reservation in reservations)
                         if (reservation.Invocation.Mode == InvocationMode.Abort) reservation.Record = live.GetValueOrDefault(reservation.Invocation.TaskId);
-                foreach (var reservation in reservations) Start(reservation);
+                // Abort invocations first. Upstream starts each reserved invocation up to its first await, so an abort handler that commits at
+                // once (as most do) enqueues that commit before any run invocation of the pass gets past its first step. A run invocation here
+                // may run its step and phase inline when the line is idle (a tool's whole recovery, say, settling it and cascading a request
+                // mark over a `restart` mark of a task it owns), so starting it first could reorder those commits.
+                foreach (var reservation in reservations)
+                    if (reservation.Invocation.Mode == InvocationMode.Abort) Start(reservation);
+                foreach (var reservation in reservations)
+                    if (reservation.Invocation.Mode != InvocationMode.Abort) Start(reservation);
             }
         }
         catch (Exception error)

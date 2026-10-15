@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/spec-usage.test.ts. The usage examples of docs/spec.md,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/spec-usage.test.ts. The usage examples of docs/spec.md,
 // compile-checked: each block is written in C# against the ported API, with the names the spec leaves to the application declared in
 // SpecNames below; SpecUsage.Examples() is never called, because those names have no values. Adaptations:
 // - TypeScript's type-level check (expectTypeOf(examples).returns.toHaveProperty("sequences")) is a reflection check of Examples()' return
@@ -205,7 +205,7 @@ internal static class SpecUsage
                             throw new InvalidOperationException($"Subagent failed: {settled.Status}");
                         return new ToolExecutionResult
                         {
-                            Content = JsonValue.Array([JsonValue.Object([
+                            Output = JsonValue.Array([JsonValue.Object([
                                 KeyValuePair.Create("type", (JsonValue)"text"),
                                 KeyValuePair.Create("text", (JsonValue)await SpecNames.AnswerText(api, settled.Answer!.Value, callContext)),
                             ])]),

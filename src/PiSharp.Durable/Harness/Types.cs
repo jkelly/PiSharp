@@ -1,10 +1,16 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/types.ts. The openable Harness (P6) and the task runtime (P7)
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/types.ts. The openable Harness (P6) and the task runtime (P7)
 // are complete; submissions and the generation hooks are final (P8); tools are final (P9); views are final (P10); compaction and the task
-// graph are final (P11).
+// graph are final (P11). v1.2.0: input entries (area i), documentRetentionMs and onReport's contract (area b), and tool task v2 (area a):
+// ToolExecutionResult.Output and StructuredOutput, NestedToolExecutionResult, IToolExecutionApi.RetainedOutput and ExecuteToolAsync,
+// ToolRegistration.StructuredOutputSchema, Callers and Deferred, AgentState modelTools (AgentChange.ModelTools) and Agent.Callable and
+// Deferred, and the ToolHookCall's parent.
 //
 // Mappings: upstream's `Tool` generic (a host's own ToolRegistration subtype) becomes record inheritance, so `{ ...tool, x }` is
 // `tool with { X = ... }` and keeps the subtype; pi-ai messages and tool calls are wire JSON (JsonValue); a field that may be given,
 // cleared with `null` or left `undefined` is a nullable Patch<T>; a stored agent state is the pi.agent document's JsonObjectValue.
+// A ToolHookCall is the call's wire JSON with, for a nested call, a `parent` object {taskId, callId}; a NestedToolExecutionResult is a
+// record whose JSON (ToJson, in upstream's key order) is what NestedCallDoc stores and tool events carry. A JSON field upstream leaves
+// undefined is a C# null; an explicit JSON null is JsonValue.Null.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -89,6 +95,35 @@ public sealed class ToolSelection
     public ImmutableArray<ToolRegistration>? Remove { get; }
 }
 
+/// <summary>
+/// The filter of the tools a conversation offers the model in an <see cref="AgentChange"/> (upstream <c>modelTools</c>:
+/// <c>readonly ToolRegistration[] | { remove?, add? }</c>): exactly these, in order, deferred ones too; or every enabled model-callable
+/// tool except deferred ones and <see cref="Remove"/>, followed by the deferred tools in <see cref="Add"/> that are not removed, in
+/// <see cref="Add"/> order. It replaces the stored filter as a whole; tools loaded with <c>control.addTools</c> are in its <c>add</c>. Tools
+/// are stored by name.
+/// </summary>
+public sealed class ModelToolSelection
+{
+    private ModelToolSelection(ImmutableArray<ToolRegistration>? exactly, ImmutableArray<ToolRegistration>? remove,
+        ImmutableArray<ToolRegistration>? add)
+    { Exactly = exactly; Remove = remove; Add = add; }
+
+    /// <summary>Offers exactly <paramref name="tools"/>, in order (an array).</summary>
+    public static ModelToolSelection Only(params IEnumerable<ToolRegistration> tools) => new([.. tools], null, null);
+
+    /// <summary>Offers every enabled model-callable tool except deferred ones and <paramref name="remove"/>, then the deferred tools of
+    /// <paramref name="add"/> (<c>{ remove?, add? }</c>; a null list is left out).</summary>
+    public static ModelToolSelection Edit(IEnumerable<ToolRegistration>? remove = null, IEnumerable<ToolRegistration>? add = null) =>
+        new(null, remove is null ? null : [.. remove], add is null ? null : [.. add]);
+
+    /// <summary>The exact filter; null for an edit.</summary>
+    public ImmutableArray<ToolRegistration>? Exactly { get; }
+    /// <summary>The removed tools of an edit; null when the edit has no <c>remove</c>.</summary>
+    public ImmutableArray<ToolRegistration>? Remove { get; }
+    /// <summary>The loaded deferred tools of an edit; null when the edit has no <c>add</c>.</summary>
+    public ImmutableArray<ToolRegistration>? Add { get; }
+}
+
 /// <summary>A change to <c>pi.agent</c> (upstream <c>AgentChange</c>): a given field replaces the stored one, <see cref="Patch{T}.Clear"/>
 /// clears it, and a null field changes nothing.</summary>
 public sealed record AgentChange
@@ -99,8 +134,10 @@ public sealed record AgentChange
     public Patch<string>? ThinkingLevel { get; init; }
     /// <summary>The extension selection.</summary>
     public Patch<ExtensionSelection>? Extensions { get; init; }
-    /// <summary>The tool filter.</summary>
+    /// <summary>The tool filter: the enabled tools.</summary>
     public Patch<ToolSelection>? Tools { get; init; }
+    /// <summary>The filter of the enabled tools the model may call: the tools offered to it. Replaces the stored filter as a whole.</summary>
+    public Patch<ModelToolSelection>? ModelTools { get; init; }
     /// <summary>Rendered after every extension section, as the section <c>instructions</c>.</summary>
     public Patch<string>? Instructions { get; init; }
     /// <summary>Directory within the environment's file system, passed to <c>HarnessOptions.Env</c>.</summary>
@@ -116,8 +153,13 @@ public sealed record Agent
     public required string ThinkingLevel { get; init; }
     /// <summary>The selected installed extensions, in order.</summary>
     public required ImmutableArray<Extension> Extensions { get; init; }
-    /// <summary>The tools a request offers, in order.</summary>
+    /// <summary>The tools a request offers, in order: enabled, callable by the model, and selected by <c>modelTools</c>.</summary>
     public required ImmutableArray<ToolRegistration> Tools { get; init; }
+    /// <summary>The tools nested calls (<see cref="IToolExecutionApi.ExecuteToolAsync"/>) resolve among, in order: enabled and callable by
+    /// tools.</summary>
+    public required ImmutableArray<ToolRegistration> Callable { get; init; }
+    /// <summary>Enabled deferred tools the model may call and is not offered yet, in registry order: what <c>tool_search</c> loads.</summary>
+    public required ImmutableArray<ToolRegistration> Deferred { get; init; }
     /// <summary>Extension sections, then <c>instructions</c> when set.</summary>
     public required ImmutableArray<PromptSection> Sections { get; init; }
     /// <summary>The agent's instructions.</summary>
@@ -181,11 +223,21 @@ public sealed record ToolControl
     public string? Handoff { get; init; }
 }
 
-/// <summary>The result of one tool execution (upstream <c>ToolExecutionResult</c>).</summary>
+/// <summary>
+/// The result of one tool execution (upstream <c>ToolExecutionResult</c>), on three channels: <see cref="Output"/> for the model,
+/// <see cref="StructuredOutput"/> for programs that call the tool (<see cref="IToolExecutionApi.ExecuteToolAsync"/> callers, code mode
+/// scripts), and <see cref="Details"/> for UIs.
+/// </summary>
 public sealed record ToolExecutionResult
 {
-    /// <summary>pi-ai tool result content (wire JSON); null: the retained running output becomes the content.</summary>
-    public JsonArrayValue? Content { get; init; }
+    /// <summary>For the model: pi-ai tool result content (wire JSON); null: the retained running output.</summary>
+    public JsonArrayValue? Output { get; init; }
+    /// <summary>
+    /// For programs. Required unless <see cref="IsError"/> when the tool declares <see cref="ToolRegistration.StructuredOutputSchema"/>, and
+    /// validated against it; not allowed without one, where programs get the output itself
+    /// (<see cref="NestedToolExecutionResult.StructuredOutput"/>). Null is upstream's undefined; <see cref="JsonValue.Null"/> is a JSON null.
+    /// </summary>
+    public JsonValue? StructuredOutput { get; init; }
     /// <summary>Whether the result is an error.</summary>
     public bool? IsError { get; init; }
     /// <summary>Null: the last running details become the details.</summary>
@@ -196,6 +248,86 @@ public sealed record ToolExecutionResult
     public JsonObjectValue? Usage { get; init; }
     /// <summary>Post-tools controls.</summary>
     public ToolControl? Control { get; init; }
+}
+
+/// <summary>
+/// Result of a nested call, as <see cref="IToolExecutionApi.ExecuteToolAsync"/> returns it (upstream <c>NestedToolExecutionResult</c>).
+/// Programs read <see cref="StructuredOutput"/>; the output for the model is not kept, and <c>control</c> does not apply. Its JSON
+/// (<see cref="ToJson"/>) is what the caller's <c>NestedCallDoc</c> stores and a nested <c>tool_execution_end</c> event carries.
+/// </summary>
+public sealed record NestedToolExecutionResult
+{
+    /// <summary>The nested call's tool task.</summary>
+    public required TaskId TaskId { get; init; }
+    /// <summary>
+    /// The tool's value for programs. A tool with <see cref="ToolRegistration.StructuredOutputSchema"/>: its validated structured output,
+    /// also on an error result that has one; null otherwise, and an error's text is then in an error diagnostic. A tool without: its bounded
+    /// output, success or error, as a string for one text item, an <c>ImageContent</c> for one image, <c>""</c> for none, and the content
+    /// list otherwise. Null on an error result the Harness wrote itself (unavailable, invalid, blocked, interrupted, aborted);
+    /// <see cref="Diagnostics"/> say what went wrong. A JSON null is <see cref="JsonValue.Null"/>.
+    /// </summary>
+    public JsonValue? StructuredOutput { get; init; }
+    /// <summary>Whether the result is an error.</summary>
+    public required bool IsError { get; init; }
+    /// <summary>The details; null when absent.</summary>
+    public JsonValue? Details { get; init; }
+    /// <summary>The diagnostics.</summary>
+    public required ImmutableArray<ToolDiagnostic> Diagnostics { get; init; }
+    /// <summary>pi-ai usage (wire JSON); null when absent.</summary>
+    public JsonObjectValue? Usage { get; init; }
+    /// <summary>Execution time of the attempt that produced the result; null when it never executed.</summary>
+    public double? DurationMs { get; init; }
+
+    /// <summary><c>{taskId, structuredOutput?, isError, details?, diagnostics, usage?, durationMs?}</c>, upstream's key order.</summary>
+    public JsonObjectValue ToJson() => new RecordJson.Writer()
+        .Add("taskId", TaskId.ToJson())
+        .Add("structuredOutput", StructuredOutput)
+        .Add("isError", IsError)
+        .Add("details", Details)
+        .Add("diagnostics", JsonValue.Array(Diagnostics.Select(ToolResults.DiagnosticJson)))
+        .Add("usage", Usage)
+        .Number("durationMs", DurationMs)
+        .Build();
+
+    /// <summary>Reads <see cref="ToJson"/>'s shape.</summary>
+    public static NestedToolExecutionResult FromJson(JsonValue json)
+    {
+        const string what = "nested tool execution result";
+        var value = RecordJson.Object(json, what);
+        return new NestedToolExecutionResult
+        {
+            TaskId = RecordJson.Id<TaskId>(value, "taskId", what),
+            StructuredOutput = RecordJson.Optional(value, "structuredOutput"),
+            IsError = RecordJson.Boolean(value, "isError", what),
+            Details = RecordJson.Optional(value, "details"),
+            Diagnostics = [.. RecordJson.Array(RecordJson.Required(value, "diagnostics", what), "diagnostics", what).Select(ToolResults.ParseDiagnostic)],
+            Usage = RecordJson.Optional(value, "usage") is { } usage ? RecordJson.Object(usage, what) : null,
+            DurationMs = RecordJson.OptionalNumber(value, "durationMs", what),
+        };
+    }
+}
+
+/// <summary>Options of a nested call (upstream <c>executeTool()</c>'s <c>{ key?, progress? }</c>).</summary>
+public sealed record NestedCallOptions
+{
+    /// <summary>The nested call's key within its caller; default its position among the invocation's nested calls, <c>1</c>, <c>2</c>, ...
+    /// An explicit key must be non-empty, without <c>/</c>, not <c>__proto__</c>, and not a positive integer.</summary>
+    public string? Key { get; init; }
+    /// <summary><c>false</c>: commit no running output, details, or diagnostics to the nested call's slot, only its status.</summary>
+    public bool? Progress { get; init; }
+}
+
+/// <summary>The output retained so far, as the model will see it when the result omits its output, and whether earlier output was
+/// dropped (upstream <c>retainedOutput()</c>'s <c>{ text, truncated }</c>).</summary>
+public readonly record struct RetainedOutput(string Text, bool Truncated);
+
+/// <summary>Who may call a tool (upstream <c>ToolRegistration.callers</c>' members).</summary>
+public enum ToolCaller
+{
+    /// <summary><c>model</c>: the model, in a tool round.</summary>
+    Model,
+    /// <summary><c>tools</c>: other tools, through <see cref="IToolExecutionApi.ExecuteToolAsync"/>.</summary>
+    Tools,
 }
 
 /// <summary>Which end of a tool's output is kept (upstream <c>"head" | "tail"</c>).</summary>
@@ -239,7 +371,7 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     /// <summary>Built by <c>HarnessOptions.Env</c> for this call; null without an environment.</summary>
     IExecutionEnv? Env { get; }
     /// <summary>
-    /// Appends running output; it becomes the result content when the result omits <c>Content</c>. <paramref name="skipped"/> counts output
+    /// Appends running output; it becomes the result's <c>Output</c> when the result omits it. <paramref name="skipped"/> counts output
     /// omitted before the chunk, as reported by an environment given <see cref="OutputWindow"/> (<c>ShellOutputInfo.skipped</c>). Throws once
     /// the call has settled.
     /// </summary>
@@ -253,6 +385,9 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     /// null, so skipped text cannot bypass its transform.
     /// </summary>
     ShellOutputWindow? OutputWindow { get; }
+    /// <summary>The output retained so far, as the model will see it when the result omits <c>Output</c>, and whether earlier output was
+    /// dropped; for a tool that also returns that text in its <c>StructuredOutput</c>. Throws once the call has settled.</summary>
+    RetainedOutput RetainedOutput();
     /// <summary>Records a model-visible remark about this call. Throws once the call has settled.</summary>
     void Diagnostic(ToolDiagnostic diagnostic);
     /// <summary>Replaces the running details; the last value becomes the result details when the result omits <c>Details</c>. Resolves with
@@ -267,7 +402,8 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     /// <summary>Stores a memo of the tool task unless one exists; returns the winner.</summary>
     Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context);
     /// <summary>Creates a task in its own commit; <see cref="TaskOptions.ConversationId"/> defaults to the calling conversation (upstream
-    /// takes the options without it).</summary>
+    /// takes the options without it). A child task of a tool that is not replay-safe defaults to <see cref="TaskOptions.AbandonOnRestart"/>:
+    /// the tool never resumes after a restart, so nothing awaits the child then.</summary>
     Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, DurableContext context);
     /// <summary>The committed task record.</summary>
     Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context);
@@ -275,6 +411,22 @@ public interface IToolExecutionApi : IDocumentObserver, IDocumentReader
     Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context);
     /// <summary>Invocation-bound handle of an existing conversation, such as one this tool created in a commit.</summary>
     Task<IConversationHandle?> ConversationAsync(ConversationId id, DurableContext context);
+    /// <summary>
+    /// Runs tool <paramref name="name"/> as a nested call of this one and waits for its result (upstream <c>executeTool</c>). The nested call
+    /// is its own <c>pi.tool</c> task, owned by this call: it resolves the tool among the conversation's tools (<see cref="Agent.Callable"/>),
+    /// validates, runs the tool task's hooks (whose call carries <c>parent</c>), applies output limits and the tool's replay policy, and reports
+    /// progress in <c>pi.live.nestedTools</c>. Its result returns here instead of entering the transcript. A call that is blocked, invalid,
+    /// throws, is interrupted, or is aborted returns an <see cref="NestedToolExecutionResult.IsError"/> result.
+    /// <para>The nested call's key names it within this call; its call ID is <c>&lt;callId&gt;/&lt;key&gt;</c>. By default the key is the
+    /// call's position among this invocation's nested calls, <c>1</c>, <c>2</c>, ... An explicit key must be non-empty, without <c>/</c>, not
+    /// <c>__proto__</c>, and not a positive integer. A rerun of a replay-safe tool that makes a call with a used key gets that nested call back,
+    /// finished or still running, instead of starting another. Reusing a key with another tool or other arguments throws. A tool that is not
+    /// replay-safe never reruns: after a restart, its unfinished nested calls are abandoned (<see cref="TaskOptions.AbandonOnRestart"/>).</para>
+    /// <para>Nested calls run as soon as they are made; cancelling <paramref name="context"/> stops only the wait. When this call settles,
+    /// nested calls it left running are aborted first. Rejects once <c>Execute</c> has returned, when this call is aborted, or when the Harness
+    /// closes.</para>
+    /// </summary>
+    Task<NestedToolExecutionResult> ExecuteToolAsync(string name, JsonObjectValue arguments, DurableContext context, NestedCallOptions? options = null);
 }
 
 /// <summary>Runs a tool with its validated arguments.</summary>
@@ -308,6 +460,16 @@ public record ToolRegistration
     /// makes the arguments invalid.
     /// </summary>
     public Func<JsonValue, JsonValue>? PrepareArguments { get; init; }
+    /// <summary>JSON Schema (TypeBox-shaped) of <see cref="ToolExecutionResult.StructuredOutput"/>, which programs that call the tool receive.
+    /// Null: they receive the result's bounded output, success or error, as <see cref="NestedToolExecutionResult.StructuredOutput"/>
+    /// describes.</summary>
+    public JsonObjectValue? StructuredOutputSchema { get; init; }
+    /// <summary>Who may call the tool: the model, other tools through <see cref="IToolExecutionApi.ExecuteToolAsync"/>, or both (null, the
+    /// default).</summary>
+    public ImmutableArray<ToolCaller>? Callers { get; init; }
+    /// <summary>Not offered to the model until loaded: the model gets the tool only when <c>modelTools</c> names it, in its array or its
+    /// <c>add</c>, which <c>control.addTools</c> writes. Other tools can call it any time.</summary>
+    public bool Deferred { get; init; }
     /// <summary>Output bounds.</summary>
     public ToolOutputLimits? OutputLimits { get; init; }
     /// <summary>Runs the tool.</summary>
@@ -966,13 +1128,15 @@ public sealed class GenerationHooks
 /// <summary>What <see cref="ToolHooks.BeforeTool"/> decides: replacement arguments or a block.</summary>
 public sealed record BeforeToolDecision(JsonObjectValue? Arguments = null, string? Block = null);
 
-/// <summary>Hooks of the built-in tool task (upstream <c>ToolHooks</c>); every handler is optional. Calls are pi-ai <c>ToolCall</c> wire
-/// JSON; hooks receive the tool task's runtime as their <see cref="IHookApi"/>, so their memos are the call's.</summary>
+/// <summary>Hooks of the built-in tool task, for model-issued and nested calls (upstream <c>ToolHooks</c>); every handler is optional. A
+/// call is upstream's <c>ToolHookCall</c>: pi-ai <c>ToolCall</c> wire JSON with, for a nested call (one a running tool made through
+/// <see cref="IToolExecutionApi.ExecuteToolAsync"/>), <c>parent: {taskId, callId}</c>. Hooks receive the tool task's runtime as their
+/// <see cref="IHookApi"/>, so their memos are the call's.</summary>
 public sealed class ToolHooks
 {
     /// <summary>Before intent; the first block wins, otherwise arguments replace the call's arguments. A throw blocks.</summary>
     public Func<JsonObjectValue, IHookApi, DurableContext, Task<BeforeToolDecision?>>? BeforeTool { get; init; }
-    /// <summary>After execution, before the result entry; replaces the result.</summary>
+    /// <summary>After execution, before the result is committed; replaces the result.</summary>
     public Func<JsonObjectValue, ToolExecutionResult, IHookApi, DurableContext, Task<ToolExecutionResult?>>? AfterTool { get; init; }
 }
 
