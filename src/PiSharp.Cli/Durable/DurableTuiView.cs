@@ -2,7 +2,10 @@
 // The fullscreen view of one conversation: the transcript from the view's entries and the pi.live document, the task panel, the inbox
 // queue, notices, the editor and the footer, built from pi's interactive components (AssistantMessageComponent, UserMessageComponent,
 // ToolExecutionComponent with the built-in tool renderers, CustomEditor, WorkingStatusIndicator) over PiSharp.Tui's TuiAltScreen.
-// Everything here runs on the TUI's UiLoop, as upstream runs on Node's event loop.
+// Everything here runs on the TUI's UiLoop, as upstream runs on Node's event loop. PiSharp-only since pi-durable 1.2.0 (durable work list
+// area l): the nested calls of a tool call as rows under its card, a tool result's diagnostics as plain lines, tool cards with pi's image
+// settings, and alerts above the notices for a failed session and for pi.live.compactionFailure.
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Interactive.Mode;
@@ -11,6 +14,8 @@ using PiSharp.Durable;
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Durable.DurableTuiState;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
+using DurableNumber = PiSharp.Durable.Chord.JsonNumberValue;
+using DurableString = PiSharp.Durable.Chord.JsonStringValue;
 using TuiKeybindingsManager = PiSharp.Tui.Pi.KeybindingsManager;
 
 namespace PiSharp.Cli.Durable;
@@ -33,6 +38,7 @@ internal sealed class DurableTuiView
     private readonly Container chat = new();
     private readonly Container tasks = new();
     private readonly Container queue = new();
+    private readonly Container alerts = new();
     private readonly Container notices = new();
     private readonly Container footer = new();
     private readonly Text footerStats = new("", 1, 0);
@@ -40,12 +46,20 @@ internal sealed class DurableTuiView
     private readonly Container editorContainer = new();
     private readonly CustomEditor editor;
     private readonly string cwd;
+    private readonly ToolExecutionOptions toolOptions;
     /// <summary>The newest card per call ID; provider call IDs may repeat across turns.</summary>
     private readonly Dictionary<string, ToolExecutionComponent> tools = new(StringComparer.Ordinal);
     /// <summary>Every card shown, also older ones whose call ID a later turn reused.</summary>
     private readonly List<ToolExecutionComponent> cards = [];
     /// <summary>Call IDs whose cards the streaming answer created; its entry takes them over.</summary>
     private readonly HashSet<string> streamingCalls = new(StringComparer.Ordinal);
+    /// <summary>The group of each card: the card and the rows of its nested calls.</summary>
+    private readonly Dictionary<ToolExecutionComponent, DurableToolGroup> groups = new(ReferenceEqualityComparer.Instance);
+    /// <summary>Where the nested calls of a tool task go, by task ID: the rows under its model-issued call's card, and the depth of its own
+    /// row there (0 for the model-issued call).</summary>
+    private readonly Dictionary<long, (DurableNestedCalls Rows, int Depth)> nestedHosts = [];
+    /// <summary>Nested calls placed once; after a rebuild only a caller that still runs places them again.</summary>
+    private readonly HashSet<long> placedNested = [];
     private readonly List<DurableCompactionComponent> summaries = [];
     /// <summary>Tool output and summaries shown in full; toggled like pi.</summary>
     private bool expanded;
@@ -57,9 +71,13 @@ internal sealed class DurableTuiView
     private bool rebuilt;
     private readonly ScrollView transcript;
 
-    public DurableTuiView(ITerminal terminal, UiLoop loop, string cwd, string agentDir, DurableTuiHandlers handlers)
+    /// <param name="toolOptions">pi's settings for tool cards (<c>terminal.showImages</c>, <c>terminal.imageWidthCells</c>, <c>outputPad</c>), as
+    /// interactive mode passes them; null is the cards' defaults.</param>
+    public DurableTuiView(ITerminal terminal, UiLoop loop, string cwd, string agentDir, DurableTuiHandlers handlers,
+        ToolExecutionOptions? toolOptions = null)
     {
         this.cwd = cwd;
+        this.toolOptions = toolOptions ?? new();
         ui = new TuiAltScreen(terminal, loop, false, agentDir);
         var keybindings = AppKeybindings.Create(agentDir);
         TuiKeybindingsManager.SetGlobal(keybindings.Manager);
@@ -75,7 +93,11 @@ internal sealed class DurableTuiView
         editor.OnAction("app.tools.expand", () =>
         {
             expanded = !expanded;
-            foreach (var card in cards) card.SetExpanded(expanded);
+            foreach (var card in cards)
+            {
+                card.SetExpanded(expanded);
+                if (groups.TryGetValue(card, out var group)) group.Nested.SetExpanded(expanded);
+            }
             foreach (var summary in summaries) summary.SetExpanded(expanded);
             ui.RequestRender();
         });
@@ -98,11 +120,12 @@ internal sealed class DurableTuiView
         var dock = new VStack([
             new StackEntry(tasks, Shrink: 1, MinSize: 0),
             new StackEntry(queue, Shrink: 1, MinSize: 0),
+            new StackEntry(alerts, Shrink: 1, MinSize: 0),
             new StackEntry(notices, Shrink: 1, MinSize: 0),
             new StackEntry(editorContainer, Shrink: 1, MinSize: 3),
             new StackEntry(footer, Shrink: 1, MinSize: 0),
         ]);
-        foreach (var component in new IComponent[] { chat, tasks, queue, notices, editorContainer, footer }) ui.AddChild(component);
+        foreach (var component in new IComponent[] { chat, tasks, queue, alerts, notices, editorContainer, footer }) ui.AddChild(component);
         ui.SetLayoutRoot(new VStack([
             new StackEntry(transcript, Basis: 0, Grow: 1, Shrink: 1, MinSize: 1),
             new StackEntry(dock, Basis: null, Grow: 0, Shrink: 1, MinSize: 1),
@@ -131,6 +154,8 @@ internal sealed class DurableTuiView
         cards.Clear();
         tools.Clear();
         streamingCalls.Clear();
+        groups.Clear();
+        nestedHosts.Clear();
     }
 
     public void Mount(IComponent component)
@@ -156,6 +181,8 @@ internal sealed class DurableTuiView
             var status = Str(slot, "status");
             if (status == "pending") continue;
             var component = Tool(Str(slot, "name") ?? "", Str(slot, "callId") ?? "");
+            // Its nested calls go under its card (a slot has its task ID since pi-durable 1.2.0).
+            if (Num(slot, "taskId") is { } taskId && groups.TryGetValue(component, out var group)) nestedHosts[(long)taskId] = (group.Nested, 0);
             component.SetArgsComplete();
             if (status != "running") continue;
             component.MarkExecutionStarted();
@@ -169,11 +196,14 @@ internal sealed class DurableTuiView
             }
             else if (output is not null) component.UpdateResult(ToolOutput(output, details), true);
         }
+        SyncNested(view.NestedCalls);
         SyncTasks(view.Tasks);
         SyncQueue(Doc(view.Conversation, "pi.inbox", static () => new JsonObject { ["items"] = new JsonArray() }));
+        SyncAlerts(view, live);
         SyncNotices(view);
         editor.BorderColor = theme.GetThinkingBorderColor(AgentOf(view.Conversation).ThinkingLevel ?? "off");
-        SyncStatus(live);
+        // A failed session runs nothing any more: what pi.live last said is not happening.
+        SyncStatus(view.Failure is null ? live : new JsonObject());
         SyncFooter(view);
         if (rebuilt) transcript.ScrollToEnd();
         ui.RequestRender(rebuilt);
@@ -186,6 +216,45 @@ internal sealed class DurableTuiView
         ["details"] = details?.DeepClone(),
         ["isError"] = false,
     };
+
+    /// <summary>
+    /// The rows of the nested calls (pi.live.nestedTools, gathered by the runtime), each under the card of the model-issued call it belongs
+    /// to and indented under the nested call that made it. A call is placed by its caller's task ID, or, when the TUI never saw its
+    /// model-issued caller's slot, by the caller's call ID; it stays where it was placed. A call whose caller has no card is not shown. A
+    /// rebuilt transcript drops the rows; only the calls of a model-issued call that still runs are placed again, by its task ID, as call IDs
+    /// may repeat across turns.
+    /// </summary>
+    private void SyncNested(ImmutableSortedDictionary<long, DurableNestedCall>? calls)
+    {
+        if (calls is null) return;
+        // Ascending task IDs: a caller's row comes before its calls'.
+        foreach (var (taskId, call) in calls)
+        {
+            if (!nestedHosts.TryGetValue(taskId, out var host))
+            {
+                if (call.Slot.TryGetValue("parentTaskId", out var parent) && parent is DurableNumber caller &&
+                    nestedHosts.TryGetValue((long)caller.Value, out var callerHost)) host = (callerHost.Rows, callerHost.Depth + 1);
+                else if (!placedNested.Contains(taskId) && call.Slot.TryGetValue("parentCallId", out var parentCall) &&
+                    parentCall is DurableString callId && tools.TryGetValue(callId.Value, out var card) && groups.TryGetValue(card, out var group))
+                    host = (group.Nested, 1);
+                else continue;
+                nestedHosts[taskId] = host;
+                placedNested.Add(taskId);
+            }
+            host.Rows.Set(taskId, NestedRow(call), host.Depth);
+        }
+    }
+
+    /// <summary>What must stay on screen until it changes: the session failed, or the newest compaction failed (pi.live.compactionFailure,
+    /// kept until a compaction produces a summary).</summary>
+    private void SyncAlerts(DurableView view, JsonObject live)
+    {
+        alerts.Clear();
+        if (view.Failure is { } failure) alerts.AddChild(new Text(theme.Fg("error", DurableFailure.Message(failure)), 1, 0));
+        if (Obj(live, "compactionFailure") is { } compaction)
+            alerts.AddChild(new TruncatedText(theme.Fg("error",
+                $"Compaction failed ({Str(compaction, "reason") ?? "undefined"}): {Str(compaction, "error") ?? "undefined"}"), 1, 0));
+    }
 
     private void SyncTasks(TaskGraph? graph)
     {
@@ -357,7 +426,7 @@ internal sealed class DurableTuiView
         }
         else if (entry.Kind == "pi.tool-result" && role == "toolResult")
         {
-            Tool(Str(message, "toolName") ?? "", Str(message, "toolCallId") ?? "").UpdateResult(message!);
+            Tool(Str(message, "toolName") ?? "", Str(message, "toolCallId") ?? "").UpdateResult(DisplayResult(entry, message!));
         }
         else if (entry.Kind == "pi.compaction")
         {
@@ -401,9 +470,12 @@ internal sealed class DurableTuiView
             if (args is not null) existing.UpdateArgs(args);
             return existing;
         }
-        var component = new ToolExecutionComponent(name, callId, args ?? new JsonObject(), null, Renderers.GetValueOrDefault(name), ui, cwd);
+        var component = new ToolExecutionComponent(name, callId, args ?? new JsonObject(), toolOptions, Renderers.GetValueOrDefault(name), ui, cwd);
         component.SetExpanded(expanded);
-        chat.AddChild(component);
+        var group = new DurableToolGroup(component);
+        group.Nested.SetExpanded(expanded);
+        groups[component] = group;
+        chat.AddChild(group);
         cards.Add(component);
         tools[callId] = component;
         return component;

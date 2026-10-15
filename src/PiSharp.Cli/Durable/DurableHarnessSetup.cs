@@ -20,8 +20,27 @@ namespace PiSharp.Cli.Durable;
 internal sealed record DurableInitialModel(ModelRef? Model = null, string? ThinkingLevel = null, string? FallbackMessage = null);
 
 /// <summary>Harness settings read at every use from pi's settings as loaded at startup (upstream <c>createHarnessSettings</c>).</summary>
-internal sealed class PiHarnessSettings(PiSettings settings) : HarnessSettings
+/// <param name="registry">The registry whose default extension selection <see cref="Extensions"/> narrows; null selects every installed
+/// extension.</param>
+internal sealed class PiHarnessSettings(PiSettings settings, IRegistryReader? registry = null) : HarnessSettings
 {
+    /// <summary>
+    /// Every installed extension but <c>tool-search</c>, which is selected only while an installed tool is deferred (PiSharp-only, durable
+    /// work list area l): as the coding agent registers <c>tool_search</c> and activates it only for deferred tools, so the tools the model
+    /// is offered stay the same until something defers one. <c>pisharp durable</c> defers none. Null without a registry: every installed
+    /// extension.
+    /// </summary>
+    public override IReadOnlyList<Extension>? Extensions
+    {
+        get
+        {
+            if (registry is null) return null;
+            var snapshot = registry.Snapshot();
+            var deferred = snapshot.Tools().Any(tool => tool.Tool.Deferred);
+            return [.. snapshot.Installed().Where(extension => deferred || extension.Name != DurableHarnessSetup.ToolSearchExtensionName)];
+        }
+    }
+
     /// <summary>getProviderRetrySettings and getHttpIdleTimeoutMs: <c>timeoutMs</c> falls back to the idle timeout (0, disabled, is
     /// 2147483647).</summary>
     public override ConversationStreamOptions? Stream
@@ -140,19 +159,26 @@ internal static class DurableHarnessSetup
     /// <summary>The image processor of <c>pisharp durable</c>'s read tool: one worker thread per process, started on the first image.</summary>
     private static readonly Lazy<IImageProcessor> CodingImages = new(() => ImageProcessors.CreateThreaded(PiSharp.Tools.Skia.SkiaImageCodec.Instance));
 
-    /// <summary>Harness settings read at every use (upstream <c>createHarnessSettings</c>).</summary>
-    internal static HarnessSettings CreateHarnessSettings(PiSettings settings) => new PiHarnessSettings(settings);
+    /// <summary>The name of <see cref="ToolSearch.CreateExtension"/>'s extension.</summary>
+    internal const string ToolSearchExtensionName = "tool-search";
+
+    /// <summary>Harness settings read at every use (upstream <c>createHarnessSettings</c>); with <paramref name="registry"/>, its default
+    /// extension selection leaves <c>tool_search</c> off until a tool is deferred (<see cref="PiHarnessSettings.Extensions"/>).</summary>
+    internal static HarnessSettings CreateHarnessSettings(PiSettings settings, IRegistryReader? registry = null) => new PiHarnessSettings(settings, registry);
 
     /// <summary>
     /// A registry with the durable coding tools and pi's system prompt (upstream <c>createCodingRegistry</c>). Since pi-durable 1.2.0 the
     /// tools' read returns images; <c>pisharp durable</c> gives it an image processor on the coding agent's Skia codec, on a worker thread
-    /// (durable work list area e; upstream's equivalent is <c>createCodingTools({ images: await createNodePhotonImages() })</c>).
+    /// (durable work list area e; upstream's equivalent is <c>createCodingTools({ images: await createNodePhotonImages() })</c>). It also
+    /// installs <c>tool_search</c> (pi-durable 1.2.0's <c>tool-search</c> extension), which the settings of
+    /// <see cref="CreateHarnessSettings"/> leave unselected until a tool is deferred (durable work list area l).
     /// </summary>
     internal static IRegistry CreateCodingRegistry(PiSettings settings, string cwd, DurablePromptResources resources)
     {
         var registry = Registry.Create();
         registry.Install(CodingTools.CreateCodingTools(new ReadToolOptions { Images = CodingImages.Value }));
         registry.Install(DurablePrompt.Create(settings, cwd, resources));
+        registry.Install(ToolSearch.CreateExtension());
         return registry;
     }
 

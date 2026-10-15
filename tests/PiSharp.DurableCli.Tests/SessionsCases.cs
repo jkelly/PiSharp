@@ -169,14 +169,26 @@ internal static partial class Program
             Equal(created.Directory, taken.Directory, "taken over once stale");
             await taken.ReleaseAsync();
         }),
-        // Pi and PiSharp continue each other's sessions. Runs the pinned upstream sessions.ts under Node when PISHARP_DURABLE_UPSTREAM names a
-        // Pi checkout at the pinned commit (with node_modules) and node is on PATH; otherwise it checks nothing.
+        // Pi v1.1.0's experimental durable agent and PiSharp find and lock each other's sessions: the same directory layout and lock. Upstream
+        // deleted that agent in v1.2.0, so this case is pinned to v1.1.0 (Program.Upstream): it runs that checkout's sessions.ts under Node
+        // when PISHARP_DURABLE_UPSTREAM_V110 names a Pi v1.1.0 checkout with node_modules and node is on PATH, and is skipped when the variable
+        // is unset. (PISHARP_DURABLE_UPSTREAM names the v1.2.0 checkout of the library's reverse case, which has no sessions.ts.) It proves the
+        // layout and the lock only: the 1.2.0 library writes pi.tool v2 records that v1.1.0 cannot resume (decision 0005, section 6).
         Case("sessions.interop.pinned-upstream-under-node", async () =>
         {
-            var upstream = Environment.GetEnvironmentVariable("PISHARP_DURABLE_UPSTREAM");
-            if (string.IsNullOrEmpty(upstream)) { Console.Error.WriteLine("sessions.interop: PISHARP_DURABLE_UPSTREAM unset; skipped"); return; }
-            await using var agent = new TestAgent("interop");
+            var upstream = Environment.GetEnvironmentVariable("PISHARP_DURABLE_UPSTREAM_V110");
+            if (string.IsNullOrEmpty(upstream))
+            {
+                Console.Error.WriteLine($"sessions.interop: PISHARP_DURABLE_UPSTREAM_V110 unset (a Pi v1.1.0 checkout at {Upstream[..8]} with node_modules); skipped");
+                return;
+            }
             var sessions = Path.Combine(upstream, "packages", "coding-agent", "src", "experimental", "durable", "sessions.ts");
+            if (!File.Exists(sessions))
+                throw new InvalidOperationException($"PISHARP_DURABLE_UPSTREAM_V110 names {upstream}, which has no packages/coding-agent/src/experimental/" +
+                    $"durable/sessions.ts: it must be a Pi v1.1.0 checkout ({Upstream}); v1.2.0 deleted the experimental durable agent.");
+            if (GitHead(upstream) is { } head && head != Upstream)
+                throw new InvalidOperationException($"PISHARP_DURABLE_UPSTREAM_V110 names {upstream} at {head}, not Pi v1.1.0 ({Upstream}).");
+            await using var agent = new TestAgent("interop");
             var probe = Path.Combine(agent.Root, "probe.ts");
             File.WriteAllText(probe, $$"""
                 import { selectSession } from "{{new Uri(sessions).AbsoluteUri}}";
@@ -236,6 +248,22 @@ internal static partial class Program
             Check(ran && !Directory.Exists(lockPath), "held while running, removed after");
         }),
     ];
+
+    /// <summary>The commit checked out at <paramref name="checkout"/>, or null when it is not a git checkout or git cannot say.</summary>
+    private static string? GitHead(string checkout)
+    {
+        if (!Directory.Exists(Path.Combine(checkout, ".git")) && !File.Exists(Path.Combine(checkout, ".git"))) return null;
+        try
+        {
+            var start = new System.Diagnostics.ProcessStartInfo("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+            foreach (var argument in new[] { "-C", checkout, "rev-parse", "HEAD" }) start.ArgumentList.Add(argument);
+            using var process = System.Diagnostics.Process.Start(start)!;
+            var head = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+            return process.ExitCode == 0 && head.Length == 40 ? head : null;
+        }
+        catch (System.ComponentModel.Win32Exception) { return null; }
+    }
 
     /// <summary><c>--durable-lock-child &lt;agent dir&gt; &lt;cwd&gt;</c>: continues the newest session with a 2 s stale time, prints
     /// <c>LOCKED &lt;dir&gt;</c> and holds the lock until killed.</summary>
