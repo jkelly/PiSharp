@@ -12,19 +12,19 @@
   },
   "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
   "summary": {
-    "filesWithOldCommit": 672,
+    "filesWithOldCommit": 308,
     "citations": {
       "repinned": 365,
       "pending": 262,
-      "unparsed": 4,
+      "unparsed": 3,
       "nonHeader": 22,
-      "excludedHistorical": 1718,
+      "excludedHistorical": 1723,
       "releaseDocs": 3
     },
     "files": {
       "repinned": 364,
       "pending": 262,
-      "historical": 22,
+      "historical": 23,
       "releaseDocs": 1,
       "nonHeader": 21
     },
@@ -7881,15 +7881,6 @@
       ]
     },
     {
-      "file": "src/PiSharp.Cli/Models/BuiltinModelCatalog.cs",
-      "line": 1,
-      "text": "// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/all.ts (getBuiltinModels,",
-      "note": "unresolved: providers/data/*.json",
-      "unchanged": [
-        "packages/ai/src/providers/all.ts"
-      ]
-    },
-    {
       "file": "tests/PiSharp.CliSync.Tests/OpenCodeSessionCases.cs",
       "line": 1,
       "text": "// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/opencode-headers.ts (withOpenCodeSessionHeader),",
@@ -8228,6 +8219,11 @@
     {
       "file": "compatibility/sync-1.2.0-applicability.json",
       "occurrences": 1,
+      "reason": "names the commit the v1.2.0 sync starts from"
+    },
+    {
+      "file": "compatibility/sync-1.2.0-worklist.json",
+      "occurrences": 5,
       "reason": "names the commit the v1.2.0 sync starts from"
     },
     {
@@ -11025,7 +11021,7 @@
       {
         "id": "model-catalog-shards",
         "area": "ai",
-        "status": "pending",
+        "status": "done",
         "files": [
           "src/PiSharp.Cli/Models/*.json",
           "src/PiSharp.Cli/Models/BuiltinModelCatalog.cs",
@@ -11033,7 +11029,7 @@
           "THIRD-PARTY-NOTICES.md"
         ],
         "pin": "Byte copies of @earendil-works/pi-ai@1.1.0 dist/providers/data/*.json",
-        "action": "Mechanical; planned in the foundation stage."
+        "action": "Refreshed from @earendil-works/pi-ai@1.2.0 (tarball SHA256 c3e69423bcab9712f31a7e5b6d3448ae356af84439ec6bc701f626f6ea164535) with tools/CompatibilityReport/refresh-model-catalogs.mjs, new in this stage; from the 1.1.0 tarball it reproduces the 1.1.0 state byte-for-byte. 15 of 42 shards changed and the catalog has 1649 models (was 1650): google-vertex drops gemini-flash-latest and gemini-flash-lite-latest, opencode drops fledge-alpha-free, openrouter drops 13 (mostly qwen) and gains 12, vercel-ai-gateway drops 9 (alibaba qwen, anthropic/claude-3-haiku, anthropic/claude-opus-4). BuiltinModelCatalog.cs, CatalogCases.cs and the notice follow; its header is re-pinned (all.ts is unchanged). Models.Tests passes 61/61 with --tarball."
       },
       {
         "id": "pi-version-identity",

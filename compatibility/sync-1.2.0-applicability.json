@@ -34,8 +34,9 @@
     "rows": 56,
     "changelogBullets": 70,
     "byStatus": {
-      "port": 43,
+      "port": 42,
       "no-op": 7,
+      "already-ported": 1,
       "exclude": 6
     },
     "byArea": {
@@ -176,21 +177,22 @@
     {
       "id": "ai.model-catalog-data",
       "area": "ai",
-      "status": "port",
+      "status": "already-ported",
       "changelog": [],
       "upstream": [
         "packages/ai/scripts/generate-models.ts",
         "packages/ai/src/models.generated.ts",
         "packages/ai/src/providers/*.models.ts"
       ],
-      "change": "Unlisted: generated model data changed between the pi-ai 1.1.0 and 1.2.0 packages (Claude 5.5 entries now come from models.dev instead of hand-added rows, plus the regular catalog refresh).",
+      "change": "Unlisted: generated model data changed between the pi-ai 1.1.0 and 1.2.0 packages (Claude 5.5 entries now come from models.dev instead of hand-added rows, plus the regular catalog refresh): 15 of 42 shards changed, 1650 -> 1649 models.",
       "pisharp": [
         "src/PiSharp.Cli/Models/*.json",
         "src/PiSharp.Cli/Models/BuiltinModelCatalog.cs",
+        "tests/PiSharp.Models.Tests/CatalogCases.cs",
         "THIRD-PARTY-NOTICES.md"
       ],
       "release": "1.2.0",
-      "notes": "Mechanical shard refresh from the published @earendil-works/pi-ai 1.2.0 package; see catalogRefresh."
+      "evidence": "Refreshed in the foundation stage by tools/CompatibilityReport/refresh-model-catalogs.mjs from @earendil-works/pi-ai@1.2.0 (tarball SHA256 c3e69423bcab9712f31a7e5b6d3448ae356af84439ec6bc701f626f6ea164535, manifest generatedAt 2026-10-12T22:50:30.032Z); BuiltinModelCatalog.ShardHashes and CatalogCases.cs carry the new pins, and tests/PiSharp.Models.Tests passes 61/61 with --tarball."
     },
     {
       "id": "schemas.ai-compat-and-model-schemas",
