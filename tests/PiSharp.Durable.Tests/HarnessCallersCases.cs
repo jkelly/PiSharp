@@ -3,8 +3,8 @@
 // - `Type.Object({})` is ToolRegistration.EmptyParameters; a probe stores what each nested call returned by tool name.
 // - Upstream runs these on MemoryStorage only; so do they here.
 // Authored, after them (harness.callers.deferred.*): deferred tools without tool_search, whose tool and its tool-search.test.ts cases are
-// work list area k: what Agent.Tools, Agent.Deferred and Agent.Callable list for a deferred tool, loaded by modelTools' array or its add,
-// removed, and loaded by control.addTools, which writes {add} (upstream agent.ts addTools and offeredTools).
+// ToolSearchCases.cs (tool-search.*): what Agent.Tools, Agent.Deferred and Agent.Callable list for a deferred tool, loaded by modelTools'
+// array or its add, removed, and loaded by control.addTools, which writes {add} (upstream agent.ts addTools and offeredTools).
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using PiSharp.Durable;

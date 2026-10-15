@@ -119,6 +119,12 @@
           "PiSharp.Tools": "[1.1.0.6, )"
         }
       },
+      "pisharp.extensions.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.1.0.6, )"
+        }
+      },
       "pisharp.sessions": {
         "type": "Project",
         "dependencies": {
