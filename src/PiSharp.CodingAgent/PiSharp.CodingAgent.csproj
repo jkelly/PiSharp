@@ -13,5 +13,7 @@
     <!-- Pi v1.1.0 export-html template, application script, vendored libraries and built-in themes, byte-for-byte. -->
     <EmbeddedResource Include="Export/Assets/*.html;Export/Assets/*.css;Export/Assets/*.js;Export/Assets/*.json" LogicalName="PiSharp.CodingAgent.Export.Assets.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Export/Assets/vendor/*.js" LogicalName="PiSharp.CodingAgent.Export.Assets.vendor.%(Filename)%(Extension)" />
+    <!-- Pi v1.2.0 published configuration schemas (packages/coding-agent/schemas), byte-for-byte. -->
+    <EmbeddedResource Include="Schemas/*.schema.json" LogicalName="PiSharp.CodingAgent.Schemas.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
