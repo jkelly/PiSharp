@@ -134,6 +134,13 @@ public class Session : ISession
     /// <summary>Internal: the exception that failed the Session, if one did (upstream <c>failure</c>).</summary>
     internal Exception? Failure => failure?.Error;
 
+    /// <summary>
+    /// Internal: whether close has begun (upstream <c>#closing !== undefined</c>), so admission is sealed. Upstream runs the close listeners in
+    /// the same synchronous call that seals admission, so no other code ever sees one without the other; here another thread can see admission
+    /// sealed before the listeners have run, and a component that ignores errors once closing must also check this.
+    /// </summary>
+    internal bool Closing => closingStarted;
+
     /// <summary>Internal: faults with <see cref="SessionFailedException"/> the moment the Session fails, before work underway has ended; never
     /// completes otherwise (upstream <c>failed</c>).</summary>
     internal Task Failed => failedSource.Task;
