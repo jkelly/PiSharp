@@ -2,12 +2,15 @@
 // totalUsage, contextTokens) and runtime.ts (agentOf). The adapters between a ConversationView and pi's interactive components (decision
 // 0005, phase P12, risk 7): the components take pi-ai wire messages as System.Text.Json objects, as they do in interactive mode, so an entry's
 // `model[0]` and the built-in documents (pi.agent, pi.live, pi.inbox, pi.usage) are read as JsonNode copies of the durable JSON values.
-// Upstream reads the same plain JSON through TypeScript casts; a missing field reads as absent here as it does there.
+// Upstream reads the same plain JSON through TypeScript casts; a missing field reads as absent here as it does there. PiSharp-only since
+// pi-durable 1.2.0 (durable work list area l): DisplayResult and NestedRow.
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Durable;
+using DurableArray = PiSharp.Durable.Chord.JsonArrayValue;
 using DurableJson = PiSharp.Durable.Chord.JsonValue;
+using DurableObject = PiSharp.Durable.Chord.JsonObjectValue;
 
 namespace PiSharp.Cli.Durable;
 
@@ -113,6 +116,51 @@ internal static class DurableTuiState
                 : (Num(usage, "input") ?? 0) + (Num(usage, "output") ?? 0) + (Num(usage, "cacheRead") ?? 0) + (Num(usage, "cacheWrite") ?? 0);
         }
         return null;
+    }
+
+    /// <summary>
+    /// A <c>pi.tool-result</c> message as its card shows it (PiSharp-only, pi-durable 1.2.0). The Harness appends a tool's diagnostics to the
+    /// content the model reads as one <c>&lt;harness&gt;</c> text block (<c>[error] Command exited with code 2</c> for a failed command,
+    /// <c>[info] Read image file [image/png]</c> for an image); the entry's <c>data.diagnostics</c> lists them. The card shows their messages
+    /// as plain lines instead, as pi shows a failed command's exit code after its output. Any other message is returned as it is.
+    /// </summary>
+    public static JsonObject DisplayResult(EntryRecord entry, JsonObject message)
+    {
+        if (entry.Data is not DurableObject data || !data.TryGetValue("diagnostics", out var listed) ||
+            listed is not DurableArray { Count: > 0 } diagnostics || message["content"] is not JsonArray { Count: > 0 } content) return message;
+        var items = diagnostics.Select(Node).ToList();
+        var rendered = "<harness>\n" + string.Join("\n", items.Select(item => $"[{Str(item, "severity")}] {Str(item, "message")}")) + "\n</harness>";
+        if (Str(content[^1], "type") != "text" || Str(content[^1], "text") != rendered) return message;
+        var copy = (JsonObject)message.DeepClone();
+        var blocks = (JsonArray)copy["content"]!;
+        var output = blocks.Take(blocks.Count - 1).Any(block => Str(block, "type") == "text" && Str(block, "text") is { Length: > 0 });
+        var lines = string.Join("\n", items.Select(item => Str(item, "message") ?? ""));
+        blocks[^1] = new JsonObject { ["type"] = "text", ["text"] = output ? "\n" + lines : lines };
+        return copy;
+    }
+
+    /// <summary>
+    /// The row of a nested call in pi's codemode row shape <c>{name, args, status, durationMs?, cost?, error?}</c> (PiSharp-only, pi-durable
+    /// 1.2.0): pending and running are <c>running</c>, a call that left <c>pi.live</c> unfinished is <c>cancelled</c>, and a done call is
+    /// <c>ok</c> or <c>error</c> by its summary (one without a summary faulted or was orphaned).
+    /// </summary>
+    public static JsonObject NestedRow(DurableNestedCall call)
+    {
+        var slot = Node(call.Slot);
+        var summary = Obj(slot, "summary");
+        var status = Str(slot, "status") == "done"
+            ? summary is not null && !(summary["isError"] is JsonValue isError && isError.TryGetValue<bool>(out var error) && error) ? "ok" : "error"
+            : call.Left ? "cancelled" : "running";
+        var row = new JsonObject
+        {
+            ["name"] = Str(slot, "name") ?? "",
+            ["args"] = call.Slot.TryGetValue("arguments", out var arguments) ? arguments.ToJson() : "",
+            ["status"] = status,
+        };
+        if (Num(summary, "durationMs") is { } duration) row["durationMs"] = duration;
+        if (Num(Obj(Obj(summary, "usage"), "cost"), "total") is { } cost && cost != 0) row["cost"] = cost;
+        if (Str(summary, "error") is { Length: > 0 } text) row["error"] = text;
+        return row;
     }
 
     /// <summary>Upstream <c>describeTask</c>: one line of the task panel.</summary>

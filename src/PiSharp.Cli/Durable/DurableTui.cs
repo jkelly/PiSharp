@@ -1,8 +1,10 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/experimental/durable/tui.ts (runDurableTui).
 // Upstream runs on Node's event loop and resolves when the user exits; here the TUI runs on its own UiLoop, view changes from the runtime
 // (any thread) are posted to it, and RunAsync completes with exit code 0 when the user exits or the token is cancelled. Controller calls are
-// fire-and-forget as upstream's `void controller.x()`: the runtime reports failures as notices.
+// fire-and-forget as upstream's `void controller.x()`: the runtime reports failures as notices. PiSharp-only since pi-durable 1.2.0 (durable
+// work list area l): once the session failed, the editor sends nothing and RunAsync returns 1 when the user exits.
 using PiSharp.Cli.Interactive.Mode;
+using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Cli.Pi;
 using PiSharp.Durable;
 using PiSharp.Tui.Pi;
@@ -19,7 +21,8 @@ internal sealed record DurableTuiOptions(Func<UiLoop, ITerminal>? CreateTerminal
 /// <see cref="IOpenDurable.Controller"/> until the user exits.</summary>
 internal static class DurableTui
 {
-    /// <summary>Runs the TUI until the user exits; returns the process exit code. The caller closes <paramref name="durable"/>.</summary>
+    /// <summary>Runs the TUI until the user exits; returns the process exit code: 0, or 1 when the session failed (<see cref="DurableView.Failure"/>).
+    /// The caller closes <paramref name="durable"/>.</summary>
     public static Task<int> RunAsync(IOpenDurable durable, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(durable);
@@ -91,7 +94,8 @@ internal static class DurableTui
                         Submit: text =>
                         {
                             var trimmed = TextUtils.JsTrim(text);
-                            if (trimmed.Length == 0) return;
+                            // A failed session takes nothing more; its alert says how to reopen it.
+                            if (trimmed.Length == 0 || source.Current.Failure is not null) return;
                             if (trimmed == "/model") { SelectModel(); return; }
                             if (trimmed == "/tasks") { Fire(controller.ToggleTasksAsync); return; }
                             if (trimmed == "/agents") { SelectConversation(); return; }
@@ -103,11 +107,16 @@ internal static class DurableTui
                             }
                             Fire(() => controller.SubmitAsync(trimmed, WhenBusy.Steer));
                         },
-                        FollowUp: text => Fire(() => controller.SubmitAsync(text, WhenBusy.FollowUp)),
+                        FollowUp: text =>
+                        {
+                            if (source.Current.Failure is null) Fire(() => controller.SubmitAsync(text, WhenBusy.FollowUp));
+                        },
                         Abort: () => Fire(controller.AbortAsync),
                         Exit: Exit,
                         SelectModel: SelectModel,
-                        CycleThinking: () => Fire(controller.CycleThinkingAsync)));
+                        CycleThinking: () => Fire(controller.CycleThinkingAsync)),
+                    // Tool cards as interactive mode makes them: images shown or not, their width, the output padding.
+                    new ToolExecutionOptions(settings.ShowImages, settings.ImageWidthCells, settings.OutputPad));
 
                 // pi's theme handling: the theme setting (also light/dark pairs) resolved against the terminal's reported colors.
                 themes = new InteractiveThemeController(view.Ui, () => settings, message => Console.Error.WriteLine(message),
@@ -127,7 +136,7 @@ internal static class DurableTui
                 view.Apply(source.Current);
             });
             await exited.Task;
-            return 0;
+            return source.Current.Failure is null ? 0 : 1;
         }
         finally
         {
