@@ -13,7 +13,7 @@ internal static partial class Program
     [
         ("bridge.before-agent-start-user-and-custom-message-runs", BeforeAgentStartTriggers),
         ("bridge.reaches-tools-and-namespace-aliases-in-getAllTools-and-loadouts", ReachesToolsInfo),
-        ("bridge.reaches-tools-of-a-typescript-tool-answered-by-node", ReachesToolsDescriptor),
+        ("bridge.reaches-tools-of-a-typescript-tool-reaches-all", ReachesToolsDescriptor),
     ];
 
     private const string TriggerExtension = """
@@ -111,7 +111,8 @@ internal static partial class Program
     }
 
     // The registration PiSharp makes for a TypeScript tool: the namespace keeps its aliases, and a tool that declares reachesTools
-    // reports a reach the Node host computes with the tool's own function ("all" or the words; a failing function reaches all).
+    // reaches every tool. ExtensionToolDescriptor.ReachesTools is pure and synchronous and runs on the tool-call path, so the tool's
+    // own function in Node is not asked there (getAllTools still hands extensions the function itself).
     private static async Task ReachesToolsDescriptor()
     {
         using var sandbox = NodeSandbox("reaches-tools-descriptor");
@@ -126,12 +127,8 @@ internal static partial class Program
         Equal("ns__docs", reacher.Namespace!.Name, "namespace");
         Names(["docs"], reacher.Namespace.Aliases, "namespace aliases");
         Equal("Docs tools", reacher.Namespace.Description, "namespace description");
-        var words = reacher.ReachesTools!(JsonData.Parse("""{"q":"alpha beta"}"""));
-        Check(!words.IsAll, "words, not all");
-        Names(["alpha", "beta"], words.Words, "reach words");
-        Check(words.Reaches("alpha") && !words.Reaches("gamma"), "reach by name");
-        Check(reacher.ReachesTools(JsonData.Parse("""{"q":"everything"}""")).IsAll, "reach all");
-        Check(owner.Tool(tools["thrower"]).ReachesTools!(JsonData.Parse("{}")).IsAll, "a failing reachesTools reaches all");
+        Check(reacher.ReachesTools!(JsonData.Parse("""{"q":"alpha beta"}""")).IsAll, "a TypeScript tool's reach is all");
+        Check(owner.Tool(tools["thrower"]).ReachesTools!(JsonData.Parse("{}")).IsAll, "also when its own function would fail");
         Check(owner.Tool(tools["probe"]).ReachesTools is null, "no reachesTools");
         Check(owner.Tool(tools["probe"]).Namespace is null, "no namespace");
     }

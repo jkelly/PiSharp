@@ -470,7 +470,10 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
                 return prepared is { ValueKind: not JsonValueKind.Null } value ? Data(value) : arguments;
             },
             PrepareLoadout = tool["hasPrepareLoadout"]?.GetValue<bool>() == true ? loadout => PrepareLoadout(name, loadout) : null,
-            ReachesTools = tool["hasReachesTools"]?.GetValue<bool>() == true ? input => ReachesTools(name, input) : null,
+            // ToolDefinition.reachesTools: the contract is pure and synchronous and runs on the tool-call path, so the tool's own
+            // function (in Node) is not asked; a TypeScript tool that declares it reaches every tool, as tool_search does. Exact
+            // per-input reach would need an asynchronous variant of the contract (deferred, decision 0006).
+            ReachesTools = tool["hasReachesTools"]?.GetValue<bool>() == true ? static _ => ToolReach.All : null,
             Renderers = hasCall || hasResult ? new ExtensionToolRenderers(
                 tool["renderShell"]?.GetValue<string>() == "self" ? ExtensionToolRenderShell.Self : null,
                 hasCall ? (context, width, token) => RenderToolAsync("call", context, null, width, token) : null,
@@ -515,25 +518,6 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
                 ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = error.Message }), ["details"] = new JsonObject(), ["isError"] = true
             }.ToJsonString());
         }
-    }
-
-    /// <summary>The tool's reachesTools(input), answered by the Node host (reachesTools is synchronous upstream). A tool whose
-    /// function fails, times out or returns neither <c>"all"</c> nor a list of words reaches every tool: the host then waits for
-    /// everything the call might reach.</summary>
-    internal ToolReach ReachesTools(string name, JsonData input)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        JsonElement? result;
-        try
-        {
-            result = host.CallAsync("tool.reachesTools", new JsonObject { ["ext"] = extension.Index, ["name"] = name, ["input"] = Parse(input) }, timeout.Token)
-                .WaitAsync(timeout.Token).GetAwaiter().GetResult();
-        }
-        catch (Exception error) when (error is OperationCanceledException or TimeoutException or InvalidOperationException or PiNodeHostException or IOException)
-        { return ToolReach.All; }
-        if (result is { ValueKind: JsonValueKind.Array } words && words.EnumerateArray().All(word => word.ValueKind == JsonValueKind.String))
-            return ToolReach.Of([.. words.EnumerateArray().Select(word => word.GetString()!)]);
-        return ToolReach.All;
     }
 
     private ToolLoadoutChanges? PrepareLoadout(string name, ToolLoadout loadout)
