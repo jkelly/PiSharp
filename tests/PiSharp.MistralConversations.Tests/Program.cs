@@ -57,6 +57,29 @@ internal static class Program
         { Reads++; return base.ReadAsync(buffer[..Math.Min(buffer.Length, 1)], token); }
         protected override void Dispose(bool disposing) { Released = true; base.Dispose(disposing); }
     }
+    // Yields one authored frame per read, pausing before each later frame.
+    private sealed class SlowFrames(string[] frames, TimeSpan pause) : Stream
+    {
+        private int next; private byte[] pending = []; private int offset;
+        public bool Released { get; private set; }
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
+        {
+            if (offset == pending.Length)
+            {
+                if (next == frames.Length) return 0;
+                if (next > 0) await Task.Delay(pause, token);
+                pending = Encoding.UTF8.GetBytes(frames[next++]); offset = 0;
+            }
+            var count = Math.Min(buffer.Length, pending.Length - offset); pending.AsMemory(offset, count).CopyTo(buffer); offset += count; return count;
+        }
+        public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken token) => ReadAsync(buffer.AsMemory(offset, count), token).AsTask();
+        public override bool CanRead => true; public override bool CanSeek => false; public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException(); public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { } public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException(); public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing) { Released = true; base.Dispose(disposing); }
+    }
     private sealed class RejectRead(Func<Exception> error) : MemoryStream
     {
         public bool Released { get; private set; }
@@ -204,6 +227,25 @@ internal static class Program
             try { await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5)); Require(!pending.IsCompleted); }
             finally { release.TrySetResult(); await pending; }
             var terminal = Terminal(await pending); Require(terminal.Reason == StopReason.Error && terminal.NativeDiagnostic?.Code == NativeChatFailureCode.SourceFailed);
+            // Pi 1.2.0 (#10609): the timeout names the header wait; a send that settles after the deadline is still that timeout.
+            Require(terminal.Message.ExtraProperties!.TryGet("errorMessage", out var error) && error!.Value.GetString() == "Mistral response headers timed out after 50ms");
+        });
+        await Check("header-timeout-rejects-abortable-send-with-pi-message", async () =>
+        {
+            // Pi 1.2.0 mistral-http-transport.test.ts: a fetch that rejects on abort fails with the header-timeout text, not as aborted.
+            using var h = new Handler(async (_, token) => { await Task.Delay(Timeout.Infinite, token); throw new InvalidOperationException(); }); using var client = new HttpClient(h);
+            var terminal = Terminal(await Collect(new MistralTextHttpSseTransport(client, Model, Options with { TimeoutMilliseconds = 5 })));
+            Require(terminal is StreamError { Reason: StopReason.Error, NativeDiagnostic.Code: NativeChatFailureCode.SourceFailed });
+            Require(terminal.Message.ExtraProperties!.TryGet("errorMessage", out var error) && error!.Value.GetString() == "Mistral response headers timed out after 5ms");
+        });
+        await Check("active-stream-outlasts-request-timeout", async () =>
+        {
+            // Pi 1.2.0 regression test for #10609: a body that keeps streaming past timeoutMs completes.
+            var thinking = "{\"choices\":[{\"index\":0,\"delta\":{\"content\":[{\"type\":\"thinking\",\"thinking\":[{\"type\":\"text\",\"text\":\"x\"}]}]}}]}";
+            var body = new SlowFrames([.. Enumerable.Repeat("data: " + thinking + "\n\n", 5), "data: " + Finish() + "\n\ndata: [DONE]\n\n"], TimeSpan.FromMilliseconds(25));
+            using var h = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) })); using var client = new HttpClient(h);
+            var events = await Collect(new MistralTextHttpSseTransport(client, Model, Options with { TimeoutMilliseconds = 20 }));
+            Require(Terminal(events) is StreamDone { Reason: StopReason.Stop } && events.OfType<ThinkingEnded>().Single().Content == "xxxxx" && body.Released);
         });
         await Check("invalid-capability-cost-and-options-reject-before-send", () =>
         {

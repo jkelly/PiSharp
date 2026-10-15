@@ -428,12 +428,18 @@ internal static partial class Program
             "Our servers are currently busy. Please wait.",
             "Selected model is at capacity. Please try a different model.",
             "The pending stream has been canceled (caused by: ERR_HTTP2_STREAM_CANCEL)",
-            "Provider stopped with: error (server error)"
+            "Provider stopped with: error (server error)",
+            // Pi 1.2.0 (#10842): gateway wording with an article is transient too, next to OpenRouter's "Provider returned error".
+            "The upstream provider returned an error",
+            "Provider returned error",
+            "provider_returned_an_error"
         })
             Check(AgentRetryPolicy.IsRetryableError(StopReason.Error, message), "Not retried: " + message);
         // Permanent limits still win, unrelated text and non-errors stay terminal, and the pre-1.1.0 Mistral text was not retryable.
         foreach (var (reason, message) in new[] { (StopReason.Error, "server_busy: insufficient_quota"), (StopReason.Error, "Provider stopped with: error"),
-            (StopReason.Error, "Invalid request body"), (StopReason.Stop, "server_busy") })
+            (StopReason.Error, "Invalid request body"), (StopReason.Stop, "server_busy"),
+            // The 1.2.0 pattern admits only an optional "an" between "returned" and "error".
+            (StopReason.Error, "The provider returned another error") })
             Check(!AgentRetryPolicy.IsRetryableError(reason, message), "Unexpectedly retried: " + message);
         return Task.CompletedTask;
     }
