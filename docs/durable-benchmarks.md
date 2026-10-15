@@ -2,7 +2,7 @@
 
 Report only. These numbers are a snapshot of one machine; nothing in CI passes or fails on them. The `benchmarks.smoke` case in `tests/PiSharp.Durable.Tests` runs every benchmark at a tiny size so the ports keep working, and asserts completion only.
 
-PiSharp ports six upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
+PiSharp ports nine upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
 
 | upstream | PiSharp | what it measures |
 |---|---|---|
@@ -12,9 +12,12 @@ PiSharp ports six upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc
 | `test/document-append-bench.ts` (`npm run bench:document-append`, new in v1.2.0) | `DocumentAppendBench.cs` (`document-append [N,...]`) | one commit per appended item: one array in one document against one family member per item |
 | `test/session-document-cache-bench.ts` (`npm run bench:document-cache`, new in v1.2.0) | `SessionDocumentCacheBench.cs` (`document-cache [N,...]`), with `HeapRetained.cs` (`test/heap-retained.ts`) | the Session document cache at four retentions: cached documents, retained bytes per conversation and the cost of reading an old conversation's document again |
 | `test/scheduler-memory-bench.ts` (`npm run bench:scheduler-memory`, new in v1.2.0) | `SchedulerMemoryBench.cs` (`scheduler-memory [N,...]`) | the scheduler's ownership index sizes and retained bytes after N ended subagent cycles under a live parent, and the storage reads a later message into an old subagent conversation costs |
+| `test/scheduler-fanout-bench.ts` (`npm run bench:scheduler-fanout`, new in v1.2.0) | `SchedulerFanoutBench.cs` (`scheduler-fanout [N,...]`) | one tool making N parallel nested calls (`ExecuteToolAsync`, progress off) on memory storage |
+| `test/nested-tools-bench.ts` (new in v1.2.0) | `NestedToolsBench.cs` (`nested-tools [streaming\|nesting]`) | commits, bytes written by write type, stored size and heap of 200 to 2,000 streaming or fast nested calls, at depth 1 and 2 |
+| `test/nested-images-bench.ts` (new in v1.2.0) | `NestedImagesBench.cs` (`nested-images [count]`) | 1 MiB images passed between nested calls inline or by a `NestedCallDoc` reference |
 | none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once) and owned chains of N tasks settling bottom-up |
 
-Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]]`. Upstream's `test/scheduler-fanout-bench.ts` (`npm run bench:scheduler-fanout`) makes nested tool calls, which arrive with work list area a; it is ported there. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
 
 ## Machine
 
@@ -260,7 +263,47 @@ Pi v1.2.0 rewrote the scheduler (work list area c): no pass visits every live ta
 
 - **Owned chains settle in linear time.** Before, a 500-task chain took 2.4 s and a 2,000-task chain almost 18 minutes; now 31 ms and 76 ms, and 20,000 tasks 0.8 s, close to Node (upstream's changelog: 500 tasks took 12 s before, 50 ms after, 20,000 take 1.5 s).
 - **Fan-out is linear in both runtimes, and PiSharp matches Node from 500 children up.** The first PiSharp row includes JIT warm-up. Before the rewrite it was about four to seven times slower, as each pass scanned every live child.
-- Upstream's own fan-out benchmark (nested calls, area a) reports 8,000 nested calls in 2.7 s instead of 18.8 s; under Node on this machine its 250 to 4,000 calls take 110 to 771 ms.
+- Upstream's own fan-out benchmark (nested calls, area a) reports 8,000 nested calls in 2.7 s instead of 18.8 s; see the next section.
+
+## Nested tool calls (`scheduler-fanout-bench.ts`, `nested-tools-bench.ts`, `nested-images-bench.ts`)
+
+Tool task v2 (work list area a). Measured on 2026-10-15, same machine, one run each, with Node and PiSharp run one after the other; heaps are V8's `heapUsed` and the managed heap (`GC.GetTotalMemory`, `HeapRetained.cs` after a collection), which also counts garbage between collections, so the heap columns compare only roughly.
+
+**Fan-out** (memory storage). Commits are equal for every size.
+
+| calls | Node | PiSharp | commits |
+|---:|---:|---:|---:|
+| 250 | 119 ms | 347 ms | 767 |
+| 500 | 150 ms | 214 ms | 1,517 |
+| 1,000 | 221 ms | 531 ms | 3,017 |
+| 2,000 | 403 ms | 1,079 ms | 6,017 |
+| 4,000 | 775 ms | 1,711 ms | 12,017 |
+
+Both are linear (0.2 ms per call under Node, 0.4 to 0.5 ms in PiSharp after warm-up); PiSharp takes about twice as long.
+
+**Nested calls** (`nested-tools-bench.ts`, run 1 of 3). Without progress, commits, logical bytes written by write type and stored sizes are equal in both runtimes on both backends, but for two more commits at depth 2 in PiSharp (699 and 6,819 against 697 and 6,817). With progress, the number of progress commits follows timing (816 to 1,616 in both).
+
+| backend | calls | depth | stream | Node | PiSharp |
+|---|---:|---:|---|---:|---:|
+| SQLite | 200 | 1 | 1 KiB, 2 ms gaps, yes | 387 ms | 375 ms |
+| SQLite | 200 | 1 | 16 KiB, 50 ms gaps, yes | 751 ms | 680 ms |
+| SQLite | 2,000 | 1 | no | 2,222 ms | 2,160 ms |
+| SQLite | 2,000 | 2 | no | 2,720 ms | 2,395 ms |
+| JSONL | 200 | 1 | 1 KiB, 2 ms gaps, yes | 1,869 ms | 1,140 ms |
+| JSONL | 2,000 | 1 | no | 16,258 ms | 9,752 ms |
+| JSONL | 2,000 | 2 | no | 19,015 ms | 10,528 ms |
+
+**Images** (`nested-images-bench.ts`, 1 MiB base64 each). Commits, bytes written, stored sizes, nested task counts and the largest task record are equal in both runtimes.
+
+| backend | variant | count | Node | PiSharp | settled heap, Node / PiSharp |
+|---|---|---:|---:|---:|---|
+| SQLite | inline | 200 | 11,496 ms | 16,602 ms | 1.0 / -1.0 MiB |
+| SQLite | reference | 200 | 2,171 ms | 2,669 ms | 0.6 / 0.1 MiB |
+| JSONL | inline | 200 | 7,807 ms | 10,608 ms | 1.2 / 401.0 MiB |
+| JSONL | reference | 200 | 4,037 ms | 3,094 ms | 1.1 / -801.8 MiB |
+
+- **Passing references instead of image data** writes 201 MiB instead of 1,401 MiB in both, as upstream's benchmark intends to show.
+- **PiSharp's JSONL storage holds what it wrote.** After the inline run settles, PiSharp keeps about 400 MiB (the 200 MiB of live JSONL records as UTF-16), where Node keeps about 1 MiB; after reopening, 803 MiB against 202 MiB. This is the JSONL storage's in-memory record copy, not the nested calls (SQLite keeps nothing in either runtime), and is noted for a later look at JSONL memory. Negative heap figures are collections of an earlier scenario's garbage after the baseline.
 
 ## Throughput target
 
