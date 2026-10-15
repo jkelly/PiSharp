@@ -390,6 +390,10 @@ internal sealed class DurableCodemodeCall
         run = options.Sandbox.Start(parsed.Code, runOptions, controllerAborted ? new CancellationToken(true) : CancellationToken.None);
         options.OnRunStarted?.Invoke(run);
         var outcome = await run.Result;
+        // The script runs on the sandbox's thread and may have ended before this await, which then continues inline, ahead of the
+        // OnCall/OnIdle callbacks it posted before ending (a call it made and never awaited, say). Yield to the call's scheduler so they run
+        // first, as upstream's host callbacks run before the result's continuation.
+        await Task.Yield();
         if (failure is not null) ExceptionDispatchInfo.Throw(failure);
         if (ended is not null) return ended;
         context.ThrowIfCancellationRequested();
