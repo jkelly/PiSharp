@@ -80,6 +80,16 @@ Native status:
 $env:PI_UPSTREAM = '<Pi checkout with v0.99.1 and v1.1.0>'; node --test tools/SurfaceInventory/inventory-refresh.test.mjs
 ```
 
+The v1.2.0 refreshes ([event-catalog.v1.2.0.json](../../compatibility/extensions/event-catalog.v1.2.0.json) with its [overlay](../../compatibility/extensions/event-catalog.v1.2.0.overlay.json), and [coding-agent-command-rpc-inventory.v1.2.0.json](../../compatibility/coding-agent-command-rpc-inventory.v1.2.0.json)) are generated from the v1.1.0 inventories with `--lock compatibility/target.lock.json`. The v1.1.0 inventories stay validated against `target.v1.1.0.lock.json`. Between the two:
+- `before_agent_start` is a union on `messageType`: `BeforeAgentStartUserEvent` and `BeforeAgentStartCustomEvent` are new root exports, and its runner dispatcher takes a trigger;
+- the removed `./client` and `./experimental/plugin` package entries are kept and marked `removedUpstream`.
+
+The command/RPC inventory records checkout bytes when the checkout is at the target tag, so the v1.2.0 inventories reproduce from a checkout at v1.2.0:
+
+```powershell
+$env:PI_UPSTREAM_V1_2_0 = '<Pi checkout at v1.2.0 with v1.1.0>'; node --test tools/SurfaceInventory/inventory-refresh.test.mjs
+```
+
 ## Evidence baseline: Pi v0.99.1
 
 The source target was public Pi v0.99.1 at `d86654abb8862e201933517d6f1fce9f88dd117f`. The local checkout HEAD, tag resolution and tree are recorded in [baseline.lock.json](../../compatibility/baseline.lock.json). The coding-agent and AI package versions are 0.99.1; the repository root package version is 0.0.3.
