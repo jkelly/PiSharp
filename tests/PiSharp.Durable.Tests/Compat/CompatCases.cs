@@ -240,10 +240,12 @@ internal static partial class CompatTests
                         await resume(() => OpenBackend(backend, directory));
                         SameJson(Expected(scenario.Name, "resumed.json", backend, root), await Dump(await OpenBackend(backend, directory)), "resumed records");
                     });
+                // A scenario whose run needs a later area's port (CompatScenarios120.cs) is read only.
+                if (scenario.Run is not { } runScenario) continue;
                 yield return Case(prefix + "written", async () =>
                 {
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
-                    var observed = await scenario.Run(() => OpenBackend(backend, directory));
+                    var observed = await runScenario(() => OpenBackend(backend, directory));
                     SameJson(Expected(scenario.Name, "records.json", backend, root), await Dump(await OpenBackend(backend, directory)), "records");
                     var upstream = Path.Combine(root, scenario.Name, backend);
                     if (backend == "jsonl") SameFiles(upstream, directory);

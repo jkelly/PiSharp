@@ -179,6 +179,10 @@ internal static partial class SchedulerTests
                 var settled = await harness.WaitForTaskAsync(holder, Context);
                 Equal<TaskAbortReason?>(TaskAbortReason.Restart, settled.AbortReason, "holder abort reason");
                 Equal("completed", StructuredTests.Wire(((TerminalTaskState)settled.State).Outcome.Status), "holder outcome");
+                // Beyond upstream's case: the mark appends abortReason as upstream's spread does, before endedAt (compare upstream's
+                // abandon-on-restart capture, Fixtures/v1.2.0/upstream-sessions/abandon-on-restart/resumed.json).
+                Seq(["id", "conversationId", "kind", "version", "input", "background", "abortRequested", "abandonOnRestart", "state", "abortReason",
+                    "endedAt"], settled.ToJson().Keys, "holder key order");
             }
             finally
             {

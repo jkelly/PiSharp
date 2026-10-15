@@ -109,6 +109,29 @@ internal static partial class Program
                 Id = new(6), Kind = "test", Scope = DocumentScope.Conversation(ConversationId.Root), History = DocumentHistory.Latest, Fork = DocumentFork.AsOf,
             }.Validate(), "latest document forking asOf");
         }),
+        // Authored for Pi v1.2.0 (durable work list area c): a task record's optional abortReason and abandonOnRestart are written only when set,
+        // in upstream's places (Transaction creates abandonOnRestart before state; a mark appends abortReason), and decode strictly.
+        Case("types.task-record-abort-reason-and-abandon-on-restart", () =>
+        {
+            const string head = "{\"id\":4,\"conversationId\":1,\"kind\":\"test\",\"version\":1,\"input\":null,\"background\":false,\"abortRequested\":";
+            const string pending = "\"state\":{\"status\":\"pending\",\"checkpoint\":{\"phase\":\"ready\"}}";
+            foreach (var json in new[]
+            {
+                head + "false," + pending + "}",
+                head + "false,\"abandonOnRestart\":true," + pending + "}",
+                head + "true,\"abandonOnRestart\":true," + pending + ",\"startedAt\":5,\"abortReason\":\"restart\"}",
+            })
+                Equal(json, TaskRecord.FromJson(J(json)).ToJson().ToJson(), "round trip of " + json);
+            var created = new TaskRecord
+            {
+                Id = new(4), ConversationId = ConversationId.Root, Kind = "test", Version = 1, Input = JsonValue.Null, Background = false,
+                AbortRequested = false, AbandonOnRestart = true, State = new PendingTaskState(J("{\"phase\":\"ready\"}")),
+            };
+            Equal(head + "false,\"abandonOnRestart\":true," + pending + "}", created.ToJson().ToJson(), "created with abandonOnRestart");
+            Equal(TaskAbortReason.Restart, TaskRecord.FromJson(J(head + "true," + pending + ",\"abortReason\":\"restart\"}")).AbortReason, "reason");
+            Throws<FormatException>(() => TaskRecord.FromJson(J(head + "false,\"abandonOnRestart\":false," + pending + "}")), "abandonOnRestart false");
+            Throws<FormatException>(() => TaskRecord.FromJson(J(head + "true," + pending + ",\"abortReason\":\"user\"}")), "unknown abort reason");
+        }),
         Case("types.record-json-key-order", () =>
         {
             Equal("{\"id\":3,\"parent\":{\"conversationId\":1,\"at\":2},\"owner\":{\"conversationId\":1,\"taskId\":4}}",

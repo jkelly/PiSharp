@@ -4,6 +4,11 @@
 // their cases read the v1.2.0 set now: read, raw, harness and written, as for the v1.1.0 scenarios, and observed (what calls returned or
 // rejected with, observed.json). Keep each scenario in step with its upstream twin: same faux responses, same calls in the same order.
 //
+// Read only: nested-tools-restart (areas a and c) and abandon-on-restart (area c) are checked by read, raw and harness: their records carry
+// abandonOnRestart and abortReason "restart", which area c ports. Their run and resume make tool calls whose pi.tool tasks are version 2 and
+// whose nested calls and api.createTask() default need tool task v2, so area a adds the run (written) and resume cases; until then the
+// harness.nested-tools-restart.* case ports the abandon-on-restart scenario's semantics on PiSharp's version 1 tool task.
+//
 // Not checked yet:
 // - events.json (the agent events of the root conversation). Its snapshot carries pi.live's nestedTools, which arrives with area a (tool
 //   task v2); area a adds the events check for every scenario.
@@ -18,8 +23,8 @@ using static ChatTests;
 using static SessionTests;
 
 /// <summary>One v1.2.0 scenario: <see cref="Run"/> writes the session, closes it and returns what it observed (or null); <see cref="Resume"/>,
-/// when present, reopens and finishes it.</summary>
-internal sealed record CompatScenario120(string Name, string[] Areas, Func<Func<Task<IStorage>>, Task<JsonValue?>> Run,
+/// when present, reopens and finishes it. Without <see cref="Run"/> the scenario is read only (see the file header).</summary>
+internal sealed record CompatScenario120(string Name, string[] Areas, Func<Func<Task<IStorage>>, Task<JsonValue?>>? Run,
     Func<Func<Task<IStorage>>, Task<JsonValue?>>? Resume = null, IReadOnlyList<string>? UnobservedFields = null);
 
 /// <summary>The ported scenarios of tools/DurableFixtures/scenarios-v1.2.0.mjs.</summary>
@@ -266,5 +271,56 @@ internal static class CompatScenarios120
             Program.Equal("SessionFailed", S(At(idle, "error", "name")), "idle after the failure");
             return Obj(("failed", failed), ("later", later), ("idle", idle), ("closed", closedJson), ("reports", JsonValue.Array(reports.Snapshot())));
         }, UnobservedFields: ["idle"]),
+        new("nested-tools-restart", ["a", "c"], null),
+        new("abandon-on-restart", ["c"], null),
+        new("wait-cycle", ["c"], async open =>
+        {
+            var setup = Chat();
+            var ids = new System.Collections.Concurrent.ConcurrentDictionary<string, TaskId>(StringComparer.Ordinal);
+            var bMayWait = new HarnessTests.Deferred();
+            static TaskState WaitOn(TaskId on) => NextTaskState.Waiting(Obj(("phase", "join")), [on], JoinPolicy.AllSettled);
+            var a = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "compat.cycle-a",
+                Version = 1,
+                Initial = _ => Obj(("phase", "wait")),
+                Phases = new Dictionary<string, TaskPhaseHandler>
+                {
+                    ["wait"] = (_, runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn(ids["b"]), ctx),
+                    ["join"] = (_, runtime, ctx) => runtime.CommitAsync((_, _) => NextTaskState.Completed(Obj(("a", "joined"))), ctx),
+                },
+                Abort = (_, _, _) => Task.CompletedTask,
+            });
+            var b = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "compat.cycle-b",
+                Version = 1,
+                Initial = _ => Obj(("phase", "wait")),
+                Phases = new Dictionary<string, TaskPhaseHandler>
+                {
+                    ["wait"] = async (_, runtime, ctx) =>
+                    {
+                        await bMayWait.Task;
+                        await runtime.CommitAsync((_, _) => WaitOn(ids["a"]), ctx);
+                    },
+                    ["join"] = (_, runtime, ctx) => runtime.CommitAsync((_, _) => NextTaskState.Completed(Obj(("b", "joined"))), ctx),
+                },
+            });
+            setup.Registry.Install(Define.Extension(new Extension { Name = "tasks", Tasks = [a, b] }));
+            var (harness, root) = await Open(setup, await open());
+            await root.CommitAsync(async tx =>
+            {
+                ids["b"] = await tx.CreateTaskAsync(b, Obj(("name", "b")), new TaskOptions(TaskOwnership.Conversation));
+                ids["a"] = await tx.CreateTaskAsync(a, Obj(("name", "a")), new TaskOptions(TaskOwnership.Conversation));
+            }, Context);
+            harness.Resume();
+            await HarnessTests.Eventually(async () => (await harness.GetTaskAsync(ids["a"], Context))?.State.Status == DurableTaskStatus.Waiting);
+            bMayWait.Resolve();
+            var bRecord = await harness.WaitForTaskAsync(ids["b"], Context);
+            var aRecord = await harness.WaitForTaskAsync(ids["a"], Context);
+            await harness.WaitForIdleAsync(Context);
+            await harness.CloseAsync(Context);
+            return Obj(("a", ((TerminalTaskState)aRecord.State).Outcome.ToJson()), ("b", ((TerminalTaskState)bRecord.State).Outcome.ToJson()));
+        }),
     ];
 }
