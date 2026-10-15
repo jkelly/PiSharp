@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/settings-manager.ts (SettingsManager: the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/settings-manager.ts (SettingsManager: the
 // getters with their defaults, the setters that persist the modified global fields, FileSettingsStorage locking).
 using System.Text.Json;
 using System.Text.Json.Nodes;

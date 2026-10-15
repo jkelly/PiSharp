@@ -72,7 +72,7 @@ public sealed partial class PersistentAgentSession
         // agent.sessionId = sessionManager.getSessionId(): every provider request carries the session id.
         // Source emitBeforeAgentStart(_baseSystemPromptOptions): before_agent_start sees the prompt of the in-memory loadout.
         var before=original.BeforePrompt;
-        return configuration with { SessionId=configuration.SessionId??_store.Snapshot.Header.Id, Hooks=original with { BeforePrompt=before is null?null:(start,token)=>before(start with { History=WithPendingSystemRecord(start.History,token) },token), PrepareRequestBoundary=PrepareActivationRequestAsync, FinishTurnDecision=async (turn,token)=>
+        return configuration with { SessionId=configuration.SessionId??_store.Snapshot.Header.Id, Hooks=original with { BeforePrompt=before is null?null:(start,_)=>PrepareRunStartAsync(before,start), PrepareRequestBoundary=PrepareActivationRequestAsync, FinishTurnDecision=async (turn,token)=>
         {
             var decision=original.FinishTurnDecision is null?AgentLoopFinishAction.Default:await original.FinishTurnDecision(turn,token).ConfigureAwait(false);
             double? desired;lock(_gate)desired=_automaticCompaction is null?null:_recoveryDesiredOutput;

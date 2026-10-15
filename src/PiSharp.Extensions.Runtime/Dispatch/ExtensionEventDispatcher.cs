@@ -57,6 +57,12 @@ public sealed class ExtensionEventDispatcher
         ArgumentNullException.ThrowIfNull(input);
         using var dispatch = Enter("before_agent_start", operationCancellationToken, sessionCancellationToken);
         if (!Text(input.Prompt) || !Text(input.SystemPrompt)) throw new ArgumentException("Invalid prompt snapshot.");
+        // A custom run carries its starting custom message and no prompt or images; a user run carries no message.
+        if (input.MessageType == ExtensionBeforeAgentStartMessageType.Custom
+                ? input.Message is not { Value.ValueKind: JsonValueKind.Object } startingMessage || input.Prompt.Length != 0 || input.Images is not null ||
+                  !startingMessage.Value.TryGetProperty("role", out var role) || role.ValueKind != JsonValueKind.String || role.GetString() != "custom"
+                : input.MessageType != ExtensionBeforeAgentStartMessageType.User || input.Message is not null)
+            throw new ArgumentException("Invalid prompt snapshot.");
         var current = input with { Images = Images(input.Images) };
         string? forced = null;
         var messages = ImmutableArray.CreateBuilder<global::PiSharp.Extensions.Events.ExtensionCustomMessage>();

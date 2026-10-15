@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/resource-loader.ts (loadProjectContextFiles,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/resource-loader.ts (loadProjectContextFiles,
 // loadContextFileFromDir, findShadowedContextFile, resolvePromptInput, discoverSystemPromptFile, discoverAppendSystemPromptFile,
 // mergePaths), packages/coding-agent/src/core/package-manager.ts (resolve, addAutoDiscoveredResources, collectAncestorAgentsSkillDirs,
 // collectAutoPromptEntries, collectAutoThemeEntries) and packages/coding-agent/src/core/footer-data-provider.ts (findGitPaths).
