@@ -1,17 +1,24 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the scenarios of tools/DurableFixtures/scenarios-v1.2.0.mjs that the v1.2.0 sync
-// areas have ported so far, run on PiSharp against Fixtures/v1.2.0/upstream-sessions. compat.* (CompatCases.cs) reads the v1.1.0 set for the
-// scenarios both pins capture until area a switches it (Fixtures/v1.2.0/index.json, "switching"); these scenarios exist only at v1.2.0, so
-// their cases read the v1.2.0 set now: read, raw, harness and written, as for the v1.1.0 scenarios, and observed (what calls returned or
-// rejected with, observed.json). Keep each scenario in step with its upstream twin: same faux responses, same calls in the same order.
+// areas have ported so far, run on PiSharp against Fixtures/v1.2.0/upstream-sessions (CompatCases.cs): read, raw, harness and written, as
+// for the v1.1.0 scenarios, and observed (what calls returned or rejected with, observed.json) and events (the root conversation's agent
+// events, events.json). Keep each scenario in step with its upstream twin: same faux responses, same calls in the same order.
 //
-// Read only: nested-tools-restart (areas a and c) and abandon-on-restart (area c) are checked by read, raw and harness: their records carry
-// abandonOnRestart and abortReason "restart", which area c ports. Their run and resume make tool calls whose pi.tool tasks are version 2 and
-// whose nested calls and api.createTask() default need tool task v2, so area a adds the run (written) and resume cases; until then the
-// harness.nested-tools-restart.* case ports the abandon-on-restart scenario's semantics on PiSharp's version 1 tool task.
+// Events: scenarios.mjs `open()` attaches watchEvents to the root conversation when the capture records events, pushes the snapshot and
+// then every event delivered, and its wrapped close() waits a macrotask and stops the stream before closing. Here Open attaches a
+// CompatEvents recorder when the case expects events, and Close waits until the expected number of events arrived (bounded), lets the
+// Session line drain, then stops the stream and closes; the case compares the whole sequence, batch boundaries left out as upstream does.
+// A scenario's `aborted(signal)` resolves on abort, as scenarios.mjs's does.
 //
-// Not checked yet:
-// - events.json (the agent events of the root conversation). Its snapshot carries pi.live's nestedTools, which arrives with area a (tool
-//   task v2); area a adds the events check for every scenario.
+// Concurrent nested calls: Node runs the invocations of nested-tools' two parallel echo calls in lockstep on its event loop (one intent,
+// the other's intent, one result, the other's), while PiSharp's invocations run on the thread pool, a step and phase inline when the line
+// is idle. The C# scenario holds them to Node's order without changing what they do: a beforeTool hook holds the second call until the
+// first's slot is running, the first returns once the second's slot is running, and the second once the first's is done. Hooks and waits
+// leave no record, so the records, events and observed results stay upstream's.
+//
+// Read only (no Run): deferred-tool-search (areas a and k) needs tool_search, which work list area k ports; its read, raw and harness cases
+// run. codemode (area d) and read-image (area e) are not listed yet.
+//
+// Not checked:
 // - session-failed's observed `idle`. capture.mjs's open() replaces harness.close with a wrapper that first waits a macrotask and stops the
 //   event stream, and the Session's own fail() calls that replaced close: the capture seals the Harness a macrotask late, so its
 //   waitForIdle() after the failure resolves (`{ "value": null }`). Without the wrapper it rejects with SessionFailed, as upstream's
@@ -21,6 +28,61 @@ using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using static ChatTests;
 using static SessionTests;
+
+/// <summary>Records a scenario's agent events for comparison with events.json (see the file header).</summary>
+internal sealed class CompatEvents
+{
+    private static readonly AsyncLocal<CompatEvents?> Current = new();
+    private readonly JsonArrayValue expected;
+    private readonly SyncList<JsonValue> recorded = new();
+    private IAgentEventStream? stream;
+    private IHarness? harness;
+
+    private CompatEvents(JsonArrayValue expected) { this.expected = expected; }
+
+    /// <summary>A recorder expecting <paramref name="phase"/>'s events of events.json; null when there are none.</summary>
+    public static CompatEvents? Expect(JsonObjectValue? events, string phase) =>
+        events is not null && events.TryGetValue(phase, out var list) ? new CompatEvents((JsonArrayValue)list) : null;
+
+    /// <summary>Runs <paramref name="run"/> with <paramref name="events"/> recording the Harness it opens.</summary>
+    public static async Task<T> Record<T>(CompatEvents? events, Func<Task<T>> run)
+    {
+        Current.Value = events;
+        try { return await run(); }
+        finally { Current.Value = null; }
+    }
+
+    /// <summary>scenarios.mjs <c>open()</c>'s stream: the snapshot, then every event delivered.</summary>
+    public static async Task AttachAsync(IHarness harness, ConversationId root)
+    {
+        if (Current.Value is not { } events || events.stream is not null) return;
+        events.harness = harness;
+        events.stream = await harness.WatchEventsAsync(root, DurableContext.Background);
+        events.recorded.Add(events.stream.Snapshot.ToJson());
+        events.stream.Start((batch, _) =>
+        {
+            foreach (var item in batch) events.recorded.Add(item.ToJson());
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>scenarios.mjs's wrapped <c>close()</c>: stops the stream, then closes.</summary>
+    public static async Task CloseAsync(IHarness harness)
+    {
+        if (Current.Value is { } events && ReferenceEquals(events.harness, harness) && events.stream is { } stream)
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+            while (events.recorded.Count < events.expected.Count && DateTime.UtcNow < deadline) await Task.Delay(5);
+            try { await ((Session)harness).FlushLineAsync(); } catch (Exception) { /* a failed Session */ }
+            await Task.Delay(20);
+            await stream.StopAsync();
+        }
+        await harness.CloseAsync(DurableContext.Background);
+    }
+
+    /// <summary>The recorded events are the expected ones, in order.</summary>
+    public void Check(string what) => CompatTests.SameJson(expected, JsonValue.Array(recorded.Snapshot()), what);
+}
 
 /// <summary>One v1.2.0 scenario: <see cref="Run"/> writes the session, closes it and returns what it observed (or null); <see cref="Resume"/>,
 /// when present, reopens and finishes it. Without <see cref="Run"/> the scenario is read only (see the file header).</summary>
@@ -45,8 +107,12 @@ internal static class CompatScenarios120
             Models = setup.Models, Registry = setup.Registry, Settings = setup.Settings, Now = () => setup.Now(), OnReport = onReport,
         }, Context);
         var root = await harness.RootAsync(Context, new AgentChange { Model = new ModelRef("faux", "faux-1") });
+        await CompatEvents.AttachAsync(harness, root.Id);
         return new OpenedChat(harness, root);
     }
+
+    /// <summary>Closes a Harness Open returned (scenarios.mjs's wrapped close).</summary>
+    private static Task Close(IHarness harness) => CompatEvents.CloseAsync(harness);
 
     /// <summary>scenarios-v1.2.0.mjs <c>described</c>: an error as observed, with upstream's error names.</summary>
     internal static JsonObjectValue Described(Exception error)
@@ -143,6 +209,162 @@ internal static class CompatScenarios120
         }
     }
 
+    // ─── Tool scenarios (tool task v2, work list area a) ─────────────────────
+
+    /// <summary>scenarios-v1.2.0.mjs <c>textTool</c>'s parameters: <c>Type.Object({ text: Type.Optional(Type.String()), id:
+    /// Type.Optional(Type.Number()) })</c>, as TypeBox prints it.</summary>
+    private static readonly JsonObjectValue TextParameters = O("""{"type":"object","properties":{"text":{"type":"string"},"id":{"type":"number"}}}""");
+
+    /// <summary><c>Type.Object({ count: Type.Number() })</c>, as TypeBox prints it.</summary>
+    private static readonly JsonObjectValue Count = O("""{"type":"object","required":["count"],"properties":{"count":{"type":"number"}}}""");
+
+    /// <summary>scenarios-v1.2.0.mjs <c>textTool</c>.</summary>
+    private static ToolRegistration TextTool(string name, string description, ToolExecute execute, Func<ToolRegistration, ToolRegistration>? extra = null)
+    {
+        var tool = Define.Tool(new ToolRegistration { Name = name, Description = description, Parameters = TextParameters, Execute = execute });
+        return extra is null ? tool : extra(tool);
+    }
+
+    /// <summary>scenarios.mjs <c>result</c> at v1.2.0: <c>{ output, ...rest }</c>.</summary>
+    private static ToolExecutionResult Result(IEnumerable<JsonObjectValue> output) => new() { Output = JsonValue.Array(output) };
+
+    /// <summary>scenarios-v1.2.0.mjs <c>install</c>.</summary>
+    private static void Install(ChatSetup setup, string name, IReadOnlyList<ToolRegistration> tools, IReadOnlyList<HookRegistration>? hooks = null) =>
+        setup.Registry.Install(Define.Extension(new Extension { Name = name, Tools = [.. tools], Hooks = hooks is null ? null : [.. hooks] }));
+
+    /// <summary>scenarios-v1.2.0.mjs <c>call</c>: a faux reply making one tool call.</summary>
+    private static JsonObjectValue Call(string name, string id = "c1") => Calls((name, JsonObjectValue.Empty, id));
+
+    private static JsonObjectValue Calls(params (string Name, JsonObjectValue Args, string Id)[] list) =>
+        FauxAssistantMessage(list.Select(call => FauxToolCall(call.Name, call.Args, call.Id)), stopReason: "toolUse", timestamp: T);
+
+    /// <summary>scenarios-v1.2.0.mjs <c>nestedResult</c>: a nested call result without its task ID and duration.</summary>
+    private static JsonValue NestedResult(NestedToolExecutionResult result) =>
+        JsonValue.Object(result.ToJson().Where(property => property.Key is not ("taskId" or "durationMs")));
+
+    private static string Text(JsonValue args) =>
+        ((JsonObjectValue)args).TryGetValue("text", out var text) && text is JsonStringValue { Value: var value } ? value : "";
+
+    private static JsonArrayValue Names(IEnumerable<ToolRegistration> tools) => JsonValue.Array(tools.Select(tool => (JsonValue)tool.Name));
+
+    /// <summary>Waits until <c>pi.live</c> shows the nested slot <paramref name="callId"/> with <paramref name="status"/>.</summary>
+    private static async Task SlotStatus(IDocumentReader reader, string callId, string status, DurableContext context)
+    {
+        var conversation = reader is IHookApi hook ? hook.ConversationId : ((IToolExecutionApi)reader).ConversationId;
+        while (true)
+        {
+            var live = await reader.SnapshotAsync(Live.LiveDoc, conversation, context);
+            if (live is not null && live.TryGetValue("nestedTools", out var slots) && ((JsonArrayValue)slots).Cast<JsonObjectValue>()
+                .Any(slot => S(slot["callId"]) == callId && S(slot["status"]) == status)) return;
+            await Task.Delay(2, context.CancellationToken);
+        }
+    }
+
+    /// <summary>scenarios.mjs <c>aborted</c>: resolves once <paramref name="signal"/> aborts.</summary>
+    private static async Task Aborted(CancellationToken signal)
+    {
+        try { await HarnessTests.Aborted(signal); }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>scenarios-v1.2.0.mjs <c>restartTools</c>: <c>batch</c> calls <c>started</c> (replay-safe, runs) and <c>gated</c> (held by a
+    /// hook).</summary>
+    private sealed class RestartTools
+    {
+        private int started;
+        private int gated;
+
+        public RestartTools(bool block)
+        {
+            Setup = Chat();
+            Install(Setup, "tools", [
+                TextTool("started", "started", async (_, api, callContext) =>
+                {
+                    Interlocked.Increment(ref started);
+                    api.Output("partial\n");
+                    await api.DetailsAsync(Obj(("step", 1)), callContext);
+                    Running.Resolve();
+                    if (block) await Aborted(callContext.CancellationToken);
+                    return Result([]);
+                }, tool => tool with { Replay = ToolReplay.Safe }),
+                TextTool("gated", "gated", (_, _, _) =>
+                {
+                    Interlocked.Increment(ref gated);
+                    return Task.FromResult(Result([]));
+                }),
+                Define.Tool(new ToolRegistration
+                {
+                    Name = "batch",
+                    Description = "batch",
+                    Parameters = ToolRegistration.EmptyParameters,
+                    Execute = async (_, api, callContext) =>
+                    {
+                        await Task.WhenAll(api.ExecuteToolAsync("started", JsonObjectValue.Empty, callContext),
+                            api.ExecuteToolAsync("gated", JsonObjectValue.Empty, callContext));
+                        return Result([]);
+                    },
+                }),
+            ], [Define.Hook(HarnessTasks.ToolTask, new ToolHooks
+            {
+                BeforeTool = async (hookCall, _, hookContext) =>
+                {
+                    if (S(hookCall["name"]) != "gated" || !block) return null;
+                    Gated.Resolve();
+                    await Aborted(hookContext.CancellationToken);
+                    return null;
+                },
+            })]);
+        }
+
+        public ChatSetup Setup { get; }
+        public HarnessTests.Deferred Running { get; } = new();
+        public HarnessTests.Deferred Gated { get; } = new();
+        public JsonObjectValue Observed() => Obj(("runs", Obj(("started", Volatile.Read(ref started)), ("gated", Volatile.Read(ref gated)))));
+    }
+
+    /// <summary>scenarios-v1.2.0.mjs <c>abandonTools</c>: a replay-unsafe tool creates a child task with <c>api.createTask()</c> and awaits it
+    /// in memory.</summary>
+    private sealed class AbandonTools
+    {
+        private readonly SyncList<string> phases = new();
+
+        public AbandonTools()
+        {
+            Setup = Chat();
+            var worker = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "compat.direct-worker",
+                Version = 1,
+                Initial = _ => Obj(("phase", "work")),
+                Phases = new Dictionary<string, TaskPhaseHandler>
+                {
+                    ["work"] = async (_, runtime, _) =>
+                    {
+                        phases.Add("work");
+                        Started.Resolve();
+                        await Aborted(runtime.Signal);
+                    },
+                },
+                Abort = async (task, runtime, abortContext) =>
+                {
+                    phases.Add($"abort {(task.AbortReason is { } reason ? StructuredTests.Wire(reason) : "undefined")}");
+                    await runtime.CommitAsync((_, _) => NextTaskState.Aborted(), abortContext);
+                },
+            });
+            Setup.Registry.Install(Define.Extension(new Extension { Name = "direct-worker", Tasks = [worker] }));
+            Install(Setup, "tools", [TextTool("work", "work", async (_, api, callContext) =>
+            {
+                var id = await api.CreateTaskAsync(worker, JsonValue.Null, new TaskOptions(TaskOwnership.Task(api.TaskId)), callContext);
+                await api.WaitForTaskAsync(id, callContext);
+                return Result([]);
+            })]);
+        }
+
+        public ChatSetup Setup { get; }
+        public HarnessTests.Deferred Started { get; } = new();
+        public JsonObjectValue Observed() => Obj(("phases", JsonValue.Array(phases.Snapshot().Select(phase => (JsonValue)phase))));
+    }
+
     private static string Tokens(string label, int count) => $"{label} {new string('x', Math.Max(0, count * 4 - label.Length - 1))}";
 
     internal static readonly IReadOnlyList<CompatScenario120> All =
@@ -164,7 +386,7 @@ internal static class CompatScenarios120
             await root.SubmitAsync(SubmissionDraft.Input("s", WhenBusy.Steer, entry: new InputEntry("p2.input")), Context);
             await root.SubmitAsync(SubmissionDraft.Input("f", WhenBusy.FollowUp, entry: Mention("f")), Context);
             var rejected = await Settle(() => root.SubmitAsync(SubmissionDraft.Input("x", entry: new InputEntry("pi.custom")), Context));
-            await harness.CloseAsync(Context);
+            await Close(harness);
             return Obj(("rejected", rejected));
         }, async open =>
         {
@@ -173,7 +395,7 @@ internal static class CompatScenarios120
             var (harness, _) = await Open(setup, await open());
             harness.Resume();
             await harness.WaitForIdleAsync(Context);
-            await harness.CloseAsync(Context);
+            await Close(harness);
             return null;
         }),
         new("compaction-failure", ["j"], async open =>
@@ -212,7 +434,7 @@ internal static class CompatScenarios120
             CompactingChat.Push(chat.Summaries, () => Task.FromResult(Failure("still bad")));
             var blocking = await Turn(Tokens("u5", 900), null);
             await harness.WaitForIdleAsync(Context);
-            await harness.CloseAsync(Context);
+            await Close(harness);
             return Obj(("background", background.ToJson()), ("blocking", blocking.ToJson()),
                 ("unusedAgentReplies", CompactingChat.Count(chat.Agent)), ("unusedSummaries", CompactingChat.Count(chat.Summaries)));
         }),
@@ -246,7 +468,7 @@ internal static class CompatScenarios120
             held.Resolve();
             foreach (var submission in new[] { input, followUp, model, edit, chat }) await submission.WaitAsync(Context);
             await harness.WaitForIdleAsync(Context);
-            await harness.CloseAsync(Context);
+            await Close(harness);
             return Obj(("noteAtOnce", noteAtOnce.ToJson()), ("chatBehindReset", chatBehindReset.ToJson()),
                 ("inbox", JsonValue.Array(inbox.Cast<JsonObjectValue>().Select(item => (JsonValue)JsonValue.Array(item["id"], item["mode"])))));
         }),
@@ -263,7 +485,7 @@ internal static class CompatScenarios120
             var later = await Settle(() => root.SubmitAsync(SubmissionDraft.Input("three"), Context));
             var idle = await Settle(() => harness.WaitForIdleAsync(Context));
             var closed = await harness.Closed;
-            await harness.CloseAsync(Context);
+            await Close(harness);
             var closedJson = closed.Error is null
                 ? Obj(("reason", closed.Reason == SessionEndReason.Failed ? "failed" : "closed"))
                 : Obj(("reason", closed.Reason == SessionEndReason.Failed ? "failed" : "closed"), ("error", Described(closed.Error)));
@@ -271,8 +493,137 @@ internal static class CompatScenarios120
             Program.Equal("SessionFailed", S(At(idle, "error", "name")), "idle after the failure");
             return Obj(("failed", failed), ("later", later), ("idle", idle), ("closed", closedJson), ("reports", JsonValue.Array(reports.Snapshot())));
         }, UnobservedFields: ["idle"]),
-        new("nested-tools-restart", ["a", "c"], null),
-        new("abandon-on-restart", ["c"], null),
+        new("nested-tools", ["a"], async open =>
+        {
+            var setup = Chat();
+            setup.ToolExecution = ToolExecutionMode.Sequential;
+            // See the file header: the two concurrent echo calls interleave as on Node's event loop.
+            var echo = TextTool("echo", "Echoes its text", async (args, api, callContext) =>
+            {
+                if (Text(args) == "a") await SlotStatus(api, "c1/named", "running", callContext);
+                if (Text(args) == "b") await SlotStatus(api, "c1/1", "done", callContext);
+                return Result([FauxText($"echo {Text(args)}")]);
+            }, tool => tool with { Callers = [ToolCaller.Tools] });
+            var counter = Define.Tool(new ToolRegistration
+            {
+                Name = "counter",
+                Description = "Counts things",
+                Parameters = ToolRegistration.EmptyParameters,
+                StructuredOutputSchema = Count,
+                Execute = (_, _, _) => Task.FromResult(Result([FauxText("3 things")]) with { StructuredOutput = Obj(("count", 3)) }),
+            });
+            var received = new SyncList<NestedToolExecutionResult>();
+            var batch = Define.Tool(new ToolRegistration
+            {
+                Name = "batch",
+                Description = "Calls other tools",
+                Parameters = ToolRegistration.EmptyParameters,
+                Execute = async (_, api, callContext) =>
+                {
+                    foreach (var result in await Task.WhenAll(api.ExecuteToolAsync("echo", Obj(("text", "a")), callContext),
+                        api.ExecuteToolAsync("echo", Obj(("text", "b")), callContext, new NestedCallOptions { Key = "named" })))
+                        received.Add(result);
+                    received.Add(await api.ExecuteToolAsync("counter", JsonObjectValue.Empty, callContext));
+                    received.Add(await api.ExecuteToolAsync("missing", JsonObjectValue.Empty, callContext));
+                    received.Add(await api.ExecuteToolAsync("echo", Obj(("text", 5)), callContext));
+                    return Result([FauxText(JsonValue.Array(received.Snapshot().Select(NestedResult)).ToJson())]);
+                },
+            });
+            Install(setup, "tools", [echo, counter, batch], [Define.Hook(HarnessTasks.ToolTask, new ToolHooks
+            {
+                BeforeTool = async (hookCall, api, hookContext) =>
+                {
+                    if (hookCall["arguments"] is JsonObjectValue { } arguments && Text(arguments) == "b") await SlotStatus(api, "c1/1", "running", hookContext);
+                    return null;
+                },
+            })]);
+            setup.Faux.SetResponses(Call("batch"), Answer("done"));
+            var (harness, root) = await Open(setup, await open());
+            var agent = await root.AgentAsync(Context);
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            await harness.WaitForIdleAsync(Context);
+            await Close(harness);
+            return Obj(("offered", Names(agent.Tools)), ("callable", Names(agent.Callable)),
+                ("received", JsonValue.Array(received.Snapshot().Select(result => (JsonValue)result.ToJson()))));
+        }),
+        new("structured-output", ["a"], async open =>
+        {
+            var setup = Chat();
+            setup.ToolExecution = ToolExecutionMode.Sequential;
+            ToolRegistration Returning(string name, ToolExecutionResult value, JsonObjectValue? schema = null) => Define.Tool(new ToolRegistration
+            {
+                Name = name, Description = name, Parameters = ToolRegistration.EmptyParameters, StructuredOutputSchema = schema,
+                Execute = (_, _, _) => Task.FromResult(value),
+            });
+            var received = new SyncList<NestedToolExecutionResult>();
+            Install(setup, "tools", [
+                Returning("counter", Result([FauxText("3 things")]) with { StructuredOutput = Obj(("count", 3)) }, Count),
+                Returning("wrong", new ToolExecutionResult { StructuredOutput = Obj(("count", "three")) }, Count),
+                Returning("picture", Result([Obj(("type", "image"), ("data", "AAAA"), ("mimeType", "image/png"))])),
+                Returning("bad", Result([FauxText("bad")]) with { IsError = true }),
+                Returning("failing", Result([FauxText("failed")]) with { StructuredOutput = Obj(("count", 0)), IsError = true }, Count),
+                Define.Tool(new ToolRegistration
+                {
+                    Name = "probe",
+                    Description = "Calls the others",
+                    Parameters = ToolRegistration.EmptyParameters,
+                    Execute = async (_, api, callContext) =>
+                    {
+                        foreach (var name in new[] { "picture", "bad", "wrong", "failing", "counter" })
+                            received.Add(await api.ExecuteToolAsync(name, JsonObjectValue.Empty, callContext));
+                        return Result([FauxText(JsonValue.Array(received.Snapshot().Select(NestedResult)).ToJson())]);
+                    },
+                }),
+            ]);
+            setup.Faux.SetResponses(Calls(("counter", JsonObjectValue.Empty, "c1"), ("wrong", JsonObjectValue.Empty, "c2")), Call("probe", "c3"),
+                Answer("done"));
+            var reports = new SyncList<JsonValue>();
+            var (harness, root) = await Open(setup, await open(), error => reports.Add(Described(error)));
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            await harness.WaitForIdleAsync(Context);
+            await Close(harness);
+            return Obj(("received", JsonValue.Array(received.Snapshot().Select(result => (JsonValue)result.ToJson()))),
+                ("reports", JsonValue.Array(reports.Snapshot())));
+        }),
+        new("deferred-tool-search", ["a", "k"], null),
+        new("nested-tools-restart", ["a", "c"], async open =>
+        {
+            var tools = new RestartTools(block: true);
+            tools.Setup.Faux.SetResponses(Call("batch"));
+            var (harness, root) = await Open(tools.Setup, await open());
+            await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            await Task.WhenAll(tools.Running.Task, tools.Gated.Task);
+            await Close(harness);
+            return tools.Observed();
+        }, async open =>
+        {
+            var tools = new RestartTools(block: false);
+            tools.Setup.Faux.SetResponses(Answer("done"));
+            var (harness, _) = await Open(tools.Setup, await open());
+            harness.Resume();
+            await harness.WaitForIdleAsync(Context);
+            await Close(harness);
+            return tools.Observed();
+        }),
+        new("abandon-on-restart", ["c"], async open =>
+        {
+            var worker = new AbandonTools();
+            worker.Setup.Faux.SetResponses(Call("work"));
+            var (harness, root) = await Open(worker.Setup, await open());
+            await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            await worker.Started.Task;
+            await Close(harness);
+            return worker.Observed();
+        }, async open =>
+        {
+            var worker = new AbandonTools();
+            worker.Setup.Faux.SetResponses(Answer("done"));
+            var (harness, _) = await Open(worker.Setup, await open());
+            harness.Resume();
+            await harness.WaitForIdleAsync(Context);
+            await Close(harness);
+            return worker.Observed();
+        }),
         new("wait-cycle", ["c"], async open =>
         {
             var setup = Chat();
@@ -319,7 +670,7 @@ internal static class CompatScenarios120
             var bRecord = await harness.WaitForTaskAsync(ids["b"], Context);
             var aRecord = await harness.WaitForTaskAsync(ids["a"], Context);
             await harness.WaitForIdleAsync(Context);
-            await harness.CloseAsync(Context);
+            await Close(harness);
             return Obj(("a", ((TerminalTaskState)aRecord.State).Outcome.ToJson()), ("b", ((TerminalTaskState)bRecord.State).Outcome.ToJson()));
         }),
     ];

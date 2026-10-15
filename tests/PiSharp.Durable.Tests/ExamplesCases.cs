@@ -17,7 +17,10 @@ using PiSharp.Durable.Examples;
 // on an ExampleClock driven like Node's event loop (24 and 23 restart on their own storage, as 13 does). 19-json prints both modes; its
 // lines are upstream's captured output (Fixtures/examples-19-json-*.upstream.jsonl, from one run of each mode under Node) and compare as
 // text, key order included, with timestamps, durations, the faux API name and the provider session ID as placeholders: those are random
-// or clock values.
+// or clock values. Pi v1.2.0's capture (Fixtures/v1.2.0) of 19 also carries read's new description and the token counts it changes (work
+// list area e), so until area e lands the events mode compares with the v1.1.0 capture plus tool task v2's two additions taken from the
+// v1.2.0 capture (area a): the snapshot's `nestedTools` and the tool events' `taskId`, each checked to be the only difference of its line
+// apart from read's description and the counts.
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -36,7 +39,7 @@ internal static partial class Program
     ];
 
     // Declared before ExamplesUpstreamOutput, which spreads them.
-    private static readonly string[] JsonModeEvents = JsonModeFixture("events");
+    private static readonly string[] JsonModeEvents = WithToolTaskV2(JsonModeFixture("events"), JsonModeFixture("events", "v1.2.0"));
     private static readonly string[] JsonModeOps = JsonModeFixture("ops");
     private static readonly string[] ReviewerTranscript =
     [
@@ -318,8 +321,38 @@ internal static partial class Program
     private const string PythonConversation = "python conversation: venv: <project>/.venv";
     private const string TimedBashCalls = "timed bash calls: 2";
 
-    private static string[] JsonModeFixture(string mode) => File.ReadAllLines(
-        Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", $"examples-19-json-{mode}.upstream.jsonl"));
+    private static string[] JsonModeFixture(string mode, string? version = null) => File.ReadAllLines(Path.Combine(
+        [RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", .. version is null ? Array.Empty<string>() : [version],
+            $"examples-19-json-{mode}.upstream.jsonl"]));
+
+    /// <summary>The v1.1.0 events of 19 with tool task v2's additions from the v1.2.0 capture (see the file header): the snapshot's
+    /// <c>nestedTools</c> after <c>tools</c>, and each tool event's <c>taskId</c> after <c>toolName</c>.</summary>
+    private static string[] WithToolTaskV2(string[] v110, string[] v120)
+    {
+        Equal(v110.Length, v120.Length, "example 19 events: lines in both captures");
+        var lines = new string[v110.Length];
+        for (var index = 0; index < v110.Length; index++)
+        {
+            var line = v110[index];
+            if (line.StartsWith("""{"type":"snapshot","entries":[],"tools":[],""", StringComparison.Ordinal))
+            {
+                Check(v120[index].StartsWith("""{"type":"snapshot","entries":[],"tools":[],"nestedTools":[],""", StringComparison.Ordinal),
+                    "example 19: the v1.2.0 snapshot adds nestedTools");
+                line = line.Replace("\"tools\":[],", "\"tools\":[],\"nestedTools\":[],", StringComparison.Ordinal);
+                Equal(v120[index], line, "example 19: snapshot line " + (index + 1));
+            }
+            else if (Regex.Match(line, "^\\{\"type\":\"tool_execution_[a-z]+\",\"toolCallId\":\"[^\"]*\",\"toolName\":\"[^\"]*\"") is { Success: true } call)
+            {
+                var taskId = Regex.Match(v120[index], "^" + Regex.Escape(call.Value) + ",\"taskId\":([0-9]+),");
+                Check(taskId.Success, "example 19: the v1.2.0 tool event of line " + (index + 1) + " carries taskId");
+                line = call.Value + ",\"taskId\":" + taskId.Groups[1].Value + line[call.Length..];
+                // Only the tool_execution_end's result entry repeats the transcript, whose read description and counts are area e's.
+                if (!line.StartsWith("{\"type\":\"tool_execution_end\"", StringComparison.Ordinal)) Equal(v120[index], line, "example 19: tool event line " + (index + 1));
+            }
+            lines[index] = line;
+        }
+        return lines;
+    }
 
     private const string LateJoinLastLine = "event: usage_changed";
 

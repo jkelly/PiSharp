@@ -64,7 +64,7 @@ internal static partial class Program
         if (ImageDetection.DetectSupportedImageMimeType(bytes) is { } mimeType)
             return new ToolExecutionResult
             {
-                Content = JsonArrayValue.Empty,
+                Output = JsonArrayValue.Empty,
                 IsError = true,
                 Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Error, $"{path} is an image ({mimeType}); reading images is not supported",
                     "unsupported_image")],
@@ -118,7 +118,7 @@ internal static partial class Program
         }
         return new ToolExecutionResult
         {
-            Content = outputText.Length == 0 ? JsonArrayValue.Empty
+            Output = outputText.Length == 0 ? JsonArrayValue.Empty
                 : JsonValue.Array(JsonValue.Object([new("type", "text"), new("text", outputText)])),
             Details = details,
             Diagnostics = diagnostics.ToImmutable(),
@@ -137,7 +137,7 @@ internal static partial class Program
         ToolExecutionResult result;
         try { result = await run(); }
         catch (Exception error) { return "error\0" + error.Message; }
-        var content = result.Content ?? JsonArrayValue.Empty;
+        var content = result.Output ?? JsonArrayValue.Empty;
         var parts = new List<string> { "result", result.IsError == true ? "true" : "undefined", content.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) };
         foreach (var part in content.Cast<JsonObjectValue>()) parts.AddRange([((JsonStringValue)part["type"]).Value, ((JsonStringValue)part["text"]).Value]);
         if (result.Details is not JsonObjectValue details) parts.Add("no-details");

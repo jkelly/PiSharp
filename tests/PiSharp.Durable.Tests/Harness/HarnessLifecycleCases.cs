@@ -251,7 +251,7 @@ internal static class LifecycleTests
                     Execute = async (_, _, _) =>
                     {
                         if (where == "tool") await Stubborn();
-                        return new ToolExecutionResult { Content = JsonArrayValue.Empty };
+                        return new ToolExecutionResult { Output = JsonArrayValue.Empty };
                     },
                 }));
                 AddHooks(setup.Registry, HarnessTasks.GenerationTask, new GenerationHooks

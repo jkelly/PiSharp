@@ -1,10 +1,10 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction statuses, tool
-// slot lookup and finishing, and settleSchedulerOutcome, the cleanup the scheduler runs for faulted and orphaned outcomes). The state is
-// upstream's JSON: {run?: {taskId, inputs}, generation?: {attempt, message?, retry?, deferred?}, tools?: ToolSlot[], compactions?: [...]}.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/live.ts (LiveDoc, endRun, compaction statuses and
+// failures, tool slot lookup, finishing and nested slot removal, and settleSchedulerOutcome, the cleanup the scheduler runs for faulted and
+// orphaned outcomes). The state is upstream's JSON: {run?: {taskId, inputs}, generation?: {attempt, message?, retry?, deferred?},
+// tools?: ToolSlot[], nestedTools?: NestedToolSlot[], compactions?: [...], compactionFailure?: {taskId, reason, error}}. A ToolSlot is
+// {callId, name, taskId?, status, output?, droppedBytes?, droppedLines?, details?, diagnostics?, entry?}; a NestedToolSlot is {callId,
+// parentCallId, parentTaskId, name, taskId, arguments, status, output?, ..., summary?: {isError, durationMs?, usage?, error?}}.
 // Upstream's run writers startRun and handOver live in generation.ts, as HarnessTasks.StartRunAsync and HandOver do in Generation.cs.
-// Pi v1.2.0's area j parts of live.ts are in (durable-sync-1.2.0-worklist.json): pi.live.compactionFailure {taskId, reason, error} and
-// failCompactionStatus, also for the scheduler's faulted and orphaned compactions. The header moves to v1.2.0 with area a (nestedTools),
-// which owns this row.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
@@ -24,13 +24,15 @@ public static class Live
     /// </summary>
     public static ConversationDocToken LiveDoc { get; } = Documents.DefineConversationDoc("pi.live", 1, DocumentFork.Initial,
         () => JsonObjectValue.Empty,
-        checkpointWhen: (value, _, _) => !value.ContainsKey("generation") &&
-            !(value.TryGetValue("tools", out var tools) && tools is JsonArrayValue slots &&
-                slots.Any(slot => slot is JsonObjectValue item && item.TryGetValue("status", out var status) && status is JsonStringValue { Value: "running" })));
+        checkpointWhen: (value, _, _) => !value.ContainsKey("generation") && !AnyRunning(value, "tools") && !AnyRunning(value, "nestedTools"));
+
+    private static bool AnyRunning(JsonObjectValue live, string key) =>
+        live.TryGetValue(key, out var listed) && listed is JsonArrayValue slots &&
+        slots.Any(slot => slot is JsonObjectValue item && item.TryGetValue("status", out var status) && status is JsonStringValue { Value: "running" });
 
     /// <summary>
     /// Ends the run owned by <paramref name="taskId"/>: settles each of its inputs and removes <c>run</c> (upstream <c>endRun</c>). Always
-    /// removes <c>generation</c> and <c>tools</c>, whose presentation belongs to the ending run.
+    /// removes <c>generation</c>, <c>tools</c> and <c>nestedTools</c>, whose presentation belongs to the ending run.
     /// </summary>
     public static void EndRun(ITx tx, DraftObject live, TaskId taskId, SubmissionSettlement settlement)
     {
@@ -42,6 +44,7 @@ public static class Live
         }
         live.Delete("generation");
         live.Delete("tools");
+        live.Delete("nestedTools");
     }
 
     /// <summary>Adds the status <c>{taskId, reason, blocking, attempt, retry?}</c> of a compaction task created in this commit; statuses stay
@@ -88,23 +91,59 @@ public static class Live
         RemoveCompactionStatus(live, taskId);
     }
 
-    /// <summary>The slot of tool task <paramref name="taskId"/> in the current round, if the round still lists it (upstream
-    /// <c>toolSlot</c>).</summary>
+    /// <summary>
+    /// The slot of tool task <paramref name="taskId"/>, model-issued or nested, if <c>pi.live</c> still lists it (upstream <c>toolSlot</c>).
+    /// Nested slots are found by binary search: a tool may make thousands of nested calls, each of which looks up its slot in several commits.
+    /// Their task IDs ascend: each slot is appended in the commit that creates its task, task IDs ascend in commit order, and removal keeps
+    /// the order. A nested slot is told apart by its <c>parentTaskId</c> (<see cref="IsNested"/>).
+    /// </summary>
     public static DraftObject? ToolSlot(DraftObject live, TaskId taskId)
     {
-        if (!live.ContainsKey("tools") || live.Get("tools") is not JsonArrayValue) return null;
-        var slots = live.GetArray("tools");
-        var index = IndexOf(slots, "taskId", taskId.Value);
-        return index < 0 ? null : slots.GetObject(index);
+        if (live.ContainsKey("tools") && live.Get("tools") is JsonArrayValue)
+        {
+            var slots = live.GetArray("tools");
+            var index = IndexOf(slots, "taskId", taskId.Value);
+            if (index >= 0) return slots.GetObject(index);
+        }
+        if (!live.ContainsKey("nestedTools") || live.Get("nestedTools") is not JsonArrayValue) return null;
+        var nested = live.GetArray("nestedTools");
+        var low = 0;
+        var high = nested.Count - 1;
+        while (low <= high)
+        {
+            var middle = (int)((uint)(low + high) >> 1);
+            var candidate = Id(((JsonObjectValue)nested.Get(middle))["taskId"]);
+            if (candidate == taskId.Value) return nested.GetObject(middle);
+            if (candidate < taskId.Value) low = middle + 1;
+            else high = middle - 1;
+        }
+        return null;
     }
 
-    /// <summary>Marks a slot done: the result entry, if any, now carries its running output, details and diagnostics (upstream
-    /// <c>finishSlot</c>).</summary>
-    public static void FinishSlot(DraftObject slot, EntryId? entry)
+    /// <summary>Whether <paramref name="slot"/> is a nested call's (upstream <c>"parentTaskId" in slot</c>).</summary>
+    public static bool IsNested(DraftObject slot) => slot.ContainsKey("parentTaskId");
+
+    /// <summary>Marks a slot done and clears its running output (upstream <c>finishSlot</c>); the caller sets a model-issued call's result
+    /// <c>entry</c>, or a nested call's <c>summary</c>. Neither is set when the task faulted or was orphaned.</summary>
+    public static void FinishSlot(DraftObject slot)
     {
         slot.Set("status", "done");
-        if (entry is { } id) slot.Set("entry", id.ToJson());
         ClearProgress(slot);
+    }
+
+    /// <summary>Removes the nested slots below tool task <paramref name="taskId"/>, transitively, and the list once empty (upstream
+    /// <c>removeNestedSlots</c>); the list holds parents before their children.</summary>
+    public static void RemoveNestedSlots(DraftObject live, TaskId taskId)
+    {
+        if (!live.ContainsKey("nestedTools") || live.Get("nestedTools") is not JsonArrayValue) return;
+        var nested = live.GetArray("nestedTools");
+        var removed = new HashSet<long> { taskId.Value };
+        var values = (JsonArrayValue)nested.ToValue();
+        foreach (var slot in values.Cast<JsonObjectValue>())
+            if (removed.Contains(Id(slot["parentTaskId"]))) removed.Add(Id(slot["taskId"]));
+        for (var index = values.Count - 1; index >= 0; index--)
+            if (removed.Contains(Id(((JsonObjectValue)values[index])["parentTaskId"]))) nested.RemoveAt(index);
+        if (nested.Count == 0) live.Delete("nestedTools");
     }
 
     /// <summary>Removes what a tool published while running; its result entry or a rerun replaces it (upstream <c>clearProgress</c>).</summary>
@@ -116,7 +155,8 @@ public static class Live
     /// <summary>
     /// Harness cleanup for a terminal outcome the scheduler writes itself, <c>faulted</c> or <c>orphaned</c> (upstream
     /// <c>settleSchedulerOutcome</c>). A run task ends its run; a tool task's slot is marked done without an entry, and context derivation
-    /// synthesizes the missing result; a compaction task's status is removed and its failure recorded. Other kinds are ignored, so it never
+    /// synthesizes the missing result, and the nested slots below it are removed; a compaction task's status is removed and its failure
+    /// recorded. Other kinds are ignored, so it never
     /// creates <c>pi.live</c>
     /// elsewhere. A committed generation partial becomes an aborted assistant entry, as in the generation abort handler; the scheduler's
     /// commit has no task scope, so that entry has no <c>byTaskId</c>.
@@ -125,7 +165,9 @@ public static class Live
     {
         if (record.Kind == ToolTaskKind)
         {
-            if (ToolSlot(await tx.DocAsync(LiveDoc, record.ConversationId).ConfigureAwait(false), record.Id) is { } slot) FinishSlot(slot, null);
+            var slots = await tx.DocAsync(LiveDoc, record.ConversationId).ConfigureAwait(false);
+            if (ToolSlot(slots, record.Id) is { } slot) FinishSlot(slot);
+            RemoveNestedSlots(slots, record.Id);
             return;
         }
         if (record.Kind == CompactionTaskKind)

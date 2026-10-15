@@ -58,7 +58,7 @@ internal static class DurableSubagent
                         var text = await AnswerTextAsync(api, answer, context).ConfigureAwait(false);
                         return new ToolExecutionResult
                         {
-                            Content = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", text)])]),
+                            Output = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", text)])]),
                             Details = Details(child),
                         };
                     },

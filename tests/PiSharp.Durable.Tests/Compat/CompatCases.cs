@@ -1,6 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): compatibility with sessions the pinned upstream itself wrote. Captured upstream evidence,
-// counted apart from the authored cases (status PASS_UPSTREAM_CAPTURE): Fixtures/upstream-sessions holds SQLite and JSONL sessions that
-// pi-durable wrote with pi-ai's faux provider, the records upstream reads back from them, and a Chord tracker ops corpus, all produced by
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): compatibility with sessions the pinned upstream itself wrote. Captured upstream evidence,
+// counted apart from the authored cases (status PASS_UPSTREAM_CAPTURE): Fixtures/v1.2.0/upstream-sessions holds SQLite and JSONL sessions
+// that pi-durable wrote with pi-ai's faux provider, the records upstream reads back from them, and a Chord tracker ops corpus, all produced by
 // tools/DurableFixtures/capture.mjs (see its manifest.json). There is no upstream test file. For each scenario and backend:
 // - read: PiSharp's storage opens a copy and reads every record equal to upstream's, key order included.
 // - raw: every persisted JSON text (SQLite record and content columns, JSONL lines and their records) decodes into PiSharp's record types
@@ -10,8 +10,13 @@
 // - resume (resumable scenarios): PiSharp resumes the copy with the scripted model and ends with upstream's own resumed records.
 // - written: PiSharp runs the same scenario (CompatScenarios.cs) and writes the same records; the JSONL files are byte for byte upstream's,
 //   and the SQLite record, revision and metadata columns hold upstream's text.
-// Only the fields manifest.json lists under "varies" are normalized: sessionId strings and durationMs numbers.
-// The scenarios new in Pi v1.2.0 (CompatScenarios120.cs) run the same checks against Fixtures/v1.2.0/upstream-sessions, plus observed.
+// Only the fields manifest.json lists under "varies" are normalized: sessionId strings and durationMs numbers (code mode's clock and seed
+// and its wall time belong to the codemode scenario, work list area d, which is not run yet).
+// The scenarios new in Pi v1.2.0 (CompatScenarios120.cs) run the same checks, plus observed (observed.json: what calls returned or rejected
+// with) and events (events.json: the root conversation's agent events, the snapshot first, from the run and from the resume).
+// - upgrade-from-v1.1.0: a v1.2.0 Harness opens copies of the v1.1.0 sessions (Fixtures/upstream-sessions) without resuming them, and
+//   resumes the resumable ones with their scenario's model, ending with the records upstream's v1.2.0 left (its v1 pi.tool tasks migrate to
+//   version 2 when they run).
 // compat.ops.* replays the ops corpus (CompatOpsCases.cs); compat.reverse.* has the pinned upstream read PiSharp's sessions under Node.
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
@@ -35,10 +40,14 @@ internal static partial class CompatTests
     private static readonly DurableContext Context = DurableContext.Background;
     internal static readonly string[] Backends = ["sqlite", "jsonl"];
 
-    internal static string Fixtures => Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "upstream-sessions");
+    /// <summary>The Pi v1.2.0 capture (Fixtures/v1.2.0/index.json).</summary>
+    internal static string Fixtures => Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "upstream-sessions");
 
-    /// <summary>The Pi v1.2.0 capture (Fixtures/v1.2.0/index.json), read by the scenarios new in v1.2.0.</summary>
-    internal static string Fixtures120 => Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "upstream-sessions");
+    /// <summary>The v1.2.0 capture, for the scenarios new in v1.2.0.</summary>
+    internal static string Fixtures120 => Fixtures;
+
+    /// <summary>The Pi v1.1.0 capture, which upgrade-from-v1.1.0 opens with v1.2.0.</summary>
+    internal static string Fixtures110 => Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "upstream-sessions");
 
     private static readonly Lazy<JsonObjectValue> Manifest = new(() => Load("manifest.json"));
 
@@ -169,7 +178,9 @@ internal static partial class CompatTests
 
     internal static IEnumerable<(string, Func<Task>)> Cases()
     {
-        var captured = ((JsonArrayValue)Manifest.Value["scenarios"]).Select(item => S(((JsonObjectValue)item)["name"])).ToList();
+        // The scenarios both pins capture: those without `since`.
+        var captured = ((JsonArrayValue)Manifest.Value["scenarios"]).Cast<JsonObjectValue>().Where(item => !item.ContainsKey("since"))
+            .Select(item => S(item["name"])).ToList();
         Check(captured.SequenceEqual(CompatScenarios.All.Select(scenario => scenario.Name)), "CompatScenarios.cs runs the captured scenarios, in order");
         foreach (var scenario in CompatScenarios.All)
         {
@@ -210,6 +221,36 @@ internal static partial class CompatTests
                 });
             }
         }
+        foreach (var scenario in CompatScenarios.All)
+        {
+            var upgrade = Path.Combine("upgrade-from-v1.1.0", scenario.Name);
+            foreach (var backend in Backends)
+            {
+                var prefix = $"compat.upgrade-from-v1.1.0.{scenario.Name}.{backend}.";
+                yield return Case(prefix + "opened", async () =>
+                {
+                    var directory = CopyFixture(scenario.Name, backend, Fixtures110);
+                    await OpenOnly(() => OpenBackend(backend, directory));
+                    SameJson(Expected(upgrade, "opened.json", backend), await Dump(await OpenBackend(backend, directory)), "opened records");
+                });
+                if (scenario.Resume is { } resume)
+                    yield return Case(prefix + "resumed", async () =>
+                    {
+                        var directory = CopyFixture(scenario.Name, backend, Fixtures110);
+                        await resume(() => OpenBackend(backend, directory));
+                        SameJson(Expected(upgrade, "resumed.json", backend), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                    });
+            }
+        }
+    }
+
+    /// <summary>scenarios.mjs <c>openOnly</c>: a Harness opens the session and closes it without resuming.</summary>
+    private static async Task OpenOnly(Func<Task<IStorage>> openStorage)
+    {
+        var setup = new ChatSetup(new FauxModels(new FauxOptions { Api = "faux" }));
+        var harness = await Harness.OpenAsync(await openStorage(),
+            new HarnessOptions { Models = setup.Models, Registry = setup.Registry, Settings = setup.Settings, Now = () => CompatScenarios.Now }, Context);
+        await harness.CloseAsync(Context);
     }
 
     /// <summary>The compat.* cases of the scenarios new in Pi v1.2.0 (CompatScenarios120.cs), against Fixtures/v1.2.0/upstream-sessions.</summary>
@@ -233,19 +274,25 @@ internal static partial class CompatTests
                     Check(checkedTexts > 0, "persisted texts were checked");
                 });
                 yield return Case(prefix + "harness", () => HarnessReads(scenario.Name, backend, root));
+                var eventsFile = Path.Combine(root, scenario.Name, "events.json");
+                JsonObjectValue? expectedEvents = File.Exists(eventsFile) ? (JsonObjectValue)Expected(scenario.Name, "events.json", backend, root) : null;
                 if (scenario.Resume is { } resume)
                     yield return Case(prefix + "resume", async () =>
                     {
                         var directory = CopyFixture(scenario.Name, backend, root);
-                        await resume(() => OpenBackend(backend, directory));
+                        var events = CompatEvents.Expect(expectedEvents, "resume");
+                        await CompatEvents.Record(events, () => resume(() => OpenBackend(backend, directory)));
                         SameJson(Expected(scenario.Name, "resumed.json", backend, root), await Dump(await OpenBackend(backend, directory)), "resumed records");
+                        events?.Check("resume events");
                     });
                 // A scenario whose run needs a later area's port (CompatScenarios120.cs) is read only.
                 if (scenario.Run is not { } runScenario) continue;
                 yield return Case(prefix + "written", async () =>
                 {
                     var directory = Temp($"compat-written-{scenario.Name}-{backend}");
-                    var observed = await runScenario(() => OpenBackend(backend, directory));
+                    var runEvents = CompatEvents.Expect(expectedEvents, "run");
+                    var observed = await CompatEvents.Record(runEvents, () => runScenario(() => OpenBackend(backend, directory)));
+                    runEvents?.Check("run events");
                     SameJson(Expected(scenario.Name, "records.json", backend, root), await Dump(await OpenBackend(backend, directory)), "records");
                     var upstream = Path.Combine(root, scenario.Name, backend);
                     if (backend == "jsonl") SameFiles(upstream, directory);
@@ -256,7 +303,9 @@ internal static partial class CompatTests
                         SameObserved(run, observed ?? throw new InvalidOperationException("the run observed nothing"), scenario.UnobservedFields, "observed run");
                     if (scenario.Resume is { } resume)
                     {
-                        var resumed = await resume(() => OpenBackend(backend, directory));
+                        var resumeEvents = CompatEvents.Expect(expectedEvents, "resume");
+                        var resumed = await CompatEvents.Record(resumeEvents, () => resume(() => OpenBackend(backend, directory)));
+                        resumeEvents?.Check("resume events");
                         SameJson(Expected(scenario.Name, "resumed.json", backend, root), await Dump(await OpenBackend(backend, directory)), "resumed records");
                         if (expectedObserved?.TryGetValue("resume", out var onResume) == true)
                             SameObserved(onResume, resumed ?? throw new InvalidOperationException("the resume observed nothing"), scenario.UnobservedFields,

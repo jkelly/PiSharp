@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/generation.ts.
-// Pi v1.2.0's area j parts of generation.ts are in (durable-sync-1.2.0-worklist.json): the prepare checkpoint's threshold flag and a
-// failed blocking threshold compaction failing the run with model_error. The header moves to v1.2.0 with area a, which owns this row.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/generation.ts. v1.2.0: the prepare checkpoint's
+// threshold flag and a failed blocking threshold compaction failing the run with model_error (area j), and tool task v2 (area a): a round's
+// tool tasks take {kind: "model", assistant, callId}, a round reads controls only from model-issued results (a version 1 result has no
+// kind), and handing a round over removes pi.live.nestedTools with its slots.
 //
 // Mappings:
 // - Checkpoints, live state and results are upstream's JSON, built in upstream's key order: prepare {phase, attempt, compacted?, overflow?},
@@ -364,7 +365,8 @@ internal static class GenerationPhases
     /// <summary>A tool task for call <paramref name="callId"/>, owned by the generation (upstream <c>createToolTask</c>).</summary>
     private static Task<TaskId> CreateToolTaskAsync(ITx tx, ITaskRuntime runtime, EntryId assistant, string callId) =>
         tx.CreateTaskAsync(HarnessTasks.ToolTask,
-            JsonValue.Object([KeyValuePair.Create("assistant", (JsonValue)assistant.ToJson()), KeyValuePair.Create("callId", (JsonValue)callId)]),
+            JsonValue.Object([KeyValuePair.Create("kind", (JsonValue)"model"), KeyValuePair.Create("assistant", (JsonValue)assistant.ToJson()),
+                KeyValuePair.Create("callId", (JsonValue)callId)]),
             new TaskOptions(TaskOwnership.Task(runtime.TaskId)));
 
     /// <summary>
@@ -701,7 +703,9 @@ internal static class GenerationPhases
         var controls = new OrderedDictionary<TaskId, JsonObjectValue?>();
         var outcomes = await runtime.OutcomesAsync(tools, context).ConfigureAwait(false);
         for (var index = 0; index < tools.Count; index++)
+            // Version 1 results have no kind; every result a generation's round reads is a model-issued call's.
             controls[tools[index]] = outcomes[index] is CompletedTaskOutcome { Result: JsonObjectValue result } &&
+                !(result.TryGetValue("kind", out var kind) && kind is JsonStringValue { Value: "nested" }) &&
                 result.TryGetValue("control", out var control) && control is JsonObjectValue value ? value : null;
         var live = await runtime.SnapshotAsync(Live.LiveDoc, conversationId, context).ConfigureAwait(false);
         var slots = live is not null && live.TryGetValue("tools", out var listed) && listed is JsonArrayValue array
@@ -753,6 +757,7 @@ internal static class GenerationPhases
                 else
                 {
                     state.Delete("tools");
+                    state.Delete("nestedTools");
                     if (HarnessTasks.RunTaskId(state) == runtime.TaskId.Value)
                         state.GetObject("run").GetArray("inputs").AddRange(users.Select(id => (JsonValue)id.ToJson()));
                     HarnessTasks.HandOver(state, runtime.TaskId, await HarnessTasks.CreateGenerationAsync(tx, conversationId).ConfigureAwait(false));

@@ -1,7 +1,8 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/events.ts (AgentEvent, MessageChange, SnapshotEvent,
-// AgentEventStream, watchEvents, translate, messageChanges, toolUpdate).
-// Pi v1.2.0's area b and j parts of events.ts are in (durable-sync-1.2.0-worklist.json): the stream's watch reports listener errors and
-// ends with session_failed; the snapshot carries compactionFailure and compaction_end its error. The header moves to v1.2.0 with area a.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/events.ts (AgentEvent, ToolEventCall, MessageChange,
+// SnapshotEvent, AgentEventStream, watchEvents, translate, messageChanges, callOf, toolUpdate). v1.2.0: the stream's watch reports listener
+// errors and ends with session_failed (area b); the snapshot carries compactionFailure and compaction_end its error (area j); tool events
+// carry their call's taskId and, for a nested call, parentToolCallId and parentTaskId, the snapshot carries nestedTools, and a nested call's
+// tool_execution_end its result from the caller's NestedCallDoc (area a).
 //
 // Mappings: each AgentEvent variant is a sealed record whose ToJson() is upstream's object with upstream's key order, so a JSON-mode host
 // prints what upstream prints. pi-ai messages, usage, tool slots, compaction statuses and the pi.agent / pi.usage states are wire JSON, as
@@ -43,7 +44,7 @@ public sealed record QueuedItem(SubmissionId Id, string Mode)
 
 /// <summary>
 /// The current state at attachment, or after an overflow (upstream <c>SnapshotEvent</c>): <c>{type, entries, run?, generation?, tools,
-/// compactions, compactionFailure?, inbox, agent, usage}</c>. Every other event applies on top of it.
+/// nestedTools, compactions, compactionFailure?, inbox, agent, usage}</c>. Every other event applies on top of it.
 /// </summary>
 public sealed record SnapshotEvent : AgentEvent
 {
@@ -58,6 +59,8 @@ public sealed record SnapshotEvent : AgentEvent
     public JsonObjectValue? Generation { get; init; }
     /// <summary>The tool slots of the current round (<c>pi.live.tools</c>).</summary>
     public required JsonArrayValue Tools { get; init; }
+    /// <summary><c>pi.live.nestedTools</c>: nested calls of running tool calls.</summary>
+    public required JsonArrayValue NestedTools { get; init; }
     /// <summary><c>pi.live.compactions</c>: live compactions with their attempt and retry backoff.</summary>
     public required JsonArrayValue Compactions { get; init; }
     /// <summary><c>pi.live.compactionFailure</c> <c>{taskId, reason, error}</c>: the newest compaction failure since a compaction last produced
@@ -74,7 +77,8 @@ public sealed record SnapshotEvent : AgentEvent
     public override JsonObjectValue ToJson() => Writer()
         .Add("entries", JsonValue.Array(Entries.Select(entry => (JsonValue)entry.ToJson())))
         .Add("run", RunInputs is { } inputs ? JsonValue.Object([KeyValuePair.Create("inputs", (JsonValue)Ids(inputs))]) : null)
-        .Add("generation", Generation).Add("tools", Tools).Add("compactions", Compactions).Add("compactionFailure", CompactionFailure)
+        .Add("generation", Generation).Add("tools", Tools).Add("nestedTools", NestedTools).Add("compactions", Compactions)
+        .Add("compactionFailure", CompactionFailure)
         .Add("inbox", JsonValue.Array(Inbox.Select(item => (JsonValue)item.ToJson()))).Add("agent", Agent).Add("usage", Usage).Build();
 }
 
@@ -145,29 +149,67 @@ public sealed record MessageEndEvent(EntryRecord Entry) : AgentEvent
     public override JsonObjectValue ToJson() => Writer().Add("entry", Entry.ToJson()).Build();
 }
 
-/// <summary><c>{type: "tool_execution_start", toolCallId, toolName, args}</c>: a slot becomes <c>running</c>; <c>args</c> come from the tool
-/// task's intent checkpoint.</summary>
-public sealed record ToolExecutionStartEvent(string ToolCallId, string ToolName, JsonObjectValue Args) : AgentEvent
+/// <summary>
+/// Which call a tool event is about (upstream <c>ToolEventCall</c>). <see cref="ToolCallId"/> is the call's ID in the transcript and in tool
+/// events: the provider's ID for a model-issued call, <c>&lt;parent call ID&gt;/&lt;key&gt;</c> for a nested one. Match events by it; do not
+/// parse it. <see cref="TaskId"/> is the call's tool task, null for a call that never got one (not offered, or not started in a sequential
+/// round). A nested call also names the call that made it, by call ID and by tool task.
+/// </summary>
+public sealed record ToolEventCall(string ToolCallId, string ToolName, TaskId? TaskId = null, string? ParentToolCallId = null,
+    TaskId? ParentTaskId = null)
 {
+    /// <summary>Adds <c>toolCallId, toolName, taskId?, parentToolCallId?, parentTaskId?</c>.</summary>
+    internal RecordJson.Writer Write(RecordJson.Writer writer) => writer.Add("toolCallId", ToolCallId).Add("toolName", ToolName)
+        .Add("taskId", TaskId?.ToJson()).Add("parentToolCallId", ParentToolCallId).Add("parentTaskId", ParentTaskId?.ToJson());
+}
+
+/// <summary>A tool event: its <see cref="Call"/> fields follow <c>type</c>.</summary>
+public abstract record ToolEvent(ToolEventCall Call) : AgentEvent
+{
+    /// <summary>The call's ID in the transcript and in tool events.</summary>
+    public string ToolCallId => Call.ToolCallId;
+    /// <summary>The tool's name.</summary>
+    public string ToolName => Call.ToolName;
+    /// <summary>The call's tool task; null for a call that never got one.</summary>
+    public TaskId? TaskId => Call.TaskId;
+    /// <summary>A nested call's caller, by call ID; null for a model-issued call.</summary>
+    public string? ParentToolCallId => Call.ParentToolCallId;
+    /// <summary>A nested call's caller, by tool task; null for a model-issued call.</summary>
+    public TaskId? ParentTaskId => Call.ParentTaskId;
+
+    /// <summary>A writer that starts with <c>type</c> and the call's fields.</summary>
+    private protected RecordJson.Writer CallWriter() => Call.Write(Writer());
+}
+
+/// <summary><c>{type: "tool_execution_start", ...call, args}</c>: a slot becomes <c>running</c>; <c>args</c> come from the tool task's
+/// intent checkpoint, or for a nested call from its slot, which carries the arguments it runs with.</summary>
+public sealed record ToolExecutionStartEvent(ToolEventCall Call, JsonObjectValue Args) : ToolEvent(Call)
+{
+    /// <summary>A model-issued call's start without a task ID.</summary>
+    public ToolExecutionStartEvent(string toolCallId, string toolName, JsonObjectValue args) : this(new ToolEventCall(toolCallId, toolName), args) { }
+
     /// <inheritdoc/>
     public override string Type => "tool_execution_start";
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => Writer().Add("toolCallId", ToolCallId).Add("toolName", ToolName).Add("args", Args).Build();
+    public override JsonObjectValue ToJson() => CallWriter().Add("args", Args).Build();
 }
 
 /// <summary>
-/// <c>{type: "tool_execution_update", toolCallId, toolName, output?, details?, diagnostics?}</c>: the running slot's output window, details or
+/// <c>{type: "tool_execution_update", ...call, output?, details?, diagnostics?}</c>: the running slot's output window, details or
 /// diagnostics changed. <see cref="Details"/> is <see cref="JsonValue.Null"/> and <see cref="Diagnostics"/> empty when a safe replay removed
 /// them; a null property is absent.
 /// </summary>
-public sealed record ToolExecutionUpdateEvent(string ToolCallId, string ToolName, ToolOutputChange? Output = null, JsonValue? Details = null,
-    JsonArrayValue? Diagnostics = null) : AgentEvent
+public sealed record ToolExecutionUpdateEvent(ToolEventCall Call, ToolOutputChange? Output = null, JsonValue? Details = null,
+    JsonArrayValue? Diagnostics = null) : ToolEvent(Call)
 {
+    /// <summary>A model-issued call's update without a task ID.</summary>
+    public ToolExecutionUpdateEvent(string toolCallId, string toolName, ToolOutputChange? output = null, JsonValue? details = null,
+        JsonArrayValue? diagnostics = null) : this(new ToolEventCall(toolCallId, toolName), output, details, diagnostics) { }
+
     /// <inheritdoc/>
     public override string Type => "tool_execution_update";
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() => Writer().Add("toolCallId", ToolCallId).Add("toolName", ToolName).Add("output", Output?.ToJson())
-        .Add("details", Details).Add("diagnostics", Diagnostics).Build();
+    public override JsonObjectValue ToJson() => CallWriter().Add("output", Output?.ToJson()).Add("details", Details).Add("diagnostics", Diagnostics).Build();
 }
 
 /// <summary>A change of a running tool's retained output window: a front trim and then an append (<see cref="ToolOutputDelta"/>), or its
@@ -207,15 +249,18 @@ public sealed record ToolOutputSet(string Set) : ToolOutputChange
     public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("set", Set).Build();
 }
 
-/// <summary><c>{type: "tool_execution_end", toolCallId, toolName, entry?}</c>: the slot is done, with its <c>pi.tool-result</c> entry, or
-/// without one when the tool task faulted or was orphaned.</summary>
-public sealed record ToolExecutionEndEvent(string ToolCallId, string ToolName, EntryRecord? Entry = null) : AgentEvent
+/// <summary><c>{type: "tool_execution_end", ...call, entry?, result?}</c>: the slot is done. A model-issued call ends with its
+/// <c>pi.tool-result</c> entry, a nested call with its <see cref="Result"/>. Both are absent when the tool task faulted or was orphaned, or
+/// when the call's slot left <c>pi.live</c> unfinished: its run ended, or its parent settled first.</summary>
+public sealed record ToolExecutionEndEvent(ToolEventCall Call, EntryRecord? Entry = null, NestedToolExecutionResult? Result = null) : ToolEvent(Call)
 {
+    /// <summary>A model-issued call's end without a task ID.</summary>
+    public ToolExecutionEndEvent(string toolCallId, string toolName, EntryRecord? entry = null) : this(new ToolEventCall(toolCallId, toolName), entry) { }
+
     /// <inheritdoc/>
     public override string Type => "tool_execution_end";
     /// <inheritdoc/>
-    public override JsonObjectValue ToJson() =>
-        Writer().Add("toolCallId", ToolCallId).Add("toolName", ToolName).Add("entry", Entry?.ToJson()).Build();
+    public override JsonObjectValue ToJson() => CallWriter().Add("entry", Entry?.ToJson()).Add("result", Result?.ToJson()).Build();
 }
 
 /// <summary><c>{type: "inbox_update", items}</c>: <c>pi.inbox</c> changed.</summary>
@@ -407,6 +452,7 @@ public interface IAgentEventStream
 public static class AgentEvents
 {
     private const string GenerationKind = "pi.generation";
+    private const string NestedCallKind = "pi.tool.nested-call";
     private static readonly ImmutableArray<PathSegment> PartialPath = Path("docs", "pi.live", "generation", "message");
 
     /// <summary>
@@ -480,6 +526,7 @@ public static class AgentEvents
         public JsonObjectValue? Run => Live.TryGetValue("run", out var run) ? run as JsonObjectValue : null;
         public JsonObjectValue? Generation => Live.TryGetValue("generation", out var generation) ? generation as JsonObjectValue : null;
         public JsonArrayValue? Tools => Live.TryGetValue("tools", out var tools) ? tools as JsonArrayValue : null;
+        public JsonArrayValue? NestedTools => Live.TryGetValue("nestedTools", out var nested) ? nested as JsonArrayValue : null;
         public JsonArrayValue? Compactions => Live.TryGetValue("compactions", out var compactions) ? compactions as JsonArrayValue : null;
         public JsonObjectValue? CompactionFailure => Live.TryGetValue("compactionFailure", out var failure) ? failure as JsonObjectValue : null;
     }
@@ -496,6 +543,7 @@ public static class AgentEvents
             RunInputs = parts.Run is { } run ? Inputs(run) : null,
             Generation = parts.Generation,
             Tools = parts.Tools ?? JsonArrayValue.Empty,
+            NestedTools = parts.NestedTools ?? JsonArrayValue.Empty,
             Compactions = parts.Compactions ?? JsonArrayValue.Empty,
             CompactionFailure = parts.CompactionFailure,
             Inbox = Queued(parts.Inbox),
@@ -528,10 +576,17 @@ public static class AgentEvents
         var tasks = new List<TaskRecord>();
         var taskIndex = new Dictionary<TaskId, int>();
         var submissions = new List<SubmissionRecord>();
+        // Nested results this commit stored, by nested task ID; read now, since the caller's documents may retire next.
+        var nestedResults = new Dictionary<long, NestedToolExecutionResult>();
         foreach (var change in publication.Changes)
         {
             switch (change)
             {
+                case DocumentCommitChange document when document.Record.Kind == NestedCallKind && document.Value is { } state &&
+                    document.ConversationId == conversationId:
+                    if (state.TryGetValue("taskId", out var nestedTask) && state.TryGetValue("result", out var nestedResult))
+                        nestedResults[Integer(nestedTask)] = NestedToolExecutionResult.FromJson(nestedResult);
+                    break;
                 case EntryWrite { Value: var entry } when entry.ConversationId == conversationId:
                     entries.Add(entry);
                     break;
@@ -548,7 +603,7 @@ public static class AgentEvents
                     break;
             }
         }
-        if (viewOps.IsEmpty && entries.Count == 0 && tasks.Count == 0 && submissions.Count == 0) return [];
+        if (viewOps.IsEmpty && entries.Count == 0 && tasks.Count == 0 && submissions.Count == 0 && nestedResults.Count == 0) return [];
         TaskRecord? TaskOf(TaskId id) => taskIndex.TryGetValue(id, out var index) ? tasks[index] : null;
         // Entries are appended in ID order; submission records are published in the order the commit first touched them.
         var sortedSubmissions = submissions.OrderBy(record => record.Id.Value).ToList();
@@ -566,15 +621,31 @@ public static class AgentEvents
             slotsBefore[callId] = slot;
         }
         var slots = Slots(now.Tools);
-        foreach (var slot in slots)
+        var nestedBefore = new Dictionary<long, JsonObjectValue>();
+        var nestedOrder = new List<long>();
+        foreach (var slot in Slots(was.NestedTools))
         {
-            var callId = Text(slot["callId"]);
-            if (Status(slot) != "running" || (slotsBefore.TryGetValue(callId, out var previous) && Status(previous) == "running")) continue;
-            var checkpoint = Field(slot, "taskId") is { } taskId && TaskOf(new TaskId(Integer(taskId)))?.State is LiveTaskState live
-                ? live.Checkpoint : null;
-            var args = checkpoint is JsonObjectValue state && state.TryGetValue("arguments", out var arguments) && arguments is JsonObjectValue given
-                ? given : JsonObjectValue.Empty;
-            events.Add(new ToolExecutionStartEvent(callId, Text(slot["name"]), args));
+            var taskId = Integer(slot["taskId"]);
+            if (!nestedBefore.ContainsKey(taskId)) nestedOrder.Add(taskId);
+            nestedBefore[taskId] = slot;
+        }
+        var nested = Slots(now.NestedTools);
+        foreach (var slot in slots.Concat(nested))
+        {
+            var isNested = slot.ContainsKey("parentCallId");
+            var previous = isNested ? nestedBefore.GetValueOrDefault(Integer(slot["taskId"])) : slotsBefore.GetValueOrDefault(Text(slot["callId"]));
+            if (Status(slot) != "running" || (previous is not null && Status(previous) == "running")) continue;
+            // A nested slot carries the arguments the call runs with; a model-issued call's are in its intent checkpoint.
+            JsonObjectValue args;
+            if (isNested) args = (JsonObjectValue)slot["arguments"];
+            else
+            {
+                var checkpoint = Field(slot, "taskId") is { } taskId && TaskOf(new TaskId(Integer(taskId)))?.State is LiveTaskState live
+                    ? live.Checkpoint : null;
+                args = checkpoint is JsonObjectValue state && state.TryGetValue("arguments", out var arguments) && arguments is JsonObjectValue given
+                    ? given : JsonObjectValue.Empty;
+            }
+            events.Add(new ToolExecutionStartEvent(CallOf(slot), args));
         }
         var partialBefore = Field(was.Generation, "message") as JsonObjectValue;
         var partial = Field(now.Generation, "message") as JsonObjectValue;
@@ -585,7 +656,13 @@ public static class AgentEvents
         {
             var slot = slots[index];
             if (Status(slot) != "running" || !slotsBefore.TryGetValue(Text(slot["callId"]), out var previous) || Status(previous) != "running") continue;
-            if (ToolUpdate(viewOps, index, slot, previous) is { } update) events.Add(update);
+            if (ToolUpdate(viewOps, "tools", index, slot, previous) is { } update) events.Add(update);
+        }
+        for (var index = 0; index < nested.Count; index++)
+        {
+            var slot = nested[index];
+            if (Status(slot) != "running" || !nestedBefore.TryGetValue(Integer(slot["taskId"]), out var previous) || Status(previous) != "running") continue;
+            if (ToolUpdate(viewOps, "nestedTools", index, slot, previous) is { } update) events.Add(update);
         }
         var generation = now.Generation;
         var generationBefore = was.Generation;
@@ -601,22 +678,37 @@ public static class AgentEvents
         // Tools that end in this commit: a slot that becomes done, one created done (a call not offered), or an unfinished one that vanishes
         // because its run ended. A done slot that vanishes ended earlier.
         var toolEnds = new List<ToolExecutionEndEvent>();
-        void EndTool(string callId, string name, long? entryId)
+        void EndTool(JsonObjectValue slot, long? entryId)
         {
             var entry = entryId is { } id ? entries.Find(candidate => candidate.Id.Value == id) : null;
-            toolEnds.Add(new ToolExecutionEndEvent(callId, name, entry));
+            toolEnds.Add(new ToolExecutionEndEvent(CallOf(slot), entry));
         }
         foreach (var callId in callOrder)
         {
             var previous = slotsBefore[callId];
             if (Status(previous) == "done") continue;
             var slot = slots.Find(candidate => Text(candidate["callId"]) == callId);
-            if (slot is not null && Status(slot) == "done") EndTool(callId, Text(previous["name"]), EntryOf(slot));
+            if (slot is not null && Status(slot) == "done") EndTool(slot, EntryOf(slot));
             // A slot whose run ended in this commit may have had its result appended with it, as for unstarted calls.
-            else if (slot is null) EndTool(callId, Text(previous["name"]), ResultOf(entries, callId)?.Id.Value);
+            else if (slot is null) EndTool(previous, ResultOf(entries, callId)?.Id.Value);
         }
         foreach (var slot in slots)
-            if (Status(slot) == "done" && !slotsBefore.ContainsKey(Text(slot["callId"]))) EndTool(Text(slot["callId"]), Text(slot["name"]), EntryOf(slot));
+            if (Status(slot) == "done" && !slotsBefore.ContainsKey(Text(slot["callId"]))) EndTool(slot, EntryOf(slot));
+        // Nested calls that end in this commit, the same way, children before the calls that made them: the lists hold parents first, so
+        // walk them backwards.
+        void EndNested(JsonObjectValue slot) =>
+            events.Add(new ToolExecutionEndEvent(CallOf(slot), Result: nestedResults.GetValueOrDefault(Integer(slot["taskId"]))));
+        var nestedNow = new Dictionary<long, JsonObjectValue>();
+        foreach (var slot in nested) nestedNow[Integer(slot["taskId"])] = slot;
+        for (var index = nestedOrder.Count - 1; index >= 0; index--)
+        {
+            var previous = nestedBefore[nestedOrder[index]];
+            if (Status(previous) == "done") continue;
+            var slot = nestedNow.GetValueOrDefault(nestedOrder[index]);
+            if (slot is null || Status(slot) == "done") EndNested(slot ?? previous);
+        }
+        for (var index = nested.Count - 1; index >= 0; index--)
+            if (Status(nested[index]) == "done" && !nestedBefore.ContainsKey(Integer(nested[index]["taskId"]))) EndNested(nested[index]);
 
         // Entries in append order; a tool's end directly precedes its result's message, as in the coding agent.
         var assistantAppended = false;
@@ -750,10 +842,18 @@ public static class AgentEvents
         return changes.ToImmutable();
     }
 
-    /// <summary>Output, details, and diagnostics changes of a running slot, from the view operations on it (upstream <c>toolUpdate</c>).</summary>
-    private static ToolExecutionUpdateEvent? ToolUpdate(ImmutableArray<Op> viewOps, int index, JsonObjectValue slot, JsonObjectValue previous)
+    /// <summary>The identifying fields of a slot's tool events (upstream <c>callOf</c>).</summary>
+    private static ToolEventCall CallOf(JsonObjectValue slot) => new(Text(slot["callId"]), Text(slot["name"]),
+        Field(slot, "taskId") is { } taskId ? new TaskId(Integer(taskId)) : null,
+        slot.ContainsKey("parentCallId") ? Text(slot["parentCallId"]) : null,
+        slot.ContainsKey("parentCallId") ? new TaskId(Integer(slot["parentTaskId"])) : null);
+
+    /// <summary>Output, details, and diagnostics changes of a running slot at <paramref name="list"/>[<paramref name="index"/>] in
+    /// <c>pi.live</c>, from the view operations on it (upstream <c>toolUpdate</c>).</summary>
+    private static ToolExecutionUpdateEvent? ToolUpdate(ImmutableArray<Op> viewOps, string list, int index, JsonObjectValue slot,
+        JsonObjectValue previous)
     {
-        var outputPath = Path("docs", "pi.live", "tools", index, "output");
+        var outputPath = Path("docs", "pi.live", list, index, "output");
         long trimStart = 0;
         var append = "";
         var set = false;
@@ -775,7 +875,7 @@ public static class AgentEvents
         var detailsChanged = !Same(details, Field(previous, "details"));
         var diagnosticsChanged = !Same(diagnostics, Field(previous, "diagnostics"));
         if (output is null && !detailsChanged && !diagnosticsChanged) return null;
-        return new ToolExecutionUpdateEvent(Text(slot["callId"]), Text(slot["name"]), output,
+        return new ToolExecutionUpdateEvent(CallOf(slot), output,
             detailsChanged ? details ?? JsonValue.Null : null,
             diagnosticsChanged ? diagnostics as JsonArrayValue ?? JsonArrayValue.Empty : null);
     }

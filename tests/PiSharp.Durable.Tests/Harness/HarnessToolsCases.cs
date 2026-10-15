@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-tools.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tools.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream opens every case on MemoryStorage. harness.tools.* does the same; harness.tools.jsonl.* and harness.tools.sqlite.*
 //   rerun every case on a fresh JSONL directory and a fresh SQLite file.
@@ -55,7 +55,7 @@ internal static class ToolsTests
 
     internal static Task<ToolExecutionResult> Result(ToolExecutionResult result) => Task.FromResult(result);
 
-    internal static readonly ToolExecutionResult NoContent = new() { Content = JsonArrayValue.Empty };
+    internal static readonly ToolExecutionResult NoContent = new() { Output = JsonArrayValue.Empty };
 
     internal static JsonArrayValue TextContent(string text) => JsonValue.Array(FauxText(text));
 
@@ -107,7 +107,7 @@ internal static class ToolsTests
             var setup = Setup();
             AddTool(setup.Registry, Tool("echo", (args, _, _) => Result(new ToolExecutionResult
             {
-                Content = TextContent($"echo {(((JsonObjectValue)args).TryGetValue("text", out var text) ? S(text) : "undefined")}"),
+                Output = TextContent($"echo {(((JsonObjectValue)args).TryGetValue("text", out var text) ? S(text) : "undefined")}"),
             })));
             var (harness, root, entries, status) = await Run(fresh, setup, [Calls(("echo", Obj(("text", "hi")), "c1")), Done]);
             Equal(SubmissionStatus.Done, status, "status");
@@ -232,7 +232,7 @@ internal static class ToolsTests
                 second!.Dispose();
                 return Result(NoContent);
             }, tool => tool with { ExecutionMode = ToolExecutionMode.Sequential }));
-            second = AddTool(setup.Registry, Tool("second", (_, _, _) => Result(new ToolExecutionResult { Content = TextContent("ran") })));
+            second = AddTool(setup.Registry, Tool("second", (_, _, _) => Result(new ToolExecutionResult { Output = TextContent("ran") })));
             var ran = await Run(fresh, setup, [Calls(("first", Obj(), "c1"), ("second", Obj(), "c2")), Done]);
             Equal(SubmissionStatus.Done, ran.Status, "status");
             Equal("<harness>\n[error] Tool second is not available\n</harness>", ResultText(Results(ran.Entries)[1]), "late");
@@ -367,7 +367,7 @@ internal static class ToolsTests
             var image = O("""{"type":"image","data":"AAAA","mimeType":"image/png"}""");
             AddTool(setup.Registry, Tool("big", (_, _, _) => Result(new ToolExecutionResult
             {
-                Content = JsonValue.Array(FauxText("a\nb\n"), image, FauxText("c\nd\n")),
+                Output = JsonValue.Array(FauxText("a\nb\n"), image, FauxText("c\nd\n")),
             }), tool => tool with { OutputLimits = new ToolOutputLimits { MaxLines = 2, Retain = ToolOutputRetention.Tail } }));
             var ran = await Run(fresh, setup, [Calls(("big", Obj(), "c1")), Done]);
             Equal("[image]|c\nd\n|<harness>\n[warn] Output truncated to its end: 2 lines, 4 bytes dropped\n</harness>", ResultText(Results(ran.Entries)[0]), "text");
@@ -531,16 +531,17 @@ internal static class ToolsTests
         yield return Case(prefix + "chains-aftertool-replacements-and-observes-the-round-with-aftertools", async () =>
         {
             var setup = Setup();
-            AddTool(setup.Registry, Tool("echo", (_, _, _) => Result(new ToolExecutionResult { Content = TextContent("raw") })));
+            AddTool(setup.Registry, Tool("echo", (_, _, _) => Result(new ToolExecutionResult { Output = TextContent("raw") })));
             AddHooks(setup.Registry, HarnessTasks.ToolTask, new ToolHooks
             {
-                AfterTool = (_, result, _, _) => Task.FromResult<ToolExecutionResult?>(result with { Content = TextContent("first") }),
+                AfterTool = (_, result, _, _) => Task.FromResult<ToolExecutionResult?>(result with { Output = TextContent("first") }),
             });
             AddHooks(setup.Registry, HarnessTasks.ToolTask, new ToolHooks
             {
                 AfterTool = (_, result, _, _) => Task.FromResult<ToolExecutionResult?>(result with
                 {
-                    Details = Obj(("replaced", ResultText(Obj(("content", result.Content!))))),
+                    Details = Obj(("replaced", string.Join("|", (result.Output ?? JsonArrayValue.Empty).Select(item =>
+                        item is JsonObjectValue block && S(block["type"]) == "text" ? S(block["text"]) : "")))),
                 }),
             });
             var observed = new SyncList<string>();
@@ -848,7 +849,7 @@ internal static class ToolsTests
         yield return Case(prefix + "answers-a-throwing-environment-with-a-tool-error-result-and-reports-it-once-while-preparing", async () =>
         {
             var setup = Setup();
-            AddTool(setup.Registry, Tool("probe", (_, _, _) => Result(new ToolExecutionResult { Content = TextContent("ran") })));
+            AddTool(setup.Registry, Tool("probe", (_, _, _) => Result(new ToolExecutionResult { Output = TextContent("ran") })));
             var ran = await Run(fresh, setup, [Calls(("probe", Obj(), "c1")), Done], null,
                 (_, _) => throw new InvalidOperationException("no sandbox"));
             var result = Results(ran.Entries)[0];
@@ -878,7 +879,7 @@ internal static class ToolsTests
                 Check(IsError(result), "isError");
                 var text = ResultText(result);
                 Check(text.StartsWith("line-1001\n", StringComparison.Ordinal), "retained tail: " + text[..Math.Min(40, text.Length)]);
-                Seq(["full_output", "tool_error", "truncated"], ((JsonArrayValue)((JsonObjectValue)entry.Data!)["diagnostics"])
+                Seq(["full_output", "exit_code", "truncated"], ((JsonArrayValue)((JsonObjectValue)entry.Data!)["diagnostics"])
                     .Select(diagnostic => ((JsonObjectValue)diagnostic).TryGetValue("code", out var code) ? S(code) : null), "diagnostic codes");
                 Check(text.Contains("line-3000\n|<harness>\n[info] Full output: ", StringComparison.Ordinal), "spill notice: " + text[^300..]);
                 Check(text.Contains("\n[error] Command exited with code 7\n[warn] Output truncated to its end: 1000 lines, ", StringComparison.Ordinal),
@@ -949,7 +950,7 @@ internal static class ToolsTests
                 slotOutput = S(((JsonObjectValue)((JsonArrayValue)live!["tools"])[0])["output"]);
                 return new ToolExecutionResult();
             }));
-            AddTool(setup.Registry, Tool("explicit", (_, _, _) => Result(new ToolExecutionResult { Content = TextContent("c\u001bd") })));
+            AddTool(setup.Registry, Tool("explicit", (_, _, _) => Result(new ToolExecutionResult { Output = TextContent("c\u001bd") })));
             var ran = await Run(fresh, setup, [Calls(("noisy", Obj(), "c1"), ("explicit", Obj(), "c2")), Done]);
             Equal("ab\n", slotOutput, "slot output");
             var byId = ById(ran.Entries);
@@ -1014,14 +1015,14 @@ internal static class ToolsTests
             {
                 started.Resolve();
                 await finished.Task;
-                return new ToolExecutionResult { Content = TextContent("v1") };
+                return new ToolExecutionResult { Output = TextContent("v1") };
             }));
             setup.Faux.SetResponses(Calls(("work", Obj(), "c1")), Done);
             var (harness, root) = await OpenChat(fresh(), setup);
             var submission = await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
             await started.Task;
             // The same extension name replaces the old one in place.
-            AddTool(setup.Registry, Tool("work", (_, _, _) => Result(new ToolExecutionResult { Content = TextContent("v2") })));
+            AddTool(setup.Registry, Tool("work", (_, _, _) => Result(new ToolExecutionResult { Output = TextContent("v2") })));
             finished.Resolve();
             await submission.WaitAsync(Context);
             Equal("v1", ResultText(Results(await AllEntries(root))[0]), "text");

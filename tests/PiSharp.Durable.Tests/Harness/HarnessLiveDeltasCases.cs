@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-live-deltas.test.ts. Verbatim apart from the adaptations
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-live-deltas.test.ts. Verbatim apart from the adaptations
 // in ChatSupport.cs and HarnessSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage; HarnessLiveDeltasCases() does the same (harness.live-deltas.*), and the JSONL and
 //   SQLite groups (harness.live-deltas.jsonl.*, harness.live-deltas.sqlite.*) rerun every case but "keeps a complete base exactly while
@@ -173,7 +173,7 @@ internal static partial class LiveDeltaTests
         yield return Case(prefix + "hands-a-generation-over-to-its-tool-round-and-starts-a-tool-with-one-field-write-each", async () =>
         {
             var setup = Setup();
-            HarnessTests.AddTool(setup.Registry, ToolOf("noop", (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty })));
+            HarnessTests.AddTool(setup.Registry, ToolOf("noop", (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty })));
             setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("noop", JsonObjectValue.Empty, "c1")], stopReason: "toolUse"),
                 FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(await fresh(), setup);
@@ -341,7 +341,7 @@ internal static partial class LiveDeltaTests
             var setup = Setup();
             // Not strict JSON: the result commit throws and the scheduler faults the task.
             HarnessTests.AddTool(setup.Registry, ToolOf("bad", (_, _, _) =>
-                Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty, Control = new ToolControl { AddTools = [null!] } })));
+                Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty, Control = new ToolControl { AddTools = [null!] } })));
             setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("ghost", JsonObjectValue.Empty, "g"), FauxToolCall("bad", JsonObjectValue.Empty, "b")],
                 stopReason: "toolUse"), FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(await fresh(), setup);
@@ -360,7 +360,7 @@ internal static partial class LiveDeltaTests
         yield return Case(prefix + "commits-the-tool-calling-answer-its-tool-tasks-the-generations-wait-and-the-tool-round-in-one-commit", async () =>
         {
             var setup = Setup();
-            HarnessTests.AddTool(setup.Registry, ToolOf("noop", (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty })));
+            HarnessTests.AddTool(setup.Registry, ToolOf("noop", (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty })));
             setup.Faux.SetResponses(FauxAssistantMessage([FauxToolCall("noop", JsonObjectValue.Empty, "a"), FauxToolCall("noop", JsonObjectValue.Empty, "b")],
                 stopReason: "toolUse"), FauxAssistantMessage([FauxText("done")]));
             var (harness, root) = await OpenChat(await fresh(), setup);

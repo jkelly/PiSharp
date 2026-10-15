@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/tools/edit.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/edit.ts (v1.2.0 renamed the result's content to output)
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -99,7 +99,7 @@ internal static class EditTool
             if (diffResult.FirstChangedLine is { } firstChangedLine) details["firstChangedLine"] = firstChangedLine;
             return new ToolExecutionResult
             {
-                Content = ToolContent.Text($"Successfully replaced {edits.Count} block(s) in {path}."),
+                Output = ToolContent.Text($"Successfully replaced {edits.Count} block(s) in {path}."),
                 Details = details.ToImmutable(),
             };
         }, context).ConfigureAwait(false);

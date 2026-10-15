@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): the scenarios of tools/DurableFixtures/scenarios.mjs, run on PiSharp. compat.* runs
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the scenarios of tools/DurableFixtures/scenarios.mjs, run on PiSharp. compat.* runs
 // them to write PiSharp's own sessions (compared with the sessions the pinned upstream wrote), and to resume upstream's sessions with the
 // same scripted model. Keep each scenario in step with its upstream twin: same faux responses, same tools and tasks, same order of calls.
 using PiSharp.Durable;
@@ -60,7 +60,7 @@ internal static class CompatScenarios
                         Started.Resolve();
                         try { await Aborted(callContext.CancellationToken); } catch (OperationCanceledException) { }
                     }
-                    return new ToolExecutionResult { Content = JsonValue.Array(FauxText($"finished run {run}")) };
+                    return new ToolExecutionResult { Output = JsonValue.Array(FauxText($"finished run {run}")) };
                 },
             });
         }
@@ -109,7 +109,7 @@ internal static class CompatScenarios
                             .Where(block => S(block["type"]) == "text").Select(block => S(block["text"])));
                         return new ToolExecutionResult
                         {
-                            Content = JsonValue.Array(FauxText(text)),
+                            Output = JsonValue.Array(FauxText(text)),
                             Details = Obj(("conversationId", child.ToJson())),
                         };
                     },
@@ -133,7 +133,7 @@ internal static class CompatScenarios
                 Tools = [Define.Tool(new ToolRegistration
                 {
                     Name = "noop", Description = "Does nothing",
-                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+                    Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
                 })],
             }));
             setup.Faux.SetResponses(Answer("Hello there"));

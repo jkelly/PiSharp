@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/tools/write.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/write.ts (v1.2.0 renamed the result's content to output)
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 
@@ -28,7 +28,7 @@ internal static class WriteTool
                 if (context.IsCancellationRequested) throw new OperationCanceledException("Operation aborted");
                 (await env.WriteFileAsync(absolutePath, content, context).ConfigureAwait(false)).GetOrThrow();
                 if (context.IsCancellationRequested) throw new OperationCanceledException("Operation aborted");
-                return new ToolExecutionResult { Content = ToolContent.Text($"Successfully wrote to {path}") };
+                return new ToolExecutionResult { Output = ToolContent.Text($"Successfully wrote to {path}") };
             }, context).ConfigureAwait(false);
         },
     });

@@ -230,7 +230,7 @@ internal static class CrashScenarios
                         await HarnessTests.Aborted(callContext.CancellationToken);
                     }
                     await gate.At("execute");
-                    return new ToolExecutionResult { Content = ToolsTests.TextContent($"ran {run}") };
+                    return new ToolExecutionResult { Output = ToolsTests.TextContent($"ran {run}") };
                 },
             }));
             HarnessTests.AddHooks(setup.Registry, HarnessTasks.ToolTask, new ToolHooks

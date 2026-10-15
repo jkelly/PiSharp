@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-prompt.test.ts (describes "system prompt preparation" and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-prompt.test.ts (describes "system prompt preparation" and
 // "tool loadout preparation"). Verbatim apart from the adaptations in HarnessSupport.cs, and these:
 // - Backends. Upstream runs these on MemoryStorage. harness.prompt.* does the same; harness.prompt.jsonl.* and harness.prompt.sqlite.* rerun
 //   the cases that plan against a stored conversation on a fresh JSONL directory and a fresh SQLite file. The three cases that use no
@@ -36,7 +36,7 @@ internal static class PromptTests
     private static readonly PromptInput Input = new()
     {
         ConversationId = new ConversationId(1),
-        Agent = new Agent { ThinkingLevel = "off", Extensions = [], Tools = [], Sections = [] },
+        Agent = new Agent { ThinkingLevel = "off", Extensions = [], Tools = [], Callable = [], Deferred = [], Sections = [] },
         Env = null,
         Shown = new Dictionary<string, string>(),
         Read = NullReader.Instance,

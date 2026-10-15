@@ -1,4 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/tools/read.ts
+// The result's content is ToolExecutionResult.Output since tool task v2 (durable work list area a); read.ts's other v1.2.0 changes (images)
+// are area e's, which re-pins this file.
 // Line numbers, offsets and limits are JavaScript numbers here too (doubles): the model may send 2.5, a negative number or 1e20, and the
 // result, its notices and its errors are upstream's for each, numbers printed as JavaScript prints them.
 using System.Collections.Immutable;
@@ -101,7 +103,7 @@ internal static class ReadTool
             // Image content is not supported yet.
             return new ToolExecutionResult
             {
-                Content = JsonArrayValue.Empty,
+                Output = JsonArrayValue.Empty,
                 IsError = true,
                 Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Error, $"{path} is an image ({mimeType}); reading images is not supported",
                     "unsupported_image")],
@@ -185,7 +187,7 @@ internal static class ReadTool
 
         return new ToolExecutionResult
         {
-            Content = outputText.Length == 0 ? JsonArrayValue.Empty : ToolContent.Text(outputText),
+            Output = outputText.Length == 0 ? JsonArrayValue.Empty : ToolContent.Text(outputText),
             Details = details,
             Diagnostics = diagnostics.ToImmutable(),
         };

@@ -78,7 +78,7 @@ internal static class InboxTests
         return new GatedStep(step, reached.Task, gate.Resolve);
     }
 
-    private static ToolExecutionResult Empty => new() { Content = JsonArrayValue.Empty };
+    private static ToolExecutionResult Empty => new() { Output = JsonArrayValue.Empty };
 
     /// <summary>Registers a <c>hold</c> tool whose calls wait for <paramref name="gate"/> and then return <paramref name="result"/> (upstream
     /// <c>holdTool</c>).</summary>

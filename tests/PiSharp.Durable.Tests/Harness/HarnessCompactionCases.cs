@@ -616,7 +616,7 @@ internal static class CompactionTests
                 Name = "wait",
                 Description = "wait",
                 Parameters = NoParameters,
-                Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonValue.Array(FauxText("waited")) }),
+                Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonValue.Array(FauxText("waited")) }),
             }));
             await chat.Root.ConfigureAsync(new AgentChange { Tools = ToolSelection.Only(ToolsNamed(chat.Setup, "wait")) }, Context);
             await History(chat);
@@ -988,7 +988,7 @@ internal static class CompactionTests
                 Name = "read",
                 Description = "read",
                 Parameters = NoParameters,
-                Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Content = JsonArrayValue.Empty }),
+                Execute = (_, _, _) => Task.FromResult(new ToolExecutionResult { Output = JsonArrayValue.Empty }),
             }));
             await chat.Root.ConfigureAsync(new AgentChange { Tools = ToolSelection.Only(ToolsNamed(chat.Setup, "read")) }, Context);
             await History(chat);
@@ -1402,7 +1402,7 @@ internal static class CompactionTests
                     {
                         toolReached.Resolve();
                         await toolGate.Task;
-                        return new ToolExecutionResult { Content = JsonValue.Array(FauxText(Text("result", 200))) };
+                        return new ToolExecutionResult { Output = JsonValue.Array(FauxText(Text("result", 200))) };
                     },
                 }));
                 await chat.Root.ConfigureAsync(new AgentChange { Tools = ToolSelection.Only(ToolsNamed(chat.Setup, "slow")) }, Context);

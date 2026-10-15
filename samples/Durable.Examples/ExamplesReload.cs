@@ -30,7 +30,7 @@ public static partial class Examples
                     {
                         started();
                         await gate;
-                        return new ToolExecutionResult { Content = JsonValue.Array(JsonValue.Object([new("type", "text"), new("text", version)])) };
+                        return new ToolExecutionResult { Output = JsonValue.Array(JsonValue.Object([new("type", "text"), new("text", version)])) };
                     },
                 }),
             ],

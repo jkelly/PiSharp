@@ -197,7 +197,7 @@ public static partial class Examples
                     callContext);
                 return new ToolExecutionResult
                 {
-                    Content = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", "Plan submitted.")])]),
+                    Output = JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", "Plan submitted.")])]),
                     Control = new ToolControl { Terminate = true },
                 };
             },

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-events.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-events.test.ts. Verbatim apart from the adaptations in
 // ChatSupport.cs, HarnessSupport.cs and HarnessViewCases.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage; nothing in it depends on the backend, so HarnessEventsCases() runs it on MemoryStorage
 //   (harness.events.*), HarnessEventsJsonlCases() on a fresh JSONL directory and HarnessEventsSqliteCases() on a fresh SQLite file.
@@ -230,7 +230,8 @@ internal static partial class EventTests
             await submission.WaitAsync(Context);
             await ViewTests.Drained(harness);
             var tool = listening.Events().Where(item => item.Type.StartsWith("tool_execution", StringComparison.Ordinal)).ToList();
-            SameJson("""{"type":"tool_execution_start","toolCallId":"c1","toolName":"print","args":{"n":1}}""", tool[0].ToJson(), "start");
+            MatchExactly("""{"type":"tool_execution_start","toolCallId":"c1","toolName":"print","taskId":"<number>","args":{"n":1}}""", tool[0].ToJson(), "start");
+            Equal("""["type","toolCallId","toolName","taskId","args"]""", JsonValue.Array(tool[0].ToJson().Keys.Select(key => (JsonValue)key)).ToJson(), "start keys");
             var end = tool[^1];
             MatchJson("""{"type":"tool_execution_end","toolCallId":"c1","entry":{"kind":"pi.tool-result"}}""", end.ToJson(), "end");
             // As in the coding agent, the tool ends directly before its result message.
