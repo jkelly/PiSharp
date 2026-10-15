@@ -110,6 +110,12 @@ public sealed record ExtensionToolDescriptor(
     public bool SequentialExecution { get; init; }
     /// <summary>Source ToolDefinition.outputSchema: the JSON schema of the result's <c>structuredContent</c> (codemode resolves to it).</summary>
     public JsonData? OutputSchema { get; init; }
+    /// <summary>Source ToolDefinition.reachesTools, for tools that reach other tools (such as <c>codemode</c>, which calls them, and
+    /// <c>tool_search</c>, which loads them): which tools a call with the given input may reach, <see cref="ToolReach.All"/> or the words
+    /// of the input that may name them. Hosts that register tools late, such as MCP servers that are still connecting, use it to
+    /// finish registering those tools before the call runs, and the MCP integration activates a <c>codemode</c> or
+    /// <c>tool_search</c> tool for MCP servers only when it declares this. Pure and synchronous. Null declares none.</summary>
+    public Func<JsonData, ToolReach>? ReachesTools { get; init; }
 }
 
 public sealed record ExtensionCommandDescriptor(

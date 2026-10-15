@@ -103,7 +103,7 @@ internal sealed partial class NativeExtensionActivation
                         tool.SequentialExecution ? PiSharp.Agent.ToolExecutionMode.Sequential : PiSharp.Agent.ToolExecutionMode.Parallel)
                     {
                         Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true, Annotations = tool.Annotations,
-                        PromptGuidelines = tool.PromptGuidelines, PromptSnippet = tool.PromptSnippet, OutputSchema = tool.OutputSchema,
+                        PromptGuidelines = tool.PromptGuidelines, PromptSnippet = tool.PromptSnippet, OutputSchema = tool.OutputSchema, ReachesTools = tool.ReachesTools,
                         PrepareLoadout = binding.GetLoadoutPreparation(tool.Name)
                     };
                 }).ToImmutableArray();

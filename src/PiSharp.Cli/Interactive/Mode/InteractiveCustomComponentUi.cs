@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (createExtensionUIContext
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (createExtensionUIContext
 // custom(): the extension's component replaces the editor and has focus until it calls done()).
 using System.Collections.Immutable;
 using PiSharp.Extensions;

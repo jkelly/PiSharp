@@ -5,11 +5,12 @@ using PiSharp.Contracts;
 
 // Authored offline expectations for PiSharp 1.1.0.3: codemode on Jint (decision 0003), ported from Pi v1.1.0
 // packages/codemode/test/{sandbox,source,declarations}.test.ts, packages/coding-agent/test/suite/agent-session-codemode.test.ts
-// and codemode-renderer.test.ts by reading; never captured from an upstream run. Fake MCP servers, a fake model registry and a
+// and codemode-renderer.test.ts by reading, updated to Pi v1.2.0 (06a46693); never captured from an upstream run. The declaration
+// differential (Declarations/declaration-goldens.json) is recorded from the real upstream 1.2.0 packages. Fake MCP servers, a fake model registry and a
 // fake Anthropic endpoint answer in process; no network or live credentials are used.
 internal static partial class Program
 {
-    private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 
     private static async Task<int> Main(string[] args)
     {
@@ -21,6 +22,8 @@ internal static partial class Program
             throw new ArgumentException("Use [--report <fresh path>] or [--only <case prefix>].");
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(PureCases());
+        cases.AddRange(DeclarationDifferentialCases());
+        cases.AddRange(Sync120Cases());
         cases.AddRange(SandboxCases());
         cases.AddRange(LimitCases());
         cases.AddRange(IsolationCases());

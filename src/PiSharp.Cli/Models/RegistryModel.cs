@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/types.ts (Model, ImageModel, ClassifierModel shapes) and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/types.ts (Model, ImageModel, ClassifierModel shapes) and
 // packages/ai/src/utils/model-operations.ts (getModelType) / models.ts (modelsAreEqual).
 using System.Collections.Immutable;
 using System.Text;

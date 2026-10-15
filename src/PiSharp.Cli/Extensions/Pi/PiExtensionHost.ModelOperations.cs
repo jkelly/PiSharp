@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts (registerProvider and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (registerProvider and
 // unregisterProvider for providers with classifiers or images) and packages/coding-agent/src/core/model-runtime.ts (registerProvider:
 // the provider joins the session's model registry, unregisterProvider and a reload remove it).
 using System.Collections.Immutable;

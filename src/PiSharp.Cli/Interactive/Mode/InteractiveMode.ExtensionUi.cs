@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (createExtensionUIContext,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (createExtensionUIContext,
 // showExtensionSelector/Confirm/Input/Editor, setExtensionStatus/Widget/Footer/Header, setCustomEditorComponent, resetExtensionUI,
 // extension shortcuts and terminal input listeners). Extension dialogs reach the mode as RPC extension_ui_request records (the host's
 // native presentation observer for dialogs, output records for notifications) and are answered with extension_ui_response.

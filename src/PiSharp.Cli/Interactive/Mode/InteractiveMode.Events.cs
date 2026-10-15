@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (subscribeToAgent,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (subscribeToAgent,
 // handleEvent, addMessageToChat, renderSessionItems, renderSessionEntries, renderInitialMessages, cache and compaction notices,
 // showStatusIndicator/clearStatusIndicator, pending messages and the compaction queue).
 using System.Globalization;
@@ -317,7 +317,7 @@ internal sealed partial class InteractiveMode
                 if (settings.ShowTerminalProgress) ui.Terminal.SetProgress(true);
                 autoCompactionEscapeHandler = defaultEditor.OnEscape;
                 defaultEditor.OnEscape = AbortCompaction;
-                ShowStatusIndicator(new CompactionStatusIndicator(ui, ToCompactionReason(S(e["reason"]))));
+                ShowStatusIndicator(new CompactionStatusIndicator(ui, ToCompactionReason(S(e["reason"])), EmbeddedStatusColor()));
                 ui.RequestRender();
                 break;
 
@@ -382,7 +382,7 @@ internal sealed partial class InteractiveMode
             case "summarization_retry_attempt_start":
                 ClearStatusIndicator(StatusIndicatorKind.Retry);
                 if (S(e["source"]) == "branchSummary") ShowStatusIndicator(new BranchSummaryStatusIndicator(ui));
-                else ShowStatusIndicator(new CompactionStatusIndicator(ui, ToCompactionReason(S(e["reason"]))));
+                else ShowStatusIndicator(new CompactionStatusIndicator(ui, ToCompactionReason(S(e["reason"])), EmbeddedStatusColor()));
                 ui.RequestRender();
                 break;
 
@@ -791,12 +791,13 @@ internal sealed partial class InteractiveMode
         if (cleared is not null && !wasEmbedded && options.TuiMode == "regular" && ui.ClearOnShrink) statusContainer.AddChild(idleStatus);
     }
 
-    private void ShowWorkingStatusIndicator()
-    {
-        Func<string, string>? colorFn = editor is CustomEditor { EmbedWorkingStatus: true }
-            ? text => (editor.BorderColor ?? theme.GetThinkingBorderColor(state.ThinkingLevel ?? "off"))(text) : null;
-        ShowStatusIndicator(new WorkingStatusIndicator(ui, workingMessage ?? DefaultWorkingMessage, workingIndicatorOptions, colorFn));
-    }
+    /// <summary>Source isEmbeddedStatus: a status embedded in a custom editor's border uses the editor border colour or the
+    /// thinking-level border colour; otherwise the indicator keeps its own colours.</summary>
+    private Func<string, string>? EmbeddedStatusColor() => editor is CustomEditor { EmbedWorkingStatus: true }
+        ? text => (editor.BorderColor ?? theme.GetThinkingBorderColor(state.ThinkingLevel ?? "off"))(text) : null;
+
+    private void ShowWorkingStatusIndicator() =>
+        ShowStatusIndicator(new WorkingStatusIndicator(ui, workingMessage ?? DefaultWorkingMessage, workingIndicatorOptions, EmbeddedStatusColor()));
 
     private void SetWorkingVisible(bool visible)
     {

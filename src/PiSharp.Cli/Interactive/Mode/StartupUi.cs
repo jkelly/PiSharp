@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/cli/startup-ui.ts (createStartupTui, startStartupTui,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/cli/startup-ui.ts (createStartupTui, startStartupTui,
 // showStartupSelector, showStartupInput, showFirstTimeSetup, shouldRunFirstTimeSetup), coding-agent/src/cli/session-picker.ts
 // (selectSession), coding-agent/src/cli/config-selector.ts (selectConfig) and the interactive prompts main.ts runs before the session\n// starts (project trust, missing session cwd).
 using System.Collections.Immutable;

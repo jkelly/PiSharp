@@ -18,15 +18,15 @@ using PiSharp.CodingAgent;
 using PiSharp.CodingAgent.Configuration;
 using PiSharp.Contracts;
 
-// Authored expectations derived by reading Pi v1.1.0 (abe508e1b89912adde45528136c3221eb69acdd7) source text:
+// Authored expectations derived by reading Pi v1.2.0 (06a466935536f8c9bcacb2d5efc0fc021be1bdff) source text:
 // api/anthropic-messages.ts, api/constrained-sampling.ts, api/simple-options.ts, api/openai-completions.ts,
 // api/openai-responses.ts, api/azure-openai-responses.ts, providers/azure.ts, env-api-keys.ts, utils/retry.ts,
 // utils/provider-retry.ts, utils/overflow.ts, api/mistral-conversations.ts, utils/estimate.ts, utils/pi-user-agent.ts,
-// api/openai-responses-shared.ts, utils/transcript.ts, models.ts and the @earendil-works/pi-ai@1.1.0 catalog shards. Nothing here executes upstream code or is an upstream capture;
+// api/openai-responses-shared.ts, utils/transcript.ts, models.ts and the @earendil-works/pi-ai@1.2.0 catalog shards (expectations first read at v1.1.0 and re-verified). Nothing here executes upstream code or is an upstream capture;
 // no network, provider or credential is used.
 internal static partial class Program
 {
-    private const string SourceSha = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string SourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
     private const string Key = "inert-provider-sync-key";
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(10);
     private static int bodyComparisons;
@@ -38,6 +38,9 @@ internal static partial class Program
         {
             ("anthropic.inline-tools-full-requests-across-add-redefine-remove", AnthropicInlineTools),
             ("anthropic.strict-rejected-keywords-send-non-strict", AnthropicStrictKeywords),
+            ("anthropic.strict-tool-limit-rejection-retries-preferred-tools-non-strict", AnthropicStrictFallbackRetries),
+            ("anthropic.strict-tool-fallback-native-and-resolved-routes-and-inline-additions", AnthropicStrictFallbackRoutes),
+            ("anthropic.strict-tool-fallback-refusals-second-rejection-hooks-cancellation-and-sse-errors", AnthropicStrictFallbackRefusals),
             ("anthropic.mid-effort-catalog-models-construct-on-key-and-resolved-routes", MidEffortModelsConstruct),
             ("anthropic.mid-effort-sonnet-5-5-every-level-full-requests-oauth-and-simple", MidEffortSonnetEveryLevel),
             ("anthropic.mid-effort-multi-turn-replay-preserves-per-turn-effort", MidEffortReplay),
@@ -428,12 +431,18 @@ internal static partial class Program
             "Our servers are currently busy. Please wait.",
             "Selected model is at capacity. Please try a different model.",
             "The pending stream has been canceled (caused by: ERR_HTTP2_STREAM_CANCEL)",
-            "Provider stopped with: error (server error)"
+            "Provider stopped with: error (server error)",
+            // Pi 1.2.0 (#10842): gateway wording with an article is transient too, next to OpenRouter's "Provider returned error".
+            "The upstream provider returned an error",
+            "Provider returned error",
+            "provider_returned_an_error"
         })
             Check(AgentRetryPolicy.IsRetryableError(StopReason.Error, message), "Not retried: " + message);
         // Permanent limits still win, unrelated text and non-errors stay terminal, and the pre-1.1.0 Mistral text was not retryable.
         foreach (var (reason, message) in new[] { (StopReason.Error, "server_busy: insufficient_quota"), (StopReason.Error, "Provider stopped with: error"),
-            (StopReason.Error, "Invalid request body"), (StopReason.Stop, "server_busy") })
+            (StopReason.Error, "Invalid request body"), (StopReason.Stop, "server_busy"),
+            // The 1.2.0 pattern admits only an optional "an" between "returned" and "error".
+            (StopReason.Error, "The provider returned another error") })
             Check(!AgentRetryPolicy.IsRetryableError(reason, message), "Unexpectedly retried: " + message);
         return Task.CompletedTask;
     }

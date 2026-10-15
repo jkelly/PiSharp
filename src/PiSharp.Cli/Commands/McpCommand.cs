@@ -353,7 +353,8 @@ internal static class McpCommand
     }
 
     /// <summary>Source list: connect to every enabled server, report its state, tools and errors; exit 1 when one is not connected
-    /// or the config has errors. Servers with resources report their resource and URI template counts.</summary>
+    /// or the config has errors. A server that offers resources reports <c>resources: true</c>; its resources are not listed, since
+    /// listing every one can take long.</summary>
     private static async Task<int> ListAsync(McpLoadedConfiguration loaded, bool json, string? untrustedNote, McpCommandOptions options,
         Action<string> log, CancellationToken token)
     {
@@ -382,11 +383,7 @@ internal static class McpCommand
                 var overrides = snapshot.Catalog.Tools.Select(tool => (tool.Name, Exposure: McpConfigurationReader.GetToolExposure(entry.Config, tool.Name).ToString().ToLowerInvariant()))
                     .Where(row => row.Exposure != exposure).ToList();
                 if (overrides.Count > 0) report["toolExposure"] = new JsonObject(overrides.Select(row => KeyValuePair.Create(row.Name, (JsonNode?)row.Exposure)));
-                if (snapshot.Catalog.HasResources)
-                {
-                    var (resources, templates) = await runtime.CountResourcesAsync(token).ConfigureAwait(false);
-                    report["resources"] = resources; report["resourceTemplates"] = templates;
-                }
+                if (snapshot.Catalog.HasResources) report["resources"] = true;
             }
             catch (Exception failure) when (!token.IsCancellationRequested)
             {
@@ -422,8 +419,7 @@ internal static class McpCommand
             if (state == "needs-auth") log($"  sign in with: {AppName} mcp login {name}");
             if (tools.Count > 0)
                 log("  tools: " + string.Join(", ", tools.Select(tool => report["toolExposure"]?[tool] is { } toolExposure ? $"{tool} [{toolExposure.GetValue<string>()}]" : tool)));
-            if (report["resources"] is { } resourceCount)
-                log($"  resources: {resourceCount.GetValue<int>()}, URI templates: {report["resourceTemplates"]?.GetValue<int>() ?? 0}");
+            if (report["resources"] is not null) log("  offers resources");
             if (report["error"] is { } failure) log("  " + failure.GetValue<string>().Replace("\n", "\n  ", StringComparison.Ordinal));
         }
         foreach (var configError in loaded.Errors) log($"config error: {configError}");

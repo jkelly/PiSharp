@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/tui-alt-screen.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui-alt-screen.ts.
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -171,7 +171,7 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         else
         {
             var width = Math.Max(1, Terminal.Columns);
-            var document = Render(width).Select(line => LayoutEngine.Osc133ZonePrefix().Replace(line, "").Replace(CursorMarker, "", StringComparison.Ordinal)).ToList();
+            var document = ResolveFakeCursors(Render(width)).Select(line => LayoutEngine.Osc133ZonePrefix().Replace(line, "").Replace(CursorMarker, "", StringComparison.Ordinal)).ToList();
             lastDocument = ApplyLineResets(document).Select(line => TerminalImage.IsImageLine(line) || TextUtils.VisibleWidth(line) <= width ? line : TextUtils.SliceByColumn(line, 0, width, true)).ToList();
             var buffer = new StringBuilder(BeginSync + ExitAltScreen + DisableAutowrap);
             for (var row = 0; row < lastDocument.Count; row++) { if (row > 0) buffer.Append("\r\n"); buffer.Append("\r\u001b[2K").Append(lastDocument[row]); }
@@ -340,7 +340,6 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
             var overlay = DispatchMouseToOverlay(mouseEvent);
             var result = overlay.Result ?? (overlay.Hit ? null : DispatchMouseToLayout(mouseEvent));
             if (result is not null) { if (ApplyMouseDispatchResult(mouseEvent, result)) RequestRender(); return new(Consume: true); }
-            if (DeferToOverlay()) return null;
             RouteWheel(wheel.X, wheel.Y, delta);
             return new(Consume: true);
         }
@@ -905,7 +904,8 @@ public sealed partial class TuiAltScreen : TuiBase, IViewportTui
         IComponent root = layoutRoot ?? implicitScrollView;
         var next = LayoutEngine.RenderFrame(root, width, height, () => RequestRender());
         if (RefreshSearch(next)) next = LayoutEngine.RenderFrame(root, width, height, () => RequestRender());
-        var screen = next.Lines.Select(line => LayoutEngine.Osc133ZonePrefix().Replace(line, "")).ToList();
+        // Resolve fake cursors before highlighting and compositing, which only track SGR codes
+        var screen = ResolveFakeCursors(next.Lines.Select(line => LayoutEngine.Osc133ZonePrefix().Replace(line, "")).ToList());
         screen = ApplySearchHighlights(screen, next);
         screen = CompositeScrollToEndIndicator(screen, next, width);
         screen = CompositeOverlays(screen, width, height);

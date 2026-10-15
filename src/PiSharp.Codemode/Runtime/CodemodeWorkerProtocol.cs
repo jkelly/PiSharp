@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/codemode/src/runtime/protocol.ts. Messages between the host and the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/runtime/protocol.ts. Messages between the host and the
 // engine (a thread or a child process). Tool arguments, results and values cross as JSON strings, as in the original.
 using System.Text;
 using System.Text.Json;

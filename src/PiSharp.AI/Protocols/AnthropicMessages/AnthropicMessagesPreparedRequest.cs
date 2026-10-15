@@ -9,6 +9,8 @@ namespace PiSharp.AI.Protocols.AnthropicMessages;
 public sealed class AnthropicMessagesPreparedRequest
 {
     public JsonData Payload { get; }
+    /// <summary>Pi 1.2.0: the same request prepared with strict "prefer" tools sent non-strict, when one was sent strict.</summary>
+    internal Func<CancellationToken, AnthropicMessagesPreparedRequest>? Fallback { get; init; }
     private readonly Func<JsonData,CancellationToken,HttpRequestMessage> _complete;
     private readonly AnthropicMessagesKeyAuthRequestOptions _limits;
     private int _used;

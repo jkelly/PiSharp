@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/oauth-selector.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/oauth-selector.ts.
 // Also ports InteractiveMode.getLoginProviderOptions (modes/interactive/interactive-mode.ts), which builds this selector's
 // provider list, over the narrow ILoginProviderCatalog.
 using System.Globalization;

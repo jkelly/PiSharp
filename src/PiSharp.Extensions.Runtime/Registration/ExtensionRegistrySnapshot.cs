@@ -31,6 +31,8 @@ public sealed record ExtensionToolRegistrationInfo(string OwnerId, long OwnerGen
     public string? PromptSnippet { get; init; }
     public bool SequentialExecution { get; init; }
     public JsonData? OutputSchema { get; init; }
+    /// <summary>The descriptor's pure reachesTools function (see <see cref="ExtensionToolDescriptor.ReachesTools"/>).</summary>
+    public Func<JsonData, ToolReach>? ReachesTools { get; init; }
 }
 
 public sealed record ExtensionCommandRegistrationInfo(string OwnerId, long OwnerGeneration,
@@ -96,7 +98,8 @@ public sealed class ExtensionRegistrySnapshot
                     Exposure = descriptor.Exposure, Namespace = descriptor.Namespace, DefaultActive = descriptor.DefaultActive,
                     HasLoadoutPreparation = descriptor.PrepareLoadout is not null, PromptGuidelines = descriptor.PromptGuidelines,
                     ConstrainedSampling = descriptor.ConstrainedSampling, Annotations = descriptor.Annotations,
-                    PromptSnippet = descriptor.PromptSnippet, SequentialExecution = descriptor.SequentialExecution, OutputSchema = descriptor.OutputSchema };
+                    PromptSnippet = descriptor.PromptSnippet, SequentialExecution = descriptor.SequentialExecution, OutputSchema = descriptor.OutputSchema,
+                    ReachesTools = descriptor.ReachesTools };
         }).ToImmutableArray();
         ToolRenderers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ToolRenderer)).ToImmutableArray();
     }

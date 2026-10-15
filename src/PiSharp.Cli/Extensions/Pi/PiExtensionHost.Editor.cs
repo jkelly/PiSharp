@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/interactive/interactive-mode.ts (setCustomEditorComponent,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/interactive-mode.ts (setCustomEditorComponent,
 // addAutocompleteProvider/setupAutocompleteProvider) and packages/coding-agent/src/modes/interactive/components/custom-editor.ts.
 using System.Collections.Concurrent;
 using System.Text.Json;

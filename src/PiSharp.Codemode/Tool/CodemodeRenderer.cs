@@ -1,4 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/codemode/renderer.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/codemode/renderer.ts and
+// packages/coding-agent/src/core/tools/render-utils.ts (formatToolDuration, toolTimerText).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -10,8 +11,10 @@ using PiSharp.Extensions;
 namespace PiSharp.Codemode;
 
 /// <summary>Presentation of the codemode tool: the call shows the script; the result lists the nested calls with their status
-/// and the cost of model calls, followed by the output without the "Script completed" header. Rows are plain text: the
-/// native renderer contract carries no theme, so colours and syntax highlighting are left to the host.</summary>
+/// and the cost of model calls, followed by the output without the "Script completed" header and the time the script took. Rows
+/// are plain text: the native renderer contract carries no theme, so colours and syntax highlighting are left to the host. It
+/// carries no row state either, so the live <c>Elapsed</c> clock is the themed host renderer's; this one shows the recorded
+/// <c>Took</c> time of a final result.</summary>
 public static partial class CodemodeRenderer
 {
     private const int CodePreviewLines = 10;
@@ -23,12 +26,24 @@ public static partial class CodemodeRenderer
 
     public static ExtensionToolRenderers Renderers { get; } = new(null,
         (context, width, _) => Task.FromResult(Rows(RenderCall(context.Arguments, context.Expanded), width)),
-        (result, context, width, _) => Task.FromResult(Rows(RenderResult(result, context.Expanded, context.IsPartial, context.ShowImages), width)));
+        (result, context, width, _) => Task.FromResult(Rows(RenderResult(result, context.Expanded, context.IsPartial, context.ShowImages, context.DurationMs), width)));
 
     private static string ExpandHint(int hidden, string noun) => $"... ({hidden} more {noun}, {ExpandKey} to expand)";
 
     internal static string FormatDuration(double? ms) => ms is not { } value ? "" :
         value < 1000 ? $"{Math.Round(value, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture)}ms" : $"{(value / 1000).ToString("F1", CultureInfo.InvariantCulture)}s";
+
+    /// <summary>render-utils.ts formatToolDuration: <c>4.2s</c> below a minute, then <c>1m 30s</c> and <c>2h 3m 4s</c>.</summary>
+    internal static string FormatToolDuration(double ms)
+    {
+        var seconds = ms / 1000;
+        if (seconds < 60) return seconds.ToString("F1", CultureInfo.InvariantCulture) + "s";
+        var totalSeconds = (long)Math.Floor(seconds);
+        var minutes = totalSeconds / 60;
+        var remainder = totalSeconds % 60;
+        if (minutes < 60) return $"{minutes}m {remainder}s";
+        return $"{minutes / 60}h {minutes % 60}m {remainder}s";
+    }
 
     /// <summary>Cents for larger amounts, two significant digits for fractions of a cent.</summary>
     internal static string FormatCost(double cost) => "$" + (cost >= 0.01 ? cost.ToString("F2", CultureInfo.InvariantCulture) : ToPrecision2(cost));
@@ -75,10 +90,12 @@ public static partial class CodemodeRenderer
         return lines;
     }
 
-    /// <summary>The result rows: nested calls (the last eight unless expanded), the total cost of model calls, and the output.</summary>
-    public static IReadOnlyList<string> RenderResult(JsonData result, bool expanded, bool isPartial, bool showImages = false)
+    /// <summary>The result rows: nested calls (the last eight unless expanded), the total cost of model calls, the output, and
+    /// <c>Took</c> with the recorded <paramref name="durationMs"/> of a final result.</summary>
+    public static IReadOnlyList<string> RenderResult(JsonData result, bool expanded, bool isPartial, bool showImages = false, long? durationMs = null)
     {
         var lines = new List<string>();
+        var timed = WithTimer(lines, isPartial, durationMs);
         var value = result.Value;
         var calls = value.ValueKind == JsonValueKind.Object && value.TryGetProperty("details", out var details) && details.ValueKind == JsonValueKind.Object &&
             details.TryGetProperty("calls", out var list) && list.ValueKind == JsonValueKind.Array ? list.EnumerateArray().ToList() : [];
@@ -91,7 +108,7 @@ public static partial class CodemodeRenderer
             var priced = calls.Where(call => call.TryGetProperty("cost", out var cost) && cost.ValueKind == JsonValueKind.Number && cost.GetDouble() != 0).ToList();
             if (priced.Count > 1) lines.Add("Model calls: " + FormatCost(priced.Sum(call => call.GetProperty("cost").GetDouble())));
         }
-        if (isPartial) return lines;
+        if (isPartial) return timed();
         var blocks = value.ValueKind == JsonValueKind.Object && value.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array
             ? content.EnumerateArray().ToList() : [];
         if (blocks.Count > 0 && Block(blocks[0], out var first) && ScriptHeader().IsMatch(first)) blocks.RemoveAt(0);
@@ -103,7 +120,7 @@ public static partial class CodemodeRenderer
             { if (text.Length > 0) text.Append('\n'); text.Append($"[Image: {(block.TryGetProperty("mimeType", out var mime) ? mime.GetString() : "image")}]"); }
         }
         var output = Js.Trim(text.ToString());
-        if (output.Length == 0) return lines;
+        if (output.Length == 0) return timed();
         lines.Add("");
         var outputLines = output.Replace("\t", "   ", StringComparison.Ordinal).Split('\n');
         if (expanded || outputLines.Length <= OutputPreviewLines) lines.AddRange(outputLines);
@@ -114,7 +131,7 @@ public static partial class CodemodeRenderer
                 resultDetails.TryGetProperty("fullOutputPath", out var path) && path.ValueKind == JsonValueKind.String)
                 lines.Add("Full output: " + path.GetString());
         }
-        return lines;
+        return timed();
         static bool Block(JsonElement block, out string text)
         {
             text = "";
@@ -123,6 +140,13 @@ public static partial class CodemodeRenderer
             text = value.GetString()!; return true;
         }
     }
+
+    /// <summary>renderer.ts: the timing line after a spacer, from toolTimerText's recorded duration of a final result.</summary>
+    private static Func<IReadOnlyList<string>> WithTimer(List<string> lines, bool isPartial, long? durationMs) => () =>
+    {
+        if (!isPartial && durationMs is { } recorded) { lines.Add(""); lines.Add("Took " + FormatToolDuration(recorded)); }
+        return lines;
+    };
 
     /// <summary>Lines wrapped to <paramref name="width"/> terminal cells (one cell per code point, two for wide characters).</summary>
     private static ExtensionCustomComponentRows Rows(IReadOnlyList<string> lines, int width)

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (session start: load the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (session start: load the
 // config, connect every enabled server in the background, the first prompt waiting for servers with direct tools,
 // ensureDiscoveryActive, reportProblems, describeState), packages/coding-agent/src/extensions/tool-search/index.ts (tool_search
 // registered inactive), packages/coding-agent/src/extensions/mcp/runtime.ts (createDefaultTransport, usesOAuth, auth.provider,
@@ -223,8 +223,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     var scope = await registry.ActivateAsync("mcp-" + actual.Name, new EmptyExtension(), cancellation).ConfigureAwait(false);
                     grants.AdmitServer(scope);
                     McpPreparedServer? prepared = null;
-                    var notifications = Notifications(actual.Name, serverLog, () => Volatile.Read(ref prepared), (name, error) => manager?.RefreshFailed(name, error),
-                        (name, server, cancellation) => manager?.CountResourcesAsync(name, server, cancellation) ?? Task.CompletedTask);
+                    var notifications = Notifications(actual.Name, serverLog, () => Volatile.Read(ref prepared), (name, error) => manager?.RefreshFailed(name, error));
                     // The original records nothing at session_shutdown, so a resumed session declares the tools again once the server connects.
                     var server = new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual, notifications),
                         new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks)
@@ -316,7 +315,6 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     {
                         try { await resources.UpdateAsync(entry.Name, server, entry.Config.Exposure, snapshot.Catalog.HasResources, cancellation).ConfigureAwait(false); }
                         catch (Exception) when (!cancellation.IsCancellationRequested) { /* The resource tools follow on the next change. */ }
-                        await manager.CountResourcesAsync(entry.Name, server, cancellation).ConfigureAwait(false);
                     },
                     BindManager = (owner, attachment, connections) =>
                     {
@@ -395,22 +393,15 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         CreateNotifyingChannel?.Invoke(entry, notification) ?? CreateChannel?.Invoke(entry) ?? (entry.Config.Transport == McpTransportKind.Http
             ? HttpChannel(entry, options, client(), notification, challenge) : StdioChannel(entry, cwd, inherited ?? InheritedEnvironment(), notification));
 
-    /// <summary>runtime.ts connectOnce notification handlers: <c>notifications/message</c> goes to the server log,
-    /// <c>notifications/tools/list_changed</c> refreshes the server's tools (new tools are added, withdrawn ones become unreachable)
-    /// and <c>notifications/resources/list_changed</c> refreshes its resource count (refreshResources).</summary>
-    private static McpNotificationHandler Notifications(string server, McpServerLog log, Func<McpPreparedServer?> target, Action<string, Exception>? refreshFailed,
-        Func<string, McpPreparedServer, CancellationToken, Task>? resourcesChanged = null) =>
+    /// <summary>runtime.ts connectOnce notification handlers: <c>notifications/message</c> goes to the server log and
+    /// <c>notifications/tools/list_changed</c> refreshes the server's tools (new tools are added, withdrawn ones become unreachable).
+    /// Resources are not listed at connect (listing every one can take long), so <c>notifications/resources/list_changed</c> changes
+    /// nothing; the resource tools list them on demand.</summary>
+    private static McpNotificationHandler Notifications(string server, McpServerLog log, Func<McpPreparedServer?> target, Action<string, Exception>? refreshFailed) =>
         async (method, parameters, token) =>
         {
             if (method == "notifications/message") { log.Write(server, parameters); return; }
             if (target() is not { } prepared) return;
-            if (method == "notifications/resources/list_changed")
-            {
-                if (resourcesChanged is not null)
-                    try { await resourcesChanged(server, prepared, token).ConfigureAwait(false); }
-                    catch (Exception) when (!token.IsCancellationRequested) { /* The count follows on the next change. */ }
-                return;
-            }
             if (method != "notifications/tools/list_changed") return;
             try { await prepared.RefreshToolsAsync(token).ConfigureAwait(false); }
             catch (Exception error) when (!token.IsCancellationRequested) { refreshFailed?.Invoke(server, error); }

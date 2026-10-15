@@ -12,7 +12,7 @@ using PiSharp.AI.Providers;
 using PiSharp.Contracts;
 using R = PiSharp.AI.Authentication.InjectedAuthenticationResolver;
 
-// Authored offline expectations for the Pi v1.1.0 Anthropic auth sync (work package 2i). These are not
+// Authored offline expectations for the Pi v1.1.0 Anthropic auth sync (work package 2i), re-verified against Pi v1.2.0. These are not
 // upstream captures: fake token endpoints, synthetic identity tokens and loopback-only callback requests.
 internal static class Program
 {
@@ -65,7 +65,7 @@ internal static class Program
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(30)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = "abe508e1b89912adde45528136c3221eb69acdd7", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
+        var report = new { sourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
             tests = cases.Length, failures, bodyComparisons, genuineSourceCasesCaptured = 0, results };
         if (args.Length == 2)
         {

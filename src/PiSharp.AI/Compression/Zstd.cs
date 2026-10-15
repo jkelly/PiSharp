@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-codex-responses.ts (compressRequestBodyZstd: Codex SSE
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openai-codex-responses.ts (compressRequestBodyZstd: Codex SSE
 // request bodies are zstd frames, Node's zstdCompressSync at level 3). The format is RFC 8878; this encoder and decoder are written from
 // the RFC (no libzstd code), so frames decode with any zstd decoder but are not byte-identical to libzstd's.
 using System.Buffers.Binary;

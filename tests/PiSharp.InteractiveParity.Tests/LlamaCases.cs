@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/llama/index.ts and ui.ts (the /llama manager),
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/llama/index.ts and ui.ts (the /llama manager),
 // packages/coding-agent/src/extensions/llama/provider.ts (the llama.cpp /login api-key flow) and
 // packages/coding-agent/src/modes/interactive/interactive-mode.ts (the built-in extension command in autocomplete).
 using System.Text.Json.Nodes;
