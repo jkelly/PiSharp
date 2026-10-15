@@ -17,5 +17,7 @@
     <ProjectReference Include="../../samples/Durable.Chat/Durable.Chat.csproj" />
     <!-- Differential cases only: PiSharp.Durable's pi-ai utility ports are compared with PiSharp.CodingAgent's ports of the same functions. -->
     <ProjectReference Include="../../src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <!-- Differential cases only: Search (upstream durable search.ts) is compared with main's port of the coding agent's tool search ranking. -->
+    <ProjectReference Include="../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
   </ItemGroup>
 </Project>

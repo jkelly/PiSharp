@@ -469,8 +469,9 @@
       "lines": 85,
       "pisharp": "src/PiSharp.Durable/Search.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "Search (internal, as upstream does not export it): Tokenize and RankDocuments (Okapi BM25, k1 1.2, b 0.75, stable ties), with SearchDocument. JavaScript's toLowerCase() expands U+0130 to i + U+0307, which .NET's invariant lowercasing does not, so Search expands it first. Shared with code mode's searchTools() (area d). Tests: tool-search.search.* (upstream search.ts results printed under Node) and tool-search.ranking-differential.* (against main's ToolSearch/Bm25Ranker in PiSharp.Extensions.Abstractions, the same algorithm)"
     },
     {
       "upstream": "packages/durable/src/session/forks.ts",
@@ -718,8 +719,9 @@
       "lines": 7,
       "pisharp": "src/PiSharp.Durable.Tools/ToolSearch/ToolSearch.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "The tool-search entry point: ToolSearch in PiSharp.Durable.Tools (ToolName, DefaultLimit, CreateTool, CreateExtension; ToolSearchToolDetails is the details JSON { loaded })"
     },
     {
       "upstream": "packages/durable/src/tool-search/tool-search.ts",
@@ -727,8 +729,9 @@
       "lines": 92,
       "pisharp": "src/PiSharp.Durable.Tools/ToolSearch/ToolSearch.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "ToolSearch.CreateTool and CreateExtension: tool_search (callers model, replay safe, fixed description) ranks Agent.Deferred by name, name with spaces, description and schema text (SearchText) with Search.RankDocuments and loads the matches through control.addTools; the extension is tool-search. Tests: tool-search.*, compat.deferred-tool-search.* (run on SQLite and JSONL: records byte for byte, events and observed)"
     },
     {
       "upstream": "packages/durable/src/tools/bash.ts",
@@ -1443,7 +1446,7 @@
       "phase": "sync-1.2.0",
       "status": "ported",
       "upstreamChange": "added",
-      "note": "harness.callers.* (5 cases) and the authored harness.callers.deferred.* (3: deferred tools without tool_search, which is area k)"
+      "note": "harness.callers.* (5 cases) and the authored harness.callers.deferred.* (3: deferred tools without tool_search; tool_search's own cases are tool-search.*, ToolSearchCases.cs)"
     },
     {
       "upstream": "packages/durable/test/harness-cancellation-barrier.test.ts",
@@ -2100,8 +2103,9 @@
       "lines": 204,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolSearchCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "tool-search.* (6 cases), and the authored tool-search.errors.* (6, upstream results printed under Node), tool-search.declaration, tool-search.search.* (27) and tool-search.ranking-differential.* (3)"
     },
     {
       "upstream": "packages/durable/test/tools-images.test.ts",

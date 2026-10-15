@@ -15,8 +15,7 @@
 // first's slot is running, the first returns once the second's slot is running, and the second once the first's is done. Hooks and waits
 // leave no record, so the records, events and observed results stay upstream's.
 //
-// Read only (no Run): deferred-tool-search (areas a and k) needs tool_search, which work list area k ports; its read, raw and harness cases
-// run. codemode (area d) is not listed yet.
+// codemode (area d) is not listed yet.
 //
 // read-image (area e) writes its two files to a fresh directory and gives the Harness a LocalExecutionEnv there (upstream NodeExecutionEnv).
 // pixelPng's IDAT is Node's deflateSync output, which .NET's zlib need not reproduce byte for byte, so the PNG is the captured file's bytes
@@ -31,6 +30,7 @@
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
+using PiSharp.Durable.Tools;
 using static ChatTests;
 using static SessionTests;
 
@@ -244,6 +244,10 @@ internal static class CompatScenarios120
 
     /// <summary><c>Type.Object({ count: Type.Number() })</c>, as TypeBox prints it.</summary>
     private static readonly JsonObjectValue Count = O("""{"type":"object","required":["count"],"properties":{"count":{"type":"number"}}}""");
+
+    /// <summary>deferred-tool-search's tool parameters: <c>Type.Object({ number: Type.Optional(Type.Number({ description: "Issue number" }))
+    /// })</c>, as TypeBox prints it.</summary>
+    private static readonly JsonObjectValue IssueParameters = O("""{"type":"object","properties":{"number":{"type":"number","description":"Issue number"}}}""");
 
     /// <summary>scenarios-v1.2.0.mjs <c>textTool</c>.</summary>
     private static ToolRegistration TextTool(string name, string description, ToolExecute execute, Func<ToolRegistration, ToolRegistration>? extra = null)
@@ -612,7 +616,32 @@ internal static class CompatScenarios120
             return Obj(("received", JsonValue.Array(received.Snapshot().Select(result => (JsonValue)result.ToJson()))),
                 ("reports", JsonValue.Array(reports.Snapshot())));
         }),
-        new("deferred-tool-search", ["a", "k"], null),
+        new("deferred-tool-search", ["a", "k"], async open =>
+        {
+            var setup = Chat();
+            ToolRegistration Tool(string name, string description, bool deferred = false) => Define.Tool(new ToolRegistration
+            {
+                Name = name, Description = description, Parameters = IssueParameters, Deferred = deferred,
+                Execute = (_, _, _) => Task.FromResult(Result([FauxText($"{name} ran")])),
+            });
+            foreach (var registration in new[] { Tool("alpha", "Alpha tool"), Tool("github_get_issue", "Get a GitHub issue by number", deferred: true),
+                Tool("github_list_repos", "List the repositories of a user", deferred: true), Tool("omega", "Omega tool") })
+                Install(setup, $"tool:{registration.Name}", [registration]);
+            setup.Registry.Install(ToolSearch.CreateExtension());
+            setup.Faux.SetResponses(Calls(("tool_search", Obj(("query", "github issue"), ("limit", 1)), "c1")),
+                Calls(("github_get_issue", Obj(("number", 42)), "c2")), Answer("done"));
+            var (harness, root) = await Open(setup, await open());
+            async Task<JsonObjectValue> ToolNames()
+            {
+                var agent = await root.AgentAsync(Context);
+                return Obj(("offered", Names(agent.Tools)), ("deferred", Names(agent.Deferred)), ("callable", Names(agent.Callable)));
+            }
+            var before = await ToolNames();
+            await (await root.SubmitAsync(SubmissionDraft.Input("go"), Context)).WaitAsync(Context);
+            var after = await ToolNames();
+            await Close(harness);
+            return Obj(("before", before), ("after", after));
+        }),
         new("read-image", ["e"], async open =>
         {
             var directory = Program.Temp("compat-read-image");
