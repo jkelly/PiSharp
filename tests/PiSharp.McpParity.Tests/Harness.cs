@@ -48,11 +48,13 @@ internal static partial class Program
         Stream(new { type = "tool_use", id, name, input = new { } }, JsonSerializer.Serialize(input), "tool_use");
 
     /// <summary>A fake MCP server: tools, optional instructions and resources; tools/call answers with the call it received.</summary>
-    internal sealed class FakeServer(string name, string[] tools, Task? initialized = null, bool resources = false, Exception? failure = null) : IMcpAdmittedRequestChannel
+    internal sealed class FakeServer(string name, string[] tools, Task? initialized = null, bool resources = false, Exception? failure = null,
+        TaskCompletionSource? initializing = null) : IMcpAdmittedRequestChannel
     {
         public string Name => name;
         public readonly ConcurrentQueue<string> Calls = new();
         public int Lists, Closes;
+        private readonly TaskCompletionSource closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask ConfigureRootsAsync(JsonData roots, CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask NotifyAsync(string method, JsonData? parameters, CancellationToken token) => ValueTask.CompletedTask;
@@ -61,6 +63,13 @@ internal static partial class Program
             switch (method)
             {
                 case "initialize":
+                    if (initializing is not null)
+                    {
+                        // Held until the channel closes, which then fails the request as a disposed transport does.
+                        initializing.TrySetResult();
+                        await closed.Task;
+                        throw new ObjectDisposedException("MCP transport");
+                    }
                     if (initialized is not null) await initialized.WaitAsync(token);
                     if (failure is not null) throw failure;
                     return JsonData.Parse("{\"protocolVersion\":\"2025-11-25\",\"serverInfo\":{\"name\":\"" + name + "\",\"version\":\"1\"},\"capabilities\":{\"tools\":{}" +
@@ -84,7 +93,7 @@ internal static partial class Program
                 default: throw new IOException("Unexpected MCP method " + method);
             }
         }
-        public Task CloseAsync() { Interlocked.Increment(ref Closes); return Task.CompletedTask; }
+        public Task CloseAsync() { Interlocked.Increment(ref Closes); closed.TrySetResult(); return Task.CompletedTask; }
     }
 
     /// <summary>One production RPC host over a bounded in-memory connection.</summary>
@@ -151,6 +160,8 @@ internal static partial class Program
         /// <summary>Per server name: the tools it offers, when initialize answers, and whether it has resources.</summary>
         public readonly ConcurrentDictionary<string, (string[] Tools, Task? Initialized, bool Resources, Exception? Failure)> Behaviors = new();
         public readonly ConcurrentQueue<McpBackgroundConnectionReport> Reports = new();
+        /// <summary>Servers whose initialize is held until their channel closes (completed when it started).</summary>
+        public readonly ConcurrentDictionary<string, TaskCompletionSource> HeldUntilClosed = new();
         public readonly TaskCompletionSource<McpServerManager> Manager = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public McpSessionHost Host(Func<string, bool>? trusted = null, TimeSpan? startupWait = null) =>
             new(Agent, Path.Combine(Root, "home"), () => [KeyValuePair.Create("PATH", Root)])
@@ -158,7 +169,8 @@ internal static partial class Program
                 CreateChannel = entry => entry.Config.Transport == PiSharp.Extensions.Mcp.Configuration.McpTransportKind.Http ? null : (actual, token) =>
                 {
                     var behavior = Behaviors.GetValueOrDefault(actual.Name, (["search", "fetch"], null, false, null));
-                    var server = new FakeServer(actual.Name, behavior.Tools, behavior.Initialized, behavior.Resources, behavior.Failure); Servers.Add(server);
+                    var server = new FakeServer(actual.Name, behavior.Tools, behavior.Initialized, behavior.Resources, behavior.Failure,
+                        HeldUntilClosed.GetValueOrDefault(actual.Name)); Servers.Add(server);
                     return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server);
                 },
                 ObserveBackgroundConnection = Reports.Enqueue,
