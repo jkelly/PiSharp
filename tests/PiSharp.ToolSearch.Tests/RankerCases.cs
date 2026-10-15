@@ -31,6 +31,8 @@ internal static partial class Program
         Names(["tie", "class", "box", "bus", "gas", "item", "ys"], ToolSearch.Tokenize("ties classes boxes bus gas items ys"), "stem lengths");
         Names([], ToolSearch.Tokenize(" -- the a__an "), "only stop words and separators");
         Names(["caf", "x2", "v"], ToolSearch.Tokenize("café x2-v"), "non-ASCII letters separate terms");
+        // JavaScript lowercases U+0130 to "i" and U+0307, and the combining dot separates terms.
+        Names(["i", "stanbul"], ToolSearch.Tokenize("İstanbul"), "U+0130 lowercases to i and U+0307");
     }
 
     private static void RanksCorpus()
@@ -67,6 +69,10 @@ internal static partial class Program
         var scored = new Bm25Ranker().Rank("alpha", [new("a", "alpha beta"), new("b", "gamma")], 8).Single();
         var expected = Math.Log(1 + (2 - 1 + 0.5) / (1 + 0.5)) * (1 * 2.2 / (1 + 1.2 * (1 - 0.75 + 0.75 * 2 / 1.5)));
         Check(Math.Abs(expected - scored.Score) < 1e-12, $"BM25 score {scored.Score} != {expected}");
+        // U+0130 yields an "i" term and splits the word, so "i" finds the second document and "istanbul" only the first.
+        ToolSearchDocument[] dotted = [new("city", "istanbul guide"), new("turkish", "İzmir İstanbul")];
+        Names(["turkish"], new Bm25Ranker().Rank("i", dotted, 8).Select(item => item.Name), "U+0130 term");
+        Names(["city"], new Bm25Ranker().Rank("istanbul", dotted, 8).Select(item => item.Name), "U+0130 splits the word");
         // Ties keep document order.
         Names(["first", "second"], new Bm25Ranker().Rank("same", [new("first", "same"), new("second", "same")], 8).Select(item => item.Name), "stable ties");
     }

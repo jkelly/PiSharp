@@ -45,11 +45,17 @@ public static partial class ToolSearch
         return term;
     }
 
+    /// <summary>String.prototype.toLowerCase() as far as the ASCII split can tell. JavaScript maps U+0130 (capital I with dot above)
+    /// to "i" and U+0307, while .NET's invariant lowercasing maps one UTF-16 unit to one and leaves it as it is, so it is expanded
+    /// first. Every other character lowercases to the same ASCII letters and digits in both, or to none.</summary>
+    private static string ToLowerCase(string text) =>
+        (text.Contains('İ') ? text.Replace("İ", "i̇", StringComparison.Ordinal) : text).ToLowerInvariant();
+
     /// <summary>Lowercase terms, split at camelCase boundaries and non-alphanumerics, without stop words.</summary>
     public static IReadOnlyList<string> Tokenize(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        var spaced = Acronym().Replace(LowerUpper().Replace(text, "$1 $2"), "$1 $2").ToLowerInvariant();
+        var spaced = ToLowerCase(Acronym().Replace(LowerUpper().Replace(text, "$1 $2"), "$1 $2"));
         return [.. Separators().Split(spaced).Where(term => term.Length > 0 && !StopWords.Contains(term)).Select(Stem)];
     }
 
