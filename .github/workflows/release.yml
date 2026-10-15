@@ -1,6 +1,6 @@
 name: Release
 
-# Push a version tag (v1.1.0, or v1.1.0.1 for a C#-only patch) to build, validate,
+# Push a version tag (v1.2.0, or v1.2.0.1 for a C#-only patch) to build, validate,
 # publish every package to NuGet with trusted publishing, and create the GitHub release.
 # Run manually to do a dry run: it builds and validates the packages but publishes nothing.
 on:
@@ -11,7 +11,7 @@ on:
       version:
         description: Version to build and validate (dry run, nothing is published)
         required: true
-        default: '1.1.0'
+        default: '1.2.0'
       skip_tests:
         description: Skip the offline tests (dry runs only; tag releases always run them)
         type: boolean

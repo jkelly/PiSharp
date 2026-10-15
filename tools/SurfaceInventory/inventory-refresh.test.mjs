@@ -1,5 +1,7 @@
 // Validates the preserved v0.99.1 event catalog and command/RPC inventory and their v1.1.0
-// refreshes. Offline by default: it reads only repository files. With PI_UPSTREAM set to a Pi git
+// refreshes. The v1.1.0 inventories were generated for the v1.1.0 target, so they are checked against
+// that target's preserved lock (compatibility/target.v1.1.0.lock.json, named by target.lock.json's
+// previousTarget once the target moved to v1.2.0). Offline by default: it reads only repository files. With PI_UPSTREAM set to a Pi git
 // checkout that contains both refs, it also re-runs both generators and requires byte-identical
 // output for v0.99.1 (preserved evidence) and v1.1.0 (current inventories).
 import test from 'node:test';
@@ -17,7 +19,8 @@ const json = path => JSON.parse(bytes(path).toString('utf8'));
 const OLD_CATALOG = 'compatibility/extensions/event-catalog.json', NEW_CATALOG = 'compatibility/extensions/event-catalog.v1.1.0.json';
 const OLD_INVENTORY = 'compatibility/coding-agent-command-rpc-inventory.json', NEW_INVENTORY = 'compatibility/coding-agent-command-rpc-inventory.v1.1.0.json';
 const CATALOG_OVERLAY = 'compatibility/extensions/event-catalog.v1.1.0.overlay.json', INVENTORY_OVERLAY = 'compatibility/coding-agent-command-rpc-inventory.v1.1.0.overlay.json';
-const baseline = json('compatibility/baseline.lock.json'), target = json('compatibility/target.lock.json');
+const baseline = json('compatibility/baseline.lock.json');
+const V1_1_0_LOCK = 'compatibility/target.v1.1.0.lock.json', target = json(V1_1_0_LOCK);
 const lockPin = (lock, path) => lock.artifacts.find(row => row.kind === 'source-file' && row.path === path);
 
 // Every cited test case must exist in the named repository file (literally or as Prefix + "suffix").
@@ -166,7 +169,7 @@ const upstream = process.env.PI_UPSTREAM;
 test('generators reproduce every inventory byte-for-byte from upstream sources', { skip: upstream ? false : 'set PI_UPSTREAM to a Pi checkout containing v0.99.1 and v1.1.0' }, () => {
   const run = (tool, ...args) => execFileSync(process.execPath, [resolve(repo, 'tools/SurfaceInventory', tool), '--upstream', upstream, ...args], { cwd: repo, stdio: 'pipe' });
   run('build-event-catalog.mjs', '--lock', 'compatibility/baseline.lock.json', '--template', OLD_CATALOG, '--check', OLD_CATALOG);
-  run('build-event-catalog.mjs', '--lock', 'compatibility/target.lock.json', '--template', OLD_CATALOG, '--overlay', CATALOG_OVERLAY, '--check', NEW_CATALOG);
+  run('build-event-catalog.mjs', '--lock', V1_1_0_LOCK, '--template', OLD_CATALOG, '--overlay', CATALOG_OVERLAY, '--check', NEW_CATALOG);
   run('build-command-rpc-inventory.mjs', '--lock', 'compatibility/baseline.lock.json', '--template', OLD_INVENTORY, '--check', OLD_INVENTORY);
-  run('build-command-rpc-inventory.mjs', '--lock', 'compatibility/target.lock.json', '--template', OLD_INVENTORY, '--overlay', INVENTORY_OVERLAY, '--check', NEW_INVENTORY);
+  run('build-command-rpc-inventory.mjs', '--lock', V1_1_0_LOCK, '--template', OLD_INVENTORY, '--overlay', INVENTORY_OVERLAY, '--check', NEW_INVENTORY);
 });
