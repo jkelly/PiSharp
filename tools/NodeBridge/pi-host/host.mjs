@@ -168,6 +168,13 @@ async function handle(method, params, id, progressWindow = 0) {
         getExposure: (name) => loadout.exposures?.[name] ?? 'direct', getNamespace: (name) => loadout.namespaces?.[name], getPromptGuidelines: (name) => loadout.guidelines?.[name] ?? [] };
       return tool.prepareLoadout(view) ?? null;
     }
+    case 'tool.reachesTools': {
+      // ToolDefinition.reachesTools(input): "all", or the words of the input that may name the tools a call reaches.
+      const tool = runtime.extensions[params.ext]?.tools.get(params.name)?.definition;
+      if (typeof tool?.reachesTools !== 'function') return 'all';
+      const reach = tool.reachesTools(params.input ?? {});
+      return reach === 'all' ? 'all' : plain([...reach]);
+    }
     case 'command.execute': await runtime.executeCommand(params.ext, params.name, params.args, params.ctx); return null;
     case 'command.complete': return runtime.completeCommand(params.ext, params.name, params.prefix);
     case 'shortcut.run': await runtime.runShortcut(params.ext, params.shortcut, params.ctx); return null;

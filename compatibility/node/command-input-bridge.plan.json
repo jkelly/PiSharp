@@ -15,9 +15,9 @@
   },
   "helpers": [
     {
-      "bytes": 23799,
+      "bytes": 24128,
       "path": "tools/NodeCommandInputBridge/worker.mjs",
-      "sha256": "61ed16f4f4b7001ff3c0e2153e9df9e9e1d46855b4eb0ea9da0f397e085bb03c"
+      "sha256": "217ea1c3b3d4cd3a367bd1651fd79bba063ac62fc8152aeb2ed89ef1e22e47c9"
     },
     {
       "bytes": 52757,

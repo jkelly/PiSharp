@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/types.ts (ExtensionAPI.on, registerTool,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/types.ts (ExtensionAPI.on, registerTool,
 // registerCommand, registerToolRenderer, ToolDefinition, the event and result types), packages/coding-agent/src/core/extensions/wrapper.ts
 // (wrapRegisteredTool), packages/coding-agent/src/core/tools/tool-definition-wrapper.ts and packages/agent/src/agent-loop.ts
 // (a thrown execute error becomes an error tool result with the error message).
@@ -374,8 +374,12 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
         registry.RegisterBeforeAgentStartHandler(new("on-before_agent_start-" + handler, async (snapshot, context, token) =>
         {
             if (handler >= LiveHandlers(eventName)) return null;
-            var result = await EmitAsync(eventName, Event("before_agent_start", ("prompt", snapshot.Prompt),
-                ("images", snapshot.Images is null ? null : Parse(snapshot.Images)), ("systemPrompt", snapshot.SystemPrompt)), context, token, handler).ConfigureAwait(false);
+            // runner.ts emitBeforeAgentStart: the trigger (messageType "user" with prompt and images, or "custom" with the starting
+            // custom message) plus the current system prompt.
+            var custom = snapshot.MessageType == ExtensionBeforeAgentStartMessageType.Custom;
+            var result = await EmitAsync(eventName, Event("before_agent_start", ("messageType", custom ? "custom" : "user"),
+                ("message", custom && snapshot.Message is { } started ? Parse(started) : null), ("prompt", custom ? null : snapshot.Prompt),
+                ("images", custom || snapshot.Images is null ? null : Parse(snapshot.Images)), ("systemPrompt", snapshot.SystemPrompt)), context, token, handler).ConfigureAwait(false);
             if (result is not { ValueKind: JsonValueKind.Object } value) { host.RunSystemPrompt = snapshot.SystemPrompt; return null; }
             PiSharp.Extensions.Events.ExtensionCustomMessage? message = null; string? systemPrompt = null;
             if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array && messages.GetArrayLength() > 0)
@@ -426,7 +430,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
 
     // ------------------------------------------------------------------------------------------------------------- tools
 
-    private ExtensionToolDescriptor Tool(JsonObject tool)
+    internal ExtensionToolDescriptor Tool(JsonObject tool)
     {
         var name = tool["name"]!.GetValue<string>();
         var exposure = tool["exposure"]?.GetValue<string>() switch
@@ -435,7 +439,12 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
             _ => ToolExposure.Direct
         };
         ToolNamespace? grouping = tool["namespace"] is JsonObject space
-            ? new(space["name"]!.GetValue<string>(), space["description"]?.GetValue<string>()) { Instructions = space["instructions"]?.GetValue<string>() } : null;
+            ? new(space["name"]!.GetValue<string>(), space["description"]?.GetValue<string>())
+            {
+                Instructions = space["instructions"]?.GetValue<string>(),
+                Aliases = [.. (space["aliases"] as JsonArray ?? []).Select(item => item is JsonValue alias && alias.GetValueKind() == JsonValueKind.String ? alias.GetValue<string>() : null)
+                    .OfType<string>()]
+            } : null;
         var parameters = JsonData.Parse(tool["parameters"]?.ToJsonString() ?? "{\"type\":\"object\",\"properties\":{}}");
         var hasCall = tool["hasRenderCall"]?.GetValue<bool>() == true; var hasResult = tool["hasRenderResult"]?.GetValue<bool>() == true;
         return new("tool-" + name, name, tool["description"]?.GetValue<string>() ?? "", parameters, (arguments, context, token) => ExecuteAsync(name, arguments, context, token))
@@ -461,6 +470,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
                 return prepared is { ValueKind: not JsonValueKind.Null } value ? Data(value) : arguments;
             },
             PrepareLoadout = tool["hasPrepareLoadout"]?.GetValue<bool>() == true ? loadout => PrepareLoadout(name, loadout) : null,
+            ReachesTools = tool["hasReachesTools"]?.GetValue<bool>() == true ? input => ReachesTools(name, input) : null,
             Renderers = hasCall || hasResult ? new ExtensionToolRenderers(
                 tool["renderShell"]?.GetValue<string>() == "self" ? ExtensionToolRenderShell.Self : null,
                 hasCall ? (context, width, token) => RenderToolAsync("call", context, null, width, token) : null,
@@ -507,6 +517,25 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
         }
     }
 
+    /// <summary>The tool's reachesTools(input), answered by the Node host (reachesTools is synchronous upstream). A tool whose
+    /// function fails, times out or returns neither <c>"all"</c> nor a list of words reaches every tool: the host then waits for
+    /// everything the call might reach.</summary>
+    internal ToolReach ReachesTools(string name, JsonData input)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        JsonElement? result;
+        try
+        {
+            result = host.CallAsync("tool.reachesTools", new JsonObject { ["ext"] = extension.Index, ["name"] = name, ["input"] = Parse(input) }, timeout.Token)
+                .WaitAsync(timeout.Token).GetAwaiter().GetResult();
+        }
+        catch (Exception error) when (error is OperationCanceledException or TimeoutException or InvalidOperationException or PiNodeHostException or IOException)
+        { return ToolReach.All; }
+        if (result is { ValueKind: JsonValueKind.Array } words && words.EnumerateArray().All(word => word.ValueKind == JsonValueKind.String))
+            return ToolReach.Of([.. words.EnumerateArray().Select(word => word.GetString()!)]);
+        return ToolReach.All;
+    }
+
     private ToolLoadoutChanges? PrepareLoadout(string name, ToolLoadout loadout)
     {
         JsonArray Tools(ImmutableArray<ToolLoadoutTool> tools) => new([.. tools.Select(tool => Parse(tool.Declaration))]);
@@ -521,7 +550,10 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
                     ToolExposure.ModelOnly => "model-only", ToolExposure.Codemode => "codemode", ToolExposure.Deferred => "deferred", ToolExposure.Hidden => "hidden", _ => "direct"
                 })))]),
                 ["guidelines"] = new JsonObject([.. loadout.Registered.DistinctBy(tool => tool.Name).Select(tool => KeyValuePair.Create(tool.Name,
-                    (JsonNode?)new JsonArray([.. (tool.PromptGuidelines.IsDefault ? [] : tool.PromptGuidelines).Select(text => (JsonNode)text)])))])
+                    (JsonNode?)new JsonArray([.. (tool.PromptGuidelines.IsDefault ? [] : tool.PromptGuidelines).Select(text => (JsonNode)text)])))]),
+                // ToolLoadout.getNamespace: the tool's namespace as registered (name, aliases, description, instructions).
+                ["namespaces"] = new JsonObject([.. loadout.Registered.DistinctBy(tool => tool.Name).Where(tool => tool.Namespace is not null)
+                    .Select(tool => KeyValuePair.Create(tool.Name, (JsonNode?)PiExtensionHost.NamespaceNode(tool.Namespace!)))])
             }
         };
         // prepareLoadout is synchronous upstream; the Node host answers it from its own event loop.
