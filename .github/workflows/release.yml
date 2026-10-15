@@ -38,7 +38,7 @@ jobs:
           global-json-file: global.json
 
       # PiSharp.ExtensionParity.Tests runs TypeScript extensions with Node.js 22.13 or later (module.stripTypeScriptTypes) and
-      # installs the Pi 1.1.0 packages with npm; the runner image's default Node.js is older.
+      # installs the Pi 1.2.0 packages with npm; the runner image's default Node.js is older.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

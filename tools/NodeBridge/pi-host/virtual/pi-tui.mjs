@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/index.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/index.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 export { Marked } from "./vendor/marked.mjs";
 export { CombinedAutocompleteProvider } from "./tui/autocomplete.mjs";
@@ -30,7 +30,7 @@ export { StdinBuffer } from "./tui/stdin-buffer.mjs";
 export { isAppleTerminalSession, ProcessTerminal } from "./tui/terminal.mjs";
 export { parseTerminalColorSchemeReport } from "./tui/terminal-colors.mjs";
 export { allocateImageId, calculateImageRows, deleteAllKittyImages, deleteKittyImage, detectCapabilities, encodeITerm2, encodeKitty, getCapabilities, getCellDimensions, getGifDimensions, getImageDimensions, getJpegDimensions, getPngDimensions, getTerminalColorMode, getWebpDimensions, hyperlink, imageFallback, renderImage, resetCapabilitiesCache, setCapabilities, setCapabilityOverrides, setCellDimensions } from "./tui/terminal-image.mjs";
-export { Container, CURSOR_MARKER, compositeTuiLine, isFocusable, isViewportTUI } from "./tui/tui.mjs";
+export { Container, CURSOR_MARKER, compositeTuiLine, isFocusable, isViewportTUI, renderFakeCursor } from "./tui/tui.mjs";
 export { TuiAltScreen } from "./tui/tui-alt-screen.mjs";
 export { TuiMainScreen } from "./tui/tui-main-screen.mjs";
 export { getOsc8LinkAtColumn, sliceByColumn, stripTerminalSequences, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "./tui/utils.mjs";

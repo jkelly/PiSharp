@@ -3,7 +3,7 @@ title: TypeScript extensions
 description: Run Pi's TypeScript and JavaScript extensions in PiSharp through the Node bridge.
 ---
 
-PiSharp runs Pi's TypeScript and JavaScript extensions unchanged. It starts Node, loads each extension with Pi's own packages, and connects the extension to the C# session. Write extensions as Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/extensions.md) page describes.
+PiSharp runs Pi's TypeScript and JavaScript extensions unchanged. It starts Node, loads each extension with Pi's own packages, and connects the extension to the C# session. Write extensions as Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/extensions.md) page describes.
 
 ## Where extensions come from
 
@@ -24,11 +24,11 @@ PiSharp starts Node only when an extension needs it. Without extensions, or with
 
 ## Pi's own packages
 
-The first time a TypeScript extension loads, PiSharp installs Pi 1.1.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` and `jiti`) into `~/.pi/agent/pisharp/pi-runtime/1.1.0`, using your npm. Every package's integrity is checked against the npm registry before it's used. Extensions then load through Pi's own `jiti` setup, so imports such as `@earendil-works/pi-coding-agent` resolve to the real code.
+The first time a TypeScript extension loads, PiSharp installs Pi 1.2.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` and `jiti`) into `~/.pi/agent/pisharp/pi-runtime/1.2.0`, using your npm. Every package's integrity is checked against the npm registry before it's used. Extensions then load through Pi's own `jiti` setup, so imports such as `@earendil-works/pi-coding-agent` resolve to the real code.
 
 `PISHARP_PI_RUNTIME_DIR` moves this folder.
 
-If the install can't run (offline, no npm, or a failed install), extensions still load against PiSharp's built-in copies of those modules, and PiSharp warns that they aren't running against the Pi 1.1.0 packages. The built-in copies don't support `.tsx` files or built-in tool factories with custom `operations`.
+If the install can't run (offline, no npm, or a failed install), extensions still load against PiSharp's built-in copies of those modules, and PiSharp warns that they aren't running against the Pi 1.2.0 packages. The built-in copies don't support `.tsx` files or built-in tool factories with custom `operations`.
 
 ## What works
 

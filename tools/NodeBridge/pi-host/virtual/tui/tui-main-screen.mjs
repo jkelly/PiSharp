@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/tui-main-screen.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui-main-screen.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -203,7 +203,7 @@ export class TuiMainScreen extends TuiBase {
             const targetScreenRow = targetRow - viewportTop;
             return targetScreenRow - currentScreenRow;
         };
-        let newLines = this.render(width);
+        let newLines = this.resolveFakeCursors(this.render(width));
         if (this.hasOverlayEntries) {
             newLines = this.compositeOverlays(newLines, width, height);
         }
