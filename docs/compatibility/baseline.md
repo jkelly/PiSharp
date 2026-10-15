@@ -22,9 +22,9 @@ node tools/CompatibilityReport/verify-baseline.mjs --upstream <checkout of v1.2.
 
 It verified all 121 files and the archive hash (176 checks).
 
-Source citations in PiSharp files that named v1.1.0 (`abe508e…`) were re-pinned to v1.2.0 by [repin-sources.mjs](../../tools/CompatibilityReport/repin-sources.mjs) only where every cited upstream file is byte-identical between the two tags. The rest stay on v1.1.0 until their area is re-ported; they are listed in [sync-1.2.0-worklist.json](../../compatibility/sync-1.2.0-worklist.json).
+Source citations in PiSharp files that named v1.1.0 (`abe508e…`) were re-pinned to v1.2.0 by [repin-sources.mjs](../../tools/CompatibilityReport/repin-sources.mjs) only where every cited upstream file is byte-identical between the two tags. The rest moved with their area's port, once the cited change was ported or verified. [sync-1.2.0-worklist.json](../../compatibility/sync-1.2.0-worklist.json) now lists no pending citation: the v1.1.0 commit remains only in historical records and in the README until the 1.2.0 release.
 
-The v1.2.0 event catalog and command/RPC inventory are not generated yet. Until they are, the v1.1.0 inventories are the newest; see the work list.
+The v1.2.0 event catalog and command/RPC inventory are generated; see the surface inventories below.
 
 ## Previous target: Pi v1.1.0
 
@@ -35,11 +35,11 @@ Under [decision 0002](../decisions/0002-pi-1.1.0-sync.md), the source target was
 
 Of the 103 rows, 35 changed and 62 were byte-identical. The coding-agent and AI package versions were 1.1.0.
 
-### Surface inventories: v0.99.1 preserved, v1.1.0 newest
+### Surface inventories: v0.99.1 preserved, v1.1.0 and v1.2.0 refreshed
 
 Two whole-file surface inventories are pinned by other evidence. They therefore follow the lock precedent: the v0.99.1 files stay byte-for-byte as evidence, and the v1.1.0 refresh lives in new files beside them.
 
-| Inventory | Preserved v0.99.1 evidence | v1.1.0 inventory (newest) |
+| Inventory | Preserved v0.99.1 evidence | v1.1.0 inventory |
 | --- | --- | --- |
 | Extension event catalog (41 events) | [event-catalog.json](../../compatibility/extensions/event-catalog.json) | [event-catalog.v1.1.0.json](../../compatibility/extensions/event-catalog.v1.1.0.json) |
 | Command, RPC and SDK declarations | [coding-agent-command-rpc-inventory.json](../../compatibility/coding-agent-command-rpc-inventory.json) (712 rows) | [coding-agent-command-rpc-inventory.v1.1.0.json](../../compatibility/coding-agent-command-rpc-inventory.v1.1.0.json) (716 rows) |
@@ -48,7 +48,7 @@ The v0.99.1 files remain the ones pinned or validated elsewhere:
 - [public-entrypoints.plan.json](../../compatibility/public-entrypoints.plan.json), [command-rpc-inventory.md](command-rpc-inventory.md) and [public-surface-inventory.md](public-surface-inventory.md) pin the command/RPC inventory.
 - `EventReducerTests` checks the event catalog against the P6-01 native-surface inventory.
 
-New work reads the v1.1.0 files until the v1.2.0 inventories are generated.
+New work reads the v1.2.0 files (below).
 
 Two generators produce both versions:
 - [build-event-catalog.mjs](../../tools/SurfaceInventory/build-event-catalog.mjs)

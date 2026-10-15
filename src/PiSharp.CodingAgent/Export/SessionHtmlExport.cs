@@ -31,7 +31,7 @@ public static class SessionHtmlExport
     /// <summary>config.ts APP_NAME (package.json piConfig has no name).</summary>
     public const string AppName = "pi";
 
-    /// <summary>Upstream asset blobs at v1.1.0 (git blob SHA-1), embedded byte-for-byte under Export/Assets.</summary>
+    /// <summary>Upstream asset blobs at v1.2.0 (git blob SHA-1; the export-html files are unchanged since v1.1.0), embedded byte-for-byte under Export/Assets.</summary>
     public static readonly IReadOnlyDictionary<string, string> AssetBlobs = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["template.html"] = "c1d678a0a2fc7df8a37dc952e270dde4b9ecba6a", // packages/coding-agent/src/core/export-html/template.html

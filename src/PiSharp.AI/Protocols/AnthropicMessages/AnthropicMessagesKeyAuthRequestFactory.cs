@@ -14,7 +14,7 @@ public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = 
     int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = PiSharp.Contracts.JsonData.MaximumDepth, int MaximumHeaders = 128,
     int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768)
 {
-    /// <summary>Pi abe508e1 anthropic-messages.ts createClient for provider github-copilot: the key travels as
+    /// <summary>Pi 06a46693 anthropic-messages.ts createClient for provider github-copilot: the key travels as
     /// <c>Authorization: Bearer</c> (the SDK's authToken) instead of x-api-key.</summary>
     public bool BearerAuthorization { get; init; }
 }

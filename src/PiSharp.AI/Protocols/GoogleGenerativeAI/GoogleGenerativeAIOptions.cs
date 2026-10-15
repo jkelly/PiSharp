@@ -17,7 +17,7 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
     /// <summary>Native timing seams. They do not enter SDK parameters or Pi wire JSON.</summary>
     public TimeProvider RetryTimeProvider { get; init; } = TimeProvider.System;
     public Func<double> RetryJitterSample { get; init; } = Random.Shared.NextDouble;
-    /// <summary>Pi abe508e1 provider-retry.ts noRetryStatuses: statuses that fail at once although they would be retried.</summary>
+    /// <summary>Pi 06a46693 provider-retry.ts noRetryStatuses: statuses that fail at once although they would be retried.</summary>
     public System.Collections.Immutable.ImmutableArray<int> NoRetryStatuses { get; init; } = [];
     public GoogleGenerativeAIHooks Hooks { get; init; } = new();
     public Func<HttpResponseMessage, CancellationToken, ValueTask<Stream?>>? BodyReaderFactory { get; init; }

@@ -342,7 +342,7 @@ internal static class Program
         await R.ResolveAnthropicApiKeyAsync(new Lookup(Env((R.AnthropicFederationRuleId, "fdrl_test"), (R.AnthropicOrganizationId, "org-test"),
             (R.AnthropicServiceAccountId, "svac_test"), (R.AnthropicIdentityTokenFile, path), (R.AnthropicWorkspaceId, "wrkspc_test"))), NoCredential);
 
-    // Pi abe508e1 anthropic-messages.ts createClient: federation shares the API-key path's default headers and body; the SDK's
+    // Pi 06a46693 anthropic-messages.ts createClient: federation shares the API-key path's default headers and body; the SDK's
     // token auth adds Authorization: Bearer and the oauth-2025-04-20 beta (2i port of @anthropic-ai/sdk 0.129.0).
     private static Task FederationResolvedProvider() => WithIdentityFile("header.payload.signature\n", async path =>
     {

@@ -31,7 +31,7 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     public JsonData? SamplingParams { get; init; }
     /// <summary>Source minimal/low/medium/high token budgets; xhigh and max use the high budget.</summary>
     public JsonData? ThinkingBudgets { get; init; }
-    /// <summary>The body's model field when it differs from the catalog id, as Pi abe508e1 providers/azure.ts withDeploymentName
+    /// <summary>The body's model field when it differs from the catalog id, as Pi 06a46693 providers/azure.ts withDeploymentName
     /// sends an Azure deployment name. The model identity, metadata binding and hooks keep the catalog id.</summary>
     public string? RequestModelId { get; init; }
 }

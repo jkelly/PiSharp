@@ -19,7 +19,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
     private readonly ImmutableArray<KeyValuePair<string, string?>> _headers;
     private readonly AnthropicInjectedAuthenticationBinding _authentication;
 
-    /// <summary>Non-null when requests rely on workload identity federation (Pi abe508e1 anthropic-messages.ts getAnthropicFederation):
+    /// <summary>Non-null when requests rely on workload identity federation (Pi 06a46693 anthropic-messages.ts getAnthropicFederation):
     /// a federation resolution whose request headers own no authorization, x-api-key or cf-aig-authorization value.</summary>
     public AnthropicFederationConfiguration? Federation { get; }
 

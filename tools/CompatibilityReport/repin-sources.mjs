@@ -78,6 +78,7 @@ const historical = [
   [/^compatibility\/target\.lock\.json$/, "previousTarget names the v1.1.0 lock"],
   [/^compatibility\/target\.v1\.1\.0\.lock\.json$/, "the preserved v1.1.0 target lock"],
   [/^compatibility\/.*\.v1\.1\.0(\.overlay)?\.json$/, "inventory generated for the v1.1.0 target (validated against target.v1.1.0.lock.json)"],
+  [/^compatibility\/.*\.v1\.2\.0\.json$/, "inventory generated for the v1.2.0 target; its v1.1.0 commit is refresh provenance (the previous inventory and each row's previous source) and the anchors of entries removed upstream at v1.2.0"],
   [/^compatibility\/public-release\.json$/, "previousReleases record the upstream commit each published release tracked"],
   [/^docs\/compatibility\/baseline\.md$/, "describes the previous target"],
   [/^docs\/plans\/(full-parity-v1\.1\.0\.md|post-port-pi-v1-upgrade\.md)$/, "the v1.1.0 plans"],
