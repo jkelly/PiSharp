@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): the support half of packages/durable/test/harness-ownership.test.ts: the held test.hold
-// task, test.waiter, their gates and run counts, and the helpers its two describes share. The cases are in HarnessOwnershipCases.cs.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the support half of packages/durable/test/harness-ownership.test.ts: the held test.hold
+// task, test.waiter, test.spawner, their gates and run counts, and the helpers its two describes share. The cases are in HarnessOwnershipCases.cs.
 //
 // Adaptations (beyond those of HarnessSupport.cs and ChatSupport.cs):
 // - Upstream keeps gates and run counts at module scope and clears them after each test. Here each case builds a fresh Holds fixture,
@@ -97,7 +97,28 @@ internal static partial class OwnershipTests
                 },
                 Abort = (_, runtime, ctx) => runtime.CommitAsync((_, _) => NextTaskState.Aborted(), ctx),
             });
+            // Tries to create, in the commit that ends it, a conversation it owns with a held task in it, named by its input (upstream
+            // Spawner).
+            Spawner = Tasks.DefineTask(new TaskDefinition
+            {
+                Name = "test.spawner",
+                Version = 1,
+                Initial = _ => O("""{"phase":"spawn"}"""),
+                Phases = new Dictionary<string, TaskPhaseHandler>
+                {
+                    ["spawn"] = (task, runtime, ctx) => runtime.CommitAsync(async (tx, current) =>
+                    {
+                        var child = await tx.CreateConversationAsync(ConversationOwnership.Task(current.Id));
+                        await tx.CreateTaskAsync(Hold, Input(NameOf(task.Input)), OwnConversation(child.Id));
+                        return (TaskState?)NextTaskState.Completed(JsonValue.Null);
+                    }, ctx),
+                },
+                Abort = (_, runtime, ctx) => runtime.CommitAsync((_, _) => NextTaskState.Aborted(), ctx),
+            });
         }
+
+        /// <summary>Upstream <c>Spawner</c>.</summary>
+        public DurableTask Spawner { get; }
 
         /// <summary>Upstream <c>Hold</c>.</summary>
         public DurableTask Hold { get; }
@@ -134,10 +155,10 @@ internal static partial class OwnershipTests
                 return new Tree(owner, child.Id, inner);
             }, Context);
 
-        /// <summary>Upstream <c>openHarness(storage)</c>: a resumed Harness running test.hold and test.waiter, and its root.</summary>
+        /// <summary>Upstream <c>openHarness(storage)</c>: a resumed Harness running test.hold, test.waiter and test.spawner, and its root.</summary>
         public async Task<Opened> OpenHarness(IStorage storage)
         {
-            var opened = await OpenTasks(storage, [Hold, Waiter]);
+            var opened = await OpenTasks(storage, [Hold, Waiter, Spawner]);
             var root = await opened.Harness.RootAsync(Context);
             opened.Harness.Resume();
             return new Opened(opened.Harness, root, opened.Registry, opened.Reports);

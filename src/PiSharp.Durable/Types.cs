@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/types.ts (table records: conversations, entries, submissions,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (table records: conversations, entries, submissions,
 // tasks). The rest of types.ts is split across Ids.cs (IDs and sequences), TypesDocuments.cs (document records and content) and
 // TypesStorage.cs (scans, writes and the Storage contract); the Session, Tx and task-runtime surfaces join with P3 and P7.
 //
@@ -123,6 +123,12 @@ public sealed record TaskOptions(TaskOwnership Ownership)
     public ConversationId? ConversationId { get; init; }
     /// <summary>Conversation-owned tasks only: excluded from ordinary idle waits, conversation aborts and cascades.</summary>
     public bool? Background { get; init; }
+    /// <summary>
+    /// Its creator awaits it only in memory and does not resume after a restart, so it is pointless once the Harness that created it is
+    /// gone. When scheduling starts in a later Harness, the task, if still live, is abort-marked with reason <c>restart</c>, and the mark
+    /// cascades to its ordinary owned work, before any of it runs again (upstream <c>abandonOnRestart</c>).
+    /// </summary>
+    public bool? AbandonOnRestart { get; init; }
 }
 
 /// <summary>Whether a context edit omits or replaces its target's model messages.</summary>
@@ -597,6 +603,13 @@ public sealed class FaultedTaskOutcome(TaskOutcomeError error) : TaskOutcome
     public override JsonObjectValue ToJson() => new RecordJson.Writer().Add("status", "faulted").Add("error", Error.ToJson()).Build();
 }
 
+/// <summary>Why a task carries an abort mark when no abort was requested (upstream <c>TaskRecord.abortReason</c>).</summary>
+public enum TaskAbortReason
+{
+    /// <summary><c>"restart"</c>: abandoned after a restart (<see cref="TaskOptions.AbandonOnRestart"/>), or below such a task.</summary>
+    Restart,
+}
+
 /// <summary>The status of a task record (upstream <c>TaskState["status"]</c>; named to avoid <see cref="System.Threading.Tasks.TaskStatus"/>).</summary>
 public enum DurableTaskStatus
 {
@@ -725,9 +738,10 @@ public sealed class TerminalTaskState(TaskOutcome outcome) : SettlingTaskState(o
 
 /// <summary>Complete replacement record for one durable task state machine (upstream <c>TaskRecord&lt;JsonValue, JsonValue,
 /// JsonValue&gt;</c>; typed task views join with the runtime in P7). JSON key order is upstream's: <c>id, conversationId, kind, version, input,
-/// owner, background, abortRequested, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first change to
-/// running), <c>memos</c> (added by a running invocation, dropped with the outcome) and <c>endedAt</c>, each appended by a spread of the
-/// current record. <see cref="KeyOrder"/> keeps a decoded record's own order through <c>with</c>.</summary>
+/// owner, background, abortRequested, abandonOnRestart, state</c> as the Session creates a record, then <c>startedAt</c> (stamped on the first
+/// change to running), <c>memos</c> (added by a running invocation, dropped with the outcome) and <c>endedAt</c>, each appended by a spread of
+/// the current record; <c>abortReason</c> is appended by the mark that sets it. <see cref="KeyOrder"/> keeps a decoded or marked record's own
+/// order through <c>with</c>.</summary>
 public sealed record TaskRecord
 {
     /// <summary>The task ID.</summary>
@@ -746,6 +760,14 @@ public sealed record TaskRecord
     public required bool Background { get; init; }
     /// <summary>Durable abort mark checked before run-mode progress is committed.</summary>
     public required bool AbortRequested { get; init; }
+    /// <summary>
+    /// Why the mark was set when not by an abort request: <see cref="TaskAbortReason.Restart"/> for a task abandoned after a restart
+    /// (<see cref="TaskOptions.AbandonOnRestart"/>) or below one. Such a task waits for its definition instead of becoming <c>orphaned</c>.
+    /// A later abort request clears it. Written only when set.
+    /// </summary>
+    public TaskAbortReason? AbortReason { get; init; }
+    /// <summary>Set from <see cref="TaskOptions.AbandonOnRestart"/>. Immutable; written only when true (upstream <c>abandonOnRestart?: true</c>).</summary>
+    public bool AbandonOnRestart { get; init; }
     /// <summary>The state.</summary>
     public required TaskState State { get; init; }
     /// <summary>Small first-writer-wins values retained while the task can run; a completing or terminal record has none.</summary>
@@ -767,16 +789,18 @@ public sealed record TaskRecord
     /// <summary>The persisted JSON.</summary>
     public JsonObjectValue ToJson() => RecordJson.Ordered(new RecordJson.Writer()
         .Add("id", Id.ToJson()).Add("conversationId", ConversationId.ToJson()).Add("kind", Kind).Number("version", Version).Add("input", Input)
-        .Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested).Add("state", State.ToJson())
-        .Number("startedAt", StartedAt).Add("memos", Memos).Number("endedAt", EndedAt).Build(), KeyOrder);
+        .Add("owner", Owner?.ToJson()).Add("background", Background).Add("abortRequested", AbortRequested)
+        .Add("abandonOnRestart", AbandonOnRestart ? JsonValue.Boolean(true) : null).Add("state", State.ToJson())
+        .Number("startedAt", StartedAt).Add("memos", Memos).Number("endedAt", EndedAt)
+        .Add("abortReason", AbortReason is { } reason ? WireName.Of(reason) : null).Build(), KeyOrder);
 
     /// <summary>Decodes and validates <see cref="ToJson"/>.</summary>
     public static TaskRecord FromJson(JsonValue json)
     {
         const string what = "task record";
         var value = RecordJson.Object(json, what);
-        RecordJson.OnlyKeys(value, what, "id", "conversationId", "kind", "version", "input", "owner", "background", "abortRequested", "state",
-            "memos", "startedAt", "endedAt");
+        RecordJson.OnlyKeys(value, what, "id", "conversationId", "kind", "version", "input", "owner", "background", "abortRequested",
+            "abortReason", "abandonOnRestart", "state", "memos", "startedAt", "endedAt");
         return new TaskRecord
         {
             Id = RecordJson.Id<TaskId>(value, "id", what),
@@ -787,6 +811,13 @@ public sealed record TaskRecord
             Owner = RecordJson.OptionalId<TaskId>(value, "owner", what),
             Background = RecordJson.Boolean(value, "background", what),
             AbortRequested = RecordJson.Boolean(value, "abortRequested", what),
+            AbortReason = RecordJson.OptionalString(value, "abortReason", what) is { } reason ? WireName.Parse<TaskAbortReason>(reason, what) : null,
+            AbandonOnRestart = RecordJson.Optional(value, "abandonOnRestart") switch
+            {
+                null => false,
+                JsonBooleanValue { Value: true } => true,
+                _ => throw RecordJson.Invalid(what, "field \"abandonOnRestart\" must be true"),
+            },
             State = TaskState.FromJson(RecordJson.Required(value, "state", what)),
             Memos = RecordJson.Optional(value, "memos") is { } memos ? RecordJson.Object(memos, "task memos") : null,
             StartedAt = RecordJson.OptionalNumber(value, "startedAt", what),

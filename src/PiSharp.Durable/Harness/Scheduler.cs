@@ -1,26 +1,31 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/scheduler.ts. Named DurableTaskScheduler because
-// System.Threading.Tasks.TaskScheduler is used throughout the assembly.
-// Pi v1.2.0's area b parts of scheduler.ts are in (durable-sync-1.2.0-worklist.json): its commit listener is an internal one (observeCommits),
-// a throw in its own commits (reconciliation, reservation, a step) fails the Session instead of being retried, closedError carries the
-// Session's failure, close signals invocations in join() after every close listener ran, and an abort's join ends when the Session fails.
-// The header moves to v1.2.0 with area c (the scheduler rewrite), which owns this row.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/scheduler.ts. Named DurableTaskScheduler because
+// System.Threading.Tasks.TaskScheduler is used throughout the assembly. Ported as a whole against the v1.2.0 text: the ownership indexes
+// (below, roots, edges, settled, unloaded, dropQueue) and the candidate sets of each pass (intent, runnable, finalizeChecks, failFastChecks,
+// waiters, abandoned), abandonOnRestart with abortReason "restart", abortOwned and ownedTasks, and wait-cycle rejection.
 //
 // Concurrency model. Upstream runs on one JavaScript thread: commit listeners, line callbacks and handler code never overlap, and wakeups
 // are queued microtasks. Here:
 // - Every transition is still decided by one callback serialized on the Session line (reservation, marks, runtime commits, steps,
-//   reconciliation), so the durable order is upstream's.
-// - The in-memory mirror (live records, invocations, owner edges, kept contexts, flags) is also read off the line (idle checks, runtime
-//   memo reads, close), so it is guarded by one short lock. The lock is held only for synchronous bookkeeping: never across an await,
-//   never while signalling an invocation, never around host code (handlers, hooks, settings getters, the clock, onReport, registry
-//   readers); the one exception is the registry snapshot's own lookup methods during inspection, which are pure reads.
+//   reconciliation), so the durable order is upstream's. The ownership indexes change only on the line too: in the commit listener, in
+//   chain loads (which run inside line jobs) and in the sweep (a line job of its own).
+// - The in-memory state (live records, the indexes and candidate sets, invocations, kept contexts, flags) is also read off the line (idle
+//   checks, runtime memo reads, close, the index sizes for tests), so it is guarded by one short lock. The lock is held only for synchronous
+//   bookkeeping: never across an await, never while signalling an invocation, never around host code (handlers, hooks, migrations, settings
+//   getters, the clock, onReport); the one exception is the registry snapshot's own lookup methods during inspection, which are pure reads.
+// - Upstream's Sets iterate in insertion order, and the order of a pass's candidates is the order of its writes; the candidate sets are
+//   insertion-ordered here (OrderedSet), so commits stage their writes in upstream's order.
 // - Upstream's queueMicrotask wakeups (#kick, #scheduleReconcile) become thread-pool work items, so nothing commits synchronously from a
-//   commit or registry listener. Invocations then run their handlers on the thread pool, possibly in parallel with each other.
+//   commit or registry listener. Invocations then run their handlers on the thread pool, possibly in parallel with each other. The sweep
+//   job (#scheduleSweep) is enqueued from the thread pool too, so it never starts inline inside the lock; it still runs after the operation
+//   underway.
 // - AbortController becomes CancellationSignal (a token plus its reason); an invocation's handler context is the scheduler context bound
 //   to that signal, so waits bound to it fail with the reason (the ended error, or OperationCanceledException for an abort mark or close,
 //   upstream's AbortError).
 // - setTimeout becomes HarnessOptions.TimeProvider timers: sleeps wait in Task.Delay steps and recheck the Harness clock; the idle context
 //   expiry is one ITimer. .NET timers never keep a process alive, so the expiry timer is always kept (upstream keeps it only where it can
 //   be unreferenced).
+// - Walks up and down the ownership tree are loops, never recursion, as upstream's are: chains can be deeper than the stack.
+using System.Collections;
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -34,6 +39,10 @@ internal delegate Task SettleOutcome(Transaction tx, TaskRecord record, TaskOutc
 /// <summary>An invocation a conversation handle is bound to: its signal, and a check that throws once it ended (upstream
 /// <c>InvocationBinding</c>).</summary>
 internal sealed record InvocationBinding(CancellationSignal Signal, Action Check);
+
+/// <summary>Sizes of the scheduler's ownership indexes, for tests that bound its memory (upstream <c>TaskScheduler.indexSizes</c>, read
+/// through the Harness's <c>SCHEDULER_INDEX_SIZES</c>). <see cref="Below"/> counts the listed child nodes.</summary>
+internal readonly record struct SchedulerIndexSizes(int Live, int Settled, int Edges, int Below, int Roots, int Unloaded, int DropQueue);
 
 /// <summary>Options of the task scheduler (upstream <c>TaskSchedulerOptions</c>).</summary>
 internal sealed record DurableTaskSchedulerOptions
@@ -68,8 +77,13 @@ internal sealed record DurableTaskSchedulerOptions
 /// <para><c>live</c> mirrors every committed non-terminal task record: pending, running, waiting and completing. The synchronous commit
 /// listener updates it on the Session line, so code running on the line reads exactly the committed state from it.</para>
 /// <para>Tasks and conversations form one ownership tree (spec §5.5): a task's parent is its owner task, or its conversation; a conversation's
-/// parent is its owner task, if any. Walks up that tree decide cascades, idle scopes, and whether a task's ordinary owned work is live, which
-/// holds its outcome as <c>completing</c> and delays its abort handler.</para>
+/// parent is its owner task, if any. Walks up that tree decide what reaches one task: a cancelling owner, a scope. <c>below</c> lists the tree
+/// downward around live work, so what lies below one node is a walk down from it: a task's live ordinary owned work, which holds its outcome
+/// as <c>completing</c> and delays its abort handler, a scope's tasks, a cascade's reach. No pass visits every live task; the candidate sets
+/// hold each pass's candidates.</para>
+/// <para>The ownership indexes are bounded by live work: an owner edge and an ended task's ownership fields are kept only while something is
+/// listed below them in <c>below</c>, so only the chains above live tasks are known, whole. Work that appears later below a dropped node finds
+/// it unknown and loads its chain from storage again.</para>
 /// <para>Invariant: every task transition is decided and written by one callback serialized on the Session line. That covers reservation,
 /// marks, runtime commits, finalization, and the synchronous step before each phase, which applies the precedence rules and writes a fault
 /// or handover. Handlers and joins run off the line. An invocation ends inside the step that decides its end, so a runtime commit it queued
@@ -115,17 +129,47 @@ internal sealed class DurableTaskScheduler
     private readonly Waiters<ConversationId?, bool> idleWaiters = new();
     /// <summary>Definition whose migration failed per task; retried only once the registry resolves another definition.</summary>
     private readonly Dictionary<TaskId, (DurableTask Task, Exception Error)> failedMigrations = [];
-    /// <summary>Owner task of each loaded conversation, null when ownerless.</summary>
+    /// <summary>Owner task of each known conversation, null when ownerless.</summary>
     private readonly Dictionary<ConversationId, TaskId?> edges = [];
-    /// <summary>Tasks that own a loaded conversation; their nodes stay in <see cref="settled"/> once terminal.</summary>
-    private readonly HashSet<TaskId> conversationOwners = [];
-    /// <summary>Ownership fields of terminal tasks that walks pass through.</summary>
+    /// <summary>Ownership fields of the known terminal tasks, which walks pass through.</summary>
     private readonly Dictionary<TaskId, TaskNode> settled = [];
+    /// <summary>
+    /// Ended tasks and conversations found unneeded, dropped by <see cref="SweepLocked"/> at the end of the commit's publication unless
+    /// needed again by then: a chain load installs nodes before the work below them is listed.
+    /// </summary>
+    private readonly OrderedSet<Node> dropQueue;
+    /// <summary>
+    /// The tree downward around live work: each node's child nodes that are live tasks or have nodes listed below them. A conversation's
+    /// parent is its owner task; ownerless ones with work are in <see cref="roots"/>.
+    /// </summary>
+    private readonly Dictionary<Node, OrderedSet<Node>> below = [];
+    private readonly OrderedSet<ConversationId> roots;
+    /// <summary>Known tasks whose chain may not be loaded; every other known task's chain is, and stays, loaded.</summary>
+    private readonly OrderedSet<TaskId> unloaded;
+    /// <summary>Live tasks with cancellation intent, the sources of abort cascades (spec §5.4).</summary>
+    private readonly OrderedSet<TaskId> intent;
+    /// <summary>Live tasks that are not <c>completing</c>, the candidates of a reservation pass; ones found waiting leave it.</summary>
+    private readonly OrderedSet<TaskId> runnable;
+    /// <summary><c>completing</c> tasks the next finalize pass checks: those that started holding, and holders of ended work.</summary>
+    private readonly OrderedSet<TaskId> finalizeChecks;
+    /// <summary>Live waiting tasks by each task in their <c>on</c>.</summary>
+    private readonly Dictionary<TaskId, OrderedSet<TaskId>> waiters = [];
     /// <summary><c>failFast</c> waiters the next reconcile checks for a failed task in <c>on</c>: at open, when they start waiting, and when
-    /// one of their tasks fails. Ordered as upstream's Set.</summary>
-    private readonly OrderedDictionary<TaskId, bool> failFastChecks = [];
+    /// one of their tasks fails.</summary>
+    private readonly OrderedSet<TaskId> failFastChecks;
+    /// <summary>
+    /// Live tasks with <c>abandonOnRestart</c> found at open, from an earlier Harness. The first reservation pass abort-marks them with reason
+    /// <c>restart</c>, so nothing of them or below them runs a phase again.
+    /// </summary>
+    private readonly OrderedSet<TaskId> abandoned;
+    /// <summary>Members iterated over the scheduler's sets, for tests that bound a pass's work (upstream's tests count
+    /// <c>Set.prototype[Symbol.iterator]</c> entries).</summary>
+    private readonly IterationCounter iterations = new();
     private bool reconcileScheduled;
+    private bool sweepScheduled;
     private bool cascadePending;
+    /// <summary>Reconciliation passes running now; with the flags above, what <see cref="QuiesceAsync"/> waits out.</summary>
+    private int reconciling;
     private IDisposable? registrySubscription;
     private bool enabled;
     private bool closing;
@@ -148,7 +192,18 @@ internal sealed class DurableTaskScheduler
         withdrawInputs = options.WithdrawInputs;
         conversation = options.Conversation;
         context = options.Context;
+        dropQueue = new(iterations);
+        roots = new(iterations);
+        unloaded = new(iterations);
+        intent = new(iterations);
+        runnable = new(iterations);
+        finalizeChecks = new(iterations);
+        failFastChecks = new(iterations);
+        abandoned = new(iterations);
     }
+
+    /// <summary>Test probe: members iterated over the scheduler's sets so far (see <see cref="iterations"/>).</summary>
+    internal long SetEntries => Interlocked.Read(ref iterations.Entries);
 
     /// <summary>Loads live tasks and changes surviving <c>running</c> tasks back to <c>pending</c>. Dispatches nothing.</summary>
     public async Task OpenAsync(DurableContext openContext)
@@ -168,9 +223,10 @@ internal sealed class DurableTaskScheduler
                 {
                     foreach (var record in records)
                     {
-                        live[record.Id] = record;
+                        TrackLocked(null, record);
+                        if (record.AbandonOnRestart) abandoned.Add(record.Id);
                         if (record.State is RunningTaskState running) tx.SetTask(WithState(record, new PendingTaskState(running.Checkpoint)));
-                        if (record.State is WaitingTaskState { Policy: JoinPolicy.FailFast }) failFastChecks[record.Id] = true;
+                        if (record.State is WaitingTaskState { Policy: JoinPolicy.FailFast }) failFastChecks.Add(record.Id);
                     }
                 }
             }
@@ -187,6 +243,34 @@ internal sealed class DurableTaskScheduler
     internal Task InvocationDone(TaskId id)
     {
         lock (gate) return invocations.TryGetValue(id, out var invocation) ? invocation.Done.Task : Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Test barrier: completes once no reconciliation, reservation or sweep is scheduled or running and the line has drained, so the indexes
+    /// hold what the committed records imply. Upstream's tests get this from microtask order; here those passes run on the thread pool.
+    /// </summary>
+    internal async Task QuiesceAsync()
+    {
+        while (true)
+        {
+            await session.FlushLineAsync().ConfigureAwait(false);
+            lock (gate) if (!reconcileScheduled && reconciling == 0 && !sweepScheduled && !draining) return;
+            await Task.Delay(1).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Sizes of the ownership indexes, for tests that bound the scheduler's memory (upstream <c>indexSizes</c>).</summary>
+    internal SchedulerIndexSizes IndexSizes
+    {
+        get
+        {
+            lock (gate)
+            {
+                var listed = 0;
+                foreach (var children in below.Values) listed += children.Count;
+                return new SchedulerIndexSizes(live.Count, settled.Count, edges.Count, listed, roots.Count, unloaded.Count, dropQueue.Count);
+            }
+        }
     }
 
     /// <summary>Enables scheduling. Idempotent; the kick does nothing once closing.</summary>
@@ -211,9 +295,11 @@ internal sealed class DurableTaskScheduler
     /// <summary>
     /// Commits the abort mark, or settles a task that no registered definition can take as <c>orphaned</c> when nothing it owns is live, then
     /// joins the run invocation seen on the line; the commit listener signalled it. The abort invocation starts once the task's ordinary owned
-    /// work is gone. A <c>completing</c> task is only marked.
+    /// work is gone. A <c>completing</c> task is only marked. A request replaces a <c>restart</c> mark, so a task abandoned after a restart
+    /// that waits for its definition is orphaned; with <paramref name="keepRestart"/>, as for an owner's own cleanup, such a task keeps its
+    /// mark and waits on.
     /// </summary>
-    public async Task<TaskAbortResult> AbortAsync(TaskId id, DurableContext callContext)
+    public async Task<TaskAbortResult> AbortAsync(TaskId id, DurableContext callContext, bool keepRestart = false)
     {
         var (result, run) = await session.CommitWithAsync<(TaskAbortResult, Invocation?)>(async tx =>
         {
@@ -221,18 +307,20 @@ internal sealed class DurableTaskScheduler
             if (current.State.Status == DurableTaskStatus.Terminal) return (TaskAbortResult.Terminal, null);
             Invocation? invocation;
             lock (gate) invocation = invocations.GetValueOrDefault(id);
+            // A restart-marked task has no run invocation; it only waits for its abort.
+            if (keepRestart && current.AbortReason == TaskAbortReason.Restart) return (TaskAbortResult.Marked, null);
             if (invocation is null && current.State.Status != DurableTaskStatus.Completing)
             {
                 await LoadScopesAsync(false).ConfigureAwait(false);
                 bool owned;
-                lock (gate) owned = OwnedLive(null).ContainsKey(id);
+                lock (gate) owned = HasOwnedLiveLocked(id, null, null);
                 if (!owned && Resolve(current, registry.Snapshot()) is { Blocked: { } reason })
                 {
                     await TerminateAsync(tx, current, new OrphanedTaskOutcome(TaskInspectionState.ReasonName(reason))).ConfigureAwait(false);
                     return (TaskAbortResult.Marked, null);
                 }
             }
-            if (!current.AbortRequested) tx.SetTask(current with { AbortRequested = true });
+            if (!current.AbortRequested || current.AbortReason is not null) tx.SetTask(WithAbortMark(current, restart: false));
             return (TaskAbortResult.Marked, invocation?.Mode == InvocationMode.Run ? invocation : null);
         }, callContext).ConfigureAwait(false);
         // The commit listener signalled the run; join it. A run that ignores its signal can outlive a failed Session, which ends the wait
@@ -265,7 +353,7 @@ internal sealed class DurableTaskScheduler
         lock (gate)
         {
             if (closing) return Task.FromException(HarnessUtil.ClosedError(session));
-            if (Idle(conversationId)) return Task.CompletedTask;
+            if (IdleLocked(conversationId)) return Task.CompletedTask;
             ScheduleReconcileLocked();
             waiting = idleWaiters.Add(conversationId, callContext);
         }
@@ -286,18 +374,17 @@ internal sealed class DurableTaskScheduler
             var reached = new List<TaskId>();
             lock (gate)
             {
-                foreach (var record in live.Values)
+                foreach (var (_, node, record) in WalkDownLocked(Node.Of(conversationId), null, background, null))
                 {
-                    if (record.Background && !background) continue;
-                    if (InScope(ParentOf(record), scope, background) != true) continue;
+                    if (record is null || (node.Background && !background)) continue;
                     reached.Add(record.Id);
-                    if (!record.AbortRequested) tx.SetTask(record with { AbortRequested = true });
+                    if (!record.AbortRequested || record.AbortReason is not null) tx.SetTask(WithAbortMark(record, restart: false));
                 }
             }
             foreach (var id in queued)
             {
                 bool inScope;
-                lock (gate) inScope = InScope(Up.Of(id), scope, background) == true;
+                lock (gate) inScope = InScopeLocked(Up.Of(id), scope, background) == true;
                 if (inScope) await withdrawInputs(tx, id).ConfigureAwait(false);
             }
             return reached;
@@ -311,12 +398,14 @@ internal sealed class DurableTaskScheduler
     private void Observe(CommitPublication publication)
     {
         var signal = new List<Invocation>();
-        bool changed;
+        var changed = false;
         lock (gate)
         {
             var updated = new List<TaskRecord>();
             var failed = new List<TaskId>();
-            changed = false;
+            // Edges first, so the tasks a commit creates in a new conversation hang from it.
+            foreach (var change in publication.Changes)
+                if (change is ConversationWrite created && !edges.ContainsKey(created.Value.Id)) SetEdgeLocked(created.Value.Id, created.Value.Owner?.TaskId);
             foreach (var change in publication.Changes)
             {
                 if (change is not TaskWrite write) continue;
@@ -324,12 +413,11 @@ internal sealed class DurableTaskScheduler
                 var record = write.Value;
                 var previous = live.GetValueOrDefault(record.Id);
                 if (FailedOutcome(record) && (previous is null || !FailedOutcome(previous))) failed.Add(record.Id);
+                TrackLocked(previous, record);
                 if (record.State.Status == DurableTaskStatus.Terminal)
                 {
-                    live.Remove(record.Id);
                     failedMigrations.Remove(record.Id);
                     failFastChecks.Remove(record.Id);
-                    if (conversationOwners.Contains(record.Id)) settled[record.Id] = NodeOf(record);
                     taskWaiters.Resolve(record.Id, record);
                     // Its owner may finalize now.
                     ScheduleReconcileLocked();
@@ -341,6 +429,8 @@ internal sealed class DurableTaskScheduler
                     // Signal a run invocation of the newly marked task; its next step ends it.
                     if (invocations.TryGetValue(record.Id, out var invocation) && invocation.Mode == InvocationMode.Run) signal.Add(invocation);
                 }
+                // A request replacing a `restart` mark upgrades the marks of the work below.
+                if (previous?.AbortReason is not null && record.AbortReason is null) cascadePending = true;
                 var status = record.State.Status;
                 if (status == DurableTaskStatus.Completing && previous?.State.Status != DurableTaskStatus.Completing)
                 {
@@ -349,40 +439,42 @@ internal sealed class DurableTaskScheduler
                 }
                 if (record.State is WaitingTaskState { Policy: JoinPolicy.FailFast } && previous?.State.Status != DurableTaskStatus.Waiting)
                 {
-                    failFastChecks[record.Id] = true;
+                    failFastChecks.Add(record.Id);
                     ScheduleReconcileLocked();
                 }
-                live[record.Id] = record;
-                updated.Add(record);
+                // Its owners and place never change: what is above it is checked once, when it becomes live.
+                if (previous is null) updated.Add(record);
             }
             foreach (var id in failed)
             {
-                foreach (var record in live.Values)
+                if (!waiters.TryGetValue(id, out var waiting)) continue;
+                foreach (var waiter in waiting)
                 {
-                    if (record.State is WaitingTaskState { Policy: JoinPolicy.FailFast } waiting && waiting.On.Contains(id))
+                    if (live.GetValueOrDefault(waiter)?.State is WaitingTaskState { Policy: JoinPolicy.FailFast })
                     {
-                        failFastChecks[record.Id] = true;
+                        failFastChecks.Add(waiter);
                         ScheduleReconcileLocked();
                     }
                 }
             }
             foreach (var change in publication.Changes)
-                if (change is ConversationWrite created && !edges.ContainsKey(created.Value.Id)) SetEdge(created.Value.Id, created.Value.Owner?.TaskId);
-            foreach (var change in publication.Changes)
             {
                 // A queued input below a cancelled owner is withdrawn, even after its cascade.
                 if (change is not SubmissionWrite { Value: { Status: SubmissionStatus.Queued, Type: SubmissionType.Input } submission }) continue;
-                var up = Up.Of(submission.ConversationId);
-                if (!ChainKnown(up, null) || BelowCancelled(up)) cascadePending = true;
+                // Only an owner with cancellation intent withdraws it; a later intent's mark runs the cascade then.
+                if (intent.Count == 0) continue;
+                var conversationId = submission.ConversationId;
+                if (!KnownLocked(Node.Of(conversationId)) || BelowCancelledLocked(Up.Of(conversationId))) cascadePending = true;
             }
             foreach (var record in updated)
             {
                 // Work created below a cancelled owner, even after its cascade, is aborted too.
-                if (!ChainKnown(ParentOf(record), null)) ScheduleReconcileLocked();
-                else if (!record.Background && !record.AbortRequested && BelowCancelled(ParentOf(record))) cascadePending = true;
+                if (unloaded.Contains(record.Id)) ScheduleReconcileLocked();
+                else if (!record.Background && !record.AbortRequested && BelowCancelledLocked(ParentOf(record))) cascadePending = true;
             }
             // A cascade that a reservation or step found pending runs with the next commit of any kind.
             if (cascadePending) ScheduleReconcileLocked();
+            SweepLocked();
         }
         foreach (var invocation in signal) Signal(invocation, null);
         if (!changed) return;
@@ -413,11 +505,11 @@ internal sealed class DurableTaskScheduler
         lock (gate)
         {
             foreach (var conversationId in idleWaiters.Keys())
-                if (Idle(conversationId)) idleWaiters.Resolve(conversationId, true);
+                if (IdleLocked(conversationId)) idleWaiters.Resolve(conversationId, true);
             foreach (var (conversationId, kept) in contexts.ToList())
             {
                 if (kept.IdleSince is { } since && at - since >= retention) contexts.Remove(conversationId);
-                else if (!Idle(conversationId)) kept.IdleSince = null;
+                else if (!IdleLocked(conversationId)) kept.IdleSince = null;
                 else if (retention > 0) kept.IdleSince ??= at;
                 else contexts.Remove(conversationId);
             }
@@ -467,9 +559,10 @@ internal sealed class DurableTaskScheduler
         lock (gate)
         {
             reconcileScheduled = false;
+            reconciling++;
             cascade = cascadePending;
             cascadePending = false;
-            checks = [.. failFastChecks.Keys];
+            checks = [.. failFastChecks];
             failFastChecks.Clear();
         }
         try
@@ -478,16 +571,29 @@ internal sealed class DurableTaskScheduler
             {
                 lock (gate) if (closing) return;
                 var queued = await LoadScopesAsync(cascade).ConfigureAwait(false);
-                var marked = new HashSet<TaskId>();
-                void Mark(TaskRecord record)
+                // A cascade from an abandoned owner passes its `restart` reason on; any other intent marks, or upgrades a `restart` mark, as
+                // a request. Collected first, so a request wins over a `restart` mark of the same pass.
+                var marks = new OrderedDictionary<TaskId, (TaskRecord Record, bool Restart)>();
+                void Mark(TaskRecord record, bool restart)
                 {
-                    if (record.AbortRequested || !marked.Add(record.Id)) return;
-                    tx.SetTask(record with { AbortRequested = true });
+                    if (marks.TryGetValue(record.Id, out var staged) && !staged.Restart) return;
+                    if (record.AbortRequested && (record.AbortReason is null || restart)) return;
+                    marks[record.Id] = (record, restart);
                 }
-                // Loading edges can reveal a cancelled owner, so marks are derived on every pass.
                 lock (gate)
-                    foreach (var record in live.Values.ToList())
-                        if (!record.Background && BelowCancelled(ParentOf(record))) Mark(record);
+                {
+                    // Every live foreground task below a live owner with cancellation intent, which is its nearest one: a walk down from
+                    // each owner with intent does not enter another, whose own walk covers what is below it. Derived again on every pass,
+                    // as loading edges can reveal a cancelled owner.
+                    foreach (var id in intent)
+                    {
+                        var owner = live[id];
+                        // Only an owner abandoned after a restart, and nothing else, passes its reason on.
+                        var restart = owner.AbortReason == TaskAbortReason.Restart && !FailedOutcome(owner);
+                        foreach (var (_, node, record) in WalkDownLocked(Node.Of(id), null, false, next => !intent.Contains(next)))
+                            if (record is not null && !node.Background) Mark(record, restart);
+                    }
+                }
                 foreach (var id in checks)
                 {
                     TaskRecord? waiter;
@@ -496,13 +602,14 @@ internal sealed class DurableTaskScheduler
                     // Every other live task: the failed one keeps its own outcome.
                     lock (gate)
                         foreach (var member in waiting.On)
-                            if (live.TryGetValue(member, out var record) && !FailedOutcome(record)) Mark(record);
+                            if (live.TryGetValue(member, out var record) && !FailedOutcome(record)) Mark(record, false);
                 }
+                foreach (var (record, restart) in marks.Values) tx.SetTask(WithAbortMark(record, restart));
                 foreach (var id in queued)
                 {
-                    bool below;
-                    lock (gate) below = BelowCancelled(Up.Of(id));
-                    if (below) await withdrawInputs(tx, id).ConfigureAwait(false);
+                    bool cancelled;
+                    lock (gate) cancelled = BelowCancelledLocked(Up.Of(id));
+                    if (cancelled) await withdrawInputs(tx, id).ConfigureAwait(false);
                 }
                 await FinalizeAsync(tx).ConfigureAwait(false);
             }, context).ConfigureAwait(false);
@@ -512,6 +619,10 @@ internal sealed class DurableTaskScheduler
             // No extension code runs in this commit: a throw is a storage failure, a host callback, or a bug. None is fixed by running the
             // pass again, so it fails the Session, which reports it.
             FailSession(error);
+        }
+        finally
+        {
+            lock (gate) reconciling--;
         }
         SettleIdle();
     }
@@ -535,97 +646,365 @@ internal sealed class DurableTaskScheduler
     /// </summary>
     private async Task FinalizeAsync(Transaction tx)
     {
-        while (true)
+        // A worklist: the tasks that started holding, and the holders of work that ended. Finalizing one can free the nearest live task above
+        // it, which goes on the list. Tasks finalized here have no live work below them, so walks down skip them.
+        // In rounds: the holders the tasks of one round free are checked once, in the next, so a holder of many tasks that end together is
+        // walked once, not once per task.
+        List<TaskId> round;
+        lock (gate)
         {
-            List<TaskRecord> done;
-            lock (gate)
+            round = [.. finalizeChecks];
+            finalizeChecks.Clear();
+        }
+        var done = new HashSet<TaskId>();
+        var overlay = OverlayOf(tx);
+        while (round.Count > 0)
+        {
+            var next = new OrderedSet<TaskId>(iterations);
+            foreach (var id in round)
             {
-                var overlay = OverlayOf(tx);
-                var owned = OwnedLive(overlay);
-                done = [.. LiveRecords(overlay).Where(record => record.State.Status == DurableTaskStatus.Completing && !owned.ContainsKey(record.Id))];
-            }
-            if (done.Count == 0) return;
-            foreach (var record in done)
-            {
-                var outcome = ((CompletingTaskState)record.State).Outcome;
-                tx.SetTask(WithState(record, new TerminalTaskState(outcome)));
-                // Only the scheduler writes faulted and orphaned (spec §5.4); their cleanup waits for this commit.
+                TaskRecord record;
+                TaskOutcome outcome;
+                TaskRecord terminal;
+                lock (gate)
+                {
+                    var found = overlay.Tasks.GetValueOrDefault(id) ?? live.GetValueOrDefault(id);
+                    if (found?.State is not CompletingTaskState completing || done.Contains(id)) continue;
+                    if (HasOwnedLiveLocked(id, overlay, done)) continue;
+                    record = found;
+                    outcome = completing.Outcome;
+                    terminal = WithState(record, new TerminalTaskState(outcome));
+                }
+                tx.SetTask(terminal);
+                lock (gate) overlay.Tasks[id] = terminal;
+                done.Add(id);
+                // REMINDER: only the scheduler writes faulted and orphaned (spec §5.4); their cleanup waits for this commit.
                 if (outcome is FaultedTaskOutcome or OrphanedTaskOutcome) await settleOutcome(tx, record, outcome).ConfigureAwait(false);
+                lock (gate)
+                {
+                    var above = NearestLiveAboveLocked(NodeOf(record), overlay);
+                    if (above?.State.Status == DurableTaskStatus.Completing) next.Add(above.Id);
+                }
             }
+            round = [.. next];
         }
     }
 
     /// <summary>
-    /// Loads the owner chains of every live task and, with <paramref name="queued"/>, of every conversation with queued submissions, on the
-    /// Session line; returns the latter. Reads committed Storage directly, so it may run inside a commit callback.
+    /// Loads the owner chains of the tasks in <see cref="unloaded"/> and, with <paramref name="queued"/>, of every conversation with queued
+    /// inputs, on the Session line; returns the latter. Reads committed Storage directly, so it may run inside a commit callback.
     /// </summary>
     private async Task<List<ConversationId>> LoadScopesAsync(bool queued)
     {
-        List<TaskRecord> records;
-        lock (gate) records = [.. live.Values];
-        foreach (var record in records)
+        List<TaskId> pending;
+        lock (gate) pending = [.. unloaded];
+        foreach (var id in pending)
         {
-            bool known;
-            lock (gate) known = ChainKnown(ParentOf(record), null);
-            if (!known) await LoadChainAsync(ParentOf(record), null).ConfigureAwait(false);
+            // An earlier load in this loop may have passed it.
+            bool still;
+            lock (gate) still = unloaded.Contains(id);
+            if (still) await LoadChainAsync(Up.Of(id), null).ConfigureAwait(false);
         }
         if (!queued) return [];
         var submissions = await HarnessUtil.ScanAll(cursor =>
             storage.ScanSubmissionsAsync(new SubmissionQuery { Status = SubmissionStatus.Queued }, ScanPageSize, cursor, context)).ConfigureAwait(false);
-        var conversations = submissions.Select(submission => submission.ConversationId).Distinct().ToList();
+        var conversations = submissions.Where(submission => submission.Type == SubmissionType.Input).Select(submission => submission.ConversationId)
+            .Distinct().ToList();
         foreach (var id in conversations) await LoadChainAsync(Up.Of(id), null).ConfigureAwait(false);
         return conversations;
     }
 
-    /// <summary>Loads the owner edges and task nodes from <paramref name="start"/> up to its ownerless root.</summary>
+    /// <summary>
+    /// Loads the owner edges and task nodes from <paramref name="start"/> up to its ownerless root. A known task outside
+    /// <see cref="unloaded"/> ends the walk, as its chain is loaded; the <see cref="unloaded"/> tasks passed have a loaded chain afterwards.
+    /// Loading a node can reveal a cancelled owner, so it makes the next reconcile derive cascade marks.
+    /// </summary>
     private async Task LoadChainAsync(Up start, Overlay? overlay)
     {
+        var passed = new List<TaskId>();
         Up? at = start;
         while (at is { } current)
         {
             if (current.IsTask)
             {
+                var id = current.Task;
                 TaskNode? node;
-                lock (gate) node = Node(current.Task, overlay);
+                bool loaded;
+                lock (gate)
+                {
+                    node = live.TryGetValue(id, out var record) ? NodeOf(record) : settled.TryGetValue(id, out var known) ? known : null;
+                    // Created in this commit: the load from its own record covers what is above it.
+                    if (node is null && overlay?.Tasks.ContainsKey(id) == true) break;
+                    loaded = node is not null && !unloaded.Contains(id);
+                }
+                if (loaded) break;
                 if (node is null)
                 {
-                    var record = await storage.GetTaskAsync(current.Task, context).ConfigureAwait(false);
+                    var record = await storage.GetTaskAsync(id, context).ConfigureAwait(false);
                     if (record is null) return;
                     node = NodeOf(record);
-                    if (record.State.Status == DurableTaskStatus.Terminal) lock (gate) settled[record.Id] = node.Value;
+                    lock (gate)
+                    {
+                        if (record.State.Status == DurableTaskStatus.Terminal) SettleLocked(id, node.Value);
+                        // A loaded node can reveal a cancelling owner: the next reconcile derives marks again.
+                        ScheduleReconcileLocked();
+                    }
                 }
+                passed.Add(id);
                 at = ParentOf(node.Value);
             }
             else
             {
                 bool known;
                 TaskId? owner;
-                lock (gate) known = TryEdge(current.Conversation, overlay, out owner);
+                lock (gate) known = EdgeLocked(current.Conversation, overlay, out owner);
                 if (!known)
                 {
                     var record = await storage.GetConversationAsync(current.Conversation, context).ConfigureAwait(false);
                     owner = record?.Owner?.TaskId;
-                    lock (gate) SetEdge(current.Conversation, owner);
+                    lock (gate)
+                    {
+                        SetEdgeLocked(current.Conversation, owner);
+                        // A loaded node can reveal a cancelling owner: the next reconcile derives marks again.
+                        ScheduleReconcileLocked();
+                    }
                 }
                 at = owner is { } task ? Up.Of(task) : null;
             }
         }
+        lock (gate) foreach (var id in passed) unloaded.Remove(id);
     }
 
-    private void SetEdge(ConversationId conversationId, TaskId? owner)
+    private void SetEdgeLocked(ConversationId conversationId, TaskId? owner)
     {
         edges[conversationId] = owner;
-        if (owner is { } task) conversationOwners.Add(task);
+        // The conversation now hangs from its owner, or is a root; with nothing below it, it waits for the sweep.
+        RelistLocked(Node.Of(conversationId));
+        DropIfUnneededLocked(Node.Of(conversationId));
+    }
+
+    /// <summary>Knows a terminal task a chain load read, so walks pass through it; its own chain is not loaded yet.</summary>
+    private void SettleLocked(TaskId id, TaskNode node)
+    {
+        settled[id] = node;
+        unloaded.Add(id);
+        RelistLocked(Node.Of(id));
+        DropIfUnneededLocked(Node.Of(id));
+    }
+
+    /// <summary>Queues an ended task or a conversation for the sweep when nothing is listed below it.</summary>
+    private void DropIfUnneededLocked(Node node)
+    {
+        if (!node.IsConversation && live.ContainsKey(node.Task)) return;
+        if (below.ContainsKey(node)) return;
+        dropQueue.Add(node);
+        ScheduleSweepLocked();
+    }
+
+    /// <summary>
+    /// Sweeps in a job of its own on the Session line, after the operation underway: a rejected commit, one with nothing to write, and a read
+    /// publish nothing, so the sweep at the end of <see cref="Observe"/> would not run for what they loaded.
+    /// </summary>
+    private void ScheduleSweepLocked()
+    {
+        if (sweepScheduled || closing) return;
+        sweepScheduled = true;
+        // Enqueued from the thread pool: on an idle line the job would start inline, inside this lock.
+        ThreadPool.UnsafeQueueUserWorkItem(static scheduler =>
+        {
+            Task<bool> job;
+            try
+            {
+                job = scheduler.session.ReadOnLineAsync(() =>
+                {
+                    lock (scheduler.gate)
+                    {
+                        scheduler.sweepScheduled = false;
+                        scheduler.SweepLocked();
+                    }
+                    return Task.FromResult(true);
+                });
+            }
+            catch
+            {
+                job = Task.FromResult(false);
+            }
+            // Rejected only once the Session is closing or failed, when nothing is kept anyway.
+            _ = job.ContinueWith(static (failed, state) =>
+            {
+                _ = failed.Exception;
+                var owner = (DurableTaskScheduler)state!;
+                lock (owner.gate) owner.sweepScheduled = false;
+            }, scheduler, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                System.Threading.Tasks.TaskScheduler.Default);
+        }, this, preferLocal: false);
+    }
+
+    /// <summary>
+    /// Drops the queued nodes that are still unneeded: not live, nothing listed below. Runs once a publication is fully tracked, and as a job of
+    /// its own on the line, never inside an operation: work a commit creates below a chain its own callback loaded keeps that chain. A flat
+    /// loop: unlisting already queued every node on the way up that lost its last listed node.
+    /// </summary>
+    private void SweepLocked()
+    {
+        foreach (var node in dropQueue)
+        {
+            if (below.ContainsKey(node)) continue;
+            if (node.IsConversation)
+            {
+                edges.Remove(node.Conversation);
+                roots.Remove(node.Conversation);
+            }
+            else if (!live.ContainsKey(node.Task))
+            {
+                settled.Remove(node.Task);
+                unloaded.Remove(node.Task);
+            }
+        }
+        dropQueue.Clear();
+    }
+
+    /// <summary>
+    /// Brings the scheduler's sets in line with a task's committed record. A task that ended may free the nearest live task above it: one
+    /// holding its outcome finalizes, an abort-marked one runs its abort handler; its waiters may run.
+    /// </summary>
+    private void TrackLocked(TaskRecord? previous, TaskRecord record)
+    {
+        var id = record.Id;
+        if (previous?.State is WaitingTaskState previousWait) foreach (var on in previousWait.On) DeleteFrom(waiters, on, id);
+        if (record.State.Status == DurableTaskStatus.Terminal)
+        {
+            var node = NodeOf(record);
+            live.Remove(id);
+            intent.Remove(id);
+            runnable.Remove(id);
+            finalizeChecks.Remove(id);
+            settled[id] = node;
+            // Before anything is forgotten: the walk up to the task it held passes the ended tasks between them. Its chain is loaded, as every
+            // commit that ends a task loads the chains of `unloaded` first.
+            ReleaseLocked(node, null);
+            if (waiters.TryGetValue(id, out var waiting)) foreach (var waiter in waiting) runnable.Add(waiter);
+            RelistLocked(Node.Of(id));
+            DropIfUnneededLocked(Node.Of(id));
+            return;
+        }
+        live[id] = record;
+        if (previous is null)
+        {
+            if (!KnownLocked(ParentNode(NodeOf(record)))) unloaded.Add(id);
+            RelistLocked(Node.Of(id));
+        }
+        if (CancellationIntent(record)) intent.Add(id);
+        else intent.Remove(id);
+        if (record.State.Status == DurableTaskStatus.Completing)
+        {
+            runnable.Remove(id);
+            finalizeChecks.Add(id);
+        }
+        else
+        {
+            runnable.Add(id);
+        }
+        if (record.State is WaitingTaskState waitingState) foreach (var on in waitingState.On) AddTo(waiters, on, id);
+    }
+
+    /// <summary>The nearest live task above ended ordinary work may be free now: one holding its outcome, or an aborting one.</summary>
+    private TaskRecord? ReleaseLocked(TaskNode node, Overlay? overlay)
+    {
+        var above = NearestLiveAboveLocked(node, overlay);
+        if (above?.State.Status == DurableTaskStatus.Completing) finalizeChecks.Add(above.Id);
+        else if (above?.AbortRequested == true) runnable.Add(above.Id);
+        return above;
+    }
+
+    /// <summary>
+    /// Lists <paramref name="start"/> under its parent node in <see cref="below"/> while it is a live task or has nodes listed below it, and
+    /// unlists it otherwise; then its parent, as far up as that changes. So <see cref="below"/> holds exactly the tree around live work; a
+    /// parent that loses its last listed node is queued for the sweep. A loop, as ownership chains can be deeper than the call stack.
+    /// </summary>
+    private void RelistLocked(Node start)
+    {
+        var node = start;
+        while (true)
+        {
+            var needed = (!node.IsConversation && live.ContainsKey(node.Task)) || below.ContainsKey(node);
+            Node parent;
+            if (node.IsConversation)
+            {
+                if (!edges.TryGetValue(node.Conversation, out var owner)) return;
+                if (owner is null)
+                {
+                    if (needed) roots.Add(node.Conversation);
+                    else roots.Remove(node.Conversation);
+                    return;
+                }
+                parent = Node.Of(owner.Value);
+            }
+            else
+            {
+                if (live.TryGetValue(node.Task, out var record)) parent = ParentNode(NodeOf(record));
+                else if (settled.TryGetValue(node.Task, out var known)) parent = ParentNode(known);
+                else return;
+            }
+            var listed = below.TryGetValue(parent, out var children) && children.Contains(node);
+            if (listed == needed) return;
+            if (needed)
+            {
+                var first = children is null;
+                AddTo(below, parent, node);
+                if (!first) return;
+            }
+            else
+            {
+                DeleteFrom(below, parent, node);
+                if (below.ContainsKey(parent)) return;
+                DropIfUnneededLocked(parent);
+            }
+            node = parent;
+        }
+    }
+
+    /// <summary>
+    /// The nearest live task above ended ordinary work <paramref name="node"/>, in the overlay's view: the one that work held, if any. Work at
+    /// or below a background task holds nothing above it.
+    /// </summary>
+    private TaskRecord? NearestLiveAboveLocked(TaskNode node, Overlay? overlay)
+    {
+        for (var current = node; !current.Background;)
+        {
+            var owner = current.Owner;
+            if (owner is null)
+            {
+                if (!EdgeLocked(current.ConversationId, overlay, out var edge) || edge is null) return null;
+                owner = edge;
+            }
+            var id = owner.Value;
+            var record = overlay?.Tasks.GetValueOrDefault(id) ?? live.GetValueOrDefault(id);
+            if (record is not null && record.State.Status != DurableTaskStatus.Terminal) return record;
+            if (record is not null) current = NodeOf(record);
+            else if (settled.TryGetValue(id, out var above)) current = above;
+            else return null;
+        }
+        return null;
+    }
+
+    /// <summary>Whether the chain above <paramref name="node"/> is loaded, without walking: known tasks outside <see cref="unloaded"/> have a
+    /// loaded chain.</summary>
+    private bool KnownLocked(Node node)
+    {
+        if (!node.IsConversation) return (live.ContainsKey(node.Task) || settled.ContainsKey(node.Task)) && !unloaded.Contains(node.Task);
+        if (!edges.TryGetValue(node.Conversation, out var owner)) return false;
+        return owner is null || KnownLocked(Node.Of(owner.Value));
     }
 
     /// <summary>Owner task of a conversation (null when ownerless); false while not loaded.</summary>
-    private bool TryEdge(ConversationId id, Overlay? overlay, out TaskId? owner)
+    private bool EdgeLocked(ConversationId id, Overlay? overlay, out TaskId? owner)
     {
         if (overlay is not null && overlay.Edges.TryGetValue(id, out owner)) return true;
         return edges.TryGetValue(id, out owner);
     }
 
-    private TaskNode? Node(TaskId id, Overlay? overlay)
+    private TaskNode? NodeLocked(TaskId id, Overlay? overlay)
     {
         if (overlay is not null && overlay.Tasks.TryGetValue(id, out var candidate)) return NodeOf(candidate);
         if (live.TryGetValue(id, out var record)) return NodeOf(record);
@@ -634,82 +1013,139 @@ internal sealed class DurableTaskScheduler
 
     /// <summary>Walks up from <paramref name="start"/>: owner tasks and conversations, ending at an ownerless root or an edge not loaded
     /// yet.</summary>
-    private List<Step> Above(Up start, Overlay? overlay)
+    private IEnumerable<Step> AboveLocked(Up start, Overlay? overlay)
     {
-        var steps = new List<Step>();
         Up? at = start;
         while (at is { } current)
         {
             if (current.IsTask)
             {
-                if (Node(current.Task, overlay) is not { } node)
+                if (NodeLocked(current.Task, overlay) is not { } node)
                 {
-                    steps.Add(Step.Unknown);
-                    return steps;
+                    yield return Step.Unknown;
+                    yield break;
                 }
-                steps.Add(Step.OfTask(current.Task, node));
+                yield return Step.OfTask(current.Task, node);
                 at = ParentOf(node);
             }
             else
             {
-                steps.Add(Step.OfConversation(current.Conversation));
-                if (!TryEdge(current.Conversation, overlay, out var owner))
+                yield return Step.OfConversation(current.Conversation);
+                if (!EdgeLocked(current.Conversation, overlay, out var owner))
                 {
-                    steps.Add(Step.Unknown);
-                    return steps;
+                    yield return Step.Unknown;
+                    yield break;
                 }
                 at = owner is { } task ? Up.Of(task) : null;
             }
         }
-        return steps;
-    }
-
-    /// <summary>Whether every owner above <paramref name="start"/> is loaded.</summary>
-    private bool ChainKnown(Up start, Overlay? overlay) => !Above(start, overlay).Any(step => step.Kind == StepKind.Unknown);
-
-    /// <summary>Live records, with the overlay's candidates replacing committed ones; terminal candidates are gone.</summary>
-    private IEnumerable<TaskRecord> LiveRecords(Overlay? overlay)
-    {
-        foreach (var record in live.Values)
-        {
-            var candidate = overlay?.Tasks.GetValueOrDefault(record.Id) ?? record;
-            if (candidate.State.Status != DurableTaskStatus.Terminal) yield return candidate;
-        }
-        if (overlay is null) yield break;
-        foreach (var record in overlay.Tasks.Values)
-            if (!live.ContainsKey(record.Id) && record.State.Status != DurableTaskStatus.Terminal) yield return record;
     }
 
     /// <summary>
-    /// Every task with live ordinary owned work (spec §5.5), mapped to that work: each live non-background task counts for every owner task
-    /// above it up to and including the first background one. Owner chains must be loaded.
+    /// The tasks below <paramref name="start"/> that a walk down reaches: those <see cref="below"/> lists and, under an overlay, the commit's
+    /// new tasks, with its candidates in place of committed records. Background tasks are reached but not entered, unless
+    /// <paramref name="crossBackground"/>, and neither are the tasks <paramref name="enter"/> rejects. A loop, as chains can be deeper than the
+    /// call stack. Consume it under the lock.
     /// </summary>
-    private Dictionary<TaskId, List<TaskId>> OwnedLive(Overlay? overlay)
+    private IEnumerable<(TaskId Id, TaskNode Node, TaskRecord? Live)> WalkDownLocked(Node start, Overlay? overlay, bool crossBackground,
+        Func<TaskId, bool>? enter)
     {
-        var owned = new Dictionary<TaskId, List<TaskId>>();
-        foreach (var record in LiveRecords(overlay).ToList())
+        var links = overlay is null ? null : LinksLocked(overlay);
+        var pending = new Stack<Node>();
+        pending.Push(start);
+        while (pending.TryPop(out var at))
         {
-            if (record.Background) continue;
-            foreach (var step in Above(ParentOf(record), overlay))
+            for (var source = 0; source < 2; source++)
             {
-                if (step.Kind == StepKind.Unknown) break;
-                if (step.Kind != StepKind.Task) continue;
-                if (owned.TryGetValue(step.Task, out var below)) below.Add(record.Id);
-                else owned[step.Task] = [record.Id];
-                if (step.Node.Background) break;
+                OrderedSet<Node>? children = null;
+                if (source == 0) below.TryGetValue(at, out children);
+                else links?.TryGetValue(at, out children);
+                if (children is null) continue;
+                foreach (var child in children)
+                {
+                    if (child.IsConversation)
+                    {
+                        pending.Push(child);
+                        continue;
+                    }
+                    var id = child.Task;
+                    var record = overlay?.Tasks.GetValueOrDefault(id) ?? live.GetValueOrDefault(id);
+                    TaskNode node;
+                    if (record is not null) node = NodeOf(record);
+                    else if (settled.TryGetValue(id, out var known)) node = known;
+                    else continue;
+                    var liveRecord = record is not null && record.State.Status != DurableTaskStatus.Terminal ? record : null;
+                    yield return (id, node, liveRecord);
+                    if ((crossBackground || !node.Background) && (enter is null || enter(id))) pending.Push(child);
+                }
             }
         }
-        return owned;
     }
+
+    /// <summary>
+    /// The links walks down need for the commit's new tasks: each one under its parent node, then each node above it that
+    /// <see cref="below"/> does not list yet, until one it lists, a live task (always listed), or the chain's end.
+    /// </summary>
+    private Dictionary<Node, OrderedSet<Node>> LinksLocked(Overlay overlay)
+    {
+        if (overlay.Links is { } cached) return cached;
+        var links = new Dictionary<Node, OrderedSet<Node>>();
+        foreach (var record in overlay.Tasks.Values)
+        {
+            if (live.ContainsKey(record.Id) || settled.ContainsKey(record.Id)) continue;
+            var child = Node.Of(record.Id);
+            Node? parent = ParentNode(NodeOf(record));
+            while (parent is { } current && !(links.TryGetValue(current, out var listed) && listed.Contains(child)))
+            {
+                AddTo(links, current, child);
+                if (!current.IsConversation && (live.ContainsKey(current.Task) || overlay.Tasks.ContainsKey(current.Task))) break;
+                Node? above = null;
+                if (current.IsConversation)
+                {
+                    if (EdgeLocked(current.Conversation, overlay, out var owner) && owner is { } ownerTask) above = Node.Of(ownerTask);
+                }
+                else if (settled.TryGetValue(current.Task, out var fields))
+                {
+                    above = ParentNode(fields);
+                }
+                if (above is { } next && below.TryGetValue(next, out var listedAbove) && listedAbove.Contains(current)) break;
+                child = current;
+                parent = above;
+            }
+        }
+        overlay.Links = links;
+        return links;
+    }
+
+    /// <summary>
+    /// The live ordinary owned work of <paramref name="owner"/> (spec §5.5): the live non-background tasks below it that a walk down reaches
+    /// without entering a background task; with <paramref name="first"/>, only the first. Candidates in <paramref name="overlay"/> replace
+    /// committed records; the walk does not enter tasks in <paramref name="done"/>, which have none. Owner chains must be loaded.
+    /// </summary>
+    private List<TaskId> OwnedLiveLocked(TaskId owner, Overlay? overlay, bool first, IReadOnlySet<TaskId>? done)
+    {
+        var found = new List<TaskId>();
+        var walk = WalkDownLocked(Node.Of(owner), overlay, false, done is null ? null : id => !done.Contains(id));
+        foreach (var (id, node, record) in walk)
+        {
+            if (record is null || node.Background) continue;
+            found.Add(id);
+            if (first) break;
+        }
+        return found;
+    }
+
+    private bool HasOwnedLiveLocked(TaskId owner, Overlay? overlay, IReadOnlySet<TaskId>? done) =>
+        OwnedLiveLocked(owner, overlay, first: true, done).Count > 0;
 
     /// <summary>
     /// Whether ordinary traversal from <paramref name="scope"/> reaches <paramref name="start"/>: walking up reaches the scope's conversation,
     /// or an ownerless one for every root, without crossing a background owner, unless <paramref name="crossBackground"/>. Null while an edge
     /// is not loaded.
     /// </summary>
-    private bool? InScope(Up start, Scope scope, bool crossBackground = false)
+    private bool? InScopeLocked(Up start, Scope scope, bool crossBackground = false)
     {
-        foreach (var step in Above(start, null))
+        foreach (var step in AboveLocked(start, null))
         {
             if (step.Kind == StepKind.Unknown) return null;
             if (step.Kind == StepKind.Conversation)
@@ -728,16 +1164,22 @@ internal sealed class DurableTaskScheduler
     /// Whether a live owner's cancellation intent reaches <paramref name="start"/>: walking up finds an owner with intent before a background
     /// owner without it. Terminal owners never cascade (spec §5.4).
     /// </summary>
-    private bool BelowCancelled(Up start)
+    private bool BelowCancelledLocked(Up start) => CancellingOwnerLocked(start) is not null;
+
+    /// <summary>The nearest live owner above <paramref name="start"/> whose cancellation intent reaches it, if any; see
+    /// <see cref="BelowCancelledLocked"/>.</summary>
+    private TaskRecord? CancellingOwnerLocked(Up start)
     {
-        foreach (var step in Above(start, null))
+        // Nothing cancels, the common case: no walk.
+        if (intent.Count == 0) return null;
+        foreach (var step in AboveLocked(start, null))
         {
-            if (step.Kind == StepKind.Unknown) return false;
+            if (step.Kind == StepKind.Unknown) return null;
             if (step.Kind != StepKind.Task) continue;
-            if (live.TryGetValue(step.Task, out var owner) && CancellationIntent(owner)) return true;
-            if (step.Node.Background) return false;
+            if (live.TryGetValue(step.Task, out var owner) && CancellationIntent(owner)) return owner;
+            if (step.Node.Background) return null;
         }
-        return false;
+        return null;
     }
 
     /// <summary>Fails the Session, which reports it, for a throw in one of the scheduler's own commits; ignored once closing.</summary>
@@ -815,42 +1257,76 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>Reserves every eligible task in one commit; orphans abort-marked tasks no definition can take.</summary>
+    /// <summary>
+    /// Reserves every eligible task in one commit; orphans abort-marked tasks no definition can take, unless abandoned after a restart. The
+    /// first pass after open only abort-marks the abandoned tasks, so later passes see the marks.
+    /// </summary>
     private async Task<List<Reservation>> ReserveAsync()
     {
         var reservations = new List<Reservation>();
+        List<TaskId> marked = [];
         try
         {
             await session.CommitWithAsync(async tx =>
             {
-                lock (gate) if (!enabled || closing) return;
-                await LoadScopesAsync(false).ConfigureAwait(false);
-                Dictionary<TaskId, List<TaskId>> owned;
-                List<TaskRecord> records;
                 lock (gate)
                 {
-                    owned = OwnedLive(null);
-                    records = [.. live.Values];
+                    if (!enabled || closing) return;
+                    foreach (var id in abandoned)
+                        if (live.TryGetValue(id, out var record) && !record.AbortRequested) tx.SetTask(WithAbortMark(record, restart: true));
+                    if (abandoned.Count > 0)
+                    {
+                        marked = [.. abandoned];
+                        return;
+                    }
                 }
+                await LoadScopesAsync(false).ConfigureAwait(false);
                 // Taken once per pass, and only when some task is a candidate.
                 IRegistrySnapshot? snapshot = null;
-                foreach (var record in records)
+                List<TaskId> candidates;
+                lock (gate) candidates = [.. runnable];
+                foreach (var id in candidates)
                 {
-                    lock (gate) if (invocations.ContainsKey(record.Id) || WaitingOn(record, owned).Count > 0) continue;
-                    if (record.State.Status == DurableTaskStatus.Completing) continue;
-                    var mode = record.AbortRequested ? InvocationMode.Abort : InvocationMode.Run;
+                    TaskRecord record;
+                    InvocationMode mode;
+                    lock (gate)
+                    {
+                        if (!live.TryGetValue(id, out var found) || found.State.Status == DurableTaskStatus.Completing || invocations.ContainsKey(id))
+                        {
+                            runnable.Remove(id);
+                            continue;
+                        }
+                        // It returns once what it waits for ends, its record changes, or the work below it ends.
+                        if (WaitingOnLocked(found, first: true).Count > 0)
+                        {
+                            runnable.Remove(id);
+                            continue;
+                        }
+                        record = found;
+                        mode = record.AbortRequested ? InvocationMode.Abort : InvocationMode.Run;
+                        // Work below an owner with cancellation intent waits for its cascade mark instead of running a phase; schedule the
+                        // cascade, which may not have run yet.
+                        if (mode == InvocationMode.Run && !record.Background && BelowCancelledLocked(ParentOf(record)))
+                        {
+                            cascadePending = true;
+                            ScheduleReconcileLocked();
+                            continue;
+                        }
+                    }
                     snapshot ??= registry.Snapshot();
                     var resolution = Resolve(record, snapshot);
                     if (resolution.Blocked is { } reason)
                     {
-                        if (mode == InvocationMode.Abort)
+                        // An abandoned task waits for its definition, so its abort handler can clean up.
+                        if (mode == InvocationMode.Abort && record.AbortReason is null)
                             await TerminateAsync(tx, record, new OrphanedTaskOutcome(TaskInspectionState.ReasonName(reason))).ConfigureAwait(false);
                         continue;
                     }
                     var resolved = resolution.Record!;
                     if (!ReferenceEquals(resolved, record) || record.State.Status != DurableTaskStatus.Running)
                         tx.SetTask(WithState(resolved, new RunningTaskState(((LiveTaskState)resolved.State).Checkpoint)));
-                    // Registered on the line, so marks and later reservations see it and close joins it.
+                    // Registered on the line, so marks and later reservations see it and close joins it; End makes it a candidate again.
+                    lock (gate) runnable.Remove(id);
                     var invocation = CreateInvocation(record, mode);
                     reservations.Add(new Reservation(invocation, resolution.Task!, snapshot));
                 }
@@ -860,10 +1336,20 @@ internal sealed class DurableTaskScheduler
         {
             foreach (var reservation in reservations)
             {
-                lock (gate) invocations.Remove(reservation.Invocation.TaskId);
+                lock (gate)
+                {
+                    invocations.Remove(reservation.Invocation.TaskId);
+                    runnable.Add(reservation.Invocation.TaskId);
+                }
                 reservation.Invocation.Done.TrySetResult();
             }
             throw;
+        }
+        // Marked, or already marked or gone: done with them. Reserve again, now seeing the marks.
+        lock (gate)
+        {
+            foreach (var id in marked) abandoned.Remove(id);
+            if (marked.Count > 0) dirty = true;
         }
         return reservations;
     }
@@ -872,11 +1358,13 @@ internal sealed class DurableTaskScheduler
     /// Live tasks a task waits for before its next invocation: its live ordinary owned work when abort-marked, since abort runs bottom-up,
     /// otherwise the live part of the <c>on</c> of a wait.
     /// </summary>
-    private List<TaskId> WaitingOn(TaskRecord record, Dictionary<TaskId, List<TaskId>> owned)
+    private List<TaskId> WaitingOnLocked(TaskRecord record, bool first = false)
     {
-        if (record.AbortRequested) return owned.GetValueOrDefault(record.Id) ?? [];
+        if (record.AbortRequested) return OwnedLiveLocked(record.Id, null, first, null);
         if (record.State is not WaitingTaskState waiting) return [];
-        return [.. waiting.On.Where(live.ContainsKey)];
+        if (!first) return [.. waiting.On.Where(live.ContainsKey)];
+        foreach (var id in waiting.On) if (live.ContainsKey(id)) return [id];
+        return [];
     }
 
     /// <summary>Resolves the record's definition by kind, migrating an older stored version. A migration runs host code, so this never runs
@@ -929,18 +1417,17 @@ internal sealed class DurableTaskScheduler
         await LoadScopesAsync(false).ConfigureAwait(false);
         lock (gate)
         {
-            var owned = OwnedLive(null);
-            var tasks = live.Values.Select(record => new TaskInspection(record, InspectTask(record, snapshot, owned))).ToImmutableArray();
+            var tasks = live.Values.Select(record => new TaskInspection(record, InspectTaskLocked(record, snapshot))).ToImmutableArray();
             var scheduling = closing ? HarnessScheduling.Closing : enabled ? HarnessScheduling.Running : HarnessScheduling.Paused;
             return (scheduling, tasks);
         }
     }
 
-    private TaskInspectionState InspectTask(TaskRecord record, IRegistrySnapshot snapshot, Dictionary<TaskId, List<TaskId>> owned)
+    private TaskInspectionState InspectTaskLocked(TaskRecord record, IRegistrySnapshot snapshot)
     {
         if (invocations.ContainsKey(record.Id)) return new TaskInspectionState(TaskInspectionKind.Running);
         if (record.State.Status == DurableTaskStatus.Completing) return new TaskInspectionState(TaskInspectionKind.Completing);
-        var on = WaitingOn(record, owned);
+        var on = WaitingOnLocked(record);
         if (on.Count > 0) return new TaskInspectionState(TaskInspectionKind.Waiting) { On = [.. on] };
         var fit = Fit(record, snapshot.GetTask(record.Kind));
         if (fit.Reason is { } reason) return new TaskInspectionState(TaskInspectionKind.Blocked) { Reason = reason, Error = fit.Error };
@@ -1027,6 +1514,16 @@ internal sealed class DurableTaskScheduler
     {
         // 3. abort mark: end; a fresh abort invocation starts once the task's ordinary owned work is gone.
         if (current.AbortRequested) return Decision.End;
+        // An owner's cancellation intent ends it too, before its cascade marks it; reservation then holds it back.
+        lock (gate)
+        {
+            if (!current.Background && BelowCancelledLocked(ParentOf(current.Record)))
+            {
+                cascadePending = true;
+                ScheduleReconcileLocked();
+                return Decision.End;
+            }
+        }
         if (previous is null) return Decision.Continue;
         // 4. uncaught error.
         if (previous.Failure is { } failure) return Decision.Fault(failure);
@@ -1130,8 +1627,9 @@ internal sealed class DurableTaskScheduler
     private async Task TerminateAsync(Transaction tx, TaskRecord record, TaskOutcome outcome)
     {
         await LoadScopesAsync(false).ConfigureAwait(false);
+        var overlay = OverlayOf(tx);
         bool owned;
-        lock (gate) owned = OwnedLive(OverlayOf(tx)).ContainsKey(record.Id);
+        lock (gate) owned = HasOwnedLiveLocked(record.Id, overlay, null);
         if (owned)
         {
             tx.SetTask(WithState(record, new CompletingTaskState(outcome)));
@@ -1155,7 +1653,7 @@ internal sealed class DurableTaskScheduler
             await LoadScopesAsync(false).ConfigureAwait(false);
             foreach (var record in overlay.Tasks.Values) await LoadChainAsync(ParentOf(record), overlay).ConfigureAwait(false);
             bool owned;
-            lock (gate) owned = OwnedLive(overlay).ContainsKey(current.Id);
+            lock (gate) owned = HasOwnedLiveLocked(current.Id, overlay, null);
             if (owned)
             {
                 tx.SetTask(WithState(current.Record, new CompletingTaskState(terminal.Outcome)));
@@ -1166,25 +1664,82 @@ internal sealed class DurableTaskScheduler
     }
 
     /// <summary>
-    /// A wait names existing tasks other than the waiter and its owners, which could never finish first; <c>failFast</c> only tasks the waiter
-    /// owns. An abort handler cannot wait.
+    /// A wait names existing tasks, and <c>failFast</c> only tasks the waiter owns. It may not close a cycle in the wait-for graph, whose edges
+    /// run from each task to what it waits on and to its live ordinary owned work (spec §5.5); waiting on itself or on an owner holding it are
+    /// the shortest such cycles. An abort handler cannot wait.
     /// </summary>
+    /// <remarks>Invariant: the wait-for graph is acyclic. Only a wait adds an edge between existing tasks, as a new task has only incoming
+    /// edges, so checking each wait maintains it.</remarks>
     private async Task ValidateWaitAsync(Transaction tx, Invocation invocation, RunningTask current, ImmutableArray<TaskId> on, JoinPolicy policy)
     {
         if (invocation.Mode == InvocationMode.Abort) throw new InvalidOperationException($"Abort handler of task {current.Id} cannot wait");
         var overlay = OverlayOf(tx);
-        await LoadChainAsync(ParentOf(current.Record), null).ConfigureAwait(false);
-        HashSet<TaskId> owners;
-        lock (gate) owners = [.. Above(ParentOf(current.Record), null).Where(step => step.Kind == StepKind.Task).Select(step => step.Task)];
+        var targets = new List<TaskId>();
         foreach (var id in on)
         {
-            if (id == current.Id || owners.Contains(id)) throw new InvalidOperationException($"Task {current.Id} cannot wait on itself or its owner {id}");
             TaskRecord? member;
             lock (gate) member = overlay.Tasks.GetValueOrDefault(id) ?? live.GetValueOrDefault(id);
             member ??= await storage.GetTaskAsync(id, context).ConfigureAwait(false);
             if (member is null) throw new InvalidOperationException($"Task {id} does not exist");
             if (policy == JoinPolicy.FailFast && member.Owner != current.Id)
                 throw new InvalidOperationException($"Task {current.Id} can wait failFast only on tasks it owns; {id} is not one");
+            // A live child already holds the waiter (task-owned tasks are never background): waiting on it adds no edge. A terminal task has
+            // no edges.
+            if (member.State.Status != DurableTaskStatus.Terminal && member.Owner != current.Id) targets.Add(id);
+        }
+        if (targets.Count == 0) return;
+        var cycle = await WaitCycleAsync(current.Id, targets, overlay).ConfigureAwait(false);
+        if (cycle is not null)
+            throw new InvalidOperationException($"Task {current.Id} cannot wait on {cycle[0]}: {string.Join(" -> ", cycle.Prepend(current.Id))} is a wait cycle");
+    }
+
+    /// <summary>
+    /// The path from a member of <paramref name="on"/> back to <paramref name="task"/> in the wait-for graph, if the wait would close a cycle
+    /// (spec §5.1). An edge X -> Y means X cannot settle before Y: Y is in the <c>on</c> of waiting X that is not abort-marked, or Y is live
+    /// ordinary owned work of X, which holds X as <c>completing</c>. Each task is visited once and each subtree walked once, so a check is
+    /// bounded by the live work it reaches.
+    /// </summary>
+    private async Task<List<TaskId>?> WaitCycleAsync(TaskId task, IReadOnlyList<TaskId> on, Overlay overlay)
+    {
+        // Owned work is found by walks down, which need the chains of every live task loaded.
+        await LoadScopesAsync(false).ConfigureAwait(false);
+        lock (gate)
+        {
+            var from = new Dictionary<TaskId, TaskId?>();
+            var walked = new HashSet<TaskId>();
+            var pending = new Stack<TaskId>();
+            void Reach(TaskId id, TaskId? via)
+            {
+                if (!from.TryAdd(id, via)) return;
+                pending.Push(id);
+            }
+            List<TaskId> PathTo(TaskId end)
+            {
+                var steps = new List<TaskId>();
+                for (TaskId? at = end; at is { } step; at = from[step]) steps.Insert(0, step);
+                return steps;
+            }
+            foreach (var id in on) Reach(id, null);
+            while (pending.TryPop(out var id))
+            {
+                if (id == task) return PathTo(id);
+                var record = overlay.Tasks.GetValueOrDefault(id) ?? live.GetValueOrDefault(id);
+                if (record is null || record.State.Status == DurableTaskStatus.Terminal) continue;
+                // An abort-marked task waits only for its owned work, as abort runs bottom-up (WaitingOnLocked).
+                if (record.State is WaitingTaskState waiting && !record.AbortRequested)
+                    foreach (var member in waiting.On) Reach(member, id);
+                if (!walked.Add(id)) continue;
+                // Below a walked task the walk does not go again: its own walk covered what lies below.
+                var found = new List<TaskId>();
+                foreach (var (belowId, node, liveRecord) in WalkDownLocked(Node.Of(id), overlay, false, next => !walked.Contains(next)))
+                {
+                    if (liveRecord is null || node.Background) continue;
+                    found.Add(belowId);
+                    Reach(belowId, id);
+                }
+                foreach (var belowId in found) walked.Add(belowId);
+            }
+            return null;
         }
     }
 
@@ -1196,7 +1751,11 @@ internal sealed class DurableTaskScheduler
         {
             if (invocation.Ended) return;
             invocation.Ended = true;
-            if (invocations.TryGetValue(invocation.TaskId, out var registered) && ReferenceEquals(registered, invocation)) invocations.Remove(invocation.TaskId);
+            if (invocations.TryGetValue(invocation.TaskId, out var registered) && ReferenceEquals(registered, invocation))
+            {
+                invocations.Remove(invocation.TaskId);
+                if (live.ContainsKey(invocation.TaskId)) runnable.Add(invocation.TaskId);
+            }
             watches = [.. invocation.Watches];
         }
         foreach (var watch in watches) _ = watch.StopAsync();
@@ -1218,16 +1777,30 @@ internal sealed class DurableTaskScheduler
         }
     }
 
-    /// <summary>No live non-background task in the scope; a task whose owner edges are not loaded yet counts as inside. Under the lock.</summary>
-    private bool Idle(ConversationId? conversationId)
+    /// <summary>No live non-background task in the scope; a task whose owner edges are not loaded yet counts as inside.</summary>
+    private bool IdleLocked(ConversationId? conversationId)
     {
         var scope = conversationId is { } id ? Scope.Of(id) : Scope.Roots;
-        foreach (var record in live.Values)
-            if (!record.Background && InScope(ParentOf(record), scope) != false) return false;
+        // Tasks whose chain is not loaded are not listed below their scope yet; one counts as inside unless its walk up decides otherwise.
+        foreach (var taskId in unloaded)
+            if (live.TryGetValue(taskId, out var record) && !record.Background && InScopeLocked(ParentOf(record), scope) != false) return false;
+        IEnumerable<ConversationId> starts = conversationId is { } only ? [only] : roots;
+        foreach (var start in starts)
+            foreach (var (_, node, record) in WalkDownLocked(Node.Of(start), null, false, null))
+                if (record is not null && !node.Background) return false;
         return true;
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /// <summary>The record with an abort mark: <c>restart</c> for an abandonment; without a reason, a request, which replaces <c>restart</c>.
+    /// As upstream's <c>{ ...rest, abortRequested: true, abortReason }</c>, a set reason is the record's last key.</summary>
+    private static TaskRecord WithAbortMark(TaskRecord record, bool restart)
+    {
+        if (!restart) return record with { AbortRequested = true, AbortReason = null };
+        var keys = record.ToJson().Keys.Where(key => key != "abortReason").Append("abortReason").ToImmutableArray();
+        return record with { AbortRequested = true, AbortReason = TaskAbortReason.Restart, KeyOrder = keys };
+    }
 
     /// <summary>A live owner's durable cancellation intent: its abort mark, or a held outcome other than completed.</summary>
     private static bool CancellationIntent(TaskRecord record) =>
@@ -1241,6 +1814,9 @@ internal sealed class DurableTaskScheduler
 
     private static Up ParentOf(TaskNode node) => node.Owner is { } owner ? Up.Of(owner) : Up.Of(node.ConversationId);
 
+    /// <summary>The node a task hangs from: its owner task, or its conversation.</summary>
+    private static Node ParentNode(TaskNode node) => node.Owner is { } owner ? Node.Of(owner) : Node.Of(node.ConversationId);
+
     private static TaskNode NodeOf(TaskRecord record) => new(record.ConversationId, record.Owner, record.Background);
 
     private static Overlay OverlayOf(Transaction tx)
@@ -1250,6 +1826,19 @@ internal sealed class DurableTaskScheduler
         var conversations = new Dictionary<ConversationId, TaskId?>();
         foreach (var record in tx.StagedConversations()) conversations[record.Id] = record.Owner?.TaskId;
         return new Overlay(tasks, conversations);
+    }
+
+    private void AddTo<TKey, TValue>(Dictionary<TKey, OrderedSet<TValue>> map, TKey key, TValue value) where TKey : notnull where TValue : notnull
+    {
+        if (!map.TryGetValue(key, out var values)) map[key] = values = new OrderedSet<TValue>(iterations);
+        values.Add(value);
+    }
+
+    private static void DeleteFrom<TKey, TValue>(Dictionary<TKey, OrderedSet<TValue>> map, TKey key, TValue value) where TKey : notnull where TValue : notnull
+    {
+        if (!map.TryGetValue(key, out var values)) return;
+        values.Remove(value);
+        if (values.Count == 0) map.Remove(key);
     }
 
     /// <summary>Own memo entry only.</summary>
@@ -1356,6 +1945,15 @@ internal sealed class DurableTaskScheduler
     /// <summary>The immutable ownership fields of a task.</summary>
     private readonly record struct TaskNode(ConversationId ConversationId, TaskId? Owner, bool Background);
 
+    /// <summary>A node of the downward index: a task, or a conversation (upstream <c>TaskId | `c${number}`</c>).</summary>
+    private readonly record struct Node(long Value, bool IsConversation)
+    {
+        public static Node Of(TaskId task) => new(task.Value, false);
+        public static Node Of(ConversationId conversation) => new(conversation.Value, true);
+        public TaskId Task => new(Value);
+        public ConversationId Conversation => new(Value);
+    }
+
     /// <summary>Where a walk up the ownership tree continues: an owner task, or a conversation.</summary>
     private readonly record struct Up(bool IsTask, TaskId Task, ConversationId Conversation)
     {
@@ -1374,7 +1972,13 @@ internal sealed class DurableTaskScheduler
     }
 
     /// <summary>Candidate records a commit staged; they override committed records in ownership walks.</summary>
-    private sealed record Overlay(Dictionary<TaskId, TaskRecord> Tasks, Dictionary<ConversationId, TaskId?> Edges);
+    private sealed class Overlay(Dictionary<TaskId, TaskRecord> tasks, Dictionary<ConversationId, TaskId?> edges)
+    {
+        public Dictionary<TaskId, TaskRecord> Tasks { get; } = tasks;
+        public Dictionary<ConversationId, TaskId?> Edges { get; } = edges;
+        /// <summary>Links to the staged tasks <c>below</c> does not list, by parent node, for walks down; built at first use.</summary>
+        public Dictionary<Node, OrderedSet<Node>>? Links { get; set; }
+    }
 
     /// <summary>Where ordinary ownership traversal starts: one conversation, or every ownerless conversation.</summary>
     private readonly record struct Scope(ConversationId? Conversation)
@@ -1392,6 +1996,77 @@ internal sealed class DurableTaskScheduler
     private sealed class StrongBoxTimer
     {
         public ITimer? Timer { get; set; }
+    }
+
+    /// <summary>Counts the members the scheduler's sets yield; they are iterated under the scheduler lock.</summary>
+    private sealed class IterationCounter
+    {
+        public long Entries;
+    }
+
+    /// <summary>An insertion-ordered set, as a JavaScript Set iterates: re-adding a member keeps its place; removal is O(1). Every member an
+    /// iteration yields is counted.</summary>
+    private sealed class OrderedSet<T>(IterationCounter counter) : IEnumerable<T> where T : notnull
+    {
+        private readonly Dictionary<T, LinkedListNode<T>> index = [];
+        private readonly LinkedList<T> order = new();
+
+        public int Count => index.Count;
+
+        public bool Contains(T value) => index.ContainsKey(value);
+
+        public bool Add(T value)
+        {
+            if (index.ContainsKey(value)) return false;
+            index[value] = order.AddLast(value);
+            return true;
+        }
+
+        public bool Remove(T value)
+        {
+            if (!index.Remove(value, out var node)) return false;
+            order.Remove(node);
+            return true;
+        }
+
+        public void Clear()
+        {
+            index.Clear();
+            order.Clear();
+        }
+
+        public Enumerator GetEnumerator() => new(order.GetEnumerator(), counter);
+
+        IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        public struct Enumerator : IEnumerator<T>
+        {
+            private LinkedList<T>.Enumerator inner;
+            private readonly IterationCounter counter;
+
+            internal Enumerator(LinkedList<T>.Enumerator inner, IterationCounter counter)
+            {
+                this.inner = inner;
+                this.counter = counter;
+            }
+
+            public readonly T Current => inner.Current;
+
+            readonly object IEnumerator.Current => Current;
+
+            public bool MoveNext()
+            {
+                if (!inner.MoveNext()) return false;
+                Interlocked.Increment(ref counter.Entries);
+                return true;
+            }
+
+            void IEnumerator.Reset() => ((IEnumerator)inner).Reset();
+
+            public void Dispose() => inner.Dispose();
+        }
     }
 
     // ─── Invocation runtime ──────────────────────────────────────────────────
@@ -1500,6 +2175,44 @@ internal sealed class DurableTaskScheduler
         public Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context) =>
             Read(() => scheduler.WaitForTaskAsync(id, context.WithSignal(invocation.Controller)));
 
+        public Task<IReadOnlyList<TaskRecord>> OwnedTasksAsync(DurableContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            return Read(() => scheduler.session.ReadOnLineAsync<IReadOnlyList<TaskRecord>>(() =>
+            {
+                // The step that ends the invocation may have run on the line before this.
+                if (invocation.Ended) throw EndedError(invocation);
+                context.ThrowIfCancellationRequested();
+                // Every live task is listed under its parent node, its owner task when it has one.
+                var owned = new List<TaskRecord>();
+                lock (scheduler.gate)
+                {
+                    if (scheduler.below.TryGetValue(Node.Of(invocation.TaskId), out var children))
+                        foreach (var child in children)
+                            if (!child.IsConversation && scheduler.live.TryGetValue(child.Task, out var record) && record.Owner == invocation.TaskId)
+                                owned.Add(record);
+                }
+                // The records are immutable: upstream's copies are not needed.
+                owned.Sort(static (left, right) => left.Id.CompareTo(right.Id));
+                return Task.FromResult<IReadOnlyList<TaskRecord>>(owned);
+            }));
+        }
+
+        public Task AbortOwnedAsync(TaskId id, DurableContext context)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            return Read(async () =>
+            {
+                var bound = context.WithSignal(invocation.Controller);
+                var record = await scheduler.session.ReadOnLineAsync(() => scheduler.storage.GetTaskAsync(id, bound)).ConfigureAwait(false);
+                if (record?.Owner != invocation.TaskId) throw new InvalidOperationException($"Task {id} is not owned by task {invocation.TaskId}");
+                if (record.State.Status == DurableTaskStatus.Terminal) return true;
+                await scheduler.AbortAsync(id, bound, keepRestart: true).ConfigureAwait(false);
+                await scheduler.WaitForTaskAsync(id, bound).ConfigureAwait(false);
+                return true;
+            });
+        }
+
         public Task<IReadOnlyList<TaskOutcome>> OutcomesAsync(IReadOnlyList<TaskId> ids, DurableContext context) => Read(() =>
             scheduler.session.ReadOnLineAsync<IReadOnlyList<TaskOutcome>>(async () =>
             {
@@ -1556,7 +2269,7 @@ internal sealed class DurableTaskScheduler
                 if (range is not null && !scheduler.closing && !invocation.Ended && (kept is null || kept.Range.Bounds.Tail.Value <= range.Bounds.Tail.Value))
                 {
                     // A read of another, idle conversation starts or continues its retention period.
-                    if (!scheduler.Idle(conversationId)) scheduler.contexts[conversationId] = new KeptContext(range, null);
+                    if (!scheduler.IdleLocked(conversationId)) scheduler.contexts[conversationId] = new KeptContext(range, null);
                     else if (retention > 0)
                     {
                         scheduler.contexts[conversationId] = new KeptContext(range, kept?.IdleSince ?? stamp);

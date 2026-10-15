@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-structured.test.ts, the task-runtime describes: task
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-structured.test.ts, the task-runtime describes: task
 // ownership, waiting, completing, abort order, boundaries, recovery, definitions and waits, conversation abort and boundaries, and recovery
 // through ownership edges. Verbatim apart from the adaptations in HarnessSupport.cs and HarnessStructuredSupport.cs, and these:
 // - Backends. Upstream runs these on MemoryStorage and reopens a SQLite file for the reopen cases. HarnessStructuredCases() does the same
@@ -363,7 +363,7 @@ internal static partial class StructuredTests
             var other = await nodes.Start(root, "other");
             (string Name, Func<ITaskRuntime, TaskId[]> On, JoinPolicy Policy, string Message)[] cases =
             [
-                ("self", runtime => [runtime.TaskId], JoinPolicy.AllSettled, "cannot wait on itself or its owner"),
+                ("self", runtime => [runtime.TaskId], JoinPolicy.AllSettled, "is a wait cycle"),
                 ("missing", _ => [new TaskId(999_999)], JoinPolicy.AllSettled, "does not exist"),
                 ("foreign", _ => [other], JoinPolicy.FailFast, "only on tasks it owns"),
             ];
@@ -396,8 +396,246 @@ internal static partial class StructuredTests
             var parent = await nodes.Start(root, "parent");
             parentKnown.Resolve(parent);
             Equal(TaskOutcomeStatus.Completed, OutcomeIn(await harness.WaitForTaskAsync(parent, Context)).Status, "parent outcome");
-            Faulted(OutcomeIn(await harness.WaitForTaskAsync(child.Id!.Value, Context)), "cannot wait on itself or its owner", "child");
+            Faulted(OutcomeIn(await harness.WaitForTaskAsync(child.Id!.Value, Context)), "is a wait cycle", "child");
             nodes.Open("other");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10411; this test and the next two are from #10533 by @odysseus0.
+        yield return Case(prefix + "rejects-the-wait-that-closes-a-cycle", async () =>
+        {
+            var nodes = new Nodes();
+            var (harness, root, _, _) = await nodes.OpenNodes(await fresh());
+            var a = new Slot();
+            var b = new Slot();
+            nodes.Script("a", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([b.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            nodes.Script("b", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([a.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            await root.CommitAsync(async tx =>
+            {
+                a.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("a"), OwnConversation);
+                b.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("b"), OwnConversation);
+            }, Context);
+            // a -> b and b -> a are waits, and whichever comes second closes the cycle.
+            var outcomes = await Task.WhenAll(OutcomeOf(harness, a.Id!.Value), OutcomeOf(harness, b.Id!.Value));
+            Seq(["completed", "faulted"], [.. outcomes.Order(StringComparer.Ordinal)], "outcomes");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10411
+        yield return Case(prefix + "rejects-the-wait-that-closes-a-cycle-through-a-held-owner", async () =>
+        {
+            var nodes = new Nodes();
+            var (harness, root, _, _) = await nodes.OpenNodes(await fresh());
+            var held = new Slot();
+            var other = new Slot();
+            var child = nodes.SpawnAndFinish("held", "child");
+            nodes.Script("child", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([other.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            nodes.Script("other", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([held.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            await root.CommitAsync(async tx =>
+            {
+                held.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("held"), OwnConversation);
+                other.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("other"), OwnConversation);
+            }, Context);
+            // held -> child is a hold; child -> other -> held are waits, and whichever wait comes second closes the cycle.
+            Equal("completed", await OutcomeOf(harness, held.Id!.Value), "held outcome");
+            var outcomes = await Task.WhenAll(OutcomeOf(harness, child.Id!.Value), OutcomeOf(harness, other.Id!.Value));
+            Seq(["completed", "faulted"], [.. outcomes.Order(StringComparer.Ordinal)], "outcomes");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10411
+        yield return Case(prefix + "rejects-a-cycle-through-holds-two-levels-deep", async () =>
+        {
+            var nodes = new Nodes();
+            var (harness, root, _, _) = await nodes.OpenNodes(await fresh());
+            var held = new Slot();
+            var other = new Slot();
+            var child = nodes.SpawnAndFinish("held", "child");
+            var grandchild = nodes.SpawnAndFinish("child", "grandchild");
+            nodes.Script("grandchild", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([other.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            nodes.Script("other", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([held.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            await root.CommitAsync(async tx =>
+            {
+                held.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("held"), OwnConversation);
+                other.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("other"), OwnConversation);
+            }, Context);
+            // held -> child -> grandchild are holds; grandchild -> other -> held are waits.
+            await Eventually(() => grandchild.Id is not null);
+            var outcomes = await Task.WhenAll(OutcomeOf(harness, grandchild.Id!.Value), OutcomeOf(harness, other.Id!.Value));
+            Seq(["completed", "faulted"], [.. outcomes.Order(StringComparer.Ordinal)], "outcomes");
+            Equal("completed", await OutcomeOf(harness, child.Id!.Value), "child outcome");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10411
+        yield return Case(prefix + "lets-a-background-task-wait-on-the-owner-of-its-conversation", async () =>
+        {
+            var nodes = new Nodes();
+            var (harness, root, _, _) = await nodes.OpenNodes(await fresh());
+            var owner = new Slot();
+            nodes.Script("background", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([owner.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            var background = await root.CommitAsync(async tx =>
+            {
+                owner.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("owner"), OwnConversation);
+                var conversation = await tx.CreateConversationAsync(ConversationOwnership.Task(owner.Id.Value));
+                return await tx.CreateTaskAsync(nodes.Node, NodeInput("background"), In(conversation.Id) with { Background = true });
+            }, Context);
+            // background -> owner is a wait but owner -> background is no hold, so there is no cycle.
+            await Eventually(async () => await StatusOf(harness, background) == DurableTaskStatus.Waiting);
+            nodes.Open("owner");
+            Equal("completed", await OutcomeOf(harness, background), "background outcome");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10411: the issue's orchestrator, worker, and reviewer.
+        yield return Case(prefix + "rejects-a-cycle-of-a-hold-and-two-waits-that-each-look-reasonable", async () =>
+        {
+            var nodes = new Nodes();
+            var (harness, root, _, _) = await nodes.OpenNodes(await fresh());
+            var orchestrator = new Slot();
+            var worker = new Slot();
+            var reviewer = new Slot();
+            var reviewerWaits = new HarnessTests.Deferred();
+            // Upstream's worker reads `ids.reviewer` after `await start(...)` assigned it, a macrotask before the run; here a deferred orders it.
+            var reviewerKnown = new HarnessTests.Deferred();
+            // The orchestrator spawns a worker and finishes; the running worker holds it as completing.
+            nodes.Script("orchestrator", new Behavior
+            {
+                Run = (runtime, ctx) => runtime.CommitAsync(async (tx, _) =>
+                {
+                    worker.Id = await nodes.Spawn(tx, runtime.TaskId, "worker");
+                    return ResumeAt(1);
+                }, ctx),
+            });
+            // The reviewer waits for the orchestrator's result.
+            nodes.Script("reviewer", new Behavior
+            {
+                Run = async (runtime, ctx) =>
+                {
+                    await runtime.CommitAsync((_, _) => WaitOn([orchestrator.Id!.Value], JoinPolicy.AllSettled), ctx);
+                    reviewerWaits.Resolve();
+                },
+            });
+            // The worker waits for the reviewer, closing the cycle.
+            nodes.Script("worker", new Behavior
+            {
+                Run = async (runtime, ctx) =>
+                {
+                    await reviewerWaits.Task;
+                    await reviewerKnown.Task;
+                    await runtime.CommitAsync((_, _) => WaitOn([reviewer.Id!.Value], JoinPolicy.AllSettled), ctx);
+                },
+            });
+            orchestrator.Id = await nodes.Start(root, "orchestrator");
+            await Eventually(async () => await StatusOf(harness, orchestrator.Id!.Value) == DurableTaskStatus.Completing);
+            reviewer.Id = await nodes.Start(root, "reviewer");
+            reviewerKnown.Resolve();
+            var outcomes = await Task.WhenAll(new[] { orchestrator, worker, reviewer }.Select(slot => OutcomeOf(harness, slot.Id!.Value)));
+            Seq(["completed", "faulted", "completed"], [.. outcomes], "outcomes");
+            var outcome = OutcomeIn(await harness.WaitForTaskAsync(worker.Id!.Value, Context));
+            var text = outcome.ToJson().ToJson();
+            var cycle = $"{worker.Id} -> {reviewer.Id} -> {orchestrator.Id} -> {worker.Id} is a wait cycle";
+            Check(text.Contains(cycle, StringComparison.Ordinal), $"expected <{cycle}> in {text}");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10411
+        yield return Case(prefix + "allows-a-diamond-of-waits", async () =>
+        {
+            var nodes = new Nodes();
+            var (harness, root, _, _) = await nodes.OpenNodes(await fresh());
+            var top = new Slot();
+            var left = new Slot();
+            var right = new Slot();
+            var bottom = new Slot();
+            // A diamond: top waits on left and right, both wait on bottom. No cycle.
+            nodes.Script("top", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([left.Id!.Value, right.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            nodes.Script("left", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([bottom.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            nodes.Script("right", new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([bottom.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            await root.CommitAsync(async tx =>
+            {
+                bottom.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("bottom"), OwnConversation);
+                left.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("left"), OwnConversation);
+                right.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("right"), OwnConversation);
+                top.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("top"), OwnConversation);
+            }, Context);
+            nodes.Open("bottom");
+            Equal("completed", await OutcomeOf(harness, top.Id!.Value), "top outcome");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10411
+        yield return Case(prefix + "follows-no-wait-of-an-abort-marked-task-which-waits-only-for-its-owned-work", async () =>
+        {
+            var nodes = new Nodes();
+            var (harness, root, _, _) = await nodes.OpenNodes(await fresh());
+            var a = new Slot();
+            var b = new Slot();
+            var c = new Slot();
+            var cleanup = new HarnessTests.Deferred();
+            // b owns c and waits on a; aborting b leaves c's cleanup pending, so b waits only for c.
+            nodes.Script("b", new Behavior
+            {
+                Run = (runtime, ctx) => runtime.CommitAsync(async (tx, _) =>
+                {
+                    c.Id = await nodes.Spawn(tx, runtime.TaskId, "c");
+                    return WaitOn([a.Id!.Value], JoinPolicy.AllSettled);
+                }, ctx),
+            });
+            nodes.Script("c", new Behavior
+            {
+                Abort = async (runtime, ctx) =>
+                {
+                    await cleanup.Task;
+                    await runtime.CommitAsync((_, _) => NextTaskState.Terminal(new AbortedTaskOutcome(null, "c")), ctx);
+                },
+            });
+            var aWaits = new HarnessTests.Deferred();
+            nodes.Script("a", new Behavior
+            {
+                Run = async (runtime, ctx) =>
+                {
+                    await aWaits.Task;
+                    await runtime.CommitAsync((_, _) => WaitOn([b.Id!.Value], JoinPolicy.AllSettled), ctx);
+                },
+                Resume = (runtime, ctx, _) => runtime.CommitAsync((_, _) => End(Ending.Completed, "a"), ctx),
+            });
+            await root.CommitAsync(async tx =>
+            {
+                a.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("a"), OwnConversation);
+                b.Id = await tx.CreateTaskAsync(nodes.Node, NodeInput("b"), OwnConversation);
+            }, Context);
+            await Eventually(async () => await StatusOf(harness, b.Id!.Value) == DurableTaskStatus.Waiting);
+            Equal(TaskAbortResult.Marked, await harness.AbortTaskAsync(b.Id!.Value, Context), "abort b");
+            await Eventually(() => nodes.Logged("abort:c"));
+            // a -> b would close a -> b -> a through b's stale wait; b now waits only for c.
+            aWaits.Resolve();
+            await Eventually(async () => await StatusOf(harness, a.Id!.Value) == DurableTaskStatus.Waiting);
+            cleanup.Resolve();
+            Equal("aborted", await OutcomeOf(harness, b.Id!.Value), "b outcome");
+            Equal("completed", await OutcomeOf(harness, a.Id!.Value), "a outcome");
+            await harness.CloseAsync(Context);
+        });
+
+        // #10411
+        yield return Case(prefix + "rejects-a-longer-cycle-of-waits", async () =>
+        {
+            var nodes = new Nodes();
+            var (harness, root, _, _) = await nodes.OpenNodes(await fresh());
+            string[] names = ["x", "y", "z"];
+            var ids = names.ToDictionary(name => name, _ => new Slot(), StringComparer.Ordinal);
+            for (var index = 0; index < names.Length; index++)
+            {
+                var next = ids[names[(index + 1) % names.Length]];
+                nodes.Script(names[index], new Behavior { Run = (runtime, ctx) => runtime.CommitAsync((_, _) => WaitOn([next.Id!.Value], JoinPolicy.AllSettled), ctx) });
+            }
+            await root.CommitAsync(async tx =>
+            {
+                foreach (var name in names) ids[name].Id = await tx.CreateTaskAsync(nodes.Node, NodeInput(name), OwnConversation);
+            }, Context);
+            var outcomes = await Task.WhenAll(names.Select(name => OutcomeOf(harness, ids[name].Id!.Value)));
+            Equal(1, outcomes.Count(outcome => outcome == "faulted"), "faulted");
+            Equal(2, outcomes.Count(outcome => outcome == "completed"), "completed");
             await harness.CloseAsync(Context);
         });
 

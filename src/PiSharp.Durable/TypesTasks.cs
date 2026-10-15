@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/types.ts (TaskRuntime and HookRunner; split from Types.cs).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (TaskRuntime and HookRunner; split from Types.cs).
 // Upstream's AbortSignal becomes a CancellationToken plus the handler context, which the same signal cancels; its memo and entry overloads
 // become C# overloads; its synchronous-or-promise commit callback becomes four overloads, as ISession.CommitAsync has.
 using PiSharp.Durable.Chord;
@@ -47,7 +47,9 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     /// Commits on the Session line after rereading the task. Rejects when the task is terminal, the invocation ended, the Harness is
     /// closing, or, in a run invocation, the task carries an abort mark. A returned state (running, waiting or terminal; see
     /// <see cref="NextTaskState"/>) replaces the task's state in the same commit; returning null leaves it unchanged.
-    /// <c>tx.CreateTaskAsync()</c> defaults to the task's conversation, and appended entries carry the task as <c>byTaskId</c>.
+    /// <c>tx.CreateTaskAsync()</c> defaults to the task's conversation, and appended entries carry the task as <c>byTaskId</c>. Inside the
+    /// callback read only through the transaction: <c>SnapshotAsync</c>, <c>DocumentStateAsync</c>, <c>WatchDocAsync</c>,
+    /// <c>GetTaskAsync</c> and the other Session and runtime reads may queue on the line the callback holds, and then never complete.
     /// </summary>
     Task CommitAsync(Func<ITx, RunningTask, Task<TaskState?>> change, DurableContext context);
     /// <summary><see cref="CommitAsync(Func{ITx, RunningTask, Task{TaskState?}}, DurableContext)"/> leaving the state unchanged.</summary>
@@ -62,6 +64,16 @@ public interface ITaskRuntime : IDocumentObserver, IDocumentReader, IHookApi
     Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context);
     /// <summary>Resolves with the task's terminal receipt (upstream <c>SettledTask</c>); rejects when the invocation ends.</summary>
     Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context);
+    /// <summary>
+    /// Aborts a task this task owns, as <c>IHarness.AbortTaskAsync</c> does, and completes once it is terminal (upstream
+    /// <c>abortOwned</c>). Rejects for a task another owns; completes at once for a terminal one.
+    /// </summary>
+    Task AbortOwnedAsync(TaskId id, DurableContext context);
+    /// <summary>
+    /// Live tasks this task owns directly, in ID order: also those an earlier invocation created, before a restart (upstream
+    /// <c>ownedTasks</c>). Tasks in conversations it owns are not included. The committed records, which are immutable.
+    /// </summary>
+    Task<IReadOnlyList<TaskRecord>> OwnedTasksAsync(DurableContext context);
     /// <summary>Outcomes of terminal tasks, in order; rejects when one is missing or not terminal. Used after a wait.</summary>
     Task<IReadOnlyList<TaskOutcome>> OutcomesAsync(IReadOnlyList<TaskId> ids, DurableContext context);
     /// <summary>

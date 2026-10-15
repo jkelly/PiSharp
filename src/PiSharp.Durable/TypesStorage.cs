@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/types.ts (scans, cursors, document addressing, storage writes
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (scans, cursors, document addressing, storage writes
 // and the Storage interface; split from Types.cs). Spec §10 is the normative contract.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
