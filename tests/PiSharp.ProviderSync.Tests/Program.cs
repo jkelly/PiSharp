@@ -38,6 +38,9 @@ internal static partial class Program
         {
             ("anthropic.inline-tools-full-requests-across-add-redefine-remove", AnthropicInlineTools),
             ("anthropic.strict-rejected-keywords-send-non-strict", AnthropicStrictKeywords),
+            ("anthropic.strict-tool-limit-rejection-retries-preferred-tools-non-strict", AnthropicStrictFallbackRetries),
+            ("anthropic.strict-tool-fallback-native-and-resolved-routes-and-inline-additions", AnthropicStrictFallbackRoutes),
+            ("anthropic.strict-tool-fallback-refusals-second-rejection-hooks-cancellation-and-sse-errors", AnthropicStrictFallbackRefusals),
             ("anthropic.mid-effort-catalog-models-construct-on-key-and-resolved-routes", MidEffortModelsConstruct),
             ("anthropic.mid-effort-sonnet-5-5-every-level-full-requests-oauth-and-simple", MidEffortSonnetEveryLevel),
             ("anthropic.mid-effort-multi-turn-replay-preserves-per-turn-effort", MidEffortReplay),
