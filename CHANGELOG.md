@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.0]
+## [1.2.0] - 2026-10-15
 
 PiSharp moves to Pi v1.2.0. Update the CLI with `dotnet tool update -g PiSharp.Cli`. The full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.md).
 
@@ -29,6 +29,7 @@ PiSharp moves to Pi v1.2.0. Update the CLI with `dotnet tool update -g PiSharp.C
 - Symlinked `AGENTS.md` in worktrees, `~` in resource patterns, and `auth.json` locks on Windows
 - MCP structured content, resources at connect, calls after an OAuth refresh and the `iss` check
 - Terminal wheel scrolling over overlays, colour replies, Herdr images and shifted-symbol bindings
+- `tool_search` ranks words with a dotted capital I (`İstanbul`) as Pi does
 
 ## [1.1.0.7] - 2026-10-14
 
