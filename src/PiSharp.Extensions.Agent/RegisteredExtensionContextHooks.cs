@@ -84,10 +84,20 @@ internal sealed class RegisteredExtensionContextHooks
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested();
-        // Context handlers snapshot once per model request. Removal during dispatch does not revoke admitted leases.
-        var conversation = await dispatcher.DispatchContextAsync(new ExtensionContextEvent(messages), cancellationToken, session).ConfigureAwait(false);
-        // The source captures the second event's handlers after the first phase has completed.
-        var result = await dispatcher.DispatchContextWithSystemAsync(new ExtensionContextWithSystemEvent(conversation.Messages), cancellationToken, session).ConfigureAwait(false);
+        ExtensionContextReduction conversation, result;
+        try
+        {
+            // Context handlers snapshot once per model request. Removal during dispatch does not revoke admitted leases.
+            conversation = await dispatcher.DispatchContextAsync(new ExtensionContextEvent(messages), cancellationToken, session).ConfigureAwait(false);
+            // The source captures the second event's handlers after the first phase has completed.
+            result = await dispatcher.DispatchContextWithSystemAsync(new ExtensionContextWithSystemEvent(conversation.Messages), cancellationToken, session).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && error.CancellationToken != cancellationToken)
+        {
+            // agent.abort() while a context handler runs aborts the request (Pi ends the run aborted). The dispatcher observes the
+            // abort through a token linked to each handler's lifetime; it is still this request's cancellation.
+            throw new OperationCanceledException(error.Message, error, cancellationToken);
+        }
         if (options.ReportEventDiagnostic is { } report)
             foreach (var diagnostic in conversation.Diagnostics.AddRange(result.Diagnostics))
             {
