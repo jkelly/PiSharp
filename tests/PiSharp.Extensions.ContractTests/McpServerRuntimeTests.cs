@@ -429,12 +429,28 @@ internal static class McpServerRuntimeTests
         catch (Exception error) { failures.Add(error); }
         if (failures.Count != 0) throw new AggregateException(failures);
     }
+    // Pi v1.2.0 (MIT): packages/mcp/src/client.ts validateCallToolResult rejects a non-object result or a non-array content
+    // with "Invalid MCP tools/call result". It no longer rejects non-object structuredContent (MCP 2026-07-28), so
+    // {"structuredContent":[]} is accepted with content defaulted to [] and the original request is still sent once.
     private static async Task ResultShapes()
     {
-        foreach (var text in new[] { "[]", "{\"content\":null}", "{\"structuredContent\":[]}" })
+        foreach (var text in new[] { "[]", "\"text\"", "null", "{\"content\":null}", "{\"content\":{}}", "{\"content\":\"x\",\"structuredContent\":[]}" })
         {
             await using var fixture = new Fixture(); await fixture.Runtime.ConnectAsync(); fixture.Channel.Handler = (_, _, _, _) => Task.FromResult(Json(text));
-            await Throws<McpRuntimeProtocolException>(fixture.Runtime.CallToolAsync("a", JsonData.EmptyObject, new Context()));
+            var error = await Throws<McpRuntimeProtocolException>(fixture.Runtime.CallToolAsync("a", JsonData.EmptyObject, new Context()));
+            Equal("Invalid MCP tools/call result", error.Message);
+            Equal(1, fixture.Channel.Requests.Count(request => request.Method == "tools/call"));
+        }
+        foreach (var (text, expected) in new[]
+        {
+            ("{\"structuredContent\":[]}", "{\"structuredContent\":[],\"content\":[]}"),
+            ("{\"structuredContent\":null}", "{\"structuredContent\":null,\"content\":[]}"),
+            ("{\"content\":[],\"structuredContent\":3}", "{\"content\":[],\"structuredContent\":3}")
+        })
+        {
+            await using var fixture = new Fixture(); await fixture.Runtime.ConnectAsync(); fixture.Channel.Handler = (_, _, _, _) => Task.FromResult(Json(text));
+            var result = await fixture.Runtime.CallToolAsync("a", JsonData.EmptyObject, new Context());
+            Equal(expected, result.ToString());
             Equal(1, fixture.Channel.Requests.Count(request => request.Method == "tools/call"));
         }
     }
