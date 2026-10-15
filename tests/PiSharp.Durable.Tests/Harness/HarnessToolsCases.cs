@@ -267,13 +267,19 @@ internal static class ToolsTests
 
         yield return Case(prefix + "runs-a-round-in-parallel-by-default-and-sequentially-when-configured-or-required-by-a-tool", async () =>
         {
-            async Task<List<string>> Trace(ChatSetup setup)
+            // overlap: a waits (bounded) until b has started instead of sleeping 20 ms. Upstream's 20 ms is enough under Node's event loop,
+            // where both calls start before any timer fires; here b's start follows its own commits, which a loaded runner can delay past
+            // 20 ms. A sequential round never starts b while a runs, so a's wait times out and the order is still start a, end a.
+            async Task<List<string>> Trace(ChatSetup setup, bool overlap = false)
             {
                 var events = new SyncList<string>();
+                var bStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 ToolExecute Slow(string name) => async (_, _, _) =>
                 {
                     events.Add($"start {name}");
-                    await Sleep(20);
+                    if (name == "b") bStarted.TrySetResult();
+                    if (overlap && name == "a") await Task.WhenAny(bStarted.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+                    else await Sleep(20);
                     events.Add($"end {name}");
                     return NoContent;
                 };
@@ -283,7 +289,7 @@ internal static class ToolsTests
                 await result.Harness.CloseAsync(Context);
                 return events.Snapshot();
             }
-            Seq(["start a", "start b"], (await Trace(Setup())).Take(2), "parallel");
+            Seq(["start a", "start b"], (await Trace(Setup(), overlap: true)).Take(2), "parallel");
             var configured = Setup();
             configured.ToolExecution = ToolExecutionMode.Sequential;
             Seq(["start a", "end a", "start b", "end b"], await Trace(configured), "sequential");
