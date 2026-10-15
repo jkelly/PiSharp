@@ -12,11 +12,13 @@
     "tree": "e8872645392bc4d214e3153104864e4b69d99ed0"
   },
   "statusMeaning": {
-    "port": "Required change; implemented with authored tests before the 1.2.0 release.",
-    "exclude": "Outside native scope per the linked decision; no port.",
+    "ported": "Required change; implemented with authored tests for the 1.2.0 release. The evidence field names the commits and tests.",
+    "ported-with-deferral": "Ported except the part the deferred field names; decision 0006 records the deferral.",
+    "already-ported": "PiSharp already has the behaviour; the evidence field cites the file and any tests the sync added.",
     "no-op": "Nothing to change in PiSharp; the evidence field says why.",
-    "already-ported": "PiSharp already has the behaviour; the evidence field cites the file."
+    "exclude": "Outside native scope per the linked decision; no port."
   },
+  "notesMeaning": "A row's notes are the planning notes written before its port and describe the code as it was then; status, evidence and deferred record the outcome.",
   "areas": [
     "ai",
     "coding-agent-core",
@@ -34,10 +36,11 @@
     "rows": 56,
     "changelogBullets": 70,
     "byStatus": {
-      "port": 42,
+      "ported": 38,
       "no-op": 7,
-      "already-ported": 1,
-      "exclude": 6
+      "already-ported": 3,
+      "exclude": 6,
+      "ported-with-deferral": 2
     },
     "byArea": {
       "ai": 7,
@@ -56,7 +59,7 @@
     {
       "id": "ai.openrouter-per-key-catalog",
       "area": "ai",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/New Features#1",
         "coding-agent/Added#3",
@@ -81,12 +84,20 @@
         "src/PiSharp.AI/Catalogs/BuiltinProviders.cs"
       ],
       "release": "1.2.0",
-      "notes": "New behaviour on the pi.dev remote-catalog path PiSharp already ports (RemoteModelCatalog.cs cites remote-catalog-provider.ts). Needs the key from auth.json/env and the models.json base URL."
+      "notes": "New behaviour on the pi.dev remote-catalog path PiSharp already ports (RemoteModelCatalog.cs cites remote-catalog-provider.ts). Needs the key from auth.json/env and the models.json base URL.",
+      "evidence": {
+        "commits": [
+          "9743760"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/OpenRouterCases.cs"
+        ]
+      }
     },
     {
       "id": "ai.openrouter-negative-prices",
       "area": "ai",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#13",
         "ai/Fixed#2"
@@ -101,12 +112,20 @@
         "src/PiSharp.Cli/Models/BuiltinModelCatalog.cs"
       ],
       "release": "1.2.0",
-      "notes": "Applies to catalogs read from OpenRouter's API (the per-key list); the embedded openrouter.json shard is generated upstream with the fix."
+      "notes": "Applies to catalogs read from OpenRouter's API (the per-key list); the embedded openrouter.json shard is generated upstream with the fix.",
+      "evidence": {
+        "commits": [
+          "9743760"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/OpenRouterCases.cs"
+        ]
+      }
     },
     {
       "id": "ai.mistral-header-timeout",
       "area": "ai",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#2",
         "ai/Fixed#1"
@@ -119,12 +138,21 @@
         "src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs",
         "src/PiSharp.AI/Protocols/MistralConversations/MistralRequestOptions.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "8a9cc59"
+        ],
+        "tests": [
+          "tests/PiSharp.MistralConversations.Tests/Program.cs",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs"
+        ]
+      }
     },
     {
       "id": "ai.anthropic-strict-fallback",
       "area": "ai",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#14",
         "ai/Fixed#3"
@@ -139,12 +167,20 @@
         "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicInjectedTransportAdapter.cs"
       ],
       "release": "1.2.0",
-      "notes": "See packages/ai/test/anthropic-strict-tool-fallback.test.ts for the rejection texts upstream detects."
+      "notes": "See packages/ai/test/anthropic-strict-tool-fallback.test.ts for the rejection texts upstream detects.",
+      "evidence": {
+        "commits": [
+          "51d16fe"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/AnthropicStrictFallbackCases.cs"
+        ]
+      }
     },
     {
       "id": "ai.retry-upstream-provider-error",
       "area": "ai",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#15",
         "ai/Fixed#4"
@@ -157,7 +193,15 @@
         "src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs",
         "src/PiSharp.Cli/Extensions/Pi/PiExtensionModels.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "8a9cc59"
+        ],
+        "tests": [
+          "tests/PiSharp.ProviderSync.Tests/Program.cs"
+        ]
+      }
     },
     {
       "id": "ai.codex-zstd-body-copy",
@@ -197,7 +241,7 @@
     {
       "id": "schemas.ai-compat-and-model-schemas",
       "area": "schemas",
-      "status": "port",
+      "status": "ported",
       "changelog": [],
       "upstream": [
         "packages/ai/src/types.ts",
@@ -211,12 +255,21 @@
         "src/PiSharp.Contracts/Compatibility/JsJsonSyntax.cs"
       ],
       "release": "1.2.0",
-      "notes": "Compare the v1.1.0 inline schemas in model-config.ts with compat-schema.ts/model-schema.ts field by field (e.g. ChatTemplateKwarg $var gains thinking.budget)."
+      "notes": "Compare the v1.1.0 inline schemas in model-config.ts with compat-schema.ts/model-schema.ts field by field (e.g. ChatTemplateKwarg $var gains thinking.budget).",
+      "evidence": {
+        "commits": [
+          "d45ec1b"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/ConfigSchemaCases.cs",
+          "tests/PiSharp.Models.Tests/ModelsJsonCases.cs"
+        ]
+      }
     },
     {
       "id": "schemas.config-schemas",
       "area": "schemas",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/New Features#2",
         "coding-agent/Breaking Changes#1"
@@ -243,12 +296,21 @@
         "src/PiSharp.Cli/Interactive/Mode/InteractiveSettings.cs"
       ],
       "release": "1.2.0",
-      "notes": "PiSharp does not host the schemas; the work is accepting $schema everywhere Pi does and matching keybinding value validation. Decide whether to ship the four schema files with the CLI or docs."
+      "notes": "PiSharp does not host the schemas; the work is accepting $schema everywhere Pi does and matching keybinding value validation. Decide whether to ship the four schema files with the CLI or docs.",
+      "evidence": {
+        "commits": [
+          "d45ec1b",
+          "d90ea8c"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/ConfigSchemaCases.cs"
+        ]
+      }
     },
     {
       "id": "schemas.theme-schema",
       "area": "schemas",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Breaking Changes#1"
       ],
@@ -271,12 +333,22 @@
         "src/PiSharp.CodingAgent/Export/Assets/dark.json",
         "src/PiSharp.CodingAgent/Export/Assets/light.json"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "d45ec1b",
+          "cb4f42f"
+        ],
+        "tests": [
+          "tests/PiSharp.Models.Tests/ConfigSchemaCases.cs",
+          "tests/PiSharp.SessionParity.Tests/ExportShareCases.cs"
+        ]
+      }
     },
     {
       "id": "core.before-agent-start-custom",
       "area": "coding-agent-core",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/New Features#5",
         "coding-agent/Breaking Changes#2",
@@ -306,12 +378,24 @@
         "compatibility/extensions/event-catalog.v1.1.0.json"
       ],
       "release": "1.2.0",
-      "notes": "Cross-area: the Node bridge (TS extensions see messageType/message) and the event catalog (BeforeAgentStartEvent declaration changes; generate a v1.2.0 catalog). Implement together with core.busy-while-starting."
+      "notes": "Cross-area: the Node bridge (TS extensions see messageType/message) and the event catalog (BeforeAgentStartEvent declaration changes; generate a v1.2.0 catalog). Implement together with core.busy-while-starting.",
+      "evidence": {
+        "commits": [
+          "f1d4b32",
+          "403b372",
+          "279e290"
+        ],
+        "tests": [
+          "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+          "tests/PiSharp.SessionParity.Tests/RunStartCases.cs",
+          "tests/PiSharp.ExtensionParity.Tests/Sync120Cases.cs"
+        ]
+      }
     },
     {
       "id": "core.busy-while-starting",
       "area": "coding-agent-core",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Breaking Changes#3"
       ],
@@ -327,7 +411,16 @@
         "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.Requests.cs",
         "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "f1d4b32"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/RunStartCases.cs",
+          "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs"
+        ]
+      }
     },
     {
       "id": "core.settings-defaults",
@@ -351,7 +444,7 @@
     {
       "id": "core.serialize-conversation-no-thinking",
       "area": "coding-agent-core",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Changed#4"
       ],
@@ -365,12 +458,22 @@
         "src/PiSharp.CodingAgent/Diagnostics/BugReport.cs",
         "tools/NodeBridge/pi-host/virtual/coding-agent/core/compaction/utils.mjs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "9026f2f",
+          "2e8e9d7"
+        ],
+        "tests": [
+          "tests/PiSharp.SessionParity.Tests/SummaryOptionCases.cs",
+          "tests/PiSharp.CodingAgent.Tests/SessionCompactionIntegrationTests.cs"
+        ]
+      }
     },
     {
       "id": "core.context-file-symlink",
       "area": "coding-agent-core",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#3"
       ],
@@ -381,12 +484,20 @@
       "pisharp": [
         "src/PiSharp.Cli/Pi/PiResources.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "9026f2f"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/ResourceCases.cs"
+        ]
+      }
     },
     {
       "id": "core.print-mode-truncated",
       "area": "coding-agent-core",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#7"
       ],
@@ -397,12 +508,20 @@
       "pisharp": [
         "src/PiSharp.Cli/Pi/PiPrintMode.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "9026f2f"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/EntryCases.cs"
+        ]
+      }
     },
     {
       "id": "core.resource-pattern-tilde",
       "area": "coding-agent-core",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#9"
       ],
@@ -415,12 +534,20 @@
         "src/PiSharp.Cli/Packages/PiGlob.cs",
         "src/PiSharp.Cli/Pi/PiResources.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "9026f2f"
+        ],
+        "tests": [
+          "tests/PiSharp.CliParity.Tests/ResourceCases.cs"
+        ]
+      }
     },
     {
       "id": "core.auth-lock-eperm",
       "area": "coding-agent-core",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#12"
       ],
@@ -432,7 +559,15 @@
         "src/PiSharp.Cli/Authentication/AuthJsonCredentialStore.cs"
       ],
       "release": "1.2.0",
-      "notes": "PiSharp's lock is a FileStream CreateNew on auth.json.lock that already retries while the lock path exists; verify the access-denied path against upstream's capped EPERM retries and port only the difference."
+      "notes": "PiSharp's lock is a FileStream CreateNew on auth.json.lock that already retries while the lock path exists; verify the access-denied path against upstream's capped EPERM retries and port only the difference.",
+      "evidence": {
+        "commits": [
+          "9026f2f"
+        ],
+        "tests": [
+          "tests/PiSharp.CliSync.Tests/LogoutCases.cs"
+        ]
+      }
     },
     {
       "id": "core.removed-experimental-stack",
@@ -458,7 +593,7 @@
     {
       "id": "cli.mcp-list-resources",
       "area": "coding-agent-cli",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Breaking Changes#4"
       ],
@@ -470,12 +605,22 @@
         "src/PiSharp.Cli/Commands/McpCommand.cs"
       ],
       "release": "1.2.0",
-      "notes": "Depends on mcp.no-resource-listing-at-connect (no counts are collected any more)."
+      "notes": "Depends on mcp.no-resource-listing-at-connect (no counts are collected any more).",
+      "evidence": {
+        "commits": [
+          "99a4524",
+          "03d612c"
+        ],
+        "tests": [
+          "tests/PiSharp.McpSync.Tests/CompletionCases.cs",
+          "tests/PiSharp.McpParity.Tests/SessionCases.cs"
+        ]
+      }
     },
     {
       "id": "cli.mcp-login-timeout-help",
       "area": "coding-agent-cli",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#8"
       ],
@@ -489,12 +634,21 @@
         "src/PiSharp.Cli/Commands/McpCommand.cs"
       ],
       "release": "1.2.0",
-      "notes": "Help text only: McpCommand.cs:99 still says \"How long login waits for the browser\"; the behaviour (whole sign-in) already matches (McpCommand.cs:462)."
+      "notes": "Help text only: McpCommand.cs:99 still says \"How long login waits for the browser\"; the behaviour (whole sign-in) already matches (McpCommand.cs:462).",
+      "evidence": {
+        "commits": [
+          "9026f2f",
+          "03d612c"
+        ],
+        "tests": [
+          "tests/PiSharp.McpSync.Tests/CompletionCases.cs"
+        ]
+      }
     },
     {
       "id": "tools.reaches-tools",
       "area": "tools",
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent/Added#1"
       ],
@@ -517,12 +671,25 @@
         "src/PiSharp.Cli/Extensions/Pi/PiNodeOwner.cs"
       ],
       "release": "1.2.0",
-      "notes": "Cross-area: codemode and MCP consume it, and TS extensions can declare it through the Node bridge (getAllTools() results carry it)."
+      "notes": "Cross-area: codemode and MCP consume it, and TS extensions can declare it through the Node bridge (getAllTools() results carry it).",
+      "evidence": {
+        "commits": [
+          "99a4524",
+          "d55b387",
+          "1340344"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync120Cases.cs",
+          "tests/PiSharp.ExtensionParity.Tests/ReachCases.cs",
+          "tests/PiSharp.ExtensionParity.Tests/Sync120Cases.cs"
+        ]
+      },
+      "deferred": "Exact per-input reach of TypeScript tools. ExtensionToolDescriptor.ReachesTools is pure and synchronous and runs on the tool-call path, so a TypeScript tool that declares reachesTools reaches every tool (as tool_search does) and its calls wait for every MCP server: never wrong, but can be slower. Exact reach needs an asynchronous variant of the contract. getAllTools still hands extensions the tool's own function. Recorded in decision 0006."
     },
     {
       "id": "tools.namespace-aliases",
       "area": "tools",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Added#2"
       ],
@@ -538,12 +705,22 @@
         "src/PiSharp.Cli/Mcp/McpCodemode.cs",
         "src/PiSharp.Extensions.Abstractions/RegistrationContracts.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "99a4524",
+          "403b372"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync120Cases.cs",
+          "tests/PiSharp.ExtensionParity.Tests/Sync120Cases.cs"
+        ]
+      }
     },
     {
       "id": "tui.fake-cursor",
       "area": "tui",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui/Breaking Changes#1",
         "tui/Added#1",
@@ -571,12 +748,21 @@
         "tools/NodeBridge/pi-host/virtual/pi-tui.mjs"
       ],
       "release": "1.2.0",
-      "notes": "pi-tui exports renderFakeCursor: the Node bridge's pi-tui surface must add it."
+      "notes": "pi-tui exports renderFakeCursor: the Node bridge's pi-tui surface must add it.",
+      "evidence": {
+        "commits": [
+          "6ec44e1",
+          "cb4f42f"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/TuiSyncCases.cs"
+        ]
+      }
     },
     {
       "id": "tui.overlay-cursor-marker",
       "area": "tui",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui/Fixed#1"
       ],
@@ -587,12 +773,20 @@
       "pisharp": [
         "src/PiSharp.Tui/Pi/TextUtils.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "6ec44e1"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/TuiSyncCases.cs"
+        ]
+      }
     },
     {
       "id": "tui.overlay-wheel",
       "area": "tui",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui/Fixed#2",
         "coding-agent/Fixed#16"
@@ -604,12 +798,20 @@
       "pisharp": [
         "src/PiSharp.Tui/Pi/TuiAltScreen.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "6ec44e1"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/TuiSyncCases.cs"
+        ]
+      }
     },
     {
       "id": "tui.terminal-reply-fragments",
       "area": "tui",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui/Fixed#3",
         "coding-agent/Fixed#17"
@@ -622,12 +824,21 @@
         "src/PiSharp.Tui/Pi/StdinBuffer.cs",
         "src/PiSharp.Tui/Pi/Terminal.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "6ec44e1",
+          "cb4f42f"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/TuiSyncCases.cs"
+        ]
+      }
     },
     {
       "id": "tui.herdr-kitty-images",
       "area": "tui",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui/Fixed#4",
         "coding-agent/Fixed#18"
@@ -640,12 +851,20 @@
         "src/PiSharp.Tui/Pi/TerminalImage.cs"
       ],
       "release": "1.2.0",
-      "notes": "TerminalImage.cs:53 returns ImageProtocol.None for herdr."
+      "notes": "TerminalImage.cs:53 returns ImageProtocol.None for herdr.",
+      "evidence": {
+        "commits": [
+          "6ec44e1"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/TuiSyncCases.cs"
+        ]
+      }
     },
     {
       "id": "tui.shifted-symbol-keys",
       "area": "tui",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "tui/Fixed#5",
         "coding-agent/Fixed#19"
@@ -659,12 +878,20 @@
         "src/PiSharp.Tui/Input/TerminalInputDecoder.cs",
         "src/PiSharp.Tui/Input/TerminalKeybindings.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "6ec44e1"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/TuiSyncCases.cs"
+        ]
+      }
     },
     {
       "id": "tui.compaction-indicator-color",
       "area": "tui",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#20"
       ],
@@ -677,12 +904,20 @@
         "src/PiSharp.Cli/Interactive/Mode/Components/StatusIndicator.cs",
         "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Events.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "6ec44e1"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/TuiSyncCases.cs"
+        ]
+      }
     },
     {
       "id": "tui.clipboard-osc52-env",
       "area": "tui",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/New Features#3",
         "coding-agent/Added#4"
@@ -695,12 +930,21 @@
       "pisharp": [
         "src/PiSharp.Cli/Interactive/Mode/Utilities/Clipboard.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "9026f2f",
+          "6ec44e1"
+        ],
+        "tests": [
+          "tests/PiSharp.InteractiveParity.Tests/UtilityCases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.declaration-constraints",
       "area": "codemode",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/New Features#4",
         "coding-agent/Changed#2",
@@ -714,12 +958,21 @@
         "src/PiSharp.Codemode/CodemodeDeclarations.cs"
       ],
       "release": "1.2.0",
-      "notes": "packages/codemode/test/declarations.test.ts has the expected renderings."
+      "notes": "packages/codemode/test/declarations.test.ts has the expected renderings.",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/PureCases.cs",
+          "tests/PiSharp.Codemode.Tests/Sync120Cases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.mcp-result-type",
       "area": "codemode",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Changed#3",
         "codemode/Breaking Changes#1"
@@ -739,12 +992,21 @@
         "src/PiSharp.Cli/Mcp/McpCodemode.cs"
       ],
       "release": "1.2.0",
-      "notes": "Cross-area with mcp.structured-content-any-json (structuredContent typed unknown when the tool has no output schema)."
+      "notes": "Cross-area with mcp.structured-content-any-json (structuredContent typed unknown when the tool has no output schema).",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync120Cases.cs",
+          "tests/PiSharp.McpParity.Tests/ResultCases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.options-line-first",
       "area": "codemode",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#1",
         "codemode/Fixed#1"
@@ -756,12 +1018,21 @@
       "pisharp": [
         "src/PiSharp.Codemode/CodemodeSource.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/PureCases.cs",
+          "tests/PiSharp.Codemode.Tests/Sync120Cases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.description-failure-resolve",
       "area": "codemode",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#4"
       ],
@@ -772,12 +1043,22 @@
       "pisharp": [
         "src/PiSharp.Codemode/Tool/CodemodeToolDefinition.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "99a4524",
+          "e64d8f0"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync120Cases.cs",
+          "tests/PiSharp.CliParity.Tests/SessionFormat"
+        ]
+      }
     },
     {
       "id": "codemode.linear-text-join",
       "area": "codemode",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#6"
       ],
@@ -789,12 +1070,20 @@
         "src/PiSharp.Codemode/Tool/CodemodeExecutor.cs"
       ],
       "release": "1.2.0",
-      "notes": "CodemodeExecutor.JoinAdjacentText concatenates strings per item (quadratic), like v1.1.0."
+      "notes": "CodemodeExecutor.JoinAdjacentText concatenates strings per item (quadratic), like v1.1.0.",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync120Cases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.row-timer",
       "area": "codemode",
-      "status": "port",
+      "status": "ported-with-deferral",
       "changelog": [
         "coding-agent/Added#5"
       ],
@@ -812,12 +1101,21 @@
         "src/PiSharp.Codemode/Tool/CodemodeExecutor.cs",
         "src/PiSharp.Codemode/Tool/CodemodeRenderer.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/Sync120Cases.cs"
+        ]
+      },
+      "deferred": "The live Elapsed clock in the unthemed native renderer (PiSharp.Codemode.CodemodeRenderer). The native renderer contract carries no row state, so that renderer shows only the recorded Took time of a final result. The themed interactive renderer has the live clock, and executeCodemode's update before the first nested call is ported. Recorded in decision 0006."
     },
     {
       "id": "codemode.prelude-refresh",
       "area": "codemode",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "codemode/Changed#2"
       ],
@@ -831,12 +1129,20 @@
         "src/PiSharp.Codemode/CodemodeTypes.cs"
       ],
       "release": "1.2.0",
-      "notes": "codemode-prelude.js is the evaluated PRELUDE_SOURCE byte-for-byte below its header; refresh it from v1.2.0 and re-pin the header."
+      "notes": "codemode-prelude.js is the evaluated PRELUDE_SOURCE byte-for-byte below its header; refresh it from v1.2.0 and re-pin the header.",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/SandboxCases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.promise-job-interrupts",
       "area": "codemode",
-      "status": "port",
+      "status": "already-ported",
       "changelog": [
         "codemode/Changed#3"
       ],
@@ -848,12 +1154,22 @@
         "src/PiSharp.Codemode/Runtime/CodemodeEngineRunner.cs"
       ],
       "release": "1.2.0",
-      "notes": "PiSharp runs scripts on Jint (decision 0003): verify the timeout/cancellation constraint interrupts a microtask-only loop and add a test."
+      "notes": "PiSharp runs scripts on Jint (decision 0003): verify the timeout/cancellation constraint interrupts a microtask-only loop and add a test.",
+      "evidence": {
+        "file": "src/PiSharp.Codemode/Runtime/CodemodeEngineRunner.cs",
+        "note": "Jint's timeout and cancellation constraints already stop a script that only queues promise jobs (while (true) await null); tests added.",
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/LimitCases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.runtime-split",
       "area": "codemode",
-      "status": "port",
+      "status": "ported",
       "changelog": [],
       "upstream": [
         "packages/codemode/src/runtime/host.ts",
@@ -872,7 +1188,16 @@
         "src/PiSharp.Codemode/CodemodeTypes.cs"
       ],
       "release": "1.2.0",
-      "notes": "Re-verify the PiSharp runtime against execution.ts/vm.ts (abort, timeout, output limits, store writes, error mapping) and re-cite them; the deterministic-only fields fall under codemode.new-sandboxes."
+      "notes": "Re-verify the PiSharp runtime against execution.ts/vm.ts (abort, timeout, output limits, store writes, error mapping) and re-cite them; the deterministic-only fields fall under codemode.new-sandboxes.",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/SandboxCases.cs",
+          "tests/PiSharp.Codemode.Tests/LimitCases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.new-sandboxes",
@@ -934,7 +1259,7 @@
     {
       "id": "mcp.structured-content-any-json",
       "area": "mcp",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "mcp/Breaking Changes#1",
         "coding-agent/Fixed#11"
@@ -951,12 +1276,22 @@
         "src/PiSharp.Agent/ToolResultValueCodec.cs"
       ],
       "release": "1.2.0",
-      "notes": "McpServerRuntime.cs:712 still rejects non-object structured content."
+      "notes": "McpServerRuntime.cs:712 still rejects non-object structured content.",
+      "evidence": {
+        "commits": [
+          "99a4524",
+          "d239525"
+        ],
+        "tests": [
+          "tests/PiSharp.McpParity.Tests/ResultCases.cs",
+          "tests/PiSharp.McpSync.Tests/DispatchCases.cs"
+        ]
+      }
     },
     {
       "id": "mcp.oauth-iss-without-metadata",
       "area": "mcp",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "mcp/Fixed#1",
         "coding-agent/Fixed#22"
@@ -971,12 +1306,20 @@
         "src/PiSharp.Extensions.Abstractions/Mcp/Authentication/McpOAuthOrchestrationContracts.cs",
         "src/PiSharp.Cli/Mcp/Authentication/McpDefaultOAuthProtocol.cs"
       ],
-      "release": "1.2.0"
+      "release": "1.2.0",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.McpSync.Tests/Program.cs"
+        ]
+      }
     },
     {
       "id": "mcp.no-dispatch-after-settle",
       "area": "mcp",
-      "status": "port",
+      "status": "already-ported",
       "changelog": [
         "mcp/Fixed#2",
         "coding-agent/Fixed#21"
@@ -994,12 +1337,22 @@
         "src/PiSharp.Cli/Mcp/AdmittedMcpHttpChannelFactory.cs"
       ],
       "release": "1.2.0",
-      "notes": "Verify whether PiSharp's per-request cancellation token already stops dispatch after a token refresh; port only the gap."
+      "notes": "Verify whether PiSharp's per-request cancellation token already stops dispatch after a token refresh; port only the gap.",
+      "evidence": {
+        "file": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpStreamableHttpTransport.cs",
+        "note": "The per-request cancellation token already keeps a request that was cancelled or timed out while it waited for a shared authorization refresh from being sent afterwards; tests added.",
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.McpSync.Tests/DispatchCases.cs"
+        ]
+      }
     },
     {
       "id": "mcp.no-resource-listing-at-connect",
       "area": "mcp",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Fixed#10",
         "coding-agent/Breaking Changes#4"
@@ -1018,12 +1371,21 @@
         "src/PiSharp.Cli/Mcp/McpPreparedServer.cs"
       ],
       "release": "1.2.0",
-      "notes": "McpServerRuntime.cs:308 counts resources/list and resources/templates/list at connect."
+      "notes": "McpServerRuntime.cs:308 counts resources/list and resources/templates/list at connect.",
+      "evidence": {
+        "commits": [
+          "99a4524"
+        ],
+        "tests": [
+          "tests/PiSharp.McpParity.Tests/SessionCases.cs",
+          "tests/PiSharp.McpParity.Tests/NotificationCases.cs"
+        ]
+      }
     },
     {
       "id": "node-bridge.pi-runtime-1.2.0",
       "area": "node-bridge",
-      "status": "port",
+      "status": "ported",
       "changelog": [
         "coding-agent/Removed#2"
       ],
@@ -1044,12 +1406,24 @@
         "website/src/content/docs/docs/extensions/node-bridge.md"
       ],
       "release": "1.2.0",
-      "notes": "Drop the chord override. Regenerate the compatibility modules with port-upstream.mjs against v1.2.0 (COMMIT constant, version strings, upstream-exports.json). Carry before_agent_start's union, reachesTools/aliases and renderFakeCursor through the bridge surface."
+      "notes": "Drop the chord override. Regenerate the compatibility modules with port-upstream.mjs against v1.2.0 (COMMIT constant, version strings, upstream-exports.json). Carry before_agent_start's union, reachesTools/aliases and renderFakeCursor through the bridge surface.",
+      "evidence": {
+        "commits": [
+          "cb4f42f",
+          "403b372",
+          "1340344",
+          "9f02f2f"
+        ],
+        "tests": [
+          "tests/PiSharp.ExtensionParity.Tests/RuntimeCases.cs",
+          "tests/PiSharp.ExtensionParity.Tests/Sync120Cases.cs"
+        ]
+      }
     },
     {
       "id": "docs.upstream-docs",
       "area": "docs",
-      "status": "port",
+      "status": "ported",
       "changelog": [],
       "upstream": [
         "packages/coding-agent/docs/cli.md",
@@ -1072,7 +1446,14 @@
         "website/src/content/docs/docs"
       ],
       "release": "1.2.0",
-      "notes": "src/PiSharp.Cli/docs/codemode.md is a byte copy of docs/codemode.md (changed); website pages link to v1.1.0 docs and describe the v1.1.0 baseline until 1.2.0 ships."
+      "notes": "src/PiSharp.Cli/docs/codemode.md is a byte copy of docs/codemode.md (changed); website pages link to v1.1.0 docs and describe the v1.1.0 baseline until 1.2.0 ships.",
+      "evidence": {
+        "commits": [
+          "d90ea8c",
+          "b8f37d5"
+        ],
+        "tests": []
+      }
     },
     {
       "id": "docs.upstream-examples",
