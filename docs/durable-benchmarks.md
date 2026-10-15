@@ -2,7 +2,7 @@
 
 Report only. These numbers are a snapshot of one machine; nothing in CI passes or fails on them. The `benchmarks.smoke` case in `tests/PiSharp.Durable.Tests` runs every benchmark at a tiny size so the ports keep working, and asserts completion only.
 
-PiSharp ports nine upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
+PiSharp ports ten upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
 
 | upstream | PiSharp | what it measures |
 |---|---|---|
@@ -15,9 +15,10 @@ PiSharp ports nine upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5ef
 | `test/scheduler-fanout-bench.ts` (`npm run bench:scheduler-fanout`, new in v1.2.0) | `SchedulerFanoutBench.cs` (`scheduler-fanout [N,...]`) | one tool making N parallel nested calls (`ExecuteToolAsync`, progress off) on memory storage |
 | `test/nested-tools-bench.ts` (new in v1.2.0) | `NestedToolsBench.cs` (`nested-tools [streaming\|nesting]`) | commits, bytes written by write type, stored size and heap of 200 to 2,000 streaming or fast nested calls, at depth 1 and 2 |
 | `test/nested-images-bench.ts` (new in v1.2.0) | `NestedImagesBench.cs` (`nested-images [count]`) | 1 MiB images passed between nested calls inline or by a `NestedCallDoc` reference |
+| `test/codemode-bench.ts` (`npm run bench:codemode`, new in v1.2.0) | `CodemodeBench.cs` (`codemode [N,...]`) | durable code mode's overhead: N calls of a trivial tool, sequential or parallel, from a code mode script (journaled) and from a plain tool's nested calls, on SQLite |
 | none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once) and owned chains of N tasks settling bottom-up |
 
-Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
 
 ## Machine
 
@@ -304,6 +305,21 @@ Both are linear (0.2 ms per call under Node, 0.4 to 0.5 ms in PiSharp after warm
 
 - **Passing references instead of image data** writes 201 MiB instead of 1,401 MiB in both, as upstream's benchmark intends to show.
 - **PiSharp's JSONL storage holds what it wrote.** After the inline run settles, PiSharp keeps about 400 MiB (the 200 MiB of live JSONL records as UTF-16), where Node keeps about 1 MiB; after reopening, 803 MiB against 202 MiB. This is the JSONL storage's in-memory record copy, not the nested calls (SQLite keeps nothing in either runtime), and is noted for a later look at JSONL memory. Negative heap figures are collections of an earlier scenario's garbage after the baseline.
+
+## Durable code mode (`codemode-bench.ts`)
+
+Work list area d. Measured on 2026-10-15, same machine, two runs each with Node and PiSharp run one after the other; the table shows the second (the first agreed within the noise, but for PiSharp's slower first row, which includes the JIT's warm-up). PiSharp's scripts run on Jint engines on threads (the benchmark sets no worker launcher), upstream's on QuickJS in worker threads.
+
+| shape | n | plain, Node | plain, PiSharp | code mode, Node | code mode, PiSharp | commits/call, plain | commits/call, code mode (Node / PiSharp) |
+|---|---:|---:|---:|---:|---:|---:|---|
+| sequential | 100 | 195 ms | 434 ms | 323 ms | 710 ms | 4.15 | 6.18 / 6.18 |
+| sequential | 1,000 | 1,302 ms | 2,238 ms | 1,656 ms | 2,167 ms | 4.01 | 6.02 / 6.02 |
+| parallel | 100 | 88 ms | 86 ms | 152 ms | 140 ms | 3.16 | 3.22 / 3.26 |
+| parallel | 1,000 | 951 ms | 829 ms | 940 ms | 971 ms | 3.02 | 3.02 / 3.04 |
+
+- **Commits are upstream's** for every plain run and every sequential script: a sequential script costs two commits per call on top of its nested call's own, the journal entry and the acknowledged count, as upstream's design says.
+- **A parallel script's journal batches follow timing.** Results that finish together are journaled in one commit. Under Node every result that is ready when a commit lands joins the next one; PiSharp's nested calls finish on several threads, so a few more batches form (322 to 326 commits for 100 calls, 3,040 to 3,050 for 1,000, against Node's 322 and 3,020).
+- **Code mode's own cost** in a sequential script, over the plain tool's: 1.3 ms per call at 100 calls and 0.4 ms at 1,000 under Node; in PiSharp 2.8 ms at 100 calls (its first script, with the engine's warm-up) and none measurable at 1,000. Parallel scripts cost little in either. PiSharp's plain sequential calls are slower than Node's (2.2 against 1.3 ms per call at 1,000), as in the fan-out rows above.
 
 ## Throughput target
 

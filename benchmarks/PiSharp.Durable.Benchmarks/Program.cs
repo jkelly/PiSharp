@@ -2,9 +2,10 @@ using PiSharp.Durable.Benchmarks;
 
 // Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]]
 //   [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]]
-//   [nested-tools [streaming|nesting]] [nested-images [count]]
-// With no argument, runs all ten (upstream: npm run bench:storage, bench:storage:memory, bench:tool-output, bench:document-append,
-// bench:document-cache, bench:scheduler-memory and bench:scheduler-fanout, and test/nested-tools-bench.ts and test/nested-images-bench.ts;
+//   [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]]
+// With no argument, runs all eleven (upstream: npm run bench:storage, bench:storage:memory, bench:tool-output, bench:document-append,
+// bench:document-cache, bench:scheduler-memory, bench:scheduler-fanout and bench:codemode, and test/nested-tools-bench.ts and
+// test/nested-images-bench.ts;
 // scheduler-scale is PiSharp-authored, see SchedulerScaleBench.cs). Report only: the
 // benchmarks print tables and never pass or fail on a timing. Run in Release. The --worker forms are the child processes of storage-memory
 // and tool-output.
@@ -12,7 +13,7 @@ if (args is ["storage-memory", "--worker", var backend, var scale]) return await
 if (args is ["tool-output", "--worker", var scenario]) return await ToolOutputBench.WorkerMainAsync(scenario, Console.Out);
 
 string[] benchmarks = ["storage", "storage-memory", "tool-output", "document-append", "document-cache", "scheduler-memory", "scheduler-scale",
-    "scheduler-fanout", "nested-tools", "nested-images"];
+    "scheduler-fanout", "nested-tools", "nested-images", "codemode"];
 var selected = args.Length == 0 ? benchmarks : args;
 string? filter = null;
 for (var index = 0; index < selected.Length; index++)
@@ -80,8 +81,14 @@ for (var index = 0; index < selected.Length; index++)
             Console.WriteLine("## nested-images-bench");
             await NestedImagesBench.RunAsync(NestedImagesBench.ParseCounts(count), Console.Out);
             break;
+        case "codemode":
+            string? codemodeSizes = null;
+            if (index + 1 < selected.Length && !benchmarks.Contains(selected[index + 1])) codemodeSizes = selected[++index];
+            Console.WriteLine("## codemode-bench");
+            await CodemodeBench.RunAsync(CodemodeBench.ParseSizes(codemodeSizes), Console.Out);
+            break;
         default:
-            Console.Error.WriteLine("Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]]");
+            Console.Error.WriteLine("Usage: PiSharp.Durable.Benchmarks [storage] [storage-memory] [tool-output [<scenario label filter>]] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]] [scheduler-fanout [N,...]] [nested-tools [streaming|nesting]] [nested-images [count]] [codemode [N,...]]");
             return 2;
     }
 }
