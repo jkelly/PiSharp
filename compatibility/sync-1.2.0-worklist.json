@@ -1,0 +1,3023 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "node tools/CompatibilityReport/repin-sources.mjs --upstream <Pi repo> --from v1.1.0 --to v1.2.0 --write",
+  "decision": "docs/decisions/0006-pi-1.2.0-sync.md",
+  "from": {
+    "tag": "v1.1.0",
+    "commit": "abe508e1b89912adde45528136c3221eb69acdd7"
+  },
+  "to": {
+    "tag": "v1.2.0",
+    "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff"
+  },
+  "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
+  "summary": {
+    "filesWithOldCommit": 25,
+    "citations": {
+      "repinned": 365,
+      "pending": 0,
+      "unparsed": 0,
+      "nonHeader": 0,
+      "excludedHistorical": 1768,
+      "releaseDocs": 0
+    },
+    "files": {
+      "repinned": 364,
+      "pending": 0,
+      "historical": 25,
+      "releaseDocs": 0,
+      "nonHeader": 0
+    },
+    "pendingByArea": {}
+  },
+  "pending": [],
+  "unparsed": [],
+  "nonHeaderCitations": [],
+  "releaseDocs": [],
+  "excludedHistorical": [
+    {
+      "file": "compatibility/coding-agent-command-rpc-inventory.v1.1.0.json",
+      "occurrences": 1576,
+      "reason": "inventory generated for the v1.1.0 target (validated against target.v1.1.0.lock.json)"
+    },
+    {
+      "file": "compatibility/coding-agent-command-rpc-inventory.v1.2.0.json",
+      "occurrences": 7,
+      "reason": "inventory generated for the v1.2.0 target; its v1.1.0 commit is refresh provenance (the previous inventory and each row's previous source) and the anchors of entries removed upstream at v1.2.0"
+    },
+    {
+      "file": "compatibility/extensions/event-catalog.v1.1.0.json",
+      "occurrences": 6,
+      "reason": "inventory generated for the v1.1.0 target (validated against target.v1.1.0.lock.json)"
+    },
+    {
+      "file": "compatibility/extensions/event-catalog.v1.2.0.json",
+      "occurrences": 42,
+      "reason": "inventory generated for the v1.2.0 target; its v1.1.0 commit is refresh provenance (the previous inventory and each row's previous source) and the anchors of entries removed upstream at v1.2.0"
+    },
+    {
+      "file": "compatibility/public-release.json",
+      "occurrences": 8,
+      "reason": "previousReleases record the upstream commit each published release tracked"
+    },
+    {
+      "file": "compatibility/sync-1.1.0-applicability.json",
+      "occurrences": 1,
+      "reason": "the v1.1.0 sync record"
+    },
+    {
+      "file": "compatibility/sync-1.2.0-applicability.json",
+      "occurrences": 1,
+      "reason": "names the commit the v1.2.0 sync starts from"
+    },
+    {
+      "file": "compatibility/sync-1.2.0-worklist.json",
+      "occurrences": 1,
+      "reason": "names the commit the v1.2.0 sync starts from"
+    },
+    {
+      "file": "compatibility/target.lock.json",
+      "occurrences": 1,
+      "reason": "previousTarget names the v1.1.0 lock"
+    },
+    {
+      "file": "compatibility/target.v1.1.0.lock.json",
+      "occurrences": 106,
+      "reason": "the preserved v1.1.0 target lock"
+    },
+    {
+      "file": "docs/compatibility/baseline.md",
+      "occurrences": 1,
+      "reason": "describes the previous target"
+    },
+    {
+      "file": "docs/contracts/anthropic-native-tool-changes.md",
+      "occurrences": 1,
+      "reason": "contract records name the release each adapter was re-ported from"
+    },
+    {
+      "file": "docs/contracts/azure-responses-explicit-adapter.md",
+      "occurrences": 1,
+      "reason": "contract records name the release each adapter was re-ported from"
+    },
+    {
+      "file": "docs/decisions/0002-pi-1.1.0-sync.md",
+      "occurrences": 1,
+      "reason": "the v1.1.0 sync decision"
+    },
+    {
+      "file": "docs/decisions/0006-pi-1.2.0-sync.md",
+      "occurrences": 1,
+      "reason": "names the commit the v1.2.0 sync starts from"
+    },
+    {
+      "file": "docs/plans/full-parity-v1.1.0.md",
+      "occurrences": 2,
+      "reason": "the v1.1.0 plans"
+    },
+    {
+      "file": "docs/plans/post-port-pi-v1-upgrade.md",
+      "occurrences": 4,
+      "reason": "the v1.1.0 plans"
+    },
+    {
+      "file": "docs/release-notes/1.1.0.1.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "docs/release-notes/1.1.0.2.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "docs/release-notes/1.1.0.3.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "docs/release-notes/1.1.0.5.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "docs/release-notes/1.1.0.6.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "docs/release-notes/1.1.0.7.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "docs/release-notes/1.1.0.md",
+      "occurrences": 1,
+      "reason": "release notes record what each release was built from"
+    },
+    {
+      "file": "tools/PerformanceReview/pisharp-ui-comparison.log",
+      "occurrences": 1,
+      "reason": "captured log"
+    }
+  ],
+  "repinned": [
+    {
+      "file": "src/PiSharp.Agent/ToolArgumentValidation.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/validation.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Agent/ToolBatchScheduler.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent-loop.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Agent/ToolInvoker.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent-loop.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Agent/ToolResultMessageMaterializer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent-loop.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Authentication/InjectedAuthenticationResolver.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/env-api-keys.ts",
+        "packages/ai/src/providers/anthropic.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Authentication/OAuth/AnthropicOAuth.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/oauth/anthropic.ts",
+        "packages/ai/src/auth/oauth/callback-server.ts",
+        "packages/ai/src/auth/oauth/pkce.ts",
+        "packages/ai/src/utils/oauth-page.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Authentication/OAuth/GitHubCopilotOAuth.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/oauth/github-copilot.ts",
+        "packages/ai/src/providers/github-copilot.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Authentication/OAuth/OpenAIOAuth.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/oauth/openai-chatgpt.ts",
+        "packages/ai/src/auth/oauth/openai-codex.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Authentication/OAuth/ProviderOAuth.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/oauth/callback-server.ts",
+        "packages/ai/src/auth/oauth/device-code.ts",
+        "packages/ai/src/auth/oauth/pkce.ts",
+        "packages/ai/src/auth/types.ts",
+        "packages/ai/src/utils/oauth-page.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Authentication/OAuth/StoredOAuthLifecycle.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/resolve.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Authentication/OAuth/StoredOAuthRefreshes.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/oauth/openai-chatgpt.ts",
+        "packages/ai/src/auth/oauth/openrouter.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Authentication/OAuth/SubscriptionOAuth.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/oauth/kimi-coding.ts",
+        "packages/ai/src/auth/oauth/meta.ts",
+        "packages/ai/src/auth/oauth/openrouter.ts",
+        "packages/ai/src/auth/oauth/radius.ts",
+        "packages/ai/src/auth/oauth/xai.ts",
+        "packages/ai/src/providers/anthropic.ts",
+        "packages/ai/src/providers/radius-config.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Catalogs/ProviderEnvironmentKeys.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/env-api-keys.ts",
+        "packages/ai/src/utils/provider-env.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/ModelOperations/ClassifierShared.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/classifier-shared.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/ModelOperations/LlamaCppClassifier.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/llama-cpp-classify.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/ModelOperations/OpenAIDecisionsClassifier.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/openai-decisions.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/ModelOperations/OpenRouterImages.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/openrouter-images.ts",
+        "packages/ai/src/images-api-registry.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/ModelOperations/ProviderRequest.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/error-body.ts",
+        "packages/ai/src/utils/headers.ts",
+        "packages/ai/src/utils/provider-retry.ts",
+        "packages/ai/src/utils/sanitize-unicode.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/ModelOperations/SystemOneClassifier.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/cloudflare-workers-ai-system-one.ts",
+        "packages/ai/src/api/system-one-shared.ts",
+        "packages/ai/src/api/typesafe-system-one.ts",
+        "packages/ai/src/providers/cloudflare-stream.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleContextEstimator.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/estimate.ts",
+        "packages/ai/src/utils/text.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/azure-openai-config.ts",
+        "packages/ai/src/api/azure-openai-responses.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/Bedrock/AwsCredentialChain.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/bedrock-converse-stream.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/Bedrock/AwsEventStream.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/bedrock-converse-stream.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/Bedrock/AwsSigV4.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/bedrock-converse-stream.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/Bedrock/BedrockConverseRequest.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/bedrock-converse-stream.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/Bedrock/BedrockConverseStreamTransport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/bedrock-converse-stream.ts",
+        "packages/ai/src/providers/amazon-bedrock.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRetryPolicy.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/google-shared.ts",
+        "packages/ai/src/utils/provider-retry.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleSimpleContextEstimator.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/estimate.ts",
+        "packages/ai/src/utils/text.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleVertex/GoogleVertexAuthentication.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/google-vertex.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/MistralConversations/MistralSimpleHttpSseTransport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/simple-options.ts",
+        "packages/ai/src/utils/estimate.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsKeyAuthRequestFactory.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/openai-completions.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsRetryOptions.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/provider-retry.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesKeyAuthRequestFactory.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/openai-responses.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesToolDeclarationProjector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/constrained-sampling.ts",
+        "packages/ai/src/utils/transcript.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/openai-responses-shared.ts",
+        "packages/ai/src/api/transform-messages.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/ProviderShared/ProviderErrorText.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/error-body.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Providers/NativeProviderFactory.AzureCompletions.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/azure-openai-config.ts",
+        "packages/ai/src/providers/azure.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Providers/NativeProviderFactory.AzureResponses.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/azure-openai-responses.ts",
+        "packages/ai/src/providers/azure.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Providers/NativeProviderFactory.Bedrock.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/bedrock-converse-stream.ts",
+        "packages/ai/src/providers/amazon-bedrock.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Providers/NativeProviderFactory.Vertex.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/google-vertex.ts",
+        "packages/ai/src/providers/google-vertex.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Streaming/ChatRun.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/event-stream.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/Streaming/TranscriptSurrogates.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/sanitize-unicode.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.AI/ToolArguments/StreamingJson.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/json-parse.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Authentication/ProviderLoginHost.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/resolve.ts",
+        "packages/coding-agent/src/modes/interactive/components/login-dialog.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Authentication/RadiusShareAuthentication.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/session-share.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Commands/AwsCredentialProcess.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/providers/amazon-bedrock.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Commands/OfflineSessionProfile.Llama.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/index.ts",
+        "packages/coding-agent/src/extensions/llama/index.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Commands/OfflineSessionProfile.PiToolPolicy.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/bash.ts",
+        "packages/coding-agent/src/utils/shell.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Commands/PiPayloadBudget.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/image-resize-core.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/docs/llama-cpp.md",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/docs/llama-cpp.md"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Extensions/Pi/PiNativeExtensions.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/loader.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/Armin.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/armin.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/AssistantMessage.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/assistant-message.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/BashExecution.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/bash-execution.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/BorderedLoader.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/bordered-loader.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/BranchSummaryMessage.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/messages.ts",
+        "packages/coding-agent/src/modes/interactive/components/branch-summary-message.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/CompactionSummaryMessage.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/messages.ts",
+        "packages/coding-agent/src/modes/interactive/components/compaction-summary-message.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/CountdownTimer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/countdown-timer.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/CustomEditor.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/custom-editor.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/Diff.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/diff.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/DynamicBorder.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/dynamic-border.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/EarendilAnnouncement.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/config.ts",
+        "packages/coding-agent/src/modes/interactive/components/earendil-announcement.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/EasterEgg3d.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/easter-egg-3d.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/EasterEgg3dLazy.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/easter-egg-3d.lazy.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ExtensionEditor.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/extension-editor.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ExtensionInput.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/extension-input.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ExtensionSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/extension-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/Footer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/experimental.ts",
+        "packages/coding-agent/src/core/usage-totals.ts",
+        "packages/coding-agent/src/modes/interactive/components/footer.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/LoginDialog.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/login-dialog.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/MermaidTransformer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/PiLogo.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/pi-logo.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/RadiusLoginSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/radius-login-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ScopedModelsSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/scoped-models-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/SessionSelectorSearch.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/session-selector-search.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/SettingsSubmenu.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/settings-submenu.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ShowImagesSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/show-images-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ThemedText.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/themed-text.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ThemeSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/theme-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ThinkingSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/thinking-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolExecution.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/tool-execution.ts",
+        "packages/coding-agent/src/utils/image-convert.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Edit.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/renderers/edit.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/EditDiff.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/edit-diff.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Find.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/renderers/find.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Grep.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/renderers/grep.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Index.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/renderers/index.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Ls.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/renderers/ls.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Read.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/config.ts",
+        "packages/coding-agent/src/core/tools/renderers/read.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Write.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/renderers/write.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/TreeSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/session-manager.ts",
+        "packages/coding-agent/src/modes/interactive/components/tree-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/TrustSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/trust-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/UserMessage.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/user-message.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/UserMessageSelector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/user-message-selector.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Components/VisualTruncate.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/bash-execution.ts",
+        "packages/coding-agent/src/modes/interactive/components/visual-truncate.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/ExternalEditor.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/external-editor.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/FooterDataProvider.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/footer-data-provider.ts",
+        "packages/coding-agent/src/utils/fs-watch.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Llama.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/llama/index.ts",
+        "packages/coding-agent/src/extensions/llama/ui.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/InteractiveProgramStatus.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/program-status-reporter.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/GrokMermaid.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidCanvas.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidGraph.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidJs.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidLabels.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidLayout.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidLayoutSeq.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidParse.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidSourceBox.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidUnicodeData.g.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Mermaid/MermaidWidth.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/ModelResolverMatch.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/model-resolver.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/ModelSearch.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/model-search.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/RpcSessionClient.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/rpc/rpc-client.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/Highlight/HighlightRenderer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/html.ts",
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/Highlight/Hljs.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/Highlight/HljsCompiler.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/Highlight/HljsEngine.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/Highlight/HljsGrammarData.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/Highlight/HljsRegex.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/Highlight/HljsTimSort.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Theme/ThemeController.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/theme/theme-controller.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/TuiRenderer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/chat-viewport.ts",
+        "packages/coding-agent/src/modes/interactive/tui-renderer.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/BugReport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/bug-report.ts",
+        "packages/coding-agent/src/utils/open-browser.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/Changelog.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/config.ts",
+        "packages/coding-agent/src/utils/changelog.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/ClipboardCommand.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/clipboard-command.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/ClipboardImage.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/clipboard-image.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/Git.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/git.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/NativeClipboard.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/native-platform.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/OpenBrowser.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/open-browser.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/Paths.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/paths.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/VersionCheck.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/management-http.ts",
+        "packages/coding-agent/src/utils/version-check.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/Wsl.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/wsl.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/Mode/Utilities/X11Clipboard.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/native-platform.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/ProgramStatusReporter.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/program-status-reporter.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Llama/HuggingFaceClient.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/llama/huggingface.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Llama/LlamaClient.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/llama/client.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Llama/LlamaProvider.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/llama/provider.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Mcp/Authentication/McpDefaultOAuthClientMetadata.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/config.ts",
+        "packages/coding-agent/src/extensions/mcp/oauth.ts",
+        "packages/mcp/src/oauth/provider.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Mcp/Authentication/McpDefaultOAuthHttp.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/oauth.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Mcp/Authentication/McpOAuthCallbackServer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/oauth-page.ts",
+        "packages/coding-agent/src/extensions/mcp/oauth.ts",
+        "packages/mcp/src/oauth/callback.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Mcp/McpServerLog.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/log.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Models/ConfigValueResolver.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/resolve-config-value.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Models/ExtensionOAuthLayer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/provider-composer.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Models/ModelListing.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/cli/list-models.ts",
+        "packages/coding-agent/src/core/auth-guidance.ts",
+        "packages/tui/src/fuzzy.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Models/ModelProviderComposer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/provider-composer.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Output/SessionJsonEventOutput.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/docs/json.md"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Packages/PiGitSource.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/git.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Packages/PiPackageCommands.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/cli/config-selector.ts",
+        "packages/coding-agent/src/package-manager-cli.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Pi/PiArgs.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/cli/args.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Pi/PiHelp.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/cli/args.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Pi/PiMigrations.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/migrations.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Pi/PiPaths.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/config.ts",
+        "packages/coding-agent/src/utils/paths.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Pi/PiSearchTools.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/find.ts",
+        "packages/coding-agent/src/core/tools/grep.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Pi/PiSessions.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/session-cwd.ts",
+        "packages/coding-agent/src/core/session-manager.ts",
+        "packages/coding-agent/src/core/virtual-models.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Pi/PiToolsManager.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/management-http.ts",
+        "packages/coding-agent/src/utils/tools-manager.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Prompts/OriginalSystemPromptBuilder.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/skills.ts",
+        "packages/coding-agent/src/core/system-prompt.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Prompts/OriginalSystemPromptInputs.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/system-prompt.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Cli/Settings/ToolSelectionCliConfiguration.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/cli/args.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Codemode/CodemodeIdentifier.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/codemode/src/identifier.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/BlockedImages.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/sdk.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Diagnostics/BugReport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/bug-report.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Diagnostics/BugReportRedaction.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/bug-report.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Diagnostics/CrashLog.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/crash-log.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Diagnostics/JsJson.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/bug-report.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Diagnostics/StartupTimings.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/timings.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Diagnostics/ZipArchiveWriter.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/zip.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Export/AnsiToHtml.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/export-html/ansi-to-html.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Export/Js.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/export-html/index.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Export/PiColors.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/colors.ts",
+        "packages/tui/src/oklab.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Export/SessionExportSource.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/session-manager.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Export/SessionJsonlExport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/session-export.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Export/SystemTheme.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/theme/system-theme.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Export/ToolHtmlRenderer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/export-html/index.ts",
+        "packages/coding-agent/src/core/export-html/tool-renderer.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/PersistentAgentSession.InitialThinking.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/sdk.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/PersistentAgentSession.PiEntries.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/session-manager.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/SessionBranchSelection.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/sdk.ts",
+        "packages/coding-agent/src/core/virtual-models.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/SessionRecoveryClassifier.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/overflow.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Usage/CacheStats.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/cache-stats.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Usage/CacheWarmer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/cache-warmer.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/Usage/UsageTotals.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/usage-totals.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Contracts/ToolSchemaOrigin.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/validation.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Abstractions/Mcp/Authentication/McpOAuthChallenge.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/oauth.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Abstractions/Mcp/Configuration/McpConfigurationModels.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/mcp-servers.ts",
+        "packages/coding-agent/src/extensions/mcp/config.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Abstractions/Mcp/Configuration/McpConfigurationReader.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/mcp-servers.ts",
+        "packages/coding-agent/src/extensions/mcp/config.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpAdmittedOAuthDiscovery.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/mcp/src/oauth/discovery.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpAdmittedOAuthRefreshAdapter.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/oauth.ts",
+        "packages/mcp/src/oauth/types.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpOAuthClientMetadataDocuments.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/oauth.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpOAuthCredentialStore.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/oauth.ts",
+        "packages/mcp/src/oauth/provider.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpOAuthRefreshLock.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/oauth.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Mcp/Registration/McpRegistrationCatalog.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/loader.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Registration/RegistrationScope.McpServers.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/loader.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Registration/RegistrationScope.ModelOperationProviders.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/loader.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/docs/json.md"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.SessionEvents.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/rpc/rpc-mode.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Sessions/Serialization/SessionJavaScriptJson.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/session-manager.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools.Skia/SkiaImageCodec.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/exif-orientation.ts",
+        "packages/coding-agent/src/utils/image-convert.ts",
+        "packages/coding-agent/src/utils/image-resize-core.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/BuiltinToolPrompts.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/bash.ts",
+        "packages/coding-agent/src/core/tools/edit.ts",
+        "packages/coding-agent/src/core/tools/find.ts",
+        "packages/coding-agent/src/core/tools/grep.ts",
+        "packages/coding-agent/src/core/tools/ls.ts",
+        "packages/coding-agent/src/core/tools/read.ts",
+        "packages/coding-agent/src/core/tools/write.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Files/EditTool.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/edit.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Files/FindTool.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/find.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Files/GrepTool.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/grep.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Files/LsTool.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/ls.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Files/PiFindTool.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/find.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Files/PiGrepTool.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/grep.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Files/PiSearchProcess.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/find.ts",
+        "packages/coding-agent/src/core/tools/grep.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Files/ReadWriteTools.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/read.ts",
+        "packages/coding-agent/src/core/tools/write.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Images/ExifOrientation.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/exif-orientation.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Images/ImageMime.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/mime.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Images/ImageProcessing.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/image-convert.ts",
+        "packages/coding-agent/src/utils/image-process.ts",
+        "packages/coding-agent/src/utils/image-resize-core.ts",
+        "packages/coding-agent/src/utils/image-resize.ts",
+        "packages/coding-agent/src/utils/tool-result-images.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/NodeArgumentErrors.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/bash.ts",
+        "packages/coding-agent/src/core/tools/edit.ts",
+        "packages/coding-agent/src/core/tools/find.ts",
+        "packages/coding-agent/src/core/tools/grep.ts",
+        "packages/coding-agent/src/core/tools/read.ts",
+        "packages/coding-agent/src/core/tools/write.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Processes/BashTool.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/bash.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Processes/BashToolOptions.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/bash.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Processes/NativeProcessRunner.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/output-files.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Processes/ShellAnsiText.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/bash-executor.ts",
+        "packages/coding-agent/src/utils/ansi.ts",
+        "packages/coding-agent/src/utils/shell.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Processes/ShellCommandExecutor.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/bash-executor.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Processes/ShellDiscovery.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/paths.ts",
+        "packages/coding-agent/src/utils/shell.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tools/Processes/Unix/PosixSpawnProcessAdmission.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/bash-executor.ts",
+        "packages/coding-agent/src/utils/shell.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Input/TerminalKeybindingDefinitions.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/keybindings.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/AltScreenSearch.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/alt-screen-search.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/Autocomplete.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/autocomplete.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/Colors.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/colors.ts",
+        "packages/tui/src/oklab.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/KeybindingsManager.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/keybindings.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/Latex.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/latex.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/Layout.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/alt-screen-flash.ts",
+        "packages/tui/src/components/h-stack.ts",
+        "packages/tui/src/components/mouse-region.ts",
+        "packages/tui/src/components/scroll-view.ts",
+        "packages/tui/src/components/stack.ts",
+        "packages/tui/src/components/v-stack.ts",
+        "packages/tui/src/layout-node.ts",
+        "packages/tui/src/layout.ts",
+        "packages/tui/src/wheel-scroll.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/Markdown.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/markdown.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/MarkdownLexer.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/markdown.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/SettingsListAndImage.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/image.ts",
+        "packages/tui/src/components/settings-list.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/Terminal.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/native-modifiers.ts",
+        "packages/tui/src/program-status.ts",
+        "packages/tui/src/terminal.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Pi/TextSupport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/fuzzy.ts",
+        "packages/tui/src/kill-ring.ts",
+        "packages/tui/src/undo-stack.ts",
+        "packages/tui/src/word-navigation.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Tui/Rendering/TerminalProgramStatus.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/program-status.ts",
+        "packages/tui/src/terminal.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Agent.Tests/ToolLoneSurrogateTests.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent-loop.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CliParity.Tests/LlamaCases.cs",
+      "citations": 2,
+      "upstream": [
+        "packages/coding-agent/docs/llama-cpp.md",
+        "packages/coding-agent/src/extensions/llama/client.ts",
+        "packages/coding-agent/src/extensions/llama/huggingface.ts",
+        "packages/coding-agent/src/extensions/llama/provider.ts",
+        "packages/coding-agent/test/llama-extension.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CliParity.Tests/NamelessToolCallCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent-loop.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CliParity.Tests/RpcInputCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/rpc/rpc-mode.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CliParity.Tests/SessionFormatCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/session-manager.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CliParity.Tests/SwitchPathCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/agent-session-runtime.ts",
+        "packages/coding-agent/src/core/session-manager.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CliParity.Tests/ValidationCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent-loop.ts",
+        "packages/ai/src/utils/validation.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CliSync.Tests/PromptCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/skills.ts",
+        "packages/coding-agent/src/core/system-prompt.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.CliSync.Tests/TerminalCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/program-status-reporter.ts",
+        "packages/tui/src/keybindings.ts",
+        "packages/tui/src/program-status.ts",
+        "packages/tui/src/terminal.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ExtensionParity.Tests/SwitchVetoCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/agent-session-runtime.ts",
+        "packages/coding-agent/src/core/session-manager.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/BuiltinExtensionCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/cli/config-selector.ts",
+        "packages/coding-agent/src/extensions/index.ts",
+        "packages/coding-agent/src/modes/interactive/components/config-selector.ts",
+        "packages/coding-agent/src/package-manager-cli.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/Highlight/HljsDifferentialTests.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.InteractiveParity.Tests/Mermaid/GrokMermaidDifferential.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ProviderSync.Tests/GoogleStreamErrorCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/google-generative-ai.ts",
+        "packages/ai/src/api/google-vertex.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ProviderSync.Tests/GoogleWireCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/google-generative-ai.ts",
+        "packages/ai/src/api/google-shared.ts",
+        "packages/ai/src/api/google-vertex.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ProviderSync.Tests/ProviderErrorTextCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/error-body.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.ProviderSync.Tests/StreamingJsonCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/json-parse.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Tools.Tests/SkiaCodecTests.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/test/image-process.test.ts",
+        "packages/coding-agent/test/image-processing.test.ts",
+        "packages/coding-agent/test/tools.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Tools.Tests/ToolEdgeInputTests.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/bash.ts",
+        "packages/coding-agent/src/core/tools/edit.ts",
+        "packages/coding-agent/src/core/tools/ls.ts",
+        "packages/coding-agent/src/core/tools/read.ts",
+        "packages/coding-agent/src/core/tools/write.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Tools.Tests/ToolParityTests.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/test/builtin-tool-strict-mode.test.ts",
+        "packages/coding-agent/test/image-process.test.ts",
+        "packages/coding-agent/test/image-processing.test.ts",
+        "packages/coding-agent/test/tool-result-images.test.ts",
+        "packages/coding-agent/test/tools.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Tools.Tests/ToolValidationTests.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent-loop.ts",
+        "packages/ai/src/utils/validation.ts"
+      ]
+    },
+    {
+      "file": "tools/GrokMermaid/gen-unicode-data.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/mermaid.ts"
+      ]
+    },
+    {
+      "file": "tools/HljsGrammars/build-corpus.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "tools/HljsGrammars/extract-grammars.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "tools/HljsGrammars/generate-goldens.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/syntax-highlight.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/loader-hooks.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/loader.ts",
+        "packages/coding-agent/src/core/extensions/virtual-modules.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/pi-modules.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/jiti-loader.ts",
+        "packages/coding-agent/src/core/extensions/loader.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/agent/agent-loop.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent-loop.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/agent/agent.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/agent.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/agent/proxy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/proxy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/agent/stream-fn.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/stream-fn.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/agent/types.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/types.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/anthropic-messages.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/anthropic-messages.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/azure-openai-responses.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/azure-openai-responses.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/bedrock-converse-stream.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/bedrock-converse-stream.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/google-generative-ai.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/google-generative-ai.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/google-vertex.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/google-vertex.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/mistral-conversations.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/mistral-conversations.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/openai-codex-responses.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/openai-codex-responses.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/openai-completions.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/openai-completions.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/openai-responses.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/openai-responses.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/api/pi-messages.lazy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/api/pi-messages.lazy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/auth/context.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/context.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/auth/credential-store.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/credential-store.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/auth/helpers.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/helpers.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/auth/resolve.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/resolve.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/auth/types.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/auth/types.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/env-api-keys.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/env-api-keys.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/images-api-registry.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/images-api-registry.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/images.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/images.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/index.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/index.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/legacy-api-aliases.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/legacy-api-aliases.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/models-store.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/models-store.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/providers/faux.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/providers/faux.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/providers/images/register-builtins.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/providers/images/register-builtins.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/session-resources.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/session-resources.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/abort.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/abort.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/assistant-message-frame.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/assistant-message-frame.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/diagnostics.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/diagnostics.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/event-stream.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/event-stream.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/json-parse.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/json-parse.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/model-operations.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/model-operations.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/models-error.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/models-error.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/overflow.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/overflow.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/provider-env.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/provider-env.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/text.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/text.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/transcript.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/transcript.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/typebox-helpers.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/typebox-helpers.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/uuid.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/uuid.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/ai/utils/validation.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/validation.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/config.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/config.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/compaction/branch-summarization.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/compaction/branch-summarization.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/compaction/compaction.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/compaction/compaction.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/compaction/index.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/compaction/index.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/event-bus.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/event-bus.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/extensions/wrapper.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/wrapper.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/messages.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/messages.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/session-manager.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/session-manager.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/skills.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/skills.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/source-info.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/source-info.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/tools/file-mutation-queue.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/file-mutation-queue.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/tools/tool-definition-wrapper.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/tool-definition-wrapper.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/tools/truncate.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/truncate.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/usage-totals.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/usage-totals.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/core/virtual-models.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/virtual-models.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/modes/interactive/components/bordered-loader.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/bordered-loader.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/modes/interactive/components/custom-editor.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/custom-editor.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/modes/interactive/components/dynamic-border.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/dynamic-border.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/modes/interactive/components/keybinding-hints.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/keybinding-hints.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/modes/interactive/components/visual-truncate.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/visual-truncate.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/modes/interactive/theme/system-theme.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/theme/system-theme.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/tools.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/core/tools/bash.ts",
+        "packages/coding-agent/src/core/tools/edit.ts",
+        "packages/coding-agent/src/core/tools/find.ts",
+        "packages/coding-agent/src/core/tools/grep.ts",
+        "packages/coding-agent/src/core/tools/index.ts",
+        "packages/coding-agent/src/core/tools/ls.ts",
+        "packages/coding-agent/src/core/tools/powershell.ts",
+        "packages/coding-agent/src/core/tools/read.ts",
+        "packages/coding-agent/src/core/tools/write.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/child-process.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/child-process.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/frontmatter.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/frontmatter.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/fs-watch.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/fs-watch.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/mime.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/mime.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/paths.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/paths.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/shell.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/shell.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/coding-agent/utils/text.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/coding-agent/src/utils/text.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/pi-agent-core.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/agent/src/index.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/pi-ai.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/compat.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/alt-screen-search.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/alt-screen-search.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/autocomplete.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/autocomplete.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/colors.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/colors.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/alt-screen-flash.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/alt-screen-flash.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/box.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/box.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/cancellable-loader.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/cancellable-loader.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/h-stack.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/h-stack.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/image.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/image.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/loader.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/loader.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/markdown.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/markdown.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/mouse-region.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/mouse-region.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/scroll-view.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/scroll-view.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/select-list.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/select-list.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/settings-list.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/settings-list.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/spacer.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/spacer.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/stack.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/stack.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/text.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/text.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/truncated-text.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/truncated-text.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/components/v-stack.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/components/v-stack.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/fuzzy.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/fuzzy.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/keybindings.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/keybindings.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/kill-ring.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/kill-ring.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/latex.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/latex.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/layout-node.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/layout-node.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/layout.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/layout.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/native-modifiers.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/native-modifiers.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/native-module-path.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/native-module-path.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/native-platform.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/native-platform.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/oklab.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/oklab.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/program-status.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/program-status.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/terminal-colors.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/terminal-colors.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/terminal.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/terminal.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/undo-stack.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/undo-stack.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/wheel-scroll.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/wheel-scroll.ts"
+      ]
+    },
+    {
+      "file": "tools/NodeBridge/pi-host/virtual/tui/word-navigation.mjs",
+      "citations": 1,
+      "upstream": [
+        "packages/tui/src/word-navigation.ts"
+      ]
+    }
+  ],
+  "nonHeaderPins": {
+    "note": "Pins of upstream versions or commits that are not citation headers. 'done' items landed in the foundation, area or close-out stages; 'prepared' waits for the release; 'kept' is history.",
+    "items": [
+      {
+        "id": "model-catalog-shards",
+        "area": "ai",
+        "status": "done",
+        "files": [
+          "src/PiSharp.Cli/Models/*.json",
+          "src/PiSharp.Cli/Models/BuiltinModelCatalog.cs",
+          "tests/PiSharp.Models.Tests/CatalogCases.cs",
+          "THIRD-PARTY-NOTICES.md"
+        ],
+        "pin": "Byte copies of @earendil-works/pi-ai@1.1.0 dist/providers/data/*.json",
+        "action": "Refreshed from @earendil-works/pi-ai@1.2.0 (tarball SHA256 c3e69423bcab9712f31a7e5b6d3448ae356af84439ec6bc701f626f6ea164535) with tools/CompatibilityReport/refresh-model-catalogs.mjs, new in this stage; from the 1.1.0 tarball it reproduces the 1.1.0 state byte-for-byte. 15 of 42 shards changed and the catalog has 1649 models (was 1650): google-vertex drops gemini-flash-latest and gemini-flash-lite-latest, opencode drops fledge-alpha-free, openrouter drops 13 (mostly qwen) and gains 12, vercel-ai-gateway drops 9 (alibaba qwen, anthropic/claude-3-haiku, anthropic/claude-opus-4). BuiltinModelCatalog.cs, CatalogCases.cs and the notice follow; its header is re-pinned (all.ts is unchanged). Models.Tests passes 61/61 with --tarball. docs/contracts/mistral-cli-selection.md and native-live-terminal-composition.md still describe the 1.1.0 shards they were admitted from (historical contract records; annotate if the ai area re-admits them)."
+      },
+      {
+        "id": "pi-version-identity",
+        "area": "ai",
+        "status": "done",
+        "files": [
+          "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleKeyAuthRequestFactory.cs",
+          "src/PiSharp.AI/Protocols/GoogleVertex/GoogleVertexRequestFactory.cs",
+          "src/PiSharp.AI/Protocols/OpenAICodexResponses/OpenAICodexResponsesTransport.cs",
+          "src/PiSharp.Cli/Models/RemoteModelCatalog.cs",
+          "src/PiSharp.Cli/Mcp/McpSessionHost.cs",
+          "src/PiSharp.CodingAgent/Diagnostics/BugReport.cs",
+          "src/PiSharp.CodingAgent/Diagnostics/CrashLog.cs",
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveModeContext.cs",
+          "tests/PiSharp.ProviderApis.Tests/CodexCases.cs",
+          "tests/PiSharp.ProviderApis.Tests/CodexWebSocketCases.cs",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs",
+          "tests/PiSharp.SessionParity.Tests/DiagnosticsCases.cs"
+        ],
+        "pin": "The Pi version PiSharp identifies as: pi/1.1.0 user agents (Google, Vertex, Codex, pi.dev catalog), MCP clientInfo.version, bug-report and crash-log Pi version, the interactive context version default.",
+        "action": "Moved to 1.2.0 with the tests that assert them (upstream reads VERSION from its 1.2.0 package.json). PiNodeRuntime.PiVersion is not part of this: it selects the npm packages extensions run against (node-bridge-pi-runtime)."
+      },
+      {
+        "id": "node-bridge-pi-runtime",
+        "area": "node-bridge",
+        "status": "done",
+        "applicabilityRows": [
+          "node-bridge.pi-runtime-1.2.0"
+        ],
+        "files": [
+          "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs",
+          "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.cs",
+          "tools/NodeBridge/pi-host/pi-modules.mjs",
+          "tools/NodeBridge/pi-host/virtual/port-upstream.mjs",
+          "tools/NodeBridge/pi-host/virtual/upstream-exports.json",
+          "tools/NodeBridge/pi-host/virtual/selftest.mjs",
+          "tools/NodeBridge/pi-host/virtual/coding-agent/config.mjs",
+          "tests/PiSharp.ExtensionParity.Tests/RuntimeCases.cs",
+          ".github/workflows/release.yml",
+          "website/src/content/docs/docs/extensions/node-bridge.md"
+        ],
+        "pin": "PiNodeRuntime.PiVersion = \"1.1.0\" (the npm package set TS extensions run against: pi-coding-agent, pi-ai, pi-tui, pi-agent-core, overrides for pi-mcp, pi-codemode, chord and pi-telemetry); port-upstream.mjs COMMIT and its \"1.1.0\" version patches; the generated config.mjs VERSION, selftest assertion and upstream-exports.json commit; the release workflow comment.",
+        "action": "Set PiVersion to 1.2.0 and drop the @earendil-works/chord override (v1.2.0's install lock has pi-agent-core, pi-ai, pi-codemode, pi-coding-agent, pi-mcp, pi-telemetry and pi-tui at 1.2.0, jiti 2.7.0, typebox 1.3.27). Regenerate the compatibility modules with port-upstream.mjs against v1.2.0 (re-pins their headers), refresh upstream-exports.json, then update RuntimeCases and the docs.",
+        "result": "PiNodeRuntime.PiVersion is 1.2.0 and the @earendil-works/chord override is gone (cb4f42f). port-upstream.mjs targets 06a46693 and regenerated the compatibility modules, config.mjs VERSION, the selftest and upstream-exports.json; the bridge carries the 1.2.0 before_agent_start union, reachesTools and namespace aliases (403b372, 1340344). RuntimeCases, the release workflow comment and the node-bridge docs follow."
+      },
+      {
+        "id": "surface-inventories-v1.2.0",
+        "area": "coding-agent-core",
+        "status": "done",
+        "applicabilityRows": [
+          "core.before-agent-start-custom",
+          "tools.reaches-tools",
+          "tools.namespace-aliases"
+        ],
+        "files": [
+          "compatibility/extensions/event-catalog.v1.1.0.json",
+          "compatibility/coding-agent-command-rpc-inventory.v1.1.0.json",
+          "compatibility/extensions/event-catalog.v1.1.0.overlay.json",
+          "compatibility/coding-agent-command-rpc-inventory.v1.1.0.overlay.json",
+          "tools/SurfaceInventory/inventory-refresh.test.mjs",
+          "docs/compatibility/baseline.md"
+        ],
+        "pin": "The newest event catalog and command/RPC inventory are generated for v1.1.0 and validated against compatibility/target.v1.1.0.lock.json.",
+        "action": "After the extension-event and SDK-export ports, generate event-catalog.v1.2.0.json and coding-agent-command-rpc-inventory.v1.2.0.json with build-event-catalog.mjs / build-command-rpc-inventory.mjs --lock compatibility/target.lock.json and v1.2.0 overlays, add their tests next to the v1.1.0 ones, and update baseline.md. Expected deltas: BeforeAgentStartEvent becomes a union (BeforeAgentStartUserEvent | BeforeAgentStartCustomEvent, both new root type exports); ToolDefinition.reachesTools and ToolNamespace.aliases; RPC types, rpc-mode.ts and the slash registry are byte-identical.",
+        "result": "event-catalog.v1.2.0.json (with its overlay) and coding-agent-command-rpc-inventory.v1.2.0.json are generated from the v1.1.0 inventories against target.lock.json and checked by inventory-refresh.test.mjs (279e290); baseline.md describes them. Their remaining v1.1.0 commit occurrences are refresh provenance and the anchors of the two package entries removed upstream (excludedHistorical)."
+      },
+      {
+        "id": "json-source-inventories",
+        "area": "ai",
+        "status": "done",
+        "files": [
+          "tests/PiSharp.AzureResponses.Tests/source-inventory.json",
+          "src/PiSharp.AI/Protocols/MistralConversations/source-inventory.json",
+          "tests/PiSharp.Tui.Keybindings.Tests/fixtures/source-defaults-inventory.json"
+        ],
+        "pin": "Inventories pinning upstream file hashes at abe508e (Azure: sourceSha and sourceVersion 1.1.0; Mistral: sourceCommit; TUI keybindings: upstream).",
+        "action": "Regenerate each with its area once the area is re-verified: Azure and Mistral with the ai area (mistral-conversations.ts changed), the TUI keybindings inventory with the tui area (tui/src/keybindings.ts is unchanged, so it can move as soon as the tui area confirms). nonHeaderCitations lists each file's upstream paths with their change status.",
+        "result": "Azure and Mistral source inventories were regenerated with the ai area (0e74848). packages/tui/src/keybindings.ts is byte-identical at both tags, so the TUI keybindings inventory moved to 06a46693 in the close-out. The fixture and source pins of all three in tools/native-companion-targets.json and tools/native-companion-registration.ps1 are resealed."
+      },
+      {
+        "id": "suite-report-labels",
+        "area": "multiple",
+        "status": "done",
+        "files": [
+          "tests/*/Program.cs"
+        ],
+        "pin": "Upstream / SourceSha / sourceSha constants that label each sync suite's report with abe508e.",
+        "action": "Move each label to 06a46693 when that suite's area has been re-ported and the suite passes against v1.2.0 (see nonHeaderCitations kind suite-label).",
+        "result": "Every suite label is on 06a46693: the ai, codemode, MCP and tool-search suites with their areas, ExtensionParity with the Node bridge (1340344), and Classifiers, CliParity, CliSync, InteractiveParity, SessionParity and WireSync in the close-out, after every area they cover was ported and the suites passed."
+      },
+      {
+        "id": "release-docs",
+        "area": "docs",
+        "status": "prepared",
+        "files": [
+          "README.md",
+          "website/src/content/docs/docs/index.md",
+          "website/src/content/docs/docs/coming-from-pi.md",
+          "website/src/content/docs/docs/guides",
+          "website/src/content/docs/docs/reference",
+          "website/src/content/docs/docs/versioning.md",
+          "website/src/data/parity.json",
+          "website/src/content/docs/docs/extensions/build-an-extension.md",
+          "docs/plans/full-parity-progress.json"
+        ],
+        "pin": "Text and links that describe the published release's baseline: Pi v1.1.0, abe508e (index.md uses the short abe508e), links to github.com/earendil-works/pi/blob/v1.1.0/..., parity.json baseline \"Pi v1.1.0\", package versions 1.1.0.7 in the extension guide.",
+        "action": "Update with the PiSharp 1.2.0 release (the website reads the published version from public-release.json). Add a 1.2.0 progress record or plan if the sync is tracked like full-parity-v1.1.0.md (that plan and its progress file stay as v1.1.0 history).",
+        "result": "Prepared for the 1.2.0 release candidate in the close-out: README (its three v1.1.0 citations now name v1.2.0), the website docs and parity.json, the extension guide package versions (1.2.0), release notes, CHANGELOG and website changelog drafts (status in-progress), public-release.json and full-parity-progress.json. Nothing is tagged or published."
+      },
+      {
+        "id": "embedded-upstream-docs",
+        "area": "docs",
+        "status": "done",
+        "applicabilityRows": [
+          "docs.upstream-docs"
+        ],
+        "files": [
+          "src/PiSharp.Cli/docs/codemode.md"
+        ],
+        "pin": "Byte copy of packages/coding-agent/docs/codemode.md at abe508e (llama-cpp.md was re-pinned: unchanged upstream).",
+        "action": "Copy docs/codemode.md from v1.2.0 below the header and PiSharp note, and re-pin the header.",
+        "result": "src/PiSharp.Cli/docs/codemode.md is the v1.2.0 docs/codemode.md (the options line must be the first line) below the unchanged header and PiSharp note; the header moved to 06a46693."
+      },
+      {
+        "id": "applicability-1.1.0-and-history",
+        "area": "docs",
+        "status": "kept",
+        "files": [
+          "compatibility/sync-1.1.0-applicability.json",
+          "docs/decisions/0002-pi-1.1.0-sync.md",
+          "docs/release-notes/*",
+          "compatibility/public-release.json previousReleases",
+          "docs/plans/full-parity-v1.1.0.md",
+          "docs/plans/post-port-pi-v1-upgrade.md",
+          "docs/contracts/*"
+        ],
+        "pin": "Records of the v1.1.0 sync and of releases built on it.",
+        "action": "None: historical (see excludedHistorical)."
+      }
+    ]
+  }
+}

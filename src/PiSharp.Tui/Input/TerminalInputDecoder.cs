@@ -103,8 +103,8 @@ public sealed class TerminalInputDecoder
         if (input is TerminalPaste or TerminalProtocol or TerminalUnknownSequence) return false;
         if (bindingOrigins.TryGetValue(input, out var origin))
             return MatchesRawKey(origin.Raw, keyId, origin.KittyActive, origin.WindowsTerminal);
-        var parts = keyId.ToLowerInvariant().Split('+'); var name = parts[^1];
-        var modifiers = KeyModifiers(parts);
+        if (ParseKeyId(keyId) is not { } parsed) return false;
+        var name = parsed.Name; var modifiers = parsed.Modifiers;
         if (input is TerminalText text) return MatchesRawKey(text.Text, keyId);
         name = name switch { "esc" => "escape", "return" => "enter", _ => name };
         return input is TerminalKey key && key.Modifiers == modifiers &&
@@ -117,24 +117,56 @@ public sealed class TerminalInputDecoder
         raw = ""; kittyActive = false; return false;
     }
 
-    private static TerminalModifiers KeyModifiers(string[] parts) =>
-        (parts.Contains("shift") ? TerminalModifiers.Shift : TerminalModifiers.None) | (parts.Contains("alt") ? TerminalModifiers.Alt : TerminalModifiers.None) |
-        (parts.Contains("ctrl") ? TerminalModifiers.Control : TerminalModifiers.None) | (parts.Contains("super") ? TerminalModifiers.Super : TerminalModifiers.None);
+    private static readonly (string Name, TerminalModifiers Modifier)[] keyIdModifiers =
+        [("shift", TerminalModifiers.Shift), ("alt", TerminalModifiers.Alt), ("ctrl", TerminalModifiers.Control), ("super", TerminalModifiers.Super)];
+    private const string SymbolKeyCharacters = "`-=[]\\;',./!@#$%^&*()_+|~{}:<>?";
+    private const string ShiftedSymbolKeyCharacters = "~!@#$%^&*()_+|{}:<>?";
+
+    // Source parseKeyId: modifiers are consumed one by one from the front, so "ctrl++" names Ctrl and "+"; a repeated
+    // modifier or a "+" left inside the key makes the identifier invalid.
+    private static (string Name, TerminalModifiers Modifiers)? ParseKeyId(string keyId)
+    {
+        var key = keyId.ToLowerInvariant(); var modifiers = TerminalModifiers.None;
+        while (true)
+        {
+            var found = Array.FindIndex(keyIdModifiers, entry => key.StartsWith(entry.Name + "+", StringComparison.Ordinal));
+            if (found < 0) break;
+            var (name, modifier) = keyIdModifiers[found];
+            if ((modifiers & modifier) != 0) return null;
+            modifiers |= modifier; key = key[(name.Length + 1)..];
+        }
+        if (key.Length == 0 || key.Contains('+') && key != "+") return null;
+        return (key, modifiers);
+    }
+
+    // Source getLogicalShiftedSymbolCandidate: a key reported as Shift plus the key producing a shifted symbol, as that symbol
+    // without the implicit Shift. String.fromCharCode truncates the codepoint to a UTF-16 code unit.
+    private static (int Code, int Modifiers)? LogicalShiftedSymbol(int? code, int modifiers, string allowed)
+    {
+        if (code is not { } value || (modifiers & 1) == 0) return null;
+        var normalized = KittySourceCode(value);
+        return allowed.Contains((char)(ushort)normalized) ? (normalized, modifiers & ~1) : null;
+    }
 
     // Translated matching rules from pinned Pi keys.ts, under the retained upstream MIT notice.
     public static bool MatchesRawKey(string data, string keyId, bool kittyActive = false, bool windowsTerminal = false)
     {
         ArgumentNullException.ThrowIfNull(data); ArgumentNullException.ThrowIfNull(keyId);
-        var parts = keyId.ToLowerInvariant().Split('+'); var name = parts[^1]; if (name.Length == 0) return false;
-        var modifiers = KeyModifiers(parts); var mask = (int)modifiers;
+        if (ParseKeyId(keyId) is not { } parsed) return false;
+        var name = parsed.Name; var modifiers = parsed.Modifiers; var mask = (int)modifiers;
         bool Kitty(int code) => RawKitty(data) is { } origin && KittyMatches(origin, code, modifiers);
         bool Mok(int code, bool printable = false)
         {
             var match = Regex.Match(data, "^\\u001b\\[27;(\\d+);(\\d+)~$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-            if (!match.Success || !Number(match.Groups[1].Value, out var encoded) || !Number(match.Groups[2].Value, out var actual) || encoded - 1 != mask)
-                return false;
-            if (printable && (mask & 1) != 0) { if (actual is >= 65 and <= 90) actual += 32; if (code is >= 65 and <= 90) code += 32; }
-            return actual == code;
+            if (!match.Success || !Number(match.Groups[1].Value, out var encoded) || !Number(match.Groups[2].Value, out var actual)) return false;
+            if (encoded - 1 == mask)
+            {
+                var actualCode = actual; var expectedCode = code;
+                if (printable && (mask & 1) != 0) { if (actualCode is >= 65 and <= 90) actualCode += 32; if (expectedCode is >= 65 and <= 90) expectedCode += 32; }
+                if (actualCode == expectedCode) return true;
+            }
+            // Printable keys also match a shifted symbol reported as Shift plus its unshifted key.
+            return printable && LogicalShiftedSymbol(actual, encoded - 1, ShiftedSymbolKeyCharacters) is { } logical && logical.Modifiers == mask && logical.Code == code;
         }
         switch (name)
         {
@@ -165,13 +197,12 @@ public sealed class TerminalInputDecoder
         }
         if (name.Length > 1 && name[0] == 'f' && int.TryParse(name.AsSpan(1), out var function) && function is >= 1 and <= 12)
             return mask == 0 && LegacyMatch(data, name, 0);
-        if (name.Length != 1 || !(name[0] is >= 'a' and <= 'z' or >= '0' and <= '9' ||
-            "`-=[]\\;',./!@#$%^&*()_+|~{}:<>?".Contains(name[0]))) return false;
+        if (name.Length != 1 || !(name[0] is >= 'a' and <= 'z' or >= '0' and <= '9' || SymbolKeyCharacters.Contains(name[0]))) return false;
         var key = name[0]; var ctrl = key is >= 'a' and <= 'z' or '[' or '\\' or ']' or '_' ? (char)(key & 31) : key == '-' ? (char)31 : (char?)null;
         if (!kittyActive && (mask == 6 && ctrl is not null && data == "\u001b" + ctrl || mask == 2 && data == "\u001b" + key)) return true;
         if (mask == 4 && ctrl is not null && data == ctrl.ToString()) return true;
         if (mask == 1 && key is >= 'a' and <= 'z' && data == char.ToUpperInvariant(key).ToString()) return true;
-        if (mask == 0) return data == name || Kitty(key);
+        if (mask == 0) return data == name || Kitty(key) || Mok(key, printable: true);
         return Kitty(key) || Mok(key, printable: true);
     }
 
@@ -526,12 +557,18 @@ public sealed class TerminalInputDecoder
 
     private static bool KittyMatches(KittyAlternateOrigin origin, int expected, TerminalModifiers modifiers)
     {
-        if ((origin.RawModifiers & ~(64 | 128)) != (int)modifiers) return false;
+        var actualModifiers = origin.RawModifiers & ~(64 | 128);
         var code = KittySourceCode(origin.Code);
         var expectedCode = KittySourceCode(expected);
         if ((origin.RawModifiers & 1) != 0 && code is >= 65 and <= 90) code += 32;
         if ((modifiers & TerminalModifiers.Shift) != 0 && expectedCode is >= 65 and <= 90) expectedCode += 32;
-        if (code == expectedCode) return true;
+        // Physical match: primary codepoint and every reported modifier match.
+        if (actualModifiers == (int)modifiers && code == expectedCode) return true;
+        // Logical match: Kitty reports symbols such as "+" as Shift plus the physical "=" key; bindings name the produced symbol,
+        // so the implicit Shift is consumed while Ctrl, Alt and Super are kept. "shift+=" still matches physically above.
+        if (LogicalShiftedSymbol(origin.Shifted, actualModifiers, SymbolKeyCharacters) is { } logical &&
+            (logical.Modifiers & ~(64 | 128)) == (int)modifiers && logical.Code == KittySourceCode(expected)) return true;
+        if (actualModifiers != (int)modifiers) return false;
         // Source matchesKey permits digit fallback even though parseKey keeps a digit's primary identity.
         // Base is compared to the requested raw codepoint, without independently normalizing it.
         return origin.Base == expected && code is not (>= 97 and <= 122) &&

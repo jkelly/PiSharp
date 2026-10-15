@@ -1,5 +1,5 @@
 {
-	"commit": "abe508e1b89912adde45528136c3221eb69acdd7",
+	"commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
 	"exports": {
 		"pi-tui.mjs": [
 			"Box",
@@ -75,6 +75,7 @@
 			"parseColor",
 			"parseKey",
 			"parseTerminalColorSchemeReport",
+			"renderFakeCursor",
 			"renderImage",
 			"renderLatex",
 			"resetCapabilitiesCache",

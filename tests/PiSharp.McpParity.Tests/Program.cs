@@ -7,10 +7,11 @@ using System.Text.Json;
 // sign-ins outside the session and the `/mcp` manager. Derived from the pinned upstream sources (extensions/mcp/index.ts, config.ts,
 // oauth.ts, cli.ts, resources.ts, extensions/tool-search, core/mcp-servers.ts, docs/mcp.md) and their tests
 // (test/suite/agent-session-mcp.test.ts, test/mcp-*.test.ts) by reading, never captured from an upstream run. Fake MCP servers, a fake
-// authorization server and a fake Anthropic endpoint answer in process; no network or live credentials are used.
+// authorization server and a fake Anthropic endpoint answer in process; no network or live credentials are used. Updated to Pi v1.2.0
+// (06a46693): no resource listing at connect, structured content of any JSON type, reachesTools.
 internal static partial class Program
 {
-    private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 
     private static async Task<int> Main(string[] args)
     {
@@ -22,6 +23,7 @@ internal static partial class Program
             ("startup.first-prompt-waits-for-direct-servers", FirstPromptWaitsForDirectServers),
             ("startup.first-prompt-waits-at-most-the-startup-cap", FirstPromptWaitCap),
             ("startup.problems-reported-once-after-all-servers-settled", ProblemsReportedOnce),
+            ("startup.server-closed-while-connecting-is-not-reported", ClosedWhileConnecting),
             ("resources.direct-server-resources-declared-and-read", DirectResources),
             ("resources.deferred-server-resources-reached-through-tool-search", DeferredResources),
             ("tool-search.registered-inactive-and-selectable-without-deferred-servers", ToolSearchInactive),
@@ -39,9 +41,10 @@ internal static partial class Program
             ("manager.login-logout-through-the-command", ManagerLoginLogout),
             ("notifications.server-log-and-tool-list-changes", NotificationsLogAndToolListChanges),
             ("notifications.server-log-format-and-rotation", ServerLogFormatAndRotation),
-            ("cli.mcp-list-resource-and-template-counts", ListResourceCounts),
+            ("cli.mcp-list-offers-resources", ListOffersResources),
             ("prompt.servers-section-follows-manager-changes", ServersSectionFollowsManagerChanges),
             ("results.call-tool-results-convert-for-the-model", ToolResultConversion),
+            ("results.structured-content-may-be-any-json", StructuredContentAnyJson),
             ("retry.http-connect-retried-twice-after-transient-errors", ConnectRetries),
             ("retry.http-connect-fails-after-the-retries", ConnectRetriesExhausted),
             ("retry.expired-session-call-and-transient-read-retried", CallAndReadRetries),
@@ -56,7 +59,7 @@ internal static partial class Program
             ("registration.re-registrations-release-their-resources", ReRegistrationsReleaseTheirResources),
             ("oauth.step-up-challenge-needs-auth-and-sign-in-in-the-session", StepUpChallengeInTheSession),
             ("oauth.mcp-login-uses-the-servers-challenge", McpLoginUsesTheChallenge),
-            ("notifications.resource-list-changes-refresh-the-count", ResourceListChangesRefreshTheCount),
+            ("notifications.resources-are-not-listed-at-connect", ResourcesAreNotListedAtConnect),
             ("registration.unhandled-registered-servers-are-reported", UnhandledRegisteredServersAreReported),
             ("results.tool-annotations-reach-the-plan", ToolAnnotationsReachThePlan)
         };

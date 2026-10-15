@@ -3,16 +3,16 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Models;
 
-// Authored offline expectations for IMPL-A2 (model catalogs and model selection) of Pi v1.1.0: the provider catalog shards of
-// @earendil-works/pi-ai@1.1.0, env-api-keys.ts, core/model-config.ts, core/provider-composer.ts, core/model-resolver.ts,
+// Authored offline expectations for IMPL-A2 (model catalogs and model selection) of Pi v1.2.0 (first authored at v1.1.0): the provider catalog shards of
+// @earendil-works/pi-ai@1.2.0, env-api-keys.ts, core/model-config.ts, core/provider-composer.ts, core/model-resolver.ts,
 // core/resolve-config-value.ts, core/virtual-models.ts, core/remote-catalog-provider.ts, cli/list-models.ts and the CLI live routes.
 // Expectations are derived from the pinned upstream source and its tests (test/model-resolver.test.ts, test/model-registry.test.ts,
 // test/resolve-config-value.test.ts, test/virtual-models.test.ts, test/remote-catalog-provider.test.ts) by reading, never captured
 // from an upstream run. Fake HTTP endpoints answer in process; no network or live credentials are used.
-// Optional: --tarball <pi-ai-1.1.0.tgz> also compares every embedded shard byte-for-byte with the package archive.
+// Optional: --tarball <pi-ai package tarball, e.g. pi-ai-1.2.0.tgz> also compares every embedded shard byte-for-byte with the package archive.
 internal static partial class Program
 {
-    private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
     internal static string? Tarball;
 
     private static async Task<int> Main(string[] args)
@@ -22,7 +22,7 @@ internal static partial class Program
         {
             if (args[index] == "--report" && report is null && index + 1 < args.Length) report = Path.GetFullPath(args[++index]);
             else if (args[index] == "--tarball" && Tarball is null && index + 1 < args.Length) Tarball = Path.GetFullPath(args[++index]);
-            else throw new ArgumentException("Use [--report <fresh path>] [--tarball <pi-ai-1.1.0.tgz>].");
+            else throw new ArgumentException("Use [--report <fresh path>] [--tarball <pi-ai package tarball>].");
         }
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(CatalogCases());
@@ -32,6 +32,8 @@ internal static partial class Program
         cases.AddRange(ListingCases());
         cases.AddRange(VirtualCases());
         cases.AddRange(RemoteCases());
+        cases.AddRange(OpenRouterCases());
+        cases.AddRange(ConfigSchemaCases());
         cases.AddRange(LiveRouteCases());
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)

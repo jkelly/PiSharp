@@ -1,7 +1,7 @@
 # Codemode engine: Jint versus QuickJS
 
-Pi v1.1.0 runs codemode scripts in QuickJS compiled to WebAssembly (`quickjs-wasi` 3.6.2), one Node worker thread per
-script. PiSharp runs them in [Jint](https://github.com/sebastienros/jint) **4.16.3** (BSD-2-Clause, exact pin), with its
+Pi v1.2.0 runs codemode scripts in QuickJS compiled to WebAssembly (`quickjs-wasi`), one Node worker thread per
+script (`CodemodeSandbox`; the coding agent uses no other sandbox host). PiSharp runs them in [Jint](https://github.com/sebastienros/jint) **4.16.3** (BSD-2-Clause, exact pin), with its
 parser [Acornima](https://github.com/adams85/acornima) **1.7.0** (BSD-3-Clause, transitive), as
 [decision 0003](../decisions/0003-codemode-javascript-engine.md) chose. Jint 4.16.3 was the newest stable release at least
 two weeks old on 2026-10-08 (published 2026-09-19; 4.16.4 and 4.17.0 were younger).
@@ -87,17 +87,30 @@ speaking upstream's protocol (start, call, output, done, crash, result, plus `re
   built-ins QuickJS may lack. They are frozen by the lockdown like every other built-in and reach nothing outside the engine.
 - **`JSON.parse` messages in `// @options:`.** An invalid options line reports .NET's JSON error text after
   "@options must be valid JSON with supported fields `max_output_tokens` and `timeout_ms`: ".
-- **Tool calls start in order.** As in `host.ts`, each call's implementation starts in message order.
+- **Tool calls start in order.** As in `execution.ts`, each call's implementation starts in message order.
+- **Promise job loops.** Pi 1.2.0's `vm.ts` polls for interrupts every 50 promise jobs while draining the job queue, so a
+  script such as `while (true) await null` is stopped by its timeout or an abort like a synchronous loop. Jint checks its
+  timeout and cancellation constraints in promise jobs too, so PiSharp already stopped such scripts; `limits.promise-job-loops-*`
+  covers them.
 
 ## Session integration
 
 - `codemode` is registered with every CLI session, inactive, as upstream registers it: `--tools`, `--exclude-tools` and
   `defaultTools` select it, also with `--no-mcp`. Codemode MCP servers activate it unless `autoEnableCodemode` is false.
-- `scriptNeedsServer`: as upstream, a script waits inside its call for the servers it names or searches (or enumerates or
-  describes tools); prompts do not wait. A server that connects meanwhile has its tools published during the run, and the
+- `reachesTools`: as upstream's MCP `tool_call` handler, before a script runs the session waits for the servers it may reach:
+  the servers whose namespace one of its words contains, or every server when it uses `searchTools`, `describeNamespace`,
+  `describeTool` or `ALL_TOOLS` (`McpDiscoveryToolIdentity.CodemodeReach`); prompts do not wait. The wait is session-wide
+  (`McpToolCallHooks`, composed over the session's tool hooks after the extensions' `tool_call` handlers), so any tool that
+  declares `reachesTools` takes part, such as another extension's `codemode`, which the MCP integration also activates for
+  `codemode` servers when the built-in one is disabled. A server that connects meanwhile has its tools published during the run, and the
   script's nested calls reach them through the invoker of that catalog until the run's next request declares it.
 
 ## Not ported
+
+- The sandbox hosts Pi 1.2.0 added besides `CodemodeSandbox` (`RemoteCodemodeSandbox` and the `/cloudflare` entry,
+  `InlineCodemodeSandbox`, the `/portable` entry with `CodemodeSandboxBase`) and deterministic `sandbox.start()` runs, which
+  the coding agent does not use ([decision 0006](../decisions/0006-pi-1.2.0-sync.md)). The prelude's `settle()` takes their
+  optional `propertiesJson`; PiSharp passes none.
 
 - `wasm.ts` and the `workerUrl`/`wasm` options configure QuickJS and Node workers; PiSharp's equivalent is
   `CodemodeWorkerLauncher`.

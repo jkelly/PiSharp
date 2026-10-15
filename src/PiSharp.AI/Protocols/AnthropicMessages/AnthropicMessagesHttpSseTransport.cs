@@ -62,11 +62,17 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         var framing = _options.Framing ?? new(RejectInvalidUtf8: true, EofBehavior: SseEofBehavior.DispatchPendingEvent);
         if (!framing.RejectInvalidUtf8 || framing.EofBehavior != SseEofBehavior.DispatchPendingEvent)
             throw new ArgumentException("Anthropic SSE requires strict UTF-8 and pending-event dispatch at EOF.", nameof(options));
-        _http = new(client, framing) { Rejection = RejectAsync }; _messages = new(ReadDtosAsync, messagesOptions);
+        _http = new(client, framing) { Rejection = RejectAsync }; _messages = new((request, token) => ReadDtosAsync(request, new(), token), messagesOptions);
         _framing = framing; _messagesOptions = messagesOptions; _hooks = hooks;
     }
-    public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default) =>
-        _hooks is null ? _messages.StreamAsync(request, cancellationToken) : StreamWithHooksAsync(request, cancellationToken);
+    public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default)
+    {
+        if (_hooks is not null) return StreamWithHooksAsync(request, cancellationToken);
+        var diagnostics = new AnthropicRequestDiagnostics();
+        return new AnthropicMessagesTransport((current, token) => ReadDtosAsync(current, diagnostics, token), _messagesOptions)
+        { RequestDiagnostics = diagnostics }.StreamAsync(request, cancellationToken);
+    }
+    private TimeProvider Clock => _messagesOptions?.Clock ?? TimeProvider.System;
 
     private async IAsyncEnumerable<StreamEvent> StreamWithHooksAsync(ChatRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -79,7 +85,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         {
             if (await session.PrepareAsync().ConfigureAwait(false))
             {
-                var mapper = new AnthropicMessagesTransport(session.ReadDtosAsync, _messagesOptions);
+                var mapper = new AnthropicMessagesTransport(session.ReadDtosAsync, _messagesOptions) { RequestDiagnostics = session.Diagnostics };
                 var iterator = mapper.StreamAsync(request, cancellationToken).GetAsyncEnumerator(cancellationToken);
                 try
                 {
@@ -125,6 +131,7 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         internal Exception? PrimaryError;
         internal List<Task> CleanupTasks = [];
         internal List<Exception> CleanupErrors = [];
+        internal readonly AnthropicRequestDiagnostics Diagnostics = new();
         private Original Register(Task task) { if (!_originals.TryGetValue(task, out var row)) { row = new(task); _originals.Add(task,row); } return row; }
         private async Task<T> Await<T>(Task<T> actual)
         {
@@ -155,26 +162,40 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
             try
             {
                 token.ThrowIfCancellationRequested();
-                if (transport._hooks!.OnPayload is { } payloadHook)
+                var prepared = transport._hooks!.OnPayload is null ? null : transport._preparedFactory!(request, token) ?? throw Protocol();
+                Func<CancellationToken, HttpRequestMessage>? fallback = null;
+                // Pi 1.2.0: a request whose strict tool set Anthropic rejects is rebuilt once with strict "prefer" tools sent
+                // non-strict, and onPayload sees the rebuilt payload too; a second rejection is the result.
+                for (var attempt = 0; ; attempt++)
                 {
-                    var prepared = transport._preparedFactory!(request, token) ?? throw Protocol();
-                    token.ThrowIfCancellationRequested();
-                    prepared.Claim();
-                    Task<JsonData?>? callback = null;
-                    JsonData? replacement;
-                    try
+                    if (prepared is not null)
                     {
-                        try { callback = payloadHook(prepared.Payload, request.Model, token) ?? throw Protocol(); }
-                        catch (OperationCanceledException cause) { throw new AnthropicMessagesHookInvocationException("onPayload", cause); }
-                        replacement = await Await(callback).ConfigureAwait(false);
+                        token.ThrowIfCancellationRequested();
+                        prepared.Claim();
+                        Task<JsonData?>? callback = null;
+                        JsonData? replacement;
+                        try
+                        {
+                            try { callback = transport._hooks!.OnPayload!(prepared.Payload, request.Model, token) ?? throw Protocol(); }
+                            catch (OperationCanceledException cause) { throw new AnthropicMessagesHookInvocationException("onPayload", cause); }
+                            replacement = await Await(callback).ConfigureAwait(false);
+                        }
+                        catch (Exception error) { Primary(error, callback); throw; }
+                        token.ThrowIfCancellationRequested();
+                        _request = prepared.CompleteClaimed(replacement, token);
                     }
-                    catch (Exception error) { Primary(error, callback); throw; }
-                    token.ThrowIfCancellationRequested();
-                    _request = prepared.CompleteClaimed(replacement, token);
+                    else _request = (attempt == 0 ? transport._requestFactory(request,token) : fallback!(token)) ?? throw Protocol();
+                    actual = transport._http.PrepareOwnedAsync(_request,token).AsTask();
+                    try { _response = await Await((Task<HttpSseTransport.OwnedResponse>)actual).ConfigureAwait(false); break; }
+                    catch (Exception error) when (attempt == 0 && !token.IsCancellationRequested && AnthropicStrictToolsFallback.IsStrictToolLimitRejection(error) &&
+                        (prepared is not null ? prepared.Fallback is not null : AnthropicStrictToolsFallback.FallbackOf(_request) is not null))
+                    {
+                        Diagnostics.Add(AnthropicStrictToolsFallback.Diagnostic(error, transport.Clock));
+                        if (prepared is not null) prepared = prepared.Fallback!(token) ?? throw Protocol();
+                        else fallback = AnthropicStrictToolsFallback.FallbackOf(_request);
+                        var rejected = _request; _request = null; rejected.Dispose();
+                    }
                 }
-                else _request = transport._requestFactory(request,token) ?? throw Protocol();
-                actual = transport._http.PrepareOwnedAsync(_request,token).AsTask();
-                _response = await Await((Task<HttpSseTransport.OwnedResponse>)actual).ConfigureAwait(false);
                 actual = _response.AcquireBodyAsync(token).AsTask();
                 _body = await Await((Task<Stream>)actual).ConfigureAwait(false);
                 // Acquisition claims the body but performs no SSE read or mapper mutation.
@@ -257,11 +278,14 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
                 try { await CleanupTask(_response.DisposeAsync().AsTask()).ConfigureAwait(false); } catch (Exception error) { CleanupErrors.Add(error); }
             try { _request?.Dispose(); } catch (Exception error) { CleanupErrors.Add(error); }
         }
+        // A request that fails before its response still carries the diagnostics recorded on the way (upstream output.diagnostics).
+        private JsonFields WithDiagnostics(JsonFields properties) => Diagnostics.Items is { Count: > 0 } items
+            ? properties.Set("diagnostics", JsonData.Parse("[" + string.Join(",", items.Select(item => item.ToString())) + "]")) : properties;
         internal StreamTerminalEvent Failure(AssistantMessage? partial,AnthropicMessagesFailure failure)
         {
             var reason = failure == AnthropicMessagesFailure.Cancelled ? StopReason.Aborted : StopReason.Error;
             // Upstream records providerThinkingLevel on the output before any request work, so pre-stream failures keep it.
-            var properties = (partial?.ExtraProperties ?? (transport._messagesOptions?.ProviderThinkingLevel is { } level
+            var properties = (partial?.ExtraProperties ?? WithDiagnostics(transport._messagesOptions?.ProviderThinkingLevel is { } level
                     ? JsonFields.Empty.Set("providerThinkingLevel", JsonData.Parse(JsonSerializer.Serialize(level))) : JsonFields.Empty))
                 .Set("errorMessage",JsonData.Parse(JsonSerializer.Serialize(reason == StopReason.Aborted ? "Anthropic stream was cancelled." :
                     PrimaryError is ProviderDisplayException shown ? shown.Message : "Anthropic stream did not complete.")))
@@ -271,15 +295,46 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         }
     }
 
-    private async IAsyncEnumerable<JsonData> ReadDtosAsync(ChatRequest request,
+    private async IAsyncEnumerable<JsonData> ReadDtosAsync(ChatRequest request, AnthropicRequestDiagnostics diagnostics,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var ownedRequest = _requestFactory(request, cancellationToken) ?? throw Protocol();
-        cancellationToken.ThrowIfCancellationRequested();
+        var ownedRequest = _requestFactory(request, cancellationToken) ?? throw Protocol();
+        HttpSseTransport.OwnedResponse? owned = null;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            (ownedRequest, owned) = await SendWithStrictToolsFallbackAsync(ownedRequest, diagnostics, cancellationToken).ConfigureAwait(false);
+            // The owned response's disposal awaits body/response cleanup before the request scope ends.
+            await foreach (var dto in ReadOwnedAsync(owned, cancellationToken).ConfigureAwait(false)) yield return dto;
+        }
+        finally
+        {
+            try { if (owned is not null) await owned.DisposeAsync().ConfigureAwait(false); }
+            finally { ownedRequest.Dispose(); }
+        }
+    }
+
+    /// <summary>Pi 1.2.0 stream(): a rejected request whose strict tool set exceeds Anthropic's limits is sent once more with strict
+    /// "prefer" tools non-strict (recording the anthropic_strict_tools_fallback diagnostic); a second rejection is the result.</summary>
+    private async Task<(HttpRequestMessage Request, HttpSseTransport.OwnedResponse Response)> SendWithStrictToolsFallbackAsync(
+        HttpRequestMessage first, AnthropicRequestDiagnostics diagnostics, CancellationToken cancellationToken)
+    {
+        try { return (first, await _http.PrepareOwnedAsync(first, cancellationToken).ConfigureAwait(false)); }
+        catch (Exception error) when (!cancellationToken.IsCancellationRequested && AnthropicStrictToolsFallback.IsStrictToolLimitRejection(error) &&
+            AnthropicStrictToolsFallback.FallbackOf(first) is not null)
+        {
+            diagnostics.Add(AnthropicStrictToolsFallback.Diagnostic(error, Clock));
+            var second = AnthropicStrictToolsFallback.FallbackOf(first)!(cancellationToken) ?? throw Protocol();
+            try { var response = await _http.PrepareOwnedAsync(second, cancellationToken).ConfigureAwait(false); first.Dispose(); return (second, response); }
+            catch { second.Dispose(); throw; }
+        }
+    }
+
+    private async IAsyncEnumerable<JsonData> ReadOwnedAsync(HttpSseTransport.OwnedResponse owned, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
         var count = 0; long characters = 0;
-        // The shared enumerator's finally owns and awaits body/response cleanup before the request scope ends.
-        await using var events = _http.SendAsync(ownedRequest, cancellationToken).GetAsyncEnumerator(cancellationToken);
+        await using var events = owned.ReadAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
         while (await events.MoveNextAsync().ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -298,8 +353,10 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
     private async ValueTask<Exception> RejectAsync(HttpResponseMessage response, CancellationToken token)
     {
         var bytes = await ProviderErrorText.ReadBodyAsync(response, _options.MaximumTotalDataCharacters, token).ConfigureAwait(false);
-        return bytes is null ? new HttpSseRejectedException(response.StatusCode)
-            : new ProviderDisplayException(ProviderErrorText.AnthropicStatus((int)response.StatusCode, ProviderErrorText.FetchText(bytes)));
+        if (bytes is null) return new HttpSseRejectedException(response.StatusCode);
+        var text = ProviderErrorText.FetchText(bytes);
+        return new ProviderDisplayException(ProviderErrorText.AnthropicStatus((int)response.StatusCode, text))
+        { Status = (int)response.StatusCode, ErrorType = ProviderErrorText.AnthropicErrorType(text) };
     }
 
     // anthropic-messages.ts iterateAnthropicEvents: a named error event throws new Error(sse.data) before parsing.

@@ -25,6 +25,7 @@ internal static class ContextWithSystemTests
         (Prefix + "removal retains admitted handler then disappears on the next request", Removal),
         (Prefix + "invalid returns and exceptions diagnose and continue; empty replacement is honored", InvalidResults),
         (Prefix + "operation session and owner cancellation join callback cleanup before settlement", Cancellation),
+        (Prefix + "an operation cancelled while a handler runs is the request token's cancellation", OperationCancellationToken),
         (Prefix + "malformed user and system content diagnoses before transport and retains prior context", MalformedContent),
         (Prefix + "legacy preparation cannot rewrite canonical history through the new seam", LegacyGuard)
     ];
@@ -238,6 +239,36 @@ internal static class ContextWithSystemTests
         AgentLoopRunner.ValidateRequestMessages([Message("system", ""), Message("user", ""),
             new("system", JsonData.Parse("{\"role\":\"system\",\"content\":[]}")),
             new("user", JsonData.Parse("{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"},{\"type\":\"image\",\"data\":\"AA==\",\"mimeType\":\"image/png\"}]}"))]);
+    }
+
+    // agent-session.ts abort(): an abort while a context handler runs ends the request as cancelled (Pi settles the run aborted). The
+    // dispatcher sees the abort through a token linked to each handler's lifetime; the request hook reports it as the cancellation of
+    // the token it was given, so the Agent and the original prompt wrapper treat it as a cancellation, never as a hook failure.
+    private static async Task OperationCancellationToken()
+    {
+        foreach (var conversation in new[] { false, true })
+        {
+            await using var registry = new ExtensionRegistry(); using var operation = new CancellationTokenSource();
+            var entered = Gate();
+            async ValueTask<ExtensionContextMessagesPatch?> Wait(CancellationToken token)
+            {
+                entered.TrySetResult();
+                await Gate().Task.WaitAsync(token);
+                return null;
+            }
+            await registry.ActivateAsync("owner", new Plugin(registrations =>
+            {
+                if (conversation) registrations.RegisterContextHandler(new("wait", (_, _, token) => Wait(token)));
+                else registrations.RegisterContextWithSystemHandler(new("wait", (_, _, token) => Wait(token)));
+            }));
+            var binding = Binding(registry);
+            var transform = binding.Hooks.TransformRequestMessages!([Message("user", "original")], operation.Token).AsTask();
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            operation.Cancel();
+            try { await transform; throw new InvalidOperationException("The cancelled request completed"); }
+            catch (OperationCanceledException error) { Check(error.CancellationToken == operation.Token); }
+            Check(transform.IsCanceled && !transform.IsFaulted);
+        }
     }
 
     private static async Task LegacyGuard()

@@ -137,6 +137,8 @@ export function buildCatalog({ template, read, commit, tag, overlay = null, temp
 
   const catalog = {};
   for (const [key, value] of Object.entries(template)) {
+    // A refreshed template (v1.1.0 onward) carries its own refresh record; this refresh writes a new one.
+    if (!same && (key === 'sourceTag' || key === 'refresh')) continue;
     catalog[key] = structuredClone(value);
     if (key === 'sourceSha') {
       catalog.sourceSha = commit;
@@ -154,8 +156,10 @@ export function buildCatalog({ template, read, commit, tag, overlay = null, temp
   catalog.authority.requiredOverloads = derived.events.length;
   catalog.authority.sourceFiles = derived.sourceFiles;
   if (!same) {
-    catalog.authority.inventoryBaseline = template.sourceSha;
-    catalog.authority.inventoryRelation = 'The P6-01 native-surface inventory above is preserved ' + template.sourceSha.slice(0, 7) + ' evidence and was not refreshed. At ' + commit.slice(0, 7) + ' the ExtensionAPI.on overloads were re-censused directly from the pinned sources.';
+    // The P6-01 inventory is the one a first refresh found; a later refresh keeps naming it.
+    const inventoryBaseline = template.authority.inventoryBaseline ?? template.sourceSha;
+    catalog.authority.inventoryBaseline = inventoryBaseline;
+    catalog.authority.inventoryRelation = 'The P6-01 native-surface inventory above is preserved ' + inventoryBaseline.slice(0, 7) + ' evidence and was not refreshed. At ' + commit.slice(0, 7) + ' the ExtensionAPI.on overloads were re-censused directly from the pinned sources.';
   }
   catalog.events = events;
   catalog.gates.mandatoryEvents = events.length;

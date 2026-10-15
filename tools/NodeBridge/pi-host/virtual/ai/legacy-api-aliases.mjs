@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/legacy-api-aliases.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/legacy-api-aliases.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { anthropicMessagesApi } from "./api/anthropic-messages.lazy.mjs";
 import { azureOpenAIResponsesApi } from "./api/azure-openai-responses.lazy.mjs";

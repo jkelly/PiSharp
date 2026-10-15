@@ -40,11 +40,9 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
     }
     private async IAsyncEnumerable<StreamEvent> Run(ChatRequest request, [EnumeratorCancellation] CancellationToken caller)
     {
-        using var timeout = new CancellationTokenSource();
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(caller, timeout.Token);
         // StreamOptions.sessionId: the request's session, unless the transport was configured with one.
         var options = request.SessionId is { } session && this.options.SessionId is null ? this.options with { SessionId = session } : this.options;
-        var token = linked.Token; var state = new TextState(request, options);
+        var token = caller; var state = new TextState(request, options);
         HttpRequestMessage? send = null; HttpResponseMessage? response = null; Stream? body = null; IAsyncEnumerator<JsonData>? reader = null;
         Exception? failure = null, cleanup = null; var completed = false;
         try
@@ -84,8 +82,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                     send.Headers.TryAddWithoutValidation("x-affinity", options.SessionId);
                 ObserveHeaders(send.Headers.Concat(send.Content.Headers));
                 token.ThrowIfCancellationRequested();
-                timeout.CancelAfter(options.TimeoutMilliseconds);
-                response = await AwaitSource(() => new ValueTask<HttpResponseMessage>(client.SendAsync(send, HttpCompletionOption.ResponseHeadersRead, token))).ConfigureAwait(false);
+                response = await SendForHeaders(send, options.TimeoutMilliseconds, token).ConfigureAwait(false);
                 var observed = ObserveHeaders(response.Headers.Concat(response.Content.Headers));
                 if (options.OnResponse is { } responseHook) await AwaitSource(() => responseHook(JsonData.Parse(new JsonObject { ["status"] = (int)response.StatusCode, ["headers"] = observed }.ToJsonString()), model, token)).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested(); body = await AwaitSource(() => new ValueTask<Stream>(response.Content.ReadAsStreamAsync(token))).ConfigureAwait(false);
@@ -126,13 +123,30 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
         foreach (var frame in state.Finish()) yield return frame;
         var reason = state.Reason; var code = NativeChatFailureCode.SourceFailed; string? text = null;
         if (caller.IsCancellationRequested) { reason = StopReason.Aborted; code = NativeChatFailureCode.Cancelled; text = "Request was aborted"; }
-        else if (failure is not null) { reason = StopReason.Error; code = MistralNativeDiagnostics.FromException(failure).Code; text = failure is MistralTextException ? failure.Message : timeout.IsCancellationRequested ? "Mistral request timed out." : "Mistral operation failed."; }
+        else if (failure is not null) { reason = StopReason.Error; code = MistralNativeDiagnostics.FromException(failure).Code; text = failure is MistralTextException ? failure.Message : "Mistral operation failed."; }
         else if (reason == StopReason.Pending) { reason = StopReason.Error; code = NativeChatFailureCode.UnexpectedEof; text = "Mistral stream ended without a finish reason"; }
         else if (reason == StopReason.Error) { code = NativeChatFailureCode.ProviderError; text = state.ProviderError; }
         if (cleanup is not null && text is null) { reason = StopReason.Error; code = NativeChatFailureCode.CleanupFailed; text = "Mistral invocation cleanup failed."; }
         StreamTerminalEvent terminal = text is null ? new StreamDone(reason, state.Message(reason)) : new StreamError(reason, state.Message(reason, text)) { NativeDiagnostic = MistralNativeDiagnostics.FromCode(code) };
         if (cleanup is not null) terminal = terminal with { NativeCleanupDiagnostic = MistralNativeDiagnostics.FromCode(NativeChatFailureCode.CleanupFailed) };
         yield return terminal;
+    }
+    // Pi 1.2.0 (#10609): the request timeout covers only the wait for response headers. The body stream
+    // (e.g. long thinking) is ended only by the caller; body stalls are left to the HTTP client.
+    private async Task<HttpResponseMessage> SendForHeaders(HttpRequestMessage send, int timeoutMilliseconds, CancellationToken caller)
+    {
+        using var headerTimeout = new CancellationTokenSource(timeoutMilliseconds);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(caller, headerTimeout.Token);
+        HttpResponseMessage? response = null;
+        try { response = await AwaitSource(() => new ValueTask<HttpResponseMessage>(client.SendAsync(send, HttpCompletionOption.ResponseHeadersRead, linked.Token))).ConfigureAwait(false); }
+        catch (Exception) when (headerTimeout.IsCancellationRequested && !caller.IsCancellationRequested) { }
+        // A send that settles only after the deadline (one that ignored the abort) is the same header timeout.
+        if (headerTimeout.IsCancellationRequested && !caller.IsCancellationRequested)
+        {
+            response?.Dispose();
+            throw Fail(NativeChatFailureCode.SourceFailed, $"Mistral response headers timed out after {timeoutMilliseconds}ms");
+        }
+        return response!;
     }
     private JsonData BuildPayload(ChatRequest request)
     {

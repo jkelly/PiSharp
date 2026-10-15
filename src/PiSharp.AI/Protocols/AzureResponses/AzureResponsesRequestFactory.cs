@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/azure-openai-responses.ts and packages/ai/src/api/azure-openai-config.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/azure-openai-responses.ts and packages/ai/src/api/azure-openai-config.ts.
 using System.Collections.Immutable;
 using System.Net.Http.Headers;
 using System.Text;

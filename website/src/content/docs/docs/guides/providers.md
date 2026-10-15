@@ -3,7 +3,7 @@ title: Providers and models
 description: Sign in, choose a model, and add your own endpoints.
 ---
 
-PiSharp has every provider and chat API that Pi v1.1.0 has, with Pi's model catalogs. Pi's [Providers](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/providers.md) and [Models](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/models.md) pages apply.
+PiSharp has every provider and chat API that Pi v1.2.0 has, with Pi's model catalogs. Pi's [Providers](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/providers.md) and [Models](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/models.md) pages apply.
 
 ## Sign in
 
@@ -29,6 +29,8 @@ Some providers need more than a key:
 - `--list-models [search]` prints the models you can use.
 
 At startup, interactive mode refreshes the model catalogs from pi.dev, as Pi does. `--offline` or `PI_OFFLINE=1` turns that off. `pisharp update --models` refreshes them by hand.
+
+With an OpenRouter key or sign-in, the refresh also asks OpenRouter which chat models that key may use, as Pi 1.2.0 does. The OpenRouter list then shows only those models, with the key's context size, output limit and prices, and is saved for offline use. A `baseUrl` for OpenRouter in `models.json`, such as a regional endpoint, is used for that request.
 
 ## Your own endpoints and models
 

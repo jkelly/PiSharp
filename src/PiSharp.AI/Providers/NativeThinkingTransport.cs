@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/models.ts (getSupportedThinkingLevels) and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (getSupportedThinkingLevels) and
 // packages/ai/src/api/anthropic-messages.ts (mapThinkingLevelToEffort, compat.supportsMidConvoEffort).
 using System.Collections.Immutable;
 using System.Text.Json;

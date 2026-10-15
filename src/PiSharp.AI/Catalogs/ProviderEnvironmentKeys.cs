@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/env-api-keys.ts and packages/ai/src/utils/provider-env.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/env-api-keys.ts and packages/ai/src/utils/provider-env.ts.
 using System.Collections.Immutable;
 
 namespace PiSharp.AI.Catalogs;

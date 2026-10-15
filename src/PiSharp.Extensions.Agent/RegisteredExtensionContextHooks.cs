@@ -32,17 +32,26 @@ internal sealed class RegisteredExtensionContextHooks
         if (registry.CaptureSnapshot().BeforeAgentStartHandlers.IsEmpty) return new([]);
         if (options.ReadSystemPrompt is null || options.RestoreSystemMessage is null)
             throw new InvalidOperationException("Before-start handlers require host system-state replay.");
-        // The CLI has one admitted user input. Low-level batch prompts use the last user as their prompt event.
-        var user = start.Inputs.LastOrDefault(message => message.Role == "user");
-        if (user is null) return new([]);
-        var content = user.WireBody.Value.GetProperty("content");
-        var text = content.ValueKind == JsonValueKind.String ? content.GetString()! :
-            string.Join("\n", content.EnumerateArray().Where(part => part.GetProperty("type").GetString() == "text").Select(part => part.GetProperty("text").GetString()));
-        var images = content.ValueKind == JsonValueKind.Array
-            ? content.EnumerateArray().Where(part => part.GetProperty("type").GetString() == "image").ToArray() : Array.Empty<JsonElement>();
-        var result = await dispatcher.DispatchBeforeAgentStartAsync(new(text,
-            options.ReadSystemPrompt(start.History.AddRange(start.Inputs), token),
-            images.Length == 0 ? null : JsonData.Parse(JsonSerializer.Serialize(images))), token, session).ConfigureAwait(false);
+        // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_startRun, _prepareRun)
+        // and extensions/runner.ts (emitBeforeAgentStart with a BeforeAgentStartTrigger): a run starts from a user message
+        // (messageType "user": prompt and images) or, for sendMessage(..., { triggerTurn: true }), from a custom message (messageType
+        // "custom": the message, no prompt). The CLI has one admitted user input. Low-level batch prompts use the last user as their
+        // prompt event; without a user input the first custom input started the run (pending nextTurn messages follow it).
+        ExtensionBeforeAgentStartEvent input;
+        var systemPrompt = options.ReadSystemPrompt(start.History.AddRange(start.Inputs), token);
+        if (start.Inputs.LastOrDefault(message => message.Role == "user") is { } user)
+        {
+            var content = user.WireBody.Value.GetProperty("content");
+            var text = content.ValueKind == JsonValueKind.String ? content.GetString()! :
+                string.Join("\n", content.EnumerateArray().Where(part => part.GetProperty("type").GetString() == "text").Select(part => part.GetProperty("text").GetString()));
+            var images = content.ValueKind == JsonValueKind.Array
+                ? content.EnumerateArray().Where(part => part.GetProperty("type").GetString() == "image").ToArray() : Array.Empty<JsonElement>();
+            input = new(text, systemPrompt, images.Length == 0 ? null : JsonData.Parse(JsonSerializer.Serialize(images)));
+        }
+        else if (start.Inputs.FirstOrDefault(message => message.Role == "custom") is { } custom)
+            input = ExtensionBeforeAgentStartEvent.ForCustomMessage(custom.WireBody, systemPrompt);
+        else return new([]);
+        var result = await dispatcher.DispatchBeforeAgentStartAsync(input, token, session).ConfigureAwait(false);
         if (options.ReportEventDiagnostic is { } report)
             foreach (var diagnostic in result.Diagnostics)
             { await report(diagnostic, token).ConfigureAwait(false); token.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested(); }
@@ -75,10 +84,20 @@ internal sealed class RegisteredExtensionContextHooks
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested();
-        // Context handlers snapshot once per model request. Removal during dispatch does not revoke admitted leases.
-        var conversation = await dispatcher.DispatchContextAsync(new ExtensionContextEvent(messages), cancellationToken, session).ConfigureAwait(false);
-        // The source captures the second event's handlers after the first phase has completed.
-        var result = await dispatcher.DispatchContextWithSystemAsync(new ExtensionContextWithSystemEvent(conversation.Messages), cancellationToken, session).ConfigureAwait(false);
+        ExtensionContextReduction conversation, result;
+        try
+        {
+            // Context handlers snapshot once per model request. Removal during dispatch does not revoke admitted leases.
+            conversation = await dispatcher.DispatchContextAsync(new ExtensionContextEvent(messages), cancellationToken, session).ConfigureAwait(false);
+            // The source captures the second event's handlers after the first phase has completed.
+            result = await dispatcher.DispatchContextWithSystemAsync(new ExtensionContextWithSystemEvent(conversation.Messages), cancellationToken, session).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && error.CancellationToken != cancellationToken)
+        {
+            // agent.abort() while a context handler runs aborts the request (Pi ends the run aborted). The dispatcher observes the
+            // abort through a token linked to each handler's lifetime; it is still this request's cancellation.
+            throw new OperationCanceledException(error.Message, error, cancellationToken);
+        }
         if (options.ReportEventDiagnostic is { } report)
             foreach (var diagnostic in conversation.Diagnostics.AddRange(result.Diagnostics))
             {

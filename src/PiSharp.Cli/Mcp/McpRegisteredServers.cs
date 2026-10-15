@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/mcp-servers.ts (McpServerRegistry),
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/mcp-servers.ts (McpServerRegistry),
 // packages/coding-agent/src/core/extensions/loader.ts (registerMcpServer: validation, ownership, namespace clashes) and
 // packages/coding-agent/src/core/extensions/runner.ts (bind: the change listener emits mcp_servers_change with every server).
 using System.Collections.Immutable;

@@ -10,7 +10,7 @@ using PiSharp.Contracts;
 // Every static method of Program whose name ends in "Cases" and returns IEnumerable<(string, Func<Task>)> is a case group.
 internal static partial class Program
 {
-    internal const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    internal const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 
     private static async Task<int> Main(string[] args)
     {

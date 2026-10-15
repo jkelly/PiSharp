@@ -1,6 +1,6 @@
 {
   "baseCommit": "a54840b36360b70cbfae16e36f831ddc642f3b1c",
-  "sourceCommit": "abe508e1b89912adde45528136c3221eb69acdd7",
+  "sourceCommit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
   "implementationFilesAdded": [
     "src/PiSharp.AI/Protocols/MistralConversations/MistralTextOptions.cs",
     "src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs",
@@ -78,9 +78,9 @@
   "schemaVersion": 1,
   "sourceFiles": [
     {
-      "sha256": "429de961a1bd84ed7feb163c0e0d91eb7096f8dcfefcd30d6f098d1c0cbbd4ab",
+      "sha256": "9cd5378daeaa38111bc5f06142859811c83f518d4103aaaa9566570677a42e75",
       "path": "packages/ai/src/api/mistral-conversations.ts",
-      "bytes": 30949
+      "bytes": 31538
     },
     {
       "sha256": "74267bc430c0c2562d166e4ae9d05966634e91b226bc564010b2b199db52dd86",
@@ -113,9 +113,9 @@
       "bytes": 7981
     },
     {
-      "sha256": "3b48631cdabe885ed846cb29f0a71abe8e3effc682c63d0b612eef648d40e9f5",
+      "sha256": "c10385291e4e79dc3ea5301629288a35cac354f8a3635c07f9312608c269f573",
       "path": "packages/ai/src/models.ts",
-      "bytes": 46494
+      "bytes": 46697
     },
     {
       "sha256": "567b559600439eac5e6c341658bb45b149c5e8a22e34624a54ad5a06f5a92885",
@@ -123,9 +123,9 @@
       "bytes": 2706
     },
     {
-      "sha256": "568d1ba5d382d9ef4e8d98040c100545c21d1cacfbc98db6dd749014c3c3a15e",
+      "sha256": "19f632e0918cca442d3dfa3572ebabe79453dea0b1f54eadd3287a9c6b515674",
       "path": "packages/ai/src/types.ts",
-      "bytes": 49482
+      "bytes": 31744
     },
     {
       "sha256": "9fd5e33a8e295d88b5911af71d7afbfd437c9620288808d18331f16811e24dac",
@@ -185,7 +185,7 @@
   ],
   "sourceRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\upstream",
   "proposedContractFile": null,
-  "sourceTag": "v1.1.0",
+  "sourceTag": "v1.2.0",
   "sourceInventoryScope": "Primary Mistral source, all its direct source imports, provider/auth/catalog evidence; not a sealed executable transitive-module admission",
   "proposedOfflineCases": 12,
   "dependenciesAdded": [],

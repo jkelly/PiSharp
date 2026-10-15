@@ -280,45 +280,6 @@ public sealed class McpServerRuntime : IAsyncDisposable
         finally { publicationGate.Release(); }
     }
 
-    /// <summary>runtime.ts fetchResources: how many resources and resource templates the server lists, for the counts of `mcp list`
-    /// and `/mcp`. MCP App resources (`ui://` URIs, `profile=mcp-app` HTML) are left out; a list that fails counts none, and a
-    /// server without the resources capability has none.</summary>
-    public Task<(int Resources, int Templates)> CountResourcesAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
-    {
-        var current = await GetConnectionAsync(token).ConfigureAwait(false);
-        if (!current.HasResources) return (0, 0);
-        async Task<int> CountAsync(string method, string key)
-        {
-            var count = 0; var cursors = new HashSet<string>(StringComparer.Ordinal); string? cursor = null;
-            try
-            {
-                for (var page = 0; page < options.Limits.MaximumPages; page++)
-                {
-                    var response = await current.Channel.RequestAsync(method, cursor is null ? null : Json(new { cursor }), RequestOptions(), token).ConfigureAwait(false);
-                    CheckResponse(response);
-                    if (response.Value.ValueKind != JsonValueKind.Object || !response.Value.TryGetProperty(key, out var items) || items.ValueKind != JsonValueKind.Array) return count;
-                    count += items.EnumerateArray().Count(item => !IsMcpAppResource(item));
-                    if (!response.Value.TryGetProperty("nextCursor", out var next) || next.ValueKind != JsonValueKind.String || !cursors.Add(next.GetString()!)) return count;
-                    cursor = next.GetString();
-                }
-                return count;
-            }
-            catch (Exception) when (!token.IsCancellationRequested) { return 0; }
-        }
-        var counts = await Task.WhenAll(CountAsync("resources/list", "resources"), CountAsync("resources/templates/list", "resourceTemplates")).ConfigureAwait(false);
-        return (counts[0], counts[1]);
-    }, cancellationToken);
-
-    /// <summary>resources.ts isMcpAppResource: user interfaces for hosts that render them.</summary>
-    private static bool IsMcpAppResource(JsonElement item)
-    {
-        if (item.ValueKind != JsonValueKind.Object) return false;
-        var uri = String(item, "uri", out var direct) ? direct : String(item, "uriTemplate", out var template) ? template : "";
-        if (uri!.StartsWith("ui://", StringComparison.Ordinal)) return true;
-        return String(item, "mimeType", out var mime) && System.Text.RegularExpressions.Regex.IsMatch(mime!, ";\\s*profile\\s*=\\s*\"?mcp-app\"?",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-    }
-
     /// <summary>runtime.ts signOut: drop the current connection without reconnecting; the next call connects again.</summary>
     public Task DisconnectAsync(CancellationToken cancellationToken = default) => RunAsync(async _ =>
     { await DisconnectCoreAsync().ConfigureAwait(false); return true; }, cancellationToken);
@@ -564,7 +525,10 @@ public sealed class McpServerRuntime : IAsyncDisposable
                 var annotationTitle = value.TryGetProperty("annotations", out var annotations) && annotations.ValueKind == JsonValueKind.Object && String(annotations, "title", out var title) ? title : null;
                 return new McpOfferedTool(value.GetProperty("name").GetString()!, JsonData.FromElement(value.GetProperty("inputSchema")),
                     String(value, "description", out var description) ? description : null, String(value, "title", out var toolTitle) ? toolTitle : null, annotationTitle)
-                { Annotations = McpOfferedTool.ToolAnnotations(value) };
+                {
+                    Annotations = McpOfferedTool.ToolAnnotations(value),
+                    OutputSchema = value.TryGetProperty("outputSchema", out var output) ? JsonData.FromElement(output.Clone()) : null
+                };
             }).ToImmutableArray();
             var catalog = new McpServerToolSnapshot(entry, tools, current.Instructions, HasResources: current.HasResources);
             // A reconnect that finds the published tools unchanged (a new session after an expired one, `/mcp` reconnect) needs no new
@@ -704,13 +668,13 @@ public sealed class McpServerRuntime : IAsyncDisposable
         return selected;
     }
 
+    /// <summary>client.ts validateCallToolResult: <c>content</c> may be missing (servers that only return <c>structuredContent</c> omit
+    /// it), and <c>structuredContent</c> may be any JSON value, as MCP 2026-07-28 allows.</summary>
     private static JsonData ValidateToolResult(JsonData result)
     {
         var value = result.Value;
         if (value.ValueKind != JsonValueKind.Object || value.TryGetProperty("content", out var content) && content.ValueKind != JsonValueKind.Array)
             throw new McpRuntimeProtocolException("Invalid MCP tools/call result");
-        if (value.TryGetProperty("structuredContent", out var structured) && structured.ValueKind != JsonValueKind.Object)
-            throw new McpRuntimeProtocolException("Invalid MCP tools/call structured content");
         if (value.TryGetProperty("content", out _)) return result;
         var fields = value.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value, StringComparer.Ordinal);
         fields.Add("content", Array.Empty<object>()); return Json(fields);

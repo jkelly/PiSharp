@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/rpc/rpc-client.ts (request/response correlation over the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/rpc/rpc-client.ts (request/response correlation over the
 // RPC JSONL protocol, event subscription). The interactive mode drives its session through the in-process RPC host.
 using System.Collections.Concurrent;
 using System.Text.Json;

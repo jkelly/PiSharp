@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/session-manager.ts (appendCustomEntry,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/session-manager.ts (appendCustomEntry,
 // appendLabelChange, appendSessionInfo) as the extension API reaches them (pi.appendEntry, pi.setLabel, pi.setSessionName): an entry
 // at the current leaf, at any time, idle or while a run is processing.
 using System.Text.Json;

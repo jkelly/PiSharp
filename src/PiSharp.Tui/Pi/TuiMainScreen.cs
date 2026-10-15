@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/tui-main-screen.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui-main-screen.ts.
 using System.Globalization;
 using System.Text;
 
@@ -148,7 +148,8 @@ public sealed class TuiMainScreen : TuiBase
         var hwRow = hardwareCursorRow;
         int LineDiff(int targetRow) => targetRow - viewportTop - (hwRow - prevViewportTop);
 
-        var newLines = Render(width);
+        // Resolve fake cursors before compositing so overlays and line slicing see plain SGR codes
+        var newLines = ResolveFakeCursors(Render(width));
         if (HasOverlayEntries) newLines = CompositeOverlays(newLines, width, height);
         var cursorPos = ExtractCursorPosition(newLines, height);
         newLines = ApplyLineResets(newLines);

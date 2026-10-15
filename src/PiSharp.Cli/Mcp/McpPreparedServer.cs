@@ -60,7 +60,27 @@ public sealed class McpPreparedServer : IAsyncDisposable
             !captured.UsesFinalActionPolicy(policy))
             throw new ArgumentException("MCP binding requires the captured attachment generation and native final-action policy.");
         runtime = new(entry, options, channelFactory, PublishAsync); serverEntry = entry;
-        resource = owner.RegisterOwnedResource(attachment, CloseOwnedAsync, runtime.CloseAsync);
+        resource = owner.RegisterOwnedResource(attachment, CloseOwnedAsync, StopRuntimeAsync);
+    }
+
+    /// <summary>The owner's stop (the session's shutdown or retirement, or an explicit close): marks the server closing before its
+    /// runtime closes, so whatever that close fails is known to be teardown.</summary>
+    private Task StopRuntimeAsync()
+    {
+        Volatile.Write(ref stopping, 1);
+        return runtime.CloseAsync();
+    }
+    private int stopping;
+
+    /// <summary>Whether the server is being closed: its owner began stopping it (the session ends, its attachment retires, or the
+    /// server was closed during the session). A connection attempt of a closing server is no longer current (index.ts isCurrent).</summary>
+    internal bool Closing
+    {
+        get
+        {
+            if (Volatile.Read(ref stopping) != 0) return true;
+            lock (admission) return closeRequested;
+        }
     }
 
     public Task<McpRuntimeSnapshot> ConnectAsync(CancellationToken token = default)
@@ -90,13 +110,6 @@ public sealed class McpPreparedServer : IAsyncDisposable
     public McpServerEntry Entry => serverEntry;
     /// <summary>runtime.ts withClient markNeedsAuth: called with a call's failure; the host marks a server that needs a sign-in.</summary>
     public Action<Exception>? CallFailed { get; init; }
-    /// <summary>How many resources and templates the server lists (fetchResources), for `/mcp`.</summary>
-    public async Task<(int Resources, int Templates)> CountResourcesAsync(CancellationToken token = default)
-    {
-        var counts = (0, 0);
-        await RunAsync(async () => { counts = await runtime.CountResourcesAsync(token).ConfigureAwait(false); return runtime.Snapshot; }, token).ConfigureAwait(false);
-        return counts;
-    }
     /// <summary>The runtime's current catalog state (connected, tools, instructions, resources).</summary>
     public McpRuntimeSnapshot Snapshot => runtime.Snapshot;
     /// <summary>Called by the actual prepared resource dispatch after its resource-scope admission.
@@ -225,7 +238,8 @@ public sealed class McpPreparedServer : IAsyncDisposable
             var current = registry.CaptureSnapshot();
             var descriptors = publication.Tools.Select(tool => new ExtensionToolDescriptor(tool.Name, tool.Name,
                 tool.Description, tool.Parameters, (arguments, context, callCancellation) => ExecuteAsync(tool.OriginalName, arguments, context, callCancellation))
-                { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.Exposure == ToolExposure.Direct, Annotations = tool.Annotations }).ToImmutableArray();
+                { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.Exposure == ToolExposure.Direct, Annotations = tool.Annotations,
+                    OutputSchema = McpToolResults.ResultSchema(tool.OutputSchema?.Value) }).ToImmutableArray();
             var nextIds = descriptors.Select(tool => tool.RegistrationId).ToImmutableArray();
             var nextNames = descriptors.Select(tool => tool.Name).ToImmutableHashSet(StringComparer.Ordinal);
             var plan = registry.PrepareToolCatalogReplacement(scope, registrationIds, descriptors, current);
@@ -240,7 +254,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
                 var index = binding.Registrations.IndexOf(tool);
                 return new SessionRegisteredTool(binding.RegisteredToolDeclarations[index], binding.Adapters[index])
                     { Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true, Annotations = tool.Annotations,
-                        PrepareLoadout = binding.GetLoadoutPreparation(tool.Name) };
+                        OutputSchema = tool.OutputSchema, PrepareLoadout = binding.GetLoadoutPreparation(tool.Name) };
             }).ToImmutableArray();
             var replacement = expected.WithToolCatalog(retained.AddRange(added), composeHooks(expected, binding));
             var available = replacement.RegisteredTools.Select(tool => tool.Adapter.Name).ToImmutableHashSet(StringComparer.Ordinal);

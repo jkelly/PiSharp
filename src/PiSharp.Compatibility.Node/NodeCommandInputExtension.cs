@@ -179,8 +179,20 @@ public sealed partial class NodeCommandInputExtension(NodeCommandInputWorkerLaun
         Exception? primary = null;
         try
         {
-            var supplied = new Dictionary<string, object?> { ["type"] = "before_agent_start", ["prompt"] = snapshot.Prompt, ["systemPrompt"] = snapshot.SystemPrompt };
-            if (snapshot.Images is not null) supplied.Add("images", snapshot.Images.Value);
+            // BeforeAgentStartEvent (Pi 1.2.0): the trigger first (messageType "user" with prompt and images, or "custom" with the
+            // custom message that starts the run), then type and the current system prompt.
+            var supplied = new Dictionary<string, object?>();
+            if (snapshot.MessageType == ExtensionBeforeAgentStartMessageType.Custom)
+            {
+                supplied.Add("messageType", "custom");
+                supplied.Add("message", snapshot.Message?.Value ?? throw new InvalidOperationException("A custom before_agent_start event requires its starting message."));
+            }
+            else
+            {
+                supplied.Add("messageType", "user"); supplied.Add("prompt", snapshot.Prompt);
+                if (snapshot.Images is not null) supplied.Add("images", snapshot.Images.Value);
+            }
+            supplied.Add("type", "before_agent_start"); supplied.Add("systemPrompt", snapshot.SystemPrompt);
             var result = await InvokeAsync("command-input.before-agent-start", operation, new()
             { ["callbackId"] = callbackId, ["eventJson"] = JsonSerializer.Serialize(supplied), ["uiCapabilities"] = Capabilities(context) }, context, cancellationToken).ConfigureAwait(false);
             RequirePublication(result);

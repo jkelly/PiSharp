@@ -1,0 +1,82 @@
+{
+  "$comment": "Authored native status for the v1.2.0 event catalog, applied by tools/SurfaceInventory/build-event-catalog.mjs --overlay over the v1.1.0 catalog (which already carries the v1.1.0 overlay). Only before_agent_start changed natively: its event is a union on messageType (user or custom) and it also fires for runs started by a custom message with triggerTurn. Assessed against PiSharp sources at f1d4b32d1e10a804b0b34e3c8522caa87d3f3f07. Tests are authored and registered, not executed by the refresh.",
+  "events": {
+    "before_agent_start": {
+      "nativeEvidence": {
+        "assessedAt": "f1d4b32d1e10a804b0b34e3c8522caa87d3f3f07",
+        "registration": "IExtensionRegistry.RegisterBeforeAgentStartHandler (ExtensionBeforeAgentStartEvent.MessageType User or Custom; Message carries the starting custom message of a Custom run)",
+        "hostEmission": "ExtensionAgentBinding.ContextHooks.BeforePrompt for prompt runs and for runs started by a custom message with triggerTurn (PersistentAgentSession.SendCustomMessageAsync), wrapped by PersistentAgentSession.PrepareRunStartAsync (busy start, held messages, abort at start)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.once per prompt with ordered snapshots and continuation projection",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "once per prompt with ordered snapshots and continuation projection"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
+            "case": "native before-start actual CLI persists custom messages and preserves user history"
+          },
+          {
+            "suite": "tests/PiSharp.ExtensionParity.Tests",
+            "file": "tests/PiSharp.ExtensionParity.Tests/BridgeCases.cs",
+            "case": "bridge.events-reach-node-handlers"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.custom-message run fires before_agent_start as messageType custom and keeps its prompt for every request",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "custom-message run fires before_agent_start as messageType custom and keeps its prompt for every request"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.custom-message run carries pending nextTurn messages and handler messages",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "custom-message run carries pending nextTurn messages and handler messages"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.custom message sent while before_agent_start runs is queued into the starting run",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "custom message sent while before_agent_start runs is queued into the starting run"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.custom message without triggerTurn sent while the run starts is recorded before it and in its first request",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "custom message without triggerTurn sent while the run starts is recorded before it and in its first request"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.abort requested while before_agent_start runs aborts the run as it starts",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "abort requested while before_agent_start runs aborts the run as it starts"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.user message sent while the run starts requires a delivery mode",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "user message sent while the run starts requires a delivery mode"
+          },
+          {
+            "suite": "tests/PiSharp.SessionParity.Tests",
+            "file": "tests/PiSharp.SessionParity.Tests/RunStartCases.cs",
+            "case": "run-start.native-send-user-message-needs-deliver-as-while-busy"
+          }
+        ],
+        "gaps": [
+          "bridge.events-reach-node-handlers loads a Node extension, which registers through PiNodeOwner in the same ExtensionRegistry; it needs Node.js and reports SKIP_NO_NODE without it.",
+          "Node extensions receive messageType and message once the Node bridge passes them (PiNodeOwner before_agent_start slot and runtime.mjs); until then a TypeScript handler sees a custom run as a user event with an empty prompt."
+        ]
+      }
+    }
+  }
+}

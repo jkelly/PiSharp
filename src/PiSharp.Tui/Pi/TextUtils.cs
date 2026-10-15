@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/utils.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/utils.ts.
 using System.Text;
 using System.Text.RegularExpressions;
 using PiSharp.Tui.Input;
@@ -586,7 +586,9 @@ public static partial class TextUtils
             {
                 tracker.Process(value);
                 if (currentCol < beforeEnd) pendingBefore.Append(value);
-                else if (currentCol >= afterStart && currentCol < afterEnd && afterStarted) after.Append(value);
+                // SGR codes are only included after "after" started (styling already prepended). Zero-width APC markers like
+                // CursorMarker are not tracked styling, so keep them at the boundary too.
+                else if (currentCol >= afterStart && currentCol < afterEnd && (afterStarted || value.StartsWith("\u001b_", StringComparison.Ordinal))) after.Append(value);
                 continue;
             }
             foreach (var segment in Graphemes(value))

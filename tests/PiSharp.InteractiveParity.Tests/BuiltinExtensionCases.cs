@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/cli/config-selector.ts and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/cli/config-selector.ts and
 // packages/coding-agent/src/modes/interactive/components/config-selector.ts (the Built-in group: getGroupLabel, displayName without
 // the builtin: prefix, toggleTopLevelResource writing -builtin:<name>), packages/coding-agent/src/package-manager-cli.ts
 // (handleConfigCommand passes the built-in extension names) and packages/coding-agent/src/extensions/index.ts (a built-in extension

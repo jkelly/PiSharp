@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/bedrock-converse-stream.ts (profile, region and explicit
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/bedrock-converse-stream.ts (profile, region and explicit
 // key selection) over @aws-sdk/client-bedrock-runtime 3.1127.0's default credential chain (@aws-sdk/credential-provider-node):
 // environment, SSO, shared ini profiles (static keys, assume role, web identity, credential_process, SSO), web identity token file,
 // then the ECS container endpoint or EC2 instance metadata. Native port; no AWS SDK.

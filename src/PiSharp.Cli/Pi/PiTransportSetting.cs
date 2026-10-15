@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/sdk.ts (transport: settingsManager.getTransport()),
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/sdk.ts (transport: settingsManager.getTransport()),
 // core/settings-manager.ts (getTransport defaults to "auto") and modes/interactive/interactive-mode.ts (the transport setting also sets
 // session.agent.transport, so the change applies to the next request).
 namespace PiSharp.Cli.Pi;

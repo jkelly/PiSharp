@@ -8,8 +8,8 @@ public sealed class NodeCommandInputWorkerLaunch
 {
     public const string AdmissionRevision = "bounded-original-suppliers-1";
     public const string EntryRelativePath = "tools/NodeCommandInputBridge/worker.mjs";
-    public const string EntrySha256 = "61ed16f4f4b7001ff3c0e2153e9df9e9e1d46855b4eb0ea9da0f397e085bb03c";
-    public const string PlanSha256 = "b2927bd5329bf0ce495e0fd08012a76b5c7f490bf1b65165f20cb5b07e7228f9";
+    public const string EntrySha256 = "217ea1c3b3d4cd3a367bd1651fd79bba063ac62fc8152aeb2ed89ef1e22e47c9";
+    public const string PlanSha256 = "99179e89ab587cf10ebd82151d14e3ebf944c3bc0dcfa3f9de159967982a1870";
     public const string SourceReferencePlanSha256 = "7eae052f5eb4447ccb2c15c2140684f6bb6260a9e1c28a8437d29dce5de759f4";
     public const string SourceReferenceManifestSha256 = "5619550b6b561596dcdb253106879eb976554d6c9daa8c8a5fb189d95a825900";
     public const string SourceReferenceExpectedSha256 = "d74d53610906cb41ec6c2ad8a10f57d242c2a2846631a0ec4901ef5a3225930d";

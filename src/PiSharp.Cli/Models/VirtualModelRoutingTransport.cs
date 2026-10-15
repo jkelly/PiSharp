@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (_installAgentRequestProjection:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_installAgentRequestProjection:
 // a virtual selection routes each request; the router's new state is appended as a pi.virtual-model-state custom entry and
 // emitted as entry_appended) and core/virtual-models.ts (getVirtualModelState, findLatestResponse).
 using System.Collections.Concurrent;

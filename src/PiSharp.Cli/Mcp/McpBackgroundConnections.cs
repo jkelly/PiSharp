@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts
 // (session_start startConnection/reportProblems, waitForDirectServers, tool_call waits, session_shutdown) and
 // packages/coding-agent/docs/mcp.md.
 using System.Collections.Immutable;
@@ -106,8 +106,9 @@ public sealed class McpBackgroundConnections
     }
 
     /// <summary>index.ts before_agent_start waitForDirectServers, before idle input is admitted: the first prompt waits up to
-    /// <see cref="StartupWait"/> for servers with `direct` tools, then notes that the others are still connecting. tool_search,
-    /// codemode and the resource tools wait for the servers they reach inside their calls (tool_call), not here.</summary>
+    /// <see cref="StartupWait"/> for servers with `direct` tools, then notes that the others are still connecting. Tools that reach
+    /// other tools (reachesTools), the resource tools and a server's own tools wait for the servers they reach before they run
+    /// (tool_call, <see cref="McpToolCallHooks"/>), not here.</summary>
     internal async Task BeforeInputAsync(PersistentAgentSession session, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -145,11 +146,12 @@ public sealed class McpBackgroundConnections
     {
         await Task.Yield();
         McpRuntimeSnapshot snapshot;
+        McpPreparedServer? server = null;
         try
         {
             stop.Token.ThrowIfCancellationRequested();
             if (ConnectAfter is { } started) await started.WaitAsync(stop.Token).ConfigureAwait(false);
-            var server = await bind(entry, owner, attachment, stop.Token).ConfigureAwait(false)
+            server = await bind(entry, owner, attachment, stop.Token).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("Background admission returned no server.");
             snapshot = await server.ConnectAsync(stop.Token).ConfigureAwait(false);
             if (Connected is { } connected) await connected(entry, server, snapshot, stop.Token).ConfigureAwait(false);
@@ -159,11 +161,15 @@ public sealed class McpBackgroundConnections
             // The session ended meanwhile; like the original, late results of a retired session are dropped. Only teardown cancels a
             // connection (the session's retirement or its server's disposal, which can run before `stop` is cancelled); timeouts
             // fail with their own errors (HttpClient's wraps a TimeoutException). So a cancelled connection is dropped, never reported as a failure.
-            if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested ||
+            // index.ts isCurrent: neither is the attempt of a server that is being closed. The owner stops a session's servers
+            // concurrently with these connections, so a server's closed transport can fail its connection (with whatever error the
+            // close causes, such as ObjectDisposedException) before `stop` is cancelled; an extension unregistering the server
+            // closes it while the session continues.
+            if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested || server is { Closing: true } ||
                 error is OperationCanceledException { InnerException: not TimeoutException }) return;
             Report(new(generation, entry, null, error)); return;
         }
-        if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested) return;
+        if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested || server.Closing) return;
         section?.Connected(generation, snapshot.Catalog);
         Report(new(generation, entry, snapshot, null));
     }

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (compact, _runAutoCompaction:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (compact, _runAutoCompaction:
 // session_before_compact with the preparation; a cancel result aborts, a compaction result replaces the default summary) and
 // core/compaction/compaction.ts (CompactionPreparation, CompactionResult).
 using System.Collections.Immutable;

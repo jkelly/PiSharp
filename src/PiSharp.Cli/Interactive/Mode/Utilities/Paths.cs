@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/utils/paths.ts (canonicalizePath, isLocalPath,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/utils/paths.ts (canonicalizePath, isLocalPath,
 // normalizeWindowsShellPath, normalizePath, resolvePath, getCwdRelativePath, formatPathRelativeToCwdOrAbsolute).
 // Reuses PiSharp.Cli.Pi.PiPaths for the shell-path regex, realpath walk and isLocalPath; normalizePath/resolvePath are ported here
 // with the source's options and with fileURLToPath throwing on invalid file URLs, as Node does.

@@ -15,7 +15,7 @@ internal static class Program
             try { await run().WaitAsync(TimeSpan.FromSeconds(60)); results.Add(new { id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
             catch (Exception error) { failures++; results.Add(new { id, status = "FAIL", failure = error.ToString() }); }
         }
-        var report = new { sourceSha = "abe508e1b89912adde45528136c3221eb69acdd7", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
+        var report = new { sourceSha = "06a466935536f8c9bcacb2d5efc0fc021be1bdff", status = "AUTHORED NATIVE; SOURCE QUALIFICATION OPEN",
             failures, genuineSourceCasesCaptured = 0, results };
         if (args.Length == 2)
         {

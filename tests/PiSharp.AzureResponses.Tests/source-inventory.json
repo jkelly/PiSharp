@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "sourceSha": "abe508e1b89912adde45528136c3221eb69acdd7",
-  "sourceVersion": "1.1.0",
+  "sourceSha": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+  "sourceVersion": "1.2.0",
   "base": "4b63271a13e10505ab0e648592021050155454d1",
   "baseTree": "993e39dbc5a502d670846edee0f9e55a849cfe63",
   "basis": "READ_ONLY_PINNED_LOCAL_SOURCE_TEXT; AUTHORED_EXPECTATIONS; NO_SOURCE_EXECUTION",
@@ -44,7 +44,7 @@
     {
       "path": "packages/ai/package.json",
       "bytes": 2721,
-      "sha256": "a8f10d5157b335379ae00edf9c25ae7a15bfc0f3a76107d4376a3779bb5b2995"
+      "sha256": "3838d036bbb844ea6d4d08ef199423a0335022e34b5d5c8833257f64e4cae625"
     },
     {
       "path": "packages/ai/src/utils/pi-user-agent.ts",

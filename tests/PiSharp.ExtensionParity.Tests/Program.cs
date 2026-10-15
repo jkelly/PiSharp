@@ -9,11 +9,11 @@ using PiSharp.Cli.Pi;
 // cli/args.ts (--extension, --no-extensions, extension flags) and cli/config-selector.ts. Expectations are written from the pinned
 // sources by reading, never captured from an upstream run. Cases that run extension code need Node.js on PATH (22.13 or later for
 // TypeScript) and report SKIP_NO_NODE without it; package cases that install from npm need npm and use only local tarballs and a
-// local registry fixture. The only network use is the one-time npm install of the Pi 1.1.0 packages extensions run
+// local registry fixture. The only network use is the one-time npm install of the Pi 1.2.0 packages extensions run
 // against (PiNodeRuntime, verified against the public registry); without it the cases run on the compatibility modules. No real credentials, no real home or agent directory.
 internal static partial class Program
 {
-    private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 
     private static async Task<int> Main(string[] args)
     {
@@ -34,11 +34,13 @@ internal static partial class Program
         cases.AddRange(SwitchVetoCases());
         cases.AddRange(RebuildCases());
         cases.AddRange(NativeCases());
+        cases.AddRange(ReachCases());
         cases.AddRange(OAuthCases());
         cases.AddRange(CapCases());
         cases.AddRange(JsonLeftoverCases());
         cases.AddRange(CloseoutCases());
         cases.AddRange(LeftoverCases());
+        cases.AddRange(Sync120Cases());
         var filter = Environment.GetEnvironmentVariable("EXTPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0; var skipped = 0;
@@ -84,7 +86,7 @@ internal static partial class Program
         var parts = version.TrimStart('v').Split('.');
         if (int.Parse(parts[0]) < 22 || int.Parse(parts[0]) == 22 && int.Parse(parts[1]) < 13) throw new SkipException("NO_NODE", "Node.js " + version + " is older than 22.13.");
     }
-    /// <summary>The Pi 1.1.0 packages for every sandbox: installed with npm from the public registry once (the production installer,
+    /// <summary>The Pi 1.2.0 packages for every sandbox: installed with npm from the public registry once (the production installer,
     /// verified against the registry's integrity hashes) into a machine-wide test folder. Null (and the compatibility modules) when
     /// Node, npm or the registry is unavailable.</summary>
     internal static readonly string SharedPiRuntimeDirectory = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "pisharp-ext-parity-pi-runtime", PiSharp.Cli.Extensions.Pi.PiNodeRuntime.PiVersion);
@@ -99,7 +101,7 @@ internal static partial class Program
     private static string RequirePiRuntime()
     {
         RequireNpm();
-        return SharedPiRuntime.Value.GetAwaiter().GetResult() ?? throw new SkipException("NO_PI_RUNTIME", "The Pi 1.1.0 packages could not be installed (no registry access).");
+        return SharedPiRuntime.Value.GetAwaiter().GetResult() ?? throw new SkipException("NO_PI_RUNTIME", "The Pi 1.2.0 packages could not be installed (no registry access).");
     }
     private static void RequireNpm() { RequireNode(); if (NpmVersion.Value is null) throw new SkipException("NO_NPM", "npm is not on PATH."); }
     private static void RequireGit() { if (GitVersion.Value is null) throw new SkipException("NO_GIT", "git is not on PATH."); }
@@ -126,13 +128,15 @@ internal static partial class Program
         public Dictionary<string, string?> Vars { get; } = new(StringComparer.Ordinal);
         public List<Seen> Requests { get; } = [];
         public Func<Seen, int, HttpResponseMessage> Respond { get; set; } = (_, _) => AnthropicText("ok");
+        /// <summary>The run's MCP host (by agent directory); null uses one without servers of its own.</summary>
+        public Func<string, PiSharp.Cli.Mcp.McpSessionHost>? McpHost { get; set; }
         public Sandbox(string name, bool trusted = true)
         {
             Root = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "pisharp-ext-parity", name + "-" + Guid.NewGuid().ToString("N")[..8]);
             Home = Path.Combine(Root, "home"); AgentDir = Path.Combine(Home, ".pi", "agent"); Cwd = Path.Combine(Root, "project");
             Directory.CreateDirectory(AgentDir); Directory.CreateDirectory(Cwd);
             Vars["ANTHROPIC_API_KEY"] = "sk-test-key";
-            // Extensions run against the real Pi 1.1.0 packages, installed once per machine for the suite (PiNodeRuntime).
+            // Extensions run against the real Pi 1.2.0 packages, installed once per machine for the suite (PiNodeRuntime).
             if (SharedPiRuntime.Value.GetAwaiter().GetResult() is not null) Vars["PISHARP_PI_RUNTIME_DIR"] = SharedPiRuntimeDirectory;
             // The sandbox is a git repository, so the ancestor walk for .agents/skills stops at its root (collectAncestorAgentsSkillDirs).
             Directory.CreateDirectory(Path.Combine(Root, ".git"));
@@ -155,7 +159,7 @@ internal static partial class Program
         {
             Cwd = Cwd, Home = Home, GetEnvironment = name => Vars.GetValueOrDefault(name), SetEnvironment = (name, value) => Vars[name] = value,
             Stdout = stdout, Stderr = stderr, Stdin = new StringReader(stdin ?? ""), StdinIsTty = stdin is null, StdoutIsTty = interactive,
-            LiveRuntime = Runtime(), CreateMcpHost = agentDir => new PiSharp.Cli.Mcp.McpSessionHost(agentDir, Home, () => []),
+            LiveRuntime = Runtime(), CreateMcpHost = McpHost ?? (agentDir => new PiSharp.Cli.Mcp.McpSessionHost(agentDir, Home, () => [])),
             RunInteractive = runInteractive, OpenRpcInput = rpcInput is null ? null : () => rpcInput, OpenRpcOutput = rpcOutput is null ? null : () => rpcOutput,
             ApplicationDirectory = Path.Combine(Root, "app"), Now = () => DateTimeOffset.UtcNow
         };
@@ -180,6 +184,8 @@ internal static partial class Program
 
     internal sealed record Seen(string Method, string Url, IReadOnlyDictionary<string, string> Headers, string? Body)
     {
+        /// <summary>When the request arrived (Stopwatch timestamp).</summary>
+        public long At { get; init; } = System.Diagnostics.Stopwatch.GetTimestamp();
         public JsonElement Json => JsonDocument.Parse(Body!).RootElement;
     }
 

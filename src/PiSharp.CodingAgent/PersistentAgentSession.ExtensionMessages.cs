@@ -14,6 +14,12 @@ public sealed partial class PersistentAgentSession
 {
     private ImmutableArray<TranscriptEntry> _nextTurnCustomMessages = [];
     private Task<AgentLoopResult>? _inputTriggeredRun;
+    // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_startRun, _prepareRun,
+    // sendCustomMessage). The session counts as busy from the start of a run. While the run starts (its before_agent_start handlers
+    // run), a custom message that does not trigger a turn is held and recorded before the run's starting messages, as it would have
+    // been while idle; one that triggers a turn is steered into the starting run.
+    private bool _runStarting;
+    private ImmutableArray<TranscriptEntry> _startingCustomMessages = [];
 
     /// <summary>The last run an extension's custom message (sendMessage with triggerTurn) started outside any prompt (while idle, or while
     /// an admitted input was being reduced, as in an extension command's handler), once: the caller owns its monitoring. Null when none
@@ -32,7 +38,7 @@ public sealed partial class PersistentAgentSession
         lock (_gate) _commandIdleBarriers = _commandIdleBarriers.RemoveAll(barrier => barrier.IsCompleted).Add(published);
     }
     /// <summary>The idle of the run an admitted input triggered (a command's sendMessage with triggerTurn), without that input: the
-    /// host settles the run while the command's handler is still running, as agent-session.ts _runAgentPrompt does.</summary>
+    /// host settles the run while the command's handler is still running, as agent-session.ts _startRun does.</summary>
     public Task WaitForTriggeredRunIdleAsync()
     {
         var agentIdle = _agent.WaitForIdleAsync();
@@ -40,7 +46,7 @@ public sealed partial class PersistentAgentSession
         lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; diagnostics = LoadoutDiagnosticIdleLocked(); settings = RetrySettingsIdleLocked(); bash = CaptureUserBashCompletionsLocked(); }
         return Task.WhenAll(new[] { agentIdle, idle, diagnostics, settings }.Concat(bash));
     }
-    /// <summary>agent-session.ts _runAgentPrompt: a triggered run continues with what was queued at its end (agent.continue) while the
+    /// <summary>agent-session.ts _startRun: a triggered run continues with what was queued at its end (agent.continue) while the
     /// command's handler still runs.</summary>
     public Task<AgentLoopResult> ContinueTriggeredRunAsync(CancellationToken cancellationToken = default) =>
         Start(_agent.ContinueAsync, cancellationToken, duringInput: true);
@@ -80,18 +86,19 @@ public sealed partial class PersistentAgentSession
             if (expectedSessionId != _acknowledgedLog.Header.Id) throw Error(PersistentAgentSessionFailure.StaleSession);
             if (delivery == SessionCustomMessageDelivery.NextTurn)
             {
-                var limits = _agentOptions?.Queue ?? new AgentPendingInputQueueOptions();
-                var length = message.WireBody.ToString().Length;
-                if (length > limits.MaximumMessageCharacters || _nextTurnCustomMessages.Length >= limits.MaximumMessagesPerQueue ||
-                    _nextTurnCustomMessages.Sum(value => (long)value.WireBody.ToString().Length) + length > limits.MaximumCharactersPerQueue)
-                    throw new ArgumentException("Next-turn custom queue exceeds admitted pending-input limits.");
+                AdmitHeldCustomLocked(_nextTurnCustomMessages, message);
                 _nextTurnCustomMessages = _nextTurnCustomMessages.Add(message);
                 return Task.FromResult(new SessionCustomMessageReceipt(SessionCustomMessageDisposition.Queued));
             }
             if (_active is not null)
             {
                 RejectSettlementQueue(); RejectConfigurationQueue();
-                if (triggerTurn == false) _agent.QueueContextOnly(message, cancellationToken);
+                if (triggerTurn == false && _runStarting)
+                {
+                    AdmitHeldCustomLocked(_startingCustomMessages, message);
+                    _startingCustomMessages = _startingCustomMessages.Add(message);
+                }
+                else if (triggerTurn == false) _agent.QueueContextOnly(message, cancellationToken);
                 else if (delivery == SessionCustomMessageDelivery.FollowUp) _agent.FollowUp(message, cancellationToken);
                 else _agent.Steer(message, cancellationToken);
                 return Task.FromResult(new SessionCustomMessageReceipt(SessionCustomMessageDisposition.Queued));
@@ -100,7 +107,7 @@ public sealed partial class PersistentAgentSession
             {
                 // agent-session.ts sendCustomMessage: while a prompt's input is admitted (input hooks, an extension command's handler)
                 // the session is not streaming, so the message is appended (and emitted) at once, ahead of anything the prompt records;
-                // a message that triggers a turn starts it at once (_runAgentPrompt), while the handler is still running.
+                // a message that triggers a turn starts it at once (_startRun), while the handler is still running.
                 if (!_agent.Snapshot.PendingInputs.IsEmpty) throw new InvalidOperationException("Input admission is already processing.");
                 // The admission owns the session reservation; the append only takes the commit gate, as other leaf entries do.
                 if (triggerTurn == true) duringInput = true;
@@ -125,7 +132,7 @@ public sealed partial class PersistentAgentSession
         lock (_gate) _inputTriggeredRun = adopted.Task;
         try
         {
-            // During a command the turn is not part of the handler's call (upstream's _runAgentPrompt outlives it): it starts now, in a
+            // During a command the turn is not part of the handler's call (upstream's _startRun outlives it): it starts now, in a
             // clean execution context, so it carries none of the handler's ambient state (its input reservation, its callback frame).
             if (duringInput) ExecutionContext.Run(CleanExecutionContext.Value, _ => original = StartRun(), null);
             else original = StartRun();
@@ -214,10 +221,43 @@ public sealed partial class PersistentAgentSession
         writer.WriteRawValue(draft.Content?.ToString() ?? "[]", skipInputValidation: true); writer.WriteBoolean("display", draft.Display);
         if (draft.Details is not null) { writer.WritePropertyName("details"); writer.WriteRawValue(draft.Details.ToString(), skipInputValidation: true); }
     }
-    // Called only under the actual session reservation gate; nextTurn is injected after the next USER.
+    /// <summary>Held custom messages (next-turn, or held while a run starts) are bounded like the agent's pending-input queues.</summary>
+    private void AdmitHeldCustomLocked(ImmutableArray<TranscriptEntry> held, TranscriptEntry message)
+    {
+        var limits = _agentOptions?.Queue ?? new AgentPendingInputQueueOptions();
+        var length = message.WireBody.ToString().Length;
+        if (length > limits.MaximumMessageCharacters || held.Length >= limits.MaximumMessagesPerQueue ||
+            held.Sum(value => (long)value.WireBody.ToString().Length) + length > limits.MaximumCharactersPerQueue)
+            throw new ArgumentException("Next-turn custom queue exceeds admitted pending-input limits.");
+    }
+
+    /// <summary>Source _startRun/_prepareRun around before_agent_start. The run does not exist yet while its handlers run, so an abort
+    /// requested meanwhile does not cancel them (it aborts the run as it starts); only closing the session does. Custom messages held
+    /// meanwhile go before the run's starting messages.</summary>
+    private async ValueTask<AgentPromptPreparation> PrepareRunStartAsync(Func<AgentPromptStart, CancellationToken, ValueTask<AgentPromptPreparation>> before,
+        AgentPromptStart start)
+    {
+        lock (_gate) { _runStarting = true; _startingCustomMessages = []; }
+        ImmutableArray<TranscriptEntry> held;
+        try
+        {
+            var token = _closing.Token;
+            var prepared = await before(start with { History = WithPendingSystemRecord(start.History, token) }, token).ConfigureAwait(false);
+            lock (_gate) { held = _startingCustomMessages; _startingCustomMessages = []; _runStarting = false; }
+            return held.IsEmpty || prepared is null ? prepared! : prepared with { LeadingMessages = held };
+        }
+        catch
+        {
+            lock (_gate) { _startingCustomMessages = []; _runStarting = false; }
+            throw;
+        }
+    }
+
+    // Called only under the actual session reservation gate. Source _prepareRun: pending nextTurn messages go with the starting
+    // message of the next run, a user prompt or (Pi 1.2.0) a custom message that triggers a turn.
     private ImmutableArray<TranscriptEntry> InjectNextTurnCustomLocked(ImmutableArray<TranscriptEntry> inputs)
     {
-        if (inputs.IsDefault || _nextTurnCustomMessages.IsEmpty || !inputs.Any(value => value.Role == "user")) return inputs;
+        if (inputs.IsDefault || _nextTurnCustomMessages.IsEmpty || !inputs.Any(value => value.Role is "user" or "custom")) return inputs;
         var combined = inputs.AddRange(_nextTurnCustomMessages); _nextTurnCustomMessages = [];
         return combined;
     }

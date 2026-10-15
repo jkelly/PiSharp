@@ -18,7 +18,7 @@ using PiSharp.Tui.Rendering;
 // Expected text is written from the upstream v1.1.0 sources; no upstream execution or genuine source capture credit.
 internal static partial class Program
 {
-    private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
+    private const string Upstream = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 
     private static async Task<int> Main(string[] args)
     {
@@ -67,6 +67,7 @@ internal static partial class Program
             ("auth.anthropic.login-copy-code-stores-auth-json-and-refreshes", LoginStoresAndRefreshes),
             ("auth.anthropic.login-browser-pasted-redirect-and-state-mismatch", BrowserLoginPastedRedirect),
             ("auth.logout-selects-and-removes-stored-credentials", LogoutRemovesStoredCredentials),
+            ("auth.lock-access-denied-retried-briefly-on-windows-other-errors-fail-fast", AuthLockEpermRetries),
             ("auth.anthropic.live-route-stored-oauth-refreshes-mid-session-and-logout-falls-back", LiveStoredOAuthRefreshesMidSession),
             ("auth.anthropic.live-route-stored-key-env-precedence-and-federation", LiveAnthropicPrecedenceAndFederation),
             ("provider.anthropic.live-route-managed-effort-levels-markers-and-recorded-effort", LiveManagedEffortLevels),

@@ -62,6 +62,10 @@ public sealed record McpSessionRuntimeAdmission(SessionRuntimeRegistry NativeReg
     public Func<McpServerEntry, McpPreparedServer, McpRuntimeSnapshot, CancellationToken, Task>? BackgroundConnected { get; init; }
     /// <summary>Called on the bound attachment after the background connections started (the `/mcp` manager binds here).</summary>
     public Action<ReplaceableAgentSession, AgentSessionAttachment, McpBackgroundConnections?>? BindManager { get; init; }
+    /// <summary>index.ts tool_call: called with a tool's name and input before the tool runs, once the extensions' tool_call
+    /// handlers allowed it; it waits for the servers the call may reach. The profile calls the bound generation's handler from its
+    /// session-wide tool hooks (<see cref="McpToolCallHooks"/>).</summary>
+    public Func<string, PiSharp.Contracts.JsonData, CancellationToken, Task>? BeforeToolCall { get; init; }
 }
 
 /// <summary>Assembles explicitly admitted native and MCP resources before historical resolution.</summary>
@@ -137,8 +141,8 @@ public sealed class McpSessionRuntimeFactory
                 {
                     activation.BindOwner(owner, attachment);
                     admission.BindProfileView?.Invoke(owner, attachment);
-                    // extensions/mcp/index.ts before_agent_start waitForDirectServers. The tool_call waits (scriptNeedsServer, tool_search,
-                    // resource tools) run inside those tools' calls.
+                    // extensions/mcp/index.ts before_agent_start waitForDirectServers. The tool_call waits (reachesTools, the resource tools,
+                    // a server's own tools) run before each tool call, from the profile's session-wide tool hooks (BeforeToolCall).
                     if (connections is not null)
                     {
                         // Chained with a gate another host installed (the extensions' pending registrations).

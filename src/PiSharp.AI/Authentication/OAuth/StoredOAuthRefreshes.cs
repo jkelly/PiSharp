@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/oauth/openai-chatgpt.ts (refreshAccessToken,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/oauth/openai-chatgpt.ts (refreshAccessToken,
 // requestToken, credentialFromTokenResponse) and packages/ai/src/auth/oauth/openrouter.ts (refresh).
 using System.Globalization;
 using System.Text.Json;

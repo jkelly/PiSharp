@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/codemode/execute.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/codemode/execute.ts.
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
@@ -90,6 +90,8 @@ public static class CodemodeExecutor
             try { await onUpdate(JsonData.Parse(partial.ToJsonString(Relaxed))).ConfigureAwait(false); }
             catch (Exception) when (!cancellationToken.IsCancellationRequested) { /* A failed progress update does not fail the script. */ }
         }
+        // Show the script as running before its first nested call, so the row's timer starts.
+        await Publish().ConfigureAwait(false);
 
         var callable = host is null ? [] : CodemodeToolDefinition.Callable(host.Tools);
         var samples = callable.ToDictionary(tool => tool.Name,
@@ -205,19 +207,25 @@ public static class CodemodeExecutor
         return items;
     }
 
-    /// <summary>Join adjacent text items into one, each part starting on its own line.</summary>
+    /// <summary>Join adjacent text items into one, each part starting on its own line. Parts are collected and joined once; the
+    /// separator check looks at the last non-empty part, not the joined text, so joining is linear (#10678).</summary>
     private static List<Item> JoinAdjacentText(IEnumerable<Item> items)
     {
         var joined = new List<Item>();
+        var parts = new List<string>(); var lastPart = "";
+        void Flush()
+        {
+            if (parts.Count > 0) joined.Add(new TextItem(string.Concat(parts)));
+            parts.Clear(); lastPart = "";
+        }
         foreach (var item in items)
         {
-            if (item is TextItem text && joined.Count > 0 && joined[^1] is TextItem last)
-            {
-                var separator = last.Text.Length == 0 || last.Text.EndsWith('\n') ? "" : "\n";
-                joined[^1] = new TextItem(last.Text + separator + text.Text);
-            }
-            else joined.Add(item);
+            if (item is not TextItem text) { Flush(); joined.Add(item); continue; }
+            if (lastPart.Length > 0 && !lastPart.EndsWith('\n')) { parts.Add("\n"); lastPart = "\n"; }
+            parts.Add(text.Text);
+            if (text.Text.Length > 0) lastPart = text.Text;
         }
+        Flush();
         return joined;
     }
 
@@ -307,13 +315,12 @@ public static class CodemodeExecutor
 
     // --- searchTools(), describeTool(), describeNamespace() -------------------------------------------------------------
 
-    /// <summary>Whether <paramref name="query"/> names the namespace: its name, its identifier, or the part after its last
-    /// <c>__</c> in either form.</summary>
-    private static bool IsNamespaceName(string ns, string query)
+    /// <summary>Whether <paramref name="query"/> names the namespace: its name or one of its aliases, as written or as the same
+    /// script identifier (<c>dev-radius</c> and <c>dev_radius</c> are both <c>dev_radius</c>).</summary>
+    private static bool IsNamespaceName(PiSharp.Contracts.ToolNamespace ns, string query)
     {
-        var id = CodemodeIdentifier.ToIdentifier(ns); var queryId = CodemodeIdentifier.ToIdentifier(query);
-        static string? Suffix(string name) => name.Contains("__", StringComparison.Ordinal) ? name[(name.LastIndexOf("__", StringComparison.Ordinal) + 2)..] : null;
-        return ns == query || id == queryId || Suffix(ns) == query || Suffix(id) == queryId;
+        var queryId = CodemodeIdentifier.ToIdentifier(query);
+        return new[] { ns.Name }.Concat(ns.Aliases).Any(name => name == query || CodemodeIdentifier.ToIdentifier(name) == queryId);
     }
 
     private static JsonElement[] Spread(JsonData? arguments) =>
@@ -341,7 +348,7 @@ public static class CodemodeExecutor
             var nsValue = options.ValueKind == JsonValueKind.Object && options.TryGetProperty("namespace", out var given) ? given : default;
             if (!Missing(nsValue) && nsValue.ValueKind != JsonValueKind.String) throw new InvalidOperationException("searchTools() namespace must be a string");
             var ns = nsValue.ValueKind == JsonValueKind.String ? nsValue.GetString()! : "";
-            var documents = tools.Where(tool => ns.Length == 0 || tool.Namespace is { } toolNamespace && IsNamespaceName(toolNamespace.Name, ns))
+            var documents = tools.Where(tool => ns.Length == 0 || tool.Namespace is { } toolNamespace && IsNamespaceName(toolNamespace, ns))
                 .Select(tool => ToolSearch.CreateDocument(tool.Name, tool.Description, tool.Parameters.Value, tool.Namespace)).ToList();
             return ValueTask.FromResult<JsonData?>(Json(ranker.Rank(query.GetString()!, documents, limit).Select(match => Entry(match.Name)).ToArray()));
         }) { Spread = true };
@@ -359,7 +366,7 @@ public static class CodemodeExecutor
             PiSharp.Contracts.ToolNamespace? found = null; var names = new List<string>();
             foreach (var tool in tools)
             {
-                if (tool.Namespace is not { } ns || !IsNamespaceName(ns.Name, name.GetString()!)) continue;
+                if (tool.Namespace is not { } ns || !IsNamespaceName(ns, name.GetString()!)) continue;
                 found ??= ns; names.Add(CodemodeIdentifier.ToIdentifier(tool.Name));
             }
             if (found is null) return ValueTask.FromResult<JsonData?>(null);

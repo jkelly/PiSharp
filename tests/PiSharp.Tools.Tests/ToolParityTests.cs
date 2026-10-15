@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): cases ported from packages/coding-agent/test/tools.test.ts,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): cases ported from packages/coding-agent/test/tools.test.ts,
 // test/image-process.test.ts, test/image-processing.test.ts, test/tool-result-images.test.ts and
 // test/builtin-tool-strict-mode.test.ts. Authored native expectations, not upstream captures.
 using System.Buffers.Binary;

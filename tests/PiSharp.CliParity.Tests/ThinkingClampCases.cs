@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/sdk.ts (createAgentSession: the restored, CLI or
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/sdk.ts (createAgentSession: the restored, CLI or
 // default level is clamped with clampThinkingLevel; only a new session, or one without a thinking entry, records it),
 // packages/coding-agent/src/core/agent-session.ts (setThinkingLevel/_clampThinkingLevel, cycleThinkingLevel, setModel/cycleModel with
 // _getThinkingLevelForModelSwitch) and packages/ai/src/models.ts (clampThinkingLevel: the level, else the nearest supported level above,

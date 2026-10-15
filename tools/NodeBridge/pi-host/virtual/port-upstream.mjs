@@ -6,13 +6,13 @@
 //
 //   node port-upstream.mjs <path-to-upstream-pi>/packages
 //
-// The upstream checkout must be Pi commit abe508e1b89912adde45528136c3221eb69acdd7 (MIT).
+// The upstream checkout must be Pi commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT).
 import fs from "node:fs";
 import path from "node:path";
 import { stripTypeScriptTypes } from "node:module";
 import { fileURLToPath } from "node:url";
 
-const COMMIT = "abe508e1b89912adde45528136c3221eb69acdd7";
+const COMMIT = "06a466935536f8c9bcacb2d5efc0fc021be1bdff";
 const UP = path.resolve(process.argv[2] ?? process.env.PI_UPSTREAM_PACKAGES ?? "");
 if (!process.argv[2] && !process.env.PI_UPSTREAM_PACKAGES) {
 	console.error("usage: node port-upstream.mjs <upstream pi packages dir>");
@@ -191,10 +191,10 @@ const patchConfig = {
 		['(await importNodeOnlyApi("./bedrock-converse-stream.ts"))', '(await import("./bedrock-converse-stream.ts"))'],
 	],
 	"coding-agent/src/config.ts": [
-		["let pkg: PackageJson = {};", 'let pkg: PackageJson = { name: "@earendil-works/pi-coding-agent", version: "1.1.0" };'],
+		["let pkg: PackageJson = {};", 'let pkg: PackageJson = { name: "@earendil-works/pi-coding-agent", version: "1.2.0" };'],
 		[
 			'try {\n\tconst packageJsonPath = getPackageJsonPath();\n\tpkg = JSON.parse(stripBom(readFileSync(packageJsonPath, "utf-8"))) as PackageJson;\n\tstartupPackageJsonPath = packageJsonPath;\n} catch (e: unknown) {\n\tconst err = e as NodeJS.ErrnoException;\n\tif (err.code !== "ENOENT") throw e;\n}',
-			"// PiSharp: the Node bridge ships no Pi package.json; it identifies as the ported Pi 1.1.0.\nstartupPackageJsonPath = undefined;",
+			"// PiSharp: the Node bridge ships no Pi package.json; it identifies as the ported Pi 1.2.0.\nstartupPackageJsonPath = undefined;",
 		],
 	],
 	"coding-agent/src/modes/interactive/theme/theme.ts": [
@@ -255,6 +255,10 @@ const PISHARP_BUILTIN_DARK_THEME = ${JSON.stringify(dark, null, "\t")};
 
 const PISHARP_BUILTIN_LIGHT_THEME = ${JSON.stringify(light, null, "\t")};
 
+// PiSharp: main.ts installs the theme JSON validator before themes load; the bridge does it here.
+import { validateThemeJson as __pisharpValidateThemeJson } from "./coding-agent/modes/interactive/theme/theme-schema.mjs";
+if (!themeJsonValidator) setThemeJsonValidator(__pisharpValidateThemeJson);
+
 // PiSharp: interactive Pi initializes the theme at startup; the bridge does it on first load so
 // extension render code (theme.fg, getMarkdownTheme(), ...) works. PISHARP_THEME selects a theme.
 if (!globalThis[THEME_KEY]) initTheme(process.env.PISHARP_THEME || undefined);`,
@@ -267,6 +271,7 @@ const result = run(
 		["ai/src/compat.ts", "pi-ai.mjs"],
 		["agent/src/index.ts", "pi-agent-core.mjs"],
 		["coding-agent/src/modes/interactive/theme/theme.ts", "theme.mjs"],
+		["coding-agent/src/modes/interactive/theme/theme-schema.ts"],
 		["coding-agent/src/config.ts"],
 		["coding-agent/src/core/extensions/types.ts"],
 		["coding-agent/src/core/extensions/wrapper.ts"],

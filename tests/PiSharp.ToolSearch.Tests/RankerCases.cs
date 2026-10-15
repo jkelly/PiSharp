@@ -83,8 +83,10 @@ internal static partial class Program
         var descriptor = McpToolSearch.Create().Descriptor;
         Equal("tool_search", descriptor.Name, "name");
         Equal(ToolExposure.ModelOnly, descriptor.Exposure, "model-only exposure");
-        Check(ReferenceEquals(McpDiscoveryToolIdentity.ToolSearchSchema, descriptor.Parameters) &&
-            McpDiscoveryToolIdentity.IsToolSearchTool(descriptor.Name, descriptor.Parameters), "the tool carries the identity schema");
+        Check(ReferenceEquals(McpDiscoveryToolIdentity.ToolSearchSchema, descriptor.Parameters), "the tool carries the identity schema");
+        // tool-search/tool.ts reachesTools: () => "all" (a query can match any tool that is not declared yet).
+        Check(descriptor.ReachesTools is { } reach && reach(JsonData.Parse("""{"query":"docs"}""")).IsAll &&
+            reach(JsonData.Parse("""{"query":""}""")).IsAll, "tool_search reaches every tool");
         Check(ToolSearch.IsSearchable(ToolExposure.Deferred) && ToolSearch.IsSearchable(ToolExposure.Codemode) &&
             !ToolSearch.IsSearchable(ToolExposure.Direct) && !ToolSearch.IsSearchable(ToolExposure.ModelOnly) && !ToolSearch.IsSearchable(ToolExposure.Hidden),
             "codemode and deferred tools are searchable");

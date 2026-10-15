@@ -8,7 +8,7 @@ using PiSharp.Contracts;
 using PiSharp.Extensions.Mcp.Runtime;
 
 // Names that select no registered tool (agent-session.ts _applyToolLoadout, setActiveToolsByName and _refreshToolRegistry; sdk.ts
-// initialActiveToolNames; cli/args.ts getToolListError at abe508e1b89912adde45528136c3221eb69acdd7): an initial selection (--tools,
+// initialActiveToolNames; cli/args.ts getToolListError at 06a466935536f8c9bcacb2d5efc0fc021be1bdff): an initial selection (--tools,
 // defaultTools, initial names) and an explicit activation ignore them instead of failing, and they do not become pending. Only
 // malformed --tools lists are CLI errors. A name a --tools allowlist matches activates when its tool registers. Authored expectations.
 internal static partial class Program

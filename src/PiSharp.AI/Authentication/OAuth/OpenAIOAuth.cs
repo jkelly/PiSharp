@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/oauth/openai-codex.ts (ChatGPT Plus/Pro OAuth for the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/oauth/openai-codex.ts (ChatGPT Plus/Pro OAuth for the
 // Codex backend: browser and device-code login, token exchange and refresh, account id claim) and auth/oauth/openai-chatgpt.ts
 // (Sign in with ChatGPT for the OpenAI Responses API: dynamic client registration, agent host id, direct-token scope).
 using System.Collections.Immutable;

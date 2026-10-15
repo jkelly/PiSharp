@@ -1058,7 +1058,7 @@
         {
           "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/source-defaults-inventory.json",
           "bytes": 7126,
-          "sha256": "63ab665be91813e5bc6cbed38fd360556297855b80e9756b4cba8ad0c5e9bc3c"
+          "sha256": "580eed87dbdba08db2558e184f76ed72049143e04bec19845b28f68df4ad7ffa"
         },
         {
           "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/authored-configuration-loading-cases.json",
@@ -1075,7 +1075,7 @@
         {
           "relative": "fixtures/source-defaults-inventory.json",
           "bytes": 7126,
-          "sha256": "63ab665be91813e5bc6cbed38fd360556297855b80e9756b4cba8ad0c5e9bc3c"
+          "sha256": "580eed87dbdba08db2558e184f76ed72049143e04bec19845b28f68df4ad7ffa"
         },
         {
           "relative": "fixtures/authored-configuration-loading-cases.json",
@@ -1662,7 +1662,7 @@
       ],
       "fixturePins": [
         {
-          "sha256": "6b86896531bb84a040584adf68bf676b83b6dc8b9e0055996c7696bbd6d104f4",
+          "sha256": "9f2d54cfb5e1b745e6116fb3b28be3a17b3606f26e88ad19d99b5a82d24d484a",
           "path": "tests/PiSharp.AzureResponses.Tests/source-inventory.json",
           "bytes": 5338
         }
@@ -1698,7 +1698,7 @@
       ],
       "fixturePins": [
         {
-          "sha256": "03c8bcc30506bb106dfb1aa4aee2efb8d62383f5f65ac873f1a2d29f2f641510",
+          "sha256": "ac263bdd05ab691b5473bc476bdb7f15f09c79cb8d82aa927c6b6011965ffdfc",
           "path": "src/PiSharp.AI/Protocols/MistralConversations/source-inventory.json",
           "bytes": 7822
         }

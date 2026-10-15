@@ -3,7 +3,7 @@ title: Packages
 description: Install Pi packages from npm, git or a local folder.
 ---
 
-Pi packages bundle extensions, skills, prompt templates and themes. PiSharp installs and loads them as Pi does. See Pi's [Packages](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/packages.md) page for how to build one.
+Pi packages bundle extensions, skills, prompt templates and themes. PiSharp installs and loads them as Pi does. See Pi's [Packages](https://github.com/earendil-works/pi/blob/v1.2.0/packages/coding-agent/docs/packages.md) page for how to build one.
 
 ## Install
 

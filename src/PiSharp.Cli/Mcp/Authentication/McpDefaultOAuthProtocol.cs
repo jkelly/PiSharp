@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/oauth/flow.ts registerClient/token requests and packages/mcp/src/oauth/types.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/mcp/src/oauth/flow.ts registerClient/token requests and packages/mcp/src/oauth/types.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;

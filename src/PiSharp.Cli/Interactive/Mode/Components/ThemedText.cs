@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/themed-text.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/themed-text.ts.
 using PiSharp.Tui.Pi;
 
 namespace PiSharp.Cli.Interactive.Mode.Components;

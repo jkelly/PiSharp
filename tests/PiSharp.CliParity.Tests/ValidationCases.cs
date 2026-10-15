@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/agent/src/agent-loop.ts (prepareToolCall) and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/agent/src/agent-loop.ts (prepareToolCall) and
 // packages/ai/src/utils/validation.ts (validateToolArguments) through the Pi entry: the tool runs with the coerced arguments, a
 // failure is the error result whose text is the validation message, and the session keeps the model's arguments.
 using System.Text.Json;

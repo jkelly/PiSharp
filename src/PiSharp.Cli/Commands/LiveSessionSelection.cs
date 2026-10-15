@@ -62,11 +62,22 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
         var registry = await PiSharp.Cli.Models.ModelRegistry.CreateAsync(new()
         {
             ModelsPath = ModelsPath, Environment = environment.Get, StoredCredentials = stored, CatalogBaseUrl = CatalogBaseUrl, CreateCatalogClient = CreateCatalogClient,
-            LlamaProvider = LlamaProvider,
-            ModelsStore = ModelsPath is null ? null : new PiSharp.Cli.Models.FileModelsStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ModelsPath))!, "models-store.json"))
+            LlamaProvider = LlamaProvider, ResolveOAuthKey = ResolveCatalogOAuthKeyAsync,
+            ModelsStore =ModelsPath is null ? null : new PiSharp.Cli.Models.FileModelsStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ModelsPath))!, "models-store.json"))
         }, cancellationToken).ConfigureAwait(false);
         ConfigureRegistry?.Invoke(registry);
         return registry;
+    }
+
+    /// <summary>models.ts resolveRefreshCredential for a stored OAuth credential: its access token, refreshed (and persisted) when it
+    /// expires, for a provider's catalog refresh (OpenRouter's per-key model list).</summary>
+    private async Task<string?> ResolveCatalogOAuthKeyAsync(string provider, CancellationToken cancellationToken)
+    {
+        if (AuthPath is null || PiSharp.Cli.Authentication.ProviderAuthCatalog.Find(provider) is not { OAuth: not null } entry) return null;
+        var authentication = new PiSharp.Cli.Authentication.ProviderLiveAuthentication(entry,
+            new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time), CreateEnvironment(), CreateAuthHttp ?? (() => new HttpClient()), Time,
+            OAuthFlows is { } flows ? context => flows(provider, context) : null);
+        return (await authentication.ResolveAsync(cancellationToken).ConfigureAwait(false))?.ApiKey;
     }
 
     /// <summary>Extension registrations applied to every registry this runtime creates (pi.registerVirtualModel, IMPL-E).</summary>
@@ -453,7 +464,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             : AnthropicResolvedTransports.AcquireMainAsync(selected.Model, new Uri(definition.BaseUrl), authentication,
                 projection, options, definition.Raw, handler, token);
     }
-    /// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT) anthropic-messages.ts buildParams: a
+    /// <summary>Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT) anthropic-messages.ts buildParams: a
     /// <c>compat.supportsMidConvoEffort</c> model always sends managed adaptive thinking with its effort markers, including on the
     /// summary route, which carries no level metadata and would otherwise send disabled thinking the model cannot accept.
     /// Disabled thinking is sent only when <c>thinkingLevelMap.off !== null</c>; the metadata-free summary route of such a model

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/azure.ts (api "azure-openai-responses")
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/azure.ts (api "azure-openai-responses")
 // and packages/ai/src/api/azure-openai-responses.ts (streamSimple).
 using System.Collections.Immutable;
 using PiSharp.AI.Protocols.AzureResponses;

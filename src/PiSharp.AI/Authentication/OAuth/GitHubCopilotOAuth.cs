@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/oauth/github-copilot.ts (device-code login for github.com
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/oauth/github-copilot.ts (device-code login for github.com
 // or a GitHub Enterprise domain, Copilot token exchange, model catalog and policy enabling, refresh and toAuth's per-credential base
 // URL) and providers/github-copilot.ts (filterModels by availableModelIds).
 using System.Globalization;

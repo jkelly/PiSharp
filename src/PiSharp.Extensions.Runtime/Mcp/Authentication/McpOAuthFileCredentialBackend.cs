@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/auth-storage.ts FileAuthStorageBackend.withLock,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/auth-storage.ts FileAuthStorageBackend.withLock,
 // packages/coding-agent/src/extensions/mcp/oauth.ts McpOAuthCredentialStore (`mcp-auth.json` in the agent directory).
 using System.Text;
 
@@ -107,13 +107,19 @@ public sealed class McpOAuthFileCredentialBackend : IMcpOAuthCredentialBackend
     {
         try
         {
+            // GetLastWriteTimeUtc reports 1601-01-01 instead of throwing when the path is gone: the holder released the lock
+            // between the existence check and the read, and another writer may already hold a new one. That is not a stale
+            // lock; deleting it would let two writers in at once.
+            var vanished = DateTime.FromFileTimeUtc(0);
             if (Directory.Exists(LockPath))
             {
-                if (DateTime.UtcNow - Directory.GetLastWriteTimeUtc(LockPath) <= StaleLockAge) return false;
+                var modified = Directory.GetLastWriteTimeUtc(LockPath);
+                if (modified == vanished || DateTime.UtcNow - modified <= StaleLockAge) return false;
                 Directory.Delete(LockPath, recursive: false); return true;
             }
             if (!File.Exists(LockPath)) return false;
-            if (DateTime.UtcNow - File.GetLastWriteTimeUtc(LockPath) <= StaleLockAge) return false;
+            var written = File.GetLastWriteTimeUtc(LockPath);
+            if (written == vanished || DateTime.UtcNow - written <= StaleLockAge) return false;
             File.Delete(LockPath); return true;
         }
         catch (IOException) { return false; }

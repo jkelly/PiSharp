@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/core/tools/edit-diff.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/core/tools/edit-diff.ts.
 // computeEditsDiff only, the preview the edit renderer shows before the tool runs. Matching and the display diff reuse the edit
 // tool's own implementation (PiSharp.Tools.Files: EditPlan, EditMatcher, DiffFormatter) with the edit tool's bounds, so the
 // preview agrees with what the tool will write.

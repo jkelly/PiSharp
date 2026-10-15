@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/utils/git.ts (GitSource, splitRef,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/git.ts (GitSource, splitRef,
 // hasUnsafeGitInstallPart, buildGitSource, parseGenericGitUrl, parseGitUrl) and the hosted-git-info 9 fromUrl it calls
 // (lib/from-url.js, lib/parse-url.js, lib/hosts.js), over a WHATWG URL subset.
 using System.Text;

@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 using PiSharp.AI.Catalogs;
 using PiSharp.Cli.Models;
 
-// Ported from packages/coding-agent/test/model-registry.test.ts (v1.1.0) "baseUrl override", "custom models merge behavior",
+// Ported from packages/coding-agent/test/model-registry.test.ts (v1.1.0; schema cases v1.2.0) "baseUrl override", "custom models merge behavior",
 // "modelOverrides" and "API key resolution" groups, plus model-config.ts load/validation behaviour.
 internal static partial class Program
 {
@@ -21,7 +21,7 @@ internal static partial class Program
         ("models-json.custom-provider-requires-base-url-and-reports-every-error", () => WithModels("""
             {"providers":{"my-custom-provider":{"apiKey":"test-key","models":[{"id":"my-model","api":"openai-completions","reasoning":false,"input":["text"]}]},
               "broken-one":{"api":"openai-completions","models":[{"id":"one"}]},"broken-two":{"api":"openai-completions","models":[{"id":"two"}]},
-              "empty":{},"bad-limits":{"baseUrl":"https://x.invalid","api":"openai-completions","models":[{"id":"z","contextWindow":0}]},
+              "empty":{},
               "no-api":{"baseUrl":"https://x.invalid","models":[{"id":"q"}]}}}
             """, CompositionErrors)),
         ("models-json.same-id-replaces-and-provider-compat-merges", () => WithModels("""
@@ -39,6 +39,7 @@ internal static partial class Program
                "not-a-model":{"name":"ignored"}}}}}
             """, ModelOverrides)),
         ("models-json.schema-parse-and-load-errors", Sync(SchemaErrors)),
+        ("models-json.pi-1.2.0-schema-dollar-schema-positive-limits-and-compat-fields", Sync(SchemaV120)),
         ("models-json.comments-trailing-commas-bom-and-missing-file", Sync(LenientParsing)),
         ("models-json.auth-status-and-availability", () => WithModels("""
             {"providers":{"env-key":{"baseUrl":"https://a.invalid","apiKey":"$TEAM_KEY","api":"openai-completions","models":[{"id":"a"}]},
@@ -115,9 +116,12 @@ internal static partial class Program
         Check(error.Contains("Provider \"my-custom-provider\": Provider my-custom-provider: \"baseUrl\" is required when defining custom models.", StringComparison.Ordinal), error);
         Check(error.Contains("Provider \"broken-one\"", StringComparison.Ordinal) && error.Contains("Provider \"broken-two\"", StringComparison.Ordinal), "every error");
         Check(error.Contains("Provider \"empty\": Provider empty: must specify \"baseUrl\", \"headers\", \"compat\", \"modelOverrides\", or \"models\".", StringComparison.Ordinal), "empty");
-        Check(error.Contains("Provider bad-limits, model z: invalid contextWindow", StringComparison.Ordinal), "limits");
         Check(error.Contains("Provider no-api, model q: no \"api\" specified. Set at provider or model level.", StringComparison.Ordinal), "api");
-        Check(!error.Contains("\n\n\n", StringComparison.Ordinal) && error.Split("\n\n").Length == 6, "joined by blank lines");
+        Check(!error.Contains("\n\n\n", StringComparison.Ordinal) && error.Split("\n\n").Length == 5, "joined by blank lines");
+        // Pi 1.2.0 rejects a non-positive contextWindow in models.json at the schema (see SchemaV120); the composer still refuses it in a
+        // provider an extension registers.
+        Equal("Provider bad-limits, model z: invalid contextWindow", Throws<InvalidOperationException>(() => registry.RegisterExtensionProvider("bad-limits",
+            JsonNode.Parse("""{"baseUrl":"https://x.invalid","api":"openai-completions","models":[{"id":"z","contextWindow":0}]}""")!.AsObject()), "limits").Message, "limits");
         Check(Of(registry, "broken-one").Count == 0 && Of(registry, "anthropic").Count > 0, "failed providers keep their base");
     }
 
@@ -163,15 +167,26 @@ internal static partial class Program
 
     private static void SchemaErrors()
     {
-        var config = ModelsJsonConfig.Parse("""{"providers":{"x":{"models":[{"name":""}],"authHeader":"yes","oauth":"github","compat":{"maxTokensField":7}}}}""", "/p/models.json");
-        // compat {maxTokensField: 7} still matches the Responses compat object (TypeBox objects admit additional properties).
+        var config = ModelsJsonConfig.Parse("""{"providers":{"x":{"models":[{"name":""}],"authHeader":"yes"}}}""", "/p/models.json");
         Equal("Invalid models.json schema:\n" +
-            "  - providers.x.oauth: must be equal to constant\n" +
             "  - providers.x.authHeader: must be boolean\n" +
             "  - providers.x.models.0.id: must have required properties id\n" +
             "  - providers.x.models.0.name: must not have fewer than 1 characters\n\nFile: /p/models.json", config.Error, "schema errors");
-        Equal("Invalid models.json schema:\n  - providers.x.compat: must match a schema in anyOf\n\nFile: /p",
-            ModelsJsonConfig.Parse("""{"providers":{"x":{"compat":5}}}""", "/p").Error, "union");
+        // Pi 1.2.0: compat is one object of every API's fields (compat-schema.ts ProviderCompatSchema), no longer a union of three API
+        // objects, so {maxTokensField: 7} is checked against its literals; TypeBox lists each union branch's error and stops at 8 errors.
+        Equal("Invalid models.json schema:\n" +
+            "  - providers.x.oauth: must be equal to constant\n" +
+            "  - providers.x.compat.maxTokensField: must be string\n" +
+            "  - providers.x.compat.maxTokensField: must be equal to constant\n" +
+            "  - providers.x.compat.maxTokensField: must be string\n" +
+            "  - providers.x.compat.maxTokensField: must be equal to constant\n" +
+            "  - providers.x.compat.maxTokensField: must match a schema in anyOf\n" +
+            "  - providers.x.authHeader: must be boolean\n" +
+            "  - providers.x.models.0.id: must have required properties id\n\nFile: /p/models.json",
+            ModelsJsonConfig.Parse("""{"providers":{"x":{"models":[{"name":""}],"authHeader":"yes","oauth":"github","compat":{"maxTokensField":7}}}}""", "/p/models.json").Error,
+            "compat literals and the eight-error limit");
+        Equal("Invalid models.json schema:\n  - providers.x.compat: must be object\n\nFile: /p",
+            ModelsJsonConfig.Parse("""{"providers":{"x":{"compat":5}}}""", "/p").Error, "compat object");
         Equal("Invalid models.json schema:\n  - providers: must have required properties providers\n\nFile: /p", ModelsJsonConfig.Parse("{}", "/p").Error, "root required");
         Equal("Invalid models.json schema:\n  - root: must be object\n\nFile: /p", ModelsJsonConfig.Parse("[]", "/p").Error, "root type");
         // model-config.ts interpolates JSON.parse's SyntaxError (Node 22 / V8 12.4 wording).
@@ -184,6 +199,37 @@ internal static partial class Program
             "  - providers.x.modelOverrides.m.inputLimits.images.resize.maxWidth: must be integer\n" +
             "  - providers.x.modelOverrides.m.inputLimits.images.resize.jpegQuality: must be <= 100\n" +
             "  - providers.x.modelOverrides.m.promptCache.short: must be > 0\n\nFile: /p", resize.Error, "numeric constraints");
+    }
+
+    // Pi 1.2.0 model-config.ts with pi-ai's compat-schema.ts and model-schema.ts (expectations checked against TypeBox 1.3.27 over the
+    // published models.schema.json): a top-level $schema string, positive token limits, the merged compat fields and enums.
+    private static void SchemaV120()
+    {
+        string? Error(string json) => ModelsJsonConfig.Parse(json, "/p").Error;
+        string Lines(params string[] lines) => "Invalid models.json schema:\n" + string.Join("\n", lines.Select(line => "  - " + line)) + "\n\nFile: /p";
+        Equal<string?>(null, Error("""{"$schema":"https://pi.dev/schemas/models.schema.json","providers":{}}"""), "$schema accepted");
+        Equal(Lines("$schema: must be string"), Error("""{"$schema":3,"providers":{}}"""), "$schema type");
+        Equal(Lines("providers.x.models.0.contextWindow: must be > 0", "providers.x.models.0.maxTokens: must be > 0", "providers.x.modelOverrides.m.contextWindow: must be > 0"),
+            Error("""{"providers":{"x":{"models":[{"id":"m","contextWindow":0,"maxTokens":-1}],"modelOverrides":{"m":{"contextWindow":0}}}}}"""), "positive token limits");
+        Equal<string?>(null, Error("""{"providers":{"x":{"compat":{"chatTemplateKwargs":{"a":{"$var":"thinking.budget","omitWhenOff":true}},"thinkingTokenBudgetField":"thinking_budget","zaiToolStream":true,"supportsMidConvoToolChanges":false,"sessionAffinityFormat":"openrouter","custom":1}}}}"""),
+            "new compat fields, thinking.budget and additional compat keys");
+        Equal(Lines("providers.x.compat.supportsMidConvoSystemMessages: must be boolean"),
+            Error("""{"providers":{"x":{"compat":{"supportsMidConvoSystemMessages":"yes"}}}}"""), "compat booleans are typed");
+        Equal(Lines("providers.x.compat.thinkingTokenBudgetField: must be equal to constant", "providers.x.compat.thinkingTokenBudgetField: must be equal to constant",
+            "providers.x.compat.thinkingTokenBudgetField: must be equal to constant", "providers.x.compat.thinkingTokenBudgetField: must match a schema in anyOf"),
+            Error("""{"providers":{"x":{"compat":{"thinkingTokenBudgetField":"x"}}}}"""), "thinking budget field literals");
+        Equal(Lines("providers.x.compat.chatTemplateKwargs.b: must be string", "providers.x.compat.chatTemplateKwargs.b: must be number",
+            "providers.x.compat.chatTemplateKwargs.b: must be boolean", "providers.x.compat.chatTemplateKwargs.b: must be null",
+            "providers.x.compat.chatTemplateKwargs.b.$var: must be equal to constant", "providers.x.compat.chatTemplateKwargs.b.$var: must be equal to constant",
+            "providers.x.compat.chatTemplateKwargs.b.$var: must be equal to constant", "providers.x.compat.chatTemplateKwargs.b.$var: must match a schema in anyOf"),
+            Error("""{"providers":{"x":{"compat":{"chatTemplateKwargs":{"b":{"$var":"nope"}}}}}}"""), "kwarg $var literals");
+        Equal(Lines("providers.x.modelOverrides.m.thinkingLevelMap.high: must be string", "providers.x.modelOverrides.m.thinkingLevelMap.high: must be null",
+            "providers.x.modelOverrides.m.thinkingLevelMap.high: must match a schema in anyOf", "providers.x.modelOverrides.m.input.1: must be equal to one of the allowed values",
+            "providers.x.modelOverrides.m.cost.input: must be number"),
+            Error("""{"providers":{"x":{"modelOverrides":{"m":{"thinkingLevelMap":{"bogus":"x","high":3},"input":["text","audio"],"cost":{"input":"1"}}}}}}"""),
+            "thinking level map, input modalities and partial cost");
+        Equal(Lines("providers.x.modelOverrides.m.cost.tiers.0.cacheWrite: must have required properties cacheWrite"),
+            Error("""{"providers":{"x":{"modelOverrides":{"m":{"cost":{"output":2,"tiers":[{"inputTokensAbove":1,"input":1,"output":1,"cacheRead":1}]}}}}}}"""), "complete cost tiers");
     }
 
     private static void LenientParsing()

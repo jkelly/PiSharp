@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/bedrock-converse-stream.ts consumes the ConverseStream
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/bedrock-converse-stream.ts consumes the ConverseStream
 // event stream through @smithy/eventstream-codec. Native port of the application/vnd.amazon.eventstream binary framing: a 12-byte
 // prelude (total length, headers length, prelude CRC32), typed headers, payload and a message CRC32 over everything before it.
 using System.Buffers.Binary;

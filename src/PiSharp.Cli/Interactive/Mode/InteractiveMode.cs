@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (InteractiveMode: fields,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (InteractiveMode: fields,
 // constructor, init, run, the startup header, loaded resources, status/error/warning lines, shutdown). The session is driven through
 // the in-process RPC host (RpcSessionClient); live host objects come from InteractiveStartup.Host where the protocol has no command.
 using System.Text.Json.Nodes;
