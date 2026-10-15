@@ -34,6 +34,38 @@ internal static partial class Program
             Check(models.GetModels("openai").All(model => model.Provider == "openai" && model.Api == "openai-responses"), "openai chat models");
             Equal(42, models.Providers.Count, "every built-in provider registers");
         }),
+        // pi-ai 1.2.0 Model.inputLimits (work list area e): the read tool's image limits come from images.resize.
+        Case("models.catalog.input-limits-come-from-the-catalog-entry", () =>
+        {
+            using var models = Models(new Dictionary<string, string>());
+            var fable = models.GetModel("anthropic", "claude-fable-5") ?? throw new InvalidOperationException("claude-fable-5 missing");
+            Equal(new DurableModelInputLimits
+            {
+                MaxRequestBytes = 33554432,
+                Images = new DurableModelImageInputLimits
+                {
+                    MaxPerRequest = 600,
+                    Resize = new DurableModelImageResizeOptions { MaxWidth = 2000, MaxHeight = 2000, MaxBytes = 4718592, JpegQuality = 80 },
+                },
+            }, fable.InputLimits, "claude-fable-5");
+            var withLimits = 0;
+            foreach (var model in models.GetModels())
+            {
+                var wire = model.Wire!.TryGetValue("inputLimits", out var limits) ? limits : null;
+                Equal(wire is null, model.InputLimits is null, model.Id + " has limits");
+                if (wire is not JsonObjectValue json) continue;
+                withLimits++;
+                var resize = json.TryGetValue("images", out var images) && ((JsonObjectValue)images).TryGetValue("resize", out var options) ? (JsonObjectValue)options : null;
+                double? Field(string name) => resize is not null && resize.TryGetValue(name, out var value) ? ((JsonNumberValue)value).Value : null;
+                Equal(Field("maxWidth"), (double?)model.InputLimits!.Images?.Resize?.MaxWidth, model.Id + " maxWidth");
+                Equal(Field("maxHeight"), (double?)model.InputLimits.Images?.Resize?.MaxHeight, model.Id + " maxHeight");
+                Equal(Field("maxBytes"), (double?)model.InputLimits.Images?.Resize?.MaxBytes, model.Id + " maxBytes");
+            }
+            Check(withLimits > 0, "catalog models declare input limits");
+            Equal(null, DurableModelInputLimits.FromJson(JsonValue.Parse("[]")), "not an object");
+            Equal(new DurableModelInputLimits { Images = new DurableModelImageInputLimits { Resize = new DurableModelImageResizeOptions { MaxHeight = 7 } } },
+                DurableModelInputLimits.FromJson(JsonValue.Parse("""{"images":{"resize":{"maxWidth":0,"maxHeight":7,"maxBytes":1.5}}}""")), "invalid fields unset");
+        }),
         Case("models.catalog.every-embedded-shard-matches-its-pinned-hash", () =>
         {
             Equal(42, DurableBuiltinCatalog.Providers.Length, "shards");

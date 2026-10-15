@@ -411,8 +411,9 @@
       "lines": 70,
       "pisharp": "src/PiSharp.Durable.Tools/Images/Exif.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "Exif.Orientation (internal): the EXIF orientation of a JPEG (APP1) or WebP (EXIF chunk, with or without the Exif prefix), 1 when absent, out of range or unreadable; reads past the end are 0 as upstream's bit operations make undefined. It decides the processor's pass-through; the codec turns pixels upright with PiSharp.Tools' ExifOrientation (the coding agent's reader of the same tag). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*"
     },
     {
       "upstream": "packages/durable/src/images/index.ts",
@@ -420,8 +421,9 @@
       "lines": 140,
       "pisharp": "src/PiSharp.Durable.Tools/Images/Images.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "ImageProcessors.Create(IImageCodec) is createPhotonImages: PiSharp has no Photon, so decode, orientation, Lanczos3 resampling and PNG/JPEG encoding are PiSharp.Tools' image codec seam (IImageCodec), the backend main's read tool uses in place of Photon; hosts pass PiSharp.Tools.Skia's SkiaImageCodec (pisharp durable, tests) or the dependency-free BuiltinImageCodec (PNG/BMP only). prepare's rules are upstream's: pass-through once decoded when inline, upright (orientation 1) and within the limits; else scale to fit (Math.round, at least 1 px), JPEG_QUALITIES 80/70/55/40 tried after PNG (JPEG first for a JPEG source), then 3/4 smaller until the base64 fits or 1x1 fails; a decode failure is null. Difference: a codec decodes again for each size (IImageCodec.Encode returns PNG and every JPEG quality at once). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*"
     },
     {
       "upstream": "packages/durable/src/images/node-worker.ts",
@@ -429,8 +431,9 @@
       "lines": 35,
       "pisharp": "src/PiSharp.Durable.Tools/Images/NodeWorker.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "ImageWorkerThread (internal, with node.ts's PhotonThread): the worker loop answering ImageRequests (PrepareRequest/PrepareReply) with CodecImageProcessor; a failure becomes an InvalidOperationException carrying only its message, as the reply does. Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*"
     },
     {
       "upstream": "packages/durable/src/images/node.ts",
@@ -438,8 +441,9 @@
       "lines": 130,
       "pisharp": "src/PiSharp.Durable.Tools/Images/Node.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "ImageProcessors.CreateThreaded(IImageCodec, ThreadedImagesOptions { Worker = true, IdleMs = 30000 }) is createNodePhotonImages: a dedicated background thread prepares images in order (a copy of the caller's bytes) and exits after IdleMs without one; the next image starts a new thread; a thread that cannot start falls back to the calling thread for good; Worker = false prepares on the calling thread. No WebAssembly to load: the codec is an object the host passes. Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*"
     },
     {
       "upstream": "packages/durable/src/images/photon-wasm.d.ts",
@@ -790,8 +794,9 @@
       "lines": 69,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/ImageProcessor.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "ImageLimits (Default: 2000x2000, 4.5 MiB of base64; CodingTools.DefaultImageLimits), PreparedImage { Data, MimeType, Resized?, ConvertedFrom? } with ImageResize/ImageSize, IImageProcessor.PrepareAsync, and ImageFormats (internal: INLINE_IMAGE_TYPES, toBase64 as Convert.ToBase64String, base64Length). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*"
     },
     {
       "upstream": "packages/durable/src/tools/image.ts",
@@ -799,12 +804,11 @@
       "lines": 182,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Image.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "dbb2f2a3b51f89748907546429f9a88b5d3d5252",
       "changedLines": 50,
-      "note": "ImageDetection (internal): MIME detection of JPEG, non-animated PNG (APNG chunk walk in 64 KiB blocks), GIF, WebP, BMP. Detection only, as upstream: read reports images as unsupported, so no image backend (PiSharp.Tools.Skia) is involved. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)",
-      "portedBlobSha1": "dbb2f2a3b51f89748907546429f9a88b5d3d5252"
+      "note": "ImageDetection (internal): MIME detection of JPEG, non-animated PNG (APNG chunk walk in 64 KiB blocks), GIF, WebP, BMP, and v1.2.0's ImageDimensions (PNG IHDR, GIF screen, WebP VP8/VP8L/VP8X, JPEG's first SOF) as JavaScript numbers (long). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*"
     },
     {
       "upstream": "packages/durable/src/tools/index.ts",
@@ -812,12 +816,11 @@
       "lines": 39,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Tools.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "b277dada74c815539aeb8cda7205a6af51d98da6",
       "changedLines": 28,
-      "note": "CodingTools: CreateReadTool, CreateWriteTool, CreateEditTool, CreateBashTool, CreatePowerShellTool and the coding-tools Extension (read, write, edit, bash). Declarations (name, description, TypeBox-printed parameters, ParametersOrigin TypeBox) match upstream byte for byte (tools.node.declarations-match-upstream-byte-for-byte). Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)",
-      "portedBlobSha1": "b277dada74c815539aeb8cda7205a6af51d98da6"
+      "note": "CodingTools: CreateCodingTools(ReadToolOptions? { Images }) (createCodingTools), Extension (CodingTools, without a processor), DefaultImageLimits, CreateReadTool(ReadToolOptions?), CreateWriteTool, CreateEditTool, CreateBashTool, CreatePowerShellTool. Declarations (name, description, TypeBox-printed parameters, ParametersOrigin TypeBox) match upstream byte for byte (tools.node.declarations-match-upstream-byte-for-byte). pisharp durable installs CreateCodingTools with ImageProcessors.CreateThreaded(SkiaImageCodec) (DurableHarnessSetup; setup.coding-tools.* in PiSharp.DurableCli.Tests). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*"
     },
     {
       "upstream": "packages/durable/src/tools/path-utils.ts",
@@ -834,12 +837,11 @@
       "lines": 312,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Read.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "2667b2b58369500fc5b2b3dfbe526e6c855ce1a5",
       "changedLines": 158,
-      "note": "CodingTools.CreateReadTool over IBinaryReader scans: bounded reads, offsets and limits as JavaScript numbers (NaN, fractions, negatives, 1e20) with JavaScript number formatting, truncation diagnostics and details {truncation} in upstream key order, the concurrent-writer retry, unsupported images. tools.read-differential.* compares 1600 seeded outcomes with the whole-file reference and with Node digests. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)",
-      "portedBlobSha1": "2667b2b58369500fc5b2b3dfbe526e6c855ce1a5"
+      "note": "CodingTools.CreateReadTool over IBinaryReader scans: bounded reads, offsets and limits as JavaScript numbers (NaN, fractions, negatives, 1e20) with JavaScript number formatting, truncation diagnostics and details {truncation} in upstream key order, and the concurrent-writer retry (an image must be whole: one that grew is read again). v1.2.0: images within the conversation model's limits (api.AgentAsync + api.Models.GetModel, DurableModel.InputLimits.Images.Resize over DEFAULT_IMAGE_LIMITS; no model counts as one that sees images) are one image block with an info \"image\" diagnostic; with a processor they are prepared and the diagnostic notes conversion and resize (toFixed(2) scale); a model without image input gets the placeholder note; otherwise an unsupported_image error result. DurableModel.InputLimits (pi-ai 1.2.0 ModelInputLimits) is read from the catalog entry by NativeDurableModels and the CLI's DurableModels (models.catalog.input-limits-come-from-the-catalog-entry). Tests: tools.images.* (tools-images.test.ts), images.wasm-module.*, tools.*, tools.read-differential.*, tools.node.* (Fixtures/v1.2.0/tools.upstream.json), compat.read-image.*"
     },
     {
       "upstream": "packages/durable/src/tools/write.ts",
@@ -1805,8 +1807,9 @@
       "lines": 17,
       "pisharp": "tests/PiSharp.Durable.Tests/ImagesWasmModuleCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "images.wasm-module.* (1 case). Adapted: PiSharp has no WebAssembly module, so \"createPhotonImages takes a compiled WebAssembly module\" checks a processor made from a codec instance: the 1x1 GIF comes back as it is once it decodes; the separate file's lazy loading is checked as nothing reaching the codec before read is given an image"
     },
     {
       "upstream": "packages/durable/test/jsonl-storage.test.ts",
@@ -2113,8 +2116,9 @@
       "lines": 550,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "tools.images.* (33 cases). Adapted: Photon is SkiaImageCodec (fixtures built and prepared images decoded with SkiaSharp); the processor is ImageProcessors.CreateThreaded(SkiaImageCodec.Instance); the api is ImageToolApi; readEnv is ObservedReadEnv. \"prepares in a worker thread, leaving the event loop free\" (timer-gap thresholds) uses a gated codec instead: inline the work is done before PrepareAsync returns, threaded it returns while the codec is held on another thread; \"starts a new worker after the idle one exited\" waits until the worker exited (bounded) and also checks that a new one started"
     },
     {
       "upstream": "packages/durable/test/tools-read-differential.test.ts",
@@ -2122,12 +2126,11 @@
       "lines": 204,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "c191d8a1fbf82302ab33afa5ea31e2cbd8782b1d",
       "changedLines": 14,
-      "note": "tools.read-differential.* (2 tests): the whole-file reference ported; NaN offsets and limits go through ReadTool.ExecuteAsync (JSON arguments cannot carry NaN). Each of the 1600 trials also matches a digest of upstream's own outcome (Fixtures/tools.upstream.json, read)",
-      "portedBlobSha1": "c191d8a1fbf82302ab33afa5ea31e2cbd8782b1d"
+      "note": "tools.read-differential.* (2 tests): the whole-file reference ported (v1.2.0: an image is an image block with an info diagnostic); NaN offsets and limits go through ReadTool.ExecuteAsync (JSON arguments cannot carry NaN). Each of the 1600 trials also matches a digest of upstream's own outcome (Fixtures/v1.2.0/tools.upstream.json, read)"
     },
     {
       "upstream": "packages/durable/test/tools.test.ts",
@@ -2135,12 +2138,11 @@
       "lines": 750,
       "pisharp": "tests/PiSharp.Durable.Tests/ToolsCases.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "5dcdd9f12c17d056c8bf2153afa4ca4e70a50a62",
       "changedLines": 75,
-      "note": "tools.* (36 cases; upstream counts its it.each as one test: 35). Adapted: FakeToolApi (ToolsSupport.cs) is upstream's fakeApi; ToolRunner.ApplyPatch stands in for jsdiff applyPatch; the growing-log reader is a LocalExecutionEnv subclass; prepare gets the call's context object. Platform: symbolic-link assertions run only where links can be created (Windows needs Developer Mode or elevation; four cases return early without it); the backslash-name case is skipped on Windows and the real-PowerShell case runs only on Windows, both as upstream; $PWD is compared only on POSIX, as upstream. Added: tools.node.* (declarations, 600 jsdiff diffs, 28 edit cases, 9 bash cases) against Fixtures/tools.upstream.json from Fixtures/capture-tools.mjs",
-      "portedBlobSha1": "5dcdd9f12c17d056c8bf2153afa4ca4e70a50a62"
+      "note": "tools.* (36 cases; upstream counts its it.each as one test: 35). Adapted: FakeToolApi (ToolsSupport.cs) is upstream's fakeApi, whose agent names no model; ToolRunner.ApplyPatch stands in for jsdiff applyPatch; the growing-log reader is a LocalExecutionEnv subclass; prepare gets the call's context object; upstream's `streamed` is ToolRun.Output. Platform: symbolic-link assertions run only where links can be created (Windows needs Developer Mode or elevation; four cases return early without it); the backslash-name case is skipped on Windows and the real-PowerShell case runs only on Windows, both as upstream; $PWD is compared only on POSIX, as upstream. Added: tools.node.* (declarations, 600 jsdiff diffs, 28 edit cases, 9 bash cases, 10 read image cases) against Fixtures/v1.2.0/tools.upstream.json from Fixtures/capture-tools.mjs"
     },
     {
       "upstream": "packages/durable/test/types.test.ts",
