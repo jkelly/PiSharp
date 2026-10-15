@@ -592,7 +592,7 @@ internal static class ToolPhases
     /// calling task, its slot, and its <c>NestedCallDoc</c> (upstream <c>startNestedCall</c>). A key already made returns that call's task
     /// when it names the same tool and arguments.
     /// </summary>
-    internal static async Task<TaskId> StartNestedCallAsync(ITaskRuntime runtime, string parentCallId, string name, JsonObjectValue args,
+    internal static async Task<TaskId> StartNestedCallAsync(ITaskRuntime runtime, string parentCallId, string name, JsonValue args,
         string key, bool? progress, bool abandonOnRestart, DurableContext context, Task? ready = null)
     {
         var call = new RecordJson.Writer()
@@ -901,11 +901,11 @@ internal sealed class NestedCalls(ITaskRuntime runtime, ToolReport reported, str
     public bool Resumes { get; } = resumes;
 
     /// <summary>One nested call waiting for its admission commit.</summary>
-    private sealed class Admission(string name, JsonObjectValue args, string key, bool? progress, DurableContext context)
+    private sealed class Admission(string name, JsonValue args, string key, bool? progress, DurableContext context)
     {
         public TaskCompletionSource<TaskId> Admitted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public string Name { get; } = name;
-        public JsonObjectValue Args { get; } = args;
+        public JsonValue Args { get; } = args;
         public string Key { get; } = key;
         public bool? Progress { get; } = progress;
         public DurableContext Context { get; } = context;
@@ -913,7 +913,7 @@ internal sealed class NestedCalls(ITaskRuntime runtime, ToolReport reported, str
 
     /// <summary>Admits a nested call (upstream <c>executeTool</c> up to its admission): throws once the call settled, picks the key, and
     /// registers the admission so cleanup waits for it.</summary>
-    public (string Key, Task<TaskId> Admission) Admit(string name, JsonObjectValue args, NestedCallOptions? options, DurableContext context) =>
+    public (string Key, Task<TaskId> Admission) Admit(string name, JsonValue args, NestedCallOptions? options, DurableContext context) =>
         reported.WhileLive(CallId, () =>
         {
             var key = options?.Key ?? (++sequence).ToString(CultureInfo.InvariantCulture);
@@ -1149,8 +1149,52 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
     public Task<TaskRecord> WaitForTaskAsync(TaskId id, DurableContext context) => runtime.WaitForTaskAsync(id, context);
     public Task<IConversationHandle?> ConversationAsync(ConversationId id, DurableContext context) => runtime.ConversationAsync(id, context);
 
-    public async Task<NestedToolExecutionResult> ExecuteToolAsync(string name, JsonObjectValue arguments, DurableContext context,
-        NestedCallOptions? options = null)
+    /// <summary>
+    /// Runs <paramref name="calls"/>, which makes nested calls of <paramref name="api"/>'s tool call on this thread, and admits those calls
+    /// together, as the calls a tool makes in one synchronous stretch: upstream's <c>executeTool()</c> calls of one stretch chain on the
+    /// attempt's memo promise, so their admission commits enqueue back to back, in call order, before the scheduler reacts to any of them.
+    /// For a tool whose calls come after an await, such as code mode launching the calls its journal commit covered (NestedCalls admits
+    /// such calls one at a time otherwise). An <see cref="IToolExecutionApi"/> that is not the Harness's own just runs
+    /// <paramref name="calls"/>.
+    /// </summary>
+    internal static void AdmitTogether(IToolExecutionApi api, Action calls)
+    {
+        ArgumentNullException.ThrowIfNull(calls);
+        if (api is not ToolExecutionApi own)
+        {
+            calls();
+            return;
+        }
+        own.nested.BeginPrefix();
+        try
+        {
+            calls();
+        }
+        finally
+        {
+            own.nested.EndPrefix();
+        }
+    }
+
+    public Task<NestedToolExecutionResult> ExecuteToolAsync(string name, JsonObjectValue arguments, DurableContext context,
+        NestedCallOptions? options = null) => ExecuteToolValueAsync(name, arguments, context, options);
+
+    /// <summary>
+    /// <see cref="IToolExecutionApi.ExecuteToolAsync"/> with arguments of any JSON kind, as upstream's <c>executeTool()</c> passes whatever
+    /// its caller gives: a code mode script's <c>tools.x("text")</c> reaches the nested call as is, where the tool's <c>prepareArguments</c>
+    /// may repair it and validation reports what is not an object. An <see cref="IToolExecutionApi"/> that is not the Harness's own takes
+    /// only objects.
+    /// </summary>
+    internal static Task<NestedToolExecutionResult> ExecuteToolAsync(IToolExecutionApi api, string name, JsonValue arguments, DurableContext context,
+        NestedCallOptions? options = null) => api switch
+        {
+            ToolExecutionApi own => own.ExecuteToolValueAsync(name, arguments, context, options),
+            _ when arguments is JsonObjectValue keyed => api.ExecuteToolAsync(name, keyed, context, options),
+            _ => Task.FromException<NestedToolExecutionResult>(new ArgumentException("Nested call arguments must be a JSON object", nameof(arguments))),
+        };
+
+    private async Task<NestedToolExecutionResult> ExecuteToolValueAsync(string name, JsonValue arguments, DurableContext context,
+        NestedCallOptions? options)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(arguments);

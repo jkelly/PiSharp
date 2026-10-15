@@ -15,7 +15,9 @@
 // first's slot is running, the first returns once the second's slot is running, and the second once the first's is done. Hooks and waits
 // leave no record, so the records, events and observed results stay upstream's.
 //
-// codemode (area d) is not listed yet.
+// codemode (area d): PiSharp writes upstream's records (code mode's clock, seed, wall time and the engine fingerprint normalized, see
+// CompatCases.cs), events and observed results, and resumes its own session to upstream's resumed records. Upstream's own session recorded
+// QuickJS's fingerprint, which PiSharp's Jint engine never matches (decision 0005), so its resume case checks the refusal instead.
 //
 // read-image (area e) writes its two files to a fresh directory and gives the Harness a LocalExecutionEnv there (upstream NodeExecutionEnv).
 // pixelPng's IDAT is Node's deflateSync output, which .NET's zlib need not reproduce byte for byte, so the PNG is the captured file's bytes
@@ -92,7 +94,13 @@ internal sealed class CompatEvents
 /// <summary>One v1.2.0 scenario: <see cref="Run"/> writes the session, closes it and returns what it observed (or null); <see cref="Resume"/>,
 /// when present, reopens and finishes it. Without <see cref="Run"/> the scenario is read only (see the file header).</summary>
 internal sealed record CompatScenario120(string Name, string[] Areas, Func<Func<Task<IStorage>>, Task<JsonValue?>>? Run,
-    Func<Func<Task<IStorage>>, Task<JsonValue?>>? Resume = null, IReadOnlyList<string>? UnobservedFields = null);
+    Func<Func<Task<IStorage>>, Task<JsonValue?>>? Resume = null, IReadOnlyList<string>? UnobservedFields = null)
+{
+    /// <summary>The resume case of upstream's own session, when PiSharp intentionally ends it differently than upstream did (see the file
+    /// header): it replaces the comparison with resumed.json. The written case still resumes PiSharp's own session with
+    /// <see cref="Resume"/>.</summary>
+    public Func<Func<Task<IStorage>>, Task>? ResumeUpstream { get; init; }
+}
 
 /// <summary>The ported scenarios of tools/DurableFixtures/scenarios-v1.2.0.mjs.</summary>
 internal static class CompatScenarios120
@@ -288,6 +296,66 @@ internal static class CompatScenarios120
             if (live is not null && live.TryGetValue("nestedTools", out var slots) && ((JsonArrayValue)slots).Cast<JsonObjectValue>()
                 .Any(slot => S(slot["callId"]) == callId && S(slot["status"]) == status)) return;
             await Task.Delay(2, context.CancellationToken);
+        }
+    }
+
+    /// <summary>scenarios-v1.2.0.mjs <c>CODEMODE_SCRIPT</c>.</summary>
+    private const string CodemodeScript = "const a = await tools.echo({ text: \"a\" });\nconst held = await tools.hold({ id: 1 });\n" +
+        "const b = await tools.echo({ text: \"b\" });\nreturn [a, held, b];";
+
+    /// <summary>scenarios-v1.2.0.mjs <c>codemodeTools</c>: codemode.test.ts's chat, the code mode extension, echo (unsafe, counted) and hold
+    /// (replay-safe; blocks until aborted when <c>block</c>). The sandbox's engines run on threads (no worker launcher), as upstream's on
+    /// worker threads; VM starts are counted through CodemodeToolOptions.OnRunStarted, as upstream wraps <c>sandbox.start</c>.</summary>
+    private sealed class CodemodeTools
+    {
+        private readonly Dictionary<string, int> echo = [];
+        private int holdRuns;
+        private int vmStarts;
+
+        public CodemodeTools(bool block)
+        {
+            Setup = Chat();
+            var sandbox = new PiSharp.Codemode.CodemodeSandbox(new PiSharp.Codemode.CodemodeSandboxOptions { MemoryLimitBytes = 64 * 1024 * 1024 });
+            Setup.Registry.Install(DurableCodemode.CreateExtension(new CodemodeToolOptions
+            {
+                Sandbox = sandbox,
+                OnRunStarted = _ => Interlocked.Increment(ref vmStarts),
+            }));
+            Install(Setup, "tools",
+            [
+                TextTool("echo", "echo", (args, _, _) =>
+                {
+                    lock (echo) echo[Text(args)] = echo.GetValueOrDefault(Text(args)) + 1;
+                    return Task.FromResult(Result([FauxText($"echo {Text(args)}")]));
+                }),
+                TextTool("hold", "hold", async (args, _, callContext) =>
+                {
+                    Interlocked.Increment(ref holdRuns);
+                    if (block)
+                    {
+                        Reached.Resolve();
+                        await Aborted(callContext.CancellationToken);
+                    }
+                    var id = ((JsonObjectValue)args).TryGetValue("id", out var value) ? value.ToJson() : "";
+                    return Result([FauxText($"held {id}")]);
+                }, tool => tool with { Replay = ToolReplay.Safe }),
+            ]);
+        }
+
+        public ChatSetup Setup { get; }
+        public HarnessTests.Deferred Reached { get; } = new();
+
+        public List<string> EchoKeys()
+        {
+            lock (echo) return [.. echo.Keys];
+        }
+
+        /// <summary><c>{ echo: Object.fromEntries(tools.echo), holdRuns, vmStarts }</c>.</summary>
+        public JsonObjectValue Observed()
+        {
+            JsonObjectValue counts;
+            lock (echo) counts = JsonValue.Object(echo.Select(pair => KeyValuePair.Create(pair.Key, (JsonValue)pair.Value)));
+            return Obj(("echo", counts), ("holdRuns", Volatile.Read(ref holdRuns)), ("vmStarts", Volatile.Read(ref vmStarts)));
         }
     }
 
@@ -642,6 +710,45 @@ internal static class CompatScenarios120
             await Close(harness);
             return Obj(("before", before), ("after", after));
         }),
+        new("codemode", ["d"], async open =>
+        {
+            var tools = new CodemodeTools(block: true);
+            tools.Setup.Faux.SetResponses(Calls(("codemode", Obj(("code", CodemodeScript)), "s1")));
+            var (harness, root) = await Open(tools.Setup, await open());
+            await root.SubmitAsync(SubmissionDraft.Input("go"), Context);
+            await tools.Reached.Task;
+            await Close(harness);
+            return tools.Observed();
+        }, async open =>
+        {
+            var tools = new CodemodeTools(block: false);
+            tools.Setup.Faux.SetResponses(Answer("done"));
+            var (harness, _) = await Open(tools.Setup, await open());
+            harness.Resume();
+            await harness.WaitForIdleAsync(Context);
+            await Close(harness);
+            return tools.Observed();
+        })
+        {
+            // Upstream's run recorded QuickJS's fingerprint, which PiSharp's Jint engine never matches (decision 0005): resumed here, the code
+            // mode call refuses to replay and ends with the fingerprint error, without running the script's calls again; the model answers.
+            ResumeUpstream = async open =>
+            {
+                var tools = new CodemodeTools(block: false);
+                tools.Setup.Faux.SetResponses(Answer("done"));
+                var (harness, root) = await Open(tools.Setup, await open());
+                harness.Resume();
+                await harness.WaitForIdleAsync(Context);
+                var results = (await AllEntries(root)).Where(entry => entry.Kind == "pi.tool-result").Select(entry => (JsonObjectValue)entry.Model![0]).ToList();
+                await Close(harness);
+                Program.Equal(1, results.Count, "tool results");
+                Program.Equal(true, results[0]["isError"] is JsonBooleanValue { Value: true }, "isError");
+                var text = S(((JsonObjectValue)((JsonArrayValue)results[0]["content"])[0])["text"]);
+                Program.Check(text.StartsWith("The script cannot resume: the sandbox changed since it started (quickjs-wasi ", StringComparison.Ordinal) &&
+                    text.Contains(" -> jint ", StringComparison.Ordinal), "fingerprint refusal: " + text);
+                Program.Equal("", string.Join(",", tools.EchoKeys()), "echo runs");
+            },
+        },
         new("read-image", ["e"], async open =>
         {
             var directory = Program.Temp("compat-read-image");
