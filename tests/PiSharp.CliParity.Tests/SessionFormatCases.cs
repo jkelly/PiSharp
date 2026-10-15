@@ -117,7 +117,7 @@ internal static partial class Program
             var lines = actual[index].Split('\n', StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
                 if (PiSharp.AI.StreamingJson.JsonReformat(line) != line) problems.Add("not JSON.stringify(entry): " + line);
-            var want = NormalizeSession(expected[index], "pi", problems);
+            var want = NormalizeSession(expected[index].Select(FollowPi120), "pi", problems);
             var have = NormalizeSession(lines.Select(line => Scrub(line, sandbox.Root)), "pisharp", problems);
             for (var line = 0; line < Math.Max(want.Count, have.Count); line++)
             {
@@ -153,6 +153,21 @@ internal static partial class Program
     private static readonly Regex SessionId = new("^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", RegexOptions.CultureInvariant);
 
     /// <summary>Replaces ids (consistently, in order of appearance), ISO and epoch timestamps and durations after checking their formats.</summary>
+    /// <summary>Authored, not captured: the Pi 1.2.0 texts that replace texts of the 1.1.0 captures (decision 0006: oracle fixtures are
+    /// not recaptured). Each pair is a change in the pinned 1.2.0 source, applied to the golden line before the comparison.</summary>
+    private static readonly (string Old, string New)[] Pi120TextChanges =
+    [
+        // extensions/codemode/tool.ts DESCRIPTION_INTRO: a tool that declares an object result resolves on failure too.
+        ("and rejects with an Error on failure. Calls still running when the script ends are cancelled.",
+            "and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled."),
+    ];
+
+    private static string FollowPi120(string line)
+    {
+        foreach (var (old, replacement) in Pi120TextChanges) line = line.Replace(old, replacement, StringComparison.Ordinal);
+        return line;
+    }
+
     private static List<string> NormalizeSession(IEnumerable<string> lines, string side, List<string> problems)
     {
         var ids = new Dictionary<string, string>(StringComparer.Ordinal);
