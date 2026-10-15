@@ -1,0 +1,1369 @@
+{
+  "schemaVersion": 1,
+  "decision": "docs/decisions/0006-pi-1.2.0-sync.md",
+  "from": {
+    "tag": "v1.1.0",
+    "commit": "abe508e1b89912adde45528136c3221eb69acdd7",
+    "tree": "77d78fae728879c16550b1f874785aed7851233c"
+  },
+  "to": {
+    "tag": "v1.2.0",
+    "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+    "tree": "e8872645392bc4d214e3153104864e4b69d99ed0"
+  },
+  "statusMeaning": {
+    "port": "Required change; implemented with authored tests before the 1.2.0 release.",
+    "exclude": "Outside native scope per the linked decision; no port.",
+    "no-op": "Nothing to change in PiSharp; the evidence field says why.",
+    "already-ported": "PiSharp already has the behaviour; the evidence field cites the file."
+  },
+  "areas": [
+    "ai",
+    "coding-agent-core",
+    "coding-agent-cli",
+    "tui",
+    "codemode",
+    "mcp",
+    "tools",
+    "schemas",
+    "node-bridge",
+    "docs"
+  ],
+  "changelogBullets": "Bullet ids are <package>/<section>#<n>, numbered in order under ## [1.2.0] of packages/<package>/CHANGELOG.md at v1.2.0. agent has no 1.2.0 entries. \"New Features\" bullets summarise Added/Breaking bullets and map to the same rows.",
+  "summary": {
+    "rows": 55,
+    "changelogBullets": 70,
+    "byStatus": {
+      "port": 42,
+      "no-op": 7,
+      "exclude": 6
+    },
+    "byArea": {
+      "ai": 7,
+      "schemas": 3,
+      "coding-agent-core": 14,
+      "coding-agent-cli": 2,
+      "tools": 2,
+      "tui": 8,
+      "codemode": 11,
+      "mcp": 4,
+      "node-bridge": 1,
+      "docs": 3
+    }
+  },
+  "rows": [
+    {
+      "id": "ai.openrouter-per-key-catalog",
+      "area": "ai",
+      "status": "port",
+      "changelog": [
+        "coding-agent/New Features#1",
+        "coding-agent/Added#3",
+        "ai/Added#1",
+        "ai/Added#2"
+      ],
+      "upstream": [
+        "packages/ai/src/providers/openrouter.ts",
+        "packages/ai/src/providers/openrouter-api.ts",
+        "packages/ai/src/models.ts",
+        "packages/ai/scripts/openrouter-catalog.ts",
+        "packages/coding-agent/src/core/remote-catalog-provider.ts",
+        "packages/coding-agent/src/core/model-runtime.ts",
+        "packages/coding-agent/docs/providers.md"
+      ],
+      "change": "With an OpenRouter key, the openrouter catalog is narrowed to the chat models GET /models/user returns for that key, with its context size, max output and prices (withPersonalizedCatalog: built-in models merged with a newer pi.dev catalog, personalized on each network refresh, saved and used offline, no refresh interval or etag). RefreshModelsContext.baseUrl carries the registered provider's base URL including models.json overrides, so regional and guardrail endpoints are followed.",
+      "pisharp": [
+        "src/PiSharp.Cli/Models/RemoteModelCatalog.cs",
+        "src/PiSharp.Cli/Models/ModelRegistry.cs",
+        "src/PiSharp.Cli/Models/ModelsJsonConfig.cs",
+        "src/PiSharp.Cli/Models/BuiltinModelCatalog.cs",
+        "src/PiSharp.AI/Catalogs/BuiltinProviders.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "New behaviour on the pi.dev remote-catalog path PiSharp already ports (RemoteModelCatalog.cs cites remote-catalog-provider.ts). Needs the key from auth.json/env and the models.json base URL."
+    },
+    {
+      "id": "ai.openrouter-negative-prices",
+      "area": "ai",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#13",
+        "ai/Fixed#2"
+      ],
+      "upstream": [
+        "packages/ai/src/providers/openrouter-api.ts",
+        "packages/ai/scripts/openrouter-catalog.ts"
+      ],
+      "change": "OpenRouter's negative placeholder prices (router models such as openrouter/auto, -1 per token) become 0 instead of -$1,000,000 per 1M tokens.",
+      "pisharp": [
+        "src/PiSharp.Cli/Models/RemoteModelCatalog.cs",
+        "src/PiSharp.Cli/Models/BuiltinModelCatalog.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "Applies to catalogs read from OpenRouter's API (the per-key list); the embedded openrouter.json shard is generated upstream with the fix."
+    },
+    {
+      "id": "ai.mistral-header-timeout",
+      "area": "ai",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#2",
+        "ai/Fixed#1"
+      ],
+      "upstream": [
+        "packages/ai/src/api/mistral-conversations.ts"
+      ],
+      "change": "The Mistral request timeout (timeoutMs, default 60000) covers only the wait for response headers; the body stream is aborted only by the caller's signal. A header timeout fails with \"Mistral response headers timed out after <n>ms\".",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs",
+        "src/PiSharp.AI/Protocols/MistralConversations/MistralRequestOptions.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "ai.anthropic-strict-fallback",
+      "area": "ai",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#14",
+        "ai/Fixed#3"
+      ],
+      "upstream": [
+        "packages/ai/src/api/anthropic-messages.ts"
+      ],
+      "change": "When Anthropic rejects the strict tool set (grammar size, tool count or union limits), the request is retried once with strict: \"prefer\" tools sent non-strict; strict: \"require\" tools stay strict.",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs",
+        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesHttpSseTransport.cs",
+        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicInjectedTransportAdapter.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "See packages/ai/test/anthropic-strict-tool-fallback.test.ts for the rejection texts upstream detects."
+    },
+    {
+      "id": "ai.retry-upstream-provider-error",
+      "area": "ai",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#15",
+        "ai/Fixed#4"
+      ],
+      "upstream": [
+        "packages/ai/src/utils/retry.ts"
+      ],
+      "change": "The retryable provider-error pattern provider.?returned.?error becomes provider.?returned.?(?:an.?)?error, so \"The upstream provider returned an error\" is retried.",
+      "pisharp": [
+        "src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs",
+        "src/PiSharp.Cli/Extensions/Pi/PiExtensionModels.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "ai.codex-zstd-body-copy",
+      "area": "ai",
+      "status": "no-op",
+      "changelog": [],
+      "upstream": [
+        "packages/ai/src/api/openai-codex-responses.ts"
+      ],
+      "change": "Unlisted: the zstd-compressed request body is copied into a Uint8Array that owns a plain ArrayBuffer (TypeScript lib typing for fetch).",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/OpenAICodexResponses/OpenAICodexResponsesTransport.cs"
+      ],
+      "release": "1.2.0",
+      "evidence": "The diff changes only the buffer's TypeScript type and copies the same bytes; the request body sent on the wire is unchanged."
+    },
+    {
+      "id": "ai.model-catalog-data",
+      "area": "ai",
+      "status": "port",
+      "changelog": [],
+      "upstream": [
+        "packages/ai/scripts/generate-models.ts",
+        "packages/ai/src/models.generated.ts",
+        "packages/ai/src/providers/*.models.ts"
+      ],
+      "change": "Unlisted: generated model data changed between the pi-ai 1.1.0 and 1.2.0 packages (Claude 5.5 entries now come from models.dev instead of hand-added rows, plus the regular catalog refresh).",
+      "pisharp": [
+        "src/PiSharp.Cli/Models/*.json",
+        "src/PiSharp.Cli/Models/BuiltinModelCatalog.cs",
+        "THIRD-PARTY-NOTICES.md"
+      ],
+      "release": "1.2.0",
+      "notes": "Mechanical shard refresh from the published @earendil-works/pi-ai 1.2.0 package; see catalogRefresh."
+    },
+    {
+      "id": "schemas.ai-compat-and-model-schemas",
+      "area": "schemas",
+      "status": "port",
+      "changelog": [],
+      "upstream": [
+        "packages/ai/src/types.ts",
+        "packages/ai/src/providers/compat-schema.ts",
+        "packages/ai/src/providers/model-schema.ts",
+        "packages/coding-agent/src/core/model-config.ts"
+      ],
+      "change": "Unlisted refactor behind the published models schema: the compat, cost, thinking-level and input-limit types become TypeBox schemas in pi-ai, and models.json validation uses them (also accepting a top-level $schema). Type shapes are unchanged; validation wording for invalid models.json may change.",
+      "pisharp": [
+        "src/PiSharp.Cli/Models/ModelsJsonConfig.cs",
+        "src/PiSharp.Contracts/Compatibility/JsJsonSyntax.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "Compare the v1.1.0 inline schemas in model-config.ts with compat-schema.ts/model-schema.ts field by field (e.g. ChatTemplateKwarg $var gains thinking.budget)."
+    },
+    {
+      "id": "schemas.config-schemas",
+      "area": "schemas",
+      "status": "port",
+      "changelog": [
+        "coding-agent/New Features#2",
+        "coding-agent/Breaking Changes#1"
+      ],
+      "upstream": [
+        "packages/coding-agent/schemas/settings.schema.json",
+        "packages/coding-agent/schemas/models.schema.json",
+        "packages/coding-agent/schemas/keybindings.schema.json",
+        "packages/coding-agent/scripts/generate-schemas.ts",
+        "packages/coding-agent/src/core/settings-schema.ts",
+        "packages/coding-agent/src/core/keybindings-schema.ts",
+        "packages/coding-agent/src/core/key-id-schema.ts",
+        "packages/coding-agent/src/core/keybindings.ts",
+        "packages/coding-agent/src/core/model-config.ts",
+        "packages/coding-agent/docs/settings.md",
+        "packages/coding-agent/docs/models.md",
+        "packages/coding-agent/docs/keybindings.md"
+      ],
+      "change": "Published JSON schemas (https://pi.dev/schemas/*.schema.json) for settings.json, models.json and keybindings.json. A $schema key is accepted in each file (keybindings skip it; models.json declares it), and keybinding values are checked with KeybindingValueSchema.",
+      "pisharp": [
+        "src/PiSharp.Cli/Models/ModelsJsonConfig.cs",
+        "src/PiSharp.Cli/Interactive/TerminalKeybindingConfigurationLoader.cs",
+        "src/PiSharp.Cli/Interactive/Mode/AppKeybindings.cs",
+        "src/PiSharp.Cli/Interactive/Mode/InteractiveSettings.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "PiSharp does not host the schemas; the work is accepting $schema everywhere Pi does and matching keybinding value validation. Decide whether to ship the four schema files with the CLI or docs."
+    },
+    {
+      "id": "schemas.theme-schema",
+      "area": "schemas",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Breaking Changes#1"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/theme/theme-schema.ts",
+        "packages/coding-agent/src/modes/interactive/theme/theme-tokens.ts",
+        "packages/coding-agent/src/modes/interactive/theme/theme.ts",
+        "packages/coding-agent/src/main.ts",
+        "packages/coding-agent/src/modes/interactive/theme/dark.json",
+        "packages/coding-agent/src/modes/interactive/theme/light.json",
+        "packages/coding-agent/schemas/theme.schema.json",
+        "packages/coding-agent/docs/themes.md"
+      ],
+      "change": "The theme schema moves to https://pi.dev/schemas/theme.schema.json (theme-json.ts and theme-schema.json replaced by theme-schema.ts/theme-tokens.ts); themes loaded during startup get the same validation as later reloads (setThemeJsonValidator runs at the start of main); reusable colours go under vars and unsupported metadata is rejected (additionalProperties: false). The built-in dark/light themes' $schema becomes the pi.dev URL.",
+      "pisharp": [
+        "src/PiSharp.Cli/Interactive/Mode/Theme/Theme.cs",
+        "src/PiSharp.CodingAgent/Export/PiThemes.cs",
+        "src/PiSharp.CodingAgent/Export/Assets/dark.json",
+        "src/PiSharp.CodingAgent/Export/Assets/light.json"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "core.before-agent-start-custom",
+      "area": "coding-agent-core",
+      "status": "port",
+      "changelog": [
+        "coding-agent/New Features#5",
+        "coding-agent/Breaking Changes#2",
+        "coding-agent/Fixed#5"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/core/agent-session.ts",
+        "packages/coding-agent/src/core/extensions/runner.ts",
+        "packages/coding-agent/src/core/extensions/types.ts",
+        "packages/coding-agent/src/core/extensions/index.ts",
+        "packages/coding-agent/src/index.ts",
+        "packages/coding-agent/docs/extensions.md"
+      ],
+      "change": "before_agent_start also fires for runs started by pi.sendMessage(..., { triggerTurn: true }) while idle. BeforeAgentStartEvent becomes a union on messageType: \"user\" (prompt, images) or \"custom\" (message, no prompt). Handler messages are added to both kinds of run; pending nextTurn messages go with the custom-message run; the run keeps its before_agent_start system prompt sections for every turn (_startRun/_prepareRun).",
+      "pisharp": [
+        "src/PiSharp.CodingAgent/PersistentAgentSession.SystemPrompt.cs",
+        "src/PiSharp.CodingAgent/PersistentAgentSession.ExtensionMessages.cs",
+        "src/PiSharp.CodingAgent/PersistentAgentSession.Recovery.cs",
+        "src/PiSharp.Extensions.Abstractions/Events/ReducerContracts.cs",
+        "src/PiSharp.Extensions.Abstractions/RegistrationContracts.cs",
+        "src/PiSharp.Extensions.Agent/RegisteredExtensionContextHooks.cs",
+        "src/PiSharp.Extensions.Runtime/Dispatch/ExtensionEventDispatcher.cs",
+        "src/PiSharp.Extensions.Runtime/Dispatch/RegisteredExtensionEventDispatcher.cs",
+        "src/PiSharp.Cli/Extensions/NativeExtensionActivation.cs",
+        "src/PiSharp.Cli/Extensions/Pi/PiNodeOwner.cs",
+        "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.Requests.cs",
+        "compatibility/extensions/event-catalog.v1.1.0.json"
+      ],
+      "release": "1.2.0",
+      "notes": "Cross-area: the Node bridge (TS extensions see messageType/message) and the event catalog (BeforeAgentStartEvent declaration changes; generate a v1.2.0 catalog). Implement together with core.busy-while-starting."
+    },
+    {
+      "id": "core.busy-while-starting",
+      "area": "coding-agent-core",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Breaking Changes#3"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/core/agent-session.ts"
+      ],
+      "change": "The session counts as busy from the start of a run, including during before_agent_start: ctx.isIdle() is false, pi.sendMessage() queues into the starting run (no second run failing with \"Agent is already processing\"), pi.sendUserMessage() requires deliverAs, and an abort requested meanwhile aborts the run at agent_start. Pending bash/custom messages are flushed after run preparation, before the starting messages.",
+      "pisharp": [
+        "src/PiSharp.CodingAgent/PersistentAgentSession.cs",
+        "src/PiSharp.CodingAgent/PersistentAgentSession.ExtensionMessages.cs",
+        "src/PiSharp.Cli/Extensions/NativeExtensionContextFacadeHost.cs",
+        "src/PiSharp.Cli/Extensions/NativeSessionLiveFacadeReads.cs",
+        "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.Requests.cs",
+        "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "core.settings-defaults",
+      "area": "coding-agent-core",
+      "status": "no-op",
+      "changelog": [],
+      "upstream": [
+        "packages/coding-agent/src/core/settings-defaults.ts",
+        "packages/coding-agent/src/core/settings-manager.ts",
+        "packages/coding-agent/src/core/project-trust.ts",
+        "packages/coding-agent/src/extensions/codemode/index.ts"
+      ],
+      "change": "Unlisted refactor: setting defaults move into SETTINGS_DEFAULTS (shared with the published schema) and the Settings types move to settings-schema.ts.",
+      "pisharp": [
+        "src/PiSharp.Cli/Interactive/Mode/InteractiveSettings.cs",
+        "src/PiSharp.Cli/Pi/PiSettings.cs"
+      ],
+      "release": "1.2.0",
+      "evidence": "Every changed getter in settings-manager.ts replaces a literal with the SETTINGS_DEFAULTS entry of the same value (transport auto, steering/follow-up one-at-a-time, compaction 16384/20000, branch summary 16384/false, retry 3/2000/60000, quietStartup false, defaultProjectTrust ask, terminal 60 cells, treeFilterMode default, outputPad 1, autocompleteMaxVisible 5, markdown mermaid streaming, codemode on/3000, cacheWarming streaming, tuiMode fullscreen). The schema-file side is schemas.config-schemas."
+    },
+    {
+      "id": "core.serialize-conversation-no-thinking",
+      "area": "coding-agent-core",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Changed#4"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/core/compaction/utils.ts",
+        "packages/coding-agent/docs/compaction.md"
+      ],
+      "change": "serializeConversation() (compaction, branch summaries, bug reports) omits thinking blocks; the [Assistant thinking] section is gone.",
+      "pisharp": [
+        "src/PiSharp.Sessions/Compaction/SessionSummaryRequestBuilder.cs",
+        "src/PiSharp.CodingAgent/Diagnostics/BugReport.cs",
+        "tools/NodeBridge/pi-host/virtual/coding-agent/core/compaction/utils.mjs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "core.context-file-symlink",
+      "area": "coding-agent-core",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#3"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/core/resource-loader.ts"
+      ],
+      "change": "loadProjectContextFiles compares the directory's real path joined with the file name, so a worktree AGENTS.md symlinked to the main repo's file no longer shadows itself and loads.",
+      "pisharp": [
+        "src/PiSharp.Cli/Pi/PiResources.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "core.print-mode-truncated",
+      "area": "coding-agent-core",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#7"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/modes/print-mode.ts"
+      ],
+      "change": "Print mode: when the final assistant message stopped with \"length\", print the partial text, write \"Response was truncated: the model reached its output token limit.\" to stderr and exit 1.",
+      "pisharp": [
+        "src/PiSharp.Cli/Pi/PiPrintMode.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "core.resource-pattern-tilde",
+      "area": "coding-agent-core",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#9"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/core/package-manager.ts"
+      ],
+      "change": "~ is expanded (normalizePath) in !pattern, +path and -path entries of the extensions, skills, prompts and themes settings before matching.",
+      "pisharp": [
+        "src/PiSharp.Cli/Packages/PiPackageManager.cs",
+        "src/PiSharp.Cli/Packages/PiGlob.cs",
+        "src/PiSharp.Cli/Pi/PiResources.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "core.auth-lock-eperm",
+      "area": "coding-agent-core",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#12"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/core/auth-storage.ts"
+      ],
+      "change": "On Windows, EPERM while taking the auth.json lock (a delete-pending lock folder) is retried: in the sync path up to the existing 10 attempts, in the async path at most 5 times within the 30 s stale deadline; other errors still fail fast.",
+      "pisharp": [
+        "src/PiSharp.Cli/Authentication/AuthJsonCredentialStore.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "PiSharp's lock is a FileStream CreateNew on auth.json.lock that already retries while the lock path exists; verify the access-denied path against upstream's capped EPERM retries and port only the difference."
+    },
+    {
+      "id": "core.removed-experimental-stack",
+      "area": "coding-agent-core",
+      "status": "exclude",
+      "changelog": [
+        "coding-agent/Removed#1"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/experimental/**",
+        "packages/coding-agent/src/cli/experimental/**",
+        "packages/coding-agent/src/client/index.ts",
+        "packages/client",
+        "packages/server",
+        "packages/protocol",
+        "packages/coding-agent/examples/plugins/pi-example-plugin/**"
+      ],
+      "change": "The unreleased experimental server, client and plugin stack and the pi-client, pi-protocol and pi-server packages are removed.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: never ported (excluded by decision 0002); nothing to remove. pisharp durable stays on feature/pi-durable as a PiSharp-only mode."
+    },
+    {
+      "id": "cli.mcp-list-resources",
+      "area": "coding-agent-cli",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Breaking Changes#4"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/cli.ts"
+      ],
+      "change": "pi mcp list --json reports resources: true for servers that offer resources (no resources/resourceTemplates counts); the text listing prints \"offers resources\" instead of \"resources: N, URI templates: M\".",
+      "pisharp": [
+        "src/PiSharp.Cli/Commands/McpCommand.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "Depends on mcp.no-resource-listing-at-connect (no counts are collected any more)."
+    },
+    {
+      "id": "cli.mcp-login-timeout-help",
+      "area": "coding-agent-cli",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#8"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/cli.ts",
+        "packages/coding-agent/docs/cli.md",
+        "packages/coding-agent/docs/mcp.md"
+      ],
+      "change": "pi mcp login help: --timeout <seconds> is \"Time limit for the whole sign-in (default: 300)\".",
+      "pisharp": [
+        "src/PiSharp.Cli/Commands/McpCommand.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "Help text only: McpCommand.cs:99 still says \"How long login waits for the browser\"; the behaviour (whole sign-in) already matches (McpCommand.cs:462)."
+    },
+    {
+      "id": "tools.reaches-tools",
+      "area": "tools",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Added#1"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/types.ts",
+        "packages/coding-agent/src/core/agent-session.ts",
+        "packages/coding-agent/src/extensions/codemode/tool.ts",
+        "packages/coding-agent/src/extensions/tool-search/tool.ts",
+        "packages/coding-agent/src/extensions/mcp/index.ts"
+      ],
+      "change": "ToolDefinition.reachesTools(input) => \"all\" | words: codemode reports \"all\" when a script uses searchTools/describeNamespace/describeTool/ALL_TOOLS, else the script's words; tool_search reports \"all\". ToolInfo exposes reachesTools. The MCP extension waits for the servers a call may reach (a word containing mcp__<server>) and treats a codemode/tool_search tool as able to reach MCP tools only when it declares reachesTools (isCodemodeTool/isToolSearchTool are removed).",
+      "pisharp": [
+        "src/PiSharp.Extensions.Abstractions/RegistrationContracts.cs",
+        "src/PiSharp.Agent/ToolContracts.cs",
+        "src/PiSharp.Codemode/Tool/CodemodeToolDefinition.cs",
+        "src/PiSharp.Cli/Mcp/McpToolSearch.cs",
+        "src/PiSharp.Cli/Mcp/McpBackgroundConnections.cs",
+        "src/PiSharp.Cli/Mcp/McpCallGrants.cs",
+        "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/McpDiscoveryToolIdentity.cs",
+        "src/PiSharp.Cli/Extensions/Pi/PiNodeOwner.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "Cross-area: codemode and MCP consume it, and TS extensions can declare it through the Node bridge (getAllTools() results carry it)."
+    },
+    {
+      "id": "tools.namespace-aliases",
+      "area": "tools",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Added#2"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/types.ts",
+        "packages/coding-agent/src/extensions/codemode/execute.ts",
+        "packages/coding-agent/src/extensions/mcp/index.ts"
+      ],
+      "change": "ToolNamespace.aliases: codemode's describeNamespace() and searchTools({ namespace }) match the namespace name or an alias, as written or as a script identifier; the old match on the part after the last __ is removed. MCP namespaces register aliases: [serverName].",
+      "pisharp": [
+        "src/PiSharp.Codemode/Tool/CodemodeHost.cs",
+        "src/PiSharp.Codemode/Tool/CodemodeExecutor.cs",
+        "src/PiSharp.Cli/Mcp/McpCodemode.cs",
+        "src/PiSharp.Extensions.Abstractions/RegistrationContracts.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "tui.fake-cursor",
+      "area": "tui",
+      "status": "port",
+      "changelog": [
+        "tui/Breaking Changes#1",
+        "tui/Added#1",
+        "tui/Changed#1",
+        "coding-agent/Changed#1"
+      ],
+      "upstream": [
+        "packages/tui/src/tui.ts",
+        "packages/tui/src/components/editor.ts",
+        "packages/tui/src/components/input.ts",
+        "packages/tui/src/tui-alt-screen.ts",
+        "packages/tui/src/tui-main-screen.ts",
+        "packages/tui/src/index.ts",
+        "packages/coding-agent/src/modes/interactive/components/settings-selector.ts"
+      ],
+      "change": "Editor and Input wrap their drawn cursor in zero-width APC markers (renderFakeCursor, \\x1b_pi:fc\\x07 ... \\x1b_pi:/fc\\x07). The TUI resolves them to reverse video (\\x1b[7m ... \\x1b[27m; the editor previously closed with \\x1b[0m) before compositing, and drops the focused fake cursor after CURSOR_MARKER when showHardwareCursor is on. The settings description becomes \"Use the terminal cursor instead of Pi's drawn cursor\".",
+      "pisharp": [
+        "src/PiSharp.Tui/Pi/Tui.cs",
+        "src/PiSharp.Tui/Pi/Editor.cs",
+        "src/PiSharp.Tui/Pi/Components.cs",
+        "src/PiSharp.Tui/Pi/TuiAltScreen.cs",
+        "src/PiSharp.Tui/Pi/TuiMainScreen.cs",
+        "src/PiSharp.Cli/Interactive/Mode/Components/SettingsSelector.cs",
+        "tools/NodeBridge/pi-host/virtual/tui/tui.mjs",
+        "tools/NodeBridge/pi-host/virtual/pi-tui.mjs"
+      ],
+      "release": "1.2.0",
+      "notes": "pi-tui exports renderFakeCursor: the Node bridge's pi-tui surface must add it."
+    },
+    {
+      "id": "tui.overlay-cursor-marker",
+      "area": "tui",
+      "status": "port",
+      "changelog": [
+        "tui/Fixed#1"
+      ],
+      "upstream": [
+        "packages/tui/src/utils.ts"
+      ],
+      "change": "extractSegments keeps zero-width APC markers (CURSOR_MARKER) at the boundary where an overlay ends directly left of the cursor.",
+      "pisharp": [
+        "src/PiSharp.Tui/Pi/TextUtils.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "tui.overlay-wheel",
+      "area": "tui",
+      "status": "port",
+      "changelog": [
+        "tui/Fixed#2",
+        "coding-agent/Fixed#16"
+      ],
+      "upstream": [
+        "packages/tui/src/tui-alt-screen.ts"
+      ],
+      "change": "Wheel events no component handles scroll the transcript instead of reaching a focused overlay's handleInput as raw input (shouldDeferViewportInputToOverlay check removed); overlays that scroll must implement handleMouse.",
+      "pisharp": [
+        "src/PiSharp.Tui/Pi/TuiAltScreen.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "tui.terminal-reply-fragments",
+      "area": "tui",
+      "status": "port",
+      "changelog": [
+        "tui/Fixed#3",
+        "coding-agent/Fixed#17"
+      ],
+      "upstream": [
+        "packages/tui/src/stdin-buffer.ts"
+      ],
+      "change": "StdinBuffer waits for the terminator of strings with a recognised terminal-reply header (OSC 10/11/4 colours, OSC 7501, XTVersion, Kitty graphics) instead of flushing them on the timeout; CAN/SUB and a new ESC end an unterminated reply; a flushed control string is split back into Alt+key plus reparsed input.",
+      "pisharp": [
+        "src/PiSharp.Tui/Pi/StdinBuffer.cs",
+        "src/PiSharp.Tui/Pi/Terminal.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "tui.herdr-kitty-images",
+      "area": "tui",
+      "status": "port",
+      "changelog": [
+        "tui/Fixed#4",
+        "coding-agent/Fixed#18"
+      ],
+      "upstream": [
+        "packages/tui/src/terminal-image.ts"
+      ],
+      "change": "TERM_PROGRAM=herdr reports the Kitty graphics protocol (images: \"kitty\") instead of no image protocol.",
+      "pisharp": [
+        "src/PiSharp.Tui/Pi/TerminalImage.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "TerminalImage.cs:53 returns ImageProtocol.None for herdr."
+    },
+    {
+      "id": "tui.shifted-symbol-keys",
+      "area": "tui",
+      "status": "port",
+      "changelog": [
+        "tui/Fixed#5",
+        "coding-agent/Fixed#19"
+      ],
+      "upstream": [
+        "packages/tui/src/keys.ts"
+      ],
+      "change": "Bindings naming a shifted symbol (+, ctrl++) match when Kitty or modifyOtherKeys reports Shift plus the unshifted key; parseKey() returns the produced symbol (+ instead of shift+=); key ids are parsed modifier by modifier so ctrl++ works, and duplicate modifiers are invalid.",
+      "pisharp": [
+        "src/PiSharp.Tui/Pi/Keys.cs",
+        "src/PiSharp.Tui/Input/TerminalInputDecoder.cs",
+        "src/PiSharp.Tui/Input/TerminalKeybindings.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "tui.compaction-indicator-color",
+      "area": "tui",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#20"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/modes/interactive/components/status-indicator.ts",
+        "packages/coding-agent/src/modes/interactive/interactive-mode.ts"
+      ],
+      "change": "CompactionStatusIndicator takes an optional colorFn; when the status is embedded in a custom editor it uses the editor border colour or the thinking-level border colour, as the working indicator does.",
+      "pisharp": [
+        "src/PiSharp.Cli/Interactive/Mode/Components/StatusIndicator.cs",
+        "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Events.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "tui.clipboard-osc52-env",
+      "area": "tui",
+      "status": "port",
+      "changelog": [
+        "coding-agent/New Features#3",
+        "coding-agent/Added#4"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/utils/clipboard.ts",
+        "packages/coding-agent/docs/environment-variables.md"
+      ],
+      "change": "PI_CLIPBOARD_OSC52=1 counts as a remote session, so copies also go to the terminal with OSC 52 after the local clipboard write.",
+      "pisharp": [
+        "src/PiSharp.Cli/Interactive/Mode/Utilities/Clipboard.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "codemode.declaration-constraints",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [
+        "coding-agent/New Features#4",
+        "coding-agent/Changed#2",
+        "codemode/Changed#1"
+      ],
+      "upstream": [
+        "packages/codemode/src/declarations.ts"
+      ],
+      "change": "schemaToType() shows constraints TypeScript cannot express as @ tags on the property comment (// @integer @minimum 0 @maximum 30000 @default 0): integer, numeric bounds, multipleOf, string length, pattern, format, array length, uniqueItems, non-null default, deprecated; nullable anyOf/oneOf read the non-null branch; draft-04 boolean exclusive bounds; descriptions also split on U+2028/U+2029; over maxChars the type is re-rendered without tags before becoming unknown.",
+      "pisharp": [
+        "src/PiSharp.Codemode/CodemodeDeclarations.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "packages/codemode/test/declarations.test.ts has the expected renderings."
+    },
+    {
+      "id": "codemode.mcp-result-type",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Changed#3",
+        "codemode/Breaking Changes#1"
+      ],
+      "upstream": [
+        "packages/codemode/src/declarations.ts",
+        "packages/codemode/src/index.ts",
+        "packages/coding-agent/src/extensions/codemode/tool.ts",
+        "packages/coding-agent/src/extensions/mcp/tools.ts"
+      ],
+      "change": "MCP_TYPESCRIPT_PREAMBLE and mcpStructuredContentSchema() are removed: every output schema renders as its own type, MCP tool declarations spell out { content, structuredContent, isError } (content items typed by a compact block schema, the tool's own schema relocated under #/properties/structuredContent, structuredContent {} when none), the codemode description drops the Shared MCP Types section, and the call summary lists nested fields one level deep.",
+      "pisharp": [
+        "src/PiSharp.Codemode/CodemodeDeclarations.cs",
+        "src/PiSharp.Codemode/Tool/CodemodeToolDefinition.cs",
+        "src/PiSharp.Codemode/Tool/CodemodeHost.cs",
+        "src/PiSharp.Cli/Mcp/McpToolResults.cs",
+        "src/PiSharp.Cli/Mcp/McpCodemode.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "Cross-area with mcp.structured-content-any-json (structuredContent typed unknown when the tool has no output schema)."
+    },
+    {
+      "id": "codemode.options-line-first",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#1",
+        "codemode/Fixed#1"
+      ],
+      "upstream": [
+        "packages/codemode/src/source.ts"
+      ],
+      "change": "parseCodemodeSource() throws CodemodeSourceError \"The // @options: line must be the first line of the input; found one on line N\" when a later line starts (after leading whitespace) with the options prefix.",
+      "pisharp": [
+        "src/PiSharp.Codemode/CodemodeSource.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "codemode.description-failure-resolve",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#4"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/extensions/codemode/tool.ts"
+      ],
+      "change": "The codemode description says a tool whose declaration returns an object also resolves on failure when it returned that object (check its fields), instead of claiming every failed call rejects.",
+      "pisharp": [
+        "src/PiSharp.Codemode/Tool/CodemodeToolDefinition.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "codemode.linear-text-join",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#6"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/extensions/codemode/execute.ts"
+      ],
+      "change": "Joining adjacent text output items is linear: parts are collected and joined once, with the separator decided by the last non-empty part.",
+      "pisharp": [
+        "src/PiSharp.Codemode/Tool/CodemodeExecutor.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "CodemodeExecutor.JoinAdjacentText concatenates strings per item (quadratic), like v1.1.0."
+    },
+    {
+      "id": "codemode.row-timer",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Added#5"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/extensions/codemode/renderer.ts",
+        "packages/coding-agent/src/extensions/codemode/execute.ts",
+        "packages/coding-agent/src/core/tools/render-utils.ts",
+        "packages/coding-agent/src/core/tools/renderers/bash.ts"
+      ],
+      "change": "The codemode row shows Elapsed while the script runs and Took once finished, like bash rows (startToolTimer/toolTimerText moved to render-utils.ts and shared with the bash renderer); executeCodemode publishes an update before the first nested call so the timer starts.",
+      "pisharp": [
+        "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/CodemodeRenderer.cs",
+        "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/RenderUtils.cs",
+        "src/PiSharp.Cli/Interactive/Mode/Components/ToolRenderers/Bash.cs",
+        "src/PiSharp.Codemode/Tool/CodemodeExecutor.cs",
+        "src/PiSharp.Codemode/Tool/CodemodeRenderer.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "codemode.prelude-refresh",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [
+        "codemode/Changed#2"
+      ],
+      "upstream": [
+        "packages/codemode/src/runtime/prelude-source.ts"
+      ],
+      "change": "PRELUDE_SOURCE: image() errors describe { type: \"image\", data, mimeType } instead of an MCP image block; settle() takes an optional propertiesJson whose properties a rejected Error receives (used by deterministic runs).",
+      "pisharp": [
+        "src/PiSharp.Codemode/Runtime/codemode-prelude.js",
+        "src/PiSharp.Codemode/Runtime/CodemodePrelude.cs",
+        "src/PiSharp.Codemode/CodemodeTypes.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "codemode-prelude.js is the evaluated PRELUDE_SOURCE byte-for-byte below its header; refresh it from v1.2.0 and re-pin the header."
+    },
+    {
+      "id": "codemode.promise-job-interrupts",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [
+        "codemode/Changed#3"
+      ],
+      "upstream": [
+        "packages/codemode/src/runtime/vm.ts"
+      ],
+      "change": "The VM polls for interrupts while draining promise jobs, so while (true) await null is stopped by the timeout like a synchronous loop.",
+      "pisharp": [
+        "src/PiSharp.Codemode/Runtime/CodemodeEngineRunner.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "PiSharp runs scripts on Jint (decision 0003): verify the timeout/cancellation constraint interrupts a microtask-only loop and add a test."
+    },
+    {
+      "id": "codemode.new-sandboxes",
+      "area": "codemode",
+      "status": "exclude",
+      "changelog": [
+        "codemode/Added#1",
+        "codemode/Added#2",
+        "codemode/Added#3",
+        "codemode/Added#4"
+      ],
+      "upstream": [
+        "packages/codemode/src/runtime/remote.ts",
+        "packages/codemode/src/runtime/inline.ts",
+        "packages/codemode/src/runtime/execution.ts",
+        "packages/codemode/src/runtime/vm.ts",
+        "packages/codemode/src/portable.ts",
+        "packages/codemode/src/cloudflare.ts",
+        "packages/codemode/examples/cloudflare/**"
+      ],
+      "change": "RemoteCodemodeSandbox (Cloudflare Durable Object), InlineCodemodeSandbox, the portable entry with CodemodeSandboxBase, and deterministic sandbox.start() runs.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: sandbox hosting options the coding agent does not use (its codemode extension still runs CodemodeSandbox); PiSharp runs codemode on Jint."
+    },
+    {
+      "id": "codemode.node-watch-messages",
+      "area": "codemode",
+      "status": "no-op",
+      "changelog": [
+        "coding-agent/Fixed#23",
+        "codemode/Fixed#2"
+      ],
+      "upstream": [
+        "packages/codemode/src/runtime/host.ts"
+      ],
+      "change": "The worker-thread host ignores Node --watch notifications on the worker channel.",
+      "pisharp": [
+        "src/PiSharp.Codemode/Runtime/CodemodeEngineRunner.cs"
+      ],
+      "release": "1.2.0",
+      "evidence": "PiSharp runs codemode in-process on Jint (decision 0003) with no Node worker channel, so there is no message to ignore."
+    },
+    {
+      "id": "codemode.classifier-context-checks",
+      "area": "codemode",
+      "status": "no-op",
+      "changelog": [],
+      "upstream": [
+        "packages/coding-agent/src/extensions/codemode/execute.ts"
+      ],
+      "change": "Unlisted refactor: classifier/images context validation inlines the isRecord checks (ScriptValue reads).",
+      "pisharp": [
+        "src/PiSharp.Codemode/Tool/CodemodeExecutor.cs"
+      ],
+      "release": "1.2.0",
+      "evidence": "Every error message and accept/reject decision is unchanged: objects, arrays and null are classified as before."
+    },
+    {
+      "id": "mcp.structured-content-any-json",
+      "area": "mcp",
+      "status": "port",
+      "changelog": [
+        "mcp/Breaking Changes#1",
+        "coding-agent/Fixed#11"
+      ],
+      "upstream": [
+        "packages/mcp/src/client.ts",
+        "packages/mcp/src/protocol/content.ts",
+        "packages/coding-agent/src/extensions/mcp/tools.ts"
+      ],
+      "change": "tools/call accepts any JSON value as structuredContent (arrays, null, primitives; MCP 2026-07-28) instead of failing with \"Invalid MCP tools/call structured content\"; declarations of MCP tools without an output schema type structuredContent as unknown.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Runtime/Mcp/McpServerRuntime.cs",
+        "src/PiSharp.Cli/Mcp/McpToolResults.cs",
+        "src/PiSharp.Agent/ToolResultValueCodec.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "McpServerRuntime.cs:712 still rejects non-object structured content."
+    },
+    {
+      "id": "mcp.oauth-iss-without-metadata",
+      "area": "mcp",
+      "status": "port",
+      "changelog": [
+        "mcp/Fixed#1",
+        "coding-agent/Fixed#22"
+      ],
+      "upstream": [
+        "packages/mcp/src/oauth/flow.ts",
+        "packages/mcp/src/oauth/errors.ts"
+      ],
+      "change": "An authorization response with an iss parameter is rejected when no authorization server metadata was discovered (OAuthIssuerMismatchError with expected undefined, message \"expected none\"), per RFC 9207.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpAdmittedOAuthOrchestrator.cs",
+        "src/PiSharp.Extensions.Abstractions/Mcp/Authentication/McpOAuthOrchestrationContracts.cs",
+        "src/PiSharp.Cli/Mcp/Authentication/McpDefaultOAuthProtocol.cs"
+      ],
+      "release": "1.2.0"
+    },
+    {
+      "id": "mcp.no-dispatch-after-settle",
+      "area": "mcp",
+      "status": "port",
+      "changelog": [
+        "mcp/Fixed#2",
+        "coding-agent/Fixed#21"
+      ],
+      "upstream": [
+        "packages/mcp/src/client.ts",
+        "packages/mcp/src/transports/streamable-http.ts",
+        "packages/mcp/src/transports/transport.ts",
+        "packages/mcp/src/index.ts"
+      ],
+      "change": "McpTransport.send() takes an optional signal that McpClient aborts once a request settles (answered, cancelled, timed out, client closed); StreamableHttpTransport does not dispatch or retry a request after an authorization refresh once its signal is aborted.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpStreamableHttpTransport.cs",
+        "src/PiSharp.Extensions.Runtime/Mcp/McpServerRuntime.cs",
+        "src/PiSharp.Cli/Mcp/AdmittedMcpHttpChannelFactory.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "Verify whether PiSharp's per-request cancellation token already stops dispatch after a token refresh; port only the gap."
+    },
+    {
+      "id": "mcp.no-resource-listing-at-connect",
+      "area": "mcp",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Fixed#10",
+        "coding-agent/Breaking Changes#4"
+      ],
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/runtime.ts",
+        "packages/coding-agent/src/extensions/mcp/index.ts",
+        "packages/coding-agent/src/extensions/mcp/resources.ts"
+      ],
+      "change": "Connecting no longer lists resources and templates (nor refreshes them on list_changed): tools register as soon as tools/list answers, hasResources comes from the server capability, and /mcp shows \"connected · N tools · resources\" instead of a resource count.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Runtime/Mcp/McpServerRuntime.cs",
+        "src/PiSharp.Cli/Mcp/McpServerManager.cs",
+        "src/PiSharp.Cli/Mcp/McpSessionHost.cs",
+        "src/PiSharp.Cli/Interactive/Mode/InteractiveMode.Mcp.cs",
+        "src/PiSharp.Cli/Mcp/McpPreparedServer.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "McpServerRuntime.cs:308 counts resources/list and resources/templates/list at connect."
+    },
+    {
+      "id": "node-bridge.pi-runtime-1.2.0",
+      "area": "node-bridge",
+      "status": "port",
+      "changelog": [
+        "coding-agent/Removed#2"
+      ],
+      "upstream": [
+        "packages/coding-agent/package.json",
+        "packages/coding-agent/install-lock/package.json",
+        "packages/coding-agent/install-lock/package-lock.json",
+        "packages/coding-agent/src/core/extensions/loader.ts"
+      ],
+      "change": "Extensions run against the Pi 1.2.0 packages: pi-coding-agent, pi-ai, pi-tui, pi-agent-core, pi-mcp, pi-codemode and pi-telemetry at 1.2.0; @earendil-works/chord is no longer a dependency (and pi-client/pi-protocol/pi-server are gone). typebox and jiti pins are unchanged at 1.3.27 and 2.7.0 (check install-lock).",
+      "pisharp": [
+        "src/PiSharp.Cli/Extensions/Pi/PiNodeRuntime.cs",
+        "src/PiSharp.Cli/Extensions/Pi/PiExtensionHost.cs",
+        "tools/NodeBridge/pi-host/pi-modules.mjs",
+        "tools/NodeBridge/pi-host/virtual/port-upstream.mjs",
+        "tools/NodeBridge/pi-host/virtual/upstream-exports.json",
+        "tests/PiSharp.ExtensionParity.Tests/RuntimeCases.cs",
+        "website/src/content/docs/docs/extensions/node-bridge.md"
+      ],
+      "release": "1.2.0",
+      "notes": "Drop the chord override. Regenerate the compatibility modules with port-upstream.mjs against v1.2.0 (COMMIT constant, version strings, upstream-exports.json). Carry before_agent_start's union, reachesTools/aliases and renderFakeCursor through the bridge surface."
+    },
+    {
+      "id": "docs.upstream-docs",
+      "area": "docs",
+      "status": "port",
+      "changelog": [],
+      "upstream": [
+        "packages/coding-agent/docs/cli.md",
+        "packages/coding-agent/docs/cli-integration.md",
+        "packages/coding-agent/docs/codemode.md",
+        "packages/coding-agent/docs/compaction.md",
+        "packages/coding-agent/docs/environment-variables.md",
+        "packages/coding-agent/docs/extensions.md",
+        "packages/coding-agent/docs/keybindings.md",
+        "packages/coding-agent/docs/mcp.md",
+        "packages/coding-agent/docs/models.md",
+        "packages/coding-agent/docs/providers.md",
+        "packages/coding-agent/docs/settings.md",
+        "packages/coding-agent/docs/themes.md",
+        "packages/coding-agent/docs/tui.md"
+      ],
+      "change": "Unlisted doc updates that accompany the rows above.",
+      "pisharp": [
+        "src/PiSharp.Cli/docs/codemode.md",
+        "website/src/content/docs/docs"
+      ],
+      "release": "1.2.0",
+      "notes": "src/PiSharp.Cli/docs/codemode.md is a byte copy of docs/codemode.md (changed); website pages link to v1.1.0 docs and describe the v1.1.0 baseline until 1.2.0 ships."
+    },
+    {
+      "id": "docs.upstream-examples",
+      "area": "docs",
+      "status": "no-op",
+      "changelog": [],
+      "upstream": [
+        "packages/coding-agent/examples/**",
+        "packages/coding-agent/examples/README.md"
+      ],
+      "change": "Unlisted: example extension package versions, plan-mode and overlay-test examples, and the removed plugin example.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "evidence": "PiSharp does not copy upstream's examples; its samples live under samples/extensions."
+    },
+    {
+      "id": "packaging.build-tooling",
+      "area": "docs",
+      "status": "no-op",
+      "changelog": [],
+      "upstream": [
+        "package.json",
+        "package-lock.json",
+        "scripts/**",
+        "biome.json",
+        "tsconfig.json",
+        "packages/coding-agent/tsconfig.build.json",
+        ".github/**",
+        ".pi/prompts/dup.md"
+      ],
+      "change": "Unlisted: upstream build, lint, release and issue-triage tooling.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "evidence": "Build tooling only; no runtime surface. package-lock.json and package.json are re-hashed in target.lock.json."
+    },
+    {
+      "id": "agent.version-only",
+      "area": "coding-agent-core",
+      "status": "no-op",
+      "changelog": [],
+      "upstream": [
+        "packages/agent/package.json",
+        "packages/telemetry/package.json"
+      ],
+      "change": "pi-agent-core and pi-telemetry change only their package versions.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "evidence": "git diff v1.1.0 v1.2.0 -- packages/agent packages/telemetry touches only package.json; packages/agent/src/{types,agent-loop}.ts are byte-identical in target.lock.json."
+    },
+    {
+      "id": "exclude.env",
+      "area": "coding-agent-core",
+      "status": "exclude",
+      "changelog": [],
+      "upstream": [
+        "packages/env/**"
+      ],
+      "change": "pi-env remote execution daemon: pseudo-terminals (pty, ptyForeground) and listFiles for remote and local environments.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md (as 0002)."
+    },
+    {
+      "id": "exclude.durable",
+      "area": "coding-agent-core",
+      "status": "exclude",
+      "changelog": [],
+      "upstream": [
+        "packages/durable/**",
+        "packages/coding-agent/src/experimental/durable/**"
+      ],
+      "change": "pi-durable: durable code mode, deferred tools and tool_search, nested calls, image processing, listFiles; upstream deleted coding-agent/src/experimental/durable.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: stays on feature/pi-durable, re-pinned there separately; the owner keeps pisharp durable as a PiSharp-only mode."
+    },
+    {
+      "id": "exclude.chord",
+      "area": "coding-agent-core",
+      "status": "exclude",
+      "changelog": [],
+      "upstream": [
+        "packages/chord/**"
+      ],
+      "change": "Chord's facet and service runtime is replaced by the chord2 host runtime.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: Chord is not ported and the coding agent no longer depends on it."
+    },
+    {
+      "id": "exclude.evals",
+      "area": "coding-agent-core",
+      "status": "exclude",
+      "changelog": [],
+      "upstream": [
+        "packages/evals/**"
+      ],
+      "change": "pi-evals (private package) dependency bumps.",
+      "pisharp": [],
+      "release": "1.2.0",
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: private, unpublished package."
+    }
+  ],
+  "changelogCoverage": {
+    "coding-agent/New Features#1": [
+      "ai.openrouter-per-key-catalog"
+    ],
+    "coding-agent/New Features#2": [
+      "schemas.config-schemas"
+    ],
+    "coding-agent/New Features#3": [
+      "tui.clipboard-osc52-env"
+    ],
+    "coding-agent/New Features#4": [
+      "codemode.declaration-constraints"
+    ],
+    "coding-agent/New Features#5": [
+      "core.before-agent-start-custom"
+    ],
+    "coding-agent/Breaking Changes#1": [
+      "schemas.config-schemas",
+      "schemas.theme-schema"
+    ],
+    "coding-agent/Breaking Changes#2": [
+      "core.before-agent-start-custom"
+    ],
+    "coding-agent/Breaking Changes#3": [
+      "core.busy-while-starting"
+    ],
+    "coding-agent/Breaking Changes#4": [
+      "cli.mcp-list-resources",
+      "mcp.no-resource-listing-at-connect"
+    ],
+    "coding-agent/Added#1": [
+      "tools.reaches-tools"
+    ],
+    "coding-agent/Added#2": [
+      "tools.namespace-aliases"
+    ],
+    "coding-agent/Added#3": [
+      "ai.openrouter-per-key-catalog"
+    ],
+    "coding-agent/Added#4": [
+      "tui.clipboard-osc52-env"
+    ],
+    "coding-agent/Added#5": [
+      "codemode.row-timer"
+    ],
+    "coding-agent/Changed#1": [
+      "tui.fake-cursor"
+    ],
+    "coding-agent/Changed#2": [
+      "codemode.declaration-constraints"
+    ],
+    "coding-agent/Changed#3": [
+      "codemode.mcp-result-type"
+    ],
+    "coding-agent/Changed#4": [
+      "core.serialize-conversation-no-thinking"
+    ],
+    "coding-agent/Fixed#1": [
+      "codemode.options-line-first"
+    ],
+    "coding-agent/Fixed#2": [
+      "ai.mistral-header-timeout"
+    ],
+    "coding-agent/Fixed#3": [
+      "core.context-file-symlink"
+    ],
+    "coding-agent/Fixed#4": [
+      "codemode.description-failure-resolve"
+    ],
+    "coding-agent/Fixed#5": [
+      "core.before-agent-start-custom"
+    ],
+    "coding-agent/Fixed#6": [
+      "codemode.linear-text-join"
+    ],
+    "coding-agent/Fixed#7": [
+      "core.print-mode-truncated"
+    ],
+    "coding-agent/Fixed#8": [
+      "cli.mcp-login-timeout-help"
+    ],
+    "coding-agent/Fixed#9": [
+      "core.resource-pattern-tilde"
+    ],
+    "coding-agent/Fixed#10": [
+      "mcp.no-resource-listing-at-connect"
+    ],
+    "coding-agent/Fixed#11": [
+      "mcp.structured-content-any-json"
+    ],
+    "coding-agent/Fixed#12": [
+      "core.auth-lock-eperm"
+    ],
+    "coding-agent/Fixed#13": [
+      "ai.openrouter-negative-prices"
+    ],
+    "coding-agent/Fixed#14": [
+      "ai.anthropic-strict-fallback"
+    ],
+    "coding-agent/Fixed#15": [
+      "ai.retry-upstream-provider-error"
+    ],
+    "coding-agent/Fixed#16": [
+      "tui.overlay-wheel"
+    ],
+    "coding-agent/Fixed#17": [
+      "tui.terminal-reply-fragments"
+    ],
+    "coding-agent/Fixed#18": [
+      "tui.herdr-kitty-images"
+    ],
+    "coding-agent/Fixed#19": [
+      "tui.shifted-symbol-keys"
+    ],
+    "coding-agent/Fixed#20": [
+      "tui.compaction-indicator-color"
+    ],
+    "coding-agent/Fixed#21": [
+      "mcp.no-dispatch-after-settle"
+    ],
+    "coding-agent/Fixed#22": [
+      "mcp.oauth-iss-without-metadata"
+    ],
+    "coding-agent/Fixed#23": [
+      "codemode.node-watch-messages"
+    ],
+    "coding-agent/Removed#1": [
+      "core.removed-experimental-stack"
+    ],
+    "coding-agent/Removed#2": [
+      "node-bridge.pi-runtime-1.2.0"
+    ],
+    "ai/Added#1": [
+      "ai.openrouter-per-key-catalog"
+    ],
+    "ai/Added#2": [
+      "ai.openrouter-per-key-catalog"
+    ],
+    "ai/Fixed#1": [
+      "ai.mistral-header-timeout"
+    ],
+    "ai/Fixed#2": [
+      "ai.openrouter-negative-prices"
+    ],
+    "ai/Fixed#3": [
+      "ai.anthropic-strict-fallback"
+    ],
+    "ai/Fixed#4": [
+      "ai.retry-upstream-provider-error"
+    ],
+    "tui/Breaking Changes#1": [
+      "tui.fake-cursor"
+    ],
+    "tui/Added#1": [
+      "tui.fake-cursor"
+    ],
+    "tui/Changed#1": [
+      "tui.fake-cursor"
+    ],
+    "tui/Fixed#1": [
+      "tui.overlay-cursor-marker"
+    ],
+    "tui/Fixed#2": [
+      "tui.overlay-wheel"
+    ],
+    "tui/Fixed#3": [
+      "tui.terminal-reply-fragments"
+    ],
+    "tui/Fixed#4": [
+      "tui.herdr-kitty-images"
+    ],
+    "tui/Fixed#5": [
+      "tui.shifted-symbol-keys"
+    ],
+    "codemode/Breaking Changes#1": [
+      "codemode.mcp-result-type"
+    ],
+    "codemode/Added#1": [
+      "codemode.new-sandboxes"
+    ],
+    "codemode/Added#2": [
+      "codemode.new-sandboxes"
+    ],
+    "codemode/Added#3": [
+      "codemode.new-sandboxes"
+    ],
+    "codemode/Added#4": [
+      "codemode.new-sandboxes"
+    ],
+    "codemode/Changed#1": [
+      "codemode.declaration-constraints"
+    ],
+    "codemode/Changed#2": [
+      "codemode.prelude-refresh"
+    ],
+    "codemode/Changed#3": [
+      "codemode.promise-job-interrupts"
+    ],
+    "codemode/Fixed#1": [
+      "codemode.options-line-first"
+    ],
+    "codemode/Fixed#2": [
+      "codemode.node-watch-messages"
+    ],
+    "mcp/Breaking Changes#1": [
+      "mcp.structured-content-any-json"
+    ],
+    "mcp/Fixed#1": [
+      "mcp.oauth-iss-without-metadata"
+    ],
+    "mcp/Fixed#2": [
+      "mcp.no-dispatch-after-settle"
+    ]
+  },
+  "catalogRefresh": {
+    "inventories": "The v1.1.0 event catalog and command/RPC inventory stay validated against compatibility/target.v1.1.0.lock.json. Generate v1.2.0 inventories (event-catalog.v1.2.0.json, coding-agent-command-rpc-inventory.v1.2.0.json) with tools/SurfaceInventory/build-*.mjs --lock compatibility/target.lock.json and new overlays once the before_agent_start union and the other surface changes are ported.",
+    "modelShards": "See sync-1.2.0-worklist.json nonHeaderPins.model-catalog-shards."
+  }
+}
