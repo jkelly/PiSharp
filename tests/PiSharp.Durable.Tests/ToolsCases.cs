@@ -1,9 +1,8 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/tools.test.ts, as tools.<group>.<case>, on LocalExecutionEnv
-// (upstream NodeExecutionEnv). Its bash and powershell cases follow Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (tool task v2, durable
-// work list area a: a nonzero exit is an error result with structured output; the fake api's retainedOutput()); the read cases (images) and
-// the header move to v1.2.0 with area e, which owns the row. Verbatim apart from these adaptations:
-// - The tools take validated JSON arguments and the api is FakeToolApi (ToolsSupport.cs), upstream's fakeApi; jsdiff's applyPatch is
-//   ToolRunner.ApplyPatch.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tools.test.ts, as tools.<group>.<case>, on LocalExecutionEnv
+// (upstream NodeExecutionEnv). Verbatim apart from these adaptations:
+// - The tools take validated JSON arguments and the api is FakeToolApi (ToolsSupport.cs), upstream's fakeApi, whose agent names no model
+//   (read then treats the model as one that sees images); jsdiff's applyPatch is ToolRunner.ApplyPatch. Upstream's renamed `streamed` (what
+//   a tool wrote through api.output) is ToolRun.Output.
 // - Upstream's `Object.create(env)` override of openBinaryReader is a LocalExecutionEnv subclass wrapping the reader; `class extends
 //   BlockingWriteExecutionEnv { id = "other" }` overrides LocalFileSystem.Id.
 // - "receivedSignal toBe controller.signal": the prepare callback gets the call's context object itself, with its cancellation.
@@ -135,13 +134,17 @@ internal static partial class Program
             Equal("one\ntwo", result.Text, "text");
         });
 
-        yield return ToolEnvCase("read.reports-images-by-content-as-unsupported", async env =>
+        // Upstream v1.2.0 changed this case (CHANGELOG: read returns images as an image block within ImageLimits): an image is one image block
+        // with an info diagnostic, no longer an unsupported_image error.
+        yield return ToolEnvCase("read.returns-images-by-content-as-one-image-block", async env =>
         {
-            var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==");
-            (await env.WriteFileAsync("image.txt", png, ToolContext)).GetOrThrow();
+            const string data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==";
+            (await env.WriteFileAsync("image.txt", Convert.FromBase64String(data), ToolContext)).GetOrThrow();
             var result = await Run(CodingTools.CreateReadTool(), ToolArgs(("path", "image.txt")), env);
-            Check(result.Result.Output is { Count: 0 } && result.Result.IsError == true, "empty error result");
-            Equal("image.txt is an image (image/png); reading images is not supported", result.DiagnosticText, "diagnostic");
+            Equal("""[{"type":"image","data":"%s","mimeType":"image/png"}]""".Replace("%s", data, StringComparison.Ordinal),
+                result.Result.Output?.ToJson(), "output");
+            Equal(null, result.Result.IsError, "isError");
+            Equal("Read image file [image/png].", result.DiagnosticText, "diagnostic");
         });
 
         // ─── write ──────────────────────────────────────────────────────────

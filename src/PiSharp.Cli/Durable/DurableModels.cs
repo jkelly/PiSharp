@@ -67,13 +67,19 @@ internal sealed class DurableModels : IDurableModels, IAsyncDisposable
         (LiveSessionSelection.SupportedApi(entry.Provider, entry.Api) || Registry.CustomStream(entry.Api) is not null);
 
     /// <summary>A registry entry as a pi-ai model carrying its JSON.</summary>
-    internal static DurableModel ToModel(RegistryModel entry) => new()
+    internal static DurableModel ToModel(RegistryModel entry)
     {
-        Id = entry.Id, Name = entry.Name ?? entry.Id, Api = entry.Api, Provider = entry.Provider, BaseUrl = entry.BaseUrl,
-        Reasoning = entry.Reasoning, Input = entry.Input.IsDefaultOrEmpty ? ["text"] : entry.Input,
-        ContextWindow = entry.ContextWindow, MaxTokens = entry.MaxTokens,
-        Wire = JsonValue.Parse(entry.ToJsonString()) as JsonObjectValue,
-    };
+        var wire = JsonValue.Parse(entry.ToJsonString()) as JsonObjectValue;
+        return new()
+        {
+            Id = entry.Id, Name = entry.Name ?? entry.Id, Api = entry.Api, Provider = entry.Provider, BaseUrl = entry.BaseUrl,
+            Reasoning = entry.Reasoning, Input = entry.Input.IsDefaultOrEmpty ? ["text"] : entry.Input,
+            ContextWindow = entry.ContextWindow, MaxTokens = entry.MaxTokens,
+            // models.json overrides merge into the entry's inputLimits (ModelProviderComposer), so the JSON carries the effective limits.
+            InputLimits = DurableModelInputLimits.FromJson(wire is not null && wire.TryGetValue("inputLimits", out var limits) ? limits : null),
+            Wire = wire,
+        };
+    }
 
     /// <inheritdoc/>
     public DurableModel? GetModel(string provider, string modelId)

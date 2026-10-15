@@ -40,6 +40,11 @@ internal sealed class FakeToolApi(IExecutionEnv? env) : DelegatingToolExecutionA
     // Upstream's fakeApi: the collected output, never truncated.
     public override RetainedOutput RetainedOutput() => new(string.Concat(Collected), false);
     public override Task DetailsAsync(JsonValue value, DurableContext context) => Task.CompletedTask;
+    // v1.2.0: "No model: `read` treats it as one that sees images" (`agent: async () => ({})`).
+    public override Task<Agent> AgentAsync(DurableContext context) => Task.FromResult(NoModelAgent);
+
+    /// <summary>An agent that names no model.</summary>
+    internal static readonly Agent NoModelAgent = new() { ThinkingLevel = "off", Extensions = [], Tools = [], Callable = [], Deferred = [], Sections = [] };
 }
 
 /// <summary>What one call returned, streamed and reported.</summary>

@@ -1,15 +1,23 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/tools/read.ts
-// The result's content is ToolExecutionResult.Output since tool task v2 (durable work list area a); read.ts's other v1.2.0 changes (images)
-// are area e's, which re-pins this file.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tools/read.ts
 // Line numbers, offsets and limits are JavaScript numbers here too (doubles): the model may send 2.5, a negative number or 1e20, and the
 // result, its notices and its errors are upstream's for each, numbers printed as JavaScript prints them.
+// The conversation's model comes from api.AgentAsync() and api.Models.GetModel(), and its image limits from DurableModel.InputLimits (pi-ai
+// 1.2.0 model.inputLimits.images.resize), as upstream's imageModel() reads them.
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Internal.PiAi.Validation;
 
 namespace PiSharp.Durable.Tools;
+
+/// <summary>Options of the read tool (upstream <c>ReadToolOptions</c>).</summary>
+public sealed record ReadToolOptions
+{
+    /// <summary>Resizes and converts images; without one, images within <see cref="ImageLimits.Default"/> pass through as they are.</summary>
+    public IImageProcessor? Images { get; init; }
+}
 
 /// <summary>Upstream <c>createReadTool</c>.</summary>
 internal static class ReadTool
@@ -21,37 +29,52 @@ internal static class ReadTool
     private const int ReadChunk = 64 * 1024;
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
 
-    /// <summary>Reads text files. Remarks about truncation and continuation are diagnostics; the content is only file text.</summary>
-    public static ToolRegistration Create() => Define.Tool(new ToolRegistration
+    /// <summary>
+    /// Reads text files and images. Remarks about truncation, continuation, and image processing are diagnostics; the content is only file
+    /// text, or one image, which programs get as its image content.
+    /// </summary>
+    public static ToolRegistration Create(ReadToolOptions? options = null)
     {
-        Name = "read",
-        Description = $"Read the contents of a text file. Output is truncated to {Truncation.DefaultMaxLines} lines or {Truncation.DefaultMaxBytes / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
-        Parameters = Parameters,
-        Execute = (arguments, api, context) =>
+        var images = options?.Images;
+        var formats = images is null ? "jpg, png, gif, webp" : "jpg, png, gif, webp, bmp";
+        return Define.Tool(new ToolRegistration
         {
-            var args = (JsonObjectValue)arguments;
-            return ExecuteAsync(((JsonStringValue)args["path"]).Value, Number(args, "offset"), Number(args, "limit"), api, context);
-        },
-    });
+            Name = "read",
+            Description = $"Read the contents of a file. Supports text files and images ({formats}). Images are sent as attachments. For text files, output is truncated to {Truncation.DefaultMaxLines} lines or {Truncation.DefaultMaxBytes / 1024}KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+            Parameters = Parameters,
+            Execute = (arguments, api, context) =>
+            {
+                var args = (JsonObjectValue)arguments;
+                return ExecuteAsync(((JsonStringValue)args["path"]).Value, Number(args, "offset"), Number(args, "limit"), api, context, images);
+            },
+        });
+    }
 
     private static double? Number(JsonObjectValue args, string key) => args.TryGetValue(key, out var value) && value is JsonNumberValue number ? number.Value : null;
 
     /// <summary>The tool's execution with its arguments as JavaScript numbers, NaN included (JSON arguments cannot carry NaN).</summary>
-    internal static async Task<ToolExecutionResult> ExecuteAsync(string path, double? offset, double? limit, IToolExecutionApi api, DurableContext context)
+    internal static async Task<ToolExecutionResult> ExecuteAsync(string path, double? offset, double? limit, IToolExecutionApi api, DurableContext context,
+        IImageProcessor? images = null)
     {
         var env = ToolEnv.Require(api);
         var absolutePath = await PathUtils.ResolveReadToolPathAsync(env, path, context).ConfigureAwait(false);
         var reader = (await env.OpenBinaryReaderAsync(absolutePath, null, context).ConfigureAwait(false)).GetOrThrow();
         try
         {
-            // A concurrent writer can change the file between the scan and the reads. Appending (a growing log) leaves the scanned bytes as
-            // they were; a file that shrank or was rewritten in place is read again once.
+            // A concurrent writer can change the file between the scan and the reads. Appending (a growing log) leaves the scanned text as it
+            // was; an image must be whole. Otherwise the file is read again once.
             for (var attempt = 0; ; attempt++)
             {
                 var before = (await reader.InfoAsync(context).ConfigureAwait(false)).GetOrThrow();
-                var result = await ReadTextAsync(reader, before, path, offset, limit, context).ConfigureAwait(false);
+                var mimeType = await ImageDetection.DetectSupportedImageMimeTypeOfAsync(new ByteSource(before.Size,
+                    async (position, length) => (await reader.ReadAsync(position, length, context).ConfigureAwait(false)).GetOrThrow())).ConfigureAwait(false);
+                var result = mimeType is null
+                    ? await ReadTextAsync(reader, path, offset, limit, context).ConfigureAwait(false)
+                    : await ReadImageAsync(reader, before, path, mimeType, images, await ImageModelAsync(api, context).ConfigureAwait(false), context)
+                        .ConfigureAwait(false);
                 var after = (await reader.InfoAsync(context).ConfigureAwait(false)).GetOrThrow();
-                if (after.Size > before.Size || (after.Size == before.Size && after.MtimeMs == before.MtimeMs)) return result;
+                var unchanged = after.Size == before.Size && after.MtimeMs == before.MtimeMs;
+                if (unchanged || (mimeType is null && after.Size > before.Size)) return result;
                 if (attempt == 1) throw new InvalidOperationException($"{path} changed while it was read");
             }
         }
@@ -60,6 +83,79 @@ internal static class ReadTool
             await reader.CloseAsync(context).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// One image block, prepared by <paramref name="processor"/> or, without one, as it is when its format is inline and it fits the limits
+    /// (its size is checked before reading it, its dimensions from its header); otherwise an error result saying why. What happened to the
+    /// image is an <c>info</c> diagnostic, so programs get the bare image content. A model without image input sees pi-ai's placeholder
+    /// instead; a diagnostic says so.
+    /// </summary>
+    private static async Task<ToolExecutionResult> ReadImageAsync(IBinaryReader reader, FileMetadata info, string path, string mimeType,
+        IImageProcessor? processor, ImageModel model, DurableContext context)
+    {
+        var limits = model.Limits;
+        string data, imageMimeType;
+        var notes = new List<string>();
+        if (processor is not null)
+        {
+            var bytes = (await reader.ReadAsync(0, info.Size, context).ConfigureAwait(false)).GetOrThrow();
+            var prepared = await processor.PrepareAsync(bytes, mimeType, limits).ConfigureAwait(false);
+            if (prepared is null) return ImageError($"{path} is an image ({mimeType}) that cannot be prepared for the model");
+            (data, imageMimeType) = (prepared.Data, prepared.MimeType);
+            if (prepared.ConvertedFrom is { } convertedFrom) notes.Add($"Converted from {convertedFrom} to {prepared.MimeType}.");
+            if (prepared.Resized is { } resized)
+            {
+                var (from, to) = (resized.From, resized.To);
+                // toFixed(2).
+                var scale = ((double)from.Width / to.Width).ToString("F2", CultureInfo.InvariantCulture);
+                notes.Add($"Resized from {from.Width}x{from.Height} to {to.Width}x{to.Height}. Multiply coordinates by {scale} to map them to the original.");
+            }
+        }
+        else
+        {
+            if (!ImageFormats.Inline.Contains(mimeType))
+                return ImageError($"{path} is an image ({mimeType}) that needs converting, and no image processor is configured");
+            const string unshrinkable = "and no image processor is configured to shrink it";
+            if (ImageFormats.Base64Length(info.Size) > limits.MaxBytes)
+                return ImageError($"{path} is an image ({mimeType}) of {Truncation.FormatSize(info.Size)}, too large to send, {unshrinkable}");
+            var bytes = (await reader.ReadAsync(0, info.Size, context).ConfigureAwait(false)).GetOrThrow();
+            if (ImageDetection.ImageDimensions(bytes, mimeType) is not { } size)
+                return ImageError($"{path} is an image ({mimeType}) whose size cannot be read");
+            if (size.Width > limits.MaxWidth || size.Height > limits.MaxHeight)
+                return ImageError($"{path} is an image ({mimeType}) of {size.Width}x{size.Height}, larger than {limits.MaxWidth}x{limits.MaxHeight}, {unshrinkable}");
+            (data, imageMimeType) = (ImageFormats.ToBase64(bytes), mimeType);
+        }
+        if (!model.Vision) notes.Add("The current model does not support images; it sees a placeholder instead.");
+        return new ToolExecutionResult
+        {
+            Output = JsonValue.Array(JsonValue.Object([new("type", "image"), new("data", data), new("mimeType", imageMimeType)])),
+            Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Info, string.Join(" ", [$"Read image file [{imageMimeType}].", .. notes]), "image")],
+        };
+    }
+
+    /// <summary>What the conversation's model takes: whether images, and within which limits.</summary>
+    private sealed record ImageModel(bool Vision, ImageLimits Limits);
+
+    /// <summary>
+    /// The conversation model's image input: <see cref="ImageLimits.Default"/> overridden by its <c>inputLimits.images.resize</c>. Without a
+    /// resolvable model, it counts as one that takes images within the defaults.
+    /// </summary>
+    private static async Task<ImageModel> ImageModelAsync(IToolExecutionApi api, DurableContext context)
+    {
+        var reference = (await api.AgentAsync(context).ConfigureAwait(false)).Model;
+        var model = reference is null ? null : api.Models.GetModel(reference.Provider, reference.ModelId);
+        var resize = model?.InputLimits?.Images?.Resize;
+        var defaults = ImageLimits.Default;
+        return new ImageModel(model is null || model.Input.Contains("image"), new ImageLimits(resize?.MaxWidth ?? defaults.MaxWidth,
+            resize?.MaxHeight ?? defaults.MaxHeight, resize?.MaxBytes ?? defaults.MaxBytes));
+    }
+
+    private static ToolExecutionResult ImageError(string message) => new()
+    {
+        Output = JsonArrayValue.Empty,
+        IsError = true,
+        Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Error, message, "unsupported_image")],
+    };
 
     /// <summary><c>Array.prototype.slice</c>'s conversion of an index: NaN is 0, other values truncate toward zero.</summary>
     private static double SliceIndex(double value) => double.IsNaN(value) ? 0 : Math.Truncate(value);
@@ -93,23 +189,8 @@ internal static class ReadTool
     /// The read result for the opened file. It equals decoding the whole file with <c>TextDecoder</c>, splitting it on <c>\n</c>, and
     /// bounding the selected lines with <c>truncateHead</c>, while reading only one scan's worth of the file plus the head.
     /// </summary>
-    private static async Task<ToolExecutionResult> ReadTextAsync(IBinaryReader reader, FileMetadata info, string path, double? offset, double? limit,
-        DurableContext context)
+    private static async Task<ToolExecutionResult> ReadTextAsync(IBinaryReader reader, string path, double? offset, double? limit, DurableContext context)
     {
-        var mimeType = await ImageDetection.DetectSupportedImageMimeTypeOfAsync(new ByteSource(info.Size,
-            async (position, length) => (await reader.ReadAsync(position, length, context).ConfigureAwait(false)).GetOrThrow())).ConfigureAwait(false);
-        if (mimeType is not null)
-        {
-            // Image content is not supported yet.
-            return new ToolExecutionResult
-            {
-                Output = JsonArrayValue.Empty,
-                IsError = true,
-                Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Error, $"{path} is an image ({mimeType}); reading images is not supported",
-                    "unsupported_image")],
-            };
-        }
-
         // `offset ? Math.max(0, offset - 1) : 0`: zero and NaN are falsy.
         var startLine = offset is { } given && given != 0 && !double.IsNaN(given) ? Math.Max(0, given - 1) : 0;
         var startLineDisplay = startLine + 1;

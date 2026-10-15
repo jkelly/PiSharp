@@ -1,9 +1,10 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/tools-read-differential.test.ts, as tools.read-differential.<case>.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tools-read-differential.test.ts, as tools.read-differential.<case>.
 // The reference is upstream's: the read tool before bounded reads, which decodes the whole file, splits it into lines and truncates the
 // selection; the tool must give the same result while reading only a bounded part of the file. Offsets and limits are JavaScript numbers,
 // NaN included, so the cases call the tool's typed entry (ReadTool.ExecuteAsync) where upstream calls execute() with an object.
-// Added: Fixtures/tools.upstream.json (Fixtures/capture-tools.mjs) records a digest of upstream's own outcome for every seed and trial, and
-// each case also matches those.
+// Added: Fixtures/v1.2.0/tools.upstream.json (Fixtures/capture-tools.mjs) records a digest of upstream's own outcome for every seed and
+// trial, and each case also matches those. v1.2.0's reference returns an image as one image block with an info diagnostic (read returns
+// images, work list area e); the fake api's agent names no model, as upstream's apiFor gives `agent: async () => ({})`.
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
@@ -64,10 +65,8 @@ internal static partial class Program
         if (ImageDetection.DetectSupportedImageMimeType(bytes) is { } mimeType)
             return new ToolExecutionResult
             {
-                Output = JsonArrayValue.Empty,
-                IsError = true,
-                Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Error, $"{path} is an image ({mimeType}); reading images is not supported",
-                    "unsupported_image")],
+                Output = JsonValue.Array(JsonValue.Object([new("type", "image"), new("data", Convert.ToBase64String(bytes)), new("mimeType", mimeType)])),
+                Diagnostics = [new ToolDiagnostic(ToolDiagnosticSeverity.Info, $"Read image file [{mimeType}].", "image")],
             };
         var textContent = TextDecoderDecode(bytes);
         var allLines = textContent.Split('\n').ToList();
@@ -139,7 +138,9 @@ internal static partial class Program
         catch (Exception error) { return "error\0" + error.Message; }
         var content = result.Output ?? JsonArrayValue.Empty;
         var parts = new List<string> { "result", result.IsError == true ? "true" : "undefined", content.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) };
-        foreach (var part in content.Cast<JsonObjectValue>()) parts.AddRange([((JsonStringValue)part["type"]).Value, ((JsonStringValue)part["text"]).Value]);
+        // part.text of an image block is undefined, which join() prints as "".
+        foreach (var part in content.Cast<JsonObjectValue>())
+            parts.AddRange([((JsonStringValue)part["type"]).Value, part.TryGetValue("text", out var text) ? ((JsonStringValue)text).Value : ""]);
         if (result.Details is not JsonObjectValue details) parts.Add("no-details");
         else
         {
@@ -162,14 +163,11 @@ internal static partial class Program
 
     private static string JsArg(double? value) => value is { } number ? Js.NumberToString(number) : "undefined";
 
-    private static JsonElement ToolsFixture() => JsonDocument.Parse(File.ReadAllText(
-        Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "tools.upstream.json"))).RootElement;
-
     private static IEnumerable<(string, Func<Task>)> ToolsReadDifferentialCases()
     {
         yield return Case("tools.read-differential.returns-exactly-what-reading-the-whole-file-returned", () => WithToolDir(async cwd =>
         {
-            var fixture = ToolsFixture().GetProperty("read");
+            var fixture = ToolsFixture120().GetProperty("read");
             var env = new LocalExecutionEnv(cwd);
             for (var seed = 1; seed <= 400; seed++)
             {

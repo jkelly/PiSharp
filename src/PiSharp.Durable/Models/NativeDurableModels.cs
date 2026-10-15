@@ -152,13 +152,15 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
     {
         var raw = model.Raw.Value;
         double Number(string name) => raw.TryGetProperty(name, out var value) && value.TryGetDouble(out var number) ? number : 0;
+        var wire = (JsonObjectValue)Chord.JsonValue.FromData(model.Raw);
         return new DurableModel
         {
             Id = model.Id, Name = model.Name, Api = model.DeclaredApi, Provider = model.Provider, BaseUrl = model.BaseUrl,
             Reasoning = raw.TryGetProperty("reasoning", out var reasoning) && reasoning.ValueKind == System.Text.Json.JsonValueKind.True,
             Input = [.. raw.GetProperty("input").EnumerateArray().Select(value => value.GetString()!)],
             ContextWindow = Number("contextWindow"), MaxTokens = Number("maxTokens"),
-            Wire = (JsonObjectValue)Chord.JsonValue.FromData(model.Raw),
+            InputLimits = DurableModelInputLimits.FromJson(wire.TryGetValue("inputLimits", out var limits) ? limits : null),
+            Wire = wire,
         };
     }
 

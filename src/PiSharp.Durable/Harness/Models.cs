@@ -6,6 +6,9 @@
 // the transcript (pi-ai wire messages; system prompt and tools ride as positional system messages, so no other context field is
 // needed); stream events and the final message are PiSharp.Contracts types (PiWireJson converts both ways). P8 adds the production
 // adapter over PiSharp.AI transports; until then hosts and tests supply their own implementation.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/model-schema.ts (ModelInputLimits, ModelImageInputLimits,
+// ModelImageResizeOptions) and types.ts (Model.inputLimits), which pi-durable 1.2.0's read tool consults for its image limits (work list
+// area e).
 using System.Collections.Immutable;
 using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
@@ -33,11 +36,77 @@ public sealed record DurableModel
     public double ContextWindow { get; init; }
     /// <summary>Maximum output tokens.</summary>
     public double MaxTokens { get; init; }
+    /// <summary>Provider input limits (pi-ai <c>inputLimits</c>); null when the catalog entry declares none.</summary>
+    public DurableModelInputLimits? InputLimits { get; init; }
     /// <summary>The complete catalog entry as pi-ai wire JSON, when the host has it (costs, compat, thinking maps).</summary>
     public JsonObjectValue? Wire { get; init; }
 
     /// <summary>The model identity PiSharp.AI transports take.</summary>
     public ModelDescriptor Descriptor => new(Id, Api, Provider);
+}
+
+/// <summary>Provider input limits of a model (pi-ai <c>ModelInputLimits</c>).</summary>
+public sealed record DurableModelInputLimits
+{
+    /// <summary>Maximum serialized provider request size in bytes.</summary>
+    public long? MaxRequestBytes { get; init; }
+    /// <summary>Image input limits.</summary>
+    public DurableModelImageInputLimits? Images { get; init; }
+
+    /// <summary>The limits of a catalog entry's <c>inputLimits</c> JSON; null when it is not an object. Fields that are not positive integers
+    /// are left unset.</summary>
+    public static DurableModelInputLimits? FromJson(JsonValue? json)
+    {
+        if (json is not JsonObjectValue limits) return null;
+        return new DurableModelInputLimits
+        {
+            MaxRequestBytes = Integer(limits, "maxRequestBytes"),
+            Images = limits.TryGetValue("images", out var images) && images is JsonObjectValue imageLimits
+                ? new DurableModelImageInputLimits
+                {
+                    Resize = imageLimits.TryGetValue("resize", out var resize) && resize is JsonObjectValue options
+                        ? new DurableModelImageResizeOptions
+                        {
+                            MaxWidth = Int(options, "maxWidth"), MaxHeight = Int(options, "maxHeight"), MaxBytes = Int(options, "maxBytes"),
+                            JpegQuality = Int(options, "jpegQuality"),
+                        }
+                        : null,
+                    MaxPerMessage = Int(imageLimits, "maxPerMessage"),
+                    MaxPerRequest = Int(imageLimits, "maxPerRequest"),
+                }
+                : null,
+        };
+    }
+
+    private static long? Integer(JsonObjectValue json, string key) =>
+        json.TryGetValue(key, out var value) && value is JsonNumberValue number && number.Value >= 1 && number.Value <= Ids.MaxSafeInteger &&
+        Math.Truncate(number.Value) == number.Value ? (long)number.Value : null;
+
+    private static int? Int(JsonObjectValue json, string key) => Integer(json, key) is { } value && value <= int.MaxValue ? (int)value : null;
+}
+
+/// <summary>Image input limits of a model (pi-ai <c>ModelImageInputLimits</c>).</summary>
+public sealed record DurableModelImageInputLimits
+{
+    /// <summary>The cache-safe resize profile applied before a new image enters conversation history.</summary>
+    public DurableModelImageResizeOptions? Resize { get; init; }
+    /// <summary>Maximum images accepted in one provider message.</summary>
+    public int? MaxPerMessage { get; init; }
+    /// <summary>Maximum images accepted across one provider request.</summary>
+    public int? MaxPerRequest { get; init; }
+}
+
+/// <summary>An image resize profile (pi-ai <c>ModelImageResizeOptions</c>); unset fields take the consumer's defaults.</summary>
+public sealed record DurableModelImageResizeOptions
+{
+    /// <summary>Pixels.</summary>
+    public int? MaxWidth { get; init; }
+    /// <summary>Pixels.</summary>
+    public int? MaxHeight { get; init; }
+    /// <summary>Maximum base64-encoded payload size in bytes.</summary>
+    public int? MaxBytes { get; init; }
+    /// <summary>JPEG quality, 1 to 100.</summary>
+    public int? JpegQuality { get; init; }
 }
 
 /// <summary>Options of one simple request (pi-ai <c>ModelsSimpleStreamOptions</c>, the fields durable sets).</summary>
