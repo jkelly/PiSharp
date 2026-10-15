@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/opencode-headers.ts (withOpenCodeSessionHeader),
-// providers/opencode.ts and opencode-go.ts (every API stream wrapped), and the agent's sessionId on every request (agent.ts).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/opencode-headers.ts (withOpenCodeSessionHeader),
+// providers/opencode.ts and opencode-go.ts (every API stream wrapped), and the agent's sessionId on every request (packages/agent/src/agent.ts).
 using System.Net;
 using System.Text;
 using PiSharp.Contracts;
