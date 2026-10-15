@@ -1086,7 +1086,11 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             await run.Ready.Task.ConfigureAwait(false); var continuations = 0;
             while (true)
             {
-                var result = await processing.ConfigureAwait(false);
+                AgentLoopResult? result;
+                // agent-session.ts abort()/dispose(): a run aborted while it starts or runs settles; a run an extension started (a
+                // custom message with triggerTurn) reports that as a cancelled task. Only an abort or shutdown makes that a settlement.
+                try { result = await processing.ConfigureAwait(false); }
+                catch (OperationCanceledException) when (StopRequested(run)) { result = null; }
                 // A command's triggered run settles while the handler (the command's input) still runs.
                 await (run.CommandTriggered ? originating.WaitForTriggeredRunIdleAsync() : _session.WaitForIdleAsync()).ConfigureAwait(false);
                 var borrowed = false;
@@ -1103,7 +1107,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                         stopping = _closed || run.AbortRequested;
                     }
                     var queue = _session.GetPendingInputQueueSnapshot();
-                    if (stopping || result.Reason != AgentLoopStopReason.Completed || queue.SteeringMessages.IsEmpty && queue.FollowUpMessages.IsEmpty) break;
+                    if (stopping || result is null || result.Reason != AgentLoopStopReason.Completed || queue.SteeringMessages.IsEmpty && queue.FollowUpMessages.IsEmpty) break;
                     if (++continuations > _options.MaximumContinuationRuns) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
                     run.HistoryLength = _session.Snapshot.Agent.Messages.Length;
                     run.Ready = ready = NewGate(); // Keep callbacks out of this short transition, even for a synchronous continuation.
@@ -1130,6 +1134,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             await JoinPostOrigin("run-settled", _postRunSettlement, originating, postSlot).ConfigureAwait(false);
         }
     }
+    private bool StopRequested(RunState run) { lock (_gate) return _closed || run.AbortRequested; }
     private void ReleaseInputTurn(RunState run, bool borrowed)
     {
         if (!borrowed) { _inputCommands.Release(); return; }
