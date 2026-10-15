@@ -4,6 +4,8 @@
 //   over the faux models that adds the test provider's classifier and image models (pi-ai model JSON) and their implementations, as
 //   pi-ai's Models would route classify() and generateImages() to them. Its auth always resolves, so getAvailableOfType lists its models.
 // - setTimeout(..., 50) is Task.Delay(50); NodeExecutionEnv is LocalExecutionEnv.
+// Authored, last: NativeDurableModels' models of every type and its classifier and image calls (pi-ai's Models over PiSharp.AI's
+// ModelOperationsRegistry), without credentials, so no request leaves the process.
 using PiSharp.Codemode;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -273,6 +275,29 @@ internal static class CodemodeModelsTests
                 """);
             Check(!shown.Text.Contains("Note:", StringComparison.Ordinal), "shown: " + shown.Text);
             Check(((JsonArrayValue)shown.Message["content"]).Cast<JsonObjectValue>().Any(item => S(item["type"]) == "image"), "image block");
+        });
+
+        yield return Case(prefix + "native-models-list-every-type-and-answer-calls-without-credentials-with-an-error-result", async () =>
+        {
+            using var models = new NativeDurableModels(new NativeDurableModelsOptions { Providers = ["openai", "openrouter"] });
+            IDurableModels durable = models;
+            var classifiers = durable.GetModelsOfType("classifier", null);
+            var images = durable.GetModelsOfType("image", null);
+            Check(classifiers.Length > 0 && classifiers.All(model => S(model["type"]) == "classifier"), "classifier models");
+            Check(images.Length > 0 && images.All(model => S(model["type"]) == "image" && S(model["provider"]) == "openrouter"), "image models");
+            Check(durable.GetModelsOfType("chat", "openai").Length > 0, "chat models");
+            var judge = classifiers[0];
+            SameJson(judge.ToJson(), durable.GetModelOfType("classifier", S(judge["provider"]), S(judge["id"])), "getModelOfType");
+            Equal<JsonObjectValue?>(null, durable.GetModelOfType("image", S(judge["provider"]), S(judge["id"])), "another type");
+            // No environment: no provider is configured.
+            Equal(0, (await durable.GetAvailableOfTypeAsync("classifier", null, CancellationToken.None)).Length, "available");
+            var result = await durable.ClassifyAsync(judge,
+                O("""{"state":{},"questions":{"good":{"type":"bool","instructions":"?","criteria":{"true":"y","false":"n"}}}}"""), CancellationToken.None);
+            Equal("error", S(result["stopReason"]), "classify stopReason");
+            Equal($"Provider is not configured: {S(judge["provider"])}", S(result["errorMessage"]), "classify error");
+            var painted = await durable.GenerateImagesAsync(images[0], O("""{"input":[{"type":"text","text":"a cat"}]}"""), CancellationToken.None);
+            Equal("error", S(painted["stopReason"]), "generateImages stopReason");
+            Equal(0, ((JsonArrayValue)painted["output"]).Count, "no images");
         });
     }
 
