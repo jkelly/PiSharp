@@ -146,11 +146,12 @@ public sealed class McpBackgroundConnections
     {
         await Task.Yield();
         McpRuntimeSnapshot snapshot;
+        McpPreparedServer? server = null;
         try
         {
             stop.Token.ThrowIfCancellationRequested();
             if (ConnectAfter is { } started) await started.WaitAsync(stop.Token).ConfigureAwait(false);
-            var server = await bind(entry, owner, attachment, stop.Token).ConfigureAwait(false)
+            server = await bind(entry, owner, attachment, stop.Token).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("Background admission returned no server.");
             snapshot = await server.ConnectAsync(stop.Token).ConfigureAwait(false);
             if (Connected is { } connected) await connected(entry, server, snapshot, stop.Token).ConfigureAwait(false);
@@ -160,11 +161,15 @@ public sealed class McpBackgroundConnections
             // The session ended meanwhile; like the original, late results of a retired session are dropped. Only teardown cancels a
             // connection (the session's retirement or its server's disposal, which can run before `stop` is cancelled); timeouts
             // fail with their own errors (HttpClient's wraps a TimeoutException). So a cancelled connection is dropped, never reported as a failure.
-            if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested ||
+            // index.ts isCurrent: neither is the attempt of a server that is being closed. The owner stops a session's servers
+            // concurrently with these connections, so a server's closed transport can fail its connection (with whatever error the
+            // close causes, such as ObjectDisposedException) before `stop` is cancelled; an extension unregistering the server
+            // closes it while the session continues.
+            if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested || server is { Closing: true } ||
                 error is OperationCanceledException { InnerException: not TimeoutException }) return;
             Report(new(generation, entry, null, error)); return;
         }
-        if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested) return;
+        if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested || server.Closing) return;
         section?.Connected(generation, snapshot.Catalog);
         Report(new(generation, entry, snapshot, null));
     }
