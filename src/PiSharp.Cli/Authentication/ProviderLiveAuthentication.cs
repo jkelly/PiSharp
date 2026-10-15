@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/resolve.ts (resolveProviderAuth: a stored credential owns
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/resolve.ts (resolveProviderAuth: a stored credential owns
 // the provider; OAuth refreshed under the store lock then toAuth; api_key through the provider's resolve; ambient only without a
 // stored credential), auth/helpers.ts (envApiKeyAuth.resolve), providers/cloudflare-auth.ts (per-field merge),
 // providers/amazon-bedrock.ts (bedrockAuth.resolve), packages/coding-agent/src/core/settings-manager.ts (getOrCreateDeviceId) and

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts (Theme class, theme
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/theme/theme.ts (Theme class, theme
 // loading, the global theme, the custom theme watcher, getAvailableThemesWithPaths, highlightCode, getLanguageFromPath and the TUI
 // theme helpers). Theme JSON loading, validation and the system theme reuse PiThemeHost (src/PiSharp.CodingAgent/Export).
 using PiSharp.CodingAgent.Export;

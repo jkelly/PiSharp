@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/virtual-models.ts and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/virtual-models.ts and
 // packages/coding-agent/src/core/model-runtime.ts (registerVirtualModel, resolveModel, getPhysicalModel) and
 // packages/ai/src/models.ts (getSupportedThinkingLevels, clampThinkingLevel).
 using System.Collections.Immutable;

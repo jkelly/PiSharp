@@ -409,6 +409,33 @@ internal static class UtilityCases
             await Clipboard.CopyToClipboard("hello", f.Build());
             Equal(1, f.Osc.Count, "OSC");
         });
+        // Pi 1.2.0 clipboard.ts: PI_CLIPBOARD_OSC52=1 counts as a remote session, so the copy also goes out with OSC 52 after the
+        // local clipboard write; any other value does not.
+        yield return ("util.copy.pi-clipboard-osc52-env-emits-after-native", async () =>
+        {
+            var f = new ClipFixture();
+            f.Env["PI_CLIPBOARD_OSC52"] = "1";
+            var gate = new TaskCompletionSource();
+            f.Native!.SetText = _ => gate.Task;
+            var copy = Clipboard.CopyToClipboard("hello", f.Build());
+            Equal(0, f.Osc.Count, "no OSC before native completes");
+            gate.SetResult();
+            await copy;
+            Seq(["hello"], f.Native.Written, "native write");
+            Equal(1, f.Osc.Count, "one OSC after the native write");
+            Equal("\u001b]52;c;aGVsbG8=\u0007", f.Osc[0], "OSC 52 payload");
+        });
+        yield return ("util.copy.pi-clipboard-osc52-env-other-values-local-only", async () =>
+        {
+            foreach (var value in new[] { "0", "true", "" })
+            {
+                var f = new ClipFixture();
+                f.Env["PI_CLIPBOARD_OSC52"] = value;
+                await Clipboard.CopyToClipboard("hello", f.Build());
+                Seq(["hello"], f.Native!.Written, $"native write ({value})");
+                Equal(0, f.Osc.Count, $"no OSC for PI_CLIPBOARD_OSC52={value}");
+            }
+        });
         yield return ("util.copy.oversized-osc52-refused", async () =>
         {
             var f = new ClipFixture();

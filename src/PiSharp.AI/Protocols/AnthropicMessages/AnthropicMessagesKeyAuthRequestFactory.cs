@@ -46,6 +46,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
     {
         _options = options ?? new();
         _withSession = session => new(baseUri, expectedModel, projectionOptions, _options with { SessionId = session });
+        _createWithoutPreferredStrict = () => new(baseUri, expectedModel, projectionOptions with { DisablePreferredStrictTools = true }, _options);
         if (baseUri is null || expectedModel is null || projectionOptions is null ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
             _options.MaxTokens is { } tokens && !double.IsFinite(tokens) || _options.MaximumKeyCharacters <= 0 || _options.MaximumBaseUriCharacters <= 0 ||
@@ -109,6 +110,11 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         catch (ArgumentException) { throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration); }
     }
 
+    // Pi 1.2.0 buildParams(disablePreferredStrictTools): the same request with strict "prefer" tools sent non-strict (cached).
+    private readonly Func<AnthropicMessagesKeyAuthRequestFactory> _createWithoutPreferredStrict;
+    private AnthropicMessagesKeyAuthRequestFactory? _withoutPreferredStrict;
+    private AnthropicMessagesKeyAuthRequestFactory WithoutPreferredStrict() =>
+        Volatile.Read(ref _withoutPreferredStrict) ?? Interlocked.CompareExchange(ref _withoutPreferredStrict, _createWithoutPreferredStrict(), null) ?? _withoutPreferredStrict!;
     // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
     private readonly Func<string, AnthropicMessagesKeyAuthRequestFactory> _withSession;
     private sealed record SessionScoped(string Id, AnthropicMessagesKeyAuthRequestFactory Factory);
@@ -132,9 +138,11 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (explicitApiKey.Length > _options.MaximumKeyCharacters) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         if (explicitApiKey.Any(value => value is < '!' or > '~')) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
         if (explicitApiKey.Contains("sk-ant-oat", StringComparison.Ordinal)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
-        var projected = AnthropicMessagesPreparedRequest.Project(_projector.Project(request, cancellationToken), Raw, cancellationToken);
+        var details = _projector.ProjectWithDetails(request, cancellationToken);
+        var projected = AnthropicMessagesPreparedRequest.Project(details.Payload, Raw, cancellationToken);
         _ = PreparedHeaders(projected, explicitApiKey);
-        return new(projected, _options, (payload, token) => CreateCore(request, explicitApiKey, token, payload), cancellationToken);
+        return new(projected, _options, (payload, token) => CreateCore(request, explicitApiKey, token, payload), cancellationToken)
+        { Fallback = details.HasPreferredStrictTools ? token => WithoutPreferredStrict().Prepare(request, explicitApiKey, token) : null };
     }
 
     private HttpRequestMessage CreateCore(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken, JsonData? prepared)
@@ -145,7 +153,8 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (explicitApiKey.Length > _options.MaximumKeyCharacters) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         if (explicitApiKey.Any(value => value is < '!' or > '~')) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
         if (explicitApiKey.Contains("sk-ant-oat", StringComparison.Ordinal)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
-        var projected = prepared ?? _projector.Project(request, cancellationToken);
+        var details = prepared is null ? _projector.ProjectWithDetails(request, cancellationToken) : null;
+        var projected = prepared ?? details!.Payload;
         CheckDepth(projected.Value, 0, cancellationToken);
         var headers = PreparedHeaders(projected, explicitApiKey);
         // Count the exact compact raw representation before allocating UTF-8 or acquiring an HTTP request/content.
@@ -180,6 +189,8 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
             foreach (var pair in headers)
                 if (pair.Key.Equals("content-type", StringComparison.OrdinalIgnoreCase)) result.Content!.Headers.ContentType = new MediaTypeHeaderValue(pair.Value);
                 else if (!result.Headers.TryAddWithoutValidation(pair.Key, pair.Value)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
+            if (details?.HasPreferredStrictTools == true)
+                result.Options.Set(AnthropicStrictToolsFallback.RequestKey, token => WithoutPreferredStrict().CreateCore(request, explicitApiKey, token, null));
             cancellationToken.ThrowIfCancellationRequested(); return result;
         }
         catch (AnthropicMessagesKeyAuthRequestException) { result?.Dispose(); content?.Dispose(); throw; }

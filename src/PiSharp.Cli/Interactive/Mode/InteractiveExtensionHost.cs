@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (the extension UI context
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/interactive-mode.ts (the extension UI context
 // the mode gives extensions: widgets, header and footer factories, working indicator, hidden thinking label, tools expansion,
 // terminal input listeners) and core/extensions/runner.ts (getMessageRenderer, getEntryRenderer, getMarkdownTransformers). PiSharp's
 // TypeScript extensions live in the Node extension host: their components render there and the mode draws the rows.

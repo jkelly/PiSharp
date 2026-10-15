@@ -44,7 +44,7 @@ static class AnthropicMessagesRequestTests
         SupportsMidConversationToolChanges: true, CacheRetention: AnthropicCacheRetention.None);
     private static void ExactJson(string expected, JsonElement actual) => Assert(JsonElement.DeepEquals(JsonData.Parse(expected).Value, actual), "Exact authored wire mismatch: " + actual.GetRawText());
 
-    // Pi abe508e1b89912adde45528136c3221eb69acdd7 (1.0.1): inline-tools-2026-09-15 replaces mid-conversation-tool-changes-2026-07-01.
+    // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (since 1.0.1): inline-tools-2026-09-15 replaces mid-conversation-tool-changes-2026-07-01.
     // Later tools are defined by value in tool_addition blocks; the request-level list stays initial tools plus placeholder.
     private const string Placeholder = """{"name":"__pi_deferred_placeholder__","description":"Reserved placeholder. Never available. Never call this.","input_schema":{"type":"object","properties":{},"required":[]},"defer_loading":true}""";
     private static string Definition(string name, string description, string schema = """{"type":"object","properties":{},"required":[]}""", string extra = ""","eager_input_streaming":true""") =>

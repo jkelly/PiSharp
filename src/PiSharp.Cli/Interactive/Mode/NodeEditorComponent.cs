@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/interactive/interactive-mode.ts (setCustomEditorComponent:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/interactive-mode.ts (setCustomEditorComponent:
 // the custom editor gets the default editor's submit and change handlers, its text, and a CustomEditor its app actions;
 // setupAutocompleteProvider: each addAutocompleteProvider factory wraps the provider so far).
 using System.Text.Json;
