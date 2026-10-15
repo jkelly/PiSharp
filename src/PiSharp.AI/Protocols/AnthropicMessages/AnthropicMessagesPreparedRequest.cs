@@ -29,7 +29,13 @@ public sealed class AnthropicMessagesPreparedRequest
     internal HttpRequestMessage CompleteClaimed(JsonData? replacement, CancellationToken token)
     {
         if (Interlocked.CompareExchange(ref _used, 2, 1) != 1) throw new InvalidOperationException("Prepared Anthropic request is not claimed.");
-        return _complete(replacement is null ? Payload : Admit(replacement, true, token), token);
+        var request = _complete(replacement is null ? Payload : Admit(replacement, true, token), token);
+        // The completed request owns its strict-tool fallback, so every route that completes a prepared request (FromPrepared with
+        // no hooks, or only onResponse/onProviderStreamEvent) can retry with "prefer" tools non-strict. The onPayload route builds
+        // its fallback from Fallback itself, so the hook sees the rebuilt payload.
+        if (Fallback is { } fallback)
+            request.Options.Set(AnthropicStrictToolsFallback.RequestKey, next => (fallback(next) ?? throw new InvalidOperationException("Prepared Anthropic fallback missing.")).Complete(null, next));
+        return request;
     }
 
     internal static JsonData Project(JsonData payload, Func<JsonProperty,string> raw, CancellationToken token)

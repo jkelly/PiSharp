@@ -127,6 +127,37 @@ internal static partial class Program
         }
     }
 
+    // Every prepared-request variant falls back: FromPrepared without hooks, with only onResponse or onProviderStreamEvent, and with
+    // onPayload (which sees both payloads); the Simple factory takes the prepared route whenever it has hooks.
+    private static async Task AnthropicStrictFallbackPreparedVariants()
+    {
+        var variants = new (string Name, AnthropicMessagesHooks? Hooks)[]
+        {
+            ("no hooks", null),
+            ("onResponse only", new(OnResponse: (_, _, _) => Task.CompletedTask)),
+            ("onProviderStreamEvent only", new(OnProviderStreamEvent: (_, _, _) => Task.CompletedTask)),
+            ("onPayload", new() { OnPayload = (_, _, _) => Task.FromResult<JsonData?>(null) }),
+        };
+        var failed = new List<string>();
+        foreach (var (name, hooks) in variants)
+        try
+        {
+            var endpoint = new StrictEndpoint(attempt => attempt == 1 ? StrictRejection() : StrictSuccess());
+            var factory = new AnthropicMessagesKeyAuthRequestFactory(new("https://anthropic.invalid"), Haiku, StrictOptions());
+            var transport = AnthropicMessagesHttpSseTransport.FromPrepared(new HttpClient(endpoint, disposeHandler: false),
+                (request, token) => factory.Prepare(request, Key, token), hooks: hooks);
+            var (_, message) = await StrictRun(transport, StrictTranscript(StrictTool("preferred", "prefer"), StrictTool("required", "require"))).WaitAsync(Deadline);
+            Check(message.StopReason == StopReason.Stop, name + ": " + ErrorText(message));
+            Equal(2, endpoint.Payloads.Count);
+            Equal("true", Strictness(StrictTools(endpoint.Payloads[0])[0]));
+            Equal(null, Strictness(StrictTools(endpoint.Payloads[1])[0]));
+            Equal("true", Strictness(StrictTools(endpoint.Payloads[1])[1]));
+            StrictFallbackDiagnostic(message, GrammarError);
+        }
+        catch (InvalidOperationException error) { failed.Add(name + " (" + error.Message.Split('\n')[0] + ")"); }
+        Check(failed.Count == 0, "Prepared variants without the fallback: " + string.Join(" | ", failed));
+    }
+
     // The production routes: the native key provider and the resolved (authenticated) provider fall back the same way; inline
     // additions and same-name redefinitions downgrade only their "prefer" definition.
     private static async Task AnthropicStrictFallbackRoutes()
