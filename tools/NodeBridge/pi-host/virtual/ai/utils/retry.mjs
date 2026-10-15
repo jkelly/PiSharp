@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/retry.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/retry.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 function buildProviderErrorPattern(patterns) {
     return new RegExp(patterns.join("|"), "i");
@@ -32,7 +32,7 @@ const RETRYABLE_PROVIDER_ERROR_PATTERN = buildProviderErrorPattern([
     "service.?unavailable",
     "server.?error",
     "internal.?error",
-    "provider.?returned.?error",
+    "provider.?returned.?(?:an.?)?error",
     "exceeded request buffer limit while retrying upstream",
     "network.?error",
     "connection.?error",

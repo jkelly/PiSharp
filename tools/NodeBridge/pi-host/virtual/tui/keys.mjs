@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/keys.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/keys.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 let _kittyProtocolActive = false;
 export function setKittyProtocolActive(active) {
@@ -121,6 +121,13 @@ const SYMBOL_KEYS = new Set([
     ">",
     "?"
 ]);
+const SHIFTED_SYMBOL_KEYS = new Set("~!@#$%^&*()_+|{}:<>?");
+const MODIFIER_NAMES = [
+    "shift",
+    "alt",
+    "ctrl",
+    "super"
+];
 const MODIFIERS = {
     shift: 1,
     alt: 2,
@@ -269,6 +276,15 @@ function normalizeShiftedLetterIdentityCodepoint(codepoint, modifier) {
         return codepoint + 32;
     }
     return codepoint;
+}
+function getLogicalShiftedSymbolCandidate(codepoint, modifier, allowedSymbols) {
+    if (codepoint === undefined || (modifier & MODIFIERS.shift) === 0) return undefined;
+    const normalizedCodepoint = normalizeKittyFunctionalCodepoint(codepoint);
+    if (!allowedSymbols.has(String.fromCharCode(normalizedCodepoint))) return undefined;
+    return {
+        codepoint: normalizedCodepoint,
+        modifier: modifier & ~MODIFIERS.shift
+    };
 }
 const LEGACY_KEY_SEQUENCES = {
     up: [
@@ -605,10 +621,14 @@ function matchesKittySequence(data, expectedCodepoint, expectedModifier) {
     if (!parsed) return false;
     const actualMod = parsed.modifier & ~LOCK_MASK;
     const expectedMod = expectedModifier & ~LOCK_MASK;
-    if (actualMod !== expectedMod) return false;
     const normalizedCodepoint = normalizeShiftedLetterIdentityCodepoint(normalizeKittyFunctionalCodepoint(parsed.codepoint), parsed.modifier);
     const normalizedExpectedCodepoint = normalizeShiftedLetterIdentityCodepoint(normalizeKittyFunctionalCodepoint(expectedCodepoint), expectedModifier);
-    if (normalizedCodepoint === normalizedExpectedCodepoint) return true;
+    if (actualMod === expectedMod && normalizedCodepoint === normalizedExpectedCodepoint) return true;
+    const logicalShiftedSymbol = getLogicalShiftedSymbolCandidate(parsed.shiftedKey, actualMod, SYMBOL_KEYS);
+    if (logicalShiftedSymbol && (logicalShiftedSymbol.modifier & ~LOCK_MASK) === expectedMod && logicalShiftedSymbol.codepoint === normalizeKittyFunctionalCodepoint(expectedCodepoint)) {
+        return true;
+    }
+    if (actualMod !== expectedMod) return false;
     if (parsed.baseLayoutKey !== undefined && parsed.baseLayoutKey === expectedCodepoint) {
         const cp = normalizedCodepoint;
         const isLatinLetter = cp >= 97 && cp <= 122;
@@ -655,10 +675,12 @@ function isDigitKey(key) {
     return key >= "0" && key <= "9";
 }
 function matchesPrintableModifyOtherKeys(data, expectedKeycode, expectedModifier) {
-    if (expectedModifier === 0) return false;
     const parsed = parseModifyOtherKeysSequence(data);
-    if (!parsed || parsed.modifier !== expectedModifier) return false;
-    return normalizeShiftedLetterIdentityCodepoint(parsed.codepoint, parsed.modifier) === normalizeShiftedLetterIdentityCodepoint(expectedKeycode, expectedModifier);
+    if (!parsed) return false;
+    const physicalMatch = parsed.modifier === expectedModifier && normalizeShiftedLetterIdentityCodepoint(parsed.codepoint, parsed.modifier) === normalizeShiftedLetterIdentityCodepoint(expectedKeycode, expectedModifier);
+    if (physicalMatch) return true;
+    const logicalShiftedSymbol = getLogicalShiftedSymbolCandidate(parsed.codepoint, parsed.modifier, SHIFTED_SYMBOL_KEYS);
+    return logicalShiftedSymbol?.modifier === expectedModifier && logicalShiftedSymbol.codepoint === expectedKeycode;
 }
 function formatKeyNameWithModifiers(keyName, modifier) {
     const mods = [];
@@ -672,15 +694,22 @@ function formatKeyNameWithModifiers(keyName, modifier) {
     return mods.length > 0 ? `${mods.join("+")}+${keyName}` : keyName;
 }
 function parseKeyId(keyId) {
-    const parts = keyId.toLowerCase().split("+");
-    const key = parts[parts.length - 1];
-    if (!key) return null;
+    let key = keyId.toLowerCase();
+    const modifiers = new Set();
+    while(true){
+        const modifier = MODIFIER_NAMES.find((name)=>key.startsWith(`${name}+`));
+        if (!modifier) break;
+        if (modifiers.has(modifier)) return null;
+        modifiers.add(modifier);
+        key = key.slice(modifier.length + 1);
+    }
+    if (!key || key.includes("+") && key !== "+") return null;
     return {
         key,
-        ctrl: parts.includes("ctrl"),
-        shift: parts.includes("shift"),
-        alt: parts.includes("alt"),
-        super: parts.includes("super")
+        ctrl: modifiers.has("ctrl"),
+        shift: modifiers.has("shift"),
+        alt: modifiers.has("alt"),
+        super: modifiers.has("super")
     };
 }
 export function matchesKey(data, keyId) {
@@ -911,7 +940,7 @@ export function matchesKey(data, keyId) {
         if (modifier !== 0) {
             return matchesKittySequence(data, codepoint, modifier) || matchesPrintableModifyOtherKeys(data, codepoint, modifier);
         }
-        return data === key || matchesKittySequence(data, codepoint, 0);
+        return data === key || matchesKittySequence(data, codepoint, 0) || matchesPrintableModifyOtherKeys(data, codepoint, 0);
     }
     return false;
 }
@@ -947,11 +976,13 @@ function formatParsedKey(codepoint, modifier, baseLayoutKey) {
 export function parseKey(data) {
     const kitty = parseKittySequence(data);
     if (kitty) {
-        return formatParsedKey(kitty.codepoint, kitty.modifier, kitty.baseLayoutKey);
+        const logicalShiftedSymbol = getLogicalShiftedSymbolCandidate(kitty.shiftedKey, kitty.modifier, SYMBOL_KEYS);
+        return formatParsedKey(logicalShiftedSymbol?.codepoint ?? kitty.codepoint, logicalShiftedSymbol?.modifier ?? kitty.modifier, kitty.baseLayoutKey);
     }
     const modifyOtherKeys = parseModifyOtherKeysSequence(data);
     if (modifyOtherKeys) {
-        return formatParsedKey(modifyOtherKeys.codepoint, modifyOtherKeys.modifier);
+        const logicalShiftedSymbol = getLogicalShiftedSymbolCandidate(modifyOtherKeys.codepoint, modifyOtherKeys.modifier, SHIFTED_SYMBOL_KEYS);
+        return formatParsedKey(logicalShiftedSymbol?.codepoint ?? modifyOtherKeys.codepoint, logicalShiftedSymbol?.modifier ?? modifyOtherKeys.modifier);
     }
     if (_kittyProtocolActive) {
         if (data === "\x1b\r" || data === "\n") return "shift+enter";

@@ -1,9 +1,9 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/components/editor.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/components/editor.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { getKeybindings } from "../keybindings.mjs";
 import { decodePrintableKey, matchesKey } from "../keys.mjs";
 import { KillRing } from "../kill-ring.mjs";
-import { CURSOR_MARKER } from "../tui.mjs";
+import { CURSOR_MARKER, renderFakeCursor } from "../tui.mjs";
 import { UndoStack } from "../undo-stack.mjs";
 import { autocompleteBoundaryRegex, autocompleteSeparatorRegex, cjkBreakRegex, getGraphemeSegmenter, getWordSegmenter, isWhitespaceChar, sliceByColumn, visibleWidth } from "../utils.mjs";
 import { findWordBackward, findWordForward } from "../word-navigation.mjs";
@@ -381,10 +381,10 @@ export class Editor {
                     ];
                     const firstGrapheme = afterGraphemes[0]?.segment || "";
                     const restAfter = after.slice(firstGrapheme.length);
-                    const cursor = `\x1b[7m${firstGrapheme}\x1b[0m`;
+                    const cursor = renderFakeCursor(firstGrapheme);
                     displayText = before + marker + cursor + restAfter;
                 } else {
-                    const cursor = "\x1b[7m \x1b[0m";
+                    const cursor = renderFakeCursor(" ");
                     displayText = before + marker + cursor;
                     lineVisibleWidth = lineVisibleWidth + 1;
                     if (lineVisibleWidth > contentWidth && paddingX > 0) {

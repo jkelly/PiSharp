@@ -463,7 +463,7 @@ export function detectInstallChange(packageJsonPath = startupPackageJsonPath) {
 }
 let pkg = {
     name: "@earendil-works/pi-coding-agent",
-    version: "1.1.0"
+    version: "1.2.0"
 };
 let startupPackageJsonPath;
 startupPackageJsonPath = undefined;

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/tui.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/tui.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { performance } from "node:perf_hooks";
 import { isKeyRelease, matchesKey } from "./keys.mjs";
@@ -50,6 +50,12 @@ export function isFocusable(component) {
     return component !== null && "focused" in component;
 }
 export const CURSOR_MARKER = "\x1b_pi:c\x07";
+export const FAKE_CURSOR_START = "\x1b_pi:fc\x07";
+export const FAKE_CURSOR_END = "\x1b_pi:/fc\x07";
+const FOCUSED_FAKE_CURSOR = /(\x1b_pi:c\x07)\x1b_pi:fc\x07(.*?)(?:\x1b_pi:\/fc\x07|$)/s;
+export function renderFakeCursor(text) {
+    return `${FAKE_CURSOR_START}${text}${FAKE_CURSOR_END}`;
+}
 export { visibleWidth };
 function parseSizeValue(value, referenceSize) {
     if (value === undefined) return undefined;
@@ -853,7 +859,7 @@ export class TuiBase extends Container {
         for (const entry of visibleEntries){
             const { component, options } = entry;
             const { width, maxHeight } = this.resolveOverlayLayout(options, 0, termWidth, termHeight);
-            let overlayLines = component.render(width);
+            let overlayLines = this.resolveFakeCursors(component.render(width));
             if (maxHeight !== undefined && overlayLines.length > maxHeight) {
                 overlayLines = overlayLines.slice(0, maxHeight);
             }
@@ -925,6 +931,13 @@ export class TuiBase extends Container {
             }
         }
         return null;
+    }
+    resolveFakeCursors(lines) {
+        return lines.map((line)=>{
+            if (!line.includes(FAKE_CURSOR_START)) return line;
+            const resolved = this.showHardwareCursor ? line.replace(FOCUSED_FAKE_CURSOR, "$1$2") : line;
+            return resolved.replaceAll(FAKE_CURSOR_START, "\x1b[7m").replaceAll(FAKE_CURSOR_END, "\x1b[27m");
+        });
     }
     queryTerminalColors({ timeoutMs, onLateReply }) {
         return new Promise((resolve)=>{

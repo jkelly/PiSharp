@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases: extensions resolve
-// Pi's own packages, and jiti loads them) and packages/coding-agent/package.json (the Pi 1.1.0 dependency set).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases: extensions resolve
+// Pi's own packages, and jiti loads them) and packages/coding-agent/package.json (the Pi 1.2.0 dependency set).
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -8,19 +8,20 @@ using PiSharp.Cli.Pi;
 namespace PiSharp.Cli.Extensions.Pi;
 
 /// <summary>
-/// The Pi packages extensions run against (owner decision, 2026-10-08): on first extension use the exact Pi 1.1.0 packages are
-/// installed with the user's npm into <c>&lt;agentDir&gt;/pisharp/pi-runtime/1.1.0</c> (or <c>PISHARP_PI_RUNTIME_DIR</c>), every
+/// The Pi packages extensions run against (owner decision, 2026-10-08): on first extension use the exact Pi 1.2.0 packages are
+/// installed with the user's npm into <c>&lt;agentDir&gt;/pisharp/pi-runtime/1.2.0</c> (or <c>PISHARP_PI_RUNTIME_DIR</c>), every
 /// installed package's lockfile integrity is checked against the npm registry's <c>dist.integrity</c>, and the result is recorded in
 /// <c>provenance.json</c>. The Node host then loads extensions with Pi's own jiti and aliases, as upstream's loader does. Offline
 /// (<c>PI_OFFLINE</c>) or without npm, PiSharp's built-in compatibility modules are the fallback, and the run says so.
 /// </summary>
 internal static class PiNodeRuntime
 {
-    internal const string PiVersion = "1.1.0";
+    internal const string PiVersion = "1.2.0";
     internal const string ProvenanceFile = "provenance.json";
 
     /// <summary>The pinned set: the packages upstream's getAliases resolves for extensions, their loader (jiti) and, through overrides,
-    /// every @earendil-works package of the 1.1.0 release at exactly 1.1.0.</summary>
+    /// every @earendil-works package of the 1.2.0 release at exactly 1.2.0 (Pi 1.2.0 no longer depends on
+    /// @earendil-works/chord).</summary>
     internal static JsonObject PackageJson() => new()
     {
         ["name"] = "pisharp-pi-runtime", ["private"] = true,
@@ -33,8 +34,7 @@ internal static class PiNodeRuntime
         ["overrides"] = new JsonObject
         {
             ["@earendil-works/pi-ai"] = PiVersion, ["@earendil-works/pi-tui"] = PiVersion, ["@earendil-works/pi-agent-core"] = PiVersion,
-            ["@earendil-works/pi-mcp"] = PiVersion, ["@earendil-works/pi-codemode"] = PiVersion, ["@earendil-works/chord"] = PiVersion,
-            ["@earendil-works/pi-telemetry"] = PiVersion
+            ["@earendil-works/pi-mcp"] = PiVersion, ["@earendil-works/pi-codemode"] = PiVersion, ["@earendil-works/pi-telemetry"] = PiVersion
         }
     };
 

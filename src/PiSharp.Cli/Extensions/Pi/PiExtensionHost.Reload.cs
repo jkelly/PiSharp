@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (reload: session_shutdown with
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (reload: session_shutdown with
 // reason "reload", the old runner invalidated, resources and extensions reloaded with the previous flag values, the runtime rebuilt
 // by _buildRuntime with a new ExtensionRunner over the loaded extensions and _refreshToolRegistry, session_start with reason
 // "reload") and packages/coding-agent/src/core/extensions/loader.ts (fresh modules on each load).

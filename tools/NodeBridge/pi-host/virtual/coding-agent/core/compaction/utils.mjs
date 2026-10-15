@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/compaction/utils.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/compaction/utils.ts.
 // Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
 import { contentText } from "../../../pi-ai.mjs";
 export function createFileOps() {
@@ -77,19 +77,13 @@ export function serializeConversation(messages) {
             const content = contentText(msg.content, "");
             if (content) parts.push(`[User]: ${content}`);
         } else if (msg.role === "assistant") {
-            const thinkingParts = [];
             const toolCalls = [];
             for (const block of msg.content){
-                if (block.type === "thinking") {
-                    thinkingParts.push(block.thinking);
-                } else if (block.type === "toolCall") {
+                if (block.type === "toolCall") {
                     const args = block.arguments;
                     const argsStr = Object.entries(args).map(([k, v])=>`${k}=${JSON.stringify(v)}`).join(", ");
                     toolCalls.push(`${block.name}(${argsStr})`);
                 }
-            }
-            if (thinkingParts.length > 0) {
-                parts.push(`[Assistant thinking]: ${thinkingParts.join("\n")}`);
             }
             if (msg.content.some((block)=>block.type === "text")) {
                 parts.push(`[Assistant]: ${contentText(msg.content)}`);
