@@ -1,11 +1,12 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/models.ts (createModels, setProvider, getModels/getModel,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (createModels, setProvider, getModels/getModel,
 // applyAuth, streamSimple, completeSimple, streamDeferred, fetchDeferred, cancelDeferred), packages/ai/src/api/lazy.ts (lazyStream: setup
 // failures end the stream with an error message), packages/ai/src/auth/helpers.ts (envApiKeyAuth: a stored key, else the first set
 // variable) and packages/ai/src/env-api-keys.ts. The provider set is pi-ai's builtinProviders() with their catalog shards; requests run
 // over PiSharp.AI's native transports (see NativeModelRoutes).
-// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/models.ts (getModelsOfType, getAvailableOfType, getModelOfType, classify,
-// generateImages), which pi-durable 1.2.0's code mode calls for scripts' models.* (work list area d), over PiSharp.AI's ModelOperationsRegistry
-// (the coding agent's port of the same functions) with the registered providers' catalogs.
+// Re-pinned from Pi v1.1.0 (abe508e1) in work list area d: models.ts' only change since, a refresh context's baseUrl, touches none of these.
+// The same file's getModelsOfType, getAvailableOfType, getModelOfType, classify and generateImages, which pi-durable 1.2.0's code mode calls
+// for scripts' models.* (work list area d), run over PiSharp.AI's ModelOperationsRegistry (the coding agent's port of the same functions) with
+// the registered providers' catalogs.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
