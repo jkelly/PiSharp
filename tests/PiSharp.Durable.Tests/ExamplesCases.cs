@@ -17,10 +17,14 @@ using PiSharp.Durable.Examples;
 // on an ExampleClock driven like Node's event loop (24 and 23 restart on their own storage, as 13 does). 19-json prints both modes; its
 // lines are upstream's captured output (Fixtures/examples-19-json-*.upstream.jsonl, from one run of each mode under Node) and compare as
 // text, key order included, with timestamps, durations, the faux API name and the provider session ID as placeholders: those are random
-// or clock values. Pi v1.2.0's capture (Fixtures/v1.2.0) of 19 also carries read's new description and the token counts it changes (work
-// list area e), so until area e lands the events mode compares with the v1.1.0 capture plus tool task v2's two additions taken from the
-// v1.2.0 capture (area a): the snapshot's `nestedTools` and the tool events' `taskId`, each checked to be the only difference of its line
-// apart from read's description and the counts.
+// or clock values. Both modes compare with Pi v1.2.0's capture (Fixtures/v1.2.0), which carries tool task v2's additions (the snapshot's
+// `nestedTools`, the tool events' `taskId`) and read's description naming images, with the token counts it changes (work list area e).
+// That capture's run committed the streaming answer's partial message once, because a progress tick (partialIntervalMs, 100 ms) fell
+// inside its 200 tokens/s stream, which the v1.1.0 run and PiSharp's paced faux model do not: its ops have one line more (the
+// docs.pi.live.generation.message progress commit), and its events' message_start carries the partial message (stopReason "pending").
+// The comparison leaves out such ops lines (JsonModeOpsLines checks that the rest has as many lines as the v1.1.0 capture) and expects
+// the message_start of a pending message to carry the message its message_end carries, as every completed message_start of both captures
+// does (JsonModeEventsLines checks that identity on the capture's other assistant message_start lines).
 internal static partial class Program
 {
     private static readonly string[] CodingToolsTranscript =
@@ -39,8 +43,8 @@ internal static partial class Program
     ];
 
     // Declared before ExamplesUpstreamOutput, which spreads them.
-    private static readonly string[] JsonModeEvents = WithToolTaskV2(JsonModeFixture("events"), JsonModeFixture("events", "v1.2.0"));
-    private static readonly string[] JsonModeOps = JsonModeFixture("ops");
+    private static readonly string[] JsonModeEvents = JsonModeEventsLines(JsonModeFixture("events", "v1.2.0"));
+    private static readonly string[] JsonModeOps = JsonModeOpsLines(JsonModeFixture("ops", "v1.2.0"), JsonModeFixture("ops"));
     private static readonly string[] ReviewerTranscript =
     [
         "> Review user.ts.",
@@ -325,32 +329,36 @@ internal static partial class Program
         [RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", .. version is null ? Array.Empty<string>() : [version],
             $"examples-19-json-{mode}.upstream.jsonl"]));
 
-    /// <summary>The v1.1.0 events of 19 with tool task v2's additions from the v1.2.0 capture (see the file header): the snapshot's
-    /// <c>nestedTools</c> after <c>tools</c>, and each tool event's <c>taskId</c> after <c>toolName</c>.</summary>
-    private static string[] WithToolTaskV2(string[] v110, string[] v120)
+    /// <summary>The v1.2.0 events of 19 with a pending message_start carrying its final message (see the file header).</summary>
+    private static string[] JsonModeEventsLines(string[] v120)
     {
-        Equal(v110.Length, v120.Length, "example 19 events: lines in both captures");
-        var lines = new string[v110.Length];
-        for (var index = 0; index < v110.Length; index++)
+        var lines = v120.ToArray();
+        for (var index = 0; index < lines.Length; index++)
         {
-            var line = v110[index];
-            if (line.StartsWith("""{"type":"snapshot","entries":[],"tools":[],""", StringComparison.Ordinal))
-            {
-                Check(v120[index].StartsWith("""{"type":"snapshot","entries":[],"tools":[],"nestedTools":[],""", StringComparison.Ordinal),
-                    "example 19: the v1.2.0 snapshot adds nestedTools");
-                line = line.Replace("\"tools\":[],", "\"tools\":[],\"nestedTools\":[],", StringComparison.Ordinal);
-                Equal(v120[index], line, "example 19: snapshot line " + (index + 1));
-            }
-            else if (Regex.Match(line, "^\\{\"type\":\"tool_execution_[a-z]+\",\"toolCallId\":\"[^\"]*\",\"toolName\":\"[^\"]*\"") is { Success: true } call)
-            {
-                var taskId = Regex.Match(v120[index], "^" + Regex.Escape(call.Value) + ",\"taskId\":([0-9]+),");
-                Check(taskId.Success, "example 19: the v1.2.0 tool event of line " + (index + 1) + " carries taskId");
-                line = call.Value + ",\"taskId\":" + taskId.Groups[1].Value + line[call.Length..];
-                // Only the tool_execution_end's result entry repeats the transcript, whose read description and counts are area e's.
-                if (!line.StartsWith("{\"type\":\"tool_execution_end\"", StringComparison.Ordinal)) Equal(v120[index], line, "example 19: tool event line " + (index + 1));
-            }
-            lines[index] = line;
+            using var start = System.Text.Json.JsonDocument.Parse(lines[index]);
+            if (start.RootElement.GetProperty("type").GetString() != "message_start" ||
+                !start.RootElement.GetProperty("message").TryGetProperty("stopReason", out var stopReason)) continue;
+            var end = lines.Skip(index + 1).First(line => line.StartsWith("{\"type\":\"message_end\",", StringComparison.Ordinal));
+            using var endDocument = System.Text.Json.JsonDocument.Parse(end);
+            var final = "{\"type\":\"message_start\",\"message\":" + endDocument.RootElement.GetProperty("entry").GetProperty("model")[0].GetRawText() + "}";
+            if (stopReason.GetString() == "pending") lines[index] = final;
+            else Equal(lines[index], final, "example 19 events: a completed message_start carries its message_end's message");
         }
+        return lines;
+    }
+
+    /// <summary>The v1.2.0 ops of 19 without the progress commits of a partial streaming message (see the file header); what remains has as many
+    /// lines as the v1.1.0 capture, which had none.</summary>
+    private static string[] JsonModeOpsLines(string[] v120, string[] v110)
+    {
+        static bool StreamingProgress(string line)
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(line);
+            return document.RootElement.TryGetProperty("ops", out var ops) && ops.EnumerateArray().All(op =>
+                op[0].GetString() == "s" && op[1].GetRawText() == "[\"docs\",\"pi.live\",\"generation\",\"message\"]");
+        }
+        var lines = v120.Where(line => !StreamingProgress(line)).ToArray();
+        Equal(v110.Length, lines.Length, "example 19 ops: lines apart from streaming progress");
         return lines;
     }
 

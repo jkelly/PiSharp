@@ -16,7 +16,11 @@
 // leave no record, so the records, events and observed results stay upstream's.
 //
 // Read only (no Run): deferred-tool-search (areas a and k) needs tool_search, which work list area k ports; its read, raw and harness cases
-// run. codemode (area d) and read-image (area e) are not listed yet.
+// run. codemode (area d) is not listed yet.
+//
+// read-image (area e) writes its two files to a fresh directory and gives the Harness a LocalExecutionEnv there (upstream NodeExecutionEnv).
+// pixelPng's IDAT is Node's deflateSync output, which .NET's zlib need not reproduce byte for byte, so the PNG is the captured file's bytes
+// (the image block in records.json carries them); pixelBmp is built as upstream builds it.
 //
 // Not checked:
 // - session-failed's observed `idle`. capture.mjs's open() replaces harness.close with a wrapper that first waits a macrotask and stops the
@@ -26,6 +30,7 @@
 //   seals at once and the case asserts that rejection. Every other observed field is compared.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Env;
 using static ChatTests;
 using static SessionTests;
 
@@ -100,11 +105,12 @@ internal static class CompatScenarios120
     private static ChatSetup Chat(FauxOptions? options = null) =>
         new(new FauxModels((options ?? new FauxOptions()) with { Api = "faux" })) { Now = () => CompatScenarios.Now };
 
-    private static async Task<OpenedChat> Open(ChatSetup setup, IStorage storage, Action<Exception>? onReport = null)
+    private static async Task<OpenedChat> Open(ChatSetup setup, IStorage storage, Action<Exception>? onReport = null, IExecutionEnv? env = null)
     {
         var harness = await Harness.OpenAsync(storage, new HarnessOptions
         {
             Models = setup.Models, Registry = setup.Registry, Settings = setup.Settings, Now = () => setup.Now(), OnReport = onReport,
+            Env = env is null ? null : (_, _) => Task.FromResult<IExecutionEnv?>(env),
         }, Context);
         var root = await harness.RootAsync(Context, new AgentChange { Model = new ModelRef("faux", "faux-1") });
         await CompatEvents.AttachAsync(harness, root.Id);
@@ -159,6 +165,27 @@ internal static class CompatScenarios120
             var error = Interlocked.Exchange(ref failNext, null);
             return error is not null ? Task.FromException<Seq>(error) : base.CommitAsync(writes, context);
         }
+    }
+
+    /// <summary>scenarios-v1.2.0.mjs <c>pixelPng</c>: a 1x1 red PNG (RGB, deflated scanline, real CRCs), as captured (see the file header).</summary>
+    private static readonly byte[] PixelPng = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC");
+
+    /// <summary>scenarios-v1.2.0.mjs <c>pixelBmp</c>: a 1x1 24-bit BMP, a red pixel, its row padded to four bytes.</summary>
+    private static byte[] PixelBmp()
+    {
+        var bytes = new byte[58];
+        bytes[0] = (byte)'B';
+        bytes[1] = (byte)'M';
+        BitConverter.TryWriteBytes(bytes.AsSpan(2), 58u);
+        BitConverter.TryWriteBytes(bytes.AsSpan(10), 54u);
+        BitConverter.TryWriteBytes(bytes.AsSpan(14), 40u);
+        BitConverter.TryWriteBytes(bytes.AsSpan(18), 1);
+        BitConverter.TryWriteBytes(bytes.AsSpan(22), 1);
+        BitConverter.TryWriteBytes(bytes.AsSpan(26), (ushort)1);
+        BitConverter.TryWriteBytes(bytes.AsSpan(28), (ushort)24);
+        BitConverter.TryWriteBytes(bytes.AsSpan(34), 4u);
+        bytes[56] = 255;
+        return bytes;
     }
 
     private static InputEntry Mention(string text) => new("chat.mention", Obj(("author", "ann"), ("text", text)));
@@ -586,6 +613,29 @@ internal static class CompatScenarios120
                 ("reports", JsonValue.Array(reports.Snapshot())));
         }),
         new("deferred-tool-search", ["a", "k"], null),
+        new("read-image", ["e"], async open =>
+        {
+            var directory = Program.Temp("compat-read-image");
+            try
+            {
+                await File.WriteAllBytesAsync(Path.Combine(directory, "pixel.png"), PixelPng);
+                await File.WriteAllBytesAsync(Path.Combine(directory, "pixel.bmp"), PixelBmp());
+                var env = new PiSharp.Durable.Tools.Env.LocalExecutionEnv(directory);
+                var setup = Chat();
+                setup.ToolExecution = ToolExecutionMode.Sequential;
+                Install(setup, "coding", [PiSharp.Durable.Tools.CodingTools.CreateReadTool()]);
+                setup.Faux.SetResponses(Calls(("read", Obj(("path", "pixel.png")), "c1"), ("read", Obj(("path", "pixel.bmp")), "c2")), Answer("a red pixel"));
+                var (harness, root) = await Open(setup, await open(), env: env);
+                await (await root.SubmitAsync(SubmissionDraft.Input("look"), Context)).WaitAsync(Context);
+                await harness.WaitForIdleAsync(Context);
+                await Close(harness);
+                return null;
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }),
         new("nested-tools-restart", ["a", "c"], async open =>
         {
             var tools = new RestartTools(block: true);
