@@ -25,6 +25,8 @@ The agent folder is `~/.pi/agent`. Set `PI_CODING_AGENT_DIR` to move it.
 
 Pi and PiSharp share these files. A sign-in with one works in the other.
 
+`settings.json`, `models.json`, `keybindings.json` and theme files accept a `$schema` key, so editors can check them against Pi's published schemas, for example `"$schema": "https://pi.dev/schemas/models.schema.json"`. PiSharp checks `models.json`, key bindings and themes against the same schemas. A theme may only use the documented fields; put your own colors under `vars`.
+
 ## The project `.pi` folder
 
 | Path | What it holds |

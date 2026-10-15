@@ -30,6 +30,8 @@ Some providers need more than a key:
 
 At startup, interactive mode refreshes the model catalogs from pi.dev, as Pi does. `--offline` or `PI_OFFLINE=1` turns that off. `pisharp update --models` refreshes them by hand.
 
+With an OpenRouter key or sign-in, the refresh also asks OpenRouter which chat models that key may use, as Pi 1.2.0 does. The OpenRouter list then shows only those models, with the key's context size, output limit and prices, and is saved for offline use. A `baseUrl` for OpenRouter in `models.json`, such as a regional endpoint, is used for that request.
+
 ## Your own endpoints and models
 
 `~/.pi/agent/models.json` adds providers and models, or overrides built-in ones, in Pi's format. A `baseUrl` there also works for built-in providers, for example to send Anthropic requests through a proxy.
