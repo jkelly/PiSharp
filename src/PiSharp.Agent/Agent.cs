@@ -312,15 +312,19 @@ public sealed class Agent : IAsyncDisposable
                 if (hooks.BeforePrompt is { } before)
                 {
                     var prepared = await InCallbackAsync(run, () => before(new(run.History, inputs, _clock()), token)).ConfigureAwait(false);
-                    token.ThrowIfCancellationRequested();
+                    // Settling an abort, a run whose abort was requested while it prepared still starts and is aborted at once
+                    // (agent-session.ts aborts at agent_start when the abort came during before_agent_start).
+                    if (_options.CancellationBehavior != AgentCancellationBehavior.SettleAborted) token.ThrowIfCancellationRequested();
                     ArgumentNullException.ThrowIfNull(prepared);
+                    var leading = prepared.LeadingMessages.IsDefault ? [] : prepared.LeadingMessages;
                     AgentLoopRunner.ValidateRequestMessages(prepared.AdditionalMessages, _options.ResultValues, _loopOptions.MaximumTranscriptMessages);
-                    if (prepared.AdditionalMessages.Any(message => message.Role != "custom"))
+                    AgentLoopRunner.ValidateRequestMessages(leading, _options.ResultValues, _loopOptions.MaximumTranscriptMessages);
+                    if (prepared.AdditionalMessages.Any(message => message.Role != "custom") || leading.Any(message => message.Role != "custom"))
                         throw new ArgumentException("Prompt preparation may append only custom messages.");
-                    if ((long)run.History.Length + inputs.Length + prepared.AdditionalMessages.Length > _loopOptions.MaximumTranscriptMessages)
+                    if ((long)run.History.Length + inputs.Length + prepared.AdditionalMessages.Length + leading.Length > _loopOptions.MaximumTranscriptMessages)
                         throw new ArgumentException("Prepared prompt exceeds the transcript limit.");
-                    inputs = inputs.AddRange(prepared.AdditionalMessages);
-                    lock (_gate) run.Pending.AddRange(prepared.AdditionalMessages);
+                    inputs = leading.AddRange(inputs).AddRange(prepared.AdditionalMessages);
+                    lock (_gate) { run.Pending.InsertRange(0, leading); run.Pending.AddRange(prepared.AdditionalMessages); }
                     afterContext = prepared.AfterContext;
                 }
                 _continuationProjection = afterContext;

@@ -17,8 +17,33 @@ public sealed record ExtensionContextMessagesPatch(ImmutableArray<TranscriptEntr
 public sealed record ExtensionContextReduction(ImmutableArray<TranscriptEntry> Messages,
     ImmutableArray<ExtensionEventDiagnostic> Diagnostics);
 
-/// <summary>Immutable native prompt snapshot. Rich mutable BuildSystemPromptOptions are not exposed.</summary>
-public sealed record ExtensionBeforeAgentStartEvent(string Prompt, string SystemPrompt, JsonData? Images = null);
+/// <summary>What started a run (Pi 1.2.0 <c>BeforeAgentStartEvent.messageType</c>).</summary>
+public enum ExtensionBeforeAgentStartMessageType
+{
+    /// <summary>A submitted prompt, an RPC prompt or <c>sendUserMessage</c>: <see cref="ExtensionBeforeAgentStartEvent.Prompt"/> and
+    /// <see cref="ExtensionBeforeAgentStartEvent.Images"/> describe it.</summary>
+    User,
+    /// <summary><c>sendMessage(..., { triggerTurn: true })</c> while idle: <see cref="ExtensionBeforeAgentStartEvent.Message"/> is the
+    /// starting custom message and there is no prompt.</summary>
+    Custom
+}
+
+/// <summary>Immutable native prompt snapshot. Rich mutable BuildSystemPromptOptions are not exposed.
+/// Pi 1.2.0: before_agent_start also fires for runs started by a custom message with <c>triggerTurn</c>; check
+/// <see cref="MessageType"/> to act only on user prompts. A custom run's <see cref="Prompt"/> is empty and it has no images.</summary>
+public sealed record ExtensionBeforeAgentStartEvent(string Prompt, string SystemPrompt, JsonData? Images = null)
+{
+    /// <summary>What started the run; <see cref="ExtensionBeforeAgentStartMessageType.User"/> unless set.</summary>
+    public ExtensionBeforeAgentStartMessageType MessageType { get; init; }
+    /// <summary>For a <see cref="ExtensionBeforeAgentStartMessageType.Custom"/> run, the starting custom message as Pi's
+    /// <c>CustomMessage</c> (<c>role</c>, <c>customType</c>, <c>content</c>, <c>display</c>, <c>details</c>, <c>timestamp</c>);
+    /// null for a user run.</summary>
+    public JsonData? Message { get; init; }
+
+    /// <summary>The event of a run started by the custom message <paramref name="message"/>.</summary>
+    public static ExtensionBeforeAgentStartEvent ForCustomMessage(JsonData message, string systemPrompt) =>
+        new("", systemPrompt) { MessageType = ExtensionBeforeAgentStartMessageType.Custom, Message = message };
+}
 public sealed record ExtensionCustomMessage(string CustomType, bool Display, JsonData? Content = null, JsonData? Details = null);
 /// <summary>Null SystemPrompt retains the prior prompt; an empty string is an explicit override.</summary>
 public sealed record ExtensionBeforeAgentStartPatch(ExtensionCustomMessage? Message = null, string? SystemPrompt = null);

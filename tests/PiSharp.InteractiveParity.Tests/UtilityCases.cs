@@ -259,6 +259,32 @@ internal static class UtilityCases
             Equal(1, f.Osc.Count, "one OSC after");
             Equal(0, f.Calls.Count, "no commands");
         });
+        // Pi 1.2.0 clipboard.ts isRemoteSession (#10826, #10835, #10114): PI_CLIPBOARD_OSC52=1 also sends the copy with OSC 52 after a
+        // successful local write, for remote clients without SSH markers.
+        foreach (var (platform, display) in new[] { ("darwin", (string?)null), ("win32", null), ("linux", ":99") })
+            yield return ($"util.copy.pi-clipboard-osc52-after-successful-{platform}-copy", async () =>
+            {
+                var f = new ClipFixture { Platform = platform };
+                if (display is not null) f.Env["DISPLAY"] = display;
+                f.Env["PI_CLIPBOARD_OSC52"] = "1";
+                await Clipboard.CopyToClipboard("hello", f.Build());
+                if (platform == "linux")
+                {
+                    Equal("xclip", f.Calls.Single().Command, "xclip");
+                    Seq(["-selection", "clipboard"], f.Calls[0].Args, "args");
+                    Equal(new ClipboardCommandOptions(Input: "hello", TimeoutMs: 5000), f.Calls[0].Options, "options");
+                }
+                else Seq(["hello"], f.Native!.Written, "native write");
+                Seq([$"\u001b]52;c;{Convert.ToBase64String(B("hello"))}\u0007"], f.Osc, "OSC 52 payload");
+            });
+        yield return ("util.copy.pi-clipboard-osc52-only-for-1", async () =>
+        {
+            var f = new ClipFixture();
+            f.Env["PI_CLIPBOARD_OSC52"] = "true";
+            await Clipboard.CopyToClipboard("hello", f.Build());
+            Seq(["hello"], f.Native!.Written, "native write");
+            Equal(0, f.Osc.Count, "only \"1\" enables OSC 52");
+        });
         yield return ("util.copy.rejected-native-falls-back-to-pbcopy", async () =>
         {
             var f = new ClipFixture();

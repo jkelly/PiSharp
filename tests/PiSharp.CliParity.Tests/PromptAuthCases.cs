@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (prompt: model and auth
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (prompt: model and auth
 // validation), packages/coding-agent/src/core/auth-guidance.ts, packages/coding-agent/src/main.ts (no model outside interactive mode),
 // packages/coding-agent/src/modes/print-mode.ts and packages/coding-agent/src/modes/rpc/rpc-mode.ts (prompt error responses).
 using System.Text;

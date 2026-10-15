@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/package-manager.ts (DefaultPackageManager and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/package-manager.ts (DefaultPackageManager and
 // its module helpers: resourcePrecedenceRank, getExtensionTempFolder, prefixIgnorePattern, addIgnoreRules, collectFiles,
 // collectSkillEntries, collectAncestorAgentsSkillDirs, collectAutoPromptEntries, collectAutoThemeEntries, resolveExtensionEntries,
 // collectAutoExtensionEntries, collectResourceFiles, matchesAnyPattern, matchesAnyExactPattern, isEnabledByOverrides,
@@ -1447,7 +1447,7 @@ internal sealed class PiPackageManager
         _ => CollectFiles(directory, ".md")
     };
 
-    private static bool MatchesAnyPattern(string filePath, IEnumerable<string> patterns, string baseDir)
+    private bool MatchesAnyPattern(string filePath, IEnumerable<string> patterns, string baseDir)
     {
         var rel = ToPosixPath(Relative(baseDir, filePath));
         var name = Path.GetFileName(filePath);
@@ -1456,7 +1456,8 @@ internal sealed class PiPackageManager
         var parentDir = isSkillFile ? Path.GetDirectoryName(filePath)! : null;
         return patterns.Any(pattern =>
         {
-            var normalized = ToPosixPath(pattern);
+            // Pi 1.2.0 matchesAnyPattern: ~ is expanded (normalizePath) before matching.
+            var normalized = ToPosixPath(PiPaths.NormalizePath(pattern, home));
             if (PiMinimatch.Match(rel, normalized) || PiMinimatch.Match(name, normalized) || PiMinimatch.Match(filePathPosix, normalized)) return true;
             if (parentDir is null) return false;
             return PiMinimatch.Match(ToPosixPath(Relative(baseDir, parentDir)), normalized) || PiMinimatch.Match(Path.GetFileName(parentDir), normalized) ||
@@ -1464,10 +1465,11 @@ internal sealed class PiPackageManager
         });
     }
 
-    private static string NormalizeExactPattern(string pattern) =>
-        ToPosixPath(pattern.StartsWith("./", StringComparison.Ordinal) || pattern.StartsWith(".\\", StringComparison.Ordinal) ? pattern[2..] : pattern);
+    /// <summary>Source normalizeExactPattern: a leading <c>./</c> dropped and (Pi 1.2.0) <c>~</c> expanded.</summary>
+    private string NormalizeExactPattern(string pattern) =>
+        ToPosixPath(PiPaths.NormalizePath(pattern.StartsWith("./", StringComparison.Ordinal) || pattern.StartsWith(".\\", StringComparison.Ordinal) ? pattern[2..] : pattern, home));
 
-    private static bool MatchesAnyExactPattern(string filePath, IReadOnlyCollection<string> patterns, string baseDir)
+    private bool MatchesAnyExactPattern(string filePath, IReadOnlyCollection<string> patterns, string baseDir)
     {
         if (patterns.Count == 0) return false;
         var rel = ToPosixPath(Relative(baseDir, filePath));
@@ -1484,7 +1486,7 @@ internal sealed class PiPackageManager
 
     private static List<string> OverridePatterns(IEnumerable<string> entries) => [.. entries.Where(IsOverridePattern)];
 
-    private static bool IsEnabledByOverrides(string filePath, List<string> patterns, string baseDir)
+    private bool IsEnabledByOverrides(string filePath, List<string> patterns, string baseDir)
     {
         var overrides = OverridePatterns(patterns);
         var excludes = overrides.Where(pattern => pattern.StartsWith('!')).Select(pattern => pattern[1..]).ToList();
@@ -1499,7 +1501,7 @@ internal sealed class PiPackageManager
 
     /// <summary>Source applyPatterns: includes (or everything), minus <c>!</c> excludes, plus exact <c>+</c> force-includes, minus exact
     /// <c>-</c> force-excludes.</summary>
-    private static HashSet<string> ApplyPatterns(List<string> allPaths, IEnumerable<string> patterns, string baseDir)
+    private HashSet<string> ApplyPatterns(List<string> allPaths, IEnumerable<string> patterns, string baseDir)
     {
         List<string> includes = [], excludes = [], forceIncludes = [], forceExcludes = [];
         foreach (var pattern in patterns)
@@ -1518,7 +1520,7 @@ internal sealed class PiPackageManager
         return new HashSet<string>(result, StringComparer.Ordinal);
     }
 
-    private static Dictionary<string, bool> ApplyAutoloadDisabledPatterns(List<string> allPaths, IEnumerable<string> patterns, string baseDir)
+    private Dictionary<string, bool> ApplyAutoloadDisabledPatterns(List<string> allPaths, IEnumerable<string> patterns, string baseDir)
     {
         var result = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (var pattern in patterns)

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/export-html/index.ts, with src/config.ts (APP_NAME,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/export-html/index.ts, with src/config.ts (APP_NAME,
 // getExportTemplateDir) and core/agent-session.ts (exportToHtml theme selection).
 
 using System.Text;

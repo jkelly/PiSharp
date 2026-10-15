@@ -32,17 +32,26 @@ internal sealed class RegisteredExtensionContextHooks
         if (registry.CaptureSnapshot().BeforeAgentStartHandlers.IsEmpty) return new([]);
         if (options.ReadSystemPrompt is null || options.RestoreSystemMessage is null)
             throw new InvalidOperationException("Before-start handlers require host system-state replay.");
-        // The CLI has one admitted user input. Low-level batch prompts use the last user as their prompt event.
-        var user = start.Inputs.LastOrDefault(message => message.Role == "user");
-        if (user is null) return new([]);
-        var content = user.WireBody.Value.GetProperty("content");
-        var text = content.ValueKind == JsonValueKind.String ? content.GetString()! :
-            string.Join("\n", content.EnumerateArray().Where(part => part.GetProperty("type").GetString() == "text").Select(part => part.GetProperty("text").GetString()));
-        var images = content.ValueKind == JsonValueKind.Array
-            ? content.EnumerateArray().Where(part => part.GetProperty("type").GetString() == "image").ToArray() : Array.Empty<JsonElement>();
-        var result = await dispatcher.DispatchBeforeAgentStartAsync(new(text,
-            options.ReadSystemPrompt(start.History.AddRange(start.Inputs), token),
-            images.Length == 0 ? null : JsonData.Parse(JsonSerializer.Serialize(images))), token, session).ConfigureAwait(false);
+        // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (_startRun, _prepareRun)
+        // and extensions/runner.ts (emitBeforeAgentStart with a BeforeAgentStartTrigger): a run starts from a user message
+        // (messageType "user": prompt and images) or, for sendMessage(..., { triggerTurn: true }), from a custom message (messageType
+        // "custom": the message, no prompt). The CLI has one admitted user input. Low-level batch prompts use the last user as their
+        // prompt event; without a user input the first custom input started the run (pending nextTurn messages follow it).
+        ExtensionBeforeAgentStartEvent input;
+        var systemPrompt = options.ReadSystemPrompt(start.History.AddRange(start.Inputs), token);
+        if (start.Inputs.LastOrDefault(message => message.Role == "user") is { } user)
+        {
+            var content = user.WireBody.Value.GetProperty("content");
+            var text = content.ValueKind == JsonValueKind.String ? content.GetString()! :
+                string.Join("\n", content.EnumerateArray().Where(part => part.GetProperty("type").GetString() == "text").Select(part => part.GetProperty("text").GetString()));
+            var images = content.ValueKind == JsonValueKind.Array
+                ? content.EnumerateArray().Where(part => part.GetProperty("type").GetString() == "image").ToArray() : Array.Empty<JsonElement>();
+            input = new(text, systemPrompt, images.Length == 0 ? null : JsonData.Parse(JsonSerializer.Serialize(images)));
+        }
+        else if (start.Inputs.FirstOrDefault(message => message.Role == "custom") is { } custom)
+            input = ExtensionBeforeAgentStartEvent.ForCustomMessage(custom.WireBody, systemPrompt);
+        else return new([]);
+        var result = await dispatcher.DispatchBeforeAgentStartAsync(input, token, session).ConfigureAwait(false);
         if (options.ReportEventDiagnostic is { } report)
             foreach (var diagnostic in result.Diagnostics)
             { await report(diagnostic, token).ConfigureAwait(false); token.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested(); }

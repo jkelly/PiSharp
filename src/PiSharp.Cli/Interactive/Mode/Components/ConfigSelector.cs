@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/config-selector.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/config-selector.ts.
 // TUI component for managing package resources (enable/disable), shown by `pi config`. The package manager's resolved paths
 // (core/package-manager.ts PathMetadata, ResolvedResource, ResolvedPaths) arrive as records; the settings it edits go through
 // IConfigSelectorSettings, the SettingsManager members the component calls (settings and package sources as Pi JSON).

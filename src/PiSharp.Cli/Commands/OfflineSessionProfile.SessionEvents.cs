@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts ("bash": emitUserBash
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/rpc/rpc-mode.ts ("bash": emitUserBash
 // before executeBash), packages/coding-agent/src/core/agent-session.ts (_emitModelSelect, _afterToolCall image normalization)
 // and packages/coding-agent/src/core/sdk.ts (convertToLlmWithBlockImages).
 using PiSharp.Agent;

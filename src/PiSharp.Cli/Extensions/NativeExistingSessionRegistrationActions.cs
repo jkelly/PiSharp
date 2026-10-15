@@ -41,9 +41,12 @@ public sealed class NativeExistingSessionRegistrationActions : IExtensionRegistr
     {
         ArgumentNullException.ThrowIfNull(content);
         var attachment = reads.CaptureRegistrationActionAttachment(token);
+        // agent-session.ts sendUserMessage -> prompt({ streamingBehavior: deliverAs }): while the session is busy (also while a run
+        // starts, Pi 1.2.0) a message without deliverAs fails with "Agent is already processing"; while idle it starts a run.
         var behavior = options?.DeliverAs switch
         {
-            null or ExtensionMessageDelivery.Steer => PromptInputStreamingBehavior.Steer,
+            null => (PromptInputStreamingBehavior?)null,
+            ExtensionMessageDelivery.Steer => PromptInputStreamingBehavior.Steer,
             ExtensionMessageDelivery.FollowUp => PromptInputStreamingBehavior.FollowUp,
             _ => throw new ArgumentException("Pinned user delivery admits only steering or follow-up.", nameof(options))
         };
@@ -69,7 +72,7 @@ public sealed class NativeExistingSessionRegistrationActions : IExtensionRegistr
         return new(Own(attachment, token, work => attachment.Session.SendCustomMessageAsync(sessionId,
             new(message.CustomType, message.Content, message.Display, message.Details), delivery, options?.TriggerTurn, work), _ => true));
     }
-    private static PromptInput NormalizeUserContent(JsonData content, PromptInputStreamingBehavior behavior, PromptInputAdmissionOptions? limits)
+    private static PromptInput NormalizeUserContent(JsonData content, PromptInputStreamingBehavior? behavior, PromptInputAdmissionOptions? limits)
     {
         if (content.Value.ValueKind == JsonValueKind.String)
             return PromptInputValue.Own(new(content.Value.GetString()!, PromptInputSource.Extension, StreamingBehavior: behavior), limits);

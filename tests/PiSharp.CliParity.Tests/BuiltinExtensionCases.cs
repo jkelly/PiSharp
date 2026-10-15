@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/index.ts (builtInExtensions),
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/index.ts (builtInExtensions),
 // packages/coding-agent/src/core/package-manager.ts (resolve: builtin:<name> enabled unless the user extensions setting excludes it, a
 // project +/-/! entry overriding; resolveExtensionSources: -e builtin:<name>), packages/coding-agent/src/core/resource-loader.ts (the
 // extension paths with noExtensions and disabledBuiltinExtensions, "Unknown built-in extension", omitReplacedExtensions, reload) and

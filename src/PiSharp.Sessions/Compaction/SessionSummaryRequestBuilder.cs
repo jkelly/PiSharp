@@ -52,8 +52,9 @@ public static class SessionSummaryRequestBuilder
             if (message.Role == "user") { var text = Text(content, ""); if (text.Length != 0) Add("[User]: " + text); }
             else if (message.Role == "assistant")
             {
-                var thinking = content.EnumerateArray().Where(block => block.GetProperty("type").GetString() == "thinking").Select(block => block.GetProperty("thinking").GetString()!).ToArray();
-                if (thinking.Length != 0) Add("[Assistant thinking]: " + string.Join('\n', thinking));
+                // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/compaction/utils.ts
+                // (serializeConversation). Thinking is omitted: replayed thinking is often not part of the live context, and
+                // including it can make the summarization request larger than the context it summarizes.
                 if (content.EnumerateArray().Any(block => block.GetProperty("type").GetString() == "text")) Add("[Assistant]: " + Text(content, "\n"));
                 var calls = content.EnumerateArray().Where(block => block.GetProperty("type").GetString() == "toolCall")
                     .Select(block => block.GetProperty("name").GetString() + "(" + string.Join(", ", SessionSummaryJson.Properties(block.GetProperty("arguments"))

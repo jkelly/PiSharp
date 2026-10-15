@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/runner.ts (emit: every handler
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/runner.ts (emit: every handler
 // in order, an error is reported through emitError and the next handler still runs; emitUserBash; hasHandlers).
 using System.Collections.Immutable;
 using PiSharp.Contracts;

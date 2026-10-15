@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/sdk.ts (cacheWarmer: start in the agent stream
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/sdk.ts (cacheWarmer: start in the agent stream
 // function for session requests, cacheContextIsCurrent, decide -> emitCacheWarmingDecision) and core/agent-session.ts
 // (onAgentSettled first in _emitAgentSettled, onWarmed -> entry_appended, cancel on dispose).
 using System.Collections.Immutable;

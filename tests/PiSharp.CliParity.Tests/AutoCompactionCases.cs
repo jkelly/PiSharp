@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (autoCompactionEnabled and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/agent-session.ts (autoCompactionEnabled and
 // setAutoCompactionEnabled over settingsManager compaction.enabled; _checkCompaction reads getCompactionSettings(this.model) and the
 // model's contextWindow when it checks), packages/coding-agent/src/core/settings-manager.ts (getCompactionEnabled: enabled ?? true)
 // and packages/coding-agent/src/modes/rpc/rpc-mode.ts (get_state autoCompactionEnabled, set_auto_compaction).

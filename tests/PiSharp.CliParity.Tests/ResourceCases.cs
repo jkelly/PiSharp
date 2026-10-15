@@ -41,6 +41,43 @@ internal static partial class Program
             files = PiResources.LoadProjectContextFiles(worktree, sandbox.AgentDir).Select(file => file.Path).ToArray();
             Check(files.Contains(mainAgents), "without its own copy the worktree inherits the main repo's");
         })),
+        // Pi 1.2.0 resource-loader.ts loadProjectContextFiles (#10681), ported from test/resource-loader.test.ts: the shadow check
+        // compares the directory's real path joined with the file name, so symlinked context files neither shadow themselves nor
+        // load twice. File symlinks need privileges on Windows; without them only the plain layout is checked.
+        ("resources.worktree-shadow-follows-the-directory-not-a-symlinked-file", Sync(() =>
+        {
+            using var sandbox = new Sandbox("worktree-shadow-symlink");
+            var outer = Path.Combine(sandbox.Root, "outer"); var main = Path.Combine(outer, "main"); var worktree = Path.Combine(main, ".worktrees", "feature");
+            var worktreeSrc = Path.Combine(worktree, "src");
+            Directory.CreateDirectory(Path.Combine(main, ".git", "worktrees", "feature"));
+            File.WriteAllText(Path.Combine(main, ".git", "HEAD"), "ref: refs/heads/main\n");
+            File.WriteAllText(Path.Combine(main, ".git", "worktrees", "feature", "HEAD"), "ref: refs/heads/feature\n");
+            File.WriteAllText(Path.Combine(main, ".git", "worktrees", "feature", "commondir"), "../..\n");
+            Directory.CreateDirectory(worktreeSrc);
+            File.WriteAllText(Path.Combine(worktree, ".git"), "gitdir: " + Path.Combine(main, ".git", "worktrees", "feature") + "\n");
+            var mainAgents = Path.Combine(main, "AGENTS.md"); var worktreeAgents = Path.Combine(worktree, "AGENTS.md");
+            static bool Link(string path, string target)
+            {
+                try { File.CreateSymbolicLink(path, target); return true; }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+            }
+            string[] Ours() => [.. PiResources.LoadProjectContextFiles(worktreeSrc, sandbox.AgentDir).Select(file => file.Path)
+                .Where(path => path.StartsWith(sandbox.Root, StringComparison.OrdinalIgnoreCase))];
+            // The worktree's AGENTS.md symlinks to the main repo's: it loads once, from the worktree.
+            sandbox.Write(mainAgents, "main repo instructions");
+            if (!Link(worktreeAgents, mainAgents))
+            {
+                sandbox.Write(worktreeAgents, "worktree instructions");
+                Names([worktreeAgents], Ours(), "plain copies: the worktree's shadows the main repo's");
+                return;
+            }
+            Names([worktreeAgents], Ours(), "a worktree file symlinked to the main repo's loads once");
+            // Both files symlink to a shared file: the main repo's duplicate is still skipped.
+            File.Delete(worktreeAgents); File.Delete(mainAgents);
+            var shared = sandbox.Write(Path.Combine(outer, "shared-agents.md"), "shared instructions");
+            Check(Link(mainAgents, shared) && Link(worktreeAgents, shared), "symlinks");
+            Names([worktreeAgents], Ours(), "a main repo file symlinked elsewhere is still the shadowed one");
+        })),
         ("resources.system-and-append-prompt-discovery-trust-and-cli", Sync(() =>
         {
             using var sandbox = new Sandbox("system-md");

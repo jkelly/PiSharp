@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/cli.ts (HELP, parseOptions, parsePairs,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/cli.ts (HELP, parseOptions, parsePairs,
 // runMcpCommand, add, remove, list, login, waitForRedirectUrl), packages/coding-agent/src/extensions/mcp/config.ts (addMcpServerConfig,
 // removeMcpServerConfig, editMcpServers) and packages/coding-agent/src/core/resolve-config-value.ts (templates).
 using System.Diagnostics;
@@ -96,7 +96,7 @@ internal static class McpCommand
         "",
         "Other options:",
         "  --json                  Print the list as JSON",
-        $"  --timeout <seconds>     How long login waits for the browser (default: {DefaultLoginTimeoutSeconds})");
+        $"  --timeout <seconds>     Time limit for the whole sign-in (default: {DefaultLoginTimeoutSeconds})");
     private static readonly string HelpHint = $"Use \"{AppName} mcp --help\" for usage.";
 
     /// <summary>The agent directory: `PI_CODING_AGENT_DIR`, else `~/.pi/agent`.</summary>

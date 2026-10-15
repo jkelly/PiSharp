@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/session-manager.ts (appendCustomEntry) as
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/session-manager.ts (appendCustomEntry) as
 // extensions call it through pi.appendEntry while a tool runs (extensions/codemode/execute.ts appends codemode-store entries).
 using PiSharp.Contracts;
 using PiSharp.Sessions.Storage;
