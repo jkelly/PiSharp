@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.0] - Unreleased
+## [1.2.0]
 
 PiSharp moves to Pi v1.2.0. Update the CLI with `dotnet tool update -g PiSharp.Cli`. The full notes are in the [release notes](https://github.com/jkelly/PiSharp/blob/main/docs/release-notes/1.2.0.md).
 
