@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/codemode/src/runtime/host.ts (Execution.start, worker.terminate) and
-// packages/codemode/src/runtime/worker.ts (the worker entry). Pi isolates each script in a Node worker running a separate wasm
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/runtime/host.ts (the worker launcher, worker.terminate),
+// packages/codemode/src/runtime/execution.ts (Execution) and packages/codemode/src/runtime/worker.ts (the worker entry). Pi isolates each script in a Node worker running a separate wasm
 // instance; PiSharp runs each script's Jint engine in a child process of its own, so nothing a script does to the engine's
 // stack or memory can take the host process down.
 using System.Collections.Concurrent;

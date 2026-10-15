@@ -1,8 +1,9 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/codemode/tool.ts and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/codemode/tool.ts and
 // packages/coding-agent/src/extensions/codemode/index.ts (readMode, readInlineBudget).
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Contracts;
+using PiSharp.Contracts.ModelOperations;
 
 namespace PiSharp.Codemode;
 
@@ -44,7 +45,7 @@ public static class CodemodeToolDefinition
     public static string DocsPath { get; set; } = Path.Combine(AppContext.BaseDirectory, "docs", "codemode.md");
 
     private const string DescriptionIntro = "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n" +
-        "- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. Calls still running when the script ends are cancelled.\n" +
+        "- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n" +
         "- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`";
 
     private static string DescribeGlobals(bool models)
@@ -105,8 +106,9 @@ public static class CodemodeToolDefinition
         return shown;
     }
 
-    /// <summary>The model-facing description: helpers, MCP types when listed tools need them, and one section per listed tool,
-    /// grouped by namespace. Deferred tools are never listed. Tool sections are limited to <paramref name="inlineBudget"/>.</summary>
+    /// <summary>The model-facing description: helpers, the <c>models</c> API, and one section per listed tool, grouped by
+    /// namespace. Deferred tools are never listed and do not affect the description at all, so it stays the same while tools are
+    /// registered late (for example by MCP servers that connect). Tool sections are limited to <paramref name="inlineBudget"/>.</summary>
     public static string CreateDescription(IEnumerable<CodemodeNestedTool> tools, bool models = false,
         IReadOnlySet<string>? deferred = null, IReadOnlyDictionary<string, ImmutableArray<string>>? guidelines = null, int? inlineBudget = null)
     {
@@ -126,8 +128,6 @@ public static class CodemodeToolDefinition
             .ThenBy(group => group.Namespace?.Name, StringComparer.InvariantCulture).ToList();
         var shown = SelectCatalog(ordered, inlineBudget);
         var sections = new List<string> { DescriptionIntro, DescribeGlobals(models) };
-        if (declarations.Any(item => shown.Contains(item.Tool.Name) && CodemodeDeclarations.McpStructuredContentSchema(item.Declaration.OutputSchema?.Value) is not null))
-            sections.Add($"Shared MCP Types:\n```ts\n{CodemodeDeclarations.McpTypeScriptPreamble}\n```");
         if (declarations.Count == 0) return string.Join("\n\n", sections);
         var toolSections = new List<string> { "Nested tools:" };
         foreach (var group in ordered)
@@ -145,26 +145,34 @@ public static class CodemodeToolDefinition
         return string.Join("\n\n", sections);
     }
 
-    /// <summary>What a script call resolves to, in one line: <c>a string</c>, the field names of an object, or the type.</summary>
+    /// <summary>The field names of an object schema, <c>{ output, exit_code, full_output_path? }</c>, with the fields of object-typed
+    /// fields <paramref name="depth"/> levels deep: <c>{ content, structuredContent?: { results } }</c>. Null for other schemas.</summary>
+    private static string? DescribeFields(JsonElement schema, int depth)
+    {
+        if (schema.ValueKind != JsonValueKind.Object) return null;
+        var entries = ModelOperationJson.ObjectEntries(schema);
+        JsonElement? Field(string name) => entries.Any(entry => entry.Key == name) ? entries.First(entry => entry.Key == name).Value : null;
+        if (Field("type") is not { ValueKind: JsonValueKind.String } type || type.GetString() != "object" ||
+            Field("properties") is not { ValueKind: JsonValueKind.Object } properties) return null;
+        var required = Field("required") is { ValueKind: JsonValueKind.Array } list
+            ? list.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal) : [];
+        var fields = ModelOperationJson.ObjectEntries(properties).Select(field =>
+        {
+            var nested = depth > 0 ? DescribeFields(field.Value, depth - 1) : null;
+            return $"{field.Key}{(required.Contains(field.Key) ? "" : "?")}{(nested is null ? "" : ": " + nested)}";
+        });
+        return $"{{ {string.Join(", ", fields)} }}";
+    }
+
+    /// <summary>What a script call resolves to, in one line: <c>a string</c>, the field names of an object (see
+    /// <see cref="DescribeFields"/>), or the rendered type for anything else.</summary>
     private static string DescribeOutput(JsonData? schema)
     {
         var type = CodemodeDeclarations.RenderToolOutputType(schema?.Value);
         if (type == "string") return "a string";
-        if (schema?.Value is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("type", out var declared) &&
-            declared.ValueKind == JsonValueKind.String && declared.GetString() == "object" &&
-            value.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object &&
-            CodemodeDeclarations.McpStructuredContentSchema(value) is null)
-        {
-            var required = value.TryGetProperty("required", out var list) && list.ValueKind == JsonValueKind.Array
-                ? list.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).ToHashSet(StringComparer.Ordinal) : [];
-            var fields = ModelOperationsKeys(properties).Select(name => required.Contains(name) ? name : name + "?");
-            return $"`{{ {string.Join(", ", fields)} }}`";
-        }
-        return $"`{CodemodeDeclarations.OneLine(type)}`";
+        var fields = schema is null ? null : DescribeFields(schema.Value, 1);
+        return $"`{fields ?? CodemodeDeclarations.OneLine(type)}`";
     }
-
-    private static IEnumerable<string> ModelOperationsKeys(JsonElement properties) =>
-        PiSharp.Contracts.ModelOperations.ModelOperationJson.ObjectEntries(properties).Select(entry => entry.Key);
 
     private static string DescribeScriptCall(CodemodeNestedTool tool) =>
         $"{Js.Trim(tool.Description)}\n\nCodemode: `tools.{CodemodeIdentifier.ToIdentifier(tool.Name)}(args)` resolves to {DescribeOutput(ToDeclaration(tool).OutputSchema)}.";
@@ -199,6 +207,11 @@ public static class CodemodeToolDefinition
                 ? [.. callable.Where(tool => IsDirect(tool.Name) && declared.Contains(tool.Name)).Select(tool => tool.Name)] : []
         };
     }
+
+    /// <summary>The tools a script may call (<c>ToolDefinition.reachesTools</c>): every tool when it uses a discovery global, else the
+    /// words of its source, so <c>tools.mcp__docs__search</c> and <c>tools["mcp__docs__" + name]</c> both name the <c>mcp__docs</c>
+    /// namespace. Input without a string <c>code</c> reaches nothing.</summary>
+    public static ToolReach GetScriptReach(JsonData input) => PiSharp.Extensions.Mcp.Discovery.McpDiscoveryToolIdentity.CodemodeReach(input);
 
     /// <summary>index.ts readMode/readInlineBudget over the effective settings (<c>codemode.mode</c>, <c>codemode.inlineBudget</c>).</summary>
     public static (CodemodeMode Mode, int? InlineBudget) ReadSettings(JsonElement? settings)

@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/codemode/src/runtime/host.ts, packages/codemode/src/runtime/worker.ts
-// and packages/codemode/src/runtime/protocol.ts. The QuickJS worker is replaced by a Jint engine in a child process (or a thread)
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/runtime/execution.ts (CodemodeSandboxBase.execute, Execution),
+// packages/codemode/src/runtime/host.ts, packages/codemode/src/runtime/worker.ts and packages/codemode/src/runtime/protocol.ts. The QuickJS worker is replaced by a Jint engine in a child process (or a thread)
 // (decision 0003); docs/compatibility/codemode-engine.md lists the differences.
 using System.Collections.Immutable;
 using System.Diagnostics;

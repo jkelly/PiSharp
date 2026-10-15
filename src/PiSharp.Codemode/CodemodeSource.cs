@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/codemode/src/source.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/codemode/src/source.ts.
 using System.Text.Json;
 
 namespace PiSharp.Codemode;
@@ -28,12 +28,18 @@ public static class CodemodeSource
         "OPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n";
 
     /// <summary>Split an optional first-line <c>// @options: {...}</c> from the script. Throws
-    /// <see cref="CodemodeSourceException"/> for empty input and invalid options.</summary>
+    /// <see cref="CodemodeSourceException"/> for empty input, invalid options, and an options line that is not the first line,
+    /// which would otherwise be ignored without notice.</summary>
     public static ParsedCodemodeSource Parse(string input)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (Js.Trim(input).Length == 0)
             throw new CodemodeSourceException("Expected JavaScript source text (non-empty). Provide JS only, optionally with a first line `// @options: {\"max_output_tokens\": 1000}`.");
+        // An options line after the first line would otherwise be ignored without notice (its timeout never applied).
+        var lines = input.Split('\n');
+        for (var index = 1; index < lines.Length; index++)
+            if (TrimStart(lines[index]).StartsWith(OptionsPrefix, StringComparison.Ordinal))
+                throw new CodemodeSourceException($"The {OptionsPrefix} line must be the first line of the input; found one on line {index + 1}");
         var newline = input.IndexOf('\n');
         var firstLine = newline == -1 ? input : input[..newline];
         if (firstLine.EndsWith('\r')) firstLine = firstLine[..^1];

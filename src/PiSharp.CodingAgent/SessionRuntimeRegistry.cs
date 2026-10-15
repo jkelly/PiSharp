@@ -27,6 +27,9 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
     public string? PromptSnippet { get; init; }
     /// <summary>Source outputSchema: the shape of the result's structuredContent (codemode declarations).</summary>
     public JsonData? OutputSchema { get; init; }
+    /// <summary>Source reachesTools of a tool that reaches other tools (codemode, tool_search): which tools a call with the given
+    /// input may reach. getAllTools reports it; the MCP integration waits for and activates by it.</summary>
+    public Func<JsonData, ToolReach>? ReachesTools { get; init; }
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumDeclarations = PiRequestBudget.RequestItems, int MaximumCharacters = 1_048_576,

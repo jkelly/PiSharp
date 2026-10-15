@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/extensions/mcp/tools.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/extensions/mcp/tools.ts.
 // The rendering parts only (createMcpToolRenderers and OUTPUT_PREVIEW_LINES); details are McpToolDetails {server, tool,
 // fullOutputPath?}. Tool naming, result conversion and execution live in PiSharp.Cli/Mcp.
 using System.Text.Json.Nodes;

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts and docs/mcp.md
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts and docs/mcp.md
 // (Permissions): a server configured in mcp.json is trusted; its calls run through the tool pipeline with no approval step of
 // their own, so extension tool_call/tool_result handlers are the only gate.
 using System.Collections.Immutable;

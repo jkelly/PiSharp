@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/index.ts (describeState,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/index.ts (describeState,
 // attentionRank, describeTransport, saveConfig, signIn, signOut, reconnect, setEnabled, setExposure, serversMenu, serverMenu,
 // showTools, chooseExposure, signInWithUi, runAction, manage, formatStatus, pickServer, loginCommand, reconnectSignedIn and the
 // `/mcp` command with its argument completions), packages/coding-agent/src/extensions/mcp/ui.ts (McpMenu, McpUi) and
@@ -91,8 +91,6 @@ public sealed class McpServerManager
         public string? TokensAtSignIn;
         /// <summary>Settles when the connection started for the server connected or failed.</summary>
         public Task Ready = Task.CompletedTask;
-        /// <summary>Resources the server listed when it connected, without MCP App resources.</summary>
-        public int Resources;
     }
 
     internal sealed record Dependencies(
@@ -350,7 +348,7 @@ public sealed class McpServerManager
             case "failed": return withError ? "failed: " + FirstLine(slot.Error ?? "unknown error") : "failed";
             case "connected":
                 var tools = ToolCount(slot);
-                var resources = slot.Resources > 0 ? $" · {slot.Resources} resource{(slot.Resources == 1 ? "" : "s")}" : "";
+                var resources = slot.Server?.Snapshot.Catalog.HasResources == true ? " · resources" : "";
                 return $"connected · {tools} tool{(tools == 1 ? "" : "s")}{resources}";
             case "connecting": return "connecting…";
             case var other: return other;
@@ -486,25 +484,6 @@ public sealed class McpServerManager
         if (dependencies.Resources is { } resources)
             await resources.UpdateAsync(slot.Entry.Name, server, slot.Entry.Config.Exposure, server?.Snapshot.Catalog is { Connected: true, HasResources: true }, token)
                 .ConfigureAwait(false);
-        if (server is not null) await CountResourcesAsync(slot, server, token).ConfigureAwait(false);
-    }
-
-    /// <summary>The resources a connected server lists (fetchResources at connect), for describeState.</summary>
-    internal async Task CountResourcesAsync(string name, McpPreparedServer server, CancellationToken token)
-    {
-        Slot? slot; lock (gate) slot = Find(name);
-        if (slot is null || !ReferenceEquals(slot.Server, server)) return;
-        await CountResourcesAsync(slot, server, token).ConfigureAwait(false);
-        Changed();
-    }
-
-    private async Task CountResourcesAsync(Slot slot, McpPreparedServer server, CancellationToken token)
-    {
-        var count = 0;
-        if (server.Snapshot.Catalog is { Connected: true, HasResources: true })
-            try { count = (await server.CountResourcesAsync(token).ConfigureAwait(false)).Resources; }
-            catch (Exception) when (!token.IsCancellationRequested) { /* A server whose lists fail still connects. */ }
-        lock (gate) slot.Resources = count;
     }
 
     /// <summary>saveConfig: save a change to the server's mcp.json (or a project override); returns an error message.</summary>
@@ -648,7 +627,10 @@ public sealed class McpServerManager
         if (Session() is not { } session) return;
         HashSet<McpExposure> exposures;
         lock (gate) exposures = [.. servers.Where(IsEnabled).SelectMany(slot => McpConfigurationReader.ConfiguredExposures(slot.Entry.Config))];
-        var registered = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
+        // Only a tool of these names that declares reachesTools can reach MCP tools; another extension's tool of the same name
+        // without it is never activated.
+        var registered = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.Where(tool => tool.ReachesTools is not null)
+            .Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
         var active = session.Attachment.Session.GetToolActivationSelection().Names;
         var activate = new List<string>();
         if (exposures.Contains(McpExposure.Codemode) && dependencies.AutoEnableCodemode && registered.Contains(McpCodemode.Name) && !active.Contains(McpCodemode.Name))

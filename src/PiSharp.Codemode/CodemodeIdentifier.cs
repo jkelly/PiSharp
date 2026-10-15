@@ -68,11 +68,12 @@ internal static class Js
         switch (value.ValueKind)
         {
             case JsonValueKind.Object:
+                // JSON.parse then JSON.stringify: array-index keys first, a duplicate key keeps its first position and last value.
                 builder.Append('{'); var first = true;
-                foreach (var property in value.EnumerateObject())
+                foreach (var (name, property) in PiSharp.Contracts.ModelOperations.ModelOperationJson.ObjectEntries(value))
                 {
                     if (!first) builder.Append(',');
-                    first = false; builder.Append(Stringify(property.Name)).Append(':'); Write(property.Value, builder);
+                    first = false; builder.Append(Stringify(name)).Append(':'); Write(property, builder);
                 }
                 builder.Append('}'); break;
             case JsonValueKind.Array:
@@ -80,7 +81,7 @@ internal static class Js
                 foreach (var item in value.EnumerateArray()) { if (index++ > 0) builder.Append(','); Write(item, builder); }
                 builder.Append(']'); break;
             case JsonValueKind.String: builder.Append(Stringify(value.GetString()!)); break;
-            case JsonValueKind.Number: builder.Append(Number(value.GetDouble())); break;
+            case JsonValueKind.Number: builder.Append(Number(NumberOf(value))); break;
             case JsonValueKind.True: builder.Append("true"); break;
             case JsonValueKind.False: builder.Append("false"); break;
             default: builder.Append("null"); break;
@@ -105,6 +106,14 @@ internal static class Js
         else result = digits[..1] + (digits.Length > 1 ? "." + digits[1..] : "") + "e" + (point - 1 >= 0 ? "+" : "-") + Math.Abs(point - 1).ToString(CultureInfo.InvariantCulture);
         return negative ? "-" + result : result;
     }
+
+    /// <summary>The number JSON.parse reads: out-of-range literals become infinities, as in JavaScript.</summary>
+    public static double NumberOf(JsonElement value) =>
+        value.TryGetDouble(out var number) ? number : double.Parse(value.GetRawText(), NumberStyles.Float, CultureInfo.InvariantCulture);
+
+    /// <summary>String(number): <see cref="Number"/> plus JavaScript's names for infinities.</summary>
+    public static string NumberText(double value) =>
+        double.IsPositiveInfinity(value) ? "Infinity" : double.IsNegativeInfinity(value) ? "-Infinity" : double.IsNaN(value) ? "NaN" : Number(value);
 
     /// <summary>String.prototype.trim: JavaScript white space and line terminators.</summary>
     public static string Trim(string value)
