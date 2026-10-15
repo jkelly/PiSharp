@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/index.ts (the portable Shell capability and ExecutionEnv,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/index.ts (the portable Shell capability and ExecutionEnv,
 // FileSystem & Shell). Upstream's `string | readonly string[]` command is ShellCommand, which converts implicitly from either; its
 // `onOutput(text, context, info)` callback is ShellOutputHandler; timeouts stay in seconds.
 using System.Collections.Immutable;

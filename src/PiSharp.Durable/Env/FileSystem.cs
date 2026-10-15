@@ -1,7 +1,9 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/index.ts (the portable FileSystem capability: its text-line,
-// binary and directory readers, line scans, watches and temporary files). Upstream's `string | Uint8Array` contents are bytes here, with
-// UTF-8 string overloads in FileSystemExtensions; upstream's `{ paths } | { overflow } | { error }` WatchChange union is the WatchChange
-// record hierarchy.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/index.ts (the portable FileSystem capability: its text-line,
+// binary and directory readers, line scans, watches, temporary files and the optional listFiles). Upstream's `string | Uint8Array` contents
+// are bytes here, with UTF-8 string overloads in FileSystemExtensions; upstream's `{ paths } | { overflow } | { error }` WatchChange union is
+// the WatchChange record hierarchy. The optional `listFiles?` member is a default interface method that fails with not_supported, which
+// callers already treat as a missing method; ListFilesOptions keeps upstream's `number` bounds as doubles so a fractional or negative bound
+// is refused with invalid, as upstream refuses it.
 using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Durable.Chord;
@@ -175,6 +177,43 @@ public interface IDirReader
     Task CloseAsync(DurableContext context);
 }
 
+/// <summary>What <see cref="IFileSystem.ListFilesAsync"/> lists (upstream <c>ListFilesOptions</c>).</summary>
+public sealed record ListFilesOptions
+{
+    /// <summary>Include names starting with <c>.</c> (on Windows also files with the hidden attribute); default true. Entries named
+    /// <c>.git</c> are never listed.</summary>
+    public bool Hidden { get; init; } = true;
+
+    /// <summary>Inside a git work tree, skip what git ignores: the <c>.gitignore</c> files of the directory, its subdirectories and its
+    /// parents, <c>.git/info/exclude</c>, and the global excludes file; default true. Unlike <c>git ls-files</c>, a tracked file that matches
+    /// an ignore rule is skipped too. Outside work trees, <c>.gitignore</c> files have no effect.</summary>
+    public bool Gitignore { get; init; } = true;
+
+    /// <summary>Names of entries to skip with everything below them, such as <c>node_modules</c>.</summary>
+    public ImmutableArray<string> Exclude { get; init; } = [];
+
+    /// <summary>Most entries to list; default 50 000. Upstream's <c>number</c>: anything but a non-negative safe integer fails with
+    /// <see cref="FileErrorCode.Invalid"/>.</summary>
+    public double? MaxEntries { get; init; }
+
+    /// <summary>Most bytes of the listing: each entry's UTF-8 path plus two; default 4 MiB, at most 15.9 MiB. A non-negative safe
+    /// integer.</summary>
+    public double? MaxBytes { get; init; }
+
+    /// <summary>Time after which the listing stops; default 10 000 ms. A non-negative safe integer.</summary>
+    public double? TimeoutMs { get; init; }
+}
+
+/// <summary>One entry of a <see cref="FileListing"/> (upstream <c>FileListEntry</c>).</summary>
+/// <param name="Path">Relative to the listed directory, with <c>/</c> separators on every system.</param>
+/// <param name="Kind">What the entry is; a symbolic link is listed as such and not followed.</param>
+public sealed record FileListEntry(string Path, FileKind Kind);
+
+/// <summary>The entries below a directory (upstream <c>FileListing</c>).</summary>
+/// <param name="Entries">Depth first, parents before their entries, siblings in byte order of their names.</param>
+/// <param name="Truncated">A bound in <see cref="ListFilesOptions"/> ended the listing early.</param>
+public sealed record FileListing(ImmutableArray<FileListEntry> Entries, bool Truncated);
+
 /// <summary>Portable file system capability (upstream <c>FileSystem</c>). Operations return failures rather than throwing; a cancelled
 /// context fails them with <see cref="FileErrorCode.Aborted"/>. Relative paths resolve against <see cref="Cwd"/>.</summary>
 public interface IFileSystem
@@ -227,6 +266,16 @@ public interface IFileSystem
 
     /// <summary>Metadata of every entry of a directory.</summary>
     Task<Result<ImmutableArray<FileMetadata>, FileError>> ListDirAsync(string path, DurableContext context);
+
+    /// <summary>
+    /// Optional (upstream's optional <c>listFiles?</c>): the files, directories and symbolic links below a directory, at any depth, for
+    /// indexes such as file completion. Symbolic links are not followed; other kinds of files are not listed; entries that cannot be read are
+    /// skipped. See <see cref="ListFilesOptions"/> for hidden and ignored files and for the bounds. Fails with
+    /// <see cref="FileErrorCode.NotSupported"/> when the environment cannot list (one that does not implement it, which this default reports,
+    /// or an older remote daemon), so callers fall back to their own walk.
+    /// </summary>
+    Task<Result<FileListing, FileError>> ListFilesAsync(string path, ListFilesOptions? options, DurableContext context) =>
+        Task.FromResult<Result<FileListing, FileError>>(new FileError(FileErrorCode.NotSupported, "The environment does not list files", path));
 
     /// <summary>Opens a directory for paged listing.</summary>
     Task<Result<IDirReader, FileError>> OpenDirReaderAsync(string path, DurableContext context);

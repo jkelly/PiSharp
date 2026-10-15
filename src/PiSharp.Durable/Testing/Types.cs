@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/testing/types.ts. Upstream's assertion interface is
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/types.ts. Upstream's assertion interface is
 // IConformanceAssertions (Assertions.cs builds one). The storage kit asserts itself and fails by throwing StorageConformanceException (it
 // predates the injected assertions and keeps that contract); the environment kit takes its assertions from EnvConformanceOptions, by default
 // ones that throw EnvConformanceException, which any test runner reports.
@@ -65,6 +65,10 @@ public sealed record EnvConformanceOptions
 
     /// <summary>Whether the shell's <c>ln -s</c> creates symbolic links; default true.</summary>
     public bool Symlinks { get; init; } = true;
+
+    /// <summary>Whether the environment implements the optional <see cref="IFileSystem.ListFilesAsync"/>, which the suite then checks;
+    /// default false.</summary>
+    public bool ListFiles { get; init; }
 }
 
 /// <summary>One runner-independent environment conformance case.</summary>

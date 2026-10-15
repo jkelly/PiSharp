@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/testing/runner.ts, and testing/index.ts, which only re-exports
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/testing/runner.ts, and testing/index.ts, which only re-exports
 // the kits (the PiSharp.Durable.Testing namespace is that subpath here). Upstream registers the cases with a Vitest/Jest-compatible runner's
 // describe/it/expect; a .NET runner implements IConformanceTestRunner.
 namespace PiSharp.Durable.Testing;
@@ -34,12 +34,13 @@ public static class ConformanceRunner
 
     /// <summary>Registers the <see cref="Env.IExecutionEnv"/> cases under <paramref name="name"/>, with the runner's assertions.
     /// <paramref name="shell"/> is the program and flag that run a POSIX shell script (default <c>["sh", "-c"]</c>); <paramref name="symlinks"/>
-    /// says whether its <c>ln -s</c> creates symbolic links (upstream's <c>Pick&lt;EnvConformanceOptions, "shell" | "symlinks"&gt;</c>).</summary>
+    /// says whether its <c>ln -s</c> creates symbolic links; <paramref name="listFiles"/> whether the environment implements the optional
+    /// <c>ListFilesAsync</c> (upstream's <c>Pick&lt;EnvConformanceOptions, "shell" | "symlinks" | "listFiles"&gt;</c>).</summary>
     public static void RegisterEnvConformance(IConformanceTestRunner runner, string name, EnvConformanceProvider withEnv,
-        System.Collections.Immutable.ImmutableArray<string> shell = default, bool symlinks = true)
+        System.Collections.Immutable.ImmutableArray<string> shell = default, bool symlinks = true, bool listFiles = false)
     {
         ArgumentNullException.ThrowIfNull(runner);
-        var options = new EnvConformanceOptions { WithEnv = withEnv, Assertions = runner.Assertions, Symlinks = symlinks };
+        var options = new EnvConformanceOptions { WithEnv = withEnv, Assertions = runner.Assertions, Symlinks = symlinks, ListFiles = listFiles };
         var cases = EnvConformance.Create(shell.IsDefaultOrEmpty ? options : options with { Shell = shell });
         runner.Describe(name, () =>
         {
