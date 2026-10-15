@@ -1,0 +1,2 @@
+# Captured bytes: example 19 lines compare as written (LF), like the session files below, which upstream-sessions/.gitattributes keeps exact.
+*.jsonl text eol=lf
