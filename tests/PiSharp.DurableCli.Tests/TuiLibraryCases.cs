@@ -49,6 +49,42 @@ internal static partial class Program
             run.Send("\u000f");
             screen = await run.WaitFor("no such dir");
             ShowsInOrder(screen, ["✗ ls {} 1.5s", "no such dir"], "the error under its row");
+            run.Send("\u000f");
+            await run.WaitUntil(text => !text.Contains("no such dir", StringComparison.Ordinal), "collapsed again");
+            // A compaction rebuilds the transcript; a later turn's call reuses the call ID. The old rows are not placed under its card.
+            var reused = Entry(12, "pi.assistant", AssistantWire($"[{ToolCallBlock("call_9", "bash", """{"command":"second-script"}""")}]", "toolUse"));
+            run.Source.Publish(View([Entry(10, "pi.compaction", UserWire("summary")), UserEntry(11, "again"), reused,
+                Entry(13, "pi.tool-result", ToolResultWire("call_9", "bash", "second done"))], live: "{}") with
+            {
+                NestedCalls = NestedCalls(read, grep with { Left = true }, ls),
+            });
+            screen = await run.WaitFor("second done");
+            Check(!screen.Contains("read {", StringComparison.Ordinal) && !screen.Contains("grep {", StringComparison.Ordinal) &&
+                !screen.Contains("ls {}", StringComparison.Ordinal), "no rows under the reused call ID:\n" + screen);
+        }),
+
+        // The runtime's gathering of pi.live.nestedTools over revisions (DurableNestedCall.Merge).
+        Case("tui.state.nested-calls-gathered-over-revisions", () =>
+        {
+            static string Slot(long taskId, string status, string extra = "") =>
+                $$$"""{"callId":"c/{{{taskId}}}","parentCallId":"c","parentTaskId":9,"name":"read","taskId":{{{taskId}}},"arguments":{},"status":"{{{status}}}"{{{extra}}}}""";
+            static PiSharp.Durable.ConversationView Revision(params string[] slots) =>
+                Conversation([], $$$"""{"pi.live":{"nestedTools":[{{{string.Join(",", slots)}}}]}}""");
+            var none = ImmutableSortedDictionary<long, DurableNestedCall>.Empty;
+            Check(ReferenceEquals(none, DurableNestedCall.Merge(none, Conversation([]))), "nothing listed, nothing kept");
+            var first = DurableNestedCall.Merge(none, Revision(Slot(10, "running"), Slot(11, "pending")));
+            Equal("10,11", string.Join(",", first.Keys), "listed calls");
+            var second = DurableNestedCall.Merge(first, Revision(Slot(10, "done", ""","summary":{"isError":false}"""), Slot(11, "running")));
+            Equal("done", ((PiSharp.Durable.Chord.JsonStringValue)second[10].Slot["status"]).Value, "replaced by the newer slot");
+            // Both leave pi.live: the finished call stays done, the unfinished one has left.
+            var third = DurableNestedCall.Merge(second, Conversation([]));
+            Check(!third[10].Left && third[11].Left, "left only when unfinished");
+            Equal("cancelled", DurableTuiState.NestedRow(third[11])["status"]!.GetValue<string>(), "a call that left reads as cancelled");
+            Equal("ok", DurableTuiState.NestedRow(third[10])["status"]!.GetValue<string>(), "done without an error");
+            // The newest 256 by task ID are kept.
+            var many = DurableNestedCall.Merge(none, Revision([.. Enumerable.Range(100, 300).Select(id => Slot(id, "running"))]));
+            Equal(DurableNestedCall.MaxKept, many.Count, "kept");
+            Equal(144L, many.Keys.First(), "the oldest dropped");
         }),
 
         Case("tui.tool.nested-calls-collapse-to-the-newest-eight", async () =>

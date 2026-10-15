@@ -38,8 +38,8 @@ internal sealed record DurableRuntimeHost
     public IDurableModels? Streams { get; init; }
     /// <summary>The session lock's timing; null is upstream's.</summary>
     public PiLockOptions? Lock { get; init; }
-    /// <summary>Opens the session's storage from its <c>session.sqlite</c> path; null is <see cref="SqliteStorage.OpenAsync(string, SqliteStorageOptions?)"/> (tests
-    /// wrap it to fail on demand).</summary>
+    /// <summary>Opens the session's storage from its <c>session.sqlite</c> path; null is
+    /// <see cref="SqliteStorage.OpenAsync(string, SqliteStorageOptions?)"/> (tests wrap it to fail on demand).</summary>
     public Func<string, Task<IStorage>>? OpenStorage { get; init; }
 
     /// <summary>The host of a <c>pisharp durable</c> run.</summary>
@@ -243,8 +243,8 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     /// conversation's revision starts them afresh.</summary>
     private static DurableView WithShown(DurableView view, ConversationView value)
     {
-        var calls = view.Conversation.Conversation.Id == value.Conversation.Id ? view.NestedCalls ?? ImmutableSortedDictionary<long, DurableNestedCall>.Empty
-            : ImmutableSortedDictionary<long, DurableNestedCall>.Empty;
+        var none = ImmutableSortedDictionary<long, DurableNestedCall>.Empty;
+        var calls = view.Conversation.Conversation.Id == value.Conversation.Id ? view.NestedCalls ?? none : none;
         return view with { Conversation = value, NestedCalls = DurableNestedCall.Merge(calls, value) };
     }
 
@@ -581,7 +581,9 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
             // Close writes no outcome: a running turn resumes with --continue. A failed session closed itself already; what its close
             // rethrows is the failure the view shows.
             try { await harness.CloseAsync(Context).ConfigureAwait(false); }
-            catch (Exception) when (harness.Closed is { IsCompleted: true, Result.Reason: SessionEndReason.Failed } || Current.Failure is not null) { }
+            catch (Exception) when (Current.Failure is not null || harness.Closed is { IsCompleted: true, Result.Reason: SessionEndReason.Failed })
+            {
+            }
             await envs.CleanupAsync(Context).ConfigureAwait(false);
             await models.DisposeAsync().ConfigureAwait(false);
         }

@@ -58,6 +58,8 @@ internal sealed class DurableTuiView
     /// <summary>Where the nested calls of a tool task go, by task ID: the rows under its model-issued call's card, and the depth of its own
     /// row there (0 for the model-issued call).</summary>
     private readonly Dictionary<long, (DurableNestedCalls Rows, int Depth)> nestedHosts = [];
+    /// <summary>Nested calls placed once; after a rebuild only a caller that still runs places them again.</summary>
+    private readonly HashSet<long> placedNested = [];
     private readonly List<DurableCompactionComponent> summaries = [];
     /// <summary>Tool output and summaries shown in full; toggled like pi.</summary>
     private bool expanded;
@@ -218,7 +220,9 @@ internal sealed class DurableTuiView
     /// <summary>
     /// The rows of the nested calls (pi.live.nestedTools, gathered by the runtime), each under the card of the model-issued call it belongs
     /// to and indented under the nested call that made it. A call is placed by its caller's task ID, or, when the TUI never saw its
-    /// model-issued caller's slot, by the caller's call ID; it stays where it was placed. A call whose caller has no card is not shown.
+    /// model-issued caller's slot, by the caller's call ID; it stays where it was placed. A call whose caller has no card is not shown. A
+    /// rebuilt transcript drops the rows; only the calls of a model-issued call that still runs are placed again, by its task ID, as call IDs
+    /// may repeat across turns.
     /// </summary>
     private void SyncNested(ImmutableSortedDictionary<long, DurableNestedCall>? calls)
     {
@@ -230,10 +234,12 @@ internal sealed class DurableTuiView
             {
                 if (call.Slot.TryGetValue("parentTaskId", out var parent) && parent is DurableNumber caller &&
                     nestedHosts.TryGetValue((long)caller.Value, out var callerHost)) host = (callerHost.Rows, callerHost.Depth + 1);
-                else if (call.Slot.TryGetValue("parentCallId", out var parentCall) && parentCall is DurableString callId &&
-                    tools.TryGetValue(callId.Value, out var card) && groups.TryGetValue(card, out var group)) host = (group.Nested, 1);
+                else if (!placedNested.Contains(taskId) && call.Slot.TryGetValue("parentCallId", out var parentCall) &&
+                    parentCall is DurableString callId && tools.TryGetValue(callId.Value, out var card) && groups.TryGetValue(card, out var group))
+                    host = (group.Nested, 1);
                 else continue;
                 nestedHosts[taskId] = host;
+                placedNested.Add(taskId);
             }
             host.Rows.Set(taskId, NestedRow(call), host.Depth);
         }

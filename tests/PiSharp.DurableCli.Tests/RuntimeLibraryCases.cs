@@ -55,6 +55,39 @@ internal static partial class Program
             Equal<string?>(null, reopened.View.Current.Failure, "a healthy session");
         }),
 
+        // End to end as DurableMain runs it, on the virtual terminal: the TUI shows the failure, takes no more input, and exits with 1 without
+        // hanging; closing the failed session releases its lock.
+        Case("runtime.e2e.tui-session-failure-exits-1", async () =>
+        {
+            await using var agent = new TestAgent("e2e-failure");
+            FailingStorage? storage = null;
+            var host = agent.Host(ScriptedStreams.Queue(ScriptedReply.Answer("Hello before the failure."), ScriptedReply.Answer("never shown"))) with
+            {
+                OpenStorage = async path => storage = new FailingStorage(await SqliteStorage.OpenAsync(path)),
+            };
+            var durable = (DurableSession)await DurableRuntime.OpenAsync(new OpenDurableOptions(), host);
+            var terminal = new VirtualTerminal(120, 40);
+            int code;
+            try
+            {
+                var run = StartTui(durable, terminal, agent.AgentDir);
+                await terminal.WaitForTextAsync("/compact · /tasks");
+                await Type(terminal, "say hello");
+                await terminal.WaitForTextAsync("Hello before the failure.");
+                await UntilView(durable.View, Idle, "idle");
+                storage!.Fail = true;
+                await Type(terminal, "and again");
+                var message = DurableFailure.Message("disk is full");
+                var screen = await terminal.WaitForAsync(text => TuiTests.Flat(text).Contains(message, StringComparison.Ordinal), "the failure");
+                Check(!screen.Contains("never shown", StringComparison.Ordinal), "nothing after the failure:\n" + screen);
+                terminal.Send("\u0003");
+                code = await run.WaitAsync(TimeSpan.FromSeconds(20));
+            }
+            finally { await durable.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)); }
+            Equal(1, code, "exit code");
+            Check(!Directory.Exists(durable.Location.Directory + ".lock"), "dispose released the lock");
+        }),
+
         Case("runtime.compact.failure-is-the-live-compaction-failure", async () =>
         {
             // Retries off, so the summarizer's error fails the compaction at once; a small kept window, so there is something to compact.
