@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): the scenarios of tools/DurableFixtures/scenarios.mjs, run on PiSharp. compat.* runs
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the scenarios of tools/DurableFixtures/scenarios.mjs, run on PiSharp. compat.* runs
 // them to write PiSharp's own sessions (compared with the sessions the pinned upstream wrote), and to resume upstream's sessions with the
 // same scripted model. Keep each scenario in step with its upstream twin: same faux responses, same tools and tasks, same order of calls.
 using PiSharp.Durable;

@@ -152,12 +152,11 @@
       "lines": 314,
       "pisharp": "src/PiSharp.Durable/Harness/Agent.cs",
       "phase": "P6",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "6908b957d77744121dd6394ae8aae707b47c620b",
       "changedLines": 90,
-      "note": "Agents: AgentDoc (pi.agent, rewindable, fork asOf), DefaultRetryPolicy/DefaultCompactionPolicy/DefaultProgressPolicy, InstructionsKey, ResolveSettings, ConfigureAsync, AddToolsAsync, CreateAgentAsync, AgentHooks, ResolveAgent. The stored AgentState is the pi.agent JsonObjectValue; AgentChange fields are Patch<T>? (given, Clear, or unchanged). Tests: harness.registry.settings.*, harness.registry.agent-resolution.*, harness.tasks.task-phases.resolves-the-agent-*",
-      "portedBlobSha1": "6908b957d77744121dd6394ae8aae707b47c620b"
+      "note": "Agents: AgentDoc (pi.agent, rewindable, fork asOf), DefaultRetryPolicy/DefaultCompactionPolicy/DefaultProgressPolicy, InstructionsKey, ResolveSettings, ConfigureAsync, AddToolsAsync, CreateAgentAsync, AgentHooks, ResolveAgent. The stored AgentState is the pi.agent JsonObjectValue; AgentChange fields are Patch<T>? (given, Clear, or unchanged). Tests: harness.registry.settings.*, harness.registry.agent-resolution.*, harness.tasks.task-phases.resolves-the-agent-* v1.2.0 (area a): modelTools (an array or {remove?, add?}) through FilterTools/OfferedTools, ToolRegistration.Callers and Deferred, Agent.Callable and Deferred, AddToolsAsync extending modelTools. Tests also harness.callers.*."
     },
     {
       "upstream": "packages/durable/src/harness/compaction.ts",
@@ -195,12 +194,11 @@
       "lines": 506,
       "pisharp": "src/PiSharp.Durable/Harness/Events.cs",
       "phase": "P10",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "dc14df94914a0c21a7f95d4a447f304015859fee",
       "changedLines": 155,
-      "note": "AgentEvents.WatchEventsAsync (an IHarness extension; upstream's watchEvents) returns IAgentEventStream (Snapshot, Start, StopAsync, Closed). Events are sealed records deriving AgentEvent (SnapshotEvent, RunStart/RunEnd, TurnStart/TurnEnd, MessageStart/MessageUpdate/MessageEnd, ToolExecutionStart/Update/End, InboxUpdate, Submission, AutoRetryStart/End, DeferredPoll, EntryAppended, AgentChanged, UsageChanged, TaskFailed, CompactionStart/End) whose ToJson() is upstream's object in upstream's key order; MessageChange records (BlockStartChange, TextDeltaChange, ToolCallDeltaChange, BlockChange, WholeMessageChange); ToolOutputChange (ToolOutputDelta {trimStart?, append?}, ToolOutputSet {set}) with Apply(window); QueuedItem. translate, messageChanges and toolUpdate follow upstream's order; JS === on view parts is reference identity for objects and value equality for primitives. Tests: harness.events.*, harness.views-differential.*, and the event cases of harness.structured.*",
-      "portedBlobSha1": "dc14df94914a0c21a7f95d4a447f304015859fee"
+      "note": "AgentEvents.WatchEventsAsync (an IHarness extension; upstream's watchEvents) returns IAgentEventStream (Snapshot, Start, StopAsync, Closed). Events are sealed records deriving AgentEvent (SnapshotEvent, RunStart/RunEnd, TurnStart/TurnEnd, MessageStart/MessageUpdate/MessageEnd, ToolExecutionStart/Update/End, InboxUpdate, Submission, AutoRetryStart/End, DeferredPoll, EntryAppended, AgentChanged, UsageChanged, TaskFailed, CompactionStart/End) whose ToJson() is upstream's object in upstream's key order; MessageChange records (BlockStartChange, TextDeltaChange, ToolCallDeltaChange, BlockChange, WholeMessageChange); ToolOutputChange (ToolOutputDelta {trimStart?, append?}, ToolOutputSet {set}) with Apply(window); QueuedItem. translate, messageChanges and toolUpdate follow upstream's order; JS === on view parts is reference identity for objects and value equality for primitives. Tests: harness.events.*, harness.views-differential.*, and the event cases of harness.structured.* v1.2.0 (area a): ToolEventCall and the ToolEvent base (taskId, parentToolCallId, parentTaskId on every tool event), SnapshotEvent.NestedTools, nested tool_execution_start/update/end from pi.live.nestedTools (ends children first, before the transcript's events) and ToolExecutionEndEvent.Result read from the commit's NestedCallDoc changes. Tests also harness.nested-tools.*, harness.views-differential.*, compat.* events.json."
     },
     {
       "upstream": "packages/durable/src/harness/generation.ts",
@@ -208,12 +206,11 @@
       "lines": 715,
       "pisharp": "src/PiSharp.Durable/Harness/Generation.cs",
       "phase": "P8",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ea384605ab9e38d713427ca8500b5cce5e15be50",
       "changedLines": 50,
-      "note": "HarnessTasks.GenerationTask (pi.generation v1, initial {phase: prepare, attempt: 1}) with phases prepare, request, retry, poll and tools and its abort handler (GenerationPhases): section rendering and pi.system planning, threshold and overflow compaction starts, streaming through IDurableModels with throttled partial commits to pi.live.generation.message (an AssistantStreamReducer snapshot per event; the throttle timer is the Harness TimeProvider's), the beforeRequest/afterResponse/onYield/afterTools hooks (the runtime is the hooks' IHookApi), retry backoff, deferred polling and cancellation, usage recording (appendAssistant), the final boundary, the tool round hand-off (tool_unavailable results, owned tool tasks, sequential pending calls, finishToolRound with terminate/handoff/addTools controls) and startRun/handOver. Provider messages are stored as PiWireJson wire JSON; a non-finite usage count throws Chord's copyJson error. Tests: harness.generation.*, harness.generation-recovery.*, harness.chat-differential.*, harness.structured.tool-rounds.*",
-      "portedBlobSha1": "ea384605ab9e38d713427ca8500b5cce5e15be50"
+      "note": "HarnessTasks.GenerationTask (pi.generation v1, initial {phase: prepare, attempt: 1}) with phases prepare, request, retry, poll and tools and its abort handler (GenerationPhases): section rendering and pi.system planning, threshold and overflow compaction starts, streaming through IDurableModels with throttled partial commits to pi.live.generation.message (an AssistantStreamReducer snapshot per event; the throttle timer is the Harness TimeProvider's), the beforeRequest/afterResponse/onYield/afterTools hooks (the runtime is the hooks' IHookApi), retry backoff, deferred polling and cancellation, usage recording (appendAssistant), the final boundary, the tool round hand-off (tool_unavailable results, owned tool tasks, sequential pending calls, finishToolRound with terminate/handoff/addTools controls) and startRun/handOver. Provider messages are stored as PiWireJson wire JSON; a non-finite usage count throws Chord's copyJson error. Tests: harness.generation.*, harness.generation-recovery.*, harness.chat-differential.*, harness.structured.tool-rounds.* v1.2.0: the blocking threshold flag (area j); tool tasks take {kind: \"model\", ...}, controls are read from model-issued results only, and a round handed over removes nestedTools (area a)."
     },
     {
       "upstream": "packages/durable/src/harness/harness.ts",
@@ -254,12 +251,11 @@
       "lines": 268,
       "pisharp": "src/PiSharp.Durable/Harness/Live.cs",
       "phase": "P8",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "0191e06101c9ff6351c87c67b902ccd113b608f0",
       "changedLines": 141,
-      "note": "Live.LiveDoc (pi.live), EndRun, AddCompactionStatus/CompactionStatus/RemoveCompactionStatus, ToolSlot, FinishSlot, ClearProgress and SettleSchedulerOutcomeAsync (the scheduler's settleOutcome seam, with HarnessTasks.ConvertPartialAsync). The run writers startRun and handOver are in Generation.cs, as upstream keeps them in generation.ts. Tests: harness.generation.*, harness.submissions.*",
-      "portedBlobSha1": "0191e06101c9ff6351c87c67b902ccd113b608f0"
+      "note": "Live.LiveDoc (pi.live, a base whenever no generation and no running tool or nested slot), EndRun (also nestedTools), compaction statuses and FailCompactionStatus (compactionFailure), ToolSlot (model-issued slots, then nestedTools by binary search over ascending task IDs), IsNested, FinishSlot, RemoveNestedSlots, ClearProgress and SettleSchedulerOutcomeAsync (also removing the nested slots below a faulted or orphaned tool task). The run writers startRun and handOver are in Generation.cs, as upstream keeps them in generation.ts. Tests: harness.generation.*, harness.submissions.*, harness.nested-tools.*, harness.compaction.*"
     },
     {
       "upstream": "packages/durable/src/harness/output.ts",
@@ -339,12 +335,11 @@
       "lines": 905,
       "pisharp": "src/PiSharp.Durable/Harness/Tool.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "df2dac03a689dfbe3e9a6807e51eed00bbb54e12",
       "changedLines": 538,
-      "note": "HarnessTasks.ToolTask (pi.tool v1): phases call and execute and the abort handler with upstream's input {assistant, callId}, checkpoints {phase: call} and {phase: execute, arguments, replay} and result {entryId, control?}; recovery reruns a call only when the recorded and the current registration both say replay safe, otherwise it settles failed with an interrupted result from the durable slot. prepareArguments, validation through Internal/PiAi/Validation.cs (an internal copy of PiSharp.Agent's ToolArgumentValidation, the port of pi-ai validateToolArguments, since the core does not reference PiSharp.Agent; piai.validation.* compares it with the pinned pi-ai and with the agent's copy; ToolRegistration.ParametersOrigin, default TypeBox), beforeTool/afterTool hooks, controls, diagnostics in {severity, code?, message} order, running output, details and diagnostics published to pi.live.tools through Progress, the tool execution api (IToolExecutionApi, implemented by ToolExecutionApi; DelegatingToolExecutionApi for wrappers), harnessError and appendToolResult. The env/index.ts shapes the api names type-only (ShellOutputWindow, ShellOutputSkip) are in Env/Shell.cs with the rest of the Shell half. Tests: harness.tools.*, harness.tools-recovery.*, harness.tools-differential.* (Fixtures/tool-rounds.upstream.json, captured by Fixtures/capture-tool-rounds.mjs) and the P9 tool-round tests of harness.structured.*",
-      "portedBlobSha1": "df2dac03a689dfbe3e9a6807e51eed00bbb54e12"
+      "note": "HarnessTasks.ToolTask (pi.tool v2) and HarnessTasks.NestedCallDoc (pi.tool.nested-call, a task-scoped family of the caller, {taskId?, result?}): input {kind: \"model\", assistant, callId} or {kind: \"nested\", parent, parentCallId, key, call, progress?}, checkpoints {phase: call} and {phase: execute, arguments, replay}, result {kind: \"model\", entryId, control?} or {kind: \"nested\"}; Migrate turns version 1 input into {kind: \"model\", ...}. Phases call/execute and the abort handler (interrupted/abandoned after a restart), resolution among Agent.Tools or Agent.Callable, structured output checked with Validation.cs's TypeBox Compile port, settle (owned nested calls aborted first, nested results to the caller's NestedCallDoc with usage and slot summary, nested slots removed when the madeNestedCalls memo says so). IToolExecutionApi: ExecuteToolAsync (NestedCalls: keys, the memo, admissions of the synchronous prefix enqueued back to back inside the memo commit, as upstream's microtasks do), RetainedOutput, CreateTaskAsync's abandonOnRestart default (ChildTaskOptions). Tests: harness.tools.*, harness.tools-recovery.*, harness.nested-tools.*, harness.nested-tools-restart.*, harness.structured-output.*, harness.callers.*, harness.tools-differential.*, compat.* (nested-tools, structured-output, nested-tools-restart, abandon-on-restart, upgrade-from-v1.1.0)"
     },
     {
       "upstream": "packages/durable/src/harness/types.ts",
@@ -352,12 +347,11 @@
       "lines": 812,
       "pisharp": "src/PiSharp.Durable/Harness/Types.cs",
       "phase": "P6",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "9e44ff89c552b4b33b2b854dab09fc90d2109942",
       "changedLines": 159,
-      "note": "All shapes final: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings (HarnessSettings with virtual getters for live values) and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi, SubmissionDraft/ISubmission, GenerationHooks, ToolHooks, IToolExecutionApi (DelegatingToolExecutionApi for wrappers), CompactionHooks/CompactionResult. Type-level helpers map as in index.ts's row (AnyTask, HooksOf, HookResult, UserInput, InputSubmissionDraft; ConversationWatch is IWatchHandle<ConversationView>); tasks are JsonValue-typed (see types.ts). The pi-ai Models seam is IDurableModels in Harness/Models.cs. Tests: harness.*, types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions",
-      "portedBlobSha1": "9e44ff89c552b4b33b2b854dab09fc90d2109942"
+      "note": "All shapes final: ModelRef, Patch<T>, ExtensionSelection/ToolSelection, AgentChange, Agent, ToolRegistration (non-sealed record; upstream's Tool generic is record inheritance), ToolExecutionResult/ToolControl/ToolDiagnostic, PromptInput/PromptSection, HookRegistration, Wrap (ToolWrap/SectionWrap), Extension, IRegistrySnapshot/IRegistryReader/IRegistry, settings (HarnessSettings with virtual getters for live values) and policies, HarnessOptions (plus a TimeProvider seam), inspection types, ContextView, IConversation, IConversationHandle, IHarness, IHookApi, SubmissionDraft/ISubmission, GenerationHooks, ToolHooks, IToolExecutionApi (DelegatingToolExecutionApi for wrappers), CompactionHooks/CompactionResult. Type-level helpers map as in index.ts's row (AnyTask, HooksOf, HookResult, UserInput, InputSubmissionDraft; ConversationWatch is IWatchHandle<ConversationView>); tasks are JsonValue-typed (see types.ts). The pi-ai Models seam is IDurableModels in Harness/Models.cs. Tests: harness.*, types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions v1.2.0 (area a): ToolExecutionResult.Output and StructuredOutput, NestedToolExecutionResult (ToJson is what NestedCallDoc stores), NestedCallOptions, RetainedOutput, ToolCaller, ToolRegistration.StructuredOutputSchema/Callers/Deferred, ModelToolSelection and AgentChange.ModelTools, Agent.Callable/Deferred, IToolExecutionApi.ExecuteToolAsync/RetainedOutput; a ToolHookCall is the call JSON with `parent`."
     },
     {
       "upstream": "packages/durable/src/harness/usage.ts",
@@ -463,12 +457,11 @@
       "lines": 205,
       "pisharp": "src/PiSharp.Durable/DurableUpstream.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "2b1dc30371f88417d809d69af123129af9ff45d0",
       "changedLines": 26,
-      "note": "Only re-exports; the PiSharp.Durable namespace is the package root (header in DurableUpstream.cs). Type-only exports map to erased or existing types: task inputs, checkpoints and results and document states (LiveState, InboxState, ProviderState) are JSON values; AnyTask, HooksOf, HookResult, UserInput and InputSubmissionDraft become DurableTask, a task's hook class, the hook delegates' return types and SubmissionDraft; the watch types are IWatchHandle<T>; the document definition and semantics types are Documents.cs's scope-typed tokens; TableCommitChange is ICommitChange",
-      "portedBlobSha1": "2b1dc30371f88417d809d69af123129af9ff45d0"
+      "note": "Only re-exports; the PiSharp.Durable namespace is the package root (header in DurableUpstream.cs). Type-only exports map to erased or existing types: task inputs, checkpoints and results and document states (LiveState, InboxState, ProviderState) are JSON values; AnyTask, HooksOf, HookResult, UserInput and InputSubmissionDraft become DurableTask, a task's hook class, the hook delegates' return types and SubmissionDraft; the watch types are IWatchHandle<T>; the document definition and semantics types are Documents.cs's scope-typed tokens; TableCommitChange is ICommitChange v1.2.0: the new exports map as the header of DurableUpstream.cs lists (NestedCallDoc is HarnessTasks.NestedCallDoc; ToolEventCall, NestedToolExecutionResult and InputEntry are types)."
     },
     {
       "upstream": "packages/durable/src/search.ts",
@@ -743,12 +736,11 @@
       "lines": 184,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Bash.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "ae2603efe4e3407c65895fc4281be279f7680d28",
       "changedLines": 40,
-      "note": "CodingTools.CreateBashTool/CreatePowerShellTool with BashToolOptions/PowerShellToolOptions, BashExecution and the BashPrepare delegate (ValueTask). Output streams to api.Output(text, info.Skipped) with api.OutputWindow as ShellExecOptions.Window, OutputLimits { Retain = Tail }, spill at the default limits reported as a full_output diagnostic; replay unset (unsafe) as upstream. On Windows LocalExecutionEnv runs bash through Git Bash. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)",
-      "portedBlobSha1": "ae2603efe4e3407c65895fc4281be279f7680d28"
+      "note": "CodingTools.CreateBashTool/CreatePowerShellTool with BashToolOptions/PowerShellToolOptions, BashExecution and the BashPrepare delegate (ValueTask). Output streams to api.Output(text, info.Skipped) with api.OutputWindow as ShellExecOptions.Window, OutputLimits { Retain = Tail }, spill at the default limits reported as a full_output diagnostic; replay unset (unsafe) as upstream. On Windows LocalExecutionEnv runs bash through Git Bash. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: StructuredOutputSchema {output, truncated, fullOutputPath?, exitCode} (RetainedOutput), and a nonzero exit is an error result with an exit_code diagnostic."
     },
     {
       "upstream": "packages/durable/src/tools/edit-diff.ts",
@@ -765,12 +757,11 @@
       "lines": 144,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Edit.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "807b6d568390bdaa18a2332616cb6d49ad170543",
       "changedLines": 2,
-      "note": "CodingTools.CreateEditTool: prepareArguments repairs (JSON-string edits, single edit object, top-level oldText/newText) over immutable JSON, file mutation queue, BOM and CRLF preservation, details {diff, patch, firstChangedLine?}; \"Operation aborted\" is an OperationCanceledException. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)",
-      "portedBlobSha1": "807b6d568390bdaa18a2332616cb6d49ad170543"
+      "note": "CodingTools.CreateEditTool: prepareArguments repairs (JSON-string edits, single edit object, top-level oldText/newText) over immutable JSON, file mutation queue, BOM and CRLF preservation, details {diff, patch, firstChangedLine?}; \"Operation aborted\" is an OperationCanceledException. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: the result's content is Output."
     },
     {
       "upstream": "packages/durable/src/tools/env.ts",
@@ -853,12 +844,11 @@
       "lines": 39,
       "pisharp": "src/PiSharp.Durable.Tools/Tools/Write.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "c25103948e4e13a90fafbad7ad5854ac6c566783",
       "changedLines": 2,
-      "note": "CodingTools.CreateWriteTool through the file mutation queue. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json)",
-      "portedBlobSha1": "c25103948e4e13a90fafbad7ad5854ac6c566783"
+      "note": "CodingTools.CreateWriteTool through the file mutation queue. Tests: tools.* (tools.test.ts), tools.read-differential.*, tools.node.* (Fixtures/tools.upstream.json) v1.2.0: the result's content is Output."
     },
     {
       "upstream": "packages/durable/src/truncate.ts",
@@ -1451,8 +1441,9 @@
       "lines": 144,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessCallersCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "harness.callers.* (5 cases) and the authored harness.callers.deferred.* (3: deferred tools without tool_search, which is area k)"
     },
     {
       "upstream": "packages/durable/test/harness-cancellation-barrier.test.ts",
@@ -1503,12 +1494,11 @@
       "lines": 622,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs",
       "phase": "P10",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "9c11d4e22cccc4d6252cde5fc4b01ad05f589567",
       "changedLines": 8,
-      "note": "harness.events.* (14 cases) on MemoryStorage, harness.events.jsonl.* and harness.events.sqlite.* (14 each). Adapted: events compare by ToJson(); drained() is a Session line barrier; waitFor is Eventually; applyChanges works on System.Text.Json nodes; tools sleep with Task.Delay in real time where upstream uses setTimeout",
-      "portedBlobSha1": "9c11d4e22cccc4d6252cde5fc4b01ad05f589567"
+      "note": "harness.events.* (14 cases) on MemoryStorage, harness.events.jsonl.* and harness.events.sqlite.* (14 each). Adapted: events compare by ToJson(); drained() is a Session line barrier; waitFor is Eventually; applyChanges works on System.Text.Json nodes; tools sleep with Task.Delay in real time where upstream uses setTimeout v1.2.0: tool_execution_start carries taskId."
     },
     {
       "upstream": "packages/durable/test/harness-generation-recovery.test.ts",
@@ -1580,12 +1570,11 @@
       "lines": 454,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessLiveDeltasCases.cs",
       "phase": "P10",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "5cf68d464344939dbfc21289f43e14c95e844679",
       "changedLines": 6,
-      "note": "harness.live-deltas.* (11 cases) on MemoryStorage, harness.live-deltas.jsonl.* and harness.live-deltas.sqlite.* (10 each; the checkpoint-predicate case reads no storage). Adapted: drive()'s action queue is a Channel read under the invocation's cancellation; RecordingStorage is ControlledStorage read as LastCommit from a commit listener; the faulting tool's result carries a null addTools name (not strict JSON) instead of a function",
-      "portedBlobSha1": "5cf68d464344939dbfc21289f43e14c95e844679"
+      "note": "harness.live-deltas.* (11 cases) on MemoryStorage, harness.live-deltas.jsonl.* and harness.live-deltas.sqlite.* (10 each; the checkpoint-predicate case reads no storage). Adapted: drive()'s action queue is a Channel read under the invocation's cancellation; RecordingStorage is ControlledStorage read as LastCommit from a commit listener; the faulting tool's result carries a null addTools name (not strict JSON) instead of a function v1.2.0: results are Output."
     },
     {
       "upstream": "packages/durable/test/harness-nested-tools-restart.test.ts",
@@ -1593,8 +1582,9 @@
       "lines": 729,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessNestedToolsRestartCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "harness.nested-tools-restart.* (12 cases on SQLite: upstream's 11 and an authored check of ToolExecutionApi.ChildTaskOptions)"
     },
     {
       "upstream": "packages/durable/test/harness-nested-tools.test.ts",
@@ -1602,8 +1592,9 @@
       "lines": 1343,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "harness.nested-tools.* (35 cases, MemoryStorage; the restart and version 1 cases on SQLite). Adapted: a DelegatingStorage records document creations; tx.setTask is Transaction.SetTask; a repair cannot hold undefined, so it returns {}; the faulting result carries a diagnostic of an undefined severity (BigInt details upstream)"
     },
     {
       "upstream": "packages/durable/test/harness-output-skip.test.ts",
@@ -1641,12 +1632,11 @@
       "lines": 274,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessPromptCases.cs",
       "phase": "P8",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "8c47b19dbcad47ab7fdeec3d5e131fe6762bd8f8",
       "changedLines": 2,
-      "note": "9 of 9 tests: harness.prompt.* (9) on MemoryStorage, plus harness.prompt.jsonl.* and harness.prompt.sqlite.* (6 each: the three storage-free cases run once). Section maps compare as ordered (key, text) pairs",
-      "portedBlobSha1": "8c47b19dbcad47ab7fdeec3d5e131fe6762bd8f8"
+      "note": "9 of 9 tests: harness.prompt.* (9) on MemoryStorage, plus harness.prompt.jsonl.* and harness.prompt.sqlite.* (6 each: the three storage-free cases run once). Section maps compare as ordered (key, text) pairs v1.2.0: the agent has Callable and Deferred."
     },
     {
       "upstream": "packages/durable/test/harness-registry.test.ts",
@@ -1654,12 +1644,11 @@
       "lines": 300,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessRegistryCases.cs",
       "phase": "P6",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "3def50429179834f4022c26d1f85ba5e4d622f0e",
       "changedLines": 2,
-      "note": "harness.registry.* (10 cases): AppTool is a derived ToolRegistration record; stored agent states are pi.agent JSON; hook maps are the built-in hook classes",
-      "portedBlobSha1": "3def50429179834f4022c26d1f85ba5e4d622f0e"
+      "note": "harness.registry.* (10 cases): AppTool is a derived ToolRegistration record; stored agent states are pi.agent JSON; hook maps are the built-in hook classes v1.2.0: results are Output."
     },
     {
       "upstream": "packages/durable/test/harness-scheduler-indexes.test.ts",
@@ -1697,8 +1686,9 @@
       "lines": 407,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessStructuredOutputCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "harness.structured-output.* (10 cases, MemoryStorage; bash over LocalExecutionEnv). Schemas are the JSON TypeBox prints"
     },
     {
       "upstream": "packages/durable/test/harness-structured.test.ts",
@@ -1727,12 +1717,11 @@
       "lines": 158,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessSupport.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "fc04a3b49bd676d399f8e3192f3997dac4f27683",
       "changedLines": 2,
-      "note": "HarnessTests: Tool, OpenHarness, User/Assistant/ToolResult/SystemMessage (wire JSON), DescribeMessage, Installed, AddTool/AddTask/AddHooks/AddSection; also ManualTimeProvider (vi.useFakeTimers and getTimerCount)",
-      "portedBlobSha1": "fc04a3b49bd676d399f8e3192f3997dac4f27683"
+      "note": "HarnessTests: Tool, OpenHarness, User/Assistant/ToolResult/SystemMessage (wire JSON), DescribeMessage, Installed, AddTool/AddTask/AddHooks/AddSection; also ManualTimeProvider (vi.useFakeTimers and getTimerCount) v1.2.0: results are Output."
     },
     {
       "upstream": "packages/durable/test/harness-task-graph.test.ts",
@@ -1770,12 +1759,11 @@
       "lines": 405,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsRecoveryCases.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "a03932f96711f92efe7ee13fd16f2037e7c44dc4",
       "changedLines": 6,
-      "note": "9 tests: harness.tools-recovery.* reopening a SQLite file as upstream does, and harness.tools-recovery.jsonl.* reopening a JSONL directory. \"answers a real bash command interrupted by close and reopen\" runs CodingTools' bash over LocalExecutionEnv in its own directory (upstream: the SQLite file's directory). Adapted: the faulting result carries a null tool name in control.addTools instead of a function in details (both are not strict JSON and make the result commit throw); NodeExecutionEnv read only for cwd is ToolTestEnv",
-      "portedBlobSha1": "a03932f96711f92efe7ee13fd16f2037e7c44dc4"
+      "note": "9 tests: harness.tools-recovery.* reopening a SQLite file as upstream does, and harness.tools-recovery.jsonl.* reopening a JSONL directory. \"answers a real bash command interrupted by close and reopen\" runs CodingTools' bash over LocalExecutionEnv in its own directory (upstream: the SQLite file's directory). Adapted: the faulting result carries a null tool name in control.addTools instead of a function in details (both are not strict JSON and make the result commit throw); NodeExecutionEnv read only for cwd is ToolTestEnv v1.2.0: results are Output."
     },
     {
       "upstream": "packages/durable/test/harness-tools.test.ts",
@@ -1783,12 +1771,11 @@
       "lines": 1200,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
       "phase": "P9",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "83ff0e015c31010feea1b9e693deeca73b5c357e",
       "changedLines": 77,
-      "note": "38 tests: harness.tools.* on MemoryStorage, harness.tools.jsonl.* and harness.tools.sqlite.* (38 each). The two coding-tools cases run CodingTools over LocalExecutionEnv in a fresh directory on each backend (upstream: MemoryStorage). Adapted: NodeExecutionEnv read only for cwd is ToolTestEnv (Harness/ToolEnvSupport.cs); \"drops control keys set to undefined\" returns a ToolControl with Terminate unset; explicit null details are JsonValue.Null",
-      "portedBlobSha1": "83ff0e015c31010feea1b9e693deeca73b5c357e"
+      "note": "38 tests: harness.tools.* on MemoryStorage, harness.tools.jsonl.* and harness.tools.sqlite.* (38 each). The two coding-tools cases run CodingTools over LocalExecutionEnv in a fresh directory on each backend (upstream: MemoryStorage); a failing command is answered with an exit_code error result (v1.2.0). Adapted: NodeExecutionEnv read only for cwd is ToolTestEnv (Harness/ToolEnvSupport.cs); \"drops control keys set to undefined\" returns a ToolControl with Terminate unset"
     },
     {
       "upstream": "packages/durable/test/harness-view.test.ts",
@@ -1842,8 +1829,9 @@
       "lines": 304,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/NestedImagesBench.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "NestedImagesBench (benchmarks: nested-images [count]); the heap is the managed heap. Report only (docs/durable-benchmarks.md); benchmarks.smoke runs the four variants with two 1 KiB images"
     },
     {
       "upstream": "packages/durable/test/nested-tools-bench.ts",
@@ -1851,8 +1839,9 @@
       "lines": 253,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/NestedToolsBench.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "NestedToolsBench (benchmarks: nested-tools [streaming|nesting]); the heap is the managed heap. Report only (docs/durable-benchmarks.md); benchmarks.smoke runs two tiny scenarios"
     },
     {
       "upstream": "packages/durable/test/provider-session-cache-e2e.test.ts",
@@ -1869,8 +1858,9 @@
       "lines": 74,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/SchedulerFanoutBench.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "SchedulerFanoutBench (benchmarks: scheduler-fanout [N,...]). Report only (docs/durable-benchmarks.md); benchmarks.smoke runs four calls"
     },
     {
       "upstream": "packages/durable/test/scheduler-memory-bench.ts",
@@ -2002,12 +1992,11 @@
       "lines": 380,
       "pisharp": "tests/PiSharp.Durable.Tests/SpecUsageCases.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "a38161a4e51f185e8396a12924cc34e320e16039",
       "changedLines": 2,
-      "note": "1 of 1 test: harness.spec-usage.compiles-the-specs-usage-examples. The spec's usage examples written against the ported API in SpecUsage.Examples(), which compiles and is never called; the names the spec leaves to the application are SpecNames members that throw. Adapted: expectTypeOf's return-type check is a reflection check; an onYield hook returns the continuing input itself (GenerationHooks.OnYield); HarnessSettings getters are overridden properties; `delete live.generation` is DraftObject.Delete",
-      "portedBlobSha1": "a38161a4e51f185e8396a12924cc34e320e16039"
+      "note": "1 of 1 test: harness.spec-usage.compiles-the-specs-usage-examples. The spec's usage examples written against the ported API in SpecUsage.Examples(), which compiles and is never called; the names the spec leaves to the application are SpecNames members that throw. Adapted: expectTypeOf's return-type check is a reflection check; an onYield hook returns the continuing input itself (GenerationHooks.OnYield); HarnessSettings getters are overridden properties; `delete live.generation` is DraftObject.Delete v1.2.0: results are Output."
     },
     {
       "upstream": "packages/durable/test/sqlite-cloudflare.test.ts",
