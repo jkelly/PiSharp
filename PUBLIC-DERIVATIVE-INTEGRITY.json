@@ -9071,8 +9071,8 @@
       "originalSha256": "749ca482ed9890c01069315a2ed62a0ef4db8968af787cb633c70d5d2e418076"
     },
     {
-      "currentSha256": "3818cddd984d82ccbe321b3b3e795030281dfadda1af058628d8d5eac6540977",
-      "currentBytes": 6974,
+      "currentSha256": "17b8691200650de16d565320569c80e7114bf76665e6c8cdcd1d2aadf7469c1b",
+      "currentBytes": 7572,
       "originalBytes": 5915,
       "path": "src/PiSharp.Extensions.Agent/RegisteredExtensionContextHooks.cs",
       "originalSha256": "6d9f6d0ed74d1ba8a7d2926110000a63e15b6534c98511ffee1a59738b45b898"
@@ -13012,8 +13012,8 @@
       "originalSha256": "d7adbc24612a914a90480d0f74def07c87273d2f2596adb8766439c5e4b6c495"
     },
     {
-      "currentSha256": "f5fafaf5a26ead21f57374e9a57991b16d6aea94f58489960f39020d48837dff",
-      "currentBytes": 20555,
+      "currentSha256": "853076cd3a00eeee3989538d7c16593a49af8dd7c60dc85b28a337aaa7770d26",
+      "currentBytes": 22515,
       "originalBytes": 20555,
       "path": "tests/PiSharp.Extensions.ContractTests/ContextWithSystemTests.cs",
       "originalSha256": "f5fafaf5a26ead21f57374e9a57991b16d6aea94f58489960f39020d48837dff"
