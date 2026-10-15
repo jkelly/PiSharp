@@ -32,6 +32,7 @@ internal static partial class Program
         cases.AddRange(ListingCases());
         cases.AddRange(VirtualCases());
         cases.AddRange(RemoteCases());
+        cases.AddRange(OpenRouterCases());
         cases.AddRange(LiveRouteCases());
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
