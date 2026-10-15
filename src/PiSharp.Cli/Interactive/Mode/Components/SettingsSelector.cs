@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/settings-selector.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/settings-selector.ts.
 // Also ports the inputs it imports: HTTP_IDLE_TIMEOUT_CHOICES and formatHttpIdleTimeoutMs (core/http-dispatcher.ts),
-// CACHE_WARMING_MODES and WarningSettings (core/settings-manager.ts) and getSupportedThinkingLevels (ai/src/models.ts).
+// CACHE_WARMING_MODES and WarningSettings (core/settings-manager.ts), SETTINGS_DEFAULTS.warnings (core/settings-defaults.ts) and
+// getSupportedThinkingLevels (ai/src/models.ts).
 using System.Globalization;
 using System.Text.Json.Nodes;
 using PiSharp.Tui.Pi;
@@ -153,6 +154,7 @@ file sealed class WarningSettingsSubmenu : Container, IInputHandler
                 Id = "anthropic-extra-usage",
                 Label = "Anthropic extra usage",
                 Description = "Warn when Anthropic subscription auth may use paid extra usage",
+                // SETTINGS_DEFAULTS.warnings.anthropicExtraUsage is true.
                 CurrentValue = (state.AnthropicExtraUsage ?? true) ? "true" : "false",
                 Values = ["true", "false"],
             },
@@ -764,7 +766,7 @@ internal sealed class SettingsSelectorComponent : Container
         {
             Id = "show-hardware-cursor",
             Label = "Show hardware cursor",
-            Description = "Show the terminal cursor while still positioning it for IME support",
+            Description = "Use the terminal cursor instead of Pi's drawn cursor",
             CurrentValue = config.ShowHardwareCursor ? "true" : "false",
             Values = ["true", "false"],
         });

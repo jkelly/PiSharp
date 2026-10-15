@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/modes/interactive/interactive-mode.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/modes/interactive/interactive-mode.ts
 // (/login: handleLoginCommand, showLoginDialog, showAuthPrompt, notifyAuthDialog), components/login-dialog.ts and
 // packages/coding-agent/src/core/slash-commands.ts (login).
 using System.Globalization;

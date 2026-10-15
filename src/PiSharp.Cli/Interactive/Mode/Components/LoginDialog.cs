@@ -264,7 +264,8 @@ internal sealed partial class LoginDialogComponent
             // Keep the end (where the cursor is) visible, leaving one cell for the cursor.
             if (masked.Length > available - 1) masked = masked[^Math.Max(0, available - 1)..];
             var marker = input.Focused ? TuiBase.CursorMarker : "";
-            var line = masked + marker + "\u001b[7m \u001b[27m";
+            // Drawn like Input: the TUI resolves the fake cursor to reverse video, or omits it when the hardware cursor is shown.
+            var line = masked + marker + TuiBase.RenderFakeCursor(" ");
             return [Prompt + line + new string(' ', Math.Max(0, available - TextUtils.VisibleWidth(line)))];
         }
     }
