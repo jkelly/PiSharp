@@ -9,6 +9,8 @@
 //   and then lets the tool queue its submit. Handlers here run on other threads, so the case waits until the mark is queued on the Session
 //   line (Session.LineBacklog, a deterministic barrier) before it lets the tool go.
 // - Tools and supervisors append the IDs they see from other threads, so those lists are SyncLists.
+// - Pi v1.2.0's queuedNote: writes queued while busy carry a model message, as a data-only write is appended at once (area i; the rest
+//   of this file follows with area c).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -46,6 +48,11 @@ internal static partial class Program
 
 internal static partial class OwnershipTests
 {
+    /// <summary>A write that affects model context, so it queues while busy; a data-only write would be appended at once (upstream v1.2.0
+    /// <c>queuedNote</c>).</summary>
+    private static EntryDraft QueuedNote(string text) =>
+        new() { Kind = "note", Model = JsonValue.Array(Obj(("role", "user"), ("content", text), ("timestamp", 0))) };
+
     /// <summary>
     /// The harness.ownership.* cases on storages from <paramref name="fresh"/>; reopen cases use locations from <paramref name="reopenable"/>
     /// and are left out without one.
@@ -149,7 +156,7 @@ internal static partial class OwnershipTests
             var background = await holds.OwnedChild(root, "background", background: true);
             await Busy(root, foreground.Owner);
             var input = (await root.SubmitAsync(SubmissionDraft.Input("later"), Context)).Id;
-            var write = (await root.SubmitAsync(SubmissionDraft.Write(new EntryDraft { Kind = "note" }), Context)).Id;
+            var write = (await root.SubmitAsync(SubmissionDraft.Write(QueuedNote("w")), Context)).Id;
             await root.AbortAsync(Context);
             foreach (var id in new[] { foreground.Owner, foreground.Inner })
                 Equal(DurableTaskStatus.Terminal, await StatusOf(harness, id), $"task {id}");
@@ -192,7 +199,7 @@ internal static partial class OwnershipTests
             await Busy(child, tree.Inner);
             var own = (await root.SubmitAsync(SubmissionDraft.Input("own"), Context)).Id;
             var below = (await child.SubmitAsync(SubmissionDraft.Input("below"), Context)).Id;
-            var write = (await child.SubmitAsync(SubmissionDraft.Write(new EntryDraft { Kind = "note" }), Context)).Id;
+            var write = (await child.SubmitAsync(SubmissionDraft.Write(QueuedNote("w")), Context)).Id;
             await harness.AbortTaskAsync(tree.Owner, Context);
             await harness.WaitForTaskAsync(tree.Inner, Context);
             Equal(SubmissionStatus.Queued, (await RecordOf(harness, own)).Status, "own");

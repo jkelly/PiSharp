@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/types.test.ts, its third test ("types submissions, task waits,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/types.test.ts, its third test ("types submissions, task waits,
 // compaction, and tasks erased into extensions"); TypesCases.cs has the other two. Upstream's test is compile-time only (expectTypeOf and
 // @ts-expect-error); so is most of this one: TypedWaits below is compiled, never run, and pins the C# types of the same calls. What C# can
 // check at run time, it checks: the two submission shapes, and that the shapes upstream rejects at compile time cannot be built here either
@@ -31,13 +31,16 @@ internal static partial class Program
             var write = SubmissionDraft.Write(new EntryDraft { Kind = "note" });
             Equal(SubmissionType.Input, input.Type, "input type");
             Equal(SubmissionType.Write, write.Type, "write type");
-            // @ts-expect-error: an input carries no entry, a write no content and no busy policy. The factories are the only constructors.
+            // @ts-expect-error: an input's entry has no model (its model message is the input's content), a write carries no content and no
+            // busy policy. The factories are the only constructors.
             Check(typeof(SubmissionDraft).GetConstructors().Length == 0, "SubmissionDraft has a public constructor");
             Check(typeof(SubmissionDraft).GetProperties().All(property => property.SetMethod is not { IsPublic: true }), "SubmissionDraft has a public setter");
             Check(typeof(SubmissionDraft).GetMethod(nameof(SubmissionDraft.Write))!.GetParameters().All(parameter => parameter.ParameterType != typeof(WhenBusy?)),
                 "a write takes a busy policy");
             Check(typeof(SubmissionDraft).GetMethod(nameof(SubmissionDraft.Input))!.GetParameters().All(parameter => parameter.ParameterType != typeof(EntryDraft)),
-                "an input takes an entry");
+                "an input takes an entry draft");
+            Check(typeof(InputEntry).GetProperties().All(property => property.Name is "Kind" or "Data"), "an input entry has a model, head or edits");
+            Equal(new InputEntry("chat.mention"), SubmissionDraft.Input("hi", entry: new InputEntry("chat.mention")).InputEntry, "input entry");
 
             // A task with input, several phases and custom hooks.
             var stepper = Tasks.DefineTask(new TaskDefinition

@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/inbox.ts. Items are stored as upstream's JSON:
-// {id, mode: "steer" | "followUp", content} or {id, mode: "write", entry}, where entry is the write's EntryDraft as plain JSON
-// {kind, head?, model?, data?, edits?} (head an entry ID or "self"). The conversation view of the inbox is view.ts's.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/inbox.ts. Items are stored as upstream's JSON:
+// {id, mode: "steer" | "followUp", content, entry?} (entry the input's InputEntry as {kind, data?}) or {id, mode: "write", entry}, where
+// entry is the write's EntryDraft as plain JSON {kind, head?, model?, data?, edits?} (head an entry ID or "self"). The conversation view of
+// the inbox is view.ts's.
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
@@ -56,8 +57,7 @@ public static class Inbox
     {
         var items = boundary.Inbox.GetArray("items");
         var snapshot = Enumerable.Range(0, items.Count).Select(index => (JsonObjectValue)items.Get(index)).ToList();
-        var reset = snapshot.Any(item => Mode(item) == "write" && ((JsonObjectValue)item["entry"]).TryGetValue("head", out var head) &&
-            head is JsonStringValue { Value: "self" });
+        var reset = HasQueuedReset(snapshot);
         final = final || reset;
         List<int> Pick(string mode, QueueMode queueMode)
         {
@@ -84,19 +84,53 @@ public static class Inbox
         foreach (var index in users)
         {
             var item = snapshot[index];
-            var message = JsonValue.Object([
-                KeyValuePair.Create("role", (JsonValue)"user"),
-                KeyValuePair.Create("content", item["content"]),
-                KeyValuePair.Create("timestamp", (JsonValue)now),
-            ]);
-            var entry = await tx.AppendEntryAsync(Entries.UserEntry, boundary.ConversationId, new TypedEntryDraft { Model = JsonValue.Array(message) })
-                .ConfigureAwait(false);
+            var entry = await AppendInputAsync(tx, boundary.ConversationId, item["content"],
+                item.TryGetValue("entry", out var placedAs) ? InputEntryFromJson((JsonObjectValue)placedAs) : null, now).ConfigureAwait(false);
             tx.PlaceSubmission(ItemSubmission(item), entry.Id);
             placed.Add(ItemSubmission(item));
         }
         foreach (var index in writes.Concat(users).OrderDescending()) items.RemoveAt(index);
         return new BoundaryResult(placed.ToImmutable(), reset);
     }
+
+    /// <summary>
+    /// Appends the entry an input is placed as (upstream <c>appendInput</c>): <paramref name="entry"/>'s kind and data, or <c>pi.user</c>, with
+    /// the user message of <paramref name="content"/>.
+    /// </summary>
+    internal static Task<EntryRecord> AppendInputAsync(ITx tx, ConversationId conversationId, JsonValue content, InputEntry? entry, double now)
+    {
+        var message = JsonValue.Object([
+            KeyValuePair.Create("role", (JsonValue)"user"),
+            KeyValuePair.Create("content", content),
+            KeyValuePair.Create("timestamp", (JsonValue)now),
+        ]);
+        if (entry is null) return tx.AppendEntryAsync(Entries.UserEntry, conversationId, new TypedEntryDraft { Model = JsonValue.Array(message) });
+        // Upstream's `{ ...pickInputEntry(entry), model: [message] }`.
+        return tx.AppendEntryAsync(conversationId, new EntryDraft
+        {
+            Kind = entry.Kind, Data = entry.Data, Model = JsonValue.Array(message), KeyOrder = ["kind", "data", "model"],
+        });
+    }
+
+    /// <summary>The kind and data of an input's entry as strict JSON <c>{kind, data?}</c> (upstream <c>pickInputEntry</c>).</summary>
+    internal static JsonObjectValue PickInputEntry(InputEntry entry) => entry.Data is null
+        ? JsonValue.Object([KeyValuePair.Create("kind", (JsonValue)entry.Kind)])
+        : JsonValue.Object([KeyValuePair.Create("kind", (JsonValue)entry.Kind), KeyValuePair.Create("data", entry.Data)]);
+
+    /// <summary>The input entry a queued input item carries.</summary>
+    internal static InputEntry InputEntryFromJson(JsonObjectValue value) =>
+        new(((JsonStringValue)value["kind"]).Value, value.TryGetValue("data", out var data) ? data : null);
+
+    /// <summary>
+    /// Whether a write is display-only: it has no <c>Model</c>, <c>Head</c> or <c>Edits</c> (present counts, even if empty), so it changes
+    /// nothing the model sees and needs no boundary (upstream <c>isDisplayOnly</c>).
+    /// </summary>
+    internal static bool IsDisplayOnly(EntryDraft entry) => entry.Model is null && entry.Head is null && entry.Edits is null;
+
+    /// <summary>Whether a reset (<c>head: "self"</c> write) is queued; entries appended before it leave the active range when it lands
+    /// (upstream <c>hasQueuedReset</c>).</summary>
+    internal static bool HasQueuedReset(IEnumerable<JsonObjectValue> items) => items.Any(item => Mode(item) == "write" &&
+        ((JsonObjectValue)item["entry"]).TryGetValue("head", out var head) && head is JsonStringValue { Value: "self" });
 
     /// <summary>Whether a head write targets an entry before the active range, so placing it would bring back cut history (upstream
     /// <c>isStale</c>).</summary>

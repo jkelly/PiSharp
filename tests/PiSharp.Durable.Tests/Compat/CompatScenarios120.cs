@@ -90,8 +90,73 @@ internal static class CompatScenarios120
         }
     }
 
+    private static InputEntry Mention(string text) => new("chat.mention", Obj(("author", "ann"), ("text", text)));
+
     internal static readonly IReadOnlyList<CompatScenario120> All =
     [
+        new("input-entries", ["i"], async open =>
+        {
+            var setup = Chat();
+            var reached = new HarnessTests.Deferred();
+            setup.Faux.SetResponses(Answer("hello"), new FauxResponseFactory(async request =>
+            {
+                reached.Resolve();
+                try { await HarnessTests.Aborted(request.Signal); } catch (OperationCanceledException) { }
+                return Answer("never");
+            }));
+            var (harness, root) = await Open(setup, await open());
+            await (await root.SubmitAsync(SubmissionDraft.Input("ann: hi", requestId: "r1", entry: Mention("hi")), Context)).WaitAsync(Context);
+            await root.SubmitAsync(SubmissionDraft.Input("a"), Context);
+            await reached.Task;
+            await root.SubmitAsync(SubmissionDraft.Input("s", WhenBusy.Steer, entry: new InputEntry("p2.input")), Context);
+            await root.SubmitAsync(SubmissionDraft.Input("f", WhenBusy.FollowUp, entry: Mention("f")), Context);
+            var rejected = await Settle(() => root.SubmitAsync(SubmissionDraft.Input("x", entry: new InputEntry("pi.custom")), Context));
+            await harness.CloseAsync(Context);
+            return Obj(("rejected", rejected));
+        }, async open =>
+        {
+            var setup = Chat();
+            setup.Faux.SetResponses(Answer("first again"), Answer("for s"), Answer("for f"), Answer("spare"));
+            var (harness, _) = await Open(setup, await open());
+            harness.Resume();
+            await harness.WaitForIdleAsync(Context);
+            await harness.CloseAsync(Context);
+            return null;
+        }),
+        new("display-only-write", ["i"], async open =>
+        {
+            var setup = Chat();
+            var reached = new HarnessTests.Deferred();
+            var held = new HarnessTests.Deferred();
+            setup.Faux.SetResponses(new FauxResponseFactory(async _ =>
+            {
+                reached.Resolve();
+                await held.Task;
+                return Answer("first");
+            }), Answer("second"));
+            var (harness, root) = await Open(setup, await open());
+            var input = await root.SubmitAsync(SubmissionDraft.Input("a"), Context);
+            await reached.Task;
+            var followUp = await root.SubmitAsync(SubmissionDraft.Input("f"), Context);
+            var model = await root.SubmitAsync(SubmissionDraft.Write(new EntryDraft
+            {
+                Kind = "note", Model = JsonValue.Array(Obj(("role", "user"), ("content", "m"), ("timestamp", T))),
+            }), Context);
+            var user = (await root.EntriesAsync(new EntryQueryBounds { Order = ScanOrder.Ascending }, 10, null, Context)).Items.First(entry => entry.Kind == "pi.user");
+            var edit = await root.SubmitAsync(SubmissionDraft.Write(new EntryDraft { Kind = "redact", Edits = [ContextEdit.Omit(user.Id)] }), Context);
+            var note = await root.SubmitAsync(SubmissionDraft.Write(new EntryDraft { Kind = "note", Data = "n" }), Context);
+            var noteAtOnce = await note.StatusAsync(Context);
+            await root.ResetAsync("handoff", Context);
+            var chat = await root.SubmitAsync(SubmissionDraft.Write(new EntryDraft { Kind = "chat.message", Data = "hi" }), Context);
+            var chatBehindReset = await chat.StatusAsync(Context);
+            var inbox = (JsonArrayValue)(await harness.SnapshotAsync(Inbox.InboxDoc, root.Id, Context))!["items"];
+            held.Resolve();
+            foreach (var submission in new[] { input, followUp, model, edit, chat }) await submission.WaitAsync(Context);
+            await harness.WaitForIdleAsync(Context);
+            await harness.CloseAsync(Context);
+            return Obj(("noteAtOnce", noteAtOnce.ToJson()), ("chatBehindReset", chatBehindReset.ToJson()),
+                ("inbox", JsonValue.Array(inbox.Cast<JsonObjectValue>().Select(item => (JsonValue)JsonValue.Array(item["id"], item["mode"])))));
+        }),
         new("session-failed", ["b"], async open =>
         {
             var setup = Chat();

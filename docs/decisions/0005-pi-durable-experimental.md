@@ -85,6 +85,8 @@ None is planned or in progress.
   - A listener's rejected promise is a faulted task from the asynchronous `SubscribeCommits`/`SubscribeClose` overloads. `OnReport` stays an `Action`: its throw is dropped, but an `async void` handler's exception escapes to the thread pool, where no caller can contain it.
   - Document cache retention sweeps with .NET timers, which never keep a process alive, so upstream's fallback for timers that cannot be unreferenced is never needed. The suite runs a second time with `PI_DURABLE_DOCUMENT_RETENTION_MS=0` in the branch CI, as upstream's `npm test` does.
 
+- **Input entries (v1.2.0, area i).** Upstream's input `entry: { kind, data }` is `InputEntry(Kind, Data)`, passed to `SubmissionDraft.Input`. It is typed, so an untyped caller's extra fields cannot reach it; only its kind is checked (non-empty, outside `pi.`). Until area a lands, `harness.inbox-differential.steer` compares the v1.2.0 capture's one `pi.tool` task in its v1 shape, after checking that version 2 and `kind: "model"` are its only differences.
+
 **Benchmarks** (`benchmarks/PiSharp.Durable.Benchmarks`) are report only; see `docs/durable-benchmarks.md`.
 - On the one Windows machine measured, neither runtime meets upstream's 0.4 s target for `cat` of 1 GiB:
   - upstream under Node: about 1.75 s;

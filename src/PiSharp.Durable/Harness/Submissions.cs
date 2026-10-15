@@ -1,6 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/submissions.ts. Inbox items keep a draft's content or
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/submissions.ts. Inbox items keep a draft's content or
 // entry as plain JSON (upstream's copyJson with omitUndefinedProperties: a C# draft has no undefined fields). A settled record is the
-// SubmissionRecord whose status is done or unanswered (upstream SettledSubmissionRecord).
+// SubmissionRecord whose status is done or unanswered (upstream SettledSubmissionRecord). Upstream's checkInputEntry guards untyped callers;
+// an InputEntry is typed, so only its kind is checked.
 using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable;
@@ -93,16 +94,28 @@ internal sealed class Submissions
 
     private static bool IsSettled(SubmissionRecord record) => record.Status is SubmissionStatus.Done or SubmissionStatus.Unanswered;
 
+    /// <summary>Rejects an input entry whose kind is empty or starts with <c>pi.</c> (upstream <c>checkInputEntry</c>).</summary>
+    private static void CheckInputEntry(InputEntry entry)
+    {
+        var kind = entry.Kind;
+        if (string.IsNullOrEmpty(kind) || kind.StartsWith("pi.", StringComparison.Ordinal))
+            throw new ArgumentException($"An input entry's kind must be a non-empty string not starting with \"pi.\", got {kind ?? "undefined"}");
+    }
+
     /// <summary>
     /// Admits a submission inside a commit (upstream <c>admitSubmission</c>, spec §6); <c>Conversation.SubmitAsync()</c> and
-    /// conversation-owned compactions share it. A known request ID returns its existing submission without writing. A busy conversation
-    /// queues it in <c>pi.inbox</c>, or rejects <c>whenBusy: "reject"</c> input with <see cref="ConversationBusyException"/>. An idle
-    /// conversation with queued items queues it behind them and runs a final boundary. Otherwise idle input places a user entry and starts a
-    /// run, and an idle write appends its entry and settles <c>done</c>, or <c>stale</c> when its head reaches before the active range.
+    /// conversation-owned compactions share it. A known request ID returns its existing submission without writing. A display-only write
+    /// (only kind and data) is appended and settled <c>done</c> at once, busy or not, as it changes nothing the model sees; only behind a
+    /// queued reset it queues, so it lands after the reset instead of before it in the context the reset ends. A busy conversation queues
+    /// anything else in <c>pi.inbox</c>, or rejects <c>whenBusy: "reject"</c> input with <see cref="ConversationBusyException"/>. An idle
+    /// conversation with queued items queues it behind them and runs a final boundary. Otherwise idle input places its entry
+    /// (<c>pi.user</c>, or the input's own) and starts a run, and an idle write appends its entry and settles <c>done</c>, or <c>stale</c>
+    /// when its head reaches before the active range.
     /// </summary>
     internal static async Task<SubmissionId> AdmitSubmissionAsync(ITx tx, ConversationId conversationId, SubmissionDraft draft, double now,
         Settings queueModes)
     {
+        if (draft.Type == SubmissionType.Input && draft.InputEntry is { } inputEntry) CheckInputEntry(inputEntry);
         if (draft.RequestId is { } requestId)
         {
             var existing = await tx.GetSubmissionByRequestAsync(conversationId, requestId).ConfigureAwait(false);
@@ -111,6 +124,19 @@ internal sealed class Submissions
                 if (existing.Type != draft.Type)
                     throw new InvalidOperationException($"Request {requestId} already identifies a submission of type {Wire(existing.Type)}");
                 return existing.Id;
+            }
+        }
+        if (draft.Type == SubmissionType.Write && Inbox.IsDisplayOnly(draft.Entry!))
+        {
+            var queuedItems = (await tx.DocAsync(Inbox.InboxDoc, conversationId).ConfigureAwait(false)).GetArray("items");
+            if (!Inbox.HasQueuedReset(Enumerable.Range(0, queuedItems.Count).Select(index => (JsonObjectValue)queuedItems.Get(index))))
+            {
+                var appended = await tx.AppendEntryAsync(conversationId, draft.Entry!).ConfigureAwait(false);
+                return (await tx.CreateSubmissionAsync(new SubmissionCreate
+                {
+                    ConversationId = conversationId, RequestId = draft.RequestId, Type = SubmissionType.Write, Status = SubmissionStatus.Done,
+                    Entry = appended.Id,
+                }).ConfigureAwait(false)).Id;
             }
         }
         var live = await tx.DocAsync(Live.LiveDoc, conversationId).ConfigureAwait(false);
@@ -135,6 +161,8 @@ internal sealed class Submissions
                     KeyValuePair.Create("id", (JsonValue)queued.Id.ToJson()),
                     KeyValuePair.Create("mode", (JsonValue)(draft.WhenBusy == WhenBusy.Steer ? "steer" : "followUp")),
                     KeyValuePair.Create("content", draft.Content!),
+                    .. draft.InputEntry is { } queuedEntry ? [KeyValuePair.Create("entry", (JsonValue)Inbox.PickInputEntry(queuedEntry))] :
+                        Array.Empty<KeyValuePair<string, JsonValue>>(),
                 ]));
             if (boundary is null) return queued.Id;
             var (users, _) = await Inbox.ApplyBoundaryAsync(tx, boundary, true, now).ConfigureAwait(false);
@@ -159,13 +187,7 @@ internal sealed class Submissions
                 Entry = written.Id,
             }).ConfigureAwait(false)).Id;
         }
-        var message = JsonValue.Object([
-            KeyValuePair.Create("role", (JsonValue)"user"),
-            KeyValuePair.Create("content", draft.Content!),
-            KeyValuePair.Create("timestamp", (JsonValue)now),
-        ]);
-        var entry = await tx.AppendEntryAsync(Entries.UserEntry, conversationId, new TypedEntryDraft { Model = JsonValue.Array(message) })
-            .ConfigureAwait(false);
+        var entry = await Inbox.AppendInputAsync(tx, conversationId, draft.Content!, draft.InputEntry, now).ConfigureAwait(false);
         var input = await tx.CreateSubmissionAsync(new SubmissionCreate
         {
             ConversationId = conversationId, RequestId = draft.RequestId, Type = SubmissionType.Input, Status = SubmissionStatus.Placed, Entry = entry.Id,

@@ -235,12 +235,11 @@
       "lines": 168,
       "pisharp": "src/PiSharp.Durable/Harness/Inbox.cs",
       "phase": "P10",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "7ba380291faab6c289ce188e6de09c180b4494df",
       "changedLines": 52,
-      "note": "Inbox.InboxDoc (pi.inbox, a complete base exactly while empty), PrepareBoundaryAsync/ApplyBoundaryAsync/IsStale (spec §6: every write, the first or all steers, at the final boundary the first or all follow-ups, a queued reset turning postTools final, stale head writes), RemoveInboxItemAsync and WithdrawQueuedInputsAsync. Queued writes store their EntryDraft as plain JSON {kind, head?, model?, data?, edits?}, the key order of upstream's own reset and compaction drafts (upstream copies the caller's object). Steer and follow-up admission is Submissions.AdmitSubmissionAsync (submissions.ts); the conversation view of the inbox is view.ts's. Tests: harness.inbox.*, harness.inbox-differential.* (Fixtures/inbox.upstream.json, captured by Fixtures/capture-inbox.mjs: a steer mid-turn, a queued reset with handoff and a stale write, queue modes all; identical records, IDs and document key order on memory, JSONL and SQLite)",
-      "portedBlobSha1": "7ba380291faab6c289ce188e6de09c180b4494df"
+      "note": "Inbox.InboxDoc (pi.inbox, a complete base exactly while empty), PrepareBoundaryAsync/ApplyBoundaryAsync/IsStale (spec §6: every write, the first or all steers, at the final boundary the first or all follow-ups, a queued reset turning postTools final, stale head writes), RemoveInboxItemAsync and WithdrawQueuedInputsAsync. Queued writes store their EntryDraft as plain JSON {kind, head?, model?, data?, edits?}, the key order of upstream's own reset and compaction drafts (upstream copies the caller's object). Steer and follow-up admission is Submissions.AdmitSubmissionAsync (submissions.ts); the conversation view of the inbox is view.ts's. Tests: harness.inbox.*, harness.inbox-differential.* (Fixtures/inbox.upstream.json, captured by Fixtures/capture-inbox.mjs: a steer mid-turn, a queued reset with handoff and a stale write, queue modes all; identical records, IDs and document key order on memory, JSONL and SQLite) v1.2.0 (area i): a queued input item carries its InputEntry as {kind, data?} (PickInputEntry); AppendInputAsync places an input as its entry ({kind, data, model} key order) or pi.user; IsDisplayOnly and HasQueuedReset."
     },
     {
       "upstream": "packages/durable/src/harness/json.ts",
@@ -319,12 +318,11 @@
       "lines": 241,
       "pisharp": "src/PiSharp.Durable/Harness/Submissions.cs",
       "phase": "P8",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "496b6cbaa04f81be186e82c9da3d8b2fe5416dd6",
       "changedLines": 62,
-      "note": "Submissions (internal: admission in one commit with request-id idempotency, status/wait/abort, waiters resolved from submission commit changes and rejected on close), the handle behind ISubmission, BoundSubmission for invocation-bound handles, and AdmitSubmissionAsync (busy queueing, whenBusy reject with ConversationBusyException, an idle boundary behind queued items, stale head writes). Tests: harness.submissions.* (memory, jsonl, sqlite; reopen on sqlite and jsonl)",
-      "portedBlobSha1": "496b6cbaa04f81be186e82c9da3d8b2fe5416dd6"
+      "note": "Submissions (internal: admission in one commit with request-id idempotency, status/wait/abort, waiters resolved from submission commit changes and rejected on close), the handle behind ISubmission, BoundSubmission for invocation-bound handles, and AdmitSubmissionAsync (busy queueing, whenBusy reject with ConversationBusyException, an idle boundary behind queued items, stale head writes). Tests: harness.submissions.* (memory, jsonl, sqlite; reopen on sqlite and jsonl) v1.2.0 (area i): SubmissionDraft.Input takes an InputEntry (kind non-empty and outside pi., else ArgumentException with upstream's message); a display-only write (only kind and data) is appended and settled done at once unless a reset is queued; b's ObserveCommits and ClosedError(session). Tests: harness.input-entries.*, compat.input-entries.*, compat.display-only-write.*"
     },
     {
       "upstream": "packages/durable/src/harness/task-graph.ts",
@@ -1544,12 +1542,11 @@
       "lines": 928,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs",
       "phase": "P10",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "bd8b2a6f22799133e3226ced1e4e879676891dba",
       "changedLines": 39,
-      "note": "32 of 32 tests (27 inbox, 5 usage): harness.inbox.* on MemoryStorage with the two reopen cases on a SQLite file as upstream, harness.inbox.jsonl.* (32, reopening a JSONL directory) and harness.inbox.sqlite.* (30: the reopen cases run in harness.inbox.*). Adapted: the queue-mode case waits for the answer's boundary commit to queue behind the held commit with Session.LineBacklog (a deterministic barrier for upstream's onYield + flush); the two cases that read what a commit listener recorded after a submission wait flush the Session line first (a C# wait resumes on its own listener, upstream's after all listeners); RecordingStorage is a decorator; [id, mode] inbox items compare as \"id mode\" strings",
-      "portedBlobSha1": "bd8b2a6f22799133e3226ced1e4e879676891dba"
+      "note": "32 of 32 tests (27 inbox, 5 usage): harness.inbox.* on MemoryStorage with the two reopen cases on a SQLite file as upstream, harness.inbox.jsonl.* (32, reopening a JSONL directory) and harness.inbox.sqlite.* (30: the reopen cases run in harness.inbox.*). Adapted: the queue-mode case waits for the answer's boundary commit to queue behind the held commit with Session.LineBacklog (a deterministic barrier for upstream's onYield + flush); the two cases that read what a commit listener recorded after a submission wait flush the Session line first (a C# wait resumes on its own listener, upstream's after all listeners); RecordingStorage is a decorator; [id, mode] inbox items compare as \"id mode\" strings v1.2.0: writes queued while busy are QueuedNote (a model message), as data-only writes are appended at once. Its hold tools keep ToolExecutionResult.Content until area a renames it to Output in every test. harness.inbox-differential.* reads Fixtures/v1.2.0/inbox.upstream.json; its steer scenario's pi.tool task is compared in its v1 shape until area a (PendingToolV2 checks the only differences are version 2 and kind \"model\")."
     },
     {
       "upstream": "packages/durable/test/harness-input-entries.test.ts",
@@ -1557,8 +1554,9 @@
       "lines": 456,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessInputEntriesCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "All 11 tests: harness.input-entries.* on MemoryStorage, the reopen case on a SQLite file as upstream. Adapted: an InputEntry is typed (a string kind, no model, head or edits), so the invalid kinds are null, \"\", pi.user and pi.compaction, and the untyped caller's extra fields are a check that the type carries only Kind and Data"
     },
     {
       "upstream": "packages/durable/test/harness-inspect.test.ts",
@@ -2161,12 +2159,11 @@
       "lines": 346,
       "pisharp": "tests/PiSharp.Durable.Tests/TypesCases.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "8a20bc07f0e6a91a7aab8b1617fa2f49a499d633",
       "changedLines": 6,
-      "note": "3 of 3 tests. types.brands-numeric-ids-by-record-kind-and-carries-task-result-types and types.encodes-discriminator-dependent-fields: ID kinds, and every @ts-expect-error record shape rejected by FromJson/Validate. types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions (TypesHarnessCases.cs): compile-checked typed waits, compaction and hooks (EachAsync's selector types the handler) plus run-time checks that the rejected submission shapes cannot be built. Not expressible in C#: the phantom task result type, typed task input and the exhaustive phase map (tasks are JsonValue-typed; see types.ts). types.record-json-key-order is authored",
-      "portedBlobSha1": "8a20bc07f0e6a91a7aab8b1617fa2f49a499d633"
+      "note": "3 of 3 tests. types.brands-numeric-ids-by-record-kind-and-carries-task-result-types and types.encodes-discriminator-dependent-fields: ID kinds, and every @ts-expect-error record shape rejected by FromJson/Validate. types.types-submissions-task-waits-compaction-and-tasks-erased-into-extensions (TypesHarnessCases.cs): compile-checked typed waits, compaction and hooks (EachAsync's selector types the handler) plus run-time checks that the rejected submission shapes cannot be built. Not expressible in C#: the phantom task result type, typed task input and the exhaustive phase map (tasks are JsonValue-typed; see types.ts). types.record-json-key-order is authored v1.2.0: an input's entry is an InputEntry with no model, head or edits (TypesHarnessCases.cs)."
     },
     {
       "upstream": "packages/coding-agent/src/experimental/durable/harness-setup.ts",
