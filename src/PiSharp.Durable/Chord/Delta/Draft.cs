@@ -1,9 +1,12 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/delta/draft.ts and the overlay nodes of
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/delta/draft.ts and the overlay nodes of
 // packages/chord/src/delta/tracker.ts. C# has no Proxy, so a draft is an explicit copy-on-write view (decision 0005): an object draft
-// records its writes, deletions and re-additions over its base object; an array draft records per-entry overrides and, once an
-// element moves, an ordered list of entries that remember which base index each came from (upstream's piece table, flattened). Child
-// drafts are created on demand, keep one identity per slot, follow their element through reindexing, and are detached (their writes
-// ignored) when their slot is overwritten or removed. Untouched subtrees are never visited and keep their base references.
+// records its writes, deletions and re-additions over its base object; an array draft records per-entry overrides and, once elements
+// are inserted or removed, upstream's piece table: base ranges in base order and runs of inserted entries, kept as a short list rather
+// than upstream's treap. Inserts and removals never visit the base elements, so an append to a long array costs no walk over it. Once an
+// element moves (reverse, sort, move), or the list grows past MaxPieces, the pieces flatten into an ordered list of entries that remember
+// which base index each came from. Child drafts are created on demand, keep one identity per slot, follow their element through
+// reindexing, and are detached (their writes ignored) when their slot is overwritten or removed. Untouched subtrees are never visited and
+// keep their base references.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -287,9 +290,15 @@ public sealed class DraftObject : Draft
 /// </summary>
 public sealed class DraftArray : Draft
 {
+    // Past this many pieces a splice flattens the draft into entries, bounding the linear piece scans (upstream keeps a treap instead).
+    private const int MaxPieces = 64;
+
     private readonly JsonArrayValue baseValue;
     private Dictionary<int, ArrayEntry>? touched; // entries by base index while no element has moved
+    private List<ArrayPiece>? pieces; // the piece table once elements were inserted or removed, until an element moves
+    private int pieceLength;
     private Dictionary<ArrayEntry, int>? positions;
+    private (int[] Starts, int[] Logical, int[] Lengths)? baseRanges; // piece mode: each base piece's base start, position and length
 
     internal DraftArray(ChangeContext context, JsonArrayValue value, Draft? parent, string? key, ArrayEntry? entry, bool placement)
         : base(context, parent, key, entry, placement)
@@ -299,8 +308,10 @@ public sealed class DraftArray : Draft
 
     internal override JsonValue BaseValue => baseValue;
     internal JsonArrayValue Base => baseValue;
-    /// <summary>Every entry in order, once an element moved, was inserted or was removed.</summary>
+    /// <summary>Every entry in order, once an element moved (or the piece table grew past <see cref="MaxPieces"/>).</summary>
     internal List<ArrayEntry>? Entries { get; private set; }
+    /// <summary>The piece table while elements were only inserted or removed: base ranges keep their base order.</summary>
+    internal IReadOnlyList<ArrayPiece>? Pieces => pieces;
     /// <summary>Whether entries were inserted, removed or reordered.</summary>
     internal bool Structural { get; private set; }
     /// <summary>Base entries whose value was replaced, by base index in first-override order.</summary>
@@ -319,15 +330,14 @@ public sealed class DraftArray : Draft
         }
     }
 
-    private int Length => Entries?.Count ?? baseValue.Count;
+    private int Length => Entries?.Count ?? (pieces is not null ? pieceLength : baseValue.Count);
 
     /// <summary>The element's current value (a container is returned as its current immutable content).</summary>
     public JsonValue Get(int index)
     {
         Context.AssertReadable();
         CheckIndex(index);
-        var entry = Entries is not null ? Entries[index] : touched is not null && touched.TryGetValue(index, out var found) ? found : null;
-        return entry is null ? baseValue[index] : SlotCurrent(entry);
+        return ValueAt(index);
     }
 
     /// <summary>Gets an element's current value, or sets it.</summary>
@@ -545,61 +555,200 @@ public sealed class DraftArray : Draft
 
     internal JsonValue SlotCurrent(ArrayEntry entry) => entry.Child?.Current() ?? entry.Value;
 
-    /// <summary>The entry's position in the draft (prepare-time; base index while nothing moved).</summary>
+    /// <summary>The entry's position in the draft (prepare-time; base index while nothing moved). The entry must not be removed.</summary>
     internal int IndexOf(ArrayEntry entry)
     {
         if (!Structural) return entry.Origin;
         if (positions is null)
         {
-            positions = new Dictionary<ArrayEntry, int>(Entries!.Count);
-            for (var index = 0; index < Entries.Count; index++) positions[Entries[index]] = index;
+            if (Entries is not null)
+            {
+                positions = new Dictionary<ArrayEntry, int>(Entries.Count);
+                for (var index = 0; index < Entries.Count; index++) positions[Entries[index]] = index;
+            }
+            else
+            {
+                // Piece mode: inserted entries by position and base pieces as ranges, so no base element is visited.
+                positions = [];
+                var (starts, logical, lengths) = (new List<int>(), new List<int>(), new List<int>());
+                var at = 0;
+                foreach (var piece in pieces!)
+                {
+                    if (piece.Inserted is { } inserted)
+                        for (var offset = 0; offset < inserted.Count; offset++) positions[inserted[offset]] = at + offset;
+                    else
+                    {
+                        starts.Add(piece.Start);
+                        logical.Add(at);
+                        lengths.Add(piece.Length);
+                    }
+                    at += piece.Count;
+                }
+                baseRanges = ([.. starts], [.. logical], [.. lengths]);
+            }
         }
-        return positions[entry];
+        if (entry.Origin < 0 || Entries is not null) return positions[entry];
+        var ranges = baseRanges!.Value;
+        var found = Array.BinarySearch(ranges.Starts, entry.Origin);
+        if (found < 0) found = ~found - 1;
+        if (found < 0 || entry.Origin >= ranges.Starts[found] + ranges.Lengths[found])
+            throw new InvalidOperationException("A removed array entry has no position.");
+        return ranges.Logical[found] + entry.Origin - ranges.Starts[found];
     }
 
     internal ImmutableArray<JsonValue> CurrentRange(int start, int length)
     {
         var items = ImmutableArray.CreateBuilder<JsonValue>(length);
-        for (var index = start; index < start + length; index++)
-        {
-            var entry = Entries is not null ? Entries[index] : touched is not null && touched.TryGetValue(index, out var found) ? found : null;
-            items.Add(entry is null ? baseValue[index] : SlotCurrent(entry));
-        }
+        for (var index = start; index < start + length; index++) items.Add(ValueAt(index));
         return items.MoveToImmutable();
+    }
+
+    private JsonValue ValueAt(int index)
+    {
+        var entry = Find(index, out var baseIndex);
+        return entry is null ? baseValue[baseIndex] : SlotCurrent(entry);
+    }
+
+    // The entry at a position, or null for a base element without one; baseIndex is then that element's base index.
+    private ArrayEntry? Find(int index, out int baseIndex)
+    {
+        baseIndex = -1;
+        if (Entries is not null) return Entries[index];
+        if (pieces is not null)
+        {
+            var (piece, offset) = PieceAt(index);
+            if (piece.Inserted is { } inserted) return inserted[offset];
+            index = piece.Start + offset;
+        }
+        baseIndex = index;
+        return touched is not null && touched.TryGetValue(index, out var found) ? found : null;
+    }
+
+    private (ArrayPiece Piece, int Offset) PieceAt(int index)
+    {
+        foreach (var piece in pieces!)
+        {
+            if (index < piece.Count) return (piece, index);
+            index -= piece.Count;
+        }
+        throw new InvalidOperationException("Index is outside the array.");
     }
 
     private ArrayEntry EntryAt(int index)
     {
-        if (Entries is not null) return Entries[index];
+        if (Find(index, out var baseIndex) is { } entry) return entry;
         touched ??= new Dictionary<int, ArrayEntry>();
-        if (!touched.TryGetValue(index, out var entry)) touched[index] = entry = new ArrayEntry(index, baseValue[index]);
+        touched[baseIndex] = entry = new ArrayEntry(baseIndex, baseValue[baseIndex]);
         return entry;
     }
 
     private void EnsureEntries()
     {
         if (Entries is not null) return;
-        var entries = new List<ArrayEntry>(baseValue.Count);
-        for (var index = 0; index < baseValue.Count; index++)
-            entries.Add(touched is not null && touched.TryGetValue(index, out var entry) ? entry : new ArrayEntry(index, baseValue[index]));
+        var entries = new List<ArrayEntry>(Length);
+        if (pieces is null) AddBaseEntries(entries, 0, baseValue.Count);
+        else
+        {
+            foreach (var piece in pieces)
+            {
+                if (piece.Inserted is { } inserted) entries.AddRange(inserted);
+                else AddBaseEntries(entries, piece.Start, piece.Length);
+            }
+        }
         Entries = entries;
         touched = null;
+        pieces = null;
+        pieceLength = 0;
+        positions = null;
+        baseRanges = null;
+    }
+
+    private void AddBaseEntries(List<ArrayEntry> entries, int start, int count)
+    {
+        for (var index = start; index < start + count; index++)
+            entries.Add(touched is not null && touched.TryGetValue(index, out var entry) ? entry : new ArrayEntry(index, baseValue[index]));
     }
 
     private void ReplaceRange(int index, int remove, IReadOnlyList<JsonValue> inserted)
     {
         if (remove == 0 && inserted.Count == 0) return;
-        EnsureEntries();
-        for (var offset = 0; offset < remove; offset++) Entries![index + offset].Removed = true;
-        Entries!.RemoveRange(index, remove);
-        Entries.InsertRange(index, inserted.Select(value => new ArrayEntry(-1, value)));
+        if (Entries is null && (pieces?.Count ?? 0) < MaxPieces) SplicePieces(index, remove, inserted);
+        else
+        {
+            EnsureEntries();
+            for (var offset = 0; offset < remove; offset++) Entries![index + offset].Removed = true;
+            Entries!.RemoveRange(index, remove);
+            Entries.InsertRange(index, inserted.Select(value => new ArrayEntry(-1, value)));
+        }
         Reordered();
+    }
+
+    // replacePieceRange: cut the pieces at both ends of the removed range, mark what it covered removed, and put the inserted entries
+    // there, joined to an adjacent run of inserted entries (an append extends the last run).
+    private void SplicePieces(int index, int remove, IReadOnlyList<JsonValue> values)
+    {
+        if (pieces is null)
+        {
+            pieces = baseValue.Count == 0 ? [] : [ArrayPiece.Base(0, baseValue.Count)];
+            pieceLength = baseValue.Count;
+        }
+        var first = Cut(index);
+        var end = remove == 0 ? first : Cut(index + remove);
+        for (var at = first; at < end; at++) MarkRemoved(pieces[at]);
+        pieces.RemoveRange(first, end - first);
+        pieceLength -= remove;
+        if (values.Count == 0) return;
+        var entries = new ArrayEntry[values.Count];
+        for (var offset = 0; offset < entries.Length; offset++) entries[offset] = new ArrayEntry(-1, values[offset]);
+        if (first > 0 && pieces[first - 1].Inserted is { } left) left.AddRange(entries);
+        else if (first < pieces.Count && pieces[first].Inserted is { } right) right.InsertRange(0, entries);
+        else pieces.Insert(first, ArrayPiece.Insert([.. entries]));
+        pieceLength += entries.Length;
+    }
+
+    // The index of the piece that starts at position, splitting the piece that spans it.
+    private int Cut(int position)
+    {
+        var list = pieces!;
+        for (var at = 0; at < list.Count; at++)
+        {
+            if (position == 0) return at;
+            var count = list[at].Count;
+            if (position < count)
+            {
+                list.Insert(at + 1, list[at].SplitAt(position));
+                return at + 1;
+            }
+            position -= count;
+        }
+        return list.Count;
+    }
+
+    private void MarkRemoved(ArrayPiece piece)
+    {
+        if (piece.Inserted is { } inserted)
+        {
+            foreach (var entry in inserted) entry.Removed = true;
+            return;
+        }
+        if (touched is null) return;
+        if (touched.Count <= piece.Length)
+        {
+            foreach (var (origin, entry) in touched)
+                if (origin >= piece.Start && origin < piece.Start + piece.Length) entry.Removed = true;
+        }
+        else
+        {
+            for (var origin = piece.Start; origin < piece.Start + piece.Length; origin++)
+                if (touched.TryGetValue(origin, out var entry)) entry.Removed = true;
+        }
     }
 
     private void Reordered()
     {
         Structural = true;
         positions = null;
+        baseRanges = null;
         MarkDirty();
     }
 
@@ -625,6 +774,7 @@ public sealed class DraftArray : Draft
     // entries in base order with base references is the base itself.
     private protected override JsonValue Materialize()
     {
+        if (pieces is not null) return MaterializePieces();
         if (Entries is null)
         {
             if (touched is null) return baseValue;
@@ -650,11 +800,80 @@ public sealed class DraftArray : Draft
         return changed ? new JsonArrayValue(items.MoveToImmutable()) : baseValue;
     }
 
+    // The pieces in one copy: base ranges as spans of the base, inserted runs, then the overridden base entries still present.
+    private JsonValue MaterializePieces()
+    {
+        var builder = ImmutableArray.CreateBuilder<JsonValue>(pieceLength);
+        var changed = pieceLength != baseValue.Count;
+        foreach (var piece in pieces!)
+        {
+            if (piece.Inserted is { } inserted)
+            {
+                changed = true;
+                foreach (var entry in inserted) builder.Add(Slot(entry));
+                continue;
+            }
+            if (piece.Start != builder.Count) changed = true;
+            builder.AddRange(baseValue.Items.AsSpan(piece.Start, piece.Length));
+        }
+        if (touched is not null)
+        {
+            foreach (var (origin, entry) in touched)
+            {
+                if (entry.Removed) continue;
+                var value = Slot(entry);
+                if (ReferenceEquals(value, baseValue[origin])) continue;
+                builder[IndexOf(entry)] = value;
+                changed = true;
+            }
+        }
+        return changed ? new JsonArrayValue(builder.MoveToImmutable()) : baseValue;
+    }
+
     private JsonValue Slot(ArrayEntry entry)
     {
         var value = SlotCurrent(entry);
         if (entry.Origin >= 0 && entry.Overridden && JsonIdentity.Same(baseValue[entry.Origin], value)) return baseValue[entry.Origin];
         return value;
+    }
+}
+
+/// <summary>
+/// One piece of an array draft's piece table (upstream <c>BasePiece</c>/<c>InsertPiece</c>, always step 1 here: a piece that would run
+/// backwards flattens the draft into entries): a range of base elements in base order, or a run of inserted entries.
+/// </summary>
+internal sealed class ArrayPiece
+{
+    private ArrayPiece(int start, int length, List<ArrayEntry>? inserted)
+    {
+        Start = start; Length = length; Inserted = inserted;
+    }
+
+    /// <summary>A base piece's first base index.</summary>
+    public int Start { get; }
+    /// <summary>A base piece's element count.</summary>
+    public int Length { get; private set; }
+    /// <summary>An insert piece's entries; null for a base piece.</summary>
+    public List<ArrayEntry>? Inserted { get; }
+    /// <summary>The piece's element count.</summary>
+    public int Count => Inserted?.Count ?? Length;
+
+    public static ArrayPiece Base(int start, int length) => new(start, length, null);
+
+    public static ArrayPiece Insert(List<ArrayEntry> entries) => new(0, 0, entries);
+
+    /// <summary>Keeps the first <paramref name="offset"/> elements and returns the rest as a new piece.</summary>
+    public ArrayPiece SplitAt(int offset)
+    {
+        if (Inserted is { } inserted)
+        {
+            var rest = inserted.GetRange(offset, inserted.Count - offset);
+            inserted.RemoveRange(offset, inserted.Count - offset);
+            return Insert(rest);
+        }
+        var tail = Base(Start + offset, Length - offset);
+        Length = offset;
+        return tail;
     }
 }
 

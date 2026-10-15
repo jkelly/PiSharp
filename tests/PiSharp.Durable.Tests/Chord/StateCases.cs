@@ -1,15 +1,18 @@
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/test/state.test.ts, state-delivery.test.ts, state-value.test.ts,
-// state-draft.test.ts, state-diff.test.ts and state-fuzz.test.ts. Adaptations, each repeated where it applies:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/test/replicated-state.test.ts, replicated-state-delivery.test.ts,
+// state-value.test.ts, state-draft.test.ts, state-diff.test.ts and state-fuzz.test.ts (v1.2.0 moved the transactional replicated state
+// cases out of state.test.ts, which now tests the excluded host runtime's cells, and dropped the exact source listeners and the service
+// replica they covered). Adaptations, each repeated where it applies:
 // - Drafts are the explicit draft API (decision 0005, as in TrackerCases.cs): property assignment is Set, delete is Delete, a nested
 //   draft is GetObject/GetArray, push/unshift/pop/shift are Add/Insert/RemoveAt, fill/copyWithin are expressed with Set, and JS
 //   TypeError/Error are InvalidOperationException with upstream's message words.
 // - Promise deferreds are TaskCompletionSource barriers; subscription continuations run synchronously when a task completes, so the
 //   state upstream reaches after `await` / vi.waitFor is asserted right after SetResult/SetException, with no sleeps.
 // - Object.isFrozen checks are dropped: JsonValue trees are immutable, never frozen copies. toBe is ReferenceEquals.
-// - getReplicatedStateInternals(state) is ReplicatedStateInternals.Get<JsonValue>(state).
+// - The default error reporter (reportErrorAsync, whose queueMicrotask upstream mocks to capture reports) is the
+//   ReplicatedState.UnhandledError event, raised synchronously.
 internal static partial class Program
 {
     private static readonly DurableContext Bg = DurableContext.Background;
@@ -17,7 +20,25 @@ internal static partial class Program
     private static JsonValue V(int value) => JsonValue.Object(KeyValuePair.Create("value", (JsonValue)JsonValue.Number(value)));
     private static int ValueOf(JsonValue value) => (int)((JsonNumberValue)At(value, "value")).Value;
     private static IReadOnlyList<Op> SetValue(int value) => [new SetOp(DeltaPath.Of("value"), JsonValue.Number(value))];
-    private static IReplicatedStateInternals<JsonValue>? Internals(object state) => ReplicatedStateInternals.Get<JsonValue>(state);
+    // The update sequences a synchronous subscriber sees: every publication, in order (it never has pending deliveries to overflow).
+    private static List<long> Updates(IReplicatedState<JsonValue> state)
+    {
+        var updates = new List<long>();
+        state.Subscribe((_, _, delivery) =>
+        {
+            if (delivery.Kind == ReplicatedStateDeliveryKind.Update) lock (updates) updates.Add(delivery.Sequence);
+        });
+        return updates;
+    }
+
+    private static void WithUnhandledReports(Action<List<Exception>> body)
+    {
+        var reports = new List<Exception>();
+        Action<Exception> handler = error => { lock (reports) reports.Add(error); };
+        ReplicatedState.UnhandledError += handler;
+        try { body(reports); }
+        finally { ReplicatedState.UnhandledError -= handler; }
+    }
     private static void Seq<T>(IEnumerable<T> expected, IEnumerable<T> actual, string what) =>
         Check(expected.SequenceEqual(actual), $"{what}: expected [{string.Join(", ", expected)}], actual [{string.Join(", ", actual)}]");
 
@@ -87,38 +108,38 @@ internal static partial class Program
         Case("chord.state.queues-listener-triggered-changes-in-sequence-order", () =>
         {
             var state = ReplicatedState.Create(V(0));
-            var sourceSequences = new List<long>();
             var deliveries = new List<(int Value, long Sequence)>();
             var lateDeliveries = new List<ReplicatedStateDelivery>();
             var nested = false;
-            Internals(state)!.SubscribeSource((_, _, _) =>
+            state.Subscribe((_, _, delivery) =>
             {
-                if (nested) return;
+                if (delivery.Kind != ReplicatedStateDeliveryKind.Update || nested) return;
                 nested = true;
                 state.Change(Bg, draft => draft.AsObject().Set("value", 2));
-                state.Subscribe((_, _, delivery) => lateDeliveries.Add(delivery));
+                state.Subscribe((_, _, late) => lateDeliveries.Add(late));
             });
-            Internals(state)!.SubscribeSource((_, sequence, _) => sourceSequences.Add(sequence));
             state.Subscribe((value, _, delivery) =>
             {
                 if (delivery.Kind == ReplicatedStateDeliveryKind.Update) deliveries.Add((ValueOf(value), delivery.Sequence));
             });
             state.Change(Bg, draft => draft.AsObject().Set("value", 1));
-            Seq([1L, 2L], sourceSequences, "source sequences");
             Seq([(1, 1L), (2, 2L)], deliveries, "deliveries");
             Seq([ReplicatedStateDelivery.Hydrate(2)], lateDeliveries, "late deliveries");
         }),
-        Case("chord.state.isolates-listener-failures-after-committing-the-revision", () =>
+        Case("chord.state.isolates-listener-failures-after-committing-the-revision", () => WithUnhandledReports(reports =>
         {
             var state = ReplicatedState.Create(V(0));
             var received = new List<long>();
-            Internals(state)!.SubscribeSource((_, _, _) => throw new InvalidOperationException("listener failed"));
-            Internals(state)!.SubscribeSource((_, sequence, _) => received.Add(sequence));
-            Equal("listener failed", Throws<InvalidOperationException>(() => state.Change(Bg, draft => draft.AsObject().Set("value", 1)),
-                "change throws").Message, "message");
+            state.Subscribe((_, _, delivery) =>
+            {
+                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) throw new InvalidOperationException("listener failed");
+            });
+            state.Subscribe((_, _, delivery) => received.Add(delivery.Sequence));
+            state.Change(Bg, draft => draft.AsObject().Set("value", 1));
             Same("{\"value\":1}", state.Value, "committed");
-            Seq([1L], received, "received");
-        }),
+            Seq([0L, 1L], received, "received");
+            Check(reports is [InvalidOperationException { Message: "listener failed" }], "one report of the failure");
+        })),
         // Adapted: the placed value is immutable, so it cannot change and two placements need no copies; the draft's edit of one slot
         // copies that slot only (left is a new object, right keeps the placed reference).
         Case("chord.state.copies-assigned-values-by-value", () =>
@@ -148,53 +169,6 @@ internal static partial class Program
             state.Change(Bg, draft => draft.AsObject().GetObject("left").Set("value", 9));
             Same("{\"left\":{\"value\":9},\"right\":{\"value\":1}}", state.Value, "value");
         }),
-        Case("chord.state.preserves-compact-string-splice-and-permutation-operations", () =>
-        {
-            var (a, b, c) = (J("{\"id\":\"a\"}"), J("{\"id\":\"b\"}"), J("{\"id\":\"c\"}"));
-            var state = ReplicatedState.Create(Obj(("text", "abcdefgh"), ("values", JsonValue.Array(a, b, c))));
-            var batches = new List<JsonValue>();
-            Internals(state)!.SubscribeSource((operations, _, _) => batches.Add(OpsJson(operations)));
-            state.Change(Bg, draft =>
-            {
-                draft.AsObject().Set("text", "defghxyz");
-                draft.AsObject().GetArray("values").RemoveAt(0);
-            });
-            state.Change(Bg, draft => draft.AsObject().GetArray("values").Reverse());
-            Same("[[[\"t\",[\"text\"],3],[\"a\",[\"text\"],\"xyz\"],[\"p\",[\"values\"],0,1,[]]],[[\"m\",[\"values\"],[1,0]]]]",
-                JsonValue.Array(batches), "batches");
-        }),
-        Case("chord.state.validates-replica-revisions-without-freezing-shared-immutable-payloads", () =>
-        {
-            var replica = new ReplicatedStateReplica(_ => { });
-            var initial = J("{\"rows\":[{\"value\":1}]}");
-            replica.Hydrate(0, [new ReplaceOp(initial)], Bg);
-            Check(ReferenceEquals(initial, replica.Value), "hydrated value is the snapshot payload");
-
-            var inserted = J("{\"value\":2}");
-            replica.Update(1, [new SpliceOp(DeltaPath.Of("rows"), 1, 0, [inserted])], Bg);
-            Check(!ReferenceEquals(initial, replica.Value), "new root");
-            Same("[{\"value\":1},{\"value\":2}]", At(replica.Value!, "rows"), "rows");
-            Check(ReferenceEquals(At(initial, "rows", 0), At(replica.Value!, "rows", 0)), "retained row shared");
-            Check(ReferenceEquals(inserted, At(replica.Value!, "rows", 1)), "inserted payload shared");
-            Equal(1, ((JsonArrayValue)At(initial, "rows")).Count, "initial unchanged");
-        }),
-        // Adapted: NaN cannot be represented (JsonValue.Number rejects it, chord.json.strict-json-only), so the invalid adopted update
-        // is one whose path does not resolve; the before-hydration and malformed-permutation halves are verbatim.
-        Case("chord.state.clears-a-replica-when-an-adopted-update-is-invalid", () =>
-        {
-            var errors = new List<Exception>();
-            var replica = new ReplicatedStateReplica(errors.Add);
-            replica.Hydrate(0, [new ReplaceOp(V(0))], Bg);
-            Throws<PathError>(() => replica.Update(1, Ops("[[\"s\",[\"missing\",\"value\"],1]]"), Bg), "invalid update");
-            Check(replica.Value is null, "cleared");
-            Check(Throws<InvalidOperationException>(() => replica.Update(2, SetValue(2), Bg), "update after clear").Message.Contains("before hydration"), "message");
-
-            var malformed = new ReplicatedStateReplica(errors.Add);
-            malformed.Hydrate(0, [new ReplaceOp(J("{\"values\":[1,2]}"))], Bg);
-            Throws<PathError>(() => malformed.Update(1, [new MoveOp(DeltaPath.Of("values"), [0])], Bg), "malformed permutation");
-            Check(malformed.Value is null, "malformed cleared");
-            Equal(0, errors.Count, "nothing reported");
-        }),
         Case("chord.state.replaces-atomically-and-ignores-deeply-equal-replacements", () =>
         {
             var state = ReplicatedState.Create(J("{\"value\":{\"nested\":1},\"retained\":{\"nested\":2}}"));
@@ -222,8 +196,6 @@ internal static partial class Program
             state.Subscribe((value, _, delivery) => deliveries.Add((value, delivery.Sequence)));
             Check(ReferenceEquals(second, state.Value), "value is the last buffered frame");
             Check(deliveries is [{ Sequence: 2 } only] && ReferenceEquals(only.Value, second), "one hydration at sequence 2");
-            var snapshot = Internals(state)!.Snapshot();
-            Check(ReferenceEquals(second, snapshot.Value) && snapshot.Sequence == 2, "snapshot");
         }),
         Case("chord.state.source.hydrates-at-sequence-zero-when-attaching-after-existing-commits", () =>
         {
@@ -236,14 +208,13 @@ internal static partial class Program
             Check(ReferenceEquals(current, state.Value), "value");
             Seq([0L], deliveries, "deliveries");
         }),
-        Case("chord.state.source.publishes-exact-source-value-and-operation-references-without-applying-or-re-diffing", () =>
+        Case("chord.state.source.publishes-exact-source-values-without-applying-or-re-diffing", () =>
         {
             var source = new TestSource<JsonValue>(V(0));
             var state = ReplicatedState.Attach(source);
             var next = V(1);
-            var ops = SetValue(1);
-            IReadOnlyList<Op>? publishedOps = null;
-            Internals(state)!.SubscribeSource((received, _, _) => publishedOps = received);
+            // Deliberately not the operation that produces next: Chord must publish the source value as is.
+            var ops = SetValue(7);
             JsonValue? publishedValue = null;
             state.Subscribe((value, _, delivery) =>
             {
@@ -252,7 +223,6 @@ internal static partial class Program
             source.Commit(next, ops);
             Check(ReferenceEquals(next, state.Value), "value reference");
             Check(ReferenceEquals(next, publishedValue), "published value reference");
-            Check(ReferenceEquals(ops, publishedOps), "published ops reference");
         }),
         Case("chord.state.source.buffers-reentrant-frames-and-skips-updates-covered-by-a-late-hydration", () =>
         {
@@ -261,12 +231,12 @@ internal static partial class Program
             var received = new List<int>();
             var late = new List<(ReplicatedStateDelivery Delivery, int Value)>();
             var nested = false;
-            Internals(state)!.SubscribeSource((_, sequence, _) =>
+            state.Subscribe((_, _, delivery) =>
             {
-                if (sequence != 1 || nested) return;
+                if (delivery.Kind != ReplicatedStateDeliveryKind.Update || delivery.Sequence != 1 || nested) return;
                 nested = true;
                 source.Commit(V(2), SetValue(2));
-                state.Subscribe((value, _, delivery) => late.Add((delivery, ValueOf(value))));
+                state.Subscribe((value, _, lateDelivery) => late.Add((lateDelivery, ValueOf(value))));
             });
             state.Subscribe((value, _, delivery) =>
             {
@@ -327,7 +297,7 @@ internal static partial class Program
             Equal(0, source.Attachments.Count, "none left");
         }),
 
-        // state-delivery.test.ts: standalone cases
+        // replicated-state-delivery.test.ts: standalone case
         // Adapted: queueMicrotask is mocked upstream to capture the default report; here the default report is the
         // ReplicatedState.UnhandledError event, raised synchronously.
         Case("chord.state.delivery.mutable-state-reports-rejected-callbacks-through-its-default-error-reporter", () =>
@@ -354,47 +324,13 @@ internal static partial class Program
                 ReplicatedState.UnhandledError -= handler;
             }
         }),
-        Case("chord.state.delivery.replica-disconnect-drops-obsolete-pending-work-but-waits-for-the-running-callback-before-rehydration", () =>
-        {
-            var replica = new ReplicatedStateReplica(_ => { });
-            var gate = new TaskCompletionSource();
-            var received = new List<ReplicatedStateDelivery>();
-            replica.Subscribe((_, _, delivery) =>
-            {
-                received.Add(delivery);
-                return delivery.Sequence == 0 ? gate.Task : Task.CompletedTask;
-            });
-            replica.Hydrate(0, [new ReplaceOp(V(0))], Bg);
-            replica.Update(1, SetValue(1), Bg);
-            replica.Clear();
-            replica.Hydrate(50, [new ReplaceOp(V(50))], Bg);
-            replica.Update(51, SetValue(51), Bg);
-            Seq([ReplicatedStateDelivery.Hydrate(0)], received, "before release");
-            gate.SetResult();
-            Seq([ReplicatedStateDelivery.Hydrate(0), ReplicatedStateDelivery.Hydrate(50), ReplicatedStateDelivery.Update(51)], received, "after release");
-        }),
-        Case("chord.state.delivery.cold-replicas-hydrate-all-listeners-before-their-reentrant-updates", () =>
-        {
-            var replica = new ReplicatedStateReplica(_ => { });
-            var second = new List<ReplicatedStateDelivery>();
-            replica.Subscribe((_, _, delivery) =>
-            {
-                if (delivery.Kind == ReplicatedStateDeliveryKind.Hydrate) replica.Update(1, SetValue(1), Bg);
-            });
-            replica.Subscribe((_, _, delivery) => second.Add(delivery));
-            replica.Hydrate(0, [new ReplaceOp(V(0))], Bg);
-            Seq([ReplicatedStateDelivery.Hydrate(0), ReplicatedStateDelivery.Update(1)], second, "second listener");
-        }),
-
-        // Native: the concurrency model. Commits from several threads are delivered to exact listeners in sequence order and to one
-        // subscription without overlapping callbacks, in increasing sequence, ending with the newest revision.
+        // Native: the concurrency model. Commits from several threads are delivered to a synchronous subscription in sequence order and to
+        // an asynchronous one without overlapping callbacks, in increasing sequence, ending with the newest revision.
         Case("chord.state.native.concurrent-commits-deliver-serially-in-sequence-order", async () =>
         {
             const int threads = 4, perThread = 200, total = threads * perThread;
             var state = ReplicatedState.Create(J("{}"));
-            var exact = new List<long>();
-            var exactGate = new object();
-            Internals(state)!.SubscribeSource((_, sequence, _) => { lock (exactGate) exact.Add(sequence); });
+            var exact = Updates(state);
             var delivered = new List<long>();
             var active = 0;
             var overlapped = false;
@@ -414,7 +350,7 @@ internal static partial class Program
             })));
             await last.Task;
             Equal(total, ((JsonObjectValue)state.Value).Count, "every commit applied");
-            lock (exactGate) Seq(Enumerable.Range(1, total).Select(sequence => (long)sequence), exact, "exact listeners see every sequence in order");
+            lock (exact) Seq(Enumerable.Range(1, total).Select(sequence => (long)sequence), exact, "a synchronous subscriber sees every sequence in order");
             Check(!overlapped, "callbacks of one subscription never overlap");
             Check(delivered[0] == 0 && delivered.Zip(delivered.Skip(1)).All(pair => pair.First < pair.Second), "deliveries increase");
         }),
@@ -422,8 +358,7 @@ internal static partial class Program
         Case("chord.state.native.a-concurrent-change-waits-for-the-running-mutation", async () =>
         {
             var state = ReplicatedState.Create(J("{\"a\":0}"));
-            var sequences = new List<long>();
-            Internals(state)!.SubscribeSource((_, sequence, _) => { lock (sequences) sequences.Add(sequence); });
+            var sequences = Updates(state);
             using var entered = new ManualResetEventSlim();
             using var otherStarted = new ManualResetEventSlim();
             JsonValue? seen = null;
@@ -454,6 +389,7 @@ internal static partial class Program
         {
             var state = ReplicatedState.Create(V(0));
             var previous = state.Value;
+            var updates = Updates(state);
             var ran = 0;
             var asyncLambda = Throws<InvalidOperationException>(() => state.Change(Bg, async draft =>
             {
@@ -474,34 +410,59 @@ internal static partial class Program
                 return Task.FromException(new InvalidOperationException("observed"));
             }), "returned faulted task");
             Check(ReferenceEquals(previous, state.Value), "nothing committed");
-            Equal(0L, Internals(state)!.Snapshot().Sequence, "nothing published");
+            Equal(0, updates.Count, "nothing published");
             state.Change(Bg, draft => draft.AsObject().Delete("missing"));
-            Equal(0L, Internals(state)!.Snapshot().Sequence, "a non-awaitable return value is ignored");
+            Equal(0, updates.Count, "a non-awaitable return value is ignored");
         }),
-        // Native: upstream's replace goes through the tracker's prepareReplace, which publishes the root replacement itself (no diff), and
-        // a no-op change or replacement publishes nothing and keeps the current value.
+        // Native: upstream's replace goes through the tracker's prepareReplace, which adopts the root replacement itself (no diff), and a
+        // no-op change or replacement publishes nothing and keeps the current value.
         Case("chord.state.native.replace-publishes-the-root-and-no-ops-publish-nothing", () =>
         {
             var state = ReplicatedState.Create(J("{\"value\":0,\"nested\":{\"value\":1}}"));
             var previous = state.Value;
-            var batches = new List<IReadOnlyList<Op>>();
-            Internals(state)!.SubscribeSource((operations, _, _) => batches.Add(operations));
+            var published = new List<(JsonValue Value, long Sequence)>();
+            state.Subscribe((value, _, delivery) =>
+            {
+                if (delivery.Kind == ReplicatedStateDeliveryKind.Update) published.Add((value, delivery.Sequence));
+            });
             state.Change(Bg, draft => draft.AsObject().Set("value", 0));
             state.Change(Bg, draft => draft.AsObject().GetObject("nested").Set("value", 1));
             state.Replace(Bg, J("{\"value\":0,\"nested\":{\"value\":1}}"));
             Check(ReferenceEquals(previous, state.Value), "no-ops keep the value");
-            Equal(0, batches.Count, "no-ops publish nothing");
+            Equal(0, published.Count, "no-ops publish nothing");
             var replacement = J("{\"value\":1,\"nested\":{\"value\":1}}");
             state.Replace(Bg, replacement);
             Check(ReferenceEquals(replacement, state.Value), "replacement adopted");
-            Check(batches is [[ReplaceOp { Value: var root }]] && ReferenceEquals(root, replacement), "published [[\"r\", value]]");
-            Equal(1L, Internals(state)!.Snapshot().Sequence, "one publication");
+            Check(published is [{ Sequence: 1 } only] && ReferenceEquals(only.Value, replacement), "one publication of the replacement root");
+        }),
+        // Native: v1.2.0 publishes no operations, so the compact operations the dropped state-level case checked through the exact
+        // listeners are checked on the tracker a change prepares through (MutableReplicatedState.Change is tracker.BeginChange, Prepare
+        // and Adopt).
+        Case("chord.state.native.changes-prepare-compact-string-splice-and-permutation-operations", () =>
+        {
+            var (a, b, c) = (J("{\"id\":\"a\"}"), J("{\"id\":\"b\"}"), J("{\"id\":\"c\"}"));
+            var tracker = Tracker.Track(Obj(("text", "abcdefgh"), ("values", JsonValue.Array(a, b, c))));
+            var batches = new List<JsonValue>();
+            void Change(Action<DraftObject> mutate)
+            {
+                var change = tracker.BeginChange();
+                mutate(change.State.AsObject());
+                var prepared = change.Prepare();
+                tracker.Adopt(prepared);
+                batches.Add(OpsJson(prepared.Ops));
+            }
+            Change(draft =>
+            {
+                draft.Set("text", "defghxyz");
+                draft.GetArray("values").RemoveAt(0);
+            });
+            Change(draft => draft.GetArray("values").Reverse());
+            Same("[[[\"t\",[\"text\"],3],[\"a\",[\"text\"],\"xyz\"],[\"p\",[\"values\"],0,1,[]]],[[\"m\",[\"values\"],[1,0]]]]",
+                JsonValue.Array(batches), "batches");
         }),
         .. StateDeliveryCases(StateKind.Mutable),
         .. StateDeliveryCases(StateKind.Attached),
-        .. StateDeliveryCases(StateKind.Replica),
         .. StateListenerErrorCases(StateKind.Attached),
-        .. StateListenerErrorCases(StateKind.Replica),
     ];
 
     private static IEnumerable<(string, Func<Task>)> ChordApplyTrustedCases() =>
@@ -857,7 +818,7 @@ internal static partial class Program
         Visit(root, "$root");
     }
 
-    private enum StateKind { Mutable, Attached, Replica }
+    private enum StateKind { Mutable, Attached }
 
     private sealed record StateFixture(IReplicatedState<JsonValue> State, Action<JsonValue, DurableContext> Publish);
 
@@ -871,35 +832,27 @@ internal static partial class Program
                 var mutable = ReplicatedState.Create(V(0));
                 return new StateFixture(mutable, (value, context) => mutable.Replace(context, value));
             }
-            case StateKind.Attached:
+            default:
             {
                 Action<ReplicatedStateSourceFrame<JsonValue>>? receive = null;
                 var state = ReplicatedState.Attach(new DelegateSource<JsonValue>(new ReplicatedStateSnapshot<JsonValue>(V(0), 0), listener => receive = listener),
                     new ReplicatedStateSourceOptions { OnError = onError });
                 return new StateFixture(state, (value, context) => receive!(new ReplicatedStateSourceFrame<JsonValue>(ValueOf(value), value, SetValue(ValueOf(value)), context)));
             }
-            default:
-            {
-                var replica = new ReplicatedStateReplica(onError);
-                replica.Hydrate(0, [new ReplaceOp(V(0))], Bg);
-                return new StateFixture(replica, (value, context) => replica.Update(ValueOf(value), SetValue(ValueOf(value)), context));
-            }
         }
     }
 
-    // state-delivery.test.ts: describe.each(["mutable", "attached", "replica"]) public delivery
+    // replicated-state-delivery.test.ts: describe.each(["mutable", "attached"]) public delivery
     private static IEnumerable<(string, Func<Task>)> StateDeliveryCases(StateKind kind)
     {
         var prefix = "chord.state.delivery." + kind.ToString().ToLowerInvariant() + ".";
-        yield return Case(prefix + "awaits-hydration-and-each-update-independently-of-other-subscribers-and-exact-listeners", async () =>
+        yield return Case(prefix + "awaits-hydration-and-each-update-independently-of-other-subscribers", async () =>
         {
             var (state, publish) = Fixture(kind);
             var hydration = new TaskCompletionSource();
             var update = new TaskCompletionSource();
             var events = new List<string>();
-            var exact = new List<long>();
             var fast = new List<int>();
-            Internals(state)?.SubscribeSource((_, sequence, _) => exact.Add(sequence));
             state.Subscribe(async (value, _, _) =>
             {
                 events.Add($"start:{ValueOf(value)}");
@@ -913,7 +866,6 @@ internal static partial class Program
             Seq(["start:0"], events, "events");
             Seq([0, 1, 2], fast, "fast");
             Same("{\"value\":2}", state.Value!, "value");
-            if (kind != StateKind.Replica) Seq([1L, 2L], exact, "exact");
             hydration.SetResult();
             Seq(["start:0", "end:0", "start:1"], events, "after hydration");
             update.SetResult();
@@ -922,13 +874,11 @@ internal static partial class Program
         });
         foreach (var count in new[] { 100, 101, 102, 201, 202 })
         {
-            yield return Case(prefix + $"bounds-{count}-pending-deliveries-without-changing-exact-publication", () =>
+            yield return Case(prefix + $"bounds-{count}-pending-deliveries", () =>
             {
                 var (state, publish) = Fixture(kind);
                 var hydration = new TaskCompletionSource();
                 var received = new List<int>();
-                var exact = new List<long>();
-                Internals(state)?.SubscribeSource((_, sequence, _) => exact.Add(sequence));
                 state.Subscribe((value, _, _) =>
                 {
                     received.Add(ValueOf(value));
@@ -936,7 +886,6 @@ internal static partial class Program
                 });
                 for (var value = 1; value <= count; value += 1) publish(V(value), Bg);
                 Seq([0], received, "before release");
-                if (kind != StateKind.Replica) Seq(Enumerable.Range(1, count).Select(index => (long)index), exact, "exact");
                 hydration.SetResult();
                 var first = (count - 1) / 100 * 100 + 1;
                 Seq([0, .. Enumerable.Range(first, count - first + 1)], received, "after release");
@@ -1025,7 +974,7 @@ internal static partial class Program
         });
     }
 
-    // state-delivery.test.ts: describe.each(["attached", "replica"]) listener errors
+    // replicated-state-delivery.test.ts: describe("attached listener errors")
     private static IEnumerable<(string, Func<Task>)> StateListenerErrorCases(StateKind kind)
     {
         var prefix = "chord.state.delivery." + kind.ToString().ToLowerInvariant() + ".";
@@ -1089,7 +1038,7 @@ internal static partial class Program
         });
     }
 
-    /// <summary>state.test.ts TestSource: commits buffer per attachment until activation, then deliver synchronously.</summary>
+    /// <summary>replicated-state.test.ts TestSource: commits buffer per attachment until activation, then deliver synchronously.</summary>
     private sealed class TestSource<T>(T value, long cursor = 0) : IReplicatedStateSource<T>
     {
         private T value = value;

@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/test/json.test.ts, delta.test.ts and delta-apply-immutable.test.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/test/json.test.ts, delta.test.ts and delta-apply-immutable.test.ts
 // (the cases that do not need the tracker; tracker cases join with the draft API). JavaScript-only constructions (accessors, prototypes,
 // sparse arrays, typed arrays) cannot occur in immutable C# values; the cases keep the behaviour they guard.
 internal static partial class Program
@@ -269,6 +269,50 @@ internal static partial class Program
             var first = DeltaApply.Apply(input, operations); var second = DeltaApply.Apply(input, operations);
             Check(JsonValue.DeepEquals(first, second) && !ReferenceEquals(first, second) && !ReferenceEquals(At(first, "placed"), At(second, "placed")), "independent results");
             Same("{\"nested\":{\"value\":1}}", payload, "payload unchanged");
+        }),
+        // Adapted: freezeDeep is unnecessary (values are immutable), and fractional indices (["list", 1.5]) cannot be written as C# path
+        // segments; the other invalid paths are upstream's.
+        Case("chord.apply-immutable.appends-to-an-array-not-yet-copied-in-one-copy-sharing-everything-else", () =>
+        {
+            var entries = JsonValue.Array(Enumerable.Range(0, 1_000).Select(index => (JsonValue)Obj(("index", index))));
+            var input = Obj(("log", Obj(("entries", entries), ("meta", Obj(("count", 1_000))))), ("other", Obj(("value", 1))));
+            var result = DeltaApply.Apply(input, Ops("[[\"p\",[\"log\",\"entries\"],1000,0,[{\"index\":1000}]],[\"p\",[\"log\",\"entries\"],1001,0,[{\"index\":1001}]]]"));
+            var appended = (JsonArrayValue)At(result, "log", "entries");
+            Equal(1_002, appended.Count, "length");
+            Same("[{\"index\":1000},{\"index\":1001}]", JsonValue.Array(appended.Items[^2..]), "appended items");
+            Equal(1_000, ((JsonArrayValue)At(input, "log", "entries")).Count, "base unchanged");
+            Check(ReferenceEquals(entries[0], appended[0]), "elements shared");
+            Check(ReferenceEquals(At(input, "log", "meta"), At(result, "log", "meta")), "sibling shared");
+            Check(ReferenceEquals(At(input, "other"), At(result, "other")), "other branch shared");
+            Check(!ReferenceEquals(At(input, "log"), At(result, "log")), "parent copied");
+
+            var rootArray = J("[1,2]");
+            Same("[1,2,3]", DeltaApply.Apply(rootArray, Ops("[[\"p\",[],2,0,[3]]]")), "root append");
+            Same("[1,2]", rootArray, "root unchanged");
+            // An appended item that is itself an array stays one element.
+            Same("[1,2,[3,4]]", DeltaApply.Apply(rootArray, Ops("[[\"p\",[],2,0,[[3,4]]]]")), "array item");
+            // Invalid paths fail with the general path's errors.
+            var document = J("{\"values\":[],\"list\":[[1]],\"text\":\"a\"}");
+            (string Op, Type Error)[] invalid =
+            [
+                ("[\"p\",[\"values\",\"missing\"],0,0,[]]", typeof(PathError)),
+                ("[\"p\",[\"missing\"],0,0,[]]", typeof(PathError)),
+                ("[\"p\",[\"values\",0],0,0,[]]", typeof(PathError)),
+                ("[\"p\",[\"__proto__\"],0,0,[]]", typeof(UnsafePathError)),
+                ("[\"p\",[\"list\",\"x\"],0,0,[]]", typeof(PathError)),
+                ("[\"p\",[\"text\"],0,0,[]]", typeof(PathError)),
+                ("[\"p\",[\"list\",-1],0,0,[]]", typeof(UnsafePathError)),
+                ("[\"p\",[\"list\",0,\"constructor\"],0,0,[]]", typeof(UnsafePathError)),
+            ];
+            foreach (var (op, error) in invalid)
+            {
+                Exception? thrown = null;
+                try { DeltaApply.Apply(document, [Op.FromJson(J(op))]); }
+                catch (Exception caught) { thrown = caught; }
+                Check(thrown?.GetType() == error, $"{op}: expected {error.Name}, got {thrown?.GetType().Name ?? "no error"}");
+            }
+            // An insert that is not at the end takes the general path.
+            Same("[1,9,2]", DeltaApply.Apply(rootArray, Ops("[[\"p\",[],1,0,[9]]]")), "middle insert");
         }),
         Case("chord.apply-immutable.wide-object-repeated-writes", () =>
         {

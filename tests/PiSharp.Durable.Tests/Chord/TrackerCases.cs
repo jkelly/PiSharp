@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/test/delta-tracker/tracker.test.ts, the tracker cases of
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/test/delta-tracker/tracker.test.ts, the tracker cases of
 // delta.test.ts and delta-apply-immutable.test.ts, and delta-clone.test.ts, adapted to the explicit draft API (decision 0005): property
 // assignment is Set, `+=` on a string is AppendString, push/unshift/pop/shift are Add/Insert/RemoveAt, fill/copyWithin are expressed with
 // Set, and JS TypeError/Error are InvalidOperationException with upstream's message words. Not ported: Promise thenable inspection,
@@ -647,6 +647,132 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> ChordTrackerArrayCases() =>
     [
+        // delta tracker piece arrays (v1.2.0): plans from the changed ranges when kept elements keep their order.
+        Case("chord.tracker.emits-one-insert-for-an-append-to-a-long-array", () =>
+        {
+            var tracker = Tracker.Track(Obj(("values", JsonValue.Array(Enumerable.Range(0, 10_000).Select(index => (JsonValue)index)))));
+            var change = tracker.BeginChange();
+            Root(change).GetArray("values").Add(-1);
+            var prepared = change.Prepare();
+            OpsAre("[[\"p\",[\"values\"],10000,0,[-1]]]", prepared);
+            tracker.Adopt(prepared);
+            var values = (JsonArrayValue)At(tracker.Value, "values");
+            Equal(-1d, Num(values[^1]), "appended");
+            Equal(10_001, values.Count, "length");
+        }),
+        Case("chord.tracker.emits-removals-from-the-end-backwards-then-inserts-when-kept-elements-keep-their-order", () =>
+        {
+            static void Edit(Draft draft)
+            {
+                var values = draft.AsObject().GetArray("values");
+                values.RemoveAt(0); // gap before the first kept element
+                values.Splice(1, 2, 20); // gap between kept elements, with an insert
+                values.Splice(5, 1); // another gap
+                values.RemoveAt(values.Count - 1); // gap after the last kept element
+                values.Add(30);
+            }
+            var tracker = Tracker.Track(J("{\"values\":[0,1,2,3,4,5,6,7,8,9]}"));
+            Same("{\"values\":[1,20,4,5,6,8,30]}", Settle(tracker, Edit), "values");
+            var change = Tracker.Track(J("{\"values\":[0,1,2,3,4,5,6,7,8,9]}")).BeginChange();
+            Edit(change.State);
+            OpsAre("[[\"p\",[\"values\"],9,1,[]],[\"p\",[\"values\"],7,1,[]],[\"p\",[\"values\"],2,2,[]],[\"p\",[\"values\"],0,1,[]]," +
+                "[\"p\",[\"values\"],1,0,[20]],[\"p\",[\"values\"],6,0,[30]]]", change.Prepare());
+        }),
+        // Adapted: upstream computes the expected order by running the same mutator on a plain array; here it is written out.
+        Case("chord.tracker.emits-a-permutation-when-kept-elements-change-order", () =>
+        {
+            (Action<DraftArray> Mutate, string Expected)[] mutators =
+            [
+                (values => values.Reverse(), "[4,3,2,1,0]"),
+                (values => values.Sort((left, right) => (Num(left) % 2).CompareTo(Num(right) % 2) is var parity and not 0 ? parity : Num(left).CompareTo(Num(right))),
+                    "[0,2,4,1,3]"),
+            ];
+            foreach (var (mutate, expected) in mutators)
+            {
+                var tracker = Tracker.Track(J("{\"values\":[0,1,2,3,4]}"));
+                var change = tracker.BeginChange();
+                mutate(Root(change).GetArray("values"));
+                var prepared = change.Prepare();
+                Check(prepared.Ops.Any(op => op is MoveOp), "permutation: " + OpsJson(prepared.Ops).ToJson());
+                Same("{\"values\":" + expected + "}", DeltaApply.Apply(tracker.Value, prepared.Ops), "replay");
+            }
+        }),
+        // Native: the piece table behind the ordered plan. An append to a long array leaves the draft a piece table (a base range and one
+        // inserted run), never a list of entries, and the prepared array is the base elements by reference plus the item.
+        Case("chord.tracker.native.an-append-keeps-the-piece-table-and-never-visits-base-elements", () =>
+        {
+            const int length = 100_000;
+            var tracker = Tracker.Track(Obj(("values", JsonValue.Array(Enumerable.Range(0, length).Select(index => (JsonValue)Obj(("index", index)))))));
+            var before = (JsonArrayValue)At(tracker.Value, "values");
+            for (var round = 0; round < 3; round++)
+            {
+                var change = tracker.BeginChange();
+                var values = Root(change).GetArray("values");
+                values.Add(Obj(("index", -1 - round)));
+                values.Add(Obj(("index", -10 - round)));
+                Check(values.Entries is null, "no entries for the base elements");
+                Check(values.Pieces is [{ Inserted: null, Start: 0 } basePiece, { Inserted.Count: 2 }] && basePiece.Length == length + round * 2,
+                    "one base range and one inserted run");
+                var prepared = change.Prepare();
+                OpsAre($"[[\"p\",[\"values\"],{length + round * 2},0,[{{\"index\":{-1 - round}}},{{\"index\":{-10 - round}}}]]]", prepared);
+                tracker.Adopt(prepared);
+            }
+            var after = (JsonArrayValue)At(tracker.Value, "values");
+            Equal(length + 6, after.Count, "length");
+            Check(ReferenceEquals(before[0], after[0]) && ReferenceEquals(before[length - 1], after[length - 1]), "base elements shared");
+        }),
+        // Native: the ordered plan (from the piece table) and the element walk (after the draft flattens) must emit the same operations.
+        // Reversing twice flattens a draft of two or more elements without changing the order, so each random edit sequence is replayed both
+        // ways, with element drafts, overrides and nested edits moving with their elements; long sequences also cross the piece table's size
+        // limit.
+        Case("chord.tracker.native.piece-table-and-flattened-drafts-emit-the-same-operations", () =>
+        {
+            var random = new Random(1_200);
+            for (var trial = 0; trial < 300; trial++)
+            {
+                var length = random.Next(0, 40);
+                var initial = Obj(("values", JsonValue.Array(Enumerable.Range(0, length).Select(index => (JsonValue)Obj(("id", index), ("n", 0))))));
+                var steps = random.Next(1, trial % 10 == 0 ? 200 : 12);
+                var seed = random.Next();
+                Prepared Run(bool flatten)
+                {
+                    var edits = new Random(seed);
+                    var change = Tracker.Track(initial).BeginChange();
+                    var values = Root(change).GetArray("values");
+                    if (flatten && length >= 2)
+                    {
+                        values.Reverse();
+                        values.Reverse();
+                    }
+                    for (var step = 0; step < steps; step++)
+                    {
+                        var count = values.Count;
+                        switch (edits.Next(6))
+                        {
+                            case 0: values.Add(Obj(("id", 1000 + step))); break;
+                            case 1: values.Insert(edits.Next(count + 1), Obj(("id", 2000 + step))); break;
+                            case 2: if (count > 0) values.RemoveAt(edits.Next(count)); break;
+                            case 3:
+                                if (count > 0)
+                                {
+                                    var start = edits.Next(count);
+                                    values.Splice(start, edits.Next(Math.Min(4, count - start) + 1), Obj(("id", 3000 + step)), Obj(("id", 4000 + step)));
+                                }
+                                break;
+                            case 4: if (count > 0) values.Set(edits.Next(count), Obj(("id", 5000 + step))); break;
+                            default: if (count > 0) values.GetObject(edits.Next(count)).Set("n", step + 1); break;
+                        }
+                    }
+                    if (flatten && length >= 2) Check(values.Entries is not null, "flattened");
+                    return change.Prepare();
+                }
+                var pieces = Run(flatten: false);
+                var flattened = Run(flatten: true);
+                Equal(OpsJson(flattened.Ops).ToJson(), OpsJson(pieces.Ops).ToJson(), $"trial {trial}: same operations");
+                Same(flattened.Value.ToJson(), pieces.Value, $"trial {trial}: same value");
+                Replays(pieces, $"trial {trial}");
+            }
+        }),
         Case("chord.tracker.sort-emits-a-detached-permutation", () =>
         {
             var tracker = Tracker.Track(J("{\"values\":[3,1,2]}"));

@@ -2,15 +2,16 @@
 
 Report only. These numbers are a snapshot of one machine; nothing in CI passes or fails on them. The `benchmarks.smoke` case in `tests/PiSharp.Durable.Tests` runs every benchmark at a tiny size so the ports keep working, and asserts completion only.
 
-PiSharp ports three upstream benchmarks of Pi v1.1.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
+PiSharp ports four upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
 
 | upstream | PiSharp | what it measures |
 |---|---|---|
 | `test/storage.bench.ts` (`npm run bench:storage`) | `StorageBench.cs` (`storage`) | read, write and reopen latency of memory, SQLite and JSONL storage |
 | `test/storage-memory.ts` (`npm run bench:storage:memory`) | `StorageMemory.cs` (`storage-memory`) | heap, RSS and disk footprint after the seed, one child process per backend and scale |
 | `test/tool-output-bench.ts` (`npm run bench:tool-output`) | `ToolOutputBench.cs` (`tool-output`) | the tool task, progress throttle and `pi.live` commits at low, normal and high output rates, the 1 GiB firehose and `cat` |
+| `test/document-append-bench.ts` (`npm run bench:document-append`, new in v1.2.0) | `DocumentAppendBench.cs` (`document-append [N,...]`) | one commit per appended item: one array in one document against one family member per item |
 
-Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
 
 ## Machine
 
@@ -187,6 +188,22 @@ Each cell is **upstream Node / PiSharp**, for each of upstream's 50 scenarios, e
 - **Replay after reopen is slower in PiSharp.** It takes 14 to 29 ms on SQLite and 55 to 91 ms on JSONL; Node takes 4 to 26 ms and 8 to 65 ms. Both are dominated by opening the storage in a fresh process.
 - **The firehose is about 3 times slower in PiSharp.** Pushing 1 GiB of unique lines through `api.output` takes 0.6 to 0.7 s; Node takes 0.17 to 0.28 s. It stays linear in the bytes pushed, which is upstream's requirement for the firehose: accepting a chunk must not cost work proportional to the retained window.
 - **The repetitive firehose is 3 to 14 times faster in PiSharp, with far fewer whole-window sets** (6 to 7 against Node's 27 to 102). Operation shape is not canonical (decision 0005), so this is allowed. The difference is in how often the tail window's overlap search falls back to a full set.
+
+## Document append (`document-append-bench.ts`)
+
+Chord v1.2.0 fixed appending to an array costing a walk over the whole array: the delta tracker plans inserts and removals that keep the remaining elements in order from the changed ranges alone, and `applyImmutable` builds an appended array in one copy instead of two. Upstream reports 32,000 one-item appends, one commit each, taking 1.4 s instead of 11.3 s. PiSharp ports both: an array draft stays a piece table while elements are only inserted or removed (`DraftArray.Pieces`), and `DeltaApply` has the `appendCopy` fast path. An append still costs one copy of the array for the next immutable value, so time per append grows with the array; the family stays flat.
+
+Measured on 2026-10-15, same machine, memory storage, one run each. Before is the branch at `5aa1b93` with the same benchmark.
+
+| appends | array, before | array, after | family, after |
+|---:|---:|---:|---:|
+| 1,000 | 88 ms | 58 ms | 21 ms |
+| 8,000 | 1.38 s | 0.20 s | 0.19 s |
+| 16,000 | 6.49 s | 1.29 s | 0.15 s |
+| 32,000 | 33.0 s | 5.22 s | 0.25 s |
+
+- **32,000 appends are about 6 times faster.** Before, every append made an entry for each element of the array, walked them to plan the operations and copied them into the next value.
+- **The remaining cost is the .NET runtime's large object heap, not the tracker.** Each revision of an array of more than about 10,600 elements is a new large object, and the background GC throttles large allocations while it runs. With `DOTNET_gcConcurrent=0`, 32,000 appends take 1.81 s after (27.4 s before), close to upstream's 1.4 s, and the microseconds per append grow in step with the array (15, 32 and 57 µs at 8,000, 16,000 and 32,000), the one copy per append.
 
 ## Throughput target
 

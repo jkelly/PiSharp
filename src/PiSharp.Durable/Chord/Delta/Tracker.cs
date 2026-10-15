@@ -1,8 +1,10 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/delta/tracker.ts (track, Tracker, Change, Prepared, lifecycle,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/delta/tracker.ts (track, Tracker, Change, Prepared, lifecycle,
 // operation emission). The lifecycle, its messages and the emitted operations follow upstream; the Proxy overlay is replaced by the
 // explicit drafts of Draft.cs. Emission walks only dirty drafts: objects emit s/d per key (a/t for strings that grew or rolled), arrays
 // emit removal splices, one permutation over retained base elements, insertion splices and per-element changes at final indices, dense
-// edit regions fold into one splice, reserved keys fold into the nearest safe ancestor, and more than 4,096 operations fold into r.
+// edit regions fold into one splice, reserved keys fold into the nearest safe ancestor, and more than 4,096 operations fold into r. An
+// array whose draft is still a piece table kept its base elements in order, so its plan comes from the pieces alone (orderedArrayPlan)
+// and an append to a long array costs no walk over it; a draft flattened into entries is planned by a walk over them (elementArrayPlan).
 using System.Collections.Immutable;
 
 namespace PiSharp.Durable.Chord.Delta;
@@ -393,7 +395,8 @@ internal sealed class DraftEmitter(ChangeContext context)
                 ops.Add(new SpliceOp(path, start, length, node.CurrentRange(start, length)));
             }
         }
-        if (node.Structural)
+        if (node.Pieces is { } pieces) EmitOrderedArrayPlan(node, path, pieces);
+        else if (node.Structural)
         {
             var entries = node.Entries!;
             var baseCount = node.Base.Count;
@@ -438,6 +441,49 @@ internal sealed class DraftEmitter(ChangeContext context)
             var index = node.IndexOf(entry);
             if (dense is not null && RegionContains(dense, index)) continue;
             EmitChanged(path.Add(index), node.Base[origin], node.SlotCurrent(entry));
+        }
+    }
+
+    // orderedArrayPlan: the retained base ranges ascend, so removals are the unretained runs from the end backwards (after the last range,
+    // between ranges, before the first) and there is no permutation; then one splice per run of consecutive insert pieces (insertRunsOf).
+    private void EmitOrderedArrayPlan(DraftArray node, ImmutableArray<PathSegment> path, IReadOnlyList<ArrayPiece> pieces)
+    {
+        var ranges = new List<int>();
+        foreach (var piece in pieces)
+        {
+            if (piece.Inserted is not null || piece.Length == 0) continue;
+            if (ranges.Count > 0 && piece.Start <= ranges[^1]) throw new InvalidOperationException("Array draft pieces lost their base order.");
+            ranges.Add(piece.Start);
+            ranges.Add(piece.Start + piece.Length - 1);
+        }
+        var end = node.Base.Count;
+        for (var index = ranges.Count - 2; index >= -2; index -= 2)
+        {
+            var start = index >= 0 ? ranges[index + 1] + 1 : 0;
+            if (end > start)
+            {
+                if (ops.Count > MaxDeltaOperations) return;
+                ops.Add(new SpliceOp(path, start, end - start, []));
+            }
+            if (index >= 0) end = ranges[index];
+        }
+        var logical = 0;
+        for (var at = 0; at < pieces.Count;)
+        {
+            if (pieces[at].Inserted is null)
+            {
+                logical += pieces[at++].Count;
+                continue;
+            }
+            var start = logical;
+            var items = ImmutableArray.CreateBuilder<JsonValue>();
+            for (; at < pieces.Count && pieces[at].Inserted is { } inserted; at++)
+            {
+                foreach (var entry in inserted) items.Add(node.SlotCurrent(entry));
+                logical += inserted.Count;
+            }
+            if (ops.Count > MaxDeltaOperations) return;
+            ops.Add(new SpliceOp(path, start, 0, items.ToImmutable()));
         }
     }
 

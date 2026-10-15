@@ -1,7 +1,9 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/services/state.ts (StateSubscriber, ReplicatedStatePublisher,
-// MutableReplicatedStateImpl, AttachedReplicatedStateImpl, attachReplicatedStateSource, ReplicatedStateReplica,
-// serviceDeliveryContext) and the replicatedState factory of packages/chord/src/api.ts. In process only: the wire codec
-// (state-codec.ts) and service RPC are not part of this file.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/state.ts (StateSubscriber, ReplicatedStatePublisher,
+// MutableReplicatedStateImpl, AttachedReplicatedStateImpl, attachReplicatedStateSource and the replicatedState factory). Replicated state
+// is in process only: an immutable JSON value with ordered, serialized change notifications. Upstream v1.2.0 moved it out of services/
+// (whose host runtime replaced facets and services and is excluded by decision 0005), dropped the exact source listeners the service
+// wire used (state-internals.ts) and the service-side ReplicatedStateReplica, and stopped publishing operation batches: a publication is
+// a value, a sequence and a context, and listener failures are reported, never thrown.
 //
 // Concurrency model. JavaScript runs all of this on one thread and relies on reentrancy guards; .NET callers may be on any thread, so
 // each guard becomes an ownership flag taken under a short lock that is never held while user code runs (the one exception is a local
@@ -13,8 +15,8 @@
 //   code, through the commit, and released before delivery. Another thread's change or replacement waits for it; the mutating thread's
 //   own nested change or replacement is rejected, as upstream rejects a reentrant one.
 // - Exactly one thread owns a state's publication loop at a time (upstream's #delivering). A commit made while the loop is owned, by
-//   a reentrant callback or by another thread, is queued and delivered by the owner in sequence order, and the committer returns
-//   without listener errors, as an upstream reentrant commit does. Exact (internal) listeners run on the owning thread, synchronously.
+//   a reentrant callback or by another thread, is queued and delivered by the owner in sequence order, as an upstream reentrant commit
+//   is.
 // - Exactly one thread runs a subscription's callbacks at a time (upstream's #running), so one subscription's callbacks never overlap
 //   and see frames in order. A callback runs on the thread that delivered its frame or on the thread that completed the previous
 //   callback's task: continuations run synchronously (ExecuteSynchronously), the deterministic stand-in for a promise's then. A task
@@ -25,7 +27,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using PiSharp.Durable.Chord.Delta;
 
 namespace PiSharp.Durable.Chord;
@@ -69,9 +70,6 @@ public static class ReplicatedState
         }
     }
 
-    /// <summary>Context for synthetic service deliveries without a caller (<c>serviceDeliveryContext</c>): hydrations.</summary>
-    internal static DurableContext ServiceDeliveryContext => DurableContext.Background;
-
     internal static void ReportUnhandled(Exception error)
     {
         var handlers = UnhandledError;
@@ -85,12 +83,6 @@ public static class ReplicatedState
             try { ((Action<Exception>)handler)(error); }
             catch (Exception) { /* a failing reporter must not break delivery */ }
         }
-    }
-
-    internal static void ThrowCollected(List<Exception> errors, string message)
-    {
-        if (errors.Count == 1) ExceptionDispatchInfo.Throw(errors[0]);
-        if (errors.Count > 1) throw new AggregateException(message, errors);
     }
 
     internal static Func<T, DurableContext, ReplicatedStateDelivery, Task?> Listener<T>(Action<T, DurableContext, ReplicatedStateDelivery> listener)
@@ -122,7 +114,7 @@ public static class ReplicatedState
 /// queued and delivered in sequence order by the delivery owner. A mutation must therefore not block on another thread that changes the
 /// same state.
 /// </remarks>
-public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IReplicatedStateInternals<JsonValue>
+public sealed class MutableReplicatedState : IReplicatedState<JsonValue>
 {
     private const string SynchronousOnly = "Replicated state change callbacks must be synchronous";
 
@@ -147,15 +139,15 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
     /// Atomically publishes one synchronous draft mutation (upstream <c>change(context, mutate)</c>). <paramref name="mutate"/> receives
     /// the root draft (an object or array draft, as the root is); every draft is revoked when it returns, so held handles throw. The
     /// change is prepared into its exact compact operations (string append/truncate, splices, permutations, sets and deletes) and the
-    /// adopted revision is published with them; untouched subtrees keep their references, and a change that leaves the value deeply equal
-    /// publishes nothing. Values placed through the draft are immutable, so a placement is a copy by value.
+    /// adopted revision is published; untouched subtrees keep their references, and a change that leaves the value deeply equal publishes
+    /// nothing. Values placed through the draft are immutable, so a placement is a copy by value.
     /// </summary>
     /// <remarks>
     /// If <paramref name="mutate"/> throws, the draft is aborted, nothing is published and the exception propagates. An <c>async</c>
     /// lambda or method is rejected before it runs (upstream rejects a callback returning a promise); changing or replacing this state
     /// from inside <paramref name="mutate"/> throws <see cref="InvalidOperationException"/> and, unless caught there, rolls the outer
-    /// change back. Once published, exact-listener failures are thrown: one as itself, several as an <see cref="AggregateException"/>; the
-    /// revision stays committed.
+    /// change back. Once committed, the revision is delivered to subscribers; their failures are reported to
+    /// <see cref="ReplicatedState.UnhandledError"/>, never thrown here.
     /// </remarks>
     public void Change(DurableContext context, Action<Draft> mutate)
     {
@@ -185,10 +177,9 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
 
     /// <summary>
     /// Atomically takes ownership of <paramref name="value"/> as the next revision (upstream <c>replace</c>, through the tracker's
-    /// <c>prepareReplace</c>): the new value is <paramref name="value"/> itself, published as <c>[["r", value]]</c>, exactly as upstream
-    /// publishes it (upstream does not diff a replacement). A deeply equal replacement keeps the current value and publishes nothing.
-    /// Throws <see cref="InvalidOperationException"/> when called from inside a change mutation. Listener failures as in
-    /// <see cref="Change(DurableContext, Action{Draft})"/>.
+    /// <c>prepareReplace</c>): the new value is <paramref name="value"/> itself (upstream does not diff a replacement). A deeply equal
+    /// replacement keeps the current value and publishes nothing. Throws <see cref="InvalidOperationException"/> when called from inside a
+    /// change mutation. Listener failures as in <see cref="Change(DurableContext, Action{Draft})"/>.
     /// </summary>
     public void Replace(DurableContext context, JsonValue value)
     {
@@ -200,7 +191,7 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
             if (changing) throw new InvalidOperationException("Replicated state cannot be replaced from a change callback");
             deliver = Commit(tracker.PrepareReplace(value), context);
         }
-        if (deliver) ReplicatedState.ThrowCollected(publisher.Deliver(), "Replicated state listeners failed");
+        if (deliver) publisher.Deliver();
     }
 
     /// <inheritdoc/>
@@ -208,10 +199,6 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
 
     /// <inheritdoc/>
     public IDisposable Subscribe(Func<JsonValue, DurableContext, ReplicatedStateDelivery, Task> listener) => publisher.Subscribe(ReplicatedState.Listener(listener));
-
-    (JsonValue Value, long Sequence) IReplicatedStateInternals<JsonValue>.Snapshot() => publisher.Snapshot();
-
-    IDisposable IReplicatedStateInternals<JsonValue>.SubscribeSource(Action<IReadOnlyList<Op>, long, DurableContext> listener) => publisher.SubscribeSource(listener);
 
     private void ChangeCore(DurableContext context, Func<Draft, object?> mutate, bool asynchronous)
     {
@@ -247,7 +234,7 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
             }
             deliver = Commit(prepared, context);
         }
-        if (deliver) ReplicatedState.ThrowCollected(publisher.Deliver(), "Replicated state listeners failed");
+        if (deliver) publisher.Deliver();
     }
 
     // Adoption and publication commit together under the publisher's gate; a no-op is adopted (the tracker revision advances) but not
@@ -255,7 +242,7 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
     private bool Commit(Prepared prepared, DurableContext context) => publisher.Commit(_ =>
     {
         tracker.Adopt(prepared);
-        return prepared.Ops.IsEmpty ? null : (prepared.Value, prepared.Ops);
+        return prepared.Ops.IsEmpty ? null : new Revision<JsonValue>(prepared.Value);
     }, context);
 
     private static bool IsAwaitable(object? outcome) =>
@@ -285,10 +272,10 @@ public sealed class MutableReplicatedState : IReplicatedState<JsonValue>, IRepli
 
 /// <summary>
 /// A synchronously hydrated publication-only state backed by one source attachment (upstream <c>AttachedReplicatedState</c>). It
-/// publishes the source's exact value and operation references; it never applies or re-diffs them.
+/// publishes the source's exact values; it never applies or re-diffs the frames' operations.
 /// </summary>
 /// <typeparam name="T">The immutable value type.</typeparam>
-public sealed class AttachedReplicatedState<T> : IReplicatedState<T>, IReplicatedStateInternals<T>, IDisposable
+public sealed class AttachedReplicatedState<T> : IReplicatedState<T>, IDisposable
 {
     private const long MaxSafeInteger = 9_007_199_254_740_991;
     private readonly IReplicatedStateSourceAttachment<T> attachment;
@@ -324,10 +311,6 @@ public sealed class AttachedReplicatedState<T> : IReplicatedState<T>, IReplicate
         attachment.Dispose();
     }
 
-    (T Value, long Sequence) IReplicatedStateInternals<T>.Snapshot() => publisher.Snapshot();
-
-    IDisposable IReplicatedStateInternals<T>.SubscribeSource(Action<IReadOnlyList<Op>, long, DurableContext> listener) => publisher.SubscribeSource(listener);
-
     internal void Activate() => attachment.Activate(Receive);
 
     private void Receive(ReplicatedStateSourceFrame<T> frame)
@@ -335,9 +318,9 @@ public sealed class AttachedReplicatedState<T> : IReplicatedState<T>, IReplicate
         if (Volatile.Read(ref disposed) != 0) return;
         try
         {
-            if (frame?.Ops is null || frame.Context is null) throw new InvalidOperationException("Replicated state source frame is incomplete");
+            if (frame?.Context is null) throw new InvalidOperationException("Replicated state source frame is incomplete");
             AssertCursor(frame.Cursor, "frame");
-            var errors = publisher.Publish(_ =>
+            publisher.Publish(_ =>
             {
                 if (Volatile.Read(ref disposed) != 0) return null;
                 var expected = cursor + 1;
@@ -345,10 +328,8 @@ public sealed class AttachedReplicatedState<T> : IReplicatedState<T>, IReplicate
                     throw new InvalidOperationException(string.Create(CultureInfo.InvariantCulture,
                         $"Replicated state source cursor has a gap: expected {expected}, received {frame.Cursor}"));
                 cursor = frame.Cursor;
-                return (frame.Value, frame.Ops);
+                return new Revision<T>(frame.Value);
             }, frame.Context);
-            if (errors.Count == 1) Report(errors[0]);
-            else if (errors.Count > 1) Report(new AggregateException("Replicated state listeners failed", errors));
         }
         catch (Exception error)
         {
@@ -381,112 +362,6 @@ public sealed class AttachedReplicatedState<T> : IReplicatedState<T>, IReplicate
     }
 }
 
-/// <summary>
-/// A cold read-only state used by service consumers until a complete snapshot arrives (upstream <c>ReplicatedStateReplica</c>). It
-/// hydrates from a base batch and applies validated update batches in strict sequence; any invalid batch or gap clears it. Upstream also
-/// runs a strict-JSON revision validator here; immutable <see cref="JsonValue"/> trees are strict, acyclic JSON by construction.
-/// </summary>
-internal sealed class ReplicatedStateReplica(Action<Exception> reportError) : IReplicatedState<JsonValue>
-{
-    private readonly Lock gate = new();
-    private readonly List<StateSubscriber<JsonValue>> subscribers = [];
-    private JsonValue? value;
-    private long? sequence;
-
-    public JsonValue? Value { get { lock (gate) return value; } }
-
-    public IDisposable Subscribe(Action<JsonValue, DurableContext, ReplicatedStateDelivery> listener) => SubscribeCore(ReplicatedState.Listener(listener));
-
-    public IDisposable Subscribe(Func<JsonValue, DurableContext, ReplicatedStateDelivery, Task> listener) => SubscribeCore(ReplicatedState.Listener(listener));
-
-    private IDisposable SubscribeCore(Func<JsonValue, DurableContext, ReplicatedStateDelivery, Task?> listener)
-    {
-        var subscriber = new StateSubscriber<JsonValue>(listener, reportError);
-        lock (gate)
-        {
-            subscribers.Add(subscriber);
-            if (value is not null)
-                subscriber.Push(new StateDelivery<JsonValue>(value, ReplicatedState.ServiceDeliveryContext, ReplicatedStateDelivery.Hydrate(sequence!.Value)));
-        }
-        subscriber.Drain();
-        return new Subscription(() =>
-        {
-            subscriber.Close();
-            lock (gate) subscribers.Remove(subscriber);
-        });
-    }
-
-    public void Hydrate(long sequence, IReadOnlyList<Op> ops, DurableContext context)
-    {
-        StateSubscriber<JsonValue>[] targets;
-        lock (gate)
-        {
-            JsonValue next;
-            try
-            {
-                if (!DeltaValidation.IsBase(ops)) throw new InvalidOperationException("Replicated state snapshot is not a base operation batch");
-                next = DeltaApply.Apply(null, ops);
-            }
-            catch
-            {
-                ClearLocked();
-                throw;
-            }
-            this.sequence = sequence;
-            value = next;
-            targets = PushAll(context, ReplicatedStateDelivery.Hydrate(sequence));
-        }
-        foreach (var subscriber in targets) subscriber.Drain();
-    }
-
-    public void Update(long sequence, IReadOnlyList<Op> ops, DurableContext context)
-    {
-        StateSubscriber<JsonValue>[] targets;
-        lock (gate)
-        {
-            if (this.sequence is not { } current || value is null) throw new InvalidOperationException("Replicated state received an update before hydration");
-            if (sequence != current + 1)
-            {
-                ClearLocked();
-                throw new InvalidOperationException("Replicated state update sequence has a gap");
-            }
-            JsonValue next;
-            try { next = DeltaApply.Apply(value, ops); }
-            catch
-            {
-                ClearLocked();
-                throw;
-            }
-            this.sequence = sequence;
-            value = next;
-            targets = PushAll(context, ReplicatedStateDelivery.Update(sequence));
-        }
-        foreach (var subscriber in targets) subscriber.Drain();
-    }
-
-    /// <summary>Forgets the value (a disconnect): pending deliveries are dropped, running callbacks finish, subscriptions stay.</summary>
-    public void Clear()
-    {
-        lock (gate) ClearLocked();
-    }
-
-    private void ClearLocked()
-    {
-        value = null;
-        sequence = null;
-        foreach (var subscriber in subscribers) subscriber.Clear();
-    }
-
-    // #deliverAll: enqueue for everyone before any callback can publish another revision reentrantly; the caller drains after.
-    private StateSubscriber<JsonValue>[] PushAll(DurableContext context, ReplicatedStateDelivery delivery)
-    {
-        var frame = new StateDelivery<JsonValue>(value!, context, delivery);
-        StateSubscriber<JsonValue>[] targets = [.. subscribers];
-        foreach (var subscriber in targets) subscriber.Push(frame);
-        return targets;
-    }
-}
-
 /// <summary>One pending delivery.</summary>
 internal readonly record struct StateDelivery<T>(T Value, DurableContext Context, ReplicatedStateDelivery Delivery);
 
@@ -509,7 +384,7 @@ internal sealed class StateSubscriber<T>(Func<T, DurableContext, ReplicatedState
             if (closed) return;
             if (pending.Count == MaxPending)
             {
-                // A cold replica can queue updates reentrantly before this subscriber's first hydration starts: keep that hydration.
+                // Keep a hydration that has not started: it is the subscriber's first value.
                 var keep = !started;
                 var hydration = keep ? pending.Peek() : default;
                 pending.Clear();
@@ -606,7 +481,6 @@ internal sealed class ReplicatedStatePublisher<T>(T initial, Action<Exception> r
     private readonly Lock gate = new();
     // Upstream's Map keeps insertion order; each entry remembers the sequence it hydrated at.
     private readonly List<(StateSubscriber<T> Subscriber, long Hydrated)> subscribers = [];
-    private readonly List<Action<IReadOnlyList<Op>, long, DurableContext>> sources = [];
     private readonly Queue<Publication> publications = new();
     private T value = initial;
     private long sequence;
@@ -625,7 +499,8 @@ internal sealed class ReplicatedStatePublisher<T>(T initial, Action<Exception> r
         lock (gate)
         {
             subscribers.Add((subscriber, sequence));
-            subscriber.Push(new StateDelivery<T>(value, ReplicatedState.ServiceDeliveryContext, ReplicatedStateDelivery.Hydrate(sequence)));
+            // Hydration has no caller; it is delivered with the background context.
+            subscriber.Push(new StateDelivery<T>(value, DurableContext.Background, ReplicatedStateDelivery.Hydrate(sequence)));
         }
         subscriber.Drain();
         return new Subscription(() =>
@@ -635,38 +510,28 @@ internal sealed class ReplicatedStatePublisher<T>(T initial, Action<Exception> r
         });
     }
 
-    public IDisposable SubscribeSource(Action<IReadOnlyList<Op>, long, DurableContext> listener)
-    {
-        ArgumentNullException.ThrowIfNull(listener);
-        // A distinct wrapper per subscription, so two subscriptions of one delegate are independent and removal is exact.
-        Action<IReadOnlyList<Op>, long, DurableContext> entry = (ops, published, context) => listener(ops, published, context);
-        lock (gate) sources.Add(entry);
-        return new Subscription(() =>
-        {
-            lock (gate) sources.Remove(entry);
-        });
-    }
-
     /// <summary>
     /// Commits the revision <paramref name="prepare"/> returns for the current value (null commits nothing; an exception commits nothing
-    /// and propagates) and, unless another delivery owns the loop, delivers queued publications. Returns the isolated exact-listener
-    /// failures of the publications this call delivered.
+    /// and propagates) and, unless another delivery owns the loop, delivers queued publications. Subscriber failures are reported, never
+    /// thrown.
     /// </summary>
-    public List<Exception> Publish(Func<T, (T Value, IReadOnlyList<Op> Ops)?> prepare, DurableContext context) =>
-        Commit(prepare, context) ? Deliver() : [];
+    public void Publish(Func<T, Revision<T>?> prepare, DurableContext context)
+    {
+        if (Commit(prepare, context)) Deliver();
+    }
 
     /// <summary>
     /// The commit half of <see cref="Publish"/>: <paramref name="prepare"/> runs under the gate. Returns true when this call took
     /// ownership of the delivery loop; the caller must then call <see cref="Deliver"/>.
     /// </summary>
-    public bool Commit(Func<T, (T Value, IReadOnlyList<Op> Ops)?> prepare, DurableContext context)
+    public bool Commit(Func<T, Revision<T>?> prepare, DurableContext context)
     {
         lock (gate)
         {
             if (prepare(value) is not { } revision) return false;
             value = revision.Value;
             sequence += 1;
-            publications.Enqueue(new Publication(revision.Value, revision.Ops, sequence, context));
+            publications.Enqueue(new Publication(revision.Value, sequence, context));
             if (delivering) return false;
             delivering = true;
             return true;
@@ -674,32 +539,23 @@ internal sealed class ReplicatedStatePublisher<T>(T initial, Action<Exception> r
     }
 
     /// <summary>The delivery half of <see cref="Publish"/>, run by the owner of the delivery loop until no publication is queued.</summary>
-    public List<Exception> Deliver()
+    public void Deliver()
     {
-        var errors = new List<Exception>();
         try
         {
             while (true)
             {
                 Publication? publication;
-                Action<IReadOnlyList<Op>, long, DurableContext>[] exact;
+                (StateSubscriber<T> Subscriber, long Hydrated)[] targets;
                 lock (gate)
                 {
                     if (!publications.TryDequeue(out publication))
                     {
                         delivering = false;
-                        return errors;
+                        return;
                     }
-                    exact = [.. sources];
+                    targets = [.. subscribers];
                 }
-                foreach (var listener in exact)
-                {
-                    try { listener(publication.Ops, publication.Sequence, publication.Context); }
-                    catch (Exception error) { errors.Add(error); }
-                }
-                // Snapshotted after the exact listeners, as upstream does: a subscription they add hydrates past this publication.
-                (StateSubscriber<T> Subscriber, long Hydrated)[] targets;
-                lock (gate) targets = [.. subscribers];
                 var frame = new StateDelivery<T>(publication.Value, publication.Context, ReplicatedStateDelivery.Update(publication.Sequence));
                 foreach (var (subscriber, hydrated) in targets)
                 {
@@ -716,8 +572,11 @@ internal sealed class ReplicatedStatePublisher<T>(T initial, Action<Exception> r
         }
     }
 
-    private sealed record Publication(T Value, IReadOnlyList<Op> Ops, long Sequence, DurableContext Context);
+    private sealed record Publication(T Value, long Sequence, DurableContext Context);
 }
+
+/// <summary>A revision to publish: the next immutable value.</summary>
+internal sealed record Revision<T>(T Value);
 
 /// <summary>An idempotent unsubscribe.</summary>
 internal sealed class Subscription(Action dispose) : IDisposable

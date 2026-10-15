@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/delta/diff.ts. Identity is JavaScript's: containers compare by
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/delta/diff.ts. Identity is JavaScript's: containers compare by
 // reference, scalars by value, so structurally shared revisions diff narrowly and reconstructed ones fall back to semantic alignment.
 using System.Collections.Immutable;
 

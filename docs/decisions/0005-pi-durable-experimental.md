@@ -67,9 +67,7 @@ None is planned or in progress.
 
 **Excluded (by this decision):**
 - `src/storage/sqlite/cloudflare.ts` and `test/sqlite-cloudflare.test.ts`. The Cloudflare Durable Object SQLite adapter is out of scope.
-- These have no rows: the `vacation` demo, `pi-env`, and Chord's facets, services and wire. Instead:
-  - `test/chord-guide.test.ts`'s canvas and diff-review runs use direct subscriptions to the same document states.
-  - Its job-output run is upstream's, on the task runtime.
+- These have no rows: the `vacation` demo, `pi-env`, and Chord's facets, services and wire. `test/chord-guide.test.ts`, which used them, was ported with direct subscriptions to the same document states until upstream deleted it in v1.2.0; its cases were retired with it.
 
 **Skipped:**
 - `test/provider-session-cache-e2e.test.ts` and `test/system-order-cache-e2e.test.ts` need live provider credentials.

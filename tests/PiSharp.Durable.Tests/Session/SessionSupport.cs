@@ -28,7 +28,7 @@ internal static partial class SessionTests
 {
     internal static readonly DurableContext Context = DurableContext.Background;
 
-    /// <summary>Every session.* and chord-guide case, with ids <c>{prefix}{file}.{case}</c>, on storages from <paramref name="storage"/>.</summary>
+    /// <summary>Every session.* case, with ids <c>{prefix}{file}.{case}</c>, on storages from <paramref name="storage"/>.</summary>
     internal static IEnumerable<(string, Func<Task>)> All(string prefix, Func<IStorage> storage) =>
     [
         .. Tables(prefix + "tables.", storage),
@@ -38,7 +38,6 @@ internal static partial class SessionTests
         .. ForkCases(prefix + "forks.", storage),
         .. States(prefix + "states.", storage),
         .. Watches(prefix + "watches.", storage),
-        .. ChordGuide(prefix + "chord-guide.", storage),
         .. Line(prefix + "line.", storage),
     ];
 
