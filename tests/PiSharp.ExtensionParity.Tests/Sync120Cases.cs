@@ -137,8 +137,11 @@ internal static partial class Program
     // print-mode.ts: session.prompt resolves once a command's handler returns, so a run the handler started with
     // pi.sendMessage(..., { triggerTurn: true }) without awaiting ctx.waitForIdle() is still starting when print mode reads the last
     // message and disposes the runtime. AgentSessionRuntime.dispose emits session_shutdown and AgentSession.dispose aborts the agent
-    // and drops the session's listeners, so Pi 1.2.0 exits 0 and prints nothing of that run: no text in text mode, the session
-    // header alone in JSON mode. (Observed with the 1.2.0 npm packages: exit 0, empty stdout and stderr, no model request.)
+    // and drops the session's listeners (print mode unsubscribes first), so Pi 1.2.0 exits 0 and prints nothing of that run after the
+    // prompt resolved: no text in text mode, no event in JSON mode. (Observed with the 1.2.0 npm packages: exit 0, empty stdout and
+    // stderr, the JSON session header alone, no model request.) In PiSharp the run may already have started on another thread when
+    // the command's prompt resolves, so JSON mode may carry its start events, as Pi's would if the run started first; it never carries
+    // the run's end, its settlement or an assistant message.
     private static async Task TriggeredRunAtPrintModeExit()
     {
         using var sandbox = NodeSandbox("triggered-run-at-print-exit");
@@ -166,8 +169,13 @@ internal static partial class Program
         (code, stdout, stderr) = await sandbox.Run([.. new[] { "--mode", "json" }, .. Model, "-e", extension, "/kick"]);
         Equal(0, code, "json mode exit; " + stderr);
         Equal("", stderr, "json mode stderr");
-        var records = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        Equal(1, records.Length, "json mode prints the session header alone: " + stdout);
-        Equal("session", JsonNode.Parse(records[0])!["type"]!.GetValue<string>(), "the header");
+        var records = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => JsonNode.Parse(line)!).ToList();
+        Equal("session", records[0]["type"]!.GetValue<string>(), "the session header first: " + stdout);
+        foreach (var record in records.Skip(1))
+        {
+            var type = record["type"]?.GetValue<string>();
+            Check(type is not ("agent_end" or "agent_settled" or "turn_end") && record["message"]?["role"]?.GetValue<string>() != "assistant",
+                "nothing is written after the prompt resolved: " + stdout);
+        }
     }
 }
