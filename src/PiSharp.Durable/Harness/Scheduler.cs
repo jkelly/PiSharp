@@ -1236,7 +1236,15 @@ internal sealed class DurableTaskScheduler
                     if (!(dirty && enabled && !closing)) break;
                     dirty = false;
                 }
-                foreach (var reservation in await ReserveAsync().ConfigureAwait(false)) Start(reservation);
+                var reservations = await ReserveAsync().ConfigureAwait(false);
+                // Upstream starts every reserved invocation before any of them gets past its first await, so an abort invocation reads its
+                // record (and its abort reason) as the reservation committed it. A run invocation here may run its step and phase inline
+                // when the line is idle, and its commits could change that record first: read the abort invocations' records before any
+                // invocation starts.
+                lock (gate)
+                    foreach (var reservation in reservations)
+                        if (reservation.Invocation.Mode == InvocationMode.Abort) reservation.Record = live.GetValueOrDefault(reservation.Invocation.TaskId);
+                foreach (var reservation in reservations) Start(reservation);
             }
         }
         catch (Exception error)
@@ -1558,13 +1566,10 @@ internal sealed class DurableTaskScheduler
     private async Task RunAbortAsync(Reservation reservation)
     {
         var invocation = reservation.Invocation;
-        TaskRecord? found;
+        // The record as the reservation committed it, read before any invocation of the pass started (see DrainAsync).
+        var found = reservation.Record;
         bool closingNow;
-        lock (gate)
-        {
-            found = live.GetValueOrDefault(invocation.TaskId);
-            closingNow = closing;
-        }
+        lock (gate) closingNow = closing;
         if (found?.State is not RunningTaskState || closingNow) return;
         Exception? failure = null;
         try
@@ -1922,7 +1927,12 @@ internal sealed class DurableTaskScheduler
     /// <summary>Replacement definition already reported as unable to take over, per invocation.</summary>
     private sealed record ReportedTask(DurableTask? Task);
 
-    private sealed record Reservation(Invocation Invocation, DurableTask Task, IRegistrySnapshot Snapshot);
+    private sealed record Reservation(Invocation Invocation, DurableTask Task, IRegistrySnapshot Snapshot)
+    {
+        /// <summary>An abort invocation's committed record, read when its pass's invocations start (upstream's <c>#runAbort</c> reads it
+        /// first thing).</summary>
+        public TaskRecord? Record { get; set; }
+    }
 
     /// <summary>Outcome of the phase that just returned, judged by the next step.</summary>
     private sealed record PhaseResult(JsonValue Checkpoint, Exception? Failure);
