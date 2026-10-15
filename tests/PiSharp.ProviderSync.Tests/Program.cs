@@ -597,7 +597,7 @@ internal static partial class Program
             using var request = await new GoogleKeyAuthRequestFactory(Gemini, options).CreateAsync(new(Gemini, [Ask], 1));
             return string.Join(" ", request.Headers.GetValues("User-Agent"));
         }
-        Equal("pi/1.1.0", await Agent(GoogleMetadata()));
+        Equal("pi/1.2.0", await Agent(GoogleMetadata()));
         Equal("model-agent", await Agent(GoogleMetadata(headers: ""","headers":{"User-Agent":"model-agent"}""")));
         Equal("caller-agent", await Agent(GoogleMetadata(headers: ""","headers":{"User-Agent":"model-agent"}"""), """{"user-agent":"caller-agent"}"""));
     }

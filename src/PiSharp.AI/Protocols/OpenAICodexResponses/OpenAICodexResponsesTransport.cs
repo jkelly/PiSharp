@@ -38,7 +38,7 @@ public sealed record OpenAICodexResponsesOptions
     public double? MaxRetryDelayMilliseconds { get; init; }
     /// <summary>Response-header timeout (timeoutMs); null waits indefinitely.</summary>
     public TimeSpan? Timeout { get; init; }
-    public string UserAgent { get; init; } = "pi/1.1.0";
+    public string UserAgent { get; init; } = "pi/1.2.0";
     public string Originator { get; init; } = "pi";
     public Func<TimeSpan, CancellationToken, Task>? Delay { get; init; }
     public TimeProvider? Time { get; init; }

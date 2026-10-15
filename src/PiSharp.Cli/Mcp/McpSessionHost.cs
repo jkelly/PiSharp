@@ -42,7 +42,7 @@ namespace PiSharp.Cli.Mcp;
 /// </summary>
 internal sealed record McpSessionHost(string AgentDirectory, string HomeDirectory, Func<IEnumerable<KeyValuePair<string, string>>> ProcessEnvironment)
 {
-    internal const string ClientVersion = "1.1.0";
+    internal const string ClientVersion = "1.2.0";
     /// <summary>mcp/index.ts registers every tool of every server (runtime.ts lists every page) and calls any number of them at once;
     /// a tool schema or description is bounded only by its 16 MiB tools/list message (transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES).</summary>
     internal static ExtensionRegistryOptions RegistryOptions { get; } = new()

@@ -66,7 +66,7 @@ public static class BugReport
     public const string CustomEntryType = "pi.bug-report";
     public const int SchemaVersion = 1;
     /// <summary>config.ts <c>VERSION</c> of the Pi release PiSharp tracks.</summary>
-    public const string PiVersion = "1.1.0";
+    public const string PiVersion = "1.2.0";
 
     public const string SummarySystemPrompt =
         "You are helping a user file a bug report about pi, the coding agent they are talking to. You will be shown the conversation transcript. Write a report for the pi developers describing what the user was doing and what went wrong.\n\n" +
@@ -80,7 +80,7 @@ public static class BugReport
         "## Relevant details\nTool calls involved, files touched, model behavior, anything else that helps a developer reproduce or locate the problem.\n\n" +
         "Do not include file contents, secrets, or credentials from the transcript; refer to files by path only. Keep the report factual and concise.";
 
-    /// <summary>pi-user-agent.ts <c>getPiUserAgent</c> with the runtime field naming .NET: <c>pi/1.1.0 (win32; dotnet/10.0.0; x64)</c>.</summary>
+    /// <summary>pi-user-agent.ts <c>getPiUserAgent</c> with the runtime field naming .NET: <c>pi/1.2.0 (win32; dotnet/10.0.0; x64)</c>.</summary>
     public static string PiUserAgent(string version) => $"pi/{version} ({Platform}; {Runtime}; {Arch})";
 
     /// <summary>Node <c>process.platform</c> for this OS.</summary>

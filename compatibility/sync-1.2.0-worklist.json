@@ -11029,12 +11029,12 @@
           "THIRD-PARTY-NOTICES.md"
         ],
         "pin": "Byte copies of @earendil-works/pi-ai@1.1.0 dist/providers/data/*.json",
-        "action": "Refreshed from @earendil-works/pi-ai@1.2.0 (tarball SHA256 c3e69423bcab9712f31a7e5b6d3448ae356af84439ec6bc701f626f6ea164535) with tools/CompatibilityReport/refresh-model-catalogs.mjs, new in this stage; from the 1.1.0 tarball it reproduces the 1.1.0 state byte-for-byte. 15 of 42 shards changed and the catalog has 1649 models (was 1650): google-vertex drops gemini-flash-latest and gemini-flash-lite-latest, opencode drops fledge-alpha-free, openrouter drops 13 (mostly qwen) and gains 12, vercel-ai-gateway drops 9 (alibaba qwen, anthropic/claude-3-haiku, anthropic/claude-opus-4). BuiltinModelCatalog.cs, CatalogCases.cs and the notice follow; its header is re-pinned (all.ts is unchanged). Models.Tests passes 61/61 with --tarball."
+        "action": "Refreshed from @earendil-works/pi-ai@1.2.0 (tarball SHA256 c3e69423bcab9712f31a7e5b6d3448ae356af84439ec6bc701f626f6ea164535) with tools/CompatibilityReport/refresh-model-catalogs.mjs, new in this stage; from the 1.1.0 tarball it reproduces the 1.1.0 state byte-for-byte. 15 of 42 shards changed and the catalog has 1649 models (was 1650): google-vertex drops gemini-flash-latest and gemini-flash-lite-latest, opencode drops fledge-alpha-free, openrouter drops 13 (mostly qwen) and gains 12, vercel-ai-gateway drops 9 (alibaba qwen, anthropic/claude-3-haiku, anthropic/claude-opus-4). BuiltinModelCatalog.cs, CatalogCases.cs and the notice follow; its header is re-pinned (all.ts is unchanged). Models.Tests passes 61/61 with --tarball. docs/contracts/mistral-cli-selection.md and native-live-terminal-composition.md still describe the 1.1.0 shards they were admitted from (historical contract records; annotate if the ai area re-admits them)."
       },
       {
         "id": "pi-version-identity",
         "area": "ai",
-        "status": "pending",
+        "status": "done",
         "files": [
           "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleKeyAuthRequestFactory.cs",
           "src/PiSharp.AI/Protocols/GoogleVertex/GoogleVertexRequestFactory.cs",
@@ -11043,10 +11043,14 @@
           "src/PiSharp.Cli/Mcp/McpSessionHost.cs",
           "src/PiSharp.CodingAgent/Diagnostics/BugReport.cs",
           "src/PiSharp.CodingAgent/Diagnostics/CrashLog.cs",
-          "src/PiSharp.Cli/Interactive/Mode/InteractiveModeContext.cs"
+          "src/PiSharp.Cli/Interactive/Mode/InteractiveModeContext.cs",
+          "tests/PiSharp.ProviderApis.Tests/CodexCases.cs",
+          "tests/PiSharp.ProviderApis.Tests/CodexWebSocketCases.cs",
+          "tests/PiSharp.ProviderSync.Tests/Program.cs",
+          "tests/PiSharp.SessionParity.Tests/DiagnosticsCases.cs"
         ],
         "pin": "The Pi version PiSharp identifies as: pi/1.1.0 user agents (Google, Vertex, Codex, pi.dev catalog), MCP clientInfo.version, bug-report and crash-log Pi version, the interactive context version default.",
-        "action": "Mechanical; planned in the foundation stage."
+        "action": "Moved to 1.2.0 with the tests that assert them (upstream reads VERSION from its 1.2.0 package.json). PiNodeRuntime.PiVersion is not part of this: it selects the npm packages extensions run against (node-bridge-pi-runtime)."
       },
       {
         "id": "node-bridge-pi-runtime",

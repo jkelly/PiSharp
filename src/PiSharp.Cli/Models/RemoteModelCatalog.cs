@@ -267,7 +267,7 @@ internal sealed class RemoteCatalogOverlay
 
     /// <summary>Source getPiUserAgent with the runtime field naming .NET.</summary>
     internal static string UserAgent { get; } = string.Create(CultureInfo.InvariantCulture,
-        $"pi/1.1.0 ({(OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : "linux")}; dotnet/{Environment.Version}; {RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()})");
+        $"pi/1.2.0 ({(OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : "linux")}; dotnet/{Environment.Version}; {RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()})");
 }
 
 /// <summary>Source refreshModelCatalogs: concurrent interactive all-catalog refreshes share one run; each caller cancels only its wait,
