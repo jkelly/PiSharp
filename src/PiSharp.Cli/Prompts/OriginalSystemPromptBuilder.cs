@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/system-prompt.ts and packages/coding-agent/src/core/skills.ts:formatSkillsForPrompt.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/system-prompt.ts and packages/coding-agent/src/core/skills.ts:formatSkillsForPrompt.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.RegularExpressions;

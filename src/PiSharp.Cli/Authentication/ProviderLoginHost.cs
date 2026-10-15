@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/resolve.ts (resolveProviderAuth: a stored credential
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/resolve.ts (resolveProviderAuth: a stored credential
 // owns the provider) and packages/coding-agent/src/modes/interactive/components/login-dialog.ts (openBrowser on auth_url).
 using System.Diagnostics;
 using PiSharp.AI.Authentication;

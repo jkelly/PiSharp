@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/package-manager-cli.ts (getPackageCommandUsage,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/package-manager-cli.ts (getPackageCommandUsage,
 // printConfigCommandHelp, printPackageCommandHelp, parsePackageCommand, refreshModelCatalogs, createCommandSettingsManager,
 // reportSettingsErrors, reportProjectTrustWarnings, handleConfigCommand, handlePackageCommand) and src/cli/config-selector.ts.
 using PiSharp.Cli.Pi;

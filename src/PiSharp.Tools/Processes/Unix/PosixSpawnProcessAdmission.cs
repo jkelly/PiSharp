@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/bash-executor.ts and utils/shell.ts (the shell runs
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/bash-executor.ts and utils/shell.ts (the shell runs
 // detached in its own process group; abort and timeout kill the whole tree).
 using System.Collections.Immutable;
 using System.ComponentModel;

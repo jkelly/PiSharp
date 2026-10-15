@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/utils/syntax-highlight.ts (renderHighlightedHtml) and packages/coding-agent/src/utils/html.ts (decodeHtmlEntityAt) — rendering of highlight.js 10.7.3 (BSD-3-Clause) HTML output.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/utils/syntax-highlight.ts (renderHighlightedHtml) and packages/coding-agent/src/utils/html.ts (decodeHtmlEntityAt) — rendering of highlight.js 10.7.3 (BSD-3-Clause) HTML output.
 using System.Text;
 
 namespace PiSharp.Cli.Interactive.Mode;

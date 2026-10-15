@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/google-vertex.ts (createClient: Vertex API key or
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/google-vertex.ts (createClient: Vertex API key or
 // Application Default Credentials with project and location; resolveCustomBaseUrl, baseUrlIncludesApiVersion, buildGoogleAuthOptions)
 // over @google/genai's endpoint construction and google-auth-library 10.6.2 (Apache-2.0) ADC: googleauth (fromJSON,
 // fromImpersonatedJSON), refreshclient (authorized_user refresh), jwtclient (service_account JWT bearer), computeclient (GCE metadata

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openrouter-images.ts, the request and error
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openrouter-images.ts, the request and error
 // behaviour of the OpenAI SDK client it uses (chat.completions.create with maxRetries 0, APIError messages), and
 // packages/ai/src/images-api-registry.ts.
 using System.Collections.Immutable;

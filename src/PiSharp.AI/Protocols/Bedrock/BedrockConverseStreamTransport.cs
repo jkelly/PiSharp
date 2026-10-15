@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/bedrock-converse-stream.ts (stream: client configuration,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/bedrock-converse-stream.ts (stream: client configuration,
 // region and endpoint selection, bearer token or SigV4 credentials, custom headers, event handling, stop reasons, usage, errors and
 // diagnostics) and providers/amazon-bedrock.ts. The AWS SDK's ConverseStream command, standard retry strategy and event stream
 // codec are ported natively.

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts (McpOAuthCredentialStore
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts (McpOAuthCredentialStore
 // withRefreshLock: proper-lockfile on `<agent dir>/mcp-auth-refresh-<hash>`, stale after 20 s, waited for up to 25 s in 100 ms steps).
 using System.Security.Cryptography;
 using System.Text;

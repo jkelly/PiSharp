@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/export-html/index.ts (JSON.parse/JSON.stringify,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/export-html/index.ts (JSON.parse/JSON.stringify,
 // String.prototype.replace and Number formatting semantics the exporter relies on, ECMA-262 behaviour as run by Node/V8).
 using System.Globalization;
 using System.Runtime.CompilerServices;

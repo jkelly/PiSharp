@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/bedrock-converse-stream.ts (stream request building:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/bedrock-converse-stream.ts (stream request building:
 // convertMessages, buildSystemPrompt, convertToolConfig, buildAdditionalModelRequestFields, streamSimple and the model capability
 // predicates). The body is the ConverseStream REST JSON the SDK 3.1127.0 serializes (members in its schema's order, blobs as base64).
 using System.Collections.Immutable;

@@ -5,7 +5,7 @@ using PiSharp.CodingAgent;
 using PiSharp.Contracts;
 
 // Upstream: packages/coding-agent/src/core/system-prompt.ts and core/skills.ts:formatSkillsForPrompt at
-// abe508e1b89912adde45528136c3221eb69acdd7. Expected sections are typed from that source text.
+// 06a466935536f8c9bcacb2d5efc0fc021be1bdff. Expected sections are typed from that source text.
 internal static partial class Program
 {
     private const string Preamble = "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.";

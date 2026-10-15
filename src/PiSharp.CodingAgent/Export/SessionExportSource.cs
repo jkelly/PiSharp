@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/session-manager.ts (SessionManager.open,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/session-manager.ts (SessionManager.open,
 // loadEntriesFromFile, parseSessionEntryLine, migrateToCurrentVersion, _buildIndex, getHeader, getEntries, getLeafId, getBranch, getCwd,
 // getSessionId, getSessionFile) for the read-only view the exporters use.
 using System.Security.Cryptography;

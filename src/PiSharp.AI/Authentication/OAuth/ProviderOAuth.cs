@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/types.ts (AuthPrompt, AuthEvent, AuthInteraction,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/auth/types.ts (AuthPrompt, AuthEvent, AuthInteraction,
 // LoginOptions, OAuthAuth, ModelAuth), auth/oauth/device-code.ts (pollOAuthDeviceCodeFlow), auth/oauth/callback-server.ts
 // (startOAuthCallbackServer with complete/timeout, waitForCallbackOrManualInput), auth/oauth/pkce.ts and utils/oauth-page.ts.
 using System.Buffers.Text;

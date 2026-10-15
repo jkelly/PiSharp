@@ -31,10 +31,10 @@
   ],
   "changelogBullets": "Bullet ids are <package>/<section>#<n>, numbered in order under ## [1.2.0] of packages/<package>/CHANGELOG.md at v1.2.0. agent has no 1.2.0 entries. \"New Features\" bullets summarise Added/Breaking bullets and map to the same rows.",
   "summary": {
-    "rows": 55,
+    "rows": 56,
     "changelogBullets": 70,
     "byStatus": {
-      "port": 42,
+      "port": 43,
       "no-op": 7,
       "exclude": 6
     },
@@ -45,7 +45,7 @@
       "coding-agent-cli": 2,
       "tools": 2,
       "tui": 8,
-      "codemode": 11,
+      "codemode": 12,
       "mcp": 4,
       "node-bridge": 1,
       "docs": 3
@@ -255,6 +255,8 @@
         "packages/coding-agent/src/modes/interactive/theme/theme-tokens.ts",
         "packages/coding-agent/src/modes/interactive/theme/theme.ts",
         "packages/coding-agent/src/main.ts",
+        "packages/coding-agent/src/modes/interactive/theme/theme-json.ts",
+        "packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
         "packages/coding-agent/src/modes/interactive/theme/dark.json",
         "packages/coding-agent/src/modes/interactive/theme/light.json",
         "packages/coding-agent/schemas/theme.schema.json",
@@ -845,6 +847,30 @@
       ],
       "release": "1.2.0",
       "notes": "PiSharp runs scripts on Jint (decision 0003): verify the timeout/cancellation constraint interrupts a microtask-only loop and add a test."
+    },
+    {
+      "id": "codemode.runtime-split",
+      "area": "codemode",
+      "status": "port",
+      "changelog": [],
+      "upstream": [
+        "packages/codemode/src/runtime/host.ts",
+        "packages/codemode/src/runtime/worker.ts",
+        "packages/codemode/src/runtime/protocol.ts",
+        "packages/codemode/src/runtime/execution.ts",
+        "packages/codemode/src/runtime/vm.ts",
+        "packages/codemode/src/types.ts"
+      ],
+      "change": "Unlisted refactor behind the new sandboxes: CodemodeSandbox's host logic moves into execution.ts (CodemodeSandboxBase) and the VM loop into vm.ts, worker.ts shrinks to the worker entry, and protocol.ts/types.ts gain optional deterministic-mode fields (seq, now, properties; started and idle messages; CodemodeDuring, CodemodeRun). execute() behaviour is meant to be unchanged.",
+      "pisharp": [
+        "src/PiSharp.Codemode/Runtime/CodemodeSandbox.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeWorkers.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeWorkerProtocol.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeEngineRunner.cs",
+        "src/PiSharp.Codemode/CodemodeTypes.cs"
+      ],
+      "release": "1.2.0",
+      "notes": "Re-verify the PiSharp runtime against execution.ts/vm.ts (abort, timeout, output limits, store writes, error mapping) and re-cite them; the deterministic-only fields fall under codemode.new-sandboxes."
     },
     {
       "id": "codemode.new-sandboxes",

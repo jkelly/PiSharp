@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/config.ts (APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/config.ts (APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR,
 // ENV_SESSION_DIR, getAgentDir, expandTildePath) and packages/coding-agent/src/utils/paths.ts (normalizePath, resolvePath,
 // canonicalizePath, isLocalPath, normalizeWindowsShellPath).
 using System.Reflection;

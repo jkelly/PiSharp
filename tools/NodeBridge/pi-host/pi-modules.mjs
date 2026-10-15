@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases, loadExtensionModule)
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (getAliases, loadExtensionModule)
 // and packages/coding-agent/src/core/extensions/jiti-loader.ts.
 //
 // The real Pi packages: PiSharp installs the exact Pi 1.1.0 packages into the agent dir (PiNodeRuntime) and names their node_modules

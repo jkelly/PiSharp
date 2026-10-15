@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts (loadExtension: the module is
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/coding-agent/src/core/extensions/loader.ts (loadExtension: the module is
 // imported fresh for every load, its default export is the factory, a failure is "Failed to load extension"). Native C# extensions are
 // PiSharp's own (owner decision 10): they are discovered as Pi discovers extensions and load into their own assembly load context.
 using System.Collections.Immutable;

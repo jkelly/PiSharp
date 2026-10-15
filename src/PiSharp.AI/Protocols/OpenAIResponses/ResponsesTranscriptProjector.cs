@@ -20,7 +20,7 @@ public sealed record ResponsesTranscriptProjectionOptions(
     /// <summary>
     /// Null keeps the text-only profile (image blocks are unsupported content). True projects user and tool-result images as
     /// <c>input_image</c> data URLs; false downgrades them to Pi's non-vision placeholders
-    /// (Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-responses-shared.ts, api/transform-messages.ts).
+    /// (Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/api/openai-responses-shared.ts, api/transform-messages.ts).
     /// </summary>
     public bool? ModelSupportsImages { get; init; }
 }

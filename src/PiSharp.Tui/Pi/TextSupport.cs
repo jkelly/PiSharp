@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/kill-ring.ts, undo-stack.ts, word-navigation.ts, fuzzy.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/tui/src/kill-ring.ts, undo-stack.ts, word-navigation.ts, fuzzy.ts.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;

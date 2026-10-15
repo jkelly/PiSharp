@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/login-dialog.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): coding-agent/src/modes/interactive/components/login-dialog.ts.
 // Upstream shows every prompt (including AuthPrompt type "secret": API keys and tokens) in a plain Input and echoes the
 // submitted value as "> value". That stays the default here. ShowPrompt's opt-in `secret` flag is a PiSharp addition: it
 // renders the typed value and the submitted echo as one '*' per grapheme, leaving the value itself unchanged.
