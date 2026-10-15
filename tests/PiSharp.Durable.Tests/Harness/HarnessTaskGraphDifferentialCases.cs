@@ -1,5 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): a differential check of the task graph view against the pinned upstream. There is no
-// upstream test file: Fixtures/task-graph.upstream.json holds what the pinned pi-durable delivers to a task graph watch acquired before
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): a differential check of the task graph view against the pinned upstream. There is no
+// upstream test file: Fixtures/v1.2.0/task-graph.upstream.json holds what the pinned pi-durable delivers to a task graph watch acquired before
 // the run (the acquisition graph, each frame's operations, the last value) and what a fresh taskGraph() state reads at four pauses, for the
 // scenario of Fixtures/capture-task-graph.mjs on MemoryStorage: harness-task-graph.test.ts's family, with the parent completing only once
 // the late child's phase started, so only one task can run at each step and the frame sequence does not depend on scheduling order. Values
@@ -34,7 +34,7 @@ internal static class TaskGraphDifferentialTests
     private static readonly DurableContext Context = DurableContext.Background;
 
     private static readonly Lazy<JsonObjectValue> Upstream = new(() => (JsonObjectValue)JsonValue.Parse(
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "task-graph.upstream.json"))));
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "tests", "PiSharp.Durable.Tests", "Fixtures", "v1.2.0", "task-graph.upstream.json"))));
 
     internal static (string, Func<Task>) Case(string id, Func<Task<IStorage>> fresh) => Program.Case(id, async () =>
     {

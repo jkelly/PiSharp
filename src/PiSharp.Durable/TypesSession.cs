@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/types.ts (entry drafts and typed entries, commit publications,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (entry drafts and typed entries, commit publications,
 // the Tx and Session surfaces, document states and watches; split from Types.cs). Upstream's overloads keyed by token type become one C#
 // overload per token type; its `(...) => void` disposers become IDisposable; its promises become tasks. A document value is a
 // JsonObjectValue, and null stands for upstream's retired `null` value.

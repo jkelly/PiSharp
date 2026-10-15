@@ -1,8 +1,7 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
-// upstream's HarnessImpl extends SessionImpl.
-// Pi v1.2.0's area b parts of harness.ts are in (durable-sync-1.2.0-worklist.json): every component reads and writes through the Session's
-// Storage guard, safeReport, safeNow, documentRetentionMs, report, assertUsable, and the open failure's close; the header moves to v1.2.0 with
-// area c (the scheduler rewrite, SCHEDULER_INDEX_SIZES), which owns this row.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/harness.ts. The Harness extends the Session kernel, as
+// upstream's HarnessImpl extends SessionImpl. Every component reads and writes through the Session's Storage guard; safeReport, safeNow,
+// documentRetentionMs, report, assertUsable and the open failure's close are v1.2.0's. Upstream's SCHEDULER_INDEX_SIZES symbol getter, for
+// tests, is the internal SchedulerIndexSizes property (the test project sees internals).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
@@ -112,6 +111,9 @@ internal sealed class DurableHarness : Session, IHarness
     internal IStorage Storage => storage;
 
     internal DurableTaskScheduler Scheduler => scheduler;
+
+    /// <summary>Internal, for tests: sizes of the scheduler's ownership indexes (upstream <c>[SCHEDULER_INDEX_SIZES]</c>).</summary>
+    internal SchedulerIndexSizes SchedulerIndexSizes => scheduler.IndexSizes;
 
     internal Submissions Submissions => submissions;
 

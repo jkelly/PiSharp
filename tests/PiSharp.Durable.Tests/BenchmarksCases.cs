@@ -3,11 +3,13 @@ using PiSharp.Durable.Testing;
 
 // P13 (decision 0005): benchmarks/PiSharp.Durable.Benchmarks ports Pi v1.1.0 packages/durable/test/storage.bench.ts, test/storage-memory.ts
 // and test/tool-output-bench.ts over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts), and Pi v1.2.0
-// test/document-append-bench.ts and test/session-document-cache-bench.ts. The benchmarks are report only (docs/durable-benchmarks.md).
+// test/document-append-bench.ts, test/session-document-cache-bench.ts and test/scheduler-memory-bench.ts, plus the PiSharp-authored
+// scheduler-scale (SchedulerScaleBench.cs). The benchmarks are report only (docs/durable-benchmarks.md).
 // This smoke case runs each of them at a tiny size so they cannot rot: one sample per storage scenario on every backend (each scenario's
 // result is checked before it is timed), the footprint worker on every backend in-process, a short rate round closed mid-round and
-// replayed, a firehose, a repetitive firehose, a bash cat of 1 MiB, 20 document appends of each kind, and three conversations at each
-// document retention. It asserts completion and the number of results, never a timing.
+// replayed, a firehose, a repetitive firehose, a bash cat of 1 MiB, 20 document appends of each kind, three conversations at each
+// document retention, three subagent cycles under a live parent, a fan-out of four child tasks and a chain of five. It asserts completion,
+// the number of results and the scheduler's bounded indexes, never a timing.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> BenchmarksCases()
@@ -66,6 +68,16 @@ internal static partial class Program
             Check(cacheRows.All(row => row.Conversations == 3), "document-cache sizes");
             Check(cacheOutput.ToString().StartsWith("conversations | retention", StringComparison.Ordinal), "document-cache table: " + cacheOutput);
             Equal(SessionDocumentCacheBench.DefaultSizes, SessionDocumentCacheBench.ParseSizes(null), "document-cache default sizes");
+
+            var memoryOutput = new StringWriter();
+            var memoryRows = await SchedulerMemoryBench.RunAsync([3], memoryOutput, tempRoot: root);
+            Check(memoryRows is [{ Cycles: 3, Settled: 0, Edges: <= 1, LateReads: > 0 }], "one scheduler-memory row with bounded indexes");
+            Check(memoryOutput.ToString().StartsWith("cycles | ms", StringComparison.Ordinal), "scheduler-memory table: " + memoryOutput);
+            Equal(SchedulerMemoryBench.DefaultSizes, SchedulerMemoryBench.ParseSizes(null), "scheduler-memory default sizes");
+            var scaleOutput = new StringWriter();
+            var scaleRows = await SchedulerScaleBench.RunAsync([4], [5], scaleOutput);
+            Check(scaleRows is [{ Scenario: "fanout", Size: 4, Commits: > 0 }, { Scenario: "chain", Size: 5, Commits: > 0 }], "scheduler-scale rows");
+            Check(scaleOutput.ToString().StartsWith("fanout | ms", StringComparison.Ordinal), "scheduler-scale table: " + scaleOutput);
             Directory.Delete(root, recursive: true);
         });
     }

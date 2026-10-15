@@ -606,8 +606,18 @@ internal sealed class ToolExecutionApi : IToolExecutionApi
     public Task<JsonValue?> MemoAsync(string name, DurableContext context) => runtime.MemoAsync(name, context);
     public Task<JsonValue> MemoAsync(string name, JsonValue candidate, DurableContext context) => runtime.MemoAsync(name, candidate, context);
 
+    /// <summary>
+    /// Pi v1.2.0's default for <c>api.createTask()</c> (tool.ts): a child task of a tool that is not replay-safe gets
+    /// <see cref="TaskOptions.AbandonOnRestart"/>, as such a caller never resumes after a restart; an explicit value wins. Durable work list
+    /// area c (the scheduler) added the option and this hook; area a (tool task v2) applies it in <see cref="CreateTaskAsync"/>, with
+    /// <c>resumes</c> = the tool's <see cref="ToolReplay.Safe"/>, and gives nested calls the same default.
+    /// </summary>
+    internal static TaskOptions ChildTaskOptions(TaskOptions options, bool resumes) =>
+        options.Ownership.TaskId is not null && !resumes && options.AbandonOnRestart is null ? options with { AbandonOnRestart = true } : options;
+
     public async Task<TaskId> CreateTaskAsync(DurableTask task, JsonValue input, TaskOptions options, DurableContext context)
     {
+        // Area a: options = ChildTaskOptions(options, resumes) here (see ChildTaskOptions).
         TaskId id = default;
         await runtime.CommitAsync(async (tx, _) => { id = await tx.CreateTaskAsync(task, input, options).ConfigureAwait(false); }, context)
             .ConfigureAwait(false);

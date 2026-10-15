@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/tasks.ts, plus the TaskDefinition, Task, RunningTask,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/tasks.ts, plus the TaskDefinition, Task, RunningTask,
 // NextTaskState and PhaseHandler types of packages/durable/src/types.ts (the TaskRuntime and HookRunner interfaces are in TypesTasks.cs).
 //
 // Upstream types a definition by its input, checkpoint, result and hook map (TaskDefinition<I, S, R, H>); here a definition is erased:
@@ -99,6 +99,11 @@ public sealed class RunningTask
     public bool Background => Record.Background;
     /// <summary>Whether the task carries a durable abort mark.</summary>
     public bool AbortRequested => Record.AbortRequested;
+    /// <summary>Why the mark was set when not by an abort request: <see cref="TaskAbortReason.Restart"/> for a task abandoned after a
+    /// restart, or below one (upstream <c>abortReason</c>).</summary>
+    public TaskAbortReason? AbortReason => Record.AbortReason;
+    /// <summary>Whether the task was created with <see cref="TaskOptions.AbandonOnRestart"/>.</summary>
+    public bool AbandonOnRestart => Record.AbandonOnRestart;
     /// <summary>First-writer-wins values retained while the task can run.</summary>
     public JsonObjectValue? Memos => Record.Memos;
     /// <summary>The complete durable state execution resumes from.</summary>

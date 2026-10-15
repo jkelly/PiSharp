@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/types.ts (document semantics, records and content; split from
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/types.ts (document semantics, records and content; split from
 // Types.cs). JSON key orders follow the Session (documentCreate() in documents.ts) and MemoryStorage (createdAt/retiredAt stamped last).
 using System.Collections.Immutable;
 using PiSharp.Durable.Chord;

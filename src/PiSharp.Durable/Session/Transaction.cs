@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/session/transaction.ts (Transaction, LoadedDocument,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/session/transaction.ts (Transaction, LoadedDocument,
 // TransactionHost, TransactionScope, applySubmissionChange, planDocument, publishes).
 //
 // A transaction belongs to one commit callback, which holds the Session line, so it never races another transaction. Its own operations
@@ -273,7 +273,8 @@ internal sealed class Transaction : ITx
             var record = new TaskRecord
             {
                 Id = id, ConversationId = conversationId, Kind = definition.Name, Version = definition.Version, Input = input, Owner = owner?.Id,
-                Background = options.Background ?? false, AbortRequested = false, State = new PendingTaskState(checkpoint),
+                Background = options.Background ?? false, AbortRequested = false, AbandonOnRestart = options.AbandonOnRestart == true,
+                State = new PendingTaskState(checkpoint),
             };
             lock (gate) tasksById[id] = new TransactionTask { Write = new TaskWriteCandidate(TaskWriteKind.Create, record) };
             return id;

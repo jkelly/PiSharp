@@ -739,12 +739,13 @@ internal static partial class HarnessTests
             controlled.KeepOpenForReopen = true;
             var (harness, _, reports, root) = await OpenRoot(controlled, [once]);
             var id = await Start(root, once);
-            // WaitForTaskAsync resumes scheduling; upstream's kick waits for a microtask, so the failure is set before the reservation commits.
-            // Here the kick runs on the thread pool at once, so the failure is set first.
+            // WaitForTaskAsync resumes scheduling; upstream's kick waits for a microtask, so the failure is set, and its harness.resume() runs,
+            // before the reservation commits. Here the kick runs on the thread pool at once, so the failure is set first, and the explicit
+            // Resume() comes before the wait: called after it, it could find the reservation already failed and throw SessionFailed itself.
             var failure = new IOException("disk gone");
             controlled.FailNextCommit(failure);
-            var waiting = harness.WaitForTaskAsync(id, Context);
             harness.Resume();
+            var waiting = harness.WaitForTaskAsync(id, Context);
             var end = await harness.Closed;
             Equal(new SessionEnd(SessionEndReason.Failed, failure), end, "closed");
             Seq([failure], reports.Snapshot(), "reports");

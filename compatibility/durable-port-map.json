@@ -221,12 +221,11 @@
       "lines": 470,
       "pisharp": "src/PiSharp.Durable/Harness/Harness.cs",
       "phase": "P6",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "320c712bfa3ca0f1d74343dfbf728f8e191c789f",
       "changedLines": 83,
-      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl (agent, configure, commit, context, entries, fork, abort, waitForIdle) and BoundConversation (abort, waitForIdle). Submissions (P8): Conversation.SubmitAsync, Harness.SubmissionAsync/AbortSubmissionAsync and the bound handle's SubmitAsync. Reset and usage (P10): Conversation.ResetAsync (a write submission of a pi.reset entry with head \"self\" and an optional handoff user message) and IHarness.UsageAsync (every conversation's pi.usage summed). Views (P10): DurableHarness.Views (ConversationViews, built with the Harness) behind Conversation.ViewStateAsync and WatchAsync, and AgentEvents.WatchEventsAsync. TaskGraphAsync and WatchTaskGraphAsync are the task graph (task-graph.ts). Conversation.CompactAsync admits the compaction task (compaction.ts). Tests: harness.tasks.*, harness.conversations.*, harness.ownership.*, harness.lifecycle.*, harness.context.*, harness.inbox.*, harness.view.*, harness.events.* (memory, jsonl, sqlite)",
-      "portedBlobSha1": "320c712bfa3ca0f1d74343dfbf728f8e191c789f"
+      "note": "Harness.OpenAsync, DurableHarness (extends Session: root/conversation/createConversation, the conversation creation hook writing pi.live/pi.inbox/pi.usage/pi.provider/pi.agent then HarnessOptions.ConversationCreated, getTask/inspect/abortTask/waitForTask/waitForIdle, resume, close/join), ConversationImpl and BoundConversation. v1.2.0: every component reads and writes through the Session's Storage guard, safeReport, safeNow, documentRetentionMs, report, assertUsable and the open failure's close; upstream's SCHEDULER_INDEX_SIZES symbol getter is the internal SchedulerIndexSizes property. Submissions (P8), reset and usage (P10), views (P10), the task graph and compaction as in their rows. Tests: harness.tasks.*, harness.conversations.*, harness.ownership.*, harness.lifecycle.*, harness.context.*, harness.inbox.*, harness.view.*, harness.events.*, harness.storage-failure.*, harness.scheduler-retention.* (memory, jsonl, sqlite)"
     },
     {
       "upstream": "packages/durable/src/harness/inbox.ts",
@@ -304,12 +303,11 @@
       "lines": 1953,
       "pisharp": "src/PiSharp.Durable/Harness/Scheduler.cs",
       "phase": "P7",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "dcc611f52d1febc362cb80cbab69559e19f8d46c",
       "changedLines": 808,
-      "note": "DurableTaskScheduler (renamed: System.Threading.Tasks.TaskScheduler is used across the assembly): open/reconcile, reservation, run and abort invocations with a step per phase, sleep, ownership walks, cascades, failFast checks, idle context expiry, inspect, join and waitForIdle. One short lock guards the in-memory mirror (never held across awaits or host code); microtask wakeups are thread-pool work items; AbortController is CancellationSignal; timers come from HarnessOptions.TimeProvider. Tests: harness.tasks.*, harness.tasks-recovery.*, the 41 task-runtime cases of harness.structured.* (memory, jsonl, sqlite), the tool-round cases of harness.structured.* (P8/P9), harness.ownership.* (P11: cascades, owned conversations from tools and supervisors, reopen derivation) and harness.lifecycle.*",
-      "portedBlobSha1": "dcc611f52d1febc362cb80cbab69559e19f8d46c"
+      "note": "DurableTaskScheduler (renamed: System.Threading.Tasks.TaskScheduler is used across the assembly), ported as a whole against v1.2.0: the downward ownership index (below, roots) and the owner edges and ended tasks above live work (edges, settled, unloaded), bounded by live work (dropQueue, swept at the end of each publication and by a sweep job on the line; dropped chains reload from storage), the candidate sets of each pass (intent, runnable, finalizeChecks, failFastChecks, waiters, abandoned), abandonOnRestart with abortReason restart (marked by the first reservation pass after open, cascading, waiting for a missing definition), abortOwned and ownedTasks, the cancellation barrier before each phase, wait-cycle rejection naming the cycle, and v1.2.0's failure handling (a throw in its own commits fails the Session). One short lock guards the in-memory state (never held across awaits or host code); its sets are insertion-ordered (OrderedSet) so each pass stages writes in upstream's order; microtask wakeups and the sweep job's enqueue are thread-pool work items; AbortController is CancellationSignal; timers come from HarnessOptions.TimeProvider. Test probes: SchedulerIndexSizes (upstream SCHEDULER_INDEX_SIZES), QuiesceAsync and SetEntries. Tests: harness.scheduler-indexes.*, harness.scheduler-retention.*, harness.cancellation-barrier.*, harness.ownership.*, harness.structured.*, harness.tasks.*, harness.tasks-recovery.*, harness.task-graph.*, harness.lifecycle.*, compat.wait-cycle.*"
     },
     {
       "upstream": "packages/durable/src/harness/submissions.ts",
@@ -520,12 +518,11 @@
       "lines": 1043,
       "pisharp": "src/PiSharp.Durable/Session/Transaction.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "4c0bfd3e681ab3ad58a895fa03b7901032b766d2",
       "changedLines": 1,
-      "note": "Transaction (ITx): table reads/writes with ReadAfterWrite, documents through the Chord tracker (DraftObject), fork copies, checkpoints, migrations, task records (CreateTaskAsync, internal SetTask; execution is P7), submissions. A lock guards its state because Tx operations may run concurrently in .NET. Tests: session.tables.*, session.documents.*, session.checkpoints-migrations.*, session.forks.* Record key order is upstream's per path: an entry is { ...draft, id, conversationId, head, byTaskId } (EntryRecord/EntryDraft KeyOrder), a submission { ...create, id } with later fields appended, a task's startedAt before memos; checked against upstream-written sessions by compat.*.",
-      "portedBlobSha1": "4c0bfd3e681ab3ad58a895fa03b7901032b766d2"
+      "note": "Transaction (ITx): table reads/writes with ReadAfterWrite, documents through the Chord tracker (DraftObject), fork copies, checkpoints, migrations, task records (CreateTaskAsync, writing abandonOnRestart before state when TaskOptions.AbandonOnRestart is true; internal SetTask; execution is P7), submissions. A lock guards its state because Tx operations may run concurrently in .NET. Tests: session.tables.*, session.documents.*, session.checkpoints-migrations.*, session.forks.*, harness.cancellation-barrier.*, types.task-record-abort-reason-and-abandon-on-restart. Record key order is upstream's per path: an entry is { ...draft, id, conversationId, head, byTaskId } (EntryRecord/EntryDraft KeyOrder), a submission { ...create, id } with later fields appended, a task's startedAt before memos; checked against upstream-written sessions by compat.*."
     },
     {
       "upstream": "packages/durable/src/storage/jsonl/index.ts",
@@ -878,12 +875,11 @@
       "lines": 1154,
       "pisharp": "src/PiSharp.Durable/Types.cs",
       "phase": "P2",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "b2924e82dc8682bdfe321f721b10650cd52a7a52",
       "changedLines": 59,
-      "note": "Records and storage contract, split across Types.cs (conversation, entry, submission and task records), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd/IWatchHandle, IDocumentReader/IDocumentObserver, ISession, ITx), TypesTasks.cs (ITaskRuntime, IHookRunner) and Ids.cs; JSON via ToJson/FromJson in upstream's key order (EntryRecord and SubmissionRecord keep the order they were created or decoded with, KeyOrder), pinned against upstream-written sessions by compat.*. Intentional mapping: TypeScript's phantom type parameters are erased, as documents are JsonObjectValue-typed (Documents.cs row): TaskId<Result>, TaskRecord<Input, Checkpoint, Result> and SettledTask<Result> are TaskId and TaskRecord over JsonValue, so a task's result type, typed input and exhaustive phase map are not checked at compile time (types.test.ts row). The document definition and semantics types (CommonDocDefinition, DocFamilyDefinition, DocumentSemantics and its conversation variants) are Documents.cs's scope-typed tokens, DocumentWatch is IWatchHandle<JsonObjectValue?> and TableCommitChange is ICommitChange. Tests: types.*, storage.*, session.*, compat.*",
-      "portedBlobSha1": "b2924e82dc8682bdfe321f721b10650cd52a7a52"
+      "note": "Records and storage contract, split across Types.cs (conversation, entry, submission and task records; TaskOptions.AbandonOnRestart; TaskRecord.AbortReason and AbandonOnRestart, written only when set, abortReason appended by the mark that sets it), TypesDocuments.cs (document semantics, records, content), TypesStorage.cs (scans, cursors, writes, IStorage and its failure contract), TypesSession.cs (EntryDraft/EntryHead, TypedEntry/TypedEntryDraft, ICommitChange/CommitPublication/DocumentCommitChange, WatchEnd with session_failed, SessionEnd, IWatchHandle, IDocumentReader/IDocumentObserver, ISession with Closed, ITx), TypesTasks.cs (ITaskRuntime with AbortOwnedAsync and OwnedTasksAsync, IHookRunner) and Ids.cs; JSON via ToJson/FromJson in upstream's key order (EntryRecord, SubmissionRecord and TaskRecord keep the order they were created, decoded or marked with, KeyOrder), pinned against upstream-written sessions by compat.*. Intentional mapping: TypeScript's phantom type parameters are erased, as documents are JsonObjectValue-typed (Documents.cs row): TaskId<Result>, TaskRecord<Input, Checkpoint, Result> and SettledTask<Result> are TaskId and TaskRecord over JsonValue, so a task's result type, typed input and exhaustive phase map are not checked at compile time (types.test.ts row). The document definition and semantics types (CommonDocDefinition, DocFamilyDefinition, DocumentSemantics and its conversation variants) are Documents.cs's scope-typed tokens, DocumentWatch is IWatchHandle<JsonObjectValue?> and TableCommitChange is ICommitChange; ownedTasks returns the immutable committed records instead of copies. Tests: types.*, storage.*, session.*, harness.*, compat.*"
     },
     {
       "upstream": "packages/chord/src/context/index.ts",
@@ -1464,8 +1460,9 @@
       "lines": 223,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessCancellationBarrierCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "4 of 4 tests: harness.cancellation-barrier.* on MemoryStorage as upstream (HarnessCancellationBarrierCases.cs). Adapted: HoldMarks is a HookedStorage over MemoryStorage; direct storage writes are TaskWrite records; the flagged-holder case also checks the record's key order (abortReason appended before endedAt)"
     },
     {
       "upstream": "packages/durable/test/harness-compaction.test.ts",
@@ -1632,12 +1629,11 @@
       "lines": 1376,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipCases.cs",
       "phase": "P11",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "c46b51a29564bc6433334d845ce666d411f739d0",
       "changedLines": 469,
-      "note": "26 of 26 tests (25 it() sites; 'derives marks a crash left unapplied below ... at open' is two): harness.ownership.* (26) on MemoryStorage with the reopen cases on a SQLite file as upstream, harness.ownership.jsonl.* (26, reopening a JSONL directory) and harness.ownership.sqlite.* (18, no reopen); support in Harness/HarnessOwnershipSupport.cs. Adapted: per-case Holds fixture instead of module-scope gates and run counts; Rejecting storage and the patched storage.commit are MarkRejectingStorage, a decorator; test.hold's slow abort handler also ends when close aborts its signal (upstream's close never meets a started slow abort handler, as its abort reservation runs after close seals; here the reservation can win that race, and a handler ignoring its signal would hold close forever); the queued-on-the-line case waits for the abort mark to queue behind the held commit (Session.LineBacklog) before the tool queues its submit",
-      "portedBlobSha1": "c46b51a29564bc6433334d845ce666d411f739d0"
+      "note": "41 of 41 tests (37 it() sites; 'derives marks a crash left unapplied below ... at open' and three v1.2.0 sites are parameterized): harness.ownership.* (41) on MemoryStorage with the reopen cases on a SQLite file as upstream, harness.ownership.jsonl.* (40, reopening a JSONL directory) and harness.ownership.sqlite.* (31, no reopen); 'tracks ownership chains deeper than the call stack' runs on MemoryStorage only, as upstream's; support in Harness/HarnessOwnershipSupport.cs. Adapted: per-case Holds fixture instead of module-scope gates and run counts; the failing storage is MarkFailingStorage, a decorator; test.hold's slow abort handler also ends when close aborts its signal; the queued-on-the-line case waits for the abort mark to queue behind the held commit (Session.LineBacklog); the two Set-iteration cases count the members the scheduler's own sets yield (DurableTaskScheduler.SetEntries) under upstream's bounds, after QuiesceAsync, and 'finalizes many held siblings ...' counts from before the leaves' commit"
     },
     {
       "upstream": "packages/durable/test/harness-prompt.test.ts",
@@ -1671,8 +1667,9 @@
       "lines": 259,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessSchedulerIndexesCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "5 of 5 tests: harness.scheduler-indexes.* on SQLite as upstream (HarnessSchedulerIndexesCases.cs, support in HarnessSchedulerSupport.cs). Adapted: per-case gates; upstream's patched storage methods are HookedStorage (a DelegatingStorage); toThrow('invocation has ended') reads the message"
     },
     {
       "upstream": "packages/durable/test/harness-scheduler-retention.test.ts",
@@ -1680,8 +1677,9 @@
       "lines": 583,
       "pisharp": "tests/PiSharp.Durable.Tests/HarnessSchedulerRetentionCases.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "14 of 14 tests: harness.scheduler-retention.* on SQLite as upstream (HarnessSchedulerRetentionCases.cs). Adapted: index sizes are read through DurableHarness.SchedulerIndexSizes after DurableTaskScheduler.QuiesceAsync (upstream's passes run in drained microtasks, these on the thread pool); the spawner and the rejected task read input.into from the record their commit rereads, as the case points them at C after their phase started; 'aborts work created in a forgotten conversation ...' holds keep's abort on a gate until late is checked, so P is still cancelling; the no-scan case waits upstream's 20 ms and then quiesces"
     },
     {
       "upstream": "packages/durable/test/harness-storage-failure.test.ts",
@@ -1708,12 +1706,11 @@
       "lines": 1914,
       "pisharp": "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs",
       "phase": "P7",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "f061e1055d819234267979e559531293025b7f11",
       "changedLines": 268,
-      "note": "All 50 upstream tests ported (48 it() sites; two sites are parameterized into two tests each), as harness.structured.* (50 cases) on MemoryStorage with SQLite reopen for the recovery describes, harness.structured.jsonl.* (50, JSONL reopen) and harness.structured.sqlite.* (42, no reopen); support in Harness/HarnessStructuredSupport.cs. Harness/HarnessStructuredToolRoundsCases.cs ports the 'tool rounds' tests 'keeps run control with a faulted generation until its owned work drains, and retries a rejected final commit' (P8), 'owns its tool tasks, waits for them, and hands the run to a conversation-owned generation', 'aborts a parallel round with its generation: tools first, then the generation, with every result written' and 'answers the unstarted calls of an aborted sequential round with aborted results, in call order' (P9). Harness/HarnessStructuredEventsCases.cs ports the tests that listen to agent events (P10): 'ends a turn at the generation's hold, before its successor's turn starts' and the four 'tool rounds and events' tests. Adapted: per-case Nodes fixture instead of module state; deferred barrier where a script reads the parent ID the test assigns after start(); Committed barrier for handler-assigned IDs; settled(...)=true awaits the task; a null TaskOptions ownership for upstream's {} (NullReferenceException for TypeError); Rejecting storage is a decorator; invalidFinalStream carries a non-finite usage count",
-      "portedBlobSha1": "f061e1055d819234267979e559531293025b7f11"
+      "note": "All 58 upstream tests ported (56 it() sites; two sites are parameterized into two tests each), as harness.structured.* (58) on MemoryStorage with SQLite reopen for the recovery describes, harness.structured.jsonl.* (58, JSONL reopen) and harness.structured.sqlite.* (50, no reopen); support in Harness/HarnessStructuredSupport.cs. v1.2.0: the eight wait-cycle cases (#10411, #10533) and 'is a wait cycle' for waits on itself or an owner; the fail-and-reopen finalization cases. Harness/HarnessStructuredToolRoundsCases.cs and Harness/HarnessStructuredEventsCases.cs port the tool-round and event tests. Adapted: per-case Nodes fixture instead of module state; deferred barriers where a script reads an ID the test assigns after start() (also the reviewer of 'rejects a cycle of a hold and two waits that each look reasonable'); Committed barrier for handler-assigned IDs; settled(...)=true awaits the task; a null TaskOptions ownership for upstream's {} (NullReferenceException for TypeError); the failing storage is a decorator"
     },
     {
       "upstream": "packages/durable/test/harness-submissions.test.ts",
@@ -1765,7 +1762,7 @@
       "upstreamChange": "modified",
       "previousBlobSha1": "f88b25567b2b95d9736e642d6b09f747ed3be679",
       "changedLines": 80,
-      "note": "harness.tasks.* (39 cases) on MemoryStorage, plus harness.tasks.jsonl.* and harness.tasks.sqlite.* (Harness/HarnessBackendCases.cs). Adapted (barriers instead of microtask timing): reads-committed-documents (InvocationEnded), resumes-a-waiting-task (Eventually), does-not-signal-a-running-abort-handler and keeps-a-terminal-outcome-committed-by-an-abort-handler (run-started deferred), signals-and-joins-the-run (abort handler gated until the second abort); AbortError is OperationCanceledException v1.2.0: \"fails the Harness on a failed reservation commit; reopening runs the task\" (the failure is set before WaitForTaskAsync resumes scheduling: the C# kick runs at once, upstream's after a microtask) and \"fails the Harness instead of running a task again when its fault write fails\", reopening through ControlledStorage.KeepOpenForReopen."
+      "note": "harness.tasks.* (39 cases) on MemoryStorage, plus harness.tasks.jsonl.* and harness.tasks.sqlite.* (Harness/HarnessBackendCases.cs). Adapted (barriers instead of microtask timing): reads-committed-documents (InvocationEnded), resumes-a-waiting-task (Eventually), does-not-signal-a-running-abort-handler and keeps-a-terminal-outcome-committed-by-an-abort-handler (run-started deferred), signals-and-joins-the-run (abort handler gated until the second abort); AbortError is OperationCanceledException v1.2.0: \"fails the Harness on a failed reservation commit; reopening runs the task\" (the failure is set, and Resume() called, before WaitForTaskAsync resumes scheduling: the C# kick runs at once, upstream's after a microtask) and \"fails the Harness instead of running a task again when its fault write fails\", reopening through ControlledStorage.KeepOpenForReopen."
     },
     {
       "upstream": "packages/durable/test/harness-tools-recovery.test.ts",
@@ -1881,8 +1878,9 @@
       "lines": 130,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/SchedulerMemoryBench.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "SchedulerMemoryBench.cs (scheduler-memory [N,...]): upstream's table and its index-growth check; index sizes by reflection after the scheduler's pending passes; storage reads counted by a decorator; heap growth from HeapRetained.cs. Report only (docs/durable-benchmarks.md); benchmarks.smoke runs three cycles"
     },
     {
       "upstream": "packages/durable/test/session-checkpoints-migrations.test.ts",

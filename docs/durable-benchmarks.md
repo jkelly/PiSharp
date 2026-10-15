@@ -2,7 +2,7 @@
 
 Report only. These numbers are a snapshot of one machine; nothing in CI passes or fails on them. The `benchmarks.smoke` case in `tests/PiSharp.Durable.Tests` runs every benchmark at a tiny size so the ports keep working, and asserts completion only.
 
-PiSharp ports five upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
+PiSharp ports six upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5efc0fc021be1bdff`) in `benchmarks/PiSharp.Durable.Benchmarks`, over the storage benchmark kit `src/PiSharp.Durable/Testing/StorageBenchmark.cs` (upstream `src/testing/storage-benchmark.ts`):
 
 | upstream | PiSharp | what it measures |
 |---|---|---|
@@ -11,8 +11,10 @@ PiSharp ports five upstream benchmarks of Pi v1.2.0 (`06a466935536f8c9bcacb2d5ef
 | `test/tool-output-bench.ts` (`npm run bench:tool-output`) | `ToolOutputBench.cs` (`tool-output`) | the tool task, progress throttle and `pi.live` commits at low, normal and high output rates, the 1 GiB firehose and `cat` |
 | `test/document-append-bench.ts` (`npm run bench:document-append`, new in v1.2.0) | `DocumentAppendBench.cs` (`document-append [N,...]`) | one commit per appended item: one array in one document against one family member per item |
 | `test/session-document-cache-bench.ts` (`npm run bench:document-cache`, new in v1.2.0) | `SessionDocumentCacheBench.cs` (`document-cache [N,...]`), with `HeapRetained.cs` (`test/heap-retained.ts`) | the Session document cache at four retentions: cached documents, retained bytes per conversation and the cost of reading an old conversation's document again |
+| `test/scheduler-memory-bench.ts` (`npm run bench:scheduler-memory`, new in v1.2.0) | `SchedulerMemoryBench.cs` (`scheduler-memory [N,...]`) | the scheduler's ownership index sizes and retained bytes after N ended subagent cycles under a live parent, and the storage reads a later message into an old subagent conversation costs |
+| none: PiSharp-authored, Node twin `benchmarks/PiSharp.Durable.Benchmarks/node/scheduler-scale-bench.ts` | `SchedulerScaleBench.cs` (`scheduler-scale [fanout N,...] [chain N,...]`) | the scheduler's fan-out (one tool creating N child tasks at once) and owned chains of N tasks settling bottom-up |
 
-Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]]`. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
+Run them with `dotnet run -c Release --project benchmarks/PiSharp.Durable.Benchmarks -- [storage] [storage-memory] [tool-output] [document-append [N,...]] [document-cache [N,...]] [scheduler-memory [N,...]] [scheduler-scale [fanout N,...] [chain N,...]]`. Upstream's `test/scheduler-fanout-bench.ts` (`npm run bench:scheduler-fanout`) makes nested tool calls, which arrive with work list area a; it is ported there. There is no benchmark library and no new dependency. The timing loops mirror upstream's.
 
 ## Machine
 
@@ -226,6 +228,39 @@ Measured on 2026-10-15, same machine, one run each.
 - **The cache behaves as upstream's.** Kept documents leave the same 6,000 and 26,000 documents (the five built-in documents of each conversation, warm-up ones included), and both evicting retentions leave none. Upstream's changelog reports 26,000 documents and about 3.8 KB each for 5,000 conversations without eviction.
 - **A kept conversation costs about 4.8 KB in PiSharp, about 3.9 to 4.6 KB under Node.** With eviction, a conversation retains well under 100 bytes in both.
 - **Reading an evicted document costs about 30 µs in both**, a SQLite reload; a cached read costs a few microseconds. The 50 ms rows read after the timer evicted.
+
+## Scheduler (`scheduler-memory-bench.ts` and `scheduler-scale`)
+
+Pi v1.2.0 rewrote the scheduler (work list area c): no pass visits every live task any more, and the ownership indexes are bounded by live work. Measured on 2026-10-15, same machine, one run each. "Before" is PiSharp's branch at `8b97eb5`, the v1.1.0 scheduler, with the same `SchedulerScaleBench.cs`.
+
+**Memory** (`scheduler-memory-bench.ts`, SQLite). Retained bytes are the growth over the cycles (Node: heap snapshot self sizes; PiSharp: `HeapRetained.cs`).
+
+| cycles | Node ms (unchanged) | Node ms (release without polling) | PiSharp ms | settled, edges, below (all) | Node retained | PiSharp retained | reads for a later message (Node / PiSharp) |
+|---:|---:|---:|---:|---|---:|---:|---|
+| 1,000 | 11,912 | 1,099 | 1,559 | 0, 1, 1 | 5.0 MiB, 5,191 B/cycle | 4.6 MiB, 4,859 B/cycle | 7 / 6 |
+| 10,000 | 125,432 | 11,328 | 11,279 | 0, 1, 1 | 35.9 MiB, 3,763 B/cycle | 44.2 MiB, 4,638 B/cycle | 7 / 6 |
+
+- **The indexes stay bounded in both.** After the cycles nothing is settled, and only the parent's conversation edge and its one listed child remain, as upstream's changelog reports. The benchmark's own check passes in both.
+- **The unchanged Node time is the benchmark's `release()`**, which polls with `setTimeout(0)` until the task waits, about 11 ms a cycle on Windows. With a release that opens the gate before or after the task waits, as PiSharp's does, Node runs 1,000 cycles in 1.1 s and 10,000 in 11.3 s; PiSharp takes 1.6 s and 11.3 s.
+- **A later message reads the same chain in both:** the old conversation and its ended tool task, two reads from the scheduler's chain load. The seventh read under the unchanged Node run is its final `waitForTask`, which finds the late task already terminal after the polling delay; without the polling Node reads 6 too.
+- **A cycle retains about 4.6 to 4.9 KB in PiSharp and 3.8 to 5.2 KB under Node.** The benchmark runs with the default ten-minute document retention, so each subagent conversation's documents stay cached; the scheduler keeps none of the ended cycles.
+
+**Scale** (`scheduler-scale`, memory storage; the Node twin runs the same scenarios on the pinned upstream). Commits are equal in all three for every size.
+
+| scenario | N | before (v1.1.0 scheduler) | PiSharp | Node | commits |
+|---|---:|---:|---:|---:|---:|
+| fan-out | 250 | 259 ms | 219 ms | 35 ms | 516 |
+| fan-out | 500 | 151 ms | 22 ms | 37 ms | 1,016 |
+| fan-out | 1,000 | 304 ms | 46 ms | 64 ms | 2,016 |
+| fan-out | 2,000 | 488 ms | 93 ms | 114 ms | 4,016 |
+| fan-out | 4,000 | 1,093 ms | 228 ms | 209 ms | 8,016 |
+| chain | 500 | 2,432 ms | 31 ms | 19 ms | 504 |
+| chain | 2,000 | 1,061,190 ms | 76 ms | 78 ms | 2,004 |
+| chain | 20,000 | not run | 771 ms | 887 ms | 20,004 |
+
+- **Owned chains settle in linear time.** Before, a 500-task chain took 2.4 s and a 2,000-task chain almost 18 minutes; now 31 ms and 76 ms, and 20,000 tasks 0.8 s, close to Node (upstream's changelog: 500 tasks took 12 s before, 50 ms after, 20,000 take 1.5 s).
+- **Fan-out is linear in both runtimes, and PiSharp matches Node from 500 children up.** The first PiSharp row includes JIT warm-up. Before the rewrite it was about four to seven times slower, as each pass scanned every live child.
+- Upstream's own fan-out benchmark (nested calls, area a) reports 8,000 nested calls in 2.7 s instead of 18.8 s; under Node on this machine its 250 to 4,000 calls take 110 to 771 ms.
 
 ## Throughput target
 

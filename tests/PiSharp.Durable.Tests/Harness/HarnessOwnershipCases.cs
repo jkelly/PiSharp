@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-ownership.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-ownership.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs, ChatSupport.cs and HarnessOwnershipSupport.cs, and these:
 // - Backends. Upstream runs these on MemoryStorage and reopens a SQLite file for the reopen cases. HarnessOwnershipCases() does the same
 //   (ids harness.ownership.<test>); HarnessOwnershipJsonlCases() reruns every case on JSONL, reopen cases reopening a JSONL directory;
@@ -9,8 +9,12 @@
 //   and then lets the tool queue its submit. Handlers here run on other threads, so the case waits until the mark is queued on the Session
 //   line (Session.LineBacklog, a deterministic barrier) before it lets the tool go.
 // - Tools and supervisors append the IDs they see from other threads, so those lists are SyncLists.
-// - Pi v1.2.0's queuedNote: writes queued while busy carry a model message, as a data-only write is appended at once (area i; the rest
-//   of this file follows with area c).
+// - Pi v1.2.0's queuedNote: writes queued while busy carry a model message, as a data-only write is appended at once (area i).
+// - Pi v1.2.0's two cases that count Set iterations (upstream patches Set.prototype[Symbol.iterator]) count the members the scheduler's own
+//   sets yield (DurableTaskScheduler.SetEntries), under the same bounds, after the scheduler's pending passes have run (QuiesceAsync).
+//   "finalizes many held siblings ..." starts counting before the leaves' commit, so its count also covers the tracking that upstream's
+//   leaves out, and first waits until every sibling holds.
+// - "tracks ownership chains deeper than the call stack" (20,000 tasks in one commit) runs on MemoryStorage only, as upstream's does.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
@@ -330,6 +334,338 @@ internal static partial class OwnershipTests
             await reopened.Harness.CloseAsync(Context);
             await controlled.Inner.CloseAsync(Context);
         });
+
+        // ─── Pi v1.2.0: the ownership index (area c) ───
+
+        yield return Case(prefix + "holds-an-owner-for-work-in-a-conversation-its-ended-child-task-owns", async () =>
+        {
+            var holds = new Holds();
+            var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+            var (owner, child, conversation) = await root.CommitAsync(async tx =>
+            {
+                var owner = await tx.CreateTaskAsync(holds.Hold, Holds.Input("owner"), OwnConversation());
+                var child = await tx.CreateTaskAsync(holds.Hold, Holds.Input("child"), new TaskOptions(TaskOwnership.Task(owner)));
+                var conversation = await tx.CreateConversationAsync(ConversationOwnership.Task(child));
+                return (owner, child, conversation.Id);
+            }, Context);
+            holds.Open("child");
+            Equal("completed", await OutcomeOf(harness, child), "child outcome");
+            // The ended child's conversation still belongs to the owner above it.
+            var handle = (await harness.ConversationAsync(conversation, Context))!;
+            await handle.CommitAsync(tx => tx.CreateTaskAsync(holds.Hold, Holds.Input("late"), OwnConversation()), Context);
+            holds.Open("owner");
+            await Eventually(async () => await StatusOf(harness, owner) == DurableTaskStatus.Completing);
+            holds.Open("late");
+            Equal("completed", await OutcomeOf(harness, owner), "owner outcome");
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "cascades-through-ended-tasks-into-an-owned-background-subtree-when-aborting-across-background", async () =>
+        {
+            var holds = new Holds();
+            var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+            // root conversation -> A -> B -> conversation -> background C -> D
+            var (a, b, c, d) = await root.CommitAsync(async tx =>
+            {
+                var a = await tx.CreateTaskAsync(holds.Hold, Holds.Input("a"), OwnConversation());
+                var b = await tx.CreateTaskAsync(holds.Hold, Holds.Input("b"), new TaskOptions(TaskOwnership.Task(a)));
+                var conversation = await tx.CreateConversationAsync(ConversationOwnership.Task(b));
+                var c = await tx.CreateTaskAsync(holds.Hold, Holds.Input("c"), OwnConversation(conversation.Id, background: true));
+                var d = await tx.CreateTaskAsync(holds.Hold, Holds.Input("d"), new TaskOptions(TaskOwnership.Task(c)));
+                return (a, b, c, d);
+            }, Context);
+            holds.Open("b");
+            holds.Open("a");
+            Equal("completed", await OutcomeOf(harness, a), "a outcome");
+            await root.AbortAsync(Context, new ConversationAbortOptions { Background = true });
+            foreach (var id in new[] { c, d }) Equal("aborted", await OutcomeOf(harness, id), $"task {id}");
+            _ = b;
+            await harness.CloseAsync(Context);
+        });
+
+        yield return Case(prefix + "keeps-ownership-queries-off-finished-subtrees", async () =>
+        {
+            var holds = new Holds();
+            var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+            // Ended chains under a live owner, each ending in an empty owned conversation.
+            var owner = await root.CommitAsync(tx => tx.CreateTaskAsync(holds.Hold, Holds.Input("owner"), OwnConversation()), Context);
+            const int chains = 50;
+            var tasks = new List<TaskId>();
+            for (var n = 0; n < chains; n++)
+            {
+                var index = n;
+                var (first, second) = await root.CommitAsync(async tx =>
+                {
+                    var first = await tx.CreateTaskAsync(holds.Hold, Holds.Input($"c{index}.0"), new TaskOptions(TaskOwnership.Task(owner)));
+                    var second = await tx.CreateTaskAsync(holds.Hold, Holds.Input($"c{index}.1"), new TaskOptions(TaskOwnership.Task(first)));
+                    await tx.CreateConversationAsync(ConversationOwnership.Task(second));
+                    return (first, second);
+                }, Context);
+                tasks.Add(first);
+                tasks.Add(second);
+            }
+            for (var n = 0; n < chains; n++)
+            {
+                holds.Open($"c{n}.1");
+                holds.Open($"c{n}.0");
+            }
+            foreach (var id in tasks) await harness.WaitForTaskAsync(id, Context);
+            // Set iterations while the owner settles, a measure of the walks down: one through every ended task iterates hundreds of entries;
+            // one over live work alone, none below the owner. Here the scheduler's own sets count the members they yield.
+            var scheduler = ((DurableHarness)harness).Scheduler;
+            await scheduler.QuiesceAsync();
+            var before = scheduler.SetEntries;
+            holds.Open("owner");
+            Equal("completed", await OutcomeOf(harness, owner), "owner outcome");
+            await scheduler.QuiesceAsync();
+            var entries = scheduler.SetEntries - before;
+            Check(entries < chains, $"set entries {entries} < {chains}");
+            await harness.CloseAsync(Context);
+        });
+
+        if (prefix == "harness.ownership.")
+        {
+            // Upstream runs these on MemoryStorage only, as this group does: 20,000 tasks in one commit.
+            yield return Case(prefix + "tracks-ownership-chains-deeper-than-the-call-stack", async () =>
+            {
+                var holds = new Holds();
+                var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+                // 20,000 tasks, each owning the next, created in one commit above a live leaf; they end top-down and hold.
+                const int depth = 20_000;
+                var (top, leaf) = await root.CommitAsync(async tx =>
+                {
+                    var top = await tx.CreateTaskAsync(holds.Hold, Holds.Input("top"), OwnConversation());
+                    var owner = top;
+                    for (var n = 0; n < depth; n++)
+                        owner = await tx.CreateTaskAsync(holds.Hold, Holds.Input($"link{n}"), new TaskOptions(TaskOwnership.Task(owner)));
+                    var leaf = await tx.CreateTaskAsync(holds.Hold, Holds.Input("leaf"), new TaskOptions(TaskOwnership.Task(owner)));
+                    return (top, leaf);
+                }, Context);
+                for (var n = 0; n < depth; n++) holds.Open($"link{n}");
+                holds.Open("top");
+                await Eventually(async () => await StatusOf(harness, top) == DurableTaskStatus.Completing);
+                holds.Open("leaf");
+                Equal("completed", await OutcomeOf(harness, leaf), "leaf outcome");
+                Equal("completed", await OutcomeOf(harness, top), "top outcome");
+                await harness.CloseAsync(Context);
+            });
+        }
+
+        yield return Case(prefix + "holds-an-owner-for-work-created-later-below-ended-tasks-without-a-reopen", async () =>
+        {
+            var holds = new Holds();
+            var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+            // Live P owns B, which owns A, which owns the empty conversation C; B and A end, C stays.
+            var (p, b, c) = await root.CommitAsync(async tx =>
+            {
+                var p = await tx.CreateTaskAsync(holds.Hold, Holds.Input("p"), OwnConversation());
+                var b = await tx.CreateTaskAsync(holds.Hold, Holds.Input("b"), new TaskOptions(TaskOwnership.Task(p)));
+                var a = await tx.CreateTaskAsync(holds.Hold, Holds.Input("a"), new TaskOptions(TaskOwnership.Task(b)));
+                var c = await tx.CreateConversationAsync(ConversationOwnership.Task(a));
+                return (p, b, c.Id);
+            }, Context);
+            holds.Open("a");
+            holds.Open("b");
+            await harness.WaitForTaskAsync(b, Context);
+            var conversation = (await harness.ConversationAsync(c, Context))!;
+            var d = await conversation.CommitAsync(tx => tx.CreateTaskAsync(holds.Hold, Holds.Input("d"), OwnConversation()), Context);
+            holds.Open("p");
+            await Eventually(async () => await StatusOf(harness, p) == DurableTaskStatus.Completing);
+            holds.Open("d");
+            Equal("completed", await OutcomeOf(harness, d), "d outcome");
+            Equal("completed", await OutcomeOf(harness, p), "p outcome");
+            await harness.CloseAsync(Context);
+        });
+
+        // Live P owns `depth` ended tasks in a chain, the last owning conversation C, empty when they ended. Work started in C later is still
+        // P's: every case below must reach it through the ended tasks (upstream endedBridge).
+        async Task<(IHarness Harness, IConversation Root, TaskId P, Func<string, Task<TaskId>> Create)> EndedBridge(Holds holds, int depth)
+        {
+            var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+            var (p, links, c) = await root.CommitAsync(async tx =>
+            {
+                var p = await tx.CreateTaskAsync(holds.Hold, Holds.Input("p", slowAbort: true), OwnConversation());
+                var links = new List<TaskId>();
+                var owner = p;
+                for (var n = 0; n < depth; n++)
+                {
+                    owner = await tx.CreateTaskAsync(holds.Hold, Holds.Input($"link{n}"), new TaskOptions(TaskOwnership.Task(owner)));
+                    links.Add(owner);
+                }
+                var c = await tx.CreateConversationAsync(ConversationOwnership.Task(owner));
+                return (p, links, c.Id);
+            }, Context);
+            for (var n = depth - 1; n >= 0; n--) holds.Open($"link{n}");
+            foreach (var id in links) await harness.WaitForTaskAsync(id, Context);
+            var conversation = (await harness.ConversationAsync(c, Context))!;
+            return (harness, root, p, name => conversation.CommitAsync(tx => tx.CreateTaskAsync(holds.Hold, Holds.Input(name), OwnConversation()), Context));
+        }
+
+        foreach (var depth in new[] { 2, 5 })
+        {
+            yield return Case(prefix + $"aborts-work-below-{depth}-ended-tasks-with-their-live-owner-which-waits-for-it", async () =>
+            {
+                var holds = new Holds();
+                var (harness, _, p, create) = await EndedBridge(holds, depth);
+                var d = await create("d");
+                await harness.AbortTaskAsync(p, Context);
+                Equal("aborted", await OutcomeOf(harness, d), "d outcome");
+                // P's abort handler ran only after D ended.
+                holds.Open("abort.p");
+                Equal("aborted", await OutcomeOf(harness, p), "p outcome");
+                await harness.CloseAsync(Context);
+            });
+
+            yield return Case(prefix + $"keeps-the-root-busy-and-aborts-with-it-work-below-{depth}-ended-tasks", async () =>
+            {
+                var holds = new Holds();
+                var (harness, root, p, create) = await EndedBridge(holds, depth);
+                holds.Open("p");
+                await harness.WaitForTaskAsync(p, Context);
+                // P has ended: D and D2 hang below ended tasks only, and are still the root conversation's work.
+                var d = await create("d");
+                var d2 = await create("d2");
+                Check(!await Settled(root.WaitForIdleAsync(Context)), "root busy");
+                Check(!await Settled(harness.WaitForIdleAsync(Context)), "harness busy");
+                await root.AbortAsync(Context);
+                foreach (var id in new[] { d, d2 }) Equal("aborted", await OutcomeOf(harness, id), $"task {id}");
+                await harness.CloseAsync(Context);
+            });
+        }
+
+        yield return Case(prefix + "reaches-work-below-ended-tasks-across-two-owned-conversations", async () =>
+        {
+            var holds = new Holds();
+            var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+            // Live P -> ended B -> conversation C -> ended X -> ended A -> conversation C2; work starts in C2 later. X owns no conversation, only
+            // the task A, so only owning a known task keeps it.
+            var (p, b, c2) = await root.CommitAsync(async tx =>
+            {
+                var p = await tx.CreateTaskAsync(holds.Hold, Holds.Input("p"), OwnConversation());
+                var b = await tx.CreateTaskAsync(holds.Hold, Holds.Input("b"), new TaskOptions(TaskOwnership.Task(p)));
+                var c = await tx.CreateConversationAsync(ConversationOwnership.Task(b));
+                var x = await tx.CreateTaskAsync(holds.Hold, Holds.Input("x"), OwnConversation(c.Id));
+                var a = await tx.CreateTaskAsync(holds.Hold, Holds.Input("a"), new TaskOptions(TaskOwnership.Task(x)));
+                var c2 = await tx.CreateConversationAsync(ConversationOwnership.Task(a));
+                return (p, b, c2.Id);
+            }, Context);
+            holds.Open("a");
+            holds.Open("x");
+            holds.Open("b");
+            await harness.WaitForTaskAsync(b, Context);
+            var conversation = (await harness.ConversationAsync(c2, Context))!;
+            var d = await conversation.CommitAsync(tx => tx.CreateTaskAsync(holds.Hold, Holds.Input("d"), OwnConversation()), Context);
+            holds.Open("p");
+            await Eventually(async () => await StatusOf(harness, p) == DurableTaskStatus.Completing);
+            Check(!await Settled(root.WaitForIdleAsync(Context)), "root busy");
+            await root.AbortAsync(Context);
+            Equal("aborted", await OutcomeOf(harness, d), "d outcome");
+            Equal("completed", await OutcomeOf(harness, p), "p outcome");
+            await harness.CloseAsync(Context);
+        });
+
+        foreach (var ending in new[] { "completes", "is aborted" })
+        {
+            yield return Case(prefix + $"frees-an-owner-that-{ending.Replace(' ', '-')}-once-the-last-work-below-ended-tasks-ends-after-a-background-task-there", async () =>
+            {
+                var holds = new Holds();
+                var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+                // Live P owns B, which owns A, which owns conversation C with background Z and, later, foreground D.
+                var (p, b, c, z) = await root.CommitAsync(async tx =>
+                {
+                    var p = await tx.CreateTaskAsync(holds.Hold, Holds.Input("p"), OwnConversation());
+                    var b = await tx.CreateTaskAsync(holds.Hold, Holds.Input("b"), new TaskOptions(TaskOwnership.Task(p)));
+                    var a = await tx.CreateTaskAsync(holds.Hold, Holds.Input("a"), new TaskOptions(TaskOwnership.Task(b)));
+                    var c = await tx.CreateConversationAsync(ConversationOwnership.Task(a));
+                    var z = await tx.CreateTaskAsync(holds.Hold, Holds.Input("z"), OwnConversation(c.Id, background: true));
+                    return (p, b, c.Id, z);
+                }, Context);
+                holds.Open("a");
+                holds.Open("b");
+                await harness.WaitForTaskAsync(b, Context);
+                var conversation = (await harness.ConversationAsync(c, Context))!;
+                var d = await conversation.CommitAsync(tx => tx.CreateTaskAsync(holds.Hold, Holds.Input("d", slowAbort: true), OwnConversation()), Context);
+                if (ending == "completes")
+                {
+                    holds.Open("p");
+                    await Eventually(async () => await StatusOf(harness, p) == DurableTaskStatus.Completing);
+                }
+                else
+                {
+                    // P waits for D's abort before its own abort handler runs.
+                    await harness.AbortTaskAsync(p, Context);
+                    await Eventually(async () => (await harness.GetTaskAsync(d, Context))!.AbortRequested);
+                }
+                // Z ends first, D last.
+                holds.Open("z");
+                await harness.WaitForTaskAsync(z, Context);
+                if (ending == "completes") holds.Open("d");
+                else holds.Open("abort.d");
+                await harness.WaitForTaskAsync(d, Context);
+                Equal(ending == "completes" ? "completed" : "aborted", await OutcomeOf(harness, p), "p outcome");
+                await harness.CloseAsync(Context);
+            });
+        }
+
+        yield return Case(prefix + "finalizes-many-held-siblings-that-end-together-in-one-pass", async () =>
+        {
+            var holds = new Holds();
+            var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+            // Top holds 1000 held children, each holding one live leaf; the leaves end in one commit.
+            const int count = 1000;
+            var (top, leaves) = await root.CommitAsync(async tx =>
+            {
+                var top = await tx.CreateTaskAsync(holds.Hold, Holds.Input("top"), OwnConversation());
+                var siblings = new List<TaskId>();
+                for (var n = 0; n < count; n++)
+                    siblings.Add(await tx.CreateTaskAsync(holds.Hold, Holds.Input($"s{n}"), new TaskOptions(TaskOwnership.Task(top))));
+                // Leaves in reverse sibling order: the last sibling is freed first, so a holder checked after each freed sibling would scan the
+                // siblings already finalized each time.
+                var leaves = new List<TaskId>();
+                for (var n = count - 1; n >= 0; n--)
+                    leaves.Add(await tx.CreateTaskAsync(holds.Hold, Holds.Input($"l{n}"), new TaskOptions(TaskOwnership.Task(siblings[n]))));
+                return (top, leaves);
+            }, Context);
+            for (var n = 0; n < count; n++) holds.Open($"s{n}");
+            holds.Open("top");
+            await Eventually(async () => await StatusOf(harness, top) == DurableTaskStatus.Completing);
+            // Every sibling holds too before the leaves end.
+            await Eventually(async () => (await harness.InspectAsync(Context)).Tasks.Count(task => task.Record.State.Status == DurableTaskStatus.Completing) == count + 1);
+            // Set entries iterated while it all finalizes: one pass is linear, a recheck per sibling quadratic (~500,000). Counted here from
+            // before the leaves' commit, whose tracking upstream's count leaves out, so this bound is the stricter one.
+            var scheduler = ((DurableHarness)harness).Scheduler;
+            await scheduler.QuiesceAsync();
+            var before = scheduler.SetEntries;
+            await SetTasks(harness, root, async tx =>
+            {
+                // Reads before the first write. Ended last to first, so a holder checked after each sibling would scan the ones already
+                // finalized every time.
+                var records = new List<TaskRecord>();
+                foreach (var id in leaves) records.Add((await tx.GetTaskAsync(id))!);
+                foreach (var record in records) tx.SetTask(record with { State = NextTaskState.Completed(JsonValue.Null) });
+            });
+            Equal("completed", await OutcomeOf(harness, top), "top outcome");
+            await scheduler.QuiesceAsync();
+            var entries = scheduler.SetEntries - before;
+            Check(entries < count * 20, $"set entries {entries} < {count * 20}");
+            await harness.CloseAsync(Context);
+        });
+
+        // Pins the Transaction rule that a conversation cannot be created in the commit that ends its owner task.
+        yield return Case(prefix + "rejects-a-conversation-created-in-the-commit-that-ends-its-owner-task", async () =>
+        {
+            var holds = new Holds();
+            var (harness, root, _, _) = await holds.OpenHarness(await fresh());
+            var spawner = await root.CommitAsync(tx => tx.CreateTaskAsync(holds.Spawner, Holds.Input("spawned"), OwnConversation()), Context);
+            var outcome = ((SettlingTaskState)(await harness.WaitForTaskAsync(spawner, Context)).State).Outcome;
+            Check(outcome is FaultedTaskOutcome, $"faulted, actual {outcome.ToJson().ToJson()}");
+            var message = ((FaultedTaskOutcome)outcome).Error.Message;
+            Check(message == $"Conversation owner task {spawner} is completing" || message == $"Conversation owner task {spawner} is terminal",
+                $"message: {message}");
+            // toEqual: the outcome is exactly { status, error: { message } }.
+            SameJson(Obj(("status", "faulted"), ("error", Obj(("message", message)))).ToJson(), outcome.ToJson(), "outcome");
+            await harness.CloseAsync(Context);
+        });
     }
 
     private static IEnumerable<(string, Func<Task>)> OwnershipReopen(string prefix, Func<StructuredTests.OpenLocation> reopenable)
@@ -449,6 +785,38 @@ internal static partial class OwnershipTests
             // Reopening derives the mark again.
             opened = await holds.OpenHarness(await location());
             Equal("aborted", await OutcomeOf(opened.Harness, late), "late");
+            await opened.Harness.CloseAsync(Context);
+        });
+
+        // Pi v1.2.0 (area c): the ownership index loads ended chains from storage again.
+        yield return Case(prefix + "holds-an-owner-for-work-a-commit-creates-below-ended-tasks-loaded-from-storage", async () =>
+        {
+            var holds = new Holds();
+            var location = reopenable();
+            var opened = await holds.OpenHarness(await location());
+            // Live P owns B, which owns A, which owns the empty conversation C; B and A end.
+            var (p, a, b, c) = await opened.Root.CommitAsync(async tx =>
+            {
+                var p = await tx.CreateTaskAsync(holds.Hold, Holds.Input("p"), OwnConversation());
+                var b = await tx.CreateTaskAsync(holds.Hold, Holds.Input("b"), new TaskOptions(TaskOwnership.Task(p)));
+                var a = await tx.CreateTaskAsync(holds.Hold, Holds.Input("a"), new TaskOptions(TaskOwnership.Task(b)));
+                var c = await tx.CreateConversationAsync(ConversationOwnership.Task(a));
+                return (p, a, b, c.Id);
+            }, Context);
+            holds.Open("a");
+            holds.Open("b");
+            await opened.Harness.WaitForTaskAsync(a, Context);
+            await opened.Harness.WaitForTaskAsync(b, Context);
+            await opened.Harness.CloseAsync(Context);
+            // After reopen, B and A are known only once a chain load reads them.
+            opened = await holds.OpenHarness(await location());
+            var conversation = (await opened.Harness.ConversationAsync(c, Context))!;
+            var d = await conversation.CommitAsync(tx => tx.CreateTaskAsync(holds.Hold, Holds.Input("d"), OwnConversation()), Context);
+            holds.Open("p");
+            await Eventually(async () => await StatusOf(opened.Harness, p) == DurableTaskStatus.Completing);
+            holds.Open("d");
+            Equal("completed", await OutcomeOf(opened.Harness, d), "d outcome");
+            Equal("completed", await OutcomeOf(opened.Harness, p), "p outcome");
             await opened.Harness.CloseAsync(Context);
         });
     }
