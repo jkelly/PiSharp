@@ -1,7 +1,8 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/types.ts (ReplicatedStateDelivery, ReplicatedState,
-// ReplicatedStateSourceFrame, ReplicatedStateSourceAttachment, ReplicatedStateSource, ReplicatedStateSourceOptions). Upstream's
-// structural interfaces become C# interfaces with the I prefix (IReplicatedState, IReplicatedStateSource,
-// IReplicatedStateSourceAttachment); unsubscribe and dispose functions become IDisposable.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/state.ts (ReplicatedStateDelivery, ReplicatedState,
+// ReplicatedStateSourceFrame, ReplicatedStateSourceAttachment, ReplicatedStateSource, ReplicatedStateSourceOptions), which v1.2.0 moved
+// out of types.ts (types.ts now holds only the excluded host runtime's types). Upstream's structural interfaces become C# interfaces with
+// the I prefix (IReplicatedState, IReplicatedStateSource, IReplicatedStateSourceAttachment); unsubscribe and dispose functions become
+// IDisposable.
 using PiSharp.Durable.Chord.Delta;
 
 namespace PiSharp.Durable.Chord;
@@ -9,7 +10,7 @@ namespace PiSharp.Durable.Chord;
 /// <summary>Whether a delivery is a subscription's first value or a later revision.</summary>
 public enum ReplicatedStateDeliveryKind
 {
-    /// <summary>The value current when the subscription started (or, for a replica, when it hydrated).</summary>
+    /// <summary>The value current when the subscription started.</summary>
     Hydrate,
     /// <summary>A revision published after the subscriber hydrated.</summary>
     Update,
@@ -31,7 +32,7 @@ public readonly record struct ReplicatedStateDelivery(ReplicatedStateDeliveryKin
 public interface IReplicatedState<T>
 {
     /// <summary>
-    /// The current immutable value, or <c>default</c> until a replica hydrates. Later revisions never change a value already returned.
+    /// The current immutable value, or <c>default</c> until hydration. Later revisions never change a value already returned.
     /// </summary>
     T? Value { get; }
 
@@ -96,7 +97,7 @@ public interface IReplicatedStateSource<T>
 /// <summary>Options for <see cref="ReplicatedState.Attach{T}"/>.</summary>
 public sealed class ReplicatedStateSourceOptions
 {
-    /// <summary>Receives source-contract and listener failures without throwing them into the source. When null, failures go to
-    /// <see cref="ReplicatedState.UnhandledError"/>.</summary>
+    /// <summary>Receives source-contract and publication-listener failures without throwing them into the source. When null, failures go
+    /// to <see cref="ReplicatedState.UnhandledError"/>.</summary>
     public Action<Exception>? OnError { get; init; }
 }

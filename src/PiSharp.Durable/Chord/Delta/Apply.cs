@@ -1,7 +1,8 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/delta/index.ts (apply, applyImmutable, applyImmutableBatches,
-// copyContainers, resolve). Values here are immutable, so every application is the immutable one: containers on a written path are copied
-// once per call (shared across batches, as upstream's owned set is) into a private work tree, and frozen back at the end; untouched
-// subtrees keep their references.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/delta/index.ts (apply, applyImmutable, applyImmutableBatches,
+// appendCopy, copyContainers, resolve). Values here are immutable, so every application is the immutable one: containers on a written path
+// are copied once per call (shared across batches, as upstream's owned set is) into a private work tree, and frozen back at the end;
+// untouched subtrees keep their references. An append to an array not yet copied in this call is built as one copy with the items
+// (appendCopy) instead of a work copy that the insert grows and the freeze copies again; the appended array then counts as copied.
 using System.Collections.Immutable;
 using System.Globalization;
 
@@ -24,6 +25,7 @@ public static class DeltaApply
     {
         ArgumentNullException.ThrowIfNull(batches);
         object? root = target;
+        HashSet<JsonArrayValue>? appended = null; // arrays appendCopy built in this call: owned, so later edits take the general path
         foreach (var ops in batches)
         {
             ArgumentNullException.ThrowIfNull(ops);
@@ -31,6 +33,11 @@ public static class DeltaApply
             {
                 ArgumentNullException.ThrowIfNull(op);
                 if (op is ReplaceOp replace) { root = replace.Value; continue; }
+                if (op is SpliceOp { Remove: 0 } splice && AppendCopy(root, splice, appended ??= new(ReferenceEqualityComparer.Instance)) is { } grown)
+                {
+                    root = grown;
+                    continue;
+                }
                 var path = ((PathOp)op).Path;
                 if (!trusted) DeltaValidation.AssertSafePath(path);
                 var containerPath = op is SpliceOp or MoveOp ? path : path[..^1];
@@ -44,6 +51,47 @@ public static class DeltaApply
             JsonValue value => value,
             _ => throw new PathError(ImmutableArray<PathSegment>.Empty)
         };
+    }
+
+    // appendCopy: an append to an array not yet copied in this replay, built as one copy with the items. Null for any other splice and for
+    // any path that is not a plain walk over own properties, which takes the general path and so fails with its errors.
+    private static object? AppendCopy(object? root, SpliceOp op, HashSet<JsonArrayValue> appended)
+    {
+        var path = op.Path;
+        var target = root;
+        foreach (var segment in path)
+        {
+            var valid = segment.Key is { } key
+                ? !DeltaValidation.ReservedSegments.Contains(key) && target is JsonObjectValue or WorkObject
+                : segment.Index >= 0 && target is JsonArrayValue or WorkArray;
+            if (!valid) return null;
+            switch (target)
+            {
+                case WorkObject work:
+                    if (!work.HasOwn(segment)) return null;
+                    target = work.Peek(segment);
+                    break;
+                case WorkArray work:
+                    if (!work.HasOwn(segment)) return null;
+                    target = work.Peek(segment);
+                    break;
+                case JsonObjectValue obj:
+                    if (!obj.TryGetValue(segment.Key!, out var property)) return null;
+                    target = property;
+                    break;
+                case JsonArrayValue items:
+                    if (segment.Index >= items.Count) return null;
+                    target = items[(int)segment.Index];
+                    break;
+            }
+        }
+        if (target is not JsonArrayValue array || appended.Contains(array) || op.Index != array.Count) return null;
+        var grown = new JsonArrayValue(array.Items.AddRange(op.Items));
+        appended.Add(grown);
+        if (path.IsEmpty) return grown;
+        var owned = Own(root, path[..^1], path);
+        Resolve(owned, path[..^1]).Set(path[^1], grown);
+        return owned;
     }
 
     // copyContainers: the root and every container on the path become owned work nodes (existence is checked before the segment's
@@ -129,6 +177,8 @@ public static class DeltaApply
         /// <summary>The child container as an owned work node, or null when the child is not a container.</summary>
         public abstract Work? OwnChild(PathSegment segment);
         public abstract JsonValue? Read(PathSegment segment);
+        /// <summary>The child as it is: a work node when already owned, otherwise the immutable value.</summary>
+        public abstract object Peek(PathSegment segment);
         public abstract void Set(PathSegment segment, JsonValue value);
         public abstract JsonValue Freeze();
 
@@ -160,6 +210,11 @@ public static class DeltaApply
         {
             var key = Key(segment);
             return owned.TryGetValue(key, out var work) ? work.Freeze() : values.TryGetValue(key, out var value) ? value : null;
+        }
+        public override object Peek(PathSegment segment)
+        {
+            var key = Key(segment);
+            return owned.TryGetValue(key, out var work) ? work : values[key];
         }
         public override void Set(PathSegment segment, JsonValue value)
         {
@@ -199,6 +254,7 @@ public static class DeltaApply
             return child;
         }
         public override JsonValue? Read(PathSegment segment) => InRange(segment) ? Frozen(items[(int)segment.Index]) : null;
+        public override object Peek(PathSegment segment) => items[(int)segment.Index];
         public override void Set(PathSegment segment, JsonValue value)
         {
             if (segment.Index == items.Count) items.Add(value);

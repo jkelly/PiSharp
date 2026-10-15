@@ -1,10 +1,9 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/session-states.test.ts. Verbatim apart from the adaptations in
-// SessionSupport.cs: getReplicatedStateInternals(state).subscribe is ReplicatedStateInternals.Get<JsonObjectValue?>(state).SubscribeSource,
-// "exposes trusted shared immutable values without freezing" checks reference sharing only (JsonValue trees are never frozen copies),
-// and a reload after unloading is shown by the storage read, not a new object (an immutable stored value may be handed out again).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-states.test.ts. Verbatim apart from the adaptations in
+// SessionSupport.cs: "exposes trusted shared immutable values without freezing" checks reference sharing only (JsonValue trees are never
+// frozen copies), and a reload after unloading is shown by the storage read, not a new object (an immutable stored value may be handed
+// out again).
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
-using PiSharp.Durable.Chord.Delta;
 using static Program;
 
 internal static partial class SessionTests
@@ -76,17 +75,14 @@ internal static partial class SessionTests
             second.Dispose();
         });
 
-        yield return Case(prefix + "shares-exact-committed-value-and-operation-references-with-chord", async () =>
+        yield return Case(prefix + "shares-exact-committed-value-references-with-chord", async () =>
         {
             var (_, session, publications) = await CreateState();
             var state = (await session.DocumentStateAsync(stateDoc, Context))!;
-            IReadOnlyList<Op>? receivedOps = null;
-            ReplicatedStateInternals.Get<JsonObjectValue?>(state)!.SubscribeSource((ops, _, _) => receivedOps = ops);
             await SetValue(session, stateDoc, 4);
             await Flush(session);
             var published = DocumentChanges(Last(publications))[0];
             Same(published.Value, state.Value, "value");
-            SameOps(published.Ops, receivedOps, "ops");
             Same((await session.SnapshotAsync(stateDoc, Context))!["retained"], state.Value!["retained"], "retained subtree");
             state.Dispose();
         });
@@ -108,8 +104,6 @@ internal static partial class SessionTests
         {
             var (_, session, _) = await CreateState();
             var oldState = (await session.DocumentStateAsync(stateDoc, Context))!;
-            IReadOnlyList<Op>? retirementOps = null;
-            ReplicatedStateInternals.Get<JsonObjectValue?>(oldState)!.SubscribeSource((ops, _, _) => retirementOps = ops);
             await session.CommitAsync(async tx =>
             {
                 await tx.RetireDocAsync(stateDoc);
@@ -117,7 +111,6 @@ internal static partial class SessionTests
             }, Context);
             await Flush(session);
             Check(oldState.Value is null, "retired to null");
-            Equal("[[\"r\",null]]", OpsJson(retirementOps!), "retirement ops");
 
             var replacement = (await session.DocumentStateAsync(stateDoc, Context))!;
             Equal(10.0, ValueOf(replacement.Value), "replacement");

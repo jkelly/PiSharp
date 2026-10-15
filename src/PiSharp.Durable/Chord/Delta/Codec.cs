@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/delta/index.ts (encoder, decoder). Path interning and arity
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/delta/index.ts (encoder, decoder). Path interning and arity
 // omission live between the tracker and a boundary; Op and Apply know nothing about them. One encoder/decoder pair per independent state
 // stream: every decoder must observe exactly the batches its matching encoder produced, beginning with that state's base.
 using System.Collections.Immutable;

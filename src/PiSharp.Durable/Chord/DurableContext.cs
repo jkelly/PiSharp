@@ -1,6 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/context/index.ts (Context, ContextKey, BACKGROUND_CONTEXT,
-// TODO_CONTEXT, createContextKey, withContextValue, withAbortSignal, withoutAbortSignal, withCancel, awaitWithContext) and the Context
-// and ContextKey types of packages/chord/src/types.ts. Named DurableContext so it is never mistaken for a conversation's context.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/context/index.ts (Context, ContextKey, BACKGROUND_CONTEXT,
+// TODO_CONTEXT, createContextKey, withContextValue, withAbortSignal, withoutAbortSignal, withCancel, awaitWithContext; v1.2.0 moved the
+// Context and ContextKey types here from types.ts). Named DurableContext so it is never mistaken for a conversation's context.
 using System.Runtime.ExceptionServices;
 
 namespace PiSharp.Durable.Chord;

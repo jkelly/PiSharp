@@ -1,5 +1,6 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/src/json.ts and the JsonValue type of packages/chord/src/types.ts.
-// Chord's values are plain JavaScript JSON; here they are immutable trees whose reference identity is the unit of structural sharing.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/src/json.ts (JsonValue, which v1.2.0 moved here from types.ts).
+// Chord's values are plain JavaScript JSON; here they are immutable trees whose reference identity is the unit of structural sharing, so
+// copyJson and isJsonValue are unnecessary, and JsonRepresentation is a compile-time mapping of TypeScript types with no C# counterpart.
 using System.Collections;
 using System.Collections.Immutable;
 using System.Globalization;

@@ -2,11 +2,11 @@ using PiSharp.Durable.Benchmarks;
 using PiSharp.Durable.Testing;
 
 // P13 (decision 0005): benchmarks/PiSharp.Durable.Benchmarks ports Pi v1.1.0 packages/durable/test/storage.bench.ts, test/storage-memory.ts
-// and test/tool-output-bench.ts over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts). The benchmarks are
-// report only (docs/durable-benchmarks.md). This smoke case runs each of them at a tiny size so they cannot rot: one sample per storage
-// scenario on every backend (each scenario's result is checked before it is timed), the footprint worker on every backend in-process, and
-// a short rate round closed mid-round and replayed, a firehose, a repetitive firehose and a bash cat of 1 MiB. It asserts completion and the
-// number of results, never a timing.
+// and test/tool-output-bench.ts over src/PiSharp.Durable/Testing/StorageBenchmark.cs (src/testing/storage-benchmark.ts), and Pi v1.2.0
+// test/document-append-bench.ts. The benchmarks are report only (docs/durable-benchmarks.md). This smoke case runs each of them at a tiny
+// size so they cannot rot: one sample per storage scenario on every backend (each scenario's result is checked before it is timed), the
+// footprint worker on every backend in-process, a short rate round closed mid-round and replayed, a firehose, a repetitive firehose, a
+// bash cat of 1 MiB, and 20 document appends of each kind. It asserts completion and the number of results, never a timing.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> BenchmarksCases()
@@ -52,6 +52,12 @@ internal static partial class Program
                     scenario.Label + " row");
             }
             Equal(50, ToolOutputBench.Scenarios().Count, "upstream scenario count");
+
+            var appendOutput = new StringWriter();
+            var appends = await DocumentAppendBench.RunAsync([20], appendOutput);
+            Check(appends is [{ N: 20 }], "one document-append row");
+            Check(appendOutput.ToString().StartsWith("n=20: array ", StringComparison.Ordinal), "document-append line: " + appendOutput);
+            Equal(DocumentAppendBench.DefaultSizes, DocumentAppendBench.ParseSizes(null), "default sizes");
             Directory.Delete(root, recursive: true);
         });
     }

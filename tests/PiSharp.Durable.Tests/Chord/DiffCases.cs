@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Chord.Delta;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/test/delta-diff.test.ts. JavaScript object identity is reference
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/test/delta-diff.test.ts. JavaScript object identity is reference
 // identity of immutable values: a value reused in both revisions is the same reference, a reconstructed one (parsed again) is not.
 // Object.freeze is unnecessary (values are immutable); the codec case reuses the existing encoder/decoder.
 internal static partial class Program

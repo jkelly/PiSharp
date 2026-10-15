@@ -909,12 +909,11 @@
       "lines": 133,
       "pisharp": "src/PiSharp.Durable/Chord/DurableContext.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "fbe54bcc46480da299d49a735daf8ccdbc20a631",
       "changedLines": 14,
-      "note": "DurableContext + ContextKey<T>; AbortSignal is a CancellationToken plus a reason (WithCancel). Tests: chord.context.*; internal WithSignal/Signal bind a context to an owned signal with its reason (the scheduler's withAbortSignal(controller.signal))",
-      "portedBlobSha1": "fbe54bcc46480da299d49a735daf8ccdbc20a631"
+      "note": "DurableContext + ContextKey<T>; AbortSignal is a CancellationToken plus a reason (WithCancel). Tests: chord.context.*; internal WithSignal/Signal bind a context to an owned signal with its reason (the scheduler's withAbortSignal(controller.signal)) v1.2.0 moved the Context and ContextKey types here from types.ts."
     },
     {
       "upstream": "packages/chord/src/delta/apply-immutable-trusted.ts",
@@ -922,12 +921,11 @@
       "lines": 128,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/ApplyImmutableTrusted.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "9049ab0407f3f1e69ec2001fdaef1b8074649cf7",
       "changedLines": 2,
-      "note": "Internal option of DeltaApply (DeltaApplyTrusted): skips the path-safety scan; immutable values make it otherwise the same applier. Tests: chord.apply-immutable-trusted.*",
-      "portedBlobSha1": "9049ab0407f3f1e69ec2001fdaef1b8074649cf7"
+      "note": "Internal option of DeltaApply (DeltaApplyTrusted): skips the path-safety scan; immutable values make it otherwise the same applier. Tests: chord.apply-immutable-trusted.*"
     },
     {
       "upstream": "packages/chord/src/delta/diff.ts",
@@ -935,12 +933,11 @@
       "lines": 523,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Diff.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "b022d142a2ca6a6f2fe411342d77f67d1dfb500a",
       "changedLines": 2,
-      "note": "DeltaDiff.DiffRevisions with JavaScript identity (containers by reference, scalars by value). Tests: chord.diff.*, chord.fuzz.diff-replays-between-tracked-and-reconstructed-revisions",
-      "portedBlobSha1": "b022d142a2ca6a6f2fe411342d77f67d1dfb500a"
+      "note": "DeltaDiff.DiffRevisions with JavaScript identity (containers by reference, scalars by value). Tests: chord.diff.*, chord.fuzz.diff-replays-between-tracked-and-reconstructed-revisions"
     },
     {
       "upstream": "packages/chord/src/delta/index.ts",
@@ -948,12 +945,11 @@
       "lines": 733,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Ops.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "982a6f464bb7211b4580959667add4b244021454",
       "changedLines": 43,
-      "note": "Ops, validation, overlap, apply/applyImmutable(Batches) and codec. Tests: chord.delta.*, chord.apply-immutable.* P13: compat.ops.* replay the upstream-captured ops corpus, and upstream replays PiSharp's operations (compat.reverse.*).",
-      "portedBlobSha1": "982a6f464bb7211b4580959667add4b244021454"
+      "note": "Ops, validation, overlap, apply/applyImmutable(Batches) and codec. Tests: chord.delta.*, chord.apply-immutable.* P13: compat.ops.* replay the upstream-captured ops corpus, and upstream replays PiSharp's operations (compat.reverse.*). v1.2.0: appendCopy (Apply.cs) builds an append to an array not yet copied in one copy (chord.apply-immutable.appends-to-an-array-not-yet-copied-in-one-copy-sharing-everything-else)."
     },
     {
       "upstream": "packages/chord/src/delta/revision-validator.ts",
@@ -961,12 +957,11 @@
       "lines": 75,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/RevisionValidator.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "d78373e7a63c486237f9f694752ea137122415a2",
       "changedLines": 2,
-      "note": "JsonRevisionValidator: JsonValue enforces strict JSON at construction, so validation is the memoized walk. Tests: chord.tracker.revision-validator-skips-validated-containers",
-      "portedBlobSha1": "d78373e7a63c486237f9f694752ea137122415a2"
+      "note": "JsonRevisionValidator: JsonValue enforces strict JSON at construction, so validation is the memoized walk. Tests: chord.tracker.revision-validator-skips-validated-containers"
     },
     {
       "upstream": "packages/chord/src/delta/tracker.ts",
@@ -974,12 +969,11 @@
       "lines": 2239,
       "pisharp": "src/PiSharp.Durable/Chord/Delta/Draft.cs",
       "phase": "P1",
-      "status": "needs-sync",
-      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005): Draft.cs (DraftObject/DraftArray) and Tracker.cs (Tracker, Change, Prepared, emission). Upstream's asserted op sequences are reproduced exactly. Tests: chord.tracker.*, chord.fuzz.tracker-ops-replay-to-value P13: compat.ops.* make the seeded edits of an upstream-captured ops corpus (Fixtures/upstream-sessions/ops-corpus.json) and must emit upstream's exact operations.",
+      "status": "ported",
+      "note": "An explicit copy-on-write draft API replaces the Proxy tracker (decision 0005): Draft.cs (DraftObject/DraftArray) and Tracker.cs (Tracker, Change, Prepared, emission). Upstream's asserted op sequences are reproduced exactly. Tests: chord.tracker.*, chord.fuzz.tracker-ops-replay-to-value P13: compat.ops.* make the seeded edits of an upstream-captured ops corpus (Fixtures/upstream-sessions/ops-corpus.json) and must emit upstream's exact operations. v1.2.0: an array draft stays a piece table while elements are only inserted or removed (DraftArray.Pieces; a short list instead of the treap, flattened into entries past 64 pieces or when an element moves), and emission plans it from the pieces alone (orderedArrayPlan, DraftEmitter.EmitOrderedArrayPlan); a flattened draft is planned by the element walk (elementArrayPlan). chord.tracker.native.piece-table-and-flattened-drafts-emit-the-same-operations checks both plans emit the same operations; benchmarks: document-append (docs/durable-benchmarks.md).",
       "upstreamChange": "modified",
       "previousBlobSha1": "6cad0ee8c95a1055e18530b4b251447342c163ad",
-      "changedLines": 44,
-      "portedBlobSha1": "6cad0ee8c95a1055e18530b4b251447342c163ad"
+      "changedLines": 44
     },
     {
       "upstream": "packages/chord/src/json.ts",
@@ -987,22 +981,21 @@
       "lines": 135,
       "pisharp": "src/PiSharp.Durable/Chord/JsonValue.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "4747dddd472e6da317a889961fb6315759380282",
       "changedLines": 17,
-      "note": "Immutable JsonValue with JavaScript key order, number and string semantics; copyJson/isJsonValue are unnecessary for immutable values. Tests: chord.json.*",
-      "portedBlobSha1": "4747dddd472e6da317a889961fb6315759380282"
+      "note": "Immutable JsonValue with JavaScript key order, number and string semantics (v1.2.0 moved the JsonValue type here from types.ts); copyJson/isJsonValue are unnecessary for immutable values and JsonRepresentation is a TypeScript-only type mapping. Tests: chord.json.*"
     },
     {
       "upstream": "packages/chord/src/services/state-internals.ts",
       "blobSha1": "ed5c1ff0e327163eb40dc69c92cd8216273b40e0",
       "lines": 19,
-      "pisharp": "src/PiSharp.Durable/Chord/ReplicatedStateInternals.cs",
+      "pisharp": "src/PiSharp.Durable/Chord/ReplicatedState.cs",
       "phase": "P1",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "Internal interface instead of a WeakMap. Tests: chord.state.* (exact listeners and snapshots)",
+      "note": "Retired in the v1.2.0 sync: upstream deleted the exact source listeners and snapshot seam, and PiSharp deleted ReplicatedStateInternals.cs (the internal interface that replaced the WeakMap) with them; state.ts (Chord/ReplicatedState.cs) took over.",
       "successor": "packages/chord/src/state.ts"
     },
     {
@@ -1011,13 +1004,12 @@
       "lines": 423,
       "pisharp": "src/PiSharp.Durable/Chord/ReplicatedState.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "renamed",
       "renamedFrom": "packages/chord/src/services/state.ts",
       "previousBlobSha1": "505ac69bd8b3571b0e002fb6182c826042711304",
       "changedLines": 278,
-      "note": "Publisher, subscriber, attached source state and replica ported in process. MutableReplicatedState is backed by a Tracker: Change(context, Action<Draft>) (plus a Func<Draft, object?> overload that rejects returned tasks) publishes the prepared compact ops with rollback, reentrancy and async rejection; Replace adopts the value through prepareReplace and publishes [[\"r\", value]] as upstream does. A per-state change gate serializes mutations across threads (see the file header). Tests: chord.state.* (state.test.ts, state-delivery.test.ts), chord.state.value.* (state-value.test.ts), chord.state.draft.* (state-draft.test.ts), chord.state.diff.* (state-diff.test.ts), chord.state.fuzz.converges-across-randomized-prepared-revisions (state-fuzz.test.ts), chord.state.native.*",
-      "portedBlobSha1": "505ac69bd8b3571b0e002fb6182c826042711304"
+      "note": "Publisher, subscriber, mutable state and attached source state ported in process, with the replicated state types in Chord/ReplicatedStateTypes.cs. v1.2.0 dropped the service-side replica, the exact source listeners (state-internals.ts) and the operations of a publication: a publication is a value, a sequence and a context, and listener failures are reported (ReplicatedState.UnhandledError or the source options' OnError), never thrown. MutableReplicatedState is backed by a Tracker: Change(context, Action<Draft>) (plus a Func<Draft, object?> overload that rejects returned tasks) publishes the prepared revision with rollback, reentrancy and async rejection; Replace adopts the value through prepareReplace. A per-state change gate serializes mutations across threads (see the file header). Tests: chord.state.* and chord.state.source.* (replicated-state.test.ts), chord.state.delivery.* (replicated-state-delivery.test.ts), chord.state.value.* (state-value.test.ts), chord.state.draft.* (state-draft.test.ts), chord.state.diff.* (state-diff.test.ts), chord.state.fuzz.converges-across-randomized-prepared-revisions (state-fuzz.test.ts), chord.state.native.*"
     },
     {
       "upstream": "packages/chord/src/types.ts",
@@ -1025,12 +1017,11 @@
       "lines": 79,
       "pisharp": "src/PiSharp.Durable/Chord/ReplicatedStateTypes.cs",
       "phase": "P1",
-      "status": "needs-sync",
+      "status": "excluded",
       "upstreamChange": "modified",
       "previousBlobSha1": "19ac55e745ec5a01519af15c386b16f84b66021e",
       "changedLines": 374,
-      "note": "The subset pi-durable uses: JsonValue in Chord/JsonValue.cs, replicated-state types in Chord/ReplicatedStateTypes.cs, delta types in Chord/Delta/*.cs. Facet/service/wire types are out of scope (decision 0005).",
-      "portedBlobSha1": "19ac55e745ec5a01519af15c386b16f84b66021e"
+      "note": "v1.2.0 types.ts holds only the host runtime's types (Ctx, Readable, StateEvent, handles and shapes), which decision 0005 excludes. The subset PiSharp ported from the v1.1.0 file moved: the replicated state types to state.ts (ported in Chord/ReplicatedStateTypes.cs, the state.ts row), JsonValue to json.ts (Chord/JsonValue.cs) and Context/ContextKey to context/index.ts (Chord/DurableContext.cs)."
     },
     {
       "upstream": "packages/durable/test/chat-support.ts",
@@ -1049,7 +1040,7 @@
       "phase": "P3",
       "status": "removed-upstream",
       "upstreamChange": "removed",
-      "note": "session.chord-guide.* (3 cases, on every session backend): the guide's documents, commits, document states and watches. The canvas and diff-review runs drop the Chord facet host, services and wire (excluded by decision 0005) for direct subscriptions to the same document states, disposed before close as the guide's shutdown order requires; the job-output run is upstream's, on a Harness with the task runtime (runtime.CommitAsync, WaitForTaskAsync, Resume)"
+      "note": "Retired in the v1.2.0 sync with the upstream file (deleted with the old Chord guide): ChordGuideCases.cs and its session.*chord-guide.* cases were deleted. The documents, commits, document states and watches it exercised stay covered by session.documents.*, session.states.* and session.watches.* on every session backend."
     },
     {
       "upstream": "packages/durable/test/codemode-bench.ts",
@@ -1093,8 +1084,9 @@
       "lines": 52,
       "pisharp": "benchmarks/PiSharp.Durable.Benchmarks/DocumentAppendBench.cs",
       "phase": "sync-1.2.0",
-      "status": "planned",
-      "upstreamChange": "added"
+      "status": "ported",
+      "upstreamChange": "added",
+      "note": "Report only: DocumentAppendBench (PiSharp.Durable.Benchmarks document-append [N,...]), run at a tiny size by benchmarks.smoke; results in docs/durable-benchmarks.md."
     },
     {
       "upstream": "packages/durable/test/env-line-scan.test.ts",
@@ -1981,12 +1973,11 @@
       "lines": 221,
       "pisharp": "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs",
       "phase": "P3",
-      "status": "needs-sync",
+      "status": "ported",
       "upstreamChange": "modified",
       "previousBlobSha1": "4c3678b46e92f28c3526a8bd0b8efa1511dbe681",
       "changedLines": 13,
-      "note": "session.states.* (10 cases). getReplicatedStateInternals is ReplicatedStateInternals.Get; Object.isFrozen checks dropped (immutable values)",
-      "portedBlobSha1": "4c3678b46e92f28c3526a8bd0b8efa1511dbe681"
+      "note": "session.states.* (10 cases). v1.2.0 dropped the exact-listener operation checks (getReplicatedStateInternals); Object.isFrozen checks dropped (immutable values)."
     },
     {
       "upstream": "packages/durable/test/session-support.ts",
