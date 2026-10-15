@@ -89,6 +89,13 @@ None is planned or in progress.
 
 - **Compaction failures (v1.2.0, area j)** are ported as upstream has them: `pi.live.compactionFailure`, the snapshot's `CompactionFailure` and `CompactionEndEvent.Error`, and a generation whose blocking threshold compaction did not complete fails with `model_error` before its request. `Live.cs`, `Generation.cs` and `Events.cs` keep their v1.1.0 headers until area a, which owns their rows.
 
+- **Scheduler (v1.2.0, area c).** `Scheduler.cs` ports v1.2.0's `scheduler.ts` as a whole: the ownership index bounded by live work, the candidate sets of each pass, `TaskOptions.AbandonOnRestart` with `TaskRecord.AbortReason` (`restart`), `ITaskRuntime.AbortOwnedAsync`/`OwnedTasksAsync`, the cancellation barrier before each phase and wait-cycle rejection. Mappings:
+  - One short lock guards the scheduler's in-memory state, as before. Its sets are insertion-ordered (`OrderedSet`), because a pass stages its writes in the order upstream's Sets iterate; the sweep job is enqueued from the thread pool, so it never starts inline inside that lock.
+  - Upstream's `SCHEDULER_INDEX_SIZES` getter is the internal `DurableHarness.SchedulerIndexSizes`. Tests read it after `DurableTaskScheduler.QuiesceAsync`, a barrier for the passes that run on the thread pool here and in drained microtasks upstream; the two ownership cases that count `Set.prototype` iterations count the members the scheduler's own sets yield (`SetEntries`).
+  - `OwnedTasksAsync` returns the committed records, which are immutable, instead of copies.
+  - The default that gives nested calls and `api.createTask()` children of tools that are not replay-safe `abandonOnRestart` is area a's: `ToolExecutionApi.ChildTaskOptions` is the hook it applies. Until then `harness.nested-tools-restart.*` ports the one case without a nested call with the option set explicitly, and `compat.abandon-on-restart.*` and `compat.nested-tools-restart.*` check read, raw and harness only (their runs need `pi.tool` version 2). `compat.wait-cycle.*` runs upstream's scenario in full.
+  - `bench:scheduler-memory` is `SchedulerMemoryBench.cs`. `bench:scheduler-fanout` makes nested calls and is area a's; the PiSharp-authored `scheduler-scale` (`SchedulerScaleBench.cs`, with a Node twin in `benchmarks/PiSharp.Durable.Benchmarks/node/`) measures the same fan-out with `api.createTask()` children, and the changelog's owned chains.
+
 **Benchmarks** (`benchmarks/PiSharp.Durable.Benchmarks`) are report only; see `docs/durable-benchmarks.md`.
 - On the one Windows machine measured, neither runtime meets upstream's 0.4 s target for `cat` of 1 GiB:
   - upstream under Node: about 1.75 s;
