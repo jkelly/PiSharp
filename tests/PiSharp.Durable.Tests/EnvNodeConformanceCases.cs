@@ -4,7 +4,7 @@ using PiSharp.Durable.Env.Local;
 using PiSharp.Durable.Testing;
 using PiSharp.Durable.Tools.Env;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/env-node-conformance.test.ts, as env.node-conformance.<suite>.<case>.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/env-node-conformance.test.ts, as env.node-conformance.<suite>.<case>.
 // The environment conformance kit registers through ConformanceRunner (upstream registerEnvConformance) on LocalExecutionEnv twice: with the
 // platform's watch mode (suite "conformance"; polling on Windows) and with polling watches every 100 ms (suite "polling"). As upstream, Windows
 // runs the kit's shell cases through Git Bash with symbolic links off (Git Bash's `ln -s` copies unless native links are enabled). The watch

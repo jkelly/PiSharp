@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/session-checkpoints-migrations.test.ts. Verbatim apart from the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-checkpoints-migrations.test.ts. Verbatim apart from the
 // adaptations in SessionSupport.cs and these: a checkpoint predicate is a delegate, so "its definition as the receiver" (`this.initial()`)
 // is the token's definition reached through the closure; a migration result is an immutable value, so "copies the callback result"
 // checks that replacing the callback's retained variable changes nothing, and "strict-checks migration results" returns null (the only

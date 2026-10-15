@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/17-coding-tools.ts, 29-sandbox-per-conversation.ts and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/17-coding-tools.ts, 29-sandbox-per-conversation.ts and
 // 30-tool-override.ts. Upstream stands in for a model with pi-ai's faux provider; here ScriptedModels does, so the examples run offline.
 // Tools reach files and processes through LocalExecutionEnv (upstream NodeExecutionEnv) over fresh temporary directories; on Windows its
 // shell is Git Bash. Each prints what upstream's console.log prints, with JSON in place of util.inspect. 17 runs on the storage the runner

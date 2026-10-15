@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/context.ts. Messages are pi-ai wire JSON. Records and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/context.ts. Messages are pi-ai wire JSON. Records and
 // JSON values are immutable here, so upstream's freezeJson has no counterpart; a kept range is shared as is, and every returned view has
 // its own arrays because ImmutableArray values are never shared mutably.
 using System.Collections.Immutable;

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/24-child-tasks.ts. Upstream times its fake bank with
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/24-child-tasks.ts. Upstream times its fake bank with
 // Date.now() and setTimeout; here an ExampleClock drives the Harness clock (HarnessOptions.TimeProvider), so a payment's sleep ends only when
 // the example advances the clock, and two barriers stand in for what Node's event loop orders: a declined card is declined only after the
 // checkout's other payments were charged (upstream runs every reserved payment's first step before the decline's commit lands), and the

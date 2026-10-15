@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/session-definitions.test.ts. The two type-level cases
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-definitions.test.ts. The two type-level cases
 // (expectTypeOf and @ts-expect-error) are compile-time checks here: TypeChecks below must compile, and each @ts-expect-error line is kept
 // as a comment naming the overload that does not exist. Their runtime parts (the snapshot calls of the first type case) run as upstream's
 // do. "version 1.5" cannot be written: versions are int.

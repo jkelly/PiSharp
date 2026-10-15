@@ -3,7 +3,7 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Storage;
 using PiSharp.Durable.Testing;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/memory-storage.test.ts. The storage conformance kit runs
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/memory-storage.test.ts. The storage conformance kit runs
 // against MemoryStorage as storage.memory.conformance.<case>; the prepared-commit case follows upstream's, with immutability standing in
 // for upstream's frozen writes. The storage.memory.prepare-* cases are authored for the prepare/apply split JSONL builds on (P4).
 internal static partial class Program

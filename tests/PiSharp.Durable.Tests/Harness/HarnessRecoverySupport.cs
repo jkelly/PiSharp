@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): the support of packages/durable/test/harness-tasks-recovery.test.ts (its sqlitePath,
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): the support of packages/durable/test/harness-tasks-recovery.test.ts (its sqlitePath,
 // createIn, TransferService, transferTask and versioned helpers, plus vitest's toMatchObject). The harness.tasks-recovery.* groups live in
 // their own class so their helpers never collide with other harness.* groups; the shared support of HarnessSupport.cs is reached through
 // using static, and SessionTests.Deferred is shadowed by an alias.

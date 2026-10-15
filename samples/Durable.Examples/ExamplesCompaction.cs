@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/25-compaction.ts. Upstream stands in for a model with
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/25-compaction.ts. Upstream stands in for a model with
 // pi-ai's faux provider and a response function; here TripModels does, so the example runs offline. Thresholds depend on the provider's
 // reported usage, so TripModels reports the faux provider's usage estimate (packages/ai/src/providers/faux.ts withUsageEstimate, prompt
 // cache simulation included). It prints what upstream's console.log prints. On a file backend the storage is then reopened in a plain

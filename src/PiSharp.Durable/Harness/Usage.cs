@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/usage.ts. Usage values are pi-ai Usage wire JSON. Upstream's
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/usage.ts. Usage values are pi-ai Usage wire JSON. Upstream's
 // addUsage mutates a draft or a plain object; here AddUsage(DraftObject, ...) changes a draft in a commit, and the plain-value overload and
 // AddUsageState return a new value. A summed key keeps its position and a new key goes last, as upstream's assignments do.
 using PiSharp.Durable.Chord;

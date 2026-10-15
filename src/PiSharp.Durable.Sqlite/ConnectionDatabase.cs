@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/storage/sqlite/node.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/sqlite/node.ts
 //
 // Upstream adapts node:sqlite's DatabaseSync; this port adapts a Microsoft.Data.Sqlite connection (decision 0005) with the same serial
 // operation queue, statement cache, transaction handles and pragmas. Differences, each forced by the binding:

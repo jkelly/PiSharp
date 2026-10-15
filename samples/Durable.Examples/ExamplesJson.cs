@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/19-json.ts. JSON mode: stream one prompt's run as JSON
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/19-json.ts. JSON mode: stream one prompt's run as JSON
 // lines, like `pi --mode json`, as the experimental agent events of WatchEventsAsync() (starting with a snapshot event, upstream --events)
 // or as the raw ConversationView frames (starting with the view itself; each later line holds one commit's ops, upstream --ops). Upstream
 // runs one mode per invocation; here the example runs both, events on the runner's storage and ops on MemoryStorage (upstream

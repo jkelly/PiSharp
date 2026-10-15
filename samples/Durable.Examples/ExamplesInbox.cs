@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/20-inbox.ts. Upstream stands in for a model with pi-ai's
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/20-inbox.ts. Upstream stands in for a model with pi-ai's
 // faux provider; here ScriptedModels does, with a held first reply, so the example runs offline. It prints what upstream's console.log
 // prints, as JSON. On a file backend the storage is then reopened in a plain Session and the transcript and inbox are read back.
 using PiSharp.Durable.Chord;

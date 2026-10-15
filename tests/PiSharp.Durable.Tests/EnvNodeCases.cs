@@ -5,7 +5,7 @@ using PiSharp.Durable.Chord;
 using PiSharp.Durable.Env;
 using PiSharp.Durable.Tools.Env;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/env-node.test.ts, as env.node.<case>, on LocalExecutionEnv (upstream
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/env-node.test.ts, as env.node.<case>, on LocalExecutionEnv (upstream
 // NodeExecutionEnv). Adapted:
 // - Truncation sizes a long cannot hold (1.5, NaN, Infinity) are dropped.
 // - Spies on Node's FileHandle become LocalFileSystem's internal seams: "syncs through an opened handle" overrides SyncFile, and "rejects a

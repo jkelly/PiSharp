@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-output-skip.test.ts. Verbatim apart from these
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-output-skip.test.ts. Verbatim apart from these
 // adaptations: the mulberry32 PRNG runs on uint, which is Math.imul's and `>>> 0`'s arithmetic modulo 2^32; `for (const character of
 // text)` walks code points, a surrogate pair as one; Buffer.byteLength is Encoding.UTF8.GetByteCount; BoundedOutput is a record struct, so
 // toEqual is struct equality.

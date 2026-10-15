@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/session-tables.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-tables.test.ts. Verbatim apart from the adaptations in
 // SessionSupport.cs and these: task definitions carry only what the Session needs until the task runtime (P7); "takes ownership of table
 // JSON and rejects non-strict values" checks that a caller cannot change committed JSON (immutable values) and that NaN cannot be
 // constructed as JSON, which rejects inside the callback before any write.

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/tool-output-bench.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/tool-output-bench.ts
 // Tool output benchmark: drives the real tool task, adaptive progress throttle and pi.live commits. Each scenario runs in its own child
 // process so its peak working set is its own. Rate scenarios write output for a fixed time, then close the Harness mid-round (persistent
 // backends) to measure replay of the round's delta chain on reopen, and finish the run to measure the stored size after the round's base and

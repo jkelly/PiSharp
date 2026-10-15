@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/storage/sqlite/migrations.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/sqlite/migrations.ts
 //
 // The schema statements are upstream's text verbatim, whitespace included, so that sqlite_schema matches a database Pi created; a test
 // pins their SHA-256 as computed from upstream's module. next_id is TEXT because node:sqlite rejects INTEGER results outside JavaScript's

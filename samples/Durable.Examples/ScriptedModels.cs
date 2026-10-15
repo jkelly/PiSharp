@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/providers/faux.ts, reduced to what the examples use: the model faux/faux-1
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/faux.ts, reduced to what the examples use: the model faux/faux-1
 // answering each request with the next scripted reply, a text streamed as one text block or tool calls streamed as tool-call blocks with
 // stop reason toolUse (upstream fauxAssistantMessage([fauxToolCall(...)], { stopReason: "toolUse" })); a held reply first waits for its
 // release, as a faux response factory awaiting a promise does. A real host passes its IDurableModels over PiSharp.AI instead.

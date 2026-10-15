@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/validation.ts (with TypeBox 1.3.27 Value.Convert, Compile and its English error messages).
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/validation.ts (with TypeBox 1.3.27 Value.Convert, Compile and its English error messages).
 //
 // PiSharp.Durable does not reference PiSharp.Agent (decision 0005: the core references only Contracts and AI), so this is a verbatim copy
 // of PiSharp.Agent/ToolArgumentValidation.cs, the agent's port of the same upstream function, made internal in its own namespace. The

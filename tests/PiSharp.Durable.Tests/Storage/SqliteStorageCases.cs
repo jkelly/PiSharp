@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/sqlite-storage.test.ts. The storage conformance kit runs
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/sqlite-storage.test.ts. The storage conformance kit runs
 // against SqliteStorage directly (storage.sqlite.conformance.<case>) and through a storage that closes and reopens the file after every
 // commit (storage.sqlite.reopen.conformance.<case>), as upstream's ReopeningStorage does. Upstream inspects the file with a second
 // node:sqlite connection; these cases use a second Microsoft.Data.Sqlite connection with Pooling=False. Adapted:

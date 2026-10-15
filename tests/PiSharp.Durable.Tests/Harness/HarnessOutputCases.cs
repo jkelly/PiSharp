@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-output.test.ts. Verbatim apart from these adaptations:
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-output.test.ts. Verbatim apart from these adaptations:
 // - Node's Buffer (from, byteLength, subarray().toString) is Encoding.UTF8, which encodes a lone surrogate as U+FFFD and decodes invalid
 //   data with one U+FFFD per maximal subpart, as Buffer does.
 // - vi.useFakeTimers({now: 0}) is a ManualTimeProvider starting at 0 passed to Progress; advanceTimersByTimeAsync(ms) is Advance(ms). A

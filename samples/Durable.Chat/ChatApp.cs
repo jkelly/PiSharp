@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/16-real-model.ts, with 17-coding-tools.ts's tools.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/16-real-model.ts, with 17-coding-tools.ts's tools.
 // Milestone M1 of decision 0005: a real model streams an answer through NativeDurableModels into a Harness on SQLite (by default); the
 // storage is then closed, reopened and the stored answer entry printed, to show it survived. Milestone M2: with --tools the model can read,
 // write and edit files and run bash commands in --cwd through LocalExecutionEnv; each tool call runs as a durable pi.tool task, and the turn

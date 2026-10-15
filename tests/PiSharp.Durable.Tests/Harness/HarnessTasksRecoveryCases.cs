@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-tasks-recovery.test.ts. Verbatim apart from the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-tasks-recovery.test.ts. Verbatim apart from the
 // adaptations in HarnessSupport.cs and HarnessRecoverySupport.cs, and these:
 // - Crashes are simulated as upstream does: the crashed Harness is abandoned without close, its held commit never lands
 //   (ControlledStorage.Crash) and its blocked handlers never return; a new Harness opens the same storage instance.

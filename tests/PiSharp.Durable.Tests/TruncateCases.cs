@@ -1,7 +1,7 @@
 using System.Text;
 using PiSharp.Durable;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/env-truncate.test.ts. The "runtime without Buffer" case ran the
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/env-truncate.test.ts. The "runtime without Buffer" case ran the
 // JavaScript fallback byte counter in a child process; Truncation.Utf8ByteLength is that counter, checked against .NET's UTF-8 encoder
 // (which, like TextEncoder, writes U+FFFD for a lone surrogate).
 internal static partial class Program

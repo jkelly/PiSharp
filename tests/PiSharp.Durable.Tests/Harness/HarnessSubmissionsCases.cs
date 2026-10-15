@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-submissions.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-submissions.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream runs these on ControlledStorage over memory and reopens a SQLite file for the reopen case. harness.submissions.*
 //   does the same; harness.submissions.jsonl.* and harness.submissions.sqlite.* rerun the storage-agnostic cases on ControlledStorage over a

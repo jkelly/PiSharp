@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/estimate.ts (calculateContextTokens, estimateMessageTokens and
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/estimate.ts (calculateContextTokens, estimateMessageTokens and
 // their helpers) over pi-ai wire JSON. JavaScript string lengths are UTF-16 code units, as .NET's are. Compaction (P11) and generation's
 // threshold check use them.
 using PiSharp.Durable.Chord;

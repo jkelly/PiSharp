@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/23-subagent-background.ts. Upstream uses OpenAI when
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/23-subagent-background.ts. Upstream uses OpenAI when
 // OPENAI_API_KEY is set and otherwise pi-ai's faux provider, routing each request by its last message and streaming at 50 tokens per second.
 // Here PacedModels always stands in with the same route and pacing (token size fixed at 4, upstream's is drawn between 3 and 5), and the
 // Harness clock, the streaming and the example's waits all run on an ExampleClock that the example drives like Node's event loop: one timer

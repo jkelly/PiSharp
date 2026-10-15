@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/14-chat.ts and 15-system-prompt.ts. Upstream stands in for a
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/14-chat.ts and 15-system-prompt.ts. Upstream stands in for a
 // model with pi-ai's faux provider; here ScriptedModels does (see ScriptedModels.cs), so the examples run offline. Each prints what
 // upstream's console.log prints, as JSON. On a file backend the storage is then reopened in a plain Session and the durable transcript is
 // read back.

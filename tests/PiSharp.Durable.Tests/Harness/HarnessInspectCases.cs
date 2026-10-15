@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-inspect.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-inspect.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and ChatSupport.cs, and these:
 // - Backends. Upstream runs this file on MemoryStorage; nothing in it depends on the backend, so HarnessInspectCases() runs it on
 //   MemoryStorage (harness.inspect.*), HarnessInspectJsonlCases() on a fresh JSONL directory (harness.inspect.jsonl.*) and

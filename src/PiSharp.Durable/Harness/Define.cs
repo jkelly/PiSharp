@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/define.ts. Upstream's identity functions exist for
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/define.ts. Upstream's identity functions exist for
 // TypeScript inference; here they are plain constructors.
 namespace PiSharp.Durable;
 

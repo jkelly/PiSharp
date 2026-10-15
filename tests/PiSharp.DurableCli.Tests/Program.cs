@@ -4,11 +4,13 @@ using System.Text.Json;
 using PiSharp.Durable;
 
 // The experimental `pisharp durable` mode (decision 0005, phase P12): Pi v1.1.0 packages/coding-agent/src/experimental/durable has no
-// upstream tests, so these cases are authored. Every static method of Program whose name ends in "Cases" and returns
-// IEnumerable<(string, Func<Task>)> is a case group; the runner is the same as tests/PiSharp.Durable.Tests'.
+// upstream tests, so these cases are authored. Upstream deleted that agent in v1.2.0; PiSharp keeps it as a PiSharp-only mode (owner
+// decision, decision 0005), so its source label stays the v1.1.0 commit while the library it runs on follows DurableUpstream.Commit.
+// Every static method of Program whose name ends in "Cases" and returns IEnumerable<(string, Func<Task>)> is a case group; the runner is
+// the same as tests/PiSharp.Durable.Tests'.
 internal static partial class Program
 {
-    internal const string Upstream = DurableUpstream.Commit;
+    internal const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
 
     private static async Task<int> Main(string[] args)
     {

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/node.ts (the FileSystem half of NodeExecutionEnv: path
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/node.ts (the FileSystem half of NodeExecutionEnv: path
 // resolution, error mapping, the text-line, binary and directory readers, line scans, watches, temporary files and every file operation;
 // the watcher itself is LocalFileWatcher, node-watch.ts). The Shell half is LocalExecutionEnv in the durable tools project, which builds on
 // this class.

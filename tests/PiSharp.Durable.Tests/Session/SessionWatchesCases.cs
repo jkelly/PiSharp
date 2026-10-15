@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/session-watches.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/session-watches.test.ts. Verbatim apart from the adaptations in
 // SessionSupport.cs and these:
 // - "never invokes the listener inline": a watch started from outside the line delivers in its own line job on the thread pool, so the
 //   listener checks it is not running inside Start on the starting thread, and upstream's "no delivery yet right after start" becomes that

@@ -6,7 +6,7 @@ using PiSharp.Durable.Env.Local;
 using PiSharp.Durable.Storage.Jsonl;
 using PiSharp.Durable.Testing;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/jsonl-storage.test.ts. Cases keep upstream's names (as
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/jsonl-storage.test.ts. Cases keep upstream's names (as
 // storage.jsonl.<slug>), inputs and expected values. The storage conformance kit runs on JsonlStorage directly
 // (storage.jsonl.conformance.*) and through a storage that closes and reopens the directory after every commit
 // (storage.jsonl.reopen.conformance.*). Adapted: "serializes the complete candidate before I/O" injects a preparation failure (a write that

@@ -1,6 +1,6 @@
 using PiSharp.Durable.Chord;
 
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/chord/test/context.test.ts. Adaptations: an AbortController whose abort
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/chord/test/context.test.ts. Adaptations: an AbortController whose abort
 // carries a reason is DurableContext.WithCancel() (a CancellationTokenSource carries no reason), so the parent controller of
 // "inherits parent cancellation" is Background.WithCancel(), equivalent to withAbortSignal(controller.signal, BACKGROUND_CONTEXT); an
 // abort-event listener is a token registration; `value(key)` returning undefined is TryGet returning false. The last case is native:

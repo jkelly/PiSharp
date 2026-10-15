@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/harness-context.test.ts. Verbatim apart from the adaptations in
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/harness-context.test.ts. Verbatim apart from the adaptations in
 // HarnessSupport.cs and HarnessConversationsSupport.cs, and these:
 // - Every case runs on the storage the group is given; countingSetup's Proxy is CountingStorage, which decorates that storage.
 // - toEqual on views is SameView (deep JSON equality of head, entries, contributions and messages).

@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/harness/json.ts. Upstream assigns into a Proxy draft through
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/harness/json.ts. Upstream assigns into a Proxy draft through
 // one indexer for objects and arrays; here the explicit drafts have one overload each. JavaScript's `current !== value` compares
 // primitives by value and containers by identity, as below.
 using PiSharp.Durable.Chord;

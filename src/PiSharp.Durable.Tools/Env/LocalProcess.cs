@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/env/node.ts (spawn, killProcessTree and the spawn errors Node
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/env/node.ts (spawn, killProcessTree and the spawn errors Node
 // reports before a process runs). The process primitives are PiSharp.Tools': on Windows the job-object lifetime the coding agent's bash tool
 // uses (WindowsProcessLifetime: the process starts suspended inside a private kill-on-close job, so killing the job kills every descendant,
 // where upstream runs `taskkill /F /T`, which can miss descendants whose parent already exited); on Linux and macOS the process-group

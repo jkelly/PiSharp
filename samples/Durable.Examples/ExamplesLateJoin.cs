@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/examples/21-late-join.ts. Upstream's timing comes from Node's
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/examples/21-late-join.ts. Upstream's timing comes from Node's
 // timers: the tool pauses 100 ms between lines, pi-ai's faux provider streams the answer at 40 tokens per second, and the client joins after
 // 500 ms. Here all of it runs on an ExampleClock: the Harness clock and its throttles (HarnessOptions.TimeProvider), the tool's pauses, and
 // PacedModels' streaming (faux pacing, token size 1). The example drives the clock like Node's event loop, firing one timer at a time and

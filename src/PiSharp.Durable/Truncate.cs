@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/truncate.ts.
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/truncate.ts.
 // Shared truncation utilities for tool outputs. Truncation is based on two independent limits, whichever is hit first: a line limit
 // (default 2000 lines) and a byte limit (default 50KB). Never returns partial lines. Tool output streams are bounded by the harness's
 // output buffer (P9) instead. Strings are UTF-16 as in JavaScript; byte counts are UTF-8, a lone surrogate counting as U+FFFD.

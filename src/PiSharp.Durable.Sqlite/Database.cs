@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/src/storage/sqlite/database.ts
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/src/storage/sqlite/database.ts
 //
 // Upstream's SqliteValue is null | number | bigint | string | Uint8Array; here a binding is null, long (or int), double, string or byte[],
 // and a result column is null, long, double, string or byte[]. Upstream returns rows as plain objects; here a row is an ordered,

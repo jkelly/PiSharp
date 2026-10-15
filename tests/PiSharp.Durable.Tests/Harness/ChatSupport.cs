@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/durable/test/chat-support.ts, and the faux provider of
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/durable/test/chat-support.ts, and the faux provider of
 // packages/ai/src/providers/faux.ts (fauxProvider, fauxAssistantMessage, fauxText, fauxThinking, fauxToolCall) as an IDurableModels.
 //
 // Adaptations:

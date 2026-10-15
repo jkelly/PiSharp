@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/overflow.ts (isContextOverflow) over a pi-ai wire assistant
+// Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/utils/overflow.ts (isContextOverflow) over a pi-ai wire assistant
 // message. PiSharp.CodingAgent's SessionRecoveryClassifier ports the same function over PiSharp.Contracts messages, but PiSharp.Durable does
 // not reference PiSharp.CodingAgent; this port uses its regex translation, and the test project compares the two on shared inputs.
 //
