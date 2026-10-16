@@ -22,6 +22,10 @@
 //   too, so it never starts inline inside the lock; it still runs after the operation underway.
 // - Two outcomes upstream gets from microtask order alone are kept explicitly: a reconciliation pass takes the pending cascade on the line
 //   (ReconcileAsync), and a context read that finishes once its task is no longer running is not kept (Runtime.ContextAsync).
+// - Abort invocations keep upstream's microtask order on the line (OrderedLineDelivery, one per scheduler): a pass starts them in one
+//   segment of the delivery, and their line results resume them one at a time in the order the jobs ran, so abort handlers started
+//   together reach the line in reservation order at every step (a caller's nested calls abandoned at a restart settle in call order).
+//   Run invocations keep the thread pool: their handlers are long-running host code.
 // - AbortController becomes CancellationSignal (a token plus its reason); an invocation's handler context is the scheduler context bound
 //   to that signal, so waits bound to it fail with the reason (the ended error, or OperationCanceledException for an abort mark or close,
 //   upstream's AbortError).
@@ -185,6 +189,9 @@ internal sealed class DurableTaskScheduler
     private int linePassesQueued;
     /// <summary>Line reservation passes not finished yet (their invocations not started); <see cref="QuiesceAsync"/> waits them out.</summary>
     private int linePassesRunning;
+    /// <summary>Starts a pass's invocations and resumes abort invocations on their line results, in line order (see
+    /// <see cref="StartPassAsync"/>).</summary>
+    private readonly OrderedLineDelivery abortDelivery = new();
 
     public DurableTaskScheduler(DurableTaskSchedulerOptions options)
     {
@@ -1307,7 +1314,7 @@ internal sealed class DurableTaskScheduler
                 FailSession(error);
                 return;
             }
-            StartPass(reservations);
+            await StartPassAsync(reservations).ConfigureAwait(false);
         }
         finally
         {
@@ -1319,7 +1326,25 @@ internal sealed class DurableTaskScheduler
         if (again) Kick();
     }
 
-    /// <summary>Starts a reservation pass's invocations.</summary>
+    /// <summary>
+    /// Starts a reservation pass's invocations; one with abort invocations, as one segment of <see cref="abortDelivery"/>. Upstream starts
+    /// each up to its first await, and from there every line result resumes its handler in the order the jobs ran, each running until it
+    /// next waits: abort handlers started together reach the line in reservation order at every step. On the thread pool each result's
+    /// continuation was scheduled on its own, and a later invocation whose job ran inline on an idle line went on at once: of a caller's two
+    /// nested calls abandoned at a restart, each reading its owned calls and then settling, c1/2 could settle before c1/1. Abort handlers
+    /// commit at once, so resuming them one at a time holds nothing up; run invocations, whose handlers are host code of any length, keep
+    /// the thread pool.
+    /// </summary>
+    private Task StartPassAsync(List<Reservation> reservations)
+    {
+        if (!reservations.Exists(reservation => reservation.Invocation.Mode == InvocationMode.Abort))
+        {
+            StartPass(reservations);
+            return Task.CompletedTask;
+        }
+        return abortDelivery.RunAsync(() => StartPass(reservations));
+    }
+
     private void StartPass(List<Reservation> reservations)
     {
         // Upstream starts every reserved invocation before any of them gets past its first await, so an abort invocation reads its record
@@ -1349,7 +1374,7 @@ internal sealed class DurableTaskScheduler
                     if (!(dirty && enabled && !closing)) break;
                     dirty = false;
                 }
-                StartPass(await ReserveAsync().ConfigureAwait(false));
+                await StartPassAsync(await ReserveAsync().ConfigureAwait(false)).ConfigureAwait(false);
             }
         }
         catch (Exception error)
@@ -1574,6 +1599,8 @@ internal sealed class DurableTaskScheduler
     private async Task RunInvocationAsync(Reservation reservation)
     {
         var invocation = reservation.Invocation;
+        // Set in this async method, so it stays with the invocation's flow (see StartPassAsync).
+        if (invocation.Mode == InvocationMode.Abort) OrderedLineDelivery.Current = abortDelivery;
         try
         {
             if (invocation.Mode == InvocationMode.Run) await RunAsync(reservation).ConfigureAwait(false);

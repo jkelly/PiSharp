@@ -6,7 +6,9 @@
 // - The line (SessionLine) is a FIFO queue of jobs run one at a time. Enqueue order, taken under a short lock, is the order jobs run in,
 //   so ordering is deterministic. An enqueue on an idle line runs the job inline on the caller's thread until its first incomplete await
 //   (an async method's usual start); later jobs run on the thread that completed the previous one. No lock is held while a job runs.
-//   Job results complete with RunContinuationsAsynchronously, so a caller's continuation never runs on, or blocks, the line.
+//   Job results complete with RunContinuationsAsynchronously, so a caller's continuation never runs on, or blocks, the line. A flow with
+//   an OrderedLineDelivery (the scheduler's abort invocations) gets its results through that delivery instead, off the line too: in line
+//   order, each continuation running until it next suspends before the next, as upstream's microtasks resume them.
 // - Every commit callback, preparation, Storage settlement, adoption and publication runs inside one job. Commit listeners run
 //   synchronously in it, after adoption. Document-state and watch deliveries that a publication schedules (upstream's microtasks) run in
 //   the same job right after publication, before the commit's task completes; a listener that awaits continues later on its own.
@@ -1138,15 +1140,35 @@ internal sealed class SessionLine
 
     /// <summary>
     /// Enqueues <paramref name="job"/>. On an idle line it starts inline when <paramref name="inline"/> is true, else on the thread pool.
-    /// The returned task completes asynchronously, after the job has fully settled.
+    /// The returned task completes asynchronously, after the job has fully settled. Enqueued from a flow with an
+    /// <see cref="OrderedLineDelivery"/>, it completes through that delivery, in line order.
     /// </summary>
     public Task<T> Enqueue<T>(Func<Task<T>> job, bool inline = true)
     {
-        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var ordered = OrderedLineDelivery.Current;
+        // An ordered result is set by the delivery, which runs its continuation until it next suspends.
+        var completion = new TaskCompletionSource<T>(ordered is null ? TaskCreationOptions.RunContinuationsAsynchronously : TaskCreationOptions.None);
+        var caller = Environment.CurrentManagedThreadId;
+        var inCaller = false;
+        void Complete(Action set)
+        {
+            if (ordered is null) set();
+            // Run inline by a flow outside the delivery's segments: nothing orders it, and its caller goes on at once, as without one.
+            else if (Volatile.Read(ref inCaller) && Environment.CurrentManagedThreadId == caller && !ordered.Executing) set();
+            else ordered.Post(set);
+        }
         async Task Run()
         {
-            try { completion.TrySetResult(await job().ConfigureAwait(false)); }
-            catch (Exception error) { completion.TrySetException(error); }
+            // A job runs on whatever thread starts or continues the line, possibly inside an ordered flow: what it enqueues is not part of it.
+            if (OrderedLineDelivery.Current is not null) OrderedLineDelivery.Current = null;
+            T result;
+            try { result = await job().ConfigureAwait(false); }
+            catch (Exception error)
+            {
+                Complete(() => completion.TrySetException(error));
+                return;
+            }
+            Complete(() => completion.TrySetResult(result));
         }
         bool start;
         lock (gate)
@@ -1157,7 +1179,12 @@ internal sealed class SessionLine
         }
         if (start)
         {
-            if (inline) Pump();
+            if (inline)
+            {
+                Volatile.Write(ref inCaller, true);
+                Pump();
+                Volatile.Write(ref inCaller, false);
+            }
             else ThreadPool.UnsafeQueueUserWorkItem(static line => line.Pump(), this, preferLocal: false);
         }
         return completion.Task;
@@ -1181,6 +1208,129 @@ internal sealed class SessionLine
             task.ContinueWith(static (_, state) => ((SessionLine)state!).Pump(), this, CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             return;
+        }
+    }
+}
+
+/// <summary>
+/// Upstream's microtask order for the line results of chosen flows (the scheduler's abort invocations). Upstream resumes every awaiting
+/// handler in the order its line job ran, and each runs until it next waits before the next resumes. Here a result's continuation is
+/// otherwise scheduled on the thread pool on its own, and a flow whose next job runs inline on an idle line goes on at once: of two flows that
+/// each read and then commit, the one whose read ran second can commit first.
+/// <para>A delivery runs segments one at a time. <see cref="RunAsync"/> runs a segment that starts flows; every line result of a flow that
+/// set <see cref="Current"/> (in an async method, so the setting stays with that flow) is queued as the job that produced it ends, so in line
+/// order, and set by the delivery, which runs the awaiting continuation inline until it next suspends. A flow inside a segment has waited
+/// before the segment ends, so its result is never set before its continuation is registered (one registered late is scheduled on the thread
+/// pool instead). Line jobs reset <see cref="Current"/>, so nothing they enqueue joins the flow. A flow resumed by anything else (a task
+/// signal, a timer) runs outside the segments until it next waits on the line.</para>
+/// </summary>
+internal sealed class OrderedLineDelivery
+{
+    private static readonly AsyncLocal<OrderedLineDelivery?> current = new();
+    [ThreadStatic] private static OrderedLineDelivery? executing;
+
+    private readonly Lock gate = new();
+    private readonly Queue<Action> pending = new();
+    private bool running;
+
+    /// <summary>The delivery of the current flow, if any.</summary>
+    public static OrderedLineDelivery? Current
+    {
+        get => current.Value;
+        set => current.Value = value;
+    }
+
+    /// <summary>Whether this thread runs one of the delivery's segments now.</summary>
+    public bool Executing => executing == this;
+
+    /// <summary>
+    /// Runs <paramref name="segment"/> as a segment of its own: inline when the delivery is idle (or from inside one of its segments), else
+    /// after the segments queued before it. Results its flows get meanwhile are delivered after it, on the thread pool.
+    /// </summary>
+    public Task RunAsync(Action segment)
+    {
+        if (Executing)
+        {
+            segment();
+            return Task.CompletedTask;
+        }
+        lock (gate)
+        {
+            if (running)
+            {
+                var queued = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                pending.Enqueue(() =>
+                {
+                    try
+                    {
+                        segment();
+                        queued.TrySetResult();
+                    }
+                    catch (Exception error)
+                    {
+                        queued.TrySetException(error);
+                    }
+                });
+                return queued.Task;
+            }
+            running = true;
+        }
+        var previous = executing;
+        executing = this;
+        try
+        {
+            segment();
+        }
+        finally
+        {
+            executing = previous;
+            bool more;
+            lock (gate)
+            {
+                more = pending.Count > 0;
+                if (!more) running = false;
+            }
+            if (more) ThreadPool.UnsafeQueueUserWorkItem(static delivery => delivery.Deliver(), this, preferLocal: false);
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Queues one result as the line job that produced it ends, so results queue in line order.</summary>
+    public void Post(Action deliver)
+    {
+        lock (gate)
+        {
+            pending.Enqueue(deliver);
+            if (running) return;
+            running = true;
+        }
+        // Never inline: this runs on the line, and the continuation would run there.
+        ThreadPool.UnsafeQueueUserWorkItem(static delivery => delivery.Deliver(), this, preferLocal: false);
+    }
+
+    private void Deliver()
+    {
+        var previous = executing;
+        executing = this;
+        try
+        {
+            while (true)
+            {
+                Action next;
+                lock (gate)
+                {
+                    if (!pending.TryDequeue(out next!))
+                    {
+                        running = false;
+                        return;
+                    }
+                }
+                next();
+            }
+        }
+        finally
+        {
+            executing = previous;
         }
     }
 }
