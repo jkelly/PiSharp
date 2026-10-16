@@ -272,14 +272,14 @@
       "kind": "sync",
       "baseline": "v1.2.0",
       "status": "release-candidate",
-      "branch": "sync/pi-1.2.0",
-      "ships": "the Pi v1.1.0..v1.2.0 sync (decision 0006): 38 applicability rows ported, 2 ported with a deferral, 3 already in PiSharp, 7 no-op, 6 excluded; the print-mode exit with a command's triggered run still starting",
+      "branch": "release/1.2.0",
+      "ships": "PR #18, the Pi v1.1.0..v1.2.0 sync (decision 0006): 38 applicability rows ported, 2 ported with a deferral, 3 already in PiSharp, 7 no-op, 6 excluded; the print-mode exit with a command's triggered run still starting. PR #19 (tool_search lowercases U+0130 as JavaScript does)",
       "decision": "docs/decisions/0006-pi-1.2.0-sync.md",
       "applicability": "compatibility/sync-1.2.0-applicability.json",
       "worklist": "compatibility/sync-1.2.0-worklist.json",
       "notes": "docs/release-notes/1.2.0.md",
-      "changelog": "website/src/content/changelog/1.2.0.md (status in-progress; set the date and status at release)",
-      "blockers": ["the owner's go-ahead to merge, tag and publish"]
+      "changelog": "website/src/content/changelog/1.2.0.md (date 2026-10-15)",
+      "blockers": []
     }
   },
   "messageCaps": {
