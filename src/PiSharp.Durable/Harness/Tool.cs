@@ -593,7 +593,7 @@ internal static class ToolPhases
     /// when it names the same tool and arguments.
     /// </summary>
     internal static async Task<TaskId> StartNestedCallAsync(ITaskRuntime runtime, string parentCallId, string name, JsonValue args,
-        string key, bool? progress, bool abandonOnRestart, DurableContext context, Task? ready = null)
+        string key, bool? progress, bool abandonOnRestart, DurableContext context)
     {
         var call = new RecordJson.Writer()
             .Add("type", "toolCall")
@@ -604,8 +604,6 @@ internal static class ToolPhases
         TaskId id = default;
         await runtime.CommitAsync(async (tx, current) =>
         {
-            // Holds the line until the admissions started with this one are all enqueued behind it (NestedCalls).
-            if (ready is not null) await ready.ConfigureAwait(false);
             // Upstream admits a nested call only once the memo committed.
             if (MemoOf(current) is null) throw new InvalidOperationException($"Tool call {parentCallId} has not committed {MadeNestedCalls}");
             // Opened, or created empty for a key not made yet.
@@ -997,25 +995,27 @@ internal sealed class NestedCalls(ITaskRuntime runtime, ToolReport reported, str
     }
 
     /// <summary>
-    /// Enqueues the admissions' commits (upstream <c>startNestedCall</c>), in call order, back to back on the Session line: each commit waits
-    /// to run until every one of them is enqueued, since an idle line would otherwise run the first at once and let the scheduler's reaction
-    /// to it in before the next. Called under the lock.
+    /// Enqueues the admissions' commits (upstream <c>startNestedCall</c>), in call order, back to back on the Session line
+    /// (<see cref="SessionLine.Together"/>): an idle line would otherwise run the first at once and let the scheduler's reaction to it in
+    /// before the next, and a job another thread enqueues meanwhile (a reservation pass the thread pool started, say) could queue between
+    /// them, so the second call's documents were created a commit later than upstream's. Called under the lock.
     /// </summary>
     private void StartAll(List<Admission> calls)
     {
         if (calls.Count == 0) return;
-        var enqueued = calls.Count > 1 ? new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously) : null;
-        foreach (var admission in calls) Start(admission, enqueued?.Task);
-        enqueued?.SetResult();
+        SessionLine.Together(() =>
+        {
+            foreach (var admission in calls) Start(admission);
+        });
     }
 
-    private void Start(Admission admission, Task? ready)
+    private void Start(Admission admission)
     {
         Task<TaskId> started;
         try
         {
             started = ToolPhases.StartNestedCallAsync(runtime, CallId, admission.Name, admission.Args, admission.Key, admission.Progress,
-                abandonOnRestart: !Resumes, admission.Context, ready);
+                abandonOnRestart: !Resumes, admission.Context);
         }
         catch (Exception error)
         {

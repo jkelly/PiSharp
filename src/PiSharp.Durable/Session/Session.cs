@@ -6,6 +6,7 @@
 // - The line (SessionLine) is a FIFO queue of jobs run one at a time. Enqueue order, taken under a short lock, is the order jobs run in,
 //   so ordering is deterministic. An enqueue on an idle line runs the job inline on the caller's thread until its first incomplete await
 //   (an async method's usual start); later jobs run on the thread that completed the previous one. No lock is held while a job runs.
+//   Jobs one thread enqueues in SessionLine.Together queue back to back, as upstream's enqueues in one synchronous stretch do.
 //   Job results complete with RunContinuationsAsynchronously, so a caller's continuation never runs on, or blocks, the line. A flow with
 //   an OrderedLineDelivery (the scheduler's abort invocations) gets its results through that delivery instead, off the line too: in line
 //   order, each continuation running until it next suspends before the next, as upstream's microtasks resume them.
@@ -1131,6 +1132,8 @@ internal sealed class SessionLine
     private readonly Lock gate = new();
     private readonly Queue<Func<Task>> jobs = new();
     private bool running;
+    /// <summary>Jobs this thread enqueues inside <see cref="Together"/>, queued when it returns.</summary>
+    [ThreadStatic] private static List<(SessionLine Line, Func<Task> Run, bool Inline)>? held;
 
     /// <summary>How many jobs wait behind the running one.</summary>
     public int Waiting
@@ -1170,6 +1173,11 @@ internal sealed class SessionLine
             }
             Complete(() => completion.TrySetResult(result));
         }
+        if (held is { } together)
+        {
+            together.Add((this, Run, inline));
+            return completion.Task;
+        }
         bool start;
         lock (gate)
         {
@@ -1188,6 +1196,45 @@ internal sealed class SessionLine
             else ThreadPool.UnsafeQueueUserWorkItem(static line => line.Pump(), this, preferLocal: false);
         }
         return completion.Task;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="enqueue"/>, holding the jobs it enqueues on this thread, and queues them when it returns, back to back under one
+    /// lock: as upstream's enqueues in one synchronous stretch, no job another thread enqueues meanwhile gets between them, and on an idle
+    /// line the first starts only once all are queued. A call inside another joins it.
+    /// </summary>
+    public static void Together(Action enqueue)
+    {
+        if (held is not null)
+        {
+            enqueue();
+            return;
+        }
+        var together = held = [];
+        try
+        {
+            enqueue();
+        }
+        finally
+        {
+            held = null;
+            foreach (var line in together.Select(job => job.Line).Distinct())
+                line.EnqueueHeld([.. together.Where(job => job.Line == line)]);
+        }
+    }
+
+    private void EnqueueHeld(List<(SessionLine Line, Func<Task> Run, bool Inline)> together)
+    {
+        bool start;
+        lock (gate)
+        {
+            foreach (var job in together) jobs.Enqueue(job.Run);
+            start = !running;
+            running = true;
+        }
+        if (!start) return;
+        if (together[0].Inline) Pump();
+        else ThreadPool.UnsafeQueueUserWorkItem(static line => line.Pump(), this, preferLocal: false);
     }
 
     private void Pump()
