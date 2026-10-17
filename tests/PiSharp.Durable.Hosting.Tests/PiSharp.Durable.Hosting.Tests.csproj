@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0008, Phase 2: the durable device host (src/PiSharp.Durable.Hosting), on its faux model only. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
+  </ItemGroup>
+</Project>

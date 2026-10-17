@@ -1,13 +1,13 @@
 name: Durable
 
-# CI for the experimental pi-durable port (decision 0005), released as experimental in 1.2.0.1. Runs on main and on
-# feature/pi-durable; the release workflow also runs both durable suites on Linux. The test job's storage.sqlite.native case loads
+# CI for the experimental pi-durable port (decision 0005), released as experimental in 1.2.0.1. Runs on main, on
+# feature/pi-durable and on feature/durable-network (decision 0008, the device host); the release workflow also runs both durable suites on Linux. The test job's storage.sqlite.native case loads
 # e_sqlite3 on each OS; sqlite-publish checks that a publish for each release RID carries that RID's e_sqlite3 native asset.
 on:
   push:
-    branches: [main, feature/pi-durable]
+    branches: [main, feature/pi-durable, feature/durable-network]
   pull_request:
-    branches: [main, feature/pi-durable]
+    branches: [main, feature/pi-durable, feature/durable-network]
   workflow_dispatch:
 
 permissions:
@@ -59,6 +59,21 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
           dotnet run --project tests/PiSharp.DurableCli.Tests/PiSharp.DurableCli.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-cli-${{ matrix.os }}.json"
+
+      # Decision 0008: the device host, on its faux model only.
+      - name: Run PiSharp.Durable.Hosting.Tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.Durable.Hosting.Tests/PiSharp.Durable.Hosting.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-hosting-${{ matrix.os }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-hosting-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/durable-hosting-${{ matrix.os }}.json
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         if: always()

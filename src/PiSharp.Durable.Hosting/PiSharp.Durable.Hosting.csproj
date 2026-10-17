@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0008 (PiSharp-only, branch feature/durable-network): hosts many durable sessions in one process, for the device server and the
+       web hub. It references the durable libraries only: no ASP.NET Core and not PiSharp.Cli, whose settings, models and registry a host passes
+       in. Not packed until the owner decides a release; every public type is [Experimental("PISHARP_DURABLE001")]. The catalog uses
+       Microsoft.Data.Sqlite through PiSharp.Durable.Sqlite's exact pins. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Hosting.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+  </ItemGroup>
+</Project>

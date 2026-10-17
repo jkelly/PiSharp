@@ -20,6 +20,7 @@
     <Project Path="src/PiSharp.Durable/PiSharp.Durable.csproj" />
     <Project Path="src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <Project Path="src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+    <Project Path="src/PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj" />
@@ -189,6 +190,9 @@
   </Folder>
   <Folder Name="/tests/parity/PiSharp.Durable.Tests/">
     <Project Path="tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.Durable.Hosting.Tests/">
+    <Project Path="tests/PiSharp.Durable.Hosting.Tests/PiSharp.Durable.Hosting.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/parity/PiSharp.InteractiveParity.Tests/">
     <Project Path="tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj" />
