@@ -64,10 +64,9 @@ public sealed class SqlServerStorage : IStorage
         ArgumentNullException.ThrowIfNull(connectionString);
         var (schemaName, timeout) = Settings(store, options);
         var db = await SqlServerDatabase.OpenAsync(connectionString).ConfigureAwait(false);
-        var resource = SqlServerLocks.StoreResource(schemaName, store);
         try
         {
-            await SqlServerMigrations.ApplyAsync(db, schemaName, timeout).ConfigureAwait(false);
+            var resource = SqlServerLocks.StoreResource(await SqlServerMigrations.ApplyAsync(db, schemaName, timeout).ConfigureAwait(false), store);
             await db.HoldAsync(async executor =>
             {
                 await SqlServerLocks.AcquireAsync(executor, resource, "Session", timeout, $"Durable SQL Server store \"{store}\" is open in another storage")
@@ -112,11 +111,11 @@ public sealed class SqlServerStorage : IStorage
         var db = await SqlServerDatabase.OpenAsync(connectionString).ConfigureAwait(false);
         try
         {
-            await SqlServerMigrations.ApplyAsync(db, schemaName, timeout).ConfigureAwait(false);
+            var schemaId = await SqlServerMigrations.ApplyAsync(db, schemaName, timeout).ConfigureAwait(false);
             var quoted = SqlServerMigrations.Quote(schemaName);
             return await db.TransactionAsync(async transaction =>
             {
-                await SqlServerLocks.AcquireAsync(transaction, SqlServerLocks.StoreResource(schemaName, store), "Transaction", timeout,
+                await SqlServerLocks.AcquireAsync(transaction, SqlServerLocks.StoreResource(schemaId, store), "Transaction", timeout,
                     $"Durable SQL Server store \"{store}\" is open in another storage").ConfigureAwait(false);
                 var row = await transaction.GetAsync(SqlServerMigrations.Render(
                     "SELECT store_id FROM {schema}.durable_stores WHERE " + StoreName, quoted), EncodeIndexedString(store))

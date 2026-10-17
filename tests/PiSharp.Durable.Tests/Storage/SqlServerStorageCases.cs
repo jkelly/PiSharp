@@ -280,6 +280,39 @@ internal static partial class Program
             }
         });
 
+        yield return Case("storage.mssql.locks-a-store-under-every-spelling-of-its-schema", async () =>
+        {
+            // The run's database is case-insensitive, so "dbo" and "DBO" name one schema. Application lock names compare byte for byte, so the
+            // store lock must be keyed by the schema SQL Server resolves, not by the caller's spelling.
+            var schema = MssqlServer.NewSchema();
+            foreach (var (first, second) in new[] { ("dbo", "DBO"), (schema, schema.ToUpperInvariant()) })
+            {
+                var store = MssqlServer.NewStore();
+                var owner = await MssqlServer.OpenAsync(store, new SqlServerStorageOptions { Schema = first });
+                try
+                {
+                    await CreateMssqlRoot(owner);
+                    var busy = await ThrowsAsync<InvalidOperationException>(() => MssqlServer.OpenAsync(store,
+                        new SqlServerStorageOptions { Schema = second, LockTimeoutMs = 0 }), $"open through {second}");
+                    Equal($"Durable SQL Server store \"{store}\" is open in another storage", busy.Message, $"busy message through {second}");
+                }
+                finally
+                {
+                    await owner.CloseAsync(MssqlContext);
+                }
+                var other = await MssqlServer.OpenAsync(store, new SqlServerStorageOptions { Schema = second, LockTimeoutMs = 0 });
+                try
+                {
+                    Equal<ConversationRecord?>(new ConversationRecord(ConversationId.Root), await other.GetConversationAsync(ConversationId.Root, MssqlContext),
+                        $"root seen through {second}");
+                }
+                finally
+                {
+                    await other.CloseAsync(MssqlContext);
+                }
+            }
+        });
+
         yield return Case("storage.mssql.keeps-stores-and-schemas-independent", async () =>
         {
             // Store names are compared exactly: a trailing space or a lone surrogate names another store. A schema name is quoted wherever
@@ -464,8 +497,9 @@ internal static partial class Program
 }
 
 /// <summary>The SQL Server the storage.mssql.* groups use: <c>PISHARP_DURABLE_MSSQL_CONNECTION_STRING</c> names the server and credentials
-/// (its database, if any, is only where the test database is created from). The first case creates one database for the run;
-/// <see cref="DropAsync"/> drops it when the run ends.</summary>
+/// (its database, if any, is only where the test database is created from). The first case creates one database for the run, with SQL Server's
+/// default case-insensitive collation whatever the server's is, so that schema names have aliases; <see cref="DropAsync"/> drops it when the run
+/// ends.</summary>
 internal static class MssqlServer
 {
     public const string Variable = "PISHARP_DURABLE_MSSQL_CONNECTION_STRING";
@@ -526,7 +560,7 @@ internal static class MssqlServer
     {
         var name = $"pisharp_durable_tests_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}"[..56];
         await using (var connection = await ConnectAsync(Server!))
-        await using (var command = Command(connection, $"CREATE DATABASE {Quote(name)}", []))
+        await using (var command = Command(connection, $"CREATE DATABASE {Quote(name)} COLLATE SQL_Latin1_General_CP1_CI_AS", []))
             await command.ExecuteNonQueryAsync();
         databaseName = name;
         return new SqlConnectionStringBuilder(Server) { InitialCatalog = name }.ConnectionString;

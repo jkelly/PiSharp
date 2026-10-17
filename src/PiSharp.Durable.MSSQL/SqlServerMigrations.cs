@@ -156,10 +156,10 @@ public static class SqlServerMigrations
     /// <summary>A statement with <c>{schema}</c> replaced by the quoted schema name.</summary>
     internal static string Render(string statement, string quotedSchema) => statement.Replace("{schema}", quotedSchema, StringComparison.Ordinal);
 
-    /// <summary>Applies all pending schema migrations to <paramref name="schema"/> atomically, creating the schema when it is missing. A
-    /// transaction-owned application lock serializes processes that open the same schema at once; <paramref name="lockTimeoutMs"/> bounds the
-    /// wait.</summary>
-    internal static async Task ApplyAsync(SqlServerDatabase database, string schema, int lockTimeoutMs, IReadOnlyList<SqlServerMigration>? migrations = null)
+    /// <summary>Applies all pending schema migrations to <paramref name="schema"/> atomically, creating the schema when it is missing, and
+    /// returns the schema's <c>SCHEMA_ID</c>. A transaction-owned application lock serializes the database's migrations;
+    /// <paramref name="lockTimeoutMs"/> bounds the wait.</summary>
+    internal static async Task<int> ApplyAsync(SqlServerDatabase database, string schema, int lockTimeoutMs, IReadOnlyList<SqlServerMigration>? migrations = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         migrations ??= Migrations;
@@ -169,10 +169,10 @@ public static class SqlServerMigrations
                 throw new InvalidOperationException("Durable SQL Server migrations must have contiguous versions starting at 1");
         }
         var quoted = Quote(schema);
-        await database.TransactionAsync(async transaction =>
+        return await database.TransactionAsync(async transaction =>
         {
-            await SqlServerLocks.AcquireAsync(transaction, SqlServerLocks.SchemaResource(schema), "Transaction", lockTimeoutMs,
-                $"Durable SQL Server schema \"{schema}\" is being migrated by another connection").ConfigureAwait(false);
+            await SqlServerLocks.AcquireAsync(transaction, SqlServerLocks.MigrationResource, "Transaction", lockTimeoutMs,
+                "Durable SQL Server schemas of this database are being migrated by another connection").ConfigureAwait(false);
             await transaction.RunAsync("""
                 DECLARE @create NVARCHAR(300) = N'CREATE SCHEMA ' + QUOTENAME(@p0);
                 IF SCHEMA_ID(@p0) IS NULL EXEC (@create);
@@ -195,7 +195,8 @@ public static class SqlServerMigrations
                 await transaction.RunAsync(Render("UPDATE {schema}.durable_schema SET version = @p0 WHERE singleton = 1", quoted), migration.Version)
                     .ConfigureAwait(false);
             }
-            return true;
+            var id = await transaction.GetAsync("SELECT SCHEMA_ID(@p0) AS id", schema).ConfigureAwait(false);
+            return checked((int)id!.GetInt64("id"));
         }).ConfigureAwait(false);
     }
 }

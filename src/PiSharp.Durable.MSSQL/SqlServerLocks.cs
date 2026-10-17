@@ -1,5 +1,8 @@
 // Authored for PiSharp (decision 0007). SQL Server application locks (sp_getapplock) stand in for the SQLite file's single owner: a store
-// is open in one storage at a time, and a schema migrates under one connection at a time. Lock resources are scoped to the database.
+// is open in one storage at a time, and a database's schemas migrate under one connection at a time. Lock resources are scoped to the
+// database and compared byte for byte, so a store's lock is keyed by its schema's ID, not by the name a caller spelled: in a case-insensitive
+// database "dbo" and "DBO" are one schema and must share one lock.
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
@@ -7,11 +10,12 @@ namespace PiSharp.Durable.MSSQL;
 
 internal static class SqlServerLocks
 {
-    /// <summary>The lock a schema's migration holds for its transaction.</summary>
-    public static string SchemaResource(string schema) => "PiSharp.Durable.MSSQL/schema/" + Digest(schema);
+    /// <summary>The lock a migration holds for its transaction: one per database, since a schema may not exist yet to give an ID.</summary>
+    public const string MigrationResource = "PiSharp.Durable.MSSQL/migrations";
 
-    /// <summary>The lock an open store holds for its session.</summary>
-    public static string StoreResource(string schema, string store) => "PiSharp.Durable.MSSQL/store/" + Digest(schema + "\0" + store);
+    /// <summary>The lock an open store holds for its session: the schema's <c>SCHEMA_ID</c> and the store name.</summary>
+    public static string StoreResource(int schemaId, string store) =>
+        "PiSharp.Durable.MSSQL/store/" + schemaId.ToString(CultureInfo.InvariantCulture) + "/" + Digest(store);
 
     /// <summary>Takes an exclusive application lock owned by <paramref name="owner"/> (<c>Session</c> or <c>Transaction</c>), waiting at most
     /// <paramref name="timeoutMs"/>; fails with <paramref name="busyMessage"/> when another connection holds it past the timeout.</summary>
