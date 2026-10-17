@@ -13,6 +13,7 @@
 // file's type (NativeFiles) is checked before opening, which is not race-free, as upstream's own Windows check is not.
 using System.Collections.Immutable;
 using System.Text;
+using System.IO.Enumeration;
 using Microsoft.Win32.SafeHandles;
 using PiSharp.Durable.Chord;
 
@@ -465,11 +466,53 @@ public class LocalFileSystem : IFileSystem
                 continue;
             }
             // The on-disk spelling of the name, as realpath reports it on case-insensitive file systems.
-            var parent = new DirectoryInfo(current);
-            var actual = parent.Exists ? parent.EnumerateFileSystemInfos(segment).FirstOrDefault()?.Name : null;
-            current = Path.Join(current, actual ?? segment);
+            current = Path.Join(current, OnDiskName(current, segment) ?? segment);
         }
         return current;
+    }
+
+    /// <summary>Every entry, hidden and system ones included; a name is compared by the predicate, never matched as a search pattern.</summary>
+    private static readonly EnumerationOptions LiteralScan = new()
+    {
+        AttributesToSkip = 0,
+        IgnoreInaccessible = false,
+        MatchType = MatchType.Simple,
+        RecurseSubdirectories = false,
+        ReturnSpecialDirectories = false,
+    };
+
+    /// <summary>
+    /// The on-disk name of <paramref name="segment"/> in <paramref name="directory"/>, compared as a literal name: <c>*</c>, <c>?</c> (valid
+    /// in Unix names) and the DOS wildcards are never patterns, so a sibling they would match is never taken. The entry named exactly so
+    /// first; otherwise, where the file system resolves the name case-insensitively (it exists, but under another spelling), the entry
+    /// equal to it ignoring case; otherwise, on Windows, the long name of an 8.3 short name, as Node's realpath (GetFinalPathNameByHandleW)
+    /// reports it. Null keeps the segment as given.
+    /// </summary>
+    /// <remarks>.NET reads every entry of the directory for a search pattern too and matches it in managed code, so the literal comparison
+    /// costs one pass, as the pattern did.</remarks>
+    private static string? OnDiskName(string directory, string segment)
+    {
+        string? folded = null;
+        try
+        {
+            var entries = new FileSystemEnumerable<string>(directory, (ref FileSystemEntry entry) => entry.FileName.ToString(), LiteralScan)
+            {
+                ShouldIncludePredicate = (ref FileSystemEntry entry) => entry.FileName.Equals(segment, StringComparison.OrdinalIgnoreCase),
+            };
+            foreach (var name in entries)
+            {
+                if (string.Equals(name, segment, StringComparison.Ordinal)) return name;
+                folded ??= name;
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; } // Searchable, not listable.
+        var path = Path.Join(directory, segment);
+        if (folded is not null) return Path.Exists(path) ? folded : null;
+        // GetFullPath expands a short name (GetLongPathNameW) on a path that has a ~ and exists.
+        if (OperatingSystem.IsWindows() && segment.Contains('~') && Path.Exists(path) &&
+            Path.GetFileName(Path.GetFullPath(path)) is { Length: > 0 } longName && !string.Equals(longName, segment, StringComparison.Ordinal))
+            return longName;
+        return null;
     }
 
     private static FileError SymlinkRefused(string resolved, Exception? cause = null) =>

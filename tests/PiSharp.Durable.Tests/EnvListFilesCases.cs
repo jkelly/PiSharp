@@ -253,6 +253,54 @@ internal static partial class Program
             Equal(Lines("f .gitignore", "d .jj", "f .jj/repo", "f b.txt"), List(root).Entries, "entries");
         });
 
+        // Authored: realpath (the canonical root, and CanonicalPathAsync) compares each name literally, as Node's realpath and Rust's
+        // canonicalize resolve it. On Unix * and ? are ordinary name characters, never a search pattern that could pick a sibling; the
+        // listing's ancestors then apply their rules to the literal directory.
+        yield return Case("env.list-files.walk.realpath-takes-wildcard-names-literally", () => WithEnvRoot(async root =>
+        {
+            if (OperatingSystem.IsWindows()) return; // * and ? are not valid in Windows names; the Windows case below covers its spellings.
+            Tree(root, ".git/HEAD", "a*/x.txt", "a1/x.txt", "ab/x.txt", "abc/x.txt", "a?b/x.txt", "axb/x.txt", "a\\b/x.txt", "a/x.txt");
+            File.WriteAllText(Path.Combine(root, ".gitignore"), "/a1/x.txt\n/ab/x.txt\n/abc/x.txt\n/axb/x.txt\n/a/x.txt\n");
+            var real = LocalFileSystem.RealPath(root);
+            var fileSystem = new LocalFileSystem(root);
+            foreach (var name in new[] { "a*", "a?b", "a\\b" })
+            {
+                Equal(Path.Join(real, name), LocalFileSystem.RealPath(Path.Join(root, name)), "realpath of " + name);
+                Equal(Path.Join(real, name, "x.txt"), (await fileSystem.CanonicalPathAsync(name + "/x.txt", context)).GetOrThrow(), "canonical path in " + name);
+                // The root's rules ignore the siblings' x.txt, not this one.
+                Equal(Lines("f x.txt"), List(Path.Join(root, name)).Entries, "listing " + name);
+                var listed = (await fileSystem.ListFilesAsync(name, null, context)).GetOrThrow();
+                Equal("x.txt", string.Join(",", listed.Entries.Select(entry => entry.Path)), "ListFilesAsync of " + name);
+            }
+            Equal(Path.Join(real, "abc"), LocalFileSystem.RealPath(Path.Join(root, "abc")), "a sibling resolves to itself");
+            Equal("", List(Path.Join(root, "abc")).Entries, "and its x.txt is ignored");
+        }));
+
+        // Authored: on Windows realpath reports each name as stored, as Node's realpath (GetFinalPathNameByHandleW) does: the on-disk case of a
+        // name given in another case, and the long name of an 8.3 short name (which .NET's name matching never sees). The listing's ancestors
+        // apply their rules to that spelling.
+        yield return Case("env.list-files.walk.realpath-reports-the-stored-spelling-on-windows", () => WithEnvRoot(async root =>
+        {
+            if (!OperatingSystem.IsWindows()) return; // Case-insensitive names and 8.3 short names are Windows's; the case above covers Unix.
+            Tree(root, ".git/HEAD", "MixedCase/Inner.txt", "MixedCase2/", "Long Directory Name One/x.txt", "Long Directory Name Two/x.txt");
+            File.WriteAllText(Path.Combine(root, ".gitignore"), "/Long Directory Name Two/x.txt\n/MixedCase/drop.txt\n");
+            File.WriteAllText(Path.Combine(root, "MixedCase", "drop.txt"), "");
+            var real = LocalFileSystem.RealPath(root);
+            var fileSystem = new LocalFileSystem(root);
+            Equal(Path.Join(real, "MixedCase", "Inner.txt"), LocalFileSystem.RealPath(Path.Join(root, "mixedcase", "INNER.txt")), "on-disk case");
+            Equal(Path.Join(real, "MixedCase", "Inner.txt"), (await fileSystem.CanonicalPathAsync("MIXEDCASE/inner.txt", context)).GetOrThrow(),
+                "canonical path in another case");
+            Equal(Lines("f Inner.txt"), List(Path.Join(root, "mixedcase")).Entries, "the root's rule applies to the on-disk spelling");
+            var two = Path.Join(root, "Long Directory Name Two");
+            var shortTwo = ShortName(two);
+            if (shortTwo == "Long Directory Name Two") return; // This volume makes no 8.3 names.
+            Check(!string.Equals(ShortName(Path.Join(root, "Long Directory Name One")), shortTwo, StringComparison.OrdinalIgnoreCase), "distinct short names");
+            Equal(Path.Join(real, "Long Directory Name Two"), LocalFileSystem.RealPath(Path.Join(root, shortTwo)), "the long name of " + shortTwo);
+            Equal(Path.Join(real, "Long Directory Name Two", "x.txt"), LocalFileSystem.RealPath(Path.Join(root, shortTwo, "x.txt")), "below a short name");
+            Equal("", List(Path.Join(root, shortTwo)).Entries, "the rule for the long name applies to the short one");
+            Equal(Lines("f x.txt"), List(Path.Join(root, "Long Directory Name One")).Entries, "the sibling is not ignored");
+        }));
+
         yield return ListCase("walk.the-global-excludes-file-applies-inside-work-trees", root =>
         {
             Tree(root, "config/x", "work/.git/", "work/a.secret", "work/sub/b.secret", "work/c.txt", "plain/a.secret");
@@ -385,6 +433,18 @@ internal static partial class Program
     }
 
     private static string Lines(params string[] lines) => string.Join("\n", lines);
+
+    /// <summary>The 8.3 short name of an existing path's last name; the long name when the volume makes none.</summary>
+    private static string ShortName(string path)
+    {
+        var buffer = new char[1024];
+        var length = GetShortPathNameW(path, buffer, (uint)buffer.Length);
+        Check(length > 0 && length < buffer.Length, "GetShortPathNameW " + path);
+        return Path.GetFileName(new string(buffer, 0, (int)length));
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetShortPathNameW(string longPath, [System.Runtime.InteropServices.Out] char[] shortPath, uint length);
 
     /// <summary>A listing through LocalFileListing as list.rs's tests read it: <c>&lt;kind letter&gt; &lt;path&gt;</c> lines.</summary>
     private static (string Entries, string[] Lines, bool Truncated) List(string root, ListFilesOptions? options = null)
