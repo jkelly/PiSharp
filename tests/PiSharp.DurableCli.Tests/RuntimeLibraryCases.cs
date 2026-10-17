@@ -2,6 +2,9 @@
 // v1.2.0, so these cases have no upstream twin). A storage error fails the session and the view says so; a failed compaction is recorded in
 // pi.live.compactionFailure, not reported twice; tool_search is installed but not offered without deferred tools; and a subagent's child
 // conversation, owned by the call's tool task, behaves sensibly when the call is aborted and when the process restarts mid-call.
+// runtime.lock-lost.<case> are PiSharp-only too: a lost session lock (removed, or taken over by another process) fails the session the same
+// way, where upstream's proper-lockfile onCompromised throws and ends the process. The lock renews every second and goes stale after 2 s
+// (the shortest proper-lockfile allows), and each case waits for the failure itself rather than for a fixed time.
 using PiSharp.Cli.Durable;
 using PiSharp.Cli.Pi;
 using PiSharp.Durable;
@@ -86,6 +89,98 @@ internal static partial class Program
             finally { await durable.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)); }
             Equal(1, code, "exit code");
             Check(!Directory.Exists(durable.Location.Directory + ".lock"), "dispose released the lock");
+        }),
+
+        Case("runtime.lock-lost.removed-lock-fails-the-session", async () =>
+        {
+            await using var agent = new TestAgent("lock-removed");
+            FailingStorage? storage = null;
+            var host = agent.Host(ScriptedStreams.Queue(ScriptedReply.Answer("first answer"), ScriptedReply.Answer("never committed")), ShortLock) with
+            {
+                OpenStorage = async path => storage = new FailingStorage(await SqliteStorage.OpenAsync(path)),
+            };
+            var durable = (DurableSession)await DurableRuntime.OpenAsync(new OpenDurableOptions(), host);
+            var lockPath = durable.Location.Directory + ".lock";
+            try
+            {
+                await durable.Controller.SubmitAsync("hi", WhenBusy.Steer);
+                await UntilView(durable.View, view => LastAnswer(view) == "first answer" && Idle(view), "answered");
+                var committed = storage!.Commits;
+                Directory.Delete(lockPath);
+                var view = await UntilView(durable.View, current => current.Failure is not null, "the session failed", seconds: 60);
+                Equal($"the session lock was lost (removed, or taken over by another process): {lockPath}", view.Failure, "the failure");
+                Check(durable.Location.LockLost is not null && durable.Location.Lock.Compromised, "the lock is lost");
+                var end = await durable.Harness.Closed.WaitAsync(TimeSpan.FromSeconds(30));
+                Equal(SessionEndReason.Failed, end.Reason, "the Harness closed failed");
+                // Nothing more reaches the storage: the request is refused and becomes no notice besides the failure.
+                await durable.Controller.SubmitAsync("after the loss", WhenBusy.Steer);
+                await durable.Controller.CompactAsync(null);
+                Equal(committed, storage.Commits, "no commit after the lock was lost");
+                Check(durable.View.Current.Notices.IsEmpty, "no notices: " + string.Join(" | ", durable.View.Current.Notices.Select(notice => notice.Message)));
+                Equal($"Session failed: the session lock was lost (removed, or taken over by another process): {lockPath}. Nothing more is saved; " +
+                    "exit and run `pisharp durable --continue` to reopen it.", DurableFailure.Message(view.Failure!), "the message");
+            }
+            finally { await durable.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)); }
+            Check(!Directory.Exists(lockPath), "nobody holds the lock");
+            // Reopening finds what was committed before the loss, and nothing after it.
+            await using var reopened = await agent.OpenAsync(ScriptedStreams.Queue(), continueSession: true);
+            Equal(durable.Location.Directory, reopened.Location.Directory, "the same session");
+            Equal("hi", string.Join(",", reopened.View.Current.Conversation.Entries.Where(entry => entry.Kind == "pi.user").Select(UserText)), "the inputs");
+            Equal("first answer", LastAnswer(reopened.View.Current), "the committed transcript");
+        }),
+
+        // Another process took the lock over (here: removed it and created its own, with an mtime this holder never wrote). The holder fails,
+        // and closing it leaves the other owner's lock alone.
+        Case("runtime.lock-lost.taken-over-lock-fails-and-is-kept", async () =>
+        {
+            await using var agent = new TestAgent("lock-taken");
+            FailingStorage? storage = null;
+            var host = agent.Host(ScriptedStreams.Queue(ScriptedReply.Answer("first answer"), ScriptedReply.Answer("never committed")), ShortLock) with
+            {
+                OpenStorage = async path => storage = new FailingStorage(await SqliteStorage.OpenAsync(path)),
+            };
+            var durable = (DurableSession)await DurableRuntime.OpenAsync(new OpenDurableOptions(), host);
+            var lockPath = durable.Location.Directory + ".lock";
+            var otherOwner = new DateTime(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
+            try
+            {
+                await durable.Controller.SubmitAsync("hi", WhenBusy.Steer);
+                await UntilView(durable.View, view => LastAnswer(view) == "first answer" && Idle(view), "answered");
+                var committed = storage!.Commits;
+                await TakeOverAsync(lockPath, otherOwner, () => durable.View.Current.Failure is not null);
+                var view = durable.View.Current;
+                Check(view.Failure!.StartsWith("the session lock was lost", StringComparison.Ordinal), "the failure: " + view.Failure);
+                await durable.Controller.SubmitAsync("after the loss", WhenBusy.Steer);
+                Equal(committed, storage.Commits, "no commit after the lock was lost");
+            }
+            finally { await durable.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30)); }
+            Check(Directory.Exists(lockPath), "closing kept the other owner's lock");
+            Equal(otherOwner, Directory.GetLastWriteTimeUtc(lockPath), "and did not renew it");
+            Directory.Delete(lockPath);
+        }),
+
+        // Lost while the session opens, after the lock was taken and before the Harness could fail on it: the open fails with the loss, and the
+        // Harness's opening commits are refused.
+        Case("runtime.lock-lost.during-open-fails-the-open", async () =>
+        {
+            await using var agent = new TestAgent("lock-open");
+            var compromised = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+            FailingStorage? storage = null;
+            string? lockPath = null;
+            var host = agent.Host(ScriptedStreams.Queue(), ShortLock with { OnCompromised = error => compromised.TrySetResult(error) }) with
+            {
+                OpenStorage = async path =>
+                {
+                    lockPath = Path.GetDirectoryName(path) + ".lock";
+                    Directory.Delete(lockPath);
+                    await compromised.Task.WaitAsync(TimeSpan.FromSeconds(60));
+                    return storage = new FailingStorage(await SqliteStorage.OpenAsync(path));
+                },
+            };
+            var error = await ThrowsAsync<DurableSessionLockLostException>(() => DurableRuntime.OpenAsync(new OpenDurableOptions(), host), "the open fails");
+            Equal($"the session lock was lost (removed, or taken over by another process): {lockPath}", error.Message, "the message");
+            Equal(0, storage!.Commits, "nothing committed");
+            Check(!Directory.Exists(lockPath), "the failed open made no lock");
         }),
 
         Case("runtime.compact.failure-is-the-live-compaction-failure", async () =>
@@ -214,15 +309,50 @@ internal static partial class Program
         }
     }
 
-    /// <summary>A storage whose commits fail with "disk is full" once <see cref="Fail"/> is set: a Storage error fails the Session.</summary>
+    /// <summary>
+    /// Takes the lock at <paramref name="lockPath"/> over as another process would (proper-lockfile removes the stale directory and creates
+    /// its own), with <paramref name="mtime"/> as the new owner's. A renewal that read the old mtime just before may still write over the new
+    /// one (proper-lockfile's check and update are not atomic either), so the new owner's mtime is put back until <paramref name="lost"/>
+    /// says the holder noticed.
+    /// </summary>
+    internal static async Task TakeOverAsync(string lockPath, DateTime mtime, Func<bool> lost)
+    {
+        Directory.Delete(lockPath);
+        Check(PiLockfile.MakeDirectory(lockPath), "the other process's mkdir");
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+        while (true)
+        {
+            if (Directory.GetLastWriteTimeUtc(lockPath) != mtime) Directory.SetLastWriteTimeUtc(lockPath, mtime);
+            if (lost()) return;
+            Check(DateTime.UtcNow < deadline, "the holder notices the takeover");
+            await Task.Delay(50);
+        }
+    }
+
+    /// <summary>The session lock's shortest timing: renewed every second, stale after 2 s.</summary>
+    private static readonly PiLockOptions ShortLock = new() { Retries = 12, RetryDelay = TimeSpan.FromSeconds(1), Stale = TimeSpan.FromSeconds(2) };
+
+    /// <summary>A storage whose commits fail with "disk is full" once <see cref="Fail"/> is set: a Storage error fails the Session. It
+    /// counts the commits that reached the backend.</summary>
     private sealed class FailingStorage(IStorage inner) : IStorage
     {
         private volatile bool fail;
+        private int commits;
 
         public bool Fail { set => fail = value; }
 
+        /// <summary>Commits the backend completed.</summary>
+        public int Commits => Volatile.Read(ref commits);
+
         public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) =>
-            fail ? Task.FromException<Seq>(new IOException("disk is full")) : inner.CommitAsync(writes, context);
+            fail ? Task.FromException<Seq>(new IOException("disk is full")) : CountedAsync(inner.CommitAsync(writes, context));
+
+        private async Task<Seq> CountedAsync(Task<Seq> commit)
+        {
+            var seq = await commit;
+            Interlocked.Increment(ref commits);
+            return seq;
+        }
         public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
         public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => inner.GetConversationAsync(id, context);
         public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>

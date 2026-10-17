@@ -5,7 +5,8 @@
 // work item does, so listeners run off the Harness's lines and must marshal to their own.
 // PiSharp-only since pi-durable 1.2.0 (decision 0005; durable work list area l): a failed Session (SessionFailedException, ISession.Closed
 // settling with SessionEnd.Failed) marks the view failed instead of leaving the TUI waiting, and failed compactions are reported through
-// pi.live.compactionFailure instead of from the task outcome.
+// pi.live.compactionFailure instead of from the task outcome. PiSharp-only as well: a lost session lock (removed, or taken over by another
+// process) fails the Session the same way; upstream's proper-lockfile onCompromised throws, which ends its process.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Cli.Commands;
@@ -117,6 +118,7 @@ internal static partial class DurableRuntime
         var envs = new DurableExecutionEnvs(location.Cwd);
         IHarness? harness = null;
         DurableModels? models = null;
+        DurableSession session;
         try
         {
             var settings = PiSettings.Load(location.Cwd, host.AgentDir, projectTrusted: true);
@@ -130,9 +132,13 @@ internal static partial class DurableRuntime
             var harnessSettings = DurableHarnessSetup.CreateHarnessSettings(settings, registry);
 
             var reports = new DurableReports();
-            var storage = host.OpenStorage is { } open
+            // A lost lock means another process may own the session now: nothing more may be committed to it (PiSharp-only; upstream's
+            // proper-lockfile onCompromised throws and ends the process). Before the Harness exists the guarded storage refuses commits;
+            // once it does, the loss fails its Session at once, which closes it and fails the view as a storage error does.
+            location.ThrowIfLockLost();
+            var storage = new LockGuardedStorage(host.OpenStorage is { } open
                 ? await open(location.Database).ConfigureAwait(false)
-                : await SqliteStorage.OpenAsync(location.Database).ConfigureAwait(false);
+                : await SqliteStorage.OpenAsync(location.Database).ConfigureAwait(false), location);
             harness = await Harness.OpenAsync(storage, new HarnessOptions
             {
                 Models = models,
@@ -141,6 +147,7 @@ internal static partial class DurableRuntime
                 Env = envs.EnvAsync,
                 OnReport = reports.Report,
             }, Context).ConfigureAwait(false);
+            location.OnLockLost(((Session)harness).Fail);
             var initial = location.Created ? DurableHarnessSetup.FindInitialAgentModel(settings, models) : null;
             var root = await harness.RootAsync(Context, new AgentChange
             {
@@ -158,17 +165,58 @@ internal static partial class DurableRuntime
                     summaries.Add(new(record.Id, DurableSession.Label(record.Id, root.Id), await FirstInputAsync(harness, record.Id).ConfigureAwait(false)));
                 cursor = page.Next;
             } while (cursor is not null);
-            var session = await DurableSession.StartAsync(location, envs, harness, models, settings, root, summaries, initial, reports).ConfigureAwait(false);
-            return session;
+            session = await DurableSession.StartAsync(location, envs, harness, models, settings, root, summaries, initial, reports).ConfigureAwait(false);
         }
         catch
         {
             if (harness is not null) try { await harness.CloseAsync(Context).ConfigureAwait(false); } catch { }
             if (models is not null) try { await models.DisposeAsync().ConfigureAwait(false); } catch { }
             try { await location.ReleaseAsync().ConfigureAwait(false); } catch { }
+            // Whatever the lost lock made fail (a refused commit, the failed Session), the loss is what the user is told.
+            if (location.LockLost is { } lost) throw lost;
             throw;
         }
+        // Lost while the session started: the open fails rather than showing a session that has already failed.
+        if (location.LockLost is { } lostAtStart)
+        {
+            try { await session.DisposeAsync().ConfigureAwait(false); } catch { }
+            throw lostAtStart;
+        }
+        return session;
     }
+}
+
+/// <summary>The session's storage, refusing every commit once the session lock is lost: the refusal fails the Session as any storage error
+/// does. It covers the commits the Harness makes while it opens, before the loss can fail its Session directly.</summary>
+internal sealed class LockGuardedStorage(IStorage inner, DurableSessionLocation location) : IStorage
+{
+    public Task<Seq> CommitAsync(IReadOnlyList<StorageWrite> writes, DurableContext context) =>
+        location.LockLost is { } lost ? Task.FromException<Seq>(lost) : inner.CommitAsync(writes, context);
+    public Task<TId> MintIdAsync<TId>() where TId : struct, IDurableId<TId> => inner.MintIdAsync<TId>();
+    public Task<ConversationRecord?> GetConversationAsync(ConversationId id, DurableContext context) => inner.GetConversationAsync(id, context);
+    public Task<Page<ConversationRecord>> ScanConversationsAsync(ConversationQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        inner.ScanConversationsAsync(query, limit, cursor, context);
+    public Task<CommittedEntry?> GetEntryAsync(EntryId id, DurableContext context) => inner.GetEntryAsync(id, context);
+    public Task<CommittedEntry?> GetEntryAsync(ConversationId conversationId, EntryId id, DurableContext context) =>
+        inner.GetEntryAsync(conversationId, id, context);
+    public Task<EntryRecord?> FindLatestHeadMarkerAsync(ConversationId conversationId, EntryId? atOrBeforeEntryId, DurableContext context) =>
+        inner.FindLatestHeadMarkerAsync(conversationId, atOrBeforeEntryId, context);
+    public Task<Page<EntryRecord>> ScanEntriesAsync(EntryQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        inner.ScanEntriesAsync(query, limit, cursor, context);
+    public Task<TaskRecord?> GetTaskAsync(TaskId id, DurableContext context) => inner.GetTaskAsync(id, context);
+    public Task<Page<TaskRecord>> ScanTasksAsync(TaskQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        inner.ScanTasksAsync(query, limit, cursor, context);
+    public Task<SubmissionRecord?> GetSubmissionAsync(SubmissionId id, DurableContext context) => inner.GetSubmissionAsync(id, context);
+    public Task<Page<SubmissionRecord>> ScanSubmissionsAsync(SubmissionQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        inner.ScanSubmissionsAsync(query, limit, cursor, context);
+    public Task<SubmissionRecord?> GetSubmissionByRequestAsync(ConversationId conversationId, string requestId, DurableContext context) =>
+        inner.GetSubmissionByRequestAsync(conversationId, requestId, context);
+    public Task<DocumentRecord?> FindDocumentAsync(DocumentAddress address, DocumentPoint at, DurableContext context) =>
+        inner.FindDocumentAsync(address, at, context);
+    public Task<StoredDocument?> GetDocumentAsync(DocumentId id, DocumentPoint at, DurableContext context) => inner.GetDocumentAsync(id, at, context);
+    public Task<Page<DocumentRecord>> ScanDocumentsAsync(DocumentQuery query, int limit, JsonObjectValue? cursor, DurableContext context) =>
+        inner.ScanDocumentsAsync(query, limit, cursor, context);
+    public Task CloseAsync(DurableContext context) => inner.CloseAsync(context);
 }
 
 /// <summary>Harness reports: buffered until the session can show them as notices.</summary>
