@@ -1,13 +1,13 @@
 name: Durable
 
-# Branch CI for the experimental pi-durable port (decision 0005). Runs on feature/pi-durable only; the release and macOS
-# workflows stay unchanged until the branch is merged. The test job's storage.sqlite.native case loads e_sqlite3 on each OS;
-# sqlite-publish checks that a publish for each release RID carries that RID's e_sqlite3 native asset.
+# CI for the experimental pi-durable port (decision 0005), released as experimental in 1.2.0.1. Runs on main and on
+# feature/pi-durable; the release workflow also runs both durable suites on Linux. The test job's storage.sqlite.native case loads
+# e_sqlite3 on each OS; sqlite-publish checks that a publish for each release RID carries that RID's e_sqlite3 native asset.
 on:
   push:
-    branches: [feature/pi-durable]
+    branches: [main, feature/pi-durable]
   pull_request:
-    branches: [feature/pi-durable]
+    branches: [main, feature/pi-durable]
   workflow_dispatch:
 
 permissions:

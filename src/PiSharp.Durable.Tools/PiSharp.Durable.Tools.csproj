@@ -4,7 +4,6 @@
        (work list area d) runs scripts on PiSharp.Codemode's deterministic CodemodeSandbox.Start() and renders tool declarations with its
        CodemodeDeclarations; that brings Jint, Acornima and PiSharp.Extensions.Abstractions in transitively (decision 0005, Codemode Start()). -->
   <PropertyGroup>
-    <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -15,5 +14,9 @@
     <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
     <ProjectReference Include="../PiSharp.Codemode/PiSharp.Codemode.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Tools/JsDiff.cs ports jsdiff 8.0.4 (BSD-3-Clause; THIRD-PARTY-NOTICES.md). -->
+    <None Include="../../third-party/jsdiff.LICENSE.txt" Pack="true" PackagePath="licenses/" />
   </ItemGroup>
 </Project>

@@ -308,7 +308,7 @@ internal static partial class Program
             var answer = await models.CompleteSimpleAsync(copilot!, [JsonValue.Parse("""{"role":"user","content":"hi","timestamp":1}""")], null, CancellationToken.None);
             Check(endpoint.Snapshot().Length > 0, "a request was sent through the live route: " + answer.ExtraProperties);
         }),
-        Case("runtime.dispatch.unknown-argument-and-hidden-help", async () =>
+        Case("runtime.dispatch.unknown-argument-and-experimental-help", async () =>
         {
             await using var agent = new TestAgent("dispatch");
             var stdout = new StringWriter(); var stderr = new StringWriter();
@@ -324,7 +324,11 @@ internal static partial class Program
             Equal(new OpenDurableOptions { ContinueSession = true }, DurableMain.ParseArgs(["-c"]), "-c");
             Equal(new OpenDurableOptions { ContinueSession = true }, DurableMain.ParseArgs(["--continue", "--continue"]), "--continue");
             Equal(new OpenDurableOptions(), DurableMain.ParseArgs([]), "no arguments");
-            Check(!PiHelp.Text().Contains("durable", StringComparison.OrdinalIgnoreCase), "hidden from --help");
+            // Decision 0005 (1.2.0.1): listed in --help as experimental, PiSharp-only; not among the commands that take --help.
+            var help = PiHelp.Text();
+            Check(help.Contains("\n  pisharp durable [--continue]      EXPERIMENTAL: PiSharp's crash-safe durable agent (-c continues the newest session)\n",
+                StringComparison.Ordinal), "listed in --help as experimental");
+            Check(help.Split('\n').Count(line => line.Contains("durable", StringComparison.OrdinalIgnoreCase)) == 1, "one --help line names durable");
         }),
         Case("runtime.kill-resume.headless-turn-finishes-after-continue", async () =>
         {

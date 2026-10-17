@@ -1,6 +1,7 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/experimental/durable/main.ts
-// Upstream runs main.ts from source (node --import source-resolver.ts .../durable/main.ts [--continue]); PiSharp runs it as the hidden
-// subcommand `pisharp durable [--continue|-c]` (decision 0005, intentional difference "pisharp durable entry point").
+// Upstream runs main.ts from source (node --import source-resolver.ts .../durable/main.ts [--continue]); PiSharp runs it as the
+// subcommand `pisharp durable [--continue|-c]`, listed in --help as experimental (decision 0005, intentional difference "pisharp durable
+// entry point").
 using PiSharp.Cli.Pi;
 
 namespace PiSharp.Cli.Durable;

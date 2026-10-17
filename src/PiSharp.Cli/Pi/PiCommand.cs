@@ -121,7 +121,8 @@ internal static class PiCommand
             return await PiSharp.Cli.Packages.PiPackageCommands.RunAsync(args, host, token).ConfigureAwait(false) ??
                 await PiSharp.Cli.Packages.PiPackageCommands.RunConfigAsync(args, host, token).ConfigureAwait(false) ?? 1;
         // Decision 0005: `durable [--continue|-c]` runs the experimental durable agent (Pi v1.1.0 experimental/durable/main.ts, which ran from
-        // source with no pi subcommand; upstream deleted it in v1.2.0 and PiSharp keeps it as a PiSharp-only mode). Hidden from --help.
+        // source with no pi subcommand; upstream deleted it in v1.2.0 and PiSharp keeps it as a PiSharp-only mode). Listed in --help as
+        // experimental since 1.2.0.1.
         if (args.Length > 0 && args[0] == "durable") return await PiSharp.Cli.Durable.DurableMain.RunAsync(args[1..], host, token).ConfigureAwait(false);
         // main.ts: `mcp` runs runMcpCommand(args.slice(1), { cwd, agentDir }) after that setup, before the main argument parser.
         if (args.Length > 0 && args[0] == "mcp")

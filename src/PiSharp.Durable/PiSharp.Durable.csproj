@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Decision 0005: experimental port of Pi's pi-durable (branch feature/pi-durable). Not packed until a release is approved. -->
-  <PropertyGroup>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
+  <!-- Decision 0005: experimental port of Pi's pi-durable. Packed as an EXPERIMENTAL NuGet library since 1.2.0.1 (owner decision 2026-10-16);
+       every public type stays [Experimental("PISHARP_DURABLE001")]. -->
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.Durable.Sqlite" />
     <InternalsVisibleTo Include="PiSharp.Durable.Tools" />
@@ -16,5 +14,9 @@
   <ItemGroup>
     <!-- NativeDurableModels: PiSharp.Cli's byte-pinned pi-ai 1.2.0 catalog shards, linked (not copied) and verified by hash on load. -->
     <EmbeddedResource Include="../PiSharp.Cli/Models/*.json" LogicalName="PiSharp.Durable.Models.%(Filename)%(Extension)" Link="Models/Catalog/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Env/Local/LocalFileListing.cs ports the ignore and globset crates (MIT option; THIRD-PARTY-NOTICES.md). -->
+    <None Include="../../third-party/ripgrep-ignore.LICENSE-MIT.txt" Pack="true" PackagePath="licenses/" />
   </ItemGroup>
 </Project>
