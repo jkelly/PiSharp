@@ -11,8 +11,8 @@
 //   lowercase to ASCII letters), empty and limit edge cases, and ties keeping document order.
 // - tool-search.ranking-differential.*: Search against main's port of the coding agent's ranking (PiSharp.Extensions.Abstractions'
 //   ToolSearch.Tokenize, ToolSearch.CreateDocument and Bm25Ranker; upstream coding-agent extensions/tool-search/tool.ts, the same
-//   algorithm search.ts copies) over seeded random texts, queries and schemas. U+0130 is left out of these texts: main lowercases with
-//   .NET's invariant mapping, Search as JavaScript does (see Search.cs), and the search.* cases pin JavaScript's result.
+//   algorithm search.ts copies) over seeded random texts, queries and schemas, U+0130 included: both lowercase it as JavaScript does
+//   (main since PR #19; see Search.cs), and the search.* cases pin JavaScript's result.
 using System.Text;
 using System.Text.Json;
 using PiSharp.Durable;
@@ -402,7 +402,7 @@ internal static class ToolSearchTests
         "wishes", "quiz", "quizzes", "series", "ies", "s", "ss", "as", "yes", "the", "a", "of", "and", "with", "to", "getHTTPResponse", "XMLHttp",
         "IOError", "parseJSON", "userId", "ID", "aB", "x2Y", "3D", "v1", "list_files", "read-file", "na\u00EFve", "caf\u00E9", "\u212Aelvin",
         "\u00C9COLE", "stra\u00DFe", "\U0001F600", "\u03A3\u03C3\u03C2", "number", "Number", "slack", "channel", "message", "post", "weather",
-        "forecast", "city", "", " ", "--", "_", "\t", "\n", "\r\n", "\u00A0", "\u3000", "\uFEFF", "\u2028",
+        "forecast", "city", "", " ", "--", "_", "\t", "\n", "\r\n", "\u00A0", "\u3000", "\uFEFF", "\u2028", "\u0130stanbul",
     ];
 
     /// <summary>mulberry32: a seeded generator of doubles in [0, 1).</summary>
