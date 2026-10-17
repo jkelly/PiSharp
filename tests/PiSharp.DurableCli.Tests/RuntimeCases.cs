@@ -197,6 +197,12 @@ internal static partial class Program
             // The child agent does not offer the subagent tool.
             var childAgent = await (await durable.Harness.ConversationAsync(child.Id, DurableRuntime.Context))!.AgentAsync(DurableRuntime.Context);
             Check(!childAgent.Tools.Any(tool => tool.Name == "subagent") && childAgent.Tools.Any(tool => tool.Name == "read"), "child tools");
+            // Nor ask_user_question and exit_plan_mode (PiSharp-only, decision 0005): nobody sees a question the child asks.
+            Check(!childAgent.Extensions.Any(extension => extension.Name == "user-interaction") &&
+                !childAgent.Tools.Any(tool => tool.Name is "ask_user_question" or "exit_plan_mode"), "the child has no user-interaction: " +
+                string.Join(",", childAgent.Tools.Select(tool => tool.Name)));
+            var parentAgent = await (await durable.Harness.ConversationAsync(ConversationId.Root, DurableRuntime.Context))!.AgentAsync(DurableRuntime.Context);
+            Check(parentAgent.Tools.Any(tool => tool.Name == "ask_user_question"), "the parent keeps ask_user_question");
             var result = view.Conversation.Entries.Single(entry => entry.Kind == "pi.tool-result");
             Check(result.Model is { Count: > 0 } resultMessages && resultMessages[0] is JsonObjectValue resultMessage &&
                 resultMessage.TryGetValue("details", out var details) && details.ToJson() == $"{{\"conversationId\":{child.Id.Value}}}",

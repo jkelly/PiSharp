@@ -7,6 +7,8 @@
 // settling with SessionEnd.Failed) marks the view failed instead of leaving the TUI waiting, and failed compactions are reported through
 // pi.live.compactionFailure instead of from the task outcome. PiSharp-only as well: a lost session lock (removed, or taken over by another
 // process) fails the Session the same way; upstream's proper-lockfile onCompromised throws, which ends its process.
+// PiSharp-only (decision 0005, "PiSharp-only additions"): the controller answers ask_user_question, reviews plans and switches plan mode,
+// each through the PiSharp.Durable.Tools host API in one commit of the shown conversation.
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using PiSharp.Cli.Commands;
@@ -14,6 +16,7 @@ using PiSharp.Cli.Pi;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
+using PiSharp.Durable.Tools;
 
 namespace PiSharp.Cli.Durable;
 
@@ -165,7 +168,9 @@ internal static partial class DurableRuntime
                     summaries.Add(new(record.Id, DurableSession.Label(record.Id, root.Id), await FirstInputAsync(harness, record.Id).ConfigureAwait(false)));
                 cursor = page.Next;
             } while (cursor is not null);
-            session = await DurableSession.StartAsync(location, envs, harness, models, settings, root, summaries, initial, reports).ConfigureAwait(false);
+            var home = host.Home;
+            session = await DurableSession.StartAsync(location, envs, harness, models, settings, root, summaries, initial, reports, registry,
+                conversation => DurableHarnessSetup.PlanDirectory(location, conversation, settings, home)).ConfigureAwait(false);
         }
         catch
         {
@@ -256,6 +261,8 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private readonly DurableExecutionEnvs envs;
     private readonly IHarness harness;
     private readonly DurableModels models;
+    private readonly IRegistryReader registry;
+    private readonly Func<ConversationId, string> planDirectory;
     private readonly ConversationId rootId;
     private readonly Lock gate = new();
     private readonly List<Action> listeners = [];
@@ -275,9 +282,11 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     private Task? closing;
 
     private DurableSession(DurableSessionLocation location, DurableExecutionEnvs envs, IHarness harness, DurableModels models, PiSettings settings,
-        IConversation root, AttachedReplicatedState<ConversationView> conversation, IReadOnlyList<DurableConversationSummary> summaries)
+        IConversation root, AttachedReplicatedState<ConversationView> conversation, IReadOnlyList<DurableConversationSummary> summaries,
+        IRegistryReader registry, Func<ConversationId, string> planDirectory)
     {
         this.location = location; this.envs = envs; this.harness = harness; this.models = models; Settings = settings;
+        this.registry = registry; this.planDirectory = planDirectory;
         rootId = root.Id;
         current = root;
         this.conversation = conversation;
@@ -301,10 +310,10 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
 
     internal static async Task<DurableSession> StartAsync(DurableSessionLocation location, DurableExecutionEnvs envs, IHarness harness,
         DurableModels models, PiSettings settings, IConversation root, IReadOnlyList<DurableConversationSummary> summaries,
-        DurableInitialModel? initial, DurableReports reports)
+        DurableInitialModel? initial, DurableReports reports, IRegistryReader registry, Func<ConversationId, string> planDirectory)
     {
         var view = await root.ViewStateAsync(Context).ConfigureAwait(false);
-        var session = new DurableSession(location, envs, harness, models, settings, root, view, summaries);
+        var session = new DurableSession(location, envs, harness, models, settings, root, view, summaries, registry, planDirectory);
         // Since pi-durable 1.2.0 a storage error fails and closes the Harness (SessionFailed); the view then says so (durable work list area l).
         // Close listeners run as the close begins, before the failed call's caller sees its error and before the failure is reported, so
         // neither becomes a notice besides the failure.
@@ -449,31 +458,41 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
 
     // ─── Controller ─────────────────────────────────────────────────────────
 
-    /// <summary>One at a time, so toggles, switches, and key presses apply in order; a failure becomes an error notice.</summary>
-    private Task Command(Func<Task> operation)
+    /// <summary>One at a time, so toggles, switches, and key presses apply in order; a failure becomes an error notice. With
+    /// <paramref name="rethrow"/> the returned task also faults with it (the queue goes on either way).</summary>
+    private Task Command(Func<Task> operation, bool rethrow = false)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var result = rethrow ? new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously) : done;
         Task previous;
         lock (gate)
         {
             previous = queue;
             queue = done.Task;
         }
-        _ = RunAfterAsync(previous, operation, done);
-        return done.Task;
+        _ = RunAfterAsync(previous, operation, done, result);
+        return result.Task;
     }
 
     /// <summary>Runs <paramref name="operation"/> on the thread pool after <paramref name="previous"/>, so the caller (the TUI's loop) gets
     /// control back at once.</summary>
-    private async Task RunAfterAsync(Task previous, Func<Task> operation, TaskCompletionSource done)
+    private async Task RunAfterAsync(Task previous, Func<Task> operation, TaskCompletionSource done, TaskCompletionSource result)
     {
         try
         {
             await previous.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
             await operation().ConfigureAwait(false);
         }
-        catch (Exception error) { Fail(error); }
-        finally { done.TrySetResult(); }
+        catch (Exception error)
+        {
+            Fail(error);
+            if (result != done) result.TrySetException(error);
+        }
+        finally
+        {
+            done.TrySetResult();
+            result.TrySetResult();
+        }
     }
 
     private void WatchAnswer(ISubmission submission) => _ = WatchAnswerAsync(submission);
@@ -604,6 +623,67 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         current = next;
         conversation = nextState;
         unsubscribe = nextState.Subscribe((value, _, _) => Update(view => WithShown(view, value)));
+    });
+
+    // ─── Questions and plan mode (PiSharp-only, decision 0005) ──────────────
+
+    /// <inheritdoc/>
+    public Task AnswerQuestionAsync(TaskId toolTask, QuestionResponse response) => Command(async () =>
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        try
+        {
+            if (response.Status == QuestionResponseStatus.Declined) await UserQuestions.DeclineAsync(current, toolTask, Context).ConfigureAwait(false);
+            else await UserQuestions.AnswerAsync(current, toolTask, response, Context).ConfigureAwait(false);
+        }
+        catch (InteractionNotPendingException)
+        {
+            Notice(DurableNoticeLevel.Info, "That question is no longer pending.");
+        }
+    }, rethrow: true);
+
+    /// <inheritdoc/>
+    public Task ReviewPlanAsync(TaskId exitCall, DurablePlanDecision decision) => Command(async () =>
+    {
+        ArgumentNullException.ThrowIfNull(decision);
+        try
+        {
+            if (decision.Verdict == DurablePlanVerdict.Reject)
+                await PlanMode.RejectAsync(current, exitCall, decision.Feedback, Context).ConfigureAwait(false);
+            else
+                await PlanMode.ApproveAsync(current, registry, exitCall, decision.Verdict == DurablePlanVerdict.ApproveAndStop, Context).ConfigureAwait(false);
+        }
+        catch (InteractionNotPendingException)
+        {
+            Notice(DurableNoticeLevel.Info, "That plan is no longer waiting for review.");
+        }
+    }, rethrow: true);
+
+    /// <inheritdoc/>
+    public Task SetPlanModeAsync(bool on, string? prompt) => Command(async () =>
+    {
+        var shown = current;
+        var active = (await PlanMode.StateAsync(harness, shown.Id, Context).ConfigureAwait(false))?.Active == true;
+        if (!on)
+        {
+            if (!active)
+            {
+                Notice(DurableNoticeLevel.Info, "Plan mode is not on.");
+                return;
+            }
+            await PlanMode.ExitAsync(shown, registry, Context).ConfigureAwait(false);
+            Notice(DurableNoticeLevel.Info, "Plan mode off: write and edit work anywhere again.");
+            return;
+        }
+        if (!active)
+        {
+            // The host creates the directory; EnterAsync checks where it is.
+            var directory = planDirectory(shown.Id);
+            Directory.CreateDirectory(directory);
+            var state = await PlanMode.EnterAsync(shown, registry, directory, Context).ConfigureAwait(false);
+            Notice(DurableNoticeLevel.Info, $"Plan mode: write and edit are limited to {state.Directory ?? directory}. /plan leaves it.");
+        }
+        if (prompt is not null) WatchAnswer(await shown.SubmitAsync(SubmissionDraft.Input(prompt, WhenBusy.Steer), Context).ConfigureAwait(false));
     });
 
     // ─── Close ──────────────────────────────────────────────────────────────

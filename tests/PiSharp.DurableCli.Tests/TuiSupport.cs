@@ -193,6 +193,35 @@ internal sealed class FakeController : IDurableController
     public Task ToggleTasksAsync() => Record("toggleTasks");
     public Task SwitchConversationAsync(ConversationId id) => Record($"switch {id.Value}");
 
+    /// <summary>The outcome of the next answer or review; null takes it.</summary>
+    public Func<Task>? NextAnswer { get; set; }
+
+    /// <summary><c>answer &lt;task&gt; &lt;answers&gt;</c> with each answer as its labels joined by "+" and "+other:&lt;text&gt;", the answers
+    /// joined by " / "; <c>decline &lt;task&gt;</c>.</summary>
+    public Task AnswerQuestionAsync(TaskId toolTask, PiSharp.Durable.Tools.QuestionResponse response)
+    {
+        var text = response.Status == PiSharp.Durable.Tools.QuestionResponseStatus.Declined
+            ? $"decline {toolTask.Value}"
+            : $"answer {toolTask.Value} " + string.Join(" / ", response.Answers.Select(answer =>
+                string.Join("+", answer.Selected.Concat(answer.Other is null ? [] : ["other:" + answer.Other]))));
+        return Answered(text);
+    }
+
+    /// <summary><c>plan on</c>, <c>plan off</c> or <c>plan on &lt;prompt&gt;</c>.</summary>
+    public Task SetPlanModeAsync(bool on, string? prompt) => Record($"plan {(on ? "on" : "off")}{(prompt is null ? "" : " " + prompt)}");
+
+    /// <summary><c>review &lt;task&gt; Approve|ApproveAndStop|Reject[ &lt;feedback&gt;]</c>.</summary>
+    public Task ReviewPlanAsync(TaskId exitCall, DurablePlanDecision decision) =>
+        Answered($"review {exitCall.Value} {decision.Verdict}{(decision.Feedback is null ? "" : " " + decision.Feedback)}");
+
+    private Task Answered(string call)
+    {
+        var outcome = NextAnswer;
+        NextAnswer = null;
+        Record(call);
+        return outcome is null ? Task.CompletedTask : outcome();
+    }
+
     public async Task WaitFor(string call, int timeoutMs = 20_000)
     {
         var deadline = Environment.TickCount64 + timeoutMs;

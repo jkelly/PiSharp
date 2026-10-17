@@ -2,7 +2,9 @@
 // Upstream runs on Node's event loop and resolves when the user exits; here the TUI runs on its own UiLoop, view changes from the runtime
 // (any thread) are posted to it, and RunAsync completes with exit code 0 when the user exits or the token is cancelled. Controller calls are
 // fire-and-forget as upstream's `void controller.x()`: the runtime reports failures as notices. PiSharp-only since pi-durable 1.2.0 (durable
-// work list area l): once the session failed, the editor sends nothing and RunAsync returns 1 when the user exits.
+// work list area l): once the session failed, the editor sends nothing and RunAsync returns 1 when the user exits. PiSharp-only (decision
+// 0005, "PiSharp-only additions"): `/plan` switches plan mode, `/plan <text>` enters it and submits the text, and the question form and
+// plan review answer through the controller.
 using PiSharp.Cli.Interactive.Mode;
 using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Cli.Pi;
@@ -99,6 +101,18 @@ internal static class DurableTui
                             if (trimmed == "/model") { SelectModel(); return; }
                             if (trimmed == "/tasks") { Fire(controller.ToggleTasksAsync); return; }
                             if (trimmed == "/agents") { SelectConversation(); return; }
+                            if (trimmed == "/plan")
+                            {
+                                var on = !DurableTuiState.IsPlanMode(source.Current.Conversation);
+                                Fire(() => controller.SetPlanModeAsync(on, null));
+                                return;
+                            }
+                            if (trimmed.StartsWith("/plan ", StringComparison.Ordinal))
+                            {
+                                var prompt = TextUtils.JsTrim(trimmed["/plan".Length..]);
+                                Fire(() => controller.SetPlanModeAsync(true, prompt));
+                                return;
+                            }
                             if (trimmed == "/compact" || trimmed.StartsWith("/compact ", StringComparison.Ordinal))
                             {
                                 var instructions = TextUtils.JsTrim(trimmed["/compact".Length..]);
@@ -114,7 +128,9 @@ internal static class DurableTui
                         Abort: () => Fire(controller.AbortAsync),
                         Exit: Exit,
                         SelectModel: SelectModel,
-                        CycleThinking: () => Fire(controller.CycleThinkingAsync)),
+                        CycleThinking: () => Fire(controller.CycleThinkingAsync),
+                        AnswerQuestion: controller.AnswerQuestionAsync,
+                        ReviewPlan: controller.ReviewPlanAsync),
                     // Tool cards as interactive mode makes them: images shown or not, their width, the output padding.
                     new ToolExecutionOptions(settings.ShowImages, settings.ImageWidthCells, settings.OutputPad));
 

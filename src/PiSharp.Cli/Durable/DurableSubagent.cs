@@ -1,6 +1,8 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/experimental/durable/subagent.ts
+// PiSharp-only (decision 0005, "PiSharp-only additions"): the child conversation drops user-interaction as well.
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Tools;
 
 namespace PiSharp.Cli.Durable;
 
@@ -43,9 +45,12 @@ internal static class DurableSubagent
                             var existing = (await tx.ScanConversationsAsync(new ConversationQuery { OwnerTaskId = api.TaskId }, 1).ConfigureAwait(false))
                                 .Items.FirstOrDefault();
                             if (existing is not null) return existing.Id;
-                            // Starts as a copy of this conversation's agent; without this extension it cannot delegate further.
+                            // Starts as a copy of this conversation's agent; without this extension it cannot delegate further. Without
+                            // user-interaction (PiSharp-only, decision 0005) it cannot block on a question or a plan review nobody sees: the
+                            // TUI shows only the conversation it talks to.
                             var created = await tx.CreateConversationAsync(ConversationOwnership.Task(api.TaskId)).ConfigureAwait(false);
-                            await Agents.ConfigureAsync(tx, created.Id, new AgentChange { Extensions = ExtensionSelection.Edit(remove: [subagent]) })
+                            Extension[] removed = api.Registry.GetExtension(UserInteraction.ExtensionName) is { } interaction ? [subagent, interaction] : [subagent];
+                            await Agents.ConfigureAsync(tx, created.Id, new AgentChange { Extensions = ExtensionSelection.Edit(remove: removed) })
                                 .ConfigureAwait(false);
                             return created.Id;
                         }, context).ConfigureAwait(false);
