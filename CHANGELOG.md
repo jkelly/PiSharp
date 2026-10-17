@@ -8,6 +8,7 @@ A C#-only release on the Pi v1.2.0 baseline that adds the experimental durable p
 
 - `pisharp durable [--continue]`: an agent whose sessions survive a crash. Every step is saved to SQLite before it is shown, and reopening a session finishes the interrupted turn. Listed in `pisharp --help` as experimental; its sessions are separate from ordinary ones
 - `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` on NuGet, a port of Pi's `pi-durable` v1.2.0. Their API is marked `[Experimental("PISHARP_DURABLE001")]`; suppress that diagnostic to use them
+- If a durable session's lock is lost (removed, or taken over by another process), the session fails at once and saves nothing more
 - The command, the session format and the library API may change in any release
 
 ## [1.2.0] - 2026-10-15

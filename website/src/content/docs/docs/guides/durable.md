@@ -59,7 +59,7 @@ Each session is one SQLite database:
 ~/.pi/agent/experimental/durable-sessions/<folder hash>/<timestamp>-<id>/session.sqlite
 ```
 
-A session is locked while it is open, so two processes cannot write to it at once. These sessions are separate from ordinary PiSharp sessions: `pisharp --resume` does not list them, and `pisharp durable` does not open ordinary sessions.
+A session is locked while it is open, so two processes cannot write to it at once. If the lock is lost while the session is open (its lock directory removed, or taken over by another process), the session fails at once: nothing more is saved, the TUI says the lock was lost, and `pisharp durable` exits with 1. These sessions are separate from ordinary PiSharp sessions: `pisharp --resume` does not list them, and `pisharp durable` does not open ordinary sessions.
 
 The layout and the lock are those of Pi v1.1.0's experimental durable agent, so each finds the other's newest session with `--continue` and respects the other's lock. Pi v1.1.0 cannot resume the records PiSharp's v1.2.0 library writes, though, so don't continue a PiSharp session with it.
 
@@ -68,6 +68,7 @@ The layout and the lock are those of Pi v1.1.0's experimental durable agent, so 
 - **The command is PiSharp's.** Pi v1.1.0 ran its durable agent from source, not from the `pi` command, and Pi v1.2.0 removed that agent. PiSharp keeps it as a PiSharp-only mode, ported from Pi v1.1.0's agent.
 - **The libraries follow `pi-durable` v1.2.0.** The storage format (SQLite schema, JSONL layout and record JSON) is upstream's. Tests open, resume and rewrite sessions that upstream wrote, and upstream reads PiSharp's.
 - **Code mode scripts don't move between Pi and PiSharp.** Durable code mode records its engine's fingerprint, and PiSharp runs scripts on Jint where Pi uses QuickJS, so neither resumes a script the other interrupted. The resume is refused rather than diverging.
+- **A lost lock fails the session.** Pi's agent ends its process when its session lock is lost; PiSharp fails the session instead, so the TUI can say why before it exits with 1. Either way nothing more is saved.
 - **Images use SkiaSharp.** Upstream resizes images with Photon compiled to WebAssembly. PiSharp applies the same rules through the image codec its main `read` tool uses.
 - **No Cloudflare adapters.** The Cloudflare Durable Object storage and image processor are not ported.
 
