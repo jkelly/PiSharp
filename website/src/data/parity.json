@@ -206,7 +206,8 @@
         { "title": "Jint limits", "notes": "Codemode runs on Jint, not QuickJS. Memory and recursion overruns end the script instead of throwing a catchable error, and the engine's own error messages differ." },
         { "title": "/bug opens a GitHub issue", "notes": "/bug builds Pi's report and zip but never uploads them to Pi's developers. It opens a prefilled issue at github.com/jkelly/PiSharp for you to attach the zip to." },
         { "title": "Version check on NuGet", "notes": "The update check looks up the latest PiSharp.Cli on NuGet and suggests dotnet tool update -g PiSharp.Cli. It never asks pi.dev." },
-        { "title": "No self-update", "notes": "pisharp update updates packages and catalogs. Update PiSharp itself with dotnet tool update -g PiSharp.Cli." }
+        { "title": "No self-update", "notes": "pisharp update updates packages and catalogs. Update PiSharp itself with dotnet tool update -g PiSharp.Cli." },
+        { "title": "pisharp durable", "notes": "An experimental, PiSharp-only command (decision 0005), listed in pisharp --help with pisharp session. Pi v1.1.0 ran its durable agent from source and Pi v1.2.0 removed it, so Pi's help has neither line." }
       ]
     },
     {
@@ -265,7 +266,7 @@
     {
       "title": "Hardening and packaging",
       "status": "partial",
-      "notes": "The release pipeline runs 17 offline suites on Linux, including the extension suite with Node. Platform and security qualification are open."
+      "notes": "The release pipeline runs 19 offline suites on Linux, including the extension suite with Node and the two durable suites. Platform and security qualification are open."
     },
     {
       "title": "1.1.0.x gap releases",
@@ -275,7 +276,12 @@
     {
       "title": "Pi 1.2.0 sync",
       "status": "partial",
-      "notes": "Every Pi 1.2.0 change in scope is ported with tests (sync-1.2.0-applicability.json), except per-input reach for TypeScript tools and the live clock of the plain codemode row."
+      "notes": "Every Pi 1.2.0 change in scope is ported with tests (sync-1.2.0-applicability.json), except per-input reach for TypeScript tools and the live clock of the plain codemode row. 1.2.0.1 adds the experimental durable port."
+    },
+    {
+      "title": "Experimental durable port",
+      "status": "partial",
+      "notes": "1.2.0.1 ships pisharp durable and the PiSharp.Durable, PiSharp.Durable.Tools and PiSharp.Durable.Sqlite packages as experimental: a port of pi-durable v1.2.0 whose every upstream file is ported or recorded as excluded (decision 0005, durable-port-map.json). Open: JSONL storage keeps its records in memory, and code mode scripts interrupted under Pi or PiSharp don't resume in the other."
     }
   ]
 }
