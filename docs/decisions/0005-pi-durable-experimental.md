@@ -333,7 +333,7 @@ Decided by the owner on 2026-10-17. Upstream pi-durable has neither; both are Pi
 - `ApproveAsync` writes the call's response, the restored agent and the approved state in one commit, so a crash can never leave an approved plan with plan mode still on, or the reverse.
 - `RejectAsync` keeps plan mode, and the call returns the feedback.
 - The host keeps `plan-mode` out of its default extension selection, as `pisharp durable` keeps `tool-search` out.
-- `EnterAsync` refuses a directory that is relative, a device or network path, a file system root, the home directory or one of its ancestors, or the conversation's working directory or one of its ancestors. It also refuses when the registry lacks `plan-mode` or `exit_plan_mode`.
+- `EnterAsync` refuses a directory that is relative, a device or network path, a file system root, the home directory or one of its ancestors, or the conversation's working directory or one of its ancestors. An existing directory that is a link is checked where it leads as well. It also refuses when the registry lacks `plan-mode` or `exit_plan_mode`.
 
 **Containment security model.** The `plan-mode` extension wraps `write` and `edit`. The wrapped tool reads the plan directory from `pisharp.plan-mode` when it executes; without one it fails. The check does not depend on the mode, so a wrapped call that runs after plan mode ended is still confined. The wrapper checks the path argument, then runs the tool with an execution environment whose every mutation is checked: write, append, truncate, flush, rename (both paths), directory creation and removal. That environment never runs commands, creates temporary files or watches. A path is allowed only when all of these hold, and any error while checking denies it:
 - The path as written has no name ending in a dot or space (Windows normalization would drop it) and no colon outside a drive designator.
@@ -341,7 +341,7 @@ Decided by the owner on 2026-10-17. Upstream pi-durable has neither; both are Pi
 - Its absolute form lies strictly below the plan directory's, so the directory itself is never a target.
 - No name below the directory is a Windows device name (CON, PRN, AUX, NUL, COM0-9, LPT0-9, CONIN$, CONOUT$, any extension), ends in a dot or space, contains a colon (an alternate data stream) or a character Windows reserves, or looks like an 8.3 short name (`~` and a digit). These names are refused on every platform.
 - No existing component below the directory is a symbolic link or junction, checked without following links. A link pointing back inside is refused too.
-- The canonical path of its deepest existing ancestor, joined with the names that do not exist yet, lies below the canonical directory. The directory is created when missing.
+- The canonical path of its deepest existing ancestor, joined with the names that do not exist yet, lies below the canonical directory, which must not be a file system root. The directory is created when missing.
 
 The denial is `FileError(PermissionDenied)` with "Plan mode: <path> is outside the plan directory <dir>", and the reason when there is one. `exit_plan_mode` reads its plan file through the same check, at most 256 KiB.
 

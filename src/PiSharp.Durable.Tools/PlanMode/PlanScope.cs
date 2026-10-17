@@ -114,6 +114,9 @@ internal sealed class PlanScopedEnv(IExecutionEnv inner, string root) : IExecuti
         if (!created.IsOk) return Denied(path, $"the plan directory cannot be created: {created.Error.Message}");
         var rootCanonical = await inner.CanonicalPathAsync(rootPath, context).ConfigureAwait(false);
         if (!rootCanonical.IsOk) return Denied(path, $"the plan directory cannot be resolved: {rootCanonical.Error.Message}");
+        // A plan directory that is (or links to) a file system root would confine nothing.
+        if (rootCanonical.Value.TrimEnd(separator).Length == 0 || IsDriveRoot(rootCanonical.Value))
+            return Denied(path, $"the plan directory resolves to the file system root {rootCanonical.Value}");
 
         // No existing component below the root is a link or junction (not followed).
         var prefix = rootPath;
@@ -163,6 +166,9 @@ internal sealed class PlanScopedEnv(IExecutionEnv inner, string root) : IExecuti
         var relative = child[(parent.Length + 1)..].TrimEnd(separator);
         return relative.Length == 0 || relative.Split(separator).Any(name => name.Length == 0 || name is "." or "..") ? null : relative;
     }
+
+    private static bool IsDriveRoot(string path) =>
+        path.Length is 2 or 3 && path[1] == ':' && char.IsAsciiLetter(path[0]) && (path.Length == 2 || path[2] is '\\' or '/');
 
     private static string DriveUpper(string path) =>
         path.Length >= 2 && path[1] == ':' && char.IsAsciiLetter(path[0]) ? char.ToUpperInvariant(path[0]) + path[1..] : path;

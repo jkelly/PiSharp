@@ -349,6 +349,11 @@ public static class PlanMode
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (home.Length > 0 && IsSameOrAncestor(full, home))
             throw new ArgumentException($"The plan directory {full} is the home directory or one of its ancestors", nameof(directory));
+        // An existing directory that is a link is checked where it leads as well.
+        string? target = null;
+        try { target = new DirectoryInfo(full).ResolveLinkTarget(returnFinalTarget: true)?.FullName; }
+        catch (IOException) { }
+        if (target is not null && !string.Equals(target, full, StringComparison.Ordinal)) CheckDirectory(target);
         return full;
     }
 

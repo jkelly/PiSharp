@@ -184,6 +184,22 @@ internal static class PlanScopeTests
             Directory.Delete(gone);
             await scope.Denied(() => scope.Write(Path.Combine(dangling, "x.txt")), "write below a dangling junction");
             Check(!Directory.Exists(gone), "the junction target was not recreated");
+            // A plan directory that is itself a junction to a drive root confines nothing: entering refuses it, and the wrapper denies.
+            var driveRoot = Path.GetPathRoot(scope.Root)!;
+            var rootLink = Path.Combine(scope.Dirs.Outside, "root-link");
+            Junction(rootLink, driveRoot);
+            var setup = NewSetup();
+            var (harness, conversation) = await Open(() => new PiSharp.Durable.Storage.MemoryStorage(), setup, scope.Dirs);
+            await ThrowsAsync<ArgumentException>(() => PlanMode.EnterAsync(conversation, setup.Registry, rootLink, Ctx), "a plan directory linked to a drive root");
+            await harness.CloseAsync(Ctx);
+            var linked = new ReaderApi(scope.Dirs.Env, new PlanStateReader(PlanState(rootLink)), new ConversationId(1));
+            var probe = Path.Combine(rootLink, "pisharp-plan-probe-" + Guid.NewGuid().ToString("N") + ".txt");
+            Exception? refused = null;
+            try { await scope.WriteTool.Execute(Obj(("path", probe), ("content", "x")), linked, Ctx); }
+            catch (FileError error) { refused = error; }
+            Check(refused is FileError { Code: FileErrorCode.PermissionDenied } && refused.Message.Contains("file system root", StringComparison.Ordinal),
+                "a write below a plan directory linked to a drive root: " + refused);
+            Check(!File.Exists(Path.Combine(driveRoot, Path.GetFileName(probe))), "nothing written at the drive root");
         });
 
         yield return Case(prefix + "windows-names", async () =>
