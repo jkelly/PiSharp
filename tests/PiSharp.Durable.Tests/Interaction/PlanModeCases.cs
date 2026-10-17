@@ -310,7 +310,7 @@ internal static class PlanModeTests
             Equal(SubmissionStatus.Done, (await Settled(submission)).Status, "submission");
             var exits = await Results(root, PlanMode.ExitToolName);
             Equal(2, exits.Count, "two submissions");
-            Equal("The user rejected the plan; you are still in plan mode. Feedback: Add a rollback step.. Revise the plan and call exit_plan_mode again.",
+            Equal("The user rejected the plan; you are still in plan mode. Feedback: Add a rollback step. Revise the plan and call exit_plan_mode again.",
                 Text(exits[0]), "rejection");
             MatchJson("""{"details":{"state":"rejected","feedback":"Add a rollback step."}}""", exits[0], "rejection details");
             Equal(Approved(null, null), Text(exits[1]), "approval of an inline plan");

@@ -125,8 +125,8 @@ internal static class ExitPlanModeTool
             case "rejected":
                 return new ToolExecutionResult
                 {
-                    Output = ToolContent.Text($"The user rejected the plan; you are still in plan mode. Feedback: {feedback ?? "none"}. Revise the plan and " +
-                        $"call {PlanMode.ExitToolName} again."),
+                    Output = ToolContent.Text($"The user rejected the plan; you are still in plan mode. Feedback: {Sentence(feedback ?? "none")} Revise the plan " +
+                        $"and call {PlanMode.ExitToolName} again."),
                     Details = details,
                 };
             default:
@@ -150,6 +150,9 @@ internal static class ExitPlanModeTool
         .Add("stop", response is not null && response.TryGetValue("stop", out var stop) ? stop : null)
         .Add("feedback", response is not null && response.TryGetValue("feedback", out var feedback) ? feedback : null)
         .Build();
+
+    /// <summary>The feedback as a sentence: a period is added unless it already ends in sentence punctuation.</summary>
+    private static string Sentence(string text) => text.Length > 0 && text[^1] is '.' or '!' or '?' ? text : text + ".";
 
     private static string? Field(JsonObjectValue doc, string key) => doc.TryGetValue(key, out var value) && value is JsonStringValue text ? text.Value : null;
 
