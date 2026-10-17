@@ -49,7 +49,7 @@ internal static class PiSystemPrompt
         Documentation = Documentation(applicationDirectory)
     };
 
-    private static OriginalPromptSkill Skill(SkillResource skill) => new(skill.Name, skill.Description, skill.FilePath, skill.BaseDir,
+    internal static OriginalPromptSkill Skill(SkillResource skill) => new(skill.Name, skill.Description, skill.FilePath, skill.BaseDir,
         PiSharp.Contracts.JsonData.Parse(System.Text.Json.JsonSerializer.Serialize(new
         {
             path = skill.SourceInfo.Path, source = skill.SourceInfo.Source,

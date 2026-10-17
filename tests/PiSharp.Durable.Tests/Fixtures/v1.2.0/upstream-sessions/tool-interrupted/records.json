@@ -1,0 +1,534 @@
+{
+ "sqlite": {
+  "conversations": [
+   {
+    "id": 1
+   }
+  ],
+  "entries": {
+   "1": [
+    {
+     "model": [
+      {
+       "role": "user",
+       "content": "go",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    },
+    {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "toolsAdded": [
+        {
+         "name": "work",
+         "description": "Works until interrupted",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call-1",
+         "name": "work",
+         "arguments": {}
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 31,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 31,
+        "totalTokens": 64,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   ]
+  },
+  "tasks": [
+   {
+    "id": 9,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "waiting",
+     "checkpoint": {
+      "phase": "tools",
+      "assistant": 11,
+      "tools": [
+       12
+      ],
+      "pending": []
+     },
+     "on": [
+      12
+     ],
+     "policy": "allSettled"
+    },
+    "startedAt": 1767225600000
+   },
+   {
+    "id": 12,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 11,
+     "callId": "call-1"
+    },
+    "owner": 9,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "running",
+     "checkpoint": {
+      "phase": "execute",
+      "arguments": {},
+      "replay": "unsafe"
+     }
+    },
+    "startedAt": 1767225600000
+   }
+  ],
+  "submissions": [
+   {
+    "conversationId": 1,
+    "type": "input",
+    "status": "placed",
+    "entry": 7,
+    "id": 8
+   }
+  ],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "run": {
+      "taskId": 9,
+      "inputs": [
+       8
+      ]
+     },
+     "tools": [
+      {
+       "callId": "call-1",
+       "name": "work",
+       "taskId": 12,
+       "status": "running",
+       "output": "run 1\n",
+       "details": {
+        "run": 1
+       }
+      }
+     ]
+    }
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {
+      "faux/faux-1": {
+       "input": 31,
+       "output": 2,
+       "cacheRead": 0,
+       "cacheWrite": 31,
+       "totalTokens": 64,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a13edc-3cb1-7554-b14b-658e73f3fa83"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   }
+  ]
+ },
+ "jsonl": {
+  "conversations": [
+   {
+    "id": 1
+   }
+  ],
+  "entries": {
+   "1": [
+    {
+     "model": [
+      {
+       "role": "user",
+       "content": "go",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    },
+    {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "toolsAdded": [
+        {
+         "name": "work",
+         "description": "Works until interrupted",
+         "parameters": {
+          "type": "object",
+          "properties": {}
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    },
+    {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call-1",
+         "name": "work",
+         "arguments": {}
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 31,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 31,
+        "totalTokens": 64,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   ]
+  },
+  "tasks": [
+   {
+    "id": 9,
+    "conversationId": 1,
+    "kind": "pi.generation",
+    "version": 1,
+    "input": {},
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "waiting",
+     "checkpoint": {
+      "phase": "tools",
+      "assistant": 11,
+      "tools": [
+       12
+      ],
+      "pending": []
+     },
+     "on": [
+      12
+     ],
+     "policy": "allSettled"
+    },
+    "startedAt": 1767225600000
+   },
+   {
+    "id": 12,
+    "conversationId": 1,
+    "kind": "pi.tool",
+    "version": 2,
+    "input": {
+     "kind": "model",
+     "assistant": 11,
+     "callId": "call-1"
+    },
+    "owner": 9,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "running",
+     "checkpoint": {
+      "phase": "execute",
+      "arguments": {},
+      "replay": "unsafe"
+     }
+    },
+    "startedAt": 1767225600000
+   }
+  ],
+  "submissions": [
+   {
+    "conversationId": 1,
+    "type": "input",
+    "status": "placed",
+    "entry": 7,
+    "id": 8
+   }
+  ],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "run": {
+      "taskId": 9,
+      "inputs": [
+       8
+      ]
+     },
+     "tools": [
+      {
+       "callId": "call-1",
+       "name": "work",
+       "taskId": 12,
+       "status": "running",
+       "output": "run 1\n",
+       "details": {
+        "run": 1
+       }
+      }
+     ]
+    }
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {
+      "faux/faux-1": {
+       "input": 31,
+       "output": 2,
+       "cacheRead": 0,
+       "cacheWrite": 31,
+       "totalTokens": 64,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a13edc-3d4b-7554-b14b-659010a1bc11"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   }
+  ]
+ }
+}

@@ -16,7 +16,7 @@
 //
 // Usage: node repin-sources.mjs --upstream <Pi git repo containing both tags> [--from v1.1.0] [--to v1.2.0] [--report <path>]
 //          [--worklist compatibility/sync-1.2.0-worklist.json] [--applicability compatibility/sync-1.2.0-applicability.json]
-//          [--write]
+//          [--paths <regex>] [--decision <path>] [--write]
 // Without --write it only reports. The work list keeps any top-level keys it does not generate
 // (for example the authored nonHeaderPins section).
 import { execFileSync } from "node:child_process";
@@ -26,7 +26,8 @@ import { fileURLToPath } from "node:url";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const self = "tools/CompatibilityReport/repin-sources.mjs";
-const args = { from: "v1.1.0", to: "v1.2.0", worklist: "compatibility/sync-1.2.0-worklist.json", applicability: "compatibility/sync-1.2.0-applicability.json" };
+const args = { from: "v1.1.0", to: "v1.2.0", worklist: "compatibility/sync-1.2.0-worklist.json", applicability: "compatibility/sync-1.2.0-applicability.json",
+  decision: "docs/decisions/0006-pi-1.2.0-sync.md" };
 for (let index = 2; index < process.argv.length; index++) {
   const name = process.argv[index];
   if (!name.startsWith("--")) throw new Error(`Unexpected argument ${name}`);
@@ -85,6 +86,13 @@ const historical = [
   [/^docs\/contracts\//, "contract records name the release each adapter was re-ported from"],
   [/^fixtures\//, "historical fixtures"],
   [/\.log$/, "captured log"],
+  // Branch feature/pi-durable (decision 0005).
+  [/^src\/PiSharp\.Cli\/Durable\/|^tests\/PiSharp\.DurableCli\.Tests\//, "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"],
+  [/^tests\/PiSharp\.Durable\.Tests\/Fixtures\/|^tools\/DurableFixtures\//, "fixtures and capture scripts record the upstream they were captured from; recapture them with the area that changes them"],
+  [/^compatibility\/durable-port-map\.json$|^tools\/DurablePortMap\/build-port-map\.mjs$/, "the durable port map diffs against the previous pin and keeps removed files' v1.1.0 blobs"],
+  [/^compatibility\/durable-sync-1\.2\.0-(worklist|repin)\.json$/, "names the commit the durable v1.2.0 sync starts from"],
+  [/^docs\/decisions\/0005-pi-durable-experimental\.md$/, "records the first durable pin"],
+  [/^\.github\/workflows\/durable\.yml$/, "fetches the previous pin for the port map's diff"],
   [new RegExp(`^${self.replace(/[.]/g, "\\.")}$`), "this tool"],
 ];
 const releaseDocs = [
@@ -176,7 +184,8 @@ function citationText(lines, index, column) {
 }
 
 // ------------------------------------------------------------------ scan
-const files = repoGit("grep", "-l", "-I", OLD).trim().split("\n").filter(Boolean).sort();
+// --paths <regex> limits the scan to matching repository paths (for example one branch's own files).
+const files = repoGit("grep", "-l", "-I", OLD).trim().split("\n").filter(Boolean).filter(file => !args.paths || new RegExp(args.paths).test(file)).sort();
 const applicability = existsSync(resolve(repo, args.applicability)) ? JSON.parse(readFileSync(resolve(repo, args.applicability), "utf8")) : { rows: [] };
 const rowsFor = path => applicability.rows.filter(row => row.upstream.some(entry => {
   const pattern = entry.replace(/\/\*\*$/, "").replace(/\*.*$/, "");
@@ -296,8 +305,8 @@ for (const entry of report.pending) {
 }
 const generated = {
   schemaVersion: 1,
-  generatedBy: `node ${self} --upstream <Pi repo> --from ${args.from} --to ${args.to}${args.write ? " --write" : ""}`,
-  decision: "docs/decisions/0006-pi-1.2.0-sync.md",
+  generatedBy: `node ${self} --upstream <Pi repo> --from ${args.from} --to ${args.to}${args.paths ? ` --paths '${args.paths}'` : ""}${args.write ? " --write" : ""}`,
+  decision: args.decision,
   from: { tag: args.from, commit: OLD },
   to: { tag: args.to, commit: NEW },
   rule: "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",

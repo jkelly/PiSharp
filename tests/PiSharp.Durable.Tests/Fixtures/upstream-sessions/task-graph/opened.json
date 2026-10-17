@@ -1,0 +1,536 @@
+{
+ "sqlite": {
+  "conversations": [
+   {
+    "id": 1
+   },
+   {
+    "id": 8,
+    "owner": {
+     "conversationId": 1,
+     "taskId": 7
+    }
+   }
+  ],
+  "entries": {
+   "1": [],
+   "8": []
+  },
+  "tasks": [
+   {
+    "id": 7,
+    "conversationId": 1,
+    "kind": "compat.root",
+    "version": 1,
+    "input": {
+     "name": "graph"
+    },
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "root": true,
+       "middle": 14
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 14,
+    "conversationId": 1,
+    "kind": "compat.middle",
+    "version": 1,
+    "input": {
+     "depth": 1
+    },
+    "owner": 7,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "middle": true,
+       "leaf": 15
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 15,
+    "conversationId": 1,
+    "kind": "compat.leaf",
+    "version": 1,
+    "input": {
+     "label": "grandchild"
+    },
+    "owner": 14,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "leaf": "grandchild"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   }
+  ],
+  "submissions": [],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {}
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a136a4-190b-7001-af09-aec2175cef56"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   },
+   {
+    "record": {
+     "id": 9,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {}
+   },
+   {
+    "record": {
+     "id": 10,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 11,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 12,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a136a4-190d-7001-af09-aec58065e392"
+    }
+   },
+   {
+    "record": {
+     "id": 13,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   }
+  ]
+ },
+ "jsonl": {
+  "conversations": [
+   {
+    "id": 1
+   },
+   {
+    "id": 8,
+    "owner": {
+     "conversationId": 1,
+     "taskId": 7
+    }
+   }
+  ],
+  "entries": {
+   "1": [],
+   "8": []
+  },
+  "tasks": [
+   {
+    "id": 7,
+    "conversationId": 1,
+    "kind": "compat.root",
+    "version": 1,
+    "input": {
+     "name": "graph"
+    },
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "root": true,
+       "middle": 14
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 14,
+    "conversationId": 1,
+    "kind": "compat.middle",
+    "version": 1,
+    "input": {
+     "depth": 1
+    },
+    "owner": 7,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "middle": true,
+       "leaf": 15
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   },
+   {
+    "id": 15,
+    "conversationId": 1,
+    "kind": "compat.leaf",
+    "version": 1,
+    "input": {
+     "label": "grandchild"
+    },
+    "owner": 14,
+    "background": false,
+    "abortRequested": false,
+    "state": {
+     "status": "terminal",
+     "outcome": {
+      "status": "completed",
+      "result": {
+       "leaf": "grandchild"
+      }
+     }
+    },
+    "startedAt": 1767225600000,
+    "endedAt": 1767225600000
+   }
+  ],
+  "submissions": [],
+  "documents": [
+   {
+    "record": {
+     "id": 2,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {}
+   },
+   {
+    "record": {
+     "id": 3,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 4,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 5,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a136a4-191d-7001-af09-aec7df6d5888"
+    }
+   },
+   {
+    "record": {
+     "id": 6,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 1
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 1
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   },
+   {
+    "record": {
+     "id": 9,
+     "kind": "pi.live",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {}
+   },
+   {
+    "record": {
+     "id": 10,
+     "kind": "pi.inbox",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {
+     "items": []
+    }
+   },
+   {
+    "record": {
+     "id": 11,
+     "kind": "pi.usage",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "record": {
+     "id": 12,
+     "kind": "pi.provider",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "latest",
+     "fork": "initial",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {
+     "sessionId": "01a136a4-1922-7001-af09-aec8dbc24115"
+    }
+   },
+   {
+    "record": {
+     "id": 13,
+     "kind": "pi.agent",
+     "scope": {
+      "kind": "conversation",
+      "conversationId": 8
+     },
+     "history": "rewindable",
+     "fork": "asOf",
+     "createdAt": 4
+    },
+    "version": 1,
+    "value": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    }
+   }
+  ]
+ }
+}

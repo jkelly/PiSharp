@@ -1,0 +1,1817 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "node tools/CompatibilityReport/repin-sources.mjs --upstream <Pi repo> --from v1.1.0 --to v1.2.0 --paths '^(src/PiSharp\\.Durable|src/PiSharp\\.Cli/(Durable/|Pi/PiLockfile\\.cs$)|tests/PiSharp\\.Durable|samples/Durable\\.|benchmarks/PiSharp\\.Durable|tools/Durable|docs/durable-|docs/decisions/0005-|compatibility/durable-|\\.github/workflows/durable\\.yml$)' --write",
+  "decision": "docs/decisions/0005-pi-durable-experimental.md",
+  "from": {
+    "tag": "v1.1.0",
+    "commit": "abe508e1b89912adde45528136c3221eb69acdd7"
+  },
+  "to": {
+    "tag": "v1.2.0",
+    "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff"
+  },
+  "rule": "A citation moves to the new commit only when every upstream path it names has the same git object id at both tags. The rest stay on the old commit until their area is re-ported, then move with the port.",
+  "summary": {
+    "filesWithOldCommit": 25,
+    "citations": {
+      "repinned": 74,
+      "pending": 1,
+      "unparsed": 0,
+      "nonHeader": 0,
+      "excludedHistorical": 25,
+      "releaseDocs": 0
+    },
+    "files": {
+      "repinned": 74,
+      "pending": 1,
+      "historical": 24,
+      "releaseDocs": 0,
+      "nonHeader": 0
+    },
+    "pendingByArea": {
+      "coding-agent-core": {
+        "files": 1,
+        "changeSize": 0
+      }
+    }
+  },
+  "pending": [
+    {
+      "file": "src/PiSharp.Cli/Pi/PiLockfile.cs",
+      "area": "coding-agent-core",
+      "citations": [
+        {
+          "line": 3,
+          "changed": [
+            "packages/coding-agent/src/experimental/durable/sessions.ts"
+          ]
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/coding-agent/src/experimental/durable/sessions.ts",
+          "status": "deleted"
+        }
+      ],
+      "changeSize": 0,
+      "applicabilityRows": [
+        "core.removed-experimental-stack",
+        "port.durable"
+      ]
+    }
+  ],
+  "unparsed": [],
+  "nonHeaderCitations": [],
+  "releaseDocs": [],
+  "excludedHistorical": [
+    {
+      "file": ".github/workflows/durable.yml",
+      "occurrences": 1,
+      "reason": "fetches the previous pin for the port map's diff"
+    },
+    {
+      "file": "compatibility/durable-port-map.json",
+      "occurrences": 1,
+      "reason": "the durable port map diffs against the previous pin and keeps removed files' v1.1.0 blobs"
+    },
+    {
+      "file": "compatibility/durable-sync-1.2.0-repin.json",
+      "occurrences": 1,
+      "reason": "names the commit the durable v1.2.0 sync starts from"
+    },
+    {
+      "file": "compatibility/durable-sync-1.2.0-worklist.json",
+      "occurrences": 1,
+      "reason": "names the commit the durable v1.2.0 sync starts from"
+    },
+    {
+      "file": "docs/decisions/0005-pi-durable-experimental.md",
+      "occurrences": 2,
+      "reason": "records the first durable pin"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableContracts.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableHarnessSetup.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableMain.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableModels.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurablePrompt.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableRuntime.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableSessions.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableSubagent.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableTui.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableTuiComponents.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableTuiState.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "src/PiSharp.Cli/Durable/DurableTuiView.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Fixtures/env-line-scan.upstream.json",
+      "occurrences": 1,
+      "reason": "fixtures and capture scripts record the upstream they were captured from; recapture them with the area that changes them"
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Fixtures/tools.upstream.json",
+      "occurrences": 1,
+      "reason": "fixtures and capture scripts record the upstream they were captured from; recapture them with the area that changes them"
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/manifest.json",
+      "occurrences": 1,
+      "reason": "fixtures and capture scripts record the upstream they were captured from; recapture them with the area that changes them"
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Fixtures/v1.2.0/index.json",
+      "occurrences": 1,
+      "reason": "fixtures and capture scripts record the upstream they were captured from; recapture them with the area that changes them"
+    },
+    {
+      "file": "tests/PiSharp.DurableCli.Tests/Program.cs",
+      "occurrences": 1,
+      "reason": "`pisharp durable` ports Pi v1.1.0's experimental durable agent, which upstream deleted in v1.2.0; PiSharp-only by owner decision (decision 0005)"
+    },
+    {
+      "file": "tools/DurableFixtures/pin.mjs",
+      "occurrences": 1,
+      "reason": "fixtures and capture scripts record the upstream they were captured from; recapture them with the area that changes them"
+    },
+    {
+      "file": "tools/DurablePortMap/build-port-map.mjs",
+      "occurrences": 1,
+      "reason": "the durable port map diffs against the previous pin and keeps removed files' v1.1.0 blobs"
+    }
+  ],
+  "repinned": [
+    {
+      "file": "benchmarks/PiSharp.Durable.Benchmarks/FauxModels.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/providers/faux.ts"
+      ]
+    },
+    {
+      "file": "benchmarks/PiSharp.Durable.Benchmarks/StorageBench.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/storage.bench.ts"
+      ]
+    },
+    {
+      "file": "benchmarks/PiSharp.Durable.Benchmarks/StorageMemory.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/storage-memory.ts"
+      ]
+    },
+    {
+      "file": "benchmarks/PiSharp.Durable.Benchmarks/ToolOutputBench.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/tool-output-bench.ts"
+      ]
+    },
+    {
+      "file": "docs/durable-benchmarks.md",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/testing/storage-benchmark.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Chat/ChatApp.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/examples/16-real-model.ts",
+        "packages/durable/test/examples/17-coding-tools.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ExamplesBackground.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/examples/23-subagent-background.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ExamplesChat.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/examples/14-chat.ts",
+        "packages/durable/test/examples/15-system-prompt.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ExamplesChildTasks.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/examples/24-child-tasks.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ExamplesCompaction.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/providers/faux.ts",
+        "packages/durable/test/examples/25-compaction.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ExamplesInbox.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/examples/20-inbox.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ExamplesJson.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/examples/19-json.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ExamplesLateJoin.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/examples/21-late-join.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ExamplesTools.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/examples/17-coding-tools.ts",
+        "packages/durable/test/examples/29-sandbox-per-conversation.ts",
+        "packages/durable/test/examples/30-tool-override.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/PacedModels.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/providers/faux.ts"
+      ]
+    },
+    {
+      "file": "samples/Durable.Examples/ScriptedModels.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/providers/faux.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Sqlite/ConnectionDatabase.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/storage/sqlite/node.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Sqlite/Database.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/storage/sqlite/database.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Sqlite/Migrations.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/storage/sqlite/migrations.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Tools/Env/LocalExecutionEnv.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/env/node.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Tools/Env/LocalProcess.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/env/node.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Tools/Tools/EditDiff.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/tools/edit-diff.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Tools/Tools/Env.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/tools/env.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Tools/Tools/FileMutationQueue.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/tools/file-mutation-queue.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Tools/Tools/JsDiff.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/tools/edit-diff.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable.Tools/Tools/PathUtils.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/tools/path-utils.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Env/Decode.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/env/decode.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Env/LineScan.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/env/line-scan.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Env/Local/LocalFileSystem.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/env/node-watch.ts",
+        "packages/durable/src/env/node.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Env/Local/LocalFileWatcher.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/env/node-watch.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Env/Local/NativeFileStatus.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/env/node-watch.ts",
+        "packages/durable/src/env/node.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Harness/Context.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/harness/context.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Harness/Define.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/harness/define.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Harness/Json.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/harness/json.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Harness/Output.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/harness/output.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Harness/Prompt.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/harness/prompt.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Harness/Provider.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/harness/provider.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Harness/Registry.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/harness/registry.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Harness/Usage.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/harness/usage.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Internal/PiAi/Estimate.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/estimate.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Internal/PiAi/Overflow.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/overflow.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Internal/PiAi/Text.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/text.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Internal/PiAi/Transcript.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/transcript.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Internal/PiAi/Uuid.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/uuid.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Internal/PiAi/Validation.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/utils/validation.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Session/Forks.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/session/forks.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Testing/Assertions.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/testing/assertions.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Testing/StorageBenchmark.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/testing/storage-benchmark.ts",
+        "packages/durable/test/storage-memory.ts",
+        "packages/durable/test/storage.bench.ts"
+      ]
+    },
+    {
+      "file": "src/PiSharp.Durable/Truncate.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/src/truncate.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Chord/ContextCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/chord/test/context.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/EnvNodeCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/env-node.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/EnvNodeConformanceCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/env-node-conformance.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/EnvNodeSpillCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/env-node-spill.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/ChatSupport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/ai/src/providers/faux.ts",
+        "packages/durable/test/chat-support.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessContextCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-context.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationRecoveryCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-generation-recovery.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessInspectCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-inspect.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessOutputCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-output.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessOutputSkipCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-output-skip.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessRecoverySupport.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-tasks-recovery.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessSubmissionsCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-submissions.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-task-graph.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessTasksRecoveryCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-tasks-recovery.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Harness/HarnessViewCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/harness-view.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Session/SessionCheckpointsMigrationsCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/session-checkpoints-migrations.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Session/SessionDefinitionsCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/session-definitions.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Session/SessionTablesCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/session-tables.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Session/SessionWatchesCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/session-watches.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Storage/InstrumentedFileSystem.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/jsonl-storage.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Storage/JsonlStorageCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/jsonl-storage.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Storage/MemoryStorageCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/memory-storage.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Storage/SqliteMigrationsCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/sqlite-migrations.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/Storage/SqliteStorageCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/sqlite-storage.test.ts"
+      ]
+    },
+    {
+      "file": "tests/PiSharp.Durable.Tests/TruncateCases.cs",
+      "citations": 1,
+      "upstream": [
+        "packages/durable/test/env-truncate.test.ts"
+      ]
+    }
+  ],
+  "portedRepins": {
+    "rule": "Authored (repin-sources.mjs keeps this key). The citations the first run left pending or unparsed (107 files pending, 13 unparsed), as the durable v1.2.0 work list areas re-ported them: each moved to the new commit by hand with its area, once the cited text was ported or checked at v1.2.0. Area h re-pinned the rest after checking each cited upstream change against the C#. commit names the change that moved the citation.",
+    "summary": {
+      "repinnedFiles": 117,
+      "repinnedCitations": 117,
+      "byArea": {
+        "a": 23,
+        "b": 19,
+        "c": 13,
+        "d": 1,
+        "e": 5,
+        "f": 17,
+        "g": 6,
+        "h": 23,
+        "i": 7,
+        "j": 3
+      },
+      "retiredFiles": 2,
+      "leftFiles": 1
+    },
+    "repinned": [
+      {
+        "file": "src/PiSharp.Durable.Tools/Tools/Bash.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable.Tools/Tools/Edit.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable.Tools/Tools/Write.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable/DurableUpstream.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "3b178ff"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Agent.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Events.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Generation.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Live.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Tool.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Types.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Compat/CompatScenarios.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "a",
+        "commit": "3b178ff"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessLiveDeltasCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessPromptCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessRegistryCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessSupport.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsDifferentialCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessToolsRecoveryCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessViewsDifferentialCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/SpecUsageCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/ToolsNodeCases.cs",
+        "lines": [
+          2
+        ],
+        "was": "pending",
+        "area": "a",
+        "commit": "96ca6e3"
+      },
+      {
+        "file": "src/PiSharp.Durable.Sqlite/Storage.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Errors.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/TaskGraph.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Util.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/View.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Session/Observation.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Session/Session.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Storage/Memory.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Storage/Scan.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Testing/StorageConformance.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessConversationsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Session/SessionDocumentsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Session/SessionForksCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Session/SessionSupport.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "b",
+        "commit": "92875db"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Harness.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Scheduler.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "src/PiSharp.Durable/Session/Transaction.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "src/PiSharp.Durable/Tasks.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "src/PiSharp.Durable/Types.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "src/PiSharp.Durable/TypesDocuments.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "src/PiSharp.Durable/TypesSession.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "src/PiSharp.Durable/TypesStorage.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "src/PiSharp.Durable/TypesTasks.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipSupport.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "c",
+        "commit": "9e7811e"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphDifferentialCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "c",
+        "commit": "3d4d53c"
+      },
+      {
+        "file": "src/PiSharp.Durable/Models/NativeDurableModels.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "d",
+        "commit": "dbc69f9"
+      },
+      {
+        "file": "src/PiSharp.Durable.Tools/Tools/Image.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "e",
+        "commit": "32e0785"
+      },
+      {
+        "file": "src/PiSharp.Durable.Tools/Tools/Read.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "e",
+        "commit": "32e0785"
+      },
+      {
+        "file": "src/PiSharp.Durable.Tools/Tools/Tools.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "e",
+        "commit": "32e0785"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/ToolsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "e",
+        "commit": "32e0785"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "e",
+        "commit": "32e0785"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/Delta/Apply.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/Delta/ApplyImmutableTrusted.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/Delta/Codec.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/Delta/Diff.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/Delta/Draft.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/Delta/Ops.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/Delta/RevisionValidator.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/Delta/Tracker.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/DurableContext.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/JsonValue.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/ReplicatedState.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Chord/ReplicatedStateTypes.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Chord/DeltaCases.cs",
+        "lines": [
+          5
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Chord/DiffCases.cs",
+        "lines": [
+          5
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Chord/StateCases.cs",
+        "lines": [
+          4
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Chord/TrackerCases.cs",
+        "lines": [
+          5
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "f",
+        "commit": "fdd8095"
+      },
+      {
+        "file": "src/PiSharp.Durable/Env/Env.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "g",
+        "commit": "9e0cd9c"
+      },
+      {
+        "file": "src/PiSharp.Durable/Env/FileSystem.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "g",
+        "commit": "9e0cd9c"
+      },
+      {
+        "file": "src/PiSharp.Durable/Env/Shell.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "g",
+        "commit": "9e0cd9c"
+      },
+      {
+        "file": "src/PiSharp.Durable/Testing/EnvConformance.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "g",
+        "commit": "9e0cd9c"
+      },
+      {
+        "file": "src/PiSharp.Durable/Testing/Runner.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "g",
+        "commit": "9e0cd9c"
+      },
+      {
+        "file": "src/PiSharp.Durable/Testing/Types.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "g",
+        "commit": "9e0cd9c"
+      },
+      {
+        "file": "samples/Durable.Examples/Examples.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "samples/Durable.Examples/ExamplesAgents.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "samples/Durable.Examples/ExamplesHarness.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "samples/Durable.Examples/ExamplesReload.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "samples/Durable.Examples/ExamplesSubagent.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Documents.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Entries.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Models.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Ids.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Internal/PiAi/Retry.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Models/NativeModelRoutes.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Storage/Jsonl/Local/JsonlStorage.Local.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Storage/StorageRules.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Compat/CompatOpsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/EnvLineScanCases.cs",
+        "lines": [
+          6
+        ],
+        "was": "unparsed",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessBackendCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessConversationsSupport.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredEventsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredSupport.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredToolRoundsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/PiAiUtilsCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/PiAiValidationCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Storage/StorageRuntimeBoundaryCases.cs",
+        "lines": [
+          5
+        ],
+        "was": "unparsed",
+        "area": "h",
+        "commit": "7389c11"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Inbox.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "i",
+        "commit": "10bbd6a"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Submissions.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "i",
+        "commit": "10bbd6a"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessChatDifferentialCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "i",
+        "commit": "10bbd6a"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "i",
+        "commit": "10bbd6a"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessInboxDifferentialCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "i",
+        "commit": "10bbd6a"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/TypesCases.cs",
+        "lines": [
+          5
+        ],
+        "was": "pending",
+        "area": "i",
+        "commit": "10bbd6a"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/TypesHarnessCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "i",
+        "commit": "10bbd6a"
+      },
+      {
+        "file": "src/PiSharp.Durable/Harness/Compaction.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "j",
+        "commit": "93327d9"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "pending",
+        "area": "j",
+        "commit": "93327d9"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionDifferentialCases.cs",
+        "lines": [
+          1
+        ],
+        "was": "unparsed",
+        "area": "j",
+        "commit": "93327d9"
+      }
+    ],
+    "retired": [
+      {
+        "file": "src/PiSharp.Durable/Chord/ReplicatedStateInternals.cs",
+        "area": "f",
+        "commit": "fdd8095",
+        "reason": "upstream merged chord/src/services/state-internals.ts into chord/src/state.ts in v1.2.0; the C# moved with it (area f)"
+      },
+      {
+        "file": "tests/PiSharp.Durable.Tests/Session/ChordGuideCases.cs",
+        "area": "f",
+        "commit": "fdd8095",
+        "reason": "upstream deleted test/chord-guide.test.ts in v1.2.0; its cases were retired with it (decision 0005)"
+      }
+    ],
+    "left": [
+      {
+        "file": "src/PiSharp.Cli/Pi/PiLockfile.cs",
+        "lines": [
+          3
+        ],
+        "reason": "cites Pi v1.1.0 packages/coding-agent/src/experimental/durable/sessions.ts, which v1.2.0 deleted; the durable session lock it ports is PiSharp-only (pisharp durable, decision 0005), so the citation stays on v1.1.0"
+      }
+    ]
+  }
+}

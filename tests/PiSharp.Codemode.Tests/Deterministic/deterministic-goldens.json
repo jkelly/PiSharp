@@ -1,0 +1,1144 @@
+{
+	"description": "Differential goldens for PiSharp's deterministic codemode runs (CodemodeSandbox.Start), recorded from the real upstream @earendil-works/pi-codemode 1.2.0 CodemodeSandbox.start(). Regenerate: node gen-deterministic-goldens.mjs <node_modules> [out.json]",
+	"piCodemode": "1.2.0",
+	"upstreamFingerprint": "quickjs-wasi 3.6.2, quickjs 0.17.0, prelude 8c6c9242, deterministic 1, stack 524288, heap none, budget none",
+	"preludeHash": "8c6c9242",
+	"tools": [
+		{
+			"name": "echo"
+		},
+		{
+			"name": "my-tool",
+			"jsName": "renamed",
+			"description": "Renamed."
+		}
+	],
+	"globals": [
+		{
+			"name": "search",
+			"spread": true
+		},
+		{
+			"name": "ns.lookup"
+		}
+	],
+	"scenarios": [
+		{
+			"name": "clock-and-random",
+			"code": "const values = [Date.now(), performance.now(), Math.random(), Math.random(), new Date().toISOString()];\nconst first = await tools.echo(values);\ntext(JSON.stringify([Date.now(), performance.now(), Math.random()]));\nreturn await tools.echo(first.concat(Math.random()));",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"idle 0 1",
+					"call 2 tool echo",
+					"idle 1 2"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": [
+							1768471200000,
+							0,
+							0.34227450605335275,
+							0.4620546081390098,
+							"2026-01-15T10:00:00.000Z"
+						]
+					},
+					{
+						"id": 2,
+						"target": "tool",
+						"name": "echo",
+						"args": [
+							1768471200000,
+							0,
+							0.34227450605335275,
+							0.4620546081390098,
+							"2026-01-15T10:00:00.000Z",
+							0.056110785474501323
+						]
+					}
+				],
+				"result": {
+					"ok": true,
+					"value": [
+						1768471200000,
+						0,
+						0.34227450605335275,
+						0.4620546081390098,
+						"2026-01-15T10:00:00.000Z",
+						0.056110785474501323
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [
+						{
+							"type": "text",
+							"text": "[1768471201000,1000,0.5807179129204683]"
+						}
+					],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 2,
+						"issued": 2
+					}
+				}
+			}
+		},
+		{
+			"name": "seed-zero",
+			"seed": 0,
+			"code": "return [Math.random(), Math.random(), Math.random()]",
+			"startedAt": 1768471200000,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started"
+				],
+				"calls": [],
+				"result": {
+					"ok": true,
+					"value": [
+						0.6711372530266764,
+						0.7258461452833667,
+						0.303529299965799
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [],
+					"during": {
+						"seq": 0,
+						"issued": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "seed-max",
+			"seed": 4294967295,
+			"code": "return [Math.random(), Math.random(), Math.random()]",
+			"startedAt": 1768471200000,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started"
+				],
+				"calls": [],
+				"result": {
+					"ok": true,
+					"value": [
+						0.32306919411247104,
+						0.6888886901883535,
+						0.7680848257540274
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [],
+					"during": {
+						"seq": 0,
+						"issued": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "random-after-allocation",
+			"seed": 77,
+			"code": "const map = new Map(); const set = new Set();\nfor (let i = 0; i < 200; i++) { map.set(\"k\" + i, { i, s: Symbol(String(i)) }); set.add([i, /x+/g.exec(\"xx\" + i)]); }\nconst sorted = [...map.keys()].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0)).slice(0, 3);\nJSON.parse(JSON.stringify({ sorted, size: set.size }));\nreturn [sorted, Math.random(), Math.random()];",
+			"startedAt": 1768471200000,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started"
+				],
+				"calls": [],
+				"result": {
+					"ok": true,
+					"value": [
+						[
+							"k99",
+							"k98",
+							"k97"
+						],
+						0.40312917019956185,
+						0.15132201135388224
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [],
+					"during": {
+						"seq": 0,
+						"issued": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "random-branching",
+			"seed": 12345,
+			"code": "let total = 0; const path = [];\nfor (let i = 0; i < 12; i++) {\n  const r = Math.random();\n  if (r < 0.4) { total += await tools.echo(i); path.push(\"one\"); }\n  else if (r < 0.8) { const both = await Promise.all([tools.echo(i), tools.echo(-i)]); total += both[0] + both[1]; path.push(\"two\"); }\n  else { path.push(\"none\"); }\n}\nconsole.log(\"path\", path.join(\",\"), Date.now() - 1768471200000);\nreturn { total, path, at: performance.now() };",
+			"startedAt": 1768471200000,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"idle 0 1",
+					"call 2 tool echo",
+					"idle 1 2",
+					"call 3 tool echo",
+					"idle 2 3",
+					"call 4 tool echo",
+					"call 5 tool echo",
+					"idle 3 5",
+					"idle 4 5",
+					"call 6 tool echo",
+					"idle 5 6",
+					"call 7 tool echo",
+					"idle 6 7",
+					"call 8 tool echo",
+					"call 9 tool echo",
+					"idle 7 9",
+					"idle 8 9"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": 0
+					},
+					{
+						"id": 2,
+						"target": "tool",
+						"name": "echo",
+						"args": 1
+					},
+					{
+						"id": 3,
+						"target": "tool",
+						"name": "echo",
+						"args": 3
+					},
+					{
+						"id": 4,
+						"target": "tool",
+						"name": "echo",
+						"args": 5
+					},
+					{
+						"id": 5,
+						"target": "tool",
+						"name": "echo",
+						"args": -5
+					},
+					{
+						"id": 6,
+						"target": "tool",
+						"name": "echo",
+						"args": 6
+					},
+					{
+						"id": 7,
+						"target": "tool",
+						"name": "echo",
+						"args": 9
+					},
+					{
+						"id": 8,
+						"target": "tool",
+						"name": "echo",
+						"args": 10
+					},
+					{
+						"id": 9,
+						"target": "tool",
+						"name": "echo",
+						"args": -10
+					}
+				],
+				"result": {
+					"ok": true,
+					"value": {
+						"total": 19,
+						"path": [
+							"one",
+							"one",
+							"none",
+							"one",
+							"none",
+							"two",
+							"one",
+							"none",
+							"none",
+							"one",
+							"two",
+							"none"
+						],
+						"at": 9000
+					},
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [
+						{
+							"type": "text",
+							"text": "path one,one,none,one,none,two,one,none,none,one,two,none 9000",
+							"console": true
+						}
+					],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 9,
+						"issued": 9
+					}
+				}
+			}
+		},
+		{
+			"name": "parallel-and-microtasks",
+			"code": "const order = [];\nconst a = tools.echo(\"a\").then((v) => order.push(v));\nPromise.resolve().then(() => order.push(\"micro\"));\nconst xs = await Promise.all([1, 2, 3].map((n) => tools.echo(n).then((v) => { order.push(v); return v; })));\norder.push(\"after all\");\nawait a;\nreturn [order, xs, await tools.echo(xs.reduce((x, y) => x + y))];",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"call 2 tool echo",
+					"call 3 tool echo",
+					"call 4 tool echo",
+					"idle 0 4",
+					"idle 1 4",
+					"idle 2 4",
+					"idle 3 4",
+					"call 5 tool echo",
+					"idle 4 5"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": "a"
+					},
+					{
+						"id": 2,
+						"target": "tool",
+						"name": "echo",
+						"args": 1
+					},
+					{
+						"id": 3,
+						"target": "tool",
+						"name": "echo",
+						"args": 2
+					},
+					{
+						"id": 4,
+						"target": "tool",
+						"name": "echo",
+						"args": 3
+					},
+					{
+						"id": 5,
+						"target": "tool",
+						"name": "echo",
+						"args": 6
+					}
+				],
+				"result": {
+					"ok": true,
+					"value": [
+						[
+							"micro",
+							"a",
+							1,
+							2,
+							3,
+							"after all"
+						],
+						[
+							1,
+							2,
+							3
+						],
+						6
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 5,
+						"issued": 5
+					}
+				}
+			}
+		},
+		{
+			"name": "batch-order",
+			"policy": "batch",
+			"code": "const order = [];\nawait Promise.all([\"a\", \"b\", \"c\"].map((name) => tools.echo(name).then(() => order.push([name, Date.now() - 1768471200000]))));\nconst second = await Promise.all([tools.echo(1), tools.echo(2)]);\nreturn [order, second, Date.now() - 1768471200000];",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"call 2 tool echo",
+					"call 3 tool echo",
+					"idle 0 3",
+					"idle 1 3",
+					"idle 2 3",
+					"call 4 tool echo",
+					"call 5 tool echo",
+					"idle 3 5",
+					"idle 4 5"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": "a"
+					},
+					{
+						"id": 2,
+						"target": "tool",
+						"name": "echo",
+						"args": "b"
+					},
+					{
+						"id": 3,
+						"target": "tool",
+						"name": "echo",
+						"args": "c"
+					},
+					{
+						"id": 4,
+						"target": "tool",
+						"name": "echo",
+						"args": 1
+					},
+					{
+						"id": 5,
+						"target": "tool",
+						"name": "echo",
+						"args": 2
+					}
+				],
+				"result": {
+					"ok": true,
+					"value": [
+						[
+							[
+								"c",
+								1000
+							],
+							[
+								"b",
+								2000
+							],
+							[
+								"a",
+								3000
+							]
+						],
+						[
+							1,
+							2
+						],
+						5000
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 5,
+						"issued": 5
+					}
+				}
+			}
+		},
+		{
+			"name": "globals-and-rejections",
+			"code": "const found = await search(\"x\", 2);\nconst looked = await ns.lookup({ id: 1 });\nlet caught;\ntry { await tools.echo(\"fail\"); } catch (error) { caught = [error instanceof Error, error.message, error.name, error.code]; }\ntext(JSON.stringify(caught));\nreturn [found, looked, await tools.renamed(\"r\"), Object.keys(tools), ALL_TOOLS.map((tool) => [tool.name, tool.description])];",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 global search",
+					"idle 0 1",
+					"call 2 global ns.lookup",
+					"idle 1 2",
+					"call 3 tool echo",
+					"idle 2 3",
+					"call 4 tool my-tool",
+					"idle 3 4"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "global",
+						"name": "search",
+						"args": [
+							"x",
+							2
+						]
+					},
+					{
+						"id": 2,
+						"target": "global",
+						"name": "ns.lookup",
+						"args": {
+							"id": 1
+						}
+					},
+					{
+						"id": 3,
+						"target": "tool",
+						"name": "echo",
+						"args": "fail"
+					},
+					{
+						"id": 4,
+						"target": "tool",
+						"name": "my-tool",
+						"args": "r"
+					}
+				],
+				"result": {
+					"ok": true,
+					"value": [
+						[
+							"found",
+							[
+								"x",
+								2
+							]
+						],
+						{
+							"id": 1
+						},
+						"r",
+						[
+							"echo",
+							"renamed",
+							"my-tool"
+						],
+						[
+							[
+								"echo",
+								""
+							],
+							[
+								"renamed",
+								"Renamed."
+							]
+						]
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [
+						{
+							"type": "text",
+							"text": "[true,\"no\",\"Error\",7]"
+						}
+					],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "error"
+						},
+						{
+							"name": "my-tool",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 4,
+						"issued": 4
+					}
+				}
+			}
+		},
+		{
+			"name": "store-writes",
+			"store": {
+				"counter": 1,
+				"list": [
+					1,
+					2
+				]
+			},
+			"code": "const before = load(\"counter\");\nconst next = await tools.echo(before + 1);\nstore(\"counter\", next);\nstore(\"list\", undefined);\nstore(\"fresh\", { at: Date.now() - 1768471200000 });\nreturn [before, load(\"counter\"), load(\"list\")];",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"idle 0 1"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": 2
+					}
+				],
+				"result": {
+					"ok": true,
+					"value": [
+						1,
+						2,
+						null
+					],
+					"storeWrites": {
+						"set": {
+							"counter": 2,
+							"fresh": {
+								"at": 1000
+							}
+						},
+						"delete": [
+							"list"
+						]
+					},
+					"output": [],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 1,
+						"issued": 1
+					}
+				}
+			}
+		},
+		{
+			"name": "throws-after-calls",
+			"code": "await tools.echo(1);\nawait Promise.all([tools.echo(2), tools.echo(3)]);\nthrow new Error(\"boom \" + Math.random());",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"idle 0 1",
+					"call 2 tool echo",
+					"call 3 tool echo",
+					"idle 1 3",
+					"idle 2 3"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": 1
+					},
+					{
+						"id": 2,
+						"target": "tool",
+						"name": "echo",
+						"args": 2
+					},
+					{
+						"id": 3,
+						"target": "tool",
+						"name": "echo",
+						"args": 3
+					}
+				],
+				"result": {
+					"ok": false,
+					"error": {
+						"kind": "script",
+						"name": "Error",
+						"message": "boom 0.34227450605335275"
+					},
+					"output": [],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 3,
+						"issued": 3
+					}
+				}
+			}
+		},
+		{
+			"name": "exits-mid-run",
+			"code": "text(\"before\"); await tools.echo(1); exit(); text(\"never\");",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"idle 0 1"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": 1
+					}
+				],
+				"result": {
+					"ok": true,
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [
+						{
+							"type": "text",
+							"text": "before"
+						}
+					],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 1,
+						"issued": 1
+					}
+				}
+			}
+		},
+		{
+			"name": "returns-at-once",
+			"code": "return [Date.now(), performance.now()]",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started"
+				],
+				"calls": [],
+				"result": {
+					"ok": true,
+					"value": [
+						1768471200000,
+						0
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [],
+					"during": {
+						"seq": 0,
+						"issued": 0
+					}
+				}
+			}
+		},
+		{
+			"name": "stalls",
+			"code": "await tools.echo(1); await new Promise(() => {});",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"idle 0 1"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": 1
+					}
+				],
+				"result": {
+					"ok": false,
+					"error": {
+						"kind": "script",
+						"name": "Error",
+						"message": "The script is waiting on a promise that can never settle: no tool call is pending, and timers do not exist here."
+					},
+					"output": [],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 1,
+						"issued": 1
+					}
+				}
+			}
+		},
+		{
+			"name": "clock-never-backwards",
+			"step": -1000,
+			"code": "const before = Date.now(); await tools.echo(1); const after = Date.now(); await tools.echo(2);\nreturn [before, after, Date.now(), performance.now()];",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"idle 0 1",
+					"call 2 tool echo",
+					"idle 1 2"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": 1
+					},
+					{
+						"id": 2,
+						"target": "tool",
+						"name": "echo",
+						"args": 2
+					}
+				],
+				"result": {
+					"ok": true,
+					"value": [
+						1768471200000,
+						1768471200000,
+						1768471200000,
+						0
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 2,
+						"issued": 2
+					}
+				}
+			}
+		},
+		{
+			"name": "fractional-clock",
+			"startedAt": 1000.6,
+			"step": 0.7,
+			"code": "const seen = [[Date.now(), performance.now()]];\nfor (let i = 0; i < 4; i++) { await tools.echo(i); seen.push([Date.now(), performance.now()]); }\nreturn seen;",
+			"seed": 1,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started",
+					"call 1 tool echo",
+					"idle 0 1",
+					"call 2 tool echo",
+					"idle 1 2",
+					"call 3 tool echo",
+					"idle 2 3",
+					"call 4 tool echo",
+					"idle 3 4"
+				],
+				"calls": [
+					{
+						"id": 1,
+						"target": "tool",
+						"name": "echo",
+						"args": 0
+					},
+					{
+						"id": 2,
+						"target": "tool",
+						"name": "echo",
+						"args": 1
+					},
+					{
+						"id": 3,
+						"target": "tool",
+						"name": "echo",
+						"args": 2
+					},
+					{
+						"id": 4,
+						"target": "tool",
+						"name": "echo",
+						"args": 3
+					}
+				],
+				"result": {
+					"ok": true,
+					"value": [
+						[
+							1001,
+							0
+						],
+						[
+							1001,
+							1
+						],
+						[
+							1002,
+							1
+						],
+						[
+							1003,
+							2
+						],
+						[
+							1003,
+							3
+						]
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						},
+						{
+							"name": "echo",
+							"status": "ok"
+						}
+					],
+					"during": {
+						"seq": 4,
+						"issued": 4
+					}
+				}
+			}
+		},
+		{
+			"name": "utc-dates",
+			"code": "const d = new Date(Date.UTC(2026, 5, 1, 23, 30));\nreturn [d.getHours(), d.getDate(), d.getTimezoneOffset(), new Date(2026, 0, 1).toISOString(), typeof WeakRef, typeof FinalizationRegistry,\n  Date.parse(\"2026-01-15T10:00:00\"), JSON.stringify(new Date(0))];",
+			"startedAt": 1768471200000,
+			"seed": 1,
+			"step": 1000,
+			"policy": "immediate",
+			"store": {},
+			"expected": {
+				"events": [
+					"started"
+				],
+				"calls": [],
+				"result": {
+					"ok": true,
+					"value": [
+						23,
+						1,
+						0,
+						"2026-01-01T00:00:00.000Z",
+						"undefined",
+						"undefined",
+						1768471200000,
+						"\"1970-01-01T00:00:00.000Z\""
+					],
+					"storeWrites": {
+						"set": {},
+						"delete": []
+					},
+					"output": [],
+					"calls": [],
+					"during": {
+						"seq": 0,
+						"issued": 0
+					}
+				}
+			}
+		}
+	]
+}

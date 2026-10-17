@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0005, P13: Pi packages/durable/test/storage.bench.ts, test/storage-memory.ts, test/tool-output-bench.ts and (v1.2.0)
+       test/document-append-bench.ts, test/session-document-cache-bench.ts, test/scheduler-memory-bench.ts and test/heap-retained.ts, plus the
+       PiSharp-authored scheduler-scale (SchedulerScaleBench.cs). Report only: nothing here passes or fails on a timing. No benchmark library; the timing loops mirror
+       upstream's (Vitest bench's tinybench loop and the scripts' own performance.now() measurements). docs/durable-benchmarks.md has the results next to upstream's under Node. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>PiSharp.Durable.Benchmarks</AssemblyName>
+    <RootNamespace>PiSharp.Durable.Benchmarks</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+  </ItemGroup>
+</Project>

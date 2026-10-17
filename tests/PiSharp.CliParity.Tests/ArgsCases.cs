@@ -174,6 +174,11 @@ internal static partial class Program
             Check(code == 0 && stdout.StartsWith("pisharp - AI coding assistant with read, bash, edit, write tools\n\nUsage:\n  pisharp [options] [--] [@files...] [messages...]\n", StringComparison.Ordinal) &&
                 stdout.EndsWith("  ls         - List directory contents (read-only, off by default)\n\n", StringComparison.Ordinal) && stderr == "", "--help text");
             Check(stdout.Contains("  --tool-policy <policy>         Tool gate: pi (default; any path and command) or explicit (exact grants only)\n", StringComparison.Ordinal), "--tool-policy help line");
+            // PiSharp-only commands (decisions 0004 and 0005): Pi's printHelp has neither line, and its "<command> --help" line is unchanged.
+            Check(stdout.Contains("  pisharp session <verb>            PiSharp explicit-path session commands (create, prompt, resume, rpc, terminal, ...)\n" +
+                "  pisharp durable [--continue]      EXPERIMENTAL: PiSharp's crash-safe durable agent (-c continues the newest session)\n" +
+                "  pisharp <command> --help          Show help for install/remove/uninstall/update/list/config/auth/mcp\n", StringComparison.Ordinal),
+                "PiSharp-only session and experimental durable command lines");
             Check(stdout.Contains("  PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent)\n", StringComparison.Ordinal), "env var padding");
             (code, stdout, stderr) = await sandbox.Run("--mode", "yaml", "--thinking", "huge");
             Equal(1, code, "invalid mode exits 1");

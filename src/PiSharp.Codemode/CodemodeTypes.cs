@@ -51,7 +51,91 @@ public sealed record CodemodeStoreWrites(ImmutableArray<KeyValuePair<string, Jso
 
 /// <summary>Output is kept for failed executions too, up to the failure. <c>exit()</c> completes with no value.</summary>
 public sealed record CodemodeResult(bool Ok, JsonData? Value, ImmutableArray<CodemodeOutputItem> Output,
-    ImmutableArray<CodemodeCall> Calls, CodemodeStoreWrites StoreWrites, CodemodeError? Error);
+    ImmutableArray<CodemodeCall> Calls, CodemodeStoreWrites StoreWrites, CodemodeError? Error)
+{
+    /// <summary>In a <see cref="CodemodeSandbox.Start"/> run that the script itself ended (it returned, threw, or exited), the result
+    /// being processed when it did. Null for <see cref="CodemodeSandbox.ExecuteAsync"/>.</summary>
+    public CodemodeDuring? During { get; init; }
+}
+
+/// <summary>types.ts <c>CodemodeDuring</c>: in a <see cref="CodemodeSandbox.Start"/> run, the result the engine was processing when the
+/// script finished (0 for its first run) and the calls issued by then.</summary>
+public sealed record CodemodeDuring(long Seq, long Issued);
+
+/// <summary>Whether a call went to <c>tools.&lt;name&gt;</c> or to a global.</summary>
+public enum CodemodeCallTarget { Tool, Global }
+
+/// <summary>types.ts <c>CodemodeHostCall</c>: a call the script made in a <see cref="CodemodeSandbox.Start"/> run, answered with
+/// <see cref="CodemodeRun.Deliver"/>. <paramref name="Id"/> is the engine's own number for the call, 1, 2, ... in the order the script
+/// made its calls (tools and globals). <paramref name="Args"/> is what the script passed after a JSON round trip (null for
+/// <c>undefined</c>); for spread globals the argument list.</summary>
+public sealed record CodemodeHostCall(long Id, CodemodeCallTarget Target, string Name, JsonData? Args);
+
+/// <summary>types.ts <c>CodemodeDeclaredTool</c>: a tool as a <see cref="CodemodeSandbox.Start"/> run's script sees it,
+/// <c>tools.&lt;JsName&gt;</c> and its <c>ALL_TOOLS</c> entry.</summary>
+public sealed record CodemodeDeclaredTool(string Name)
+{
+    /// <summary>The identifier the script uses. Default: <see cref="CodemodeIdentifier.ToIdentifier"/> of the name. A host that replays a
+    /// run passes the one the run started with, so a changed mapping cannot rename a tool under a resumed script.</summary>
+    public string? JsName { get; init; }
+    public string? Description { get; init; }
+}
+
+/// <summary>types.ts <c>CodemodeDeclaredGlobal</c>: a global as a <see cref="CodemodeSandbox.Start"/> run's script sees it; the same
+/// names as <see cref="CodemodeSandboxOptions.Globals"/> allow.</summary>
+public sealed record CodemodeDeclaredGlobal(string Name)
+{
+    public bool Spread { get; init; }
+}
+
+/// <summary>types.ts <c>CodemodeOutcome</c>: a call's answer. A failure becomes an <c>Error</c> with <see cref="Message"/> in the script,
+/// carrying the own properties of <see cref="Properties"/> (a JSON object; <c>name</c>, <c>message</c> and <c>stack</c> are ignored),
+/// for example <c>{ structuredOutput }</c>.</summary>
+public sealed record CodemodeOutcome
+{
+    private CodemodeOutcome(bool ok, JsonData? value, string? message, JsonData? properties)
+    { Ok = ok; Value = value; Message = message; Properties = properties; }
+
+    public bool Ok { get; }
+    /// <summary>The resolved value when <see cref="Ok"/>; null for <c>undefined</c>.</summary>
+    public JsonData? Value { get; }
+    /// <summary>The rejection's message when not <see cref="Ok"/>.</summary>
+    public string? Message { get; }
+    public JsonData? Properties { get; }
+
+    /// <summary><c>{ ok: true, value }</c>.</summary>
+    public static CodemodeOutcome Success(JsonData? value) => new(true, value, null, null);
+    /// <summary><c>{ ok: false, message, properties? }</c>.</summary>
+    public static CodemodeOutcome Failure(string message, JsonData? properties = null)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        return new(false, null, message, properties);
+    }
+}
+
+/// <summary>types.ts <c>CodemodeRunOptions</c>.</summary>
+public sealed record CodemodeRunOptions
+{
+    /// <summary>The engine clock's start, in ms since the epoch: <c>Date.now()</c> until the first result arrives.</summary>
+    public required double StartedAt { get; init; }
+    /// <summary>Seeds <c>Math.random()</c>.</summary>
+    public required uint Seed { get; init; }
+    public ImmutableArray<CodemodeDeclaredTool> Tools { get; init; } = [];
+    public ImmutableArray<CodemodeDeclaredGlobal> Globals { get; init; } = [];
+    /// <summary>Values the script reads with <c>load(key)</c>.</summary>
+    public IReadOnlyList<KeyValuePair<string, JsonData>>? Store { get; init; }
+    /// <summary>Deadline of this run in ms. Default: none (not the sandbox's default).</summary>
+    public double? TimeoutMs { get; init; }
+    /// <summary>Message of a run the caller's token aborts (an AbortSignal's reason); default "This operation was aborted".</summary>
+    public string? AbortMessage { get; init; }
+    /// <summary>The engine's fingerprint, before the script runs and before any of its calls.</summary>
+    public Action<string>? OnStarted { get; init; }
+    /// <summary>The script made a call. Answer it with <see cref="CodemodeRun.Deliver"/>, now or later.</summary>
+    public required Action<CodemodeHostCall> OnCall { get; init; }
+    /// <summary>The engine processed result <c>seq</c> (0: the script's first run, before any result) and waits again, having issued
+    /// <c>issued</c> calls in total.</summary>
+    public Action<long, long>? OnIdle { get; init; }
+}
 
 public sealed record CodemodeSandboxOptions
 {
@@ -72,6 +156,10 @@ public sealed record CodemodeSandboxOptions
     internal Func<ICodemodeWorker>? WorkerFactory { get; init; }
     /// <summary>Maximum JavaScript call depth. Default 10000.</summary>
     public int RecursionLimit { get; init; } = CodemodeLimits.DefaultRecursionLimit;
+    /// <summary>inline.ts <c>interruptBudget</c>: Jint statements one execution may run in total before it fails with
+    /// <see cref="CodemodeErrorKind.Timeout"/>. Unlike the deadline it does not depend on the machine's speed, so a replayed
+    /// <see cref="CodemodeSandbox.Start"/> run stops at the same point; it is part of the fingerprint. Default: none.</summary>
+    public long? InterruptBudget { get; init; }
 }
 
 public sealed record CodemodeExecuteOptions

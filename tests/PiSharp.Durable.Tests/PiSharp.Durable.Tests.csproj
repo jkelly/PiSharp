@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+    <!-- Work list area e: the image processor's cases decode, encode and prepare images with the coding agent's Skia codec, as upstream's
+         tools-images.test.ts does with Photon (ToolsImagesCases.cs). -->
+    <ProjectReference Include="../../src/PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />
+    <ProjectReference Include="../../samples/Durable.Examples/Durable.Examples.csproj" />
+    <!-- P13: the benchmark ports, run at a tiny size by the benchmarks.smoke case (BenchmarksCases.cs). -->
+    <ProjectReference Include="../../benchmarks/PiSharp.Durable.Benchmarks/PiSharp.Durable.Benchmarks.csproj" />
+    <!-- M2: the Durable.Chat tools path, offline against recorded SSE (M2Cases.cs). -->
+    <ProjectReference Include="../../samples/Durable.Chat/Durable.Chat.csproj" />
+    <!-- Differential cases only: PiSharp.Durable's pi-ai utility ports are compared with PiSharp.CodingAgent's ports of the same functions. -->
+    <ProjectReference Include="../../src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <!-- Differential cases only: Search (upstream durable search.ts) is compared with main's port of the coding agent's tool search ranking. -->
+    <ProjectReference Include="../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

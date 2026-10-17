@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "product": "PiSharp",
-  "version": "1.2.0",
-  "proposedReleaseTag": "v1.2.0",
+  "version": "1.2.0.1",
+  "proposedReleaseTag": "v1.2.0.1",
   "upstream": {
     "repository": "https://github.com/earendil-works/pi",
     "tag": "v1.2.0",
     "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff"
   },
   "versionMeaning": "Upstream porting baseline, not a claim of complete behavioral parity.",
-  "productAndPackageVersion": "1.2.0",
+  "productAndPackageVersion": "1.2.0.1",
   "assemblyIdentityPolicy": {
-    "defaultSdkDerivedVersion": "1.2.0.0",
+    "defaultSdkDerivedVersion": "1.2.0.1",
     "fixedSupervisorAssembly": "PiSharp.ExtensionHost",
     "fixedSupervisorAssemblyVersion": "1.0.0.0",
     "fixedSupervisorReason": "Retain the exact existing approved system-import identity; no loader guard is relaxed."
@@ -21,14 +21,14 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Release candidate on sync/pi-1.2.0: the sync is complete and the offline suites pass, but nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release, with the owner's go-ahead."
+    "status": "Release candidate on release/1.2.0.1: a C#-only release on the Pi v1.2.0 baseline that adds the experimental durable port (decision 0005) as pisharp durable and three [Experimental] packages. Nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release, with the owner's go-ahead."
   },
   "releaseCandidate": {
-    "branch": "sync/pi-1.2.0",
-    "decision": "docs/decisions/0006-pi-1.2.0-sync.md",
-    "applicability": "compatibility/sync-1.2.0-applicability.json",
-    "notes": "docs/release-notes/1.2.0.md",
-    "changelog": "website/src/content/changelog/1.2.0.md"
+    "branch": "release/1.2.0.1",
+    "decision": "docs/decisions/0005-pi-durable-experimental.md",
+    "experimental": ["pisharp durable", "PiSharp.Durable", "PiSharp.Durable.Tools", "PiSharp.Durable.Sqlite"],
+    "notes": "docs/release-notes/1.2.0.1.md",
+    "changelog": "website/src/content/changelog/1.2.0.1.md"
   },
   "publication": {
     "tagCreated": false,
@@ -127,6 +127,18 @@
       "publishedOn": "2026-10-14",
       "tagCommit": "cb057c77d195007e13a4de491f29a2f6cfbb3252",
       "releaseRun": "38672066567"
+    },
+    {
+      "version": "1.2.0",
+      "tag": "v1.2.0",
+      "upstreamTag": "v1.2.0",
+      "upstreamCommit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+      "tagCreated": true,
+      "githubReleasePublished": true,
+      "nugetPackagesPublished": true,
+      "publishedOn": "2026-10-15",
+      "tagCommit": "849cfe7107be1f8b116f1bcb97cfb4dfba433577",
+      "releaseRun": "38827782975"
     }
   ],
   "historicalArtifacts": "Earlier private versions and their qualification receipts retain their original identities; no artifact is renamed or relabeled."

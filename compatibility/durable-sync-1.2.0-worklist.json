@@ -1,0 +1,1372 @@
+{
+  "schemaVersion": 1,
+  "decision": "docs/decisions/0005-pi-durable-experimental.md",
+  "portMap": "compatibility/durable-port-map.json",
+  "from": {
+    "version": "1.1.0",
+    "commit": "abe508e1b89912adde45528136c3221eb69acdd7"
+  },
+  "to": {
+    "version": "1.2.0",
+    "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff"
+  },
+  "rule": "Every upstream file under packages/durable and packages/chord that changed, appeared or disappeared between the pins is in exactly one area's upstream list or one excluded entry (a file several areas edit belongs to the last of them in order, and earlier areas list its C# file under pisharp); a port map row moves from needs-sync or planned to ported only when its area lands with its tests passing.",
+  "sizeScale": {
+    "S": "under 300 upstream changed lines (added/removed files count their full length); a day or less of C#",
+    "M": "300 to 1500 lines; a few days",
+    "L": "1500 to 4000 lines; about one to two weeks, may need several landings",
+    "XL": "over 4000 lines, or less with a new runtime capability to build in C#; several landings"
+  },
+  "areas": [
+    {
+      "id": "a",
+      "title": "Tool task v2: nested calls, structured output, callers, modelTools and deferred tools",
+      "summary": "pi.tool becomes version 2: ToolTaskInput and ToolTaskResult are tagged unions of model-issued and nested calls, and version 1 tasks migrate. A running tool can call another tool through ToolExecutionApi.executeTool(); the nested call is its own pi.tool task owned by the caller, its result goes to the caller's task-scoped NestedCallDoc instead of the transcript, it shows in pi.live.nestedTools and in tool events (parentToolCallId, parentTaskId, taskId). ToolExecutionResult.content becomes output, tools can declare structuredOutputSchema and return a validated structuredOutput, ToolRegistration gains callers and deferred, and AgentState gains modelTools so Agent exposes tools, callable and deferred. bash and powershell return an error result with an exit_code diagnostic for a nonzero exit instead of throwing.",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "ToolTaskInput/ToolTaskResult are now kind-tagged unions (model or nested); pi.tool v2 migrates live v1 tasks"
+        },
+        {
+          "package": "durable",
+          "item": "ToolExecutionResult.content renamed to output; new structuredOutput channel"
+        },
+        {
+          "package": "durable",
+          "item": "bash/powershell report a nonzero exit as an error result with an exit_code diagnostic, not a throw"
+        },
+        {
+          "package": "durable",
+          "item": "executeTool() runs a nested tool call as an owned pi.tool task; results live in NestedCallDoc, keyed for replay; shown in pi.live.nestedTools and tool events"
+        },
+        {
+          "package": "durable",
+          "item": "structuredOutputSchema/structuredOutput validated by the Harness; api.retainedOutput(); bash/powershell structured output { output, truncated, fullOutputPath?, exitCode }"
+        },
+        {
+          "package": "durable",
+          "item": "ToolRegistration.callers and AgentState.modelTools decide who may call a tool and what the model is offered; Agent.callable lists nested-call targets"
+        },
+        {
+          "package": "durable",
+          "item": "ToolRegistration.deferred hides a tool until modelTools.add loads it (control.addTools appends); Agent.deferred lists the unloaded ones"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/harness/tool.ts",
+          "change": "modified",
+          "lines": 538
+        },
+        {
+          "path": "packages/durable/src/harness/types.ts",
+          "change": "modified",
+          "lines": 159
+        },
+        {
+          "path": "packages/durable/src/harness/events.ts",
+          "change": "modified",
+          "lines": 155
+        },
+        {
+          "path": "packages/durable/src/harness/live.ts",
+          "change": "modified",
+          "lines": 141
+        },
+        {
+          "path": "packages/durable/src/harness/agent.ts",
+          "change": "modified",
+          "lines": 90
+        },
+        {
+          "path": "packages/durable/src/harness/generation.ts",
+          "change": "modified",
+          "lines": 50
+        },
+        {
+          "path": "packages/durable/src/index.ts",
+          "change": "modified",
+          "lines": 26
+        },
+        {
+          "path": "packages/durable/src/tools/bash.ts",
+          "change": "modified",
+          "lines": 40
+        },
+        {
+          "path": "packages/durable/src/tools/edit.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/src/tools/write.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/harness-nested-tools.test.ts",
+          "change": "added",
+          "lines": 1343
+        },
+        {
+          "path": "packages/durable/test/harness-nested-tools-restart.test.ts",
+          "change": "added",
+          "lines": 729
+        },
+        {
+          "path": "packages/durable/test/harness-structured-output.test.ts",
+          "change": "added",
+          "lines": 407
+        },
+        {
+          "path": "packages/durable/test/harness-callers.test.ts",
+          "change": "added",
+          "lines": 144
+        },
+        {
+          "path": "packages/durable/test/harness-tools.test.ts",
+          "change": "modified",
+          "lines": 77
+        },
+        {
+          "path": "packages/durable/test/harness-tools-recovery.test.ts",
+          "change": "modified",
+          "lines": 6
+        },
+        {
+          "path": "packages/durable/test/harness-live-deltas.test.ts",
+          "change": "modified",
+          "lines": 6
+        },
+        {
+          "path": "packages/durable/test/harness-events.test.ts",
+          "change": "modified",
+          "lines": 8
+        },
+        {
+          "path": "packages/durable/test/harness-prompt.test.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/harness-registry.test.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/harness-support.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/spec-usage.test.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/nested-tools-bench.ts",
+          "change": "added",
+          "lines": 253
+        },
+        {
+          "path": "packages/durable/test/nested-images-bench.ts",
+          "change": "added",
+          "lines": 304
+        },
+        {
+          "path": "packages/durable/test/scheduler-fanout-bench.ts",
+          "change": "added",
+          "lines": 74
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable/Harness/Tool.cs",
+        "src/PiSharp.Durable/Harness/Types.cs",
+        "src/PiSharp.Durable/Harness/Events.cs",
+        "src/PiSharp.Durable/Harness/Live.cs",
+        "src/PiSharp.Durable/Harness/Agent.cs",
+        "src/PiSharp.Durable/Harness/Generation.cs",
+        "src/PiSharp.Durable/Harness/Define.cs",
+        "src/PiSharp.Durable/Harness/Output.cs",
+        "src/PiSharp.Durable/Harness/Prompt.cs",
+        "src/PiSharp.Durable/Harness/Registry.cs",
+        "src/PiSharp.Durable/Internal/PiAi/Validation.cs",
+        "src/PiSharp.Durable/DurableUpstream.cs",
+        "src/PiSharp.Durable.Tools/Tools/Bash.cs",
+        "src/PiSharp.Durable.Tools/Tools/Edit.cs",
+        "src/PiSharp.Durable.Tools/Tools/Write.cs"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/HarnessNestedToolsCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/HarnessNestedToolsRestartCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/HarnessStructuredOutputCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/HarnessCallersCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessToolsCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessToolsRecoveryCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessToolsDifferentialCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessLiveDeltasCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessEventsCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessPromptCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessRegistryCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessSupport.cs",
+        "tests/PiSharp.Durable.Tests/SpecUsageCases.cs",
+        "tests/PiSharp.Durable.Tests/TypesHarnessCases.cs",
+        "tests/PiSharp.Durable.Tests/Crash/CrashScenarios.cs (tool scenarios write v2 tool tasks)",
+        "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs (tool-interrupted, subagent: v1 tool tasks now migrate on open)",
+        "benchmarks/PiSharp.Durable.Benchmarks/NestedToolsBench.cs (new)",
+        "benchmarks/PiSharp.Durable.Benchmarks/NestedImagesBench.cs (new)",
+        "benchmarks/PiSharp.Durable.Benchmarks/SchedulerFanoutBench.cs (new)"
+      ],
+      "upstreamLines": 4562,
+      "size": "XL",
+      "dependsOn": [
+        "b",
+        "c",
+        "i",
+        "j"
+      ],
+      "notes": "The core of the sync and the largest area; split it into landings if needed (v2 union + migration + content->output rename first, then executeTool/NestedCallDoc/nested slots and events, then structured output, then callers/modelTools/deferred), but the rows move to ported only at the end. The content->output rename touches every C# tool and almost every harness test file, and the pisharp durable CLI (area l) does not compile until it adapts, so land l right after a or adapt DurableSubagent.cs here. NestedCallDoc is a task-scoped document family (kind pi.tool.nested-call); Documents.cs already supports DocumentScopeKind.Task families. Nested slots in pi.live are found by binary search over ascending task IDs because each lookup costs a tracker node; keep that in the C# Draft API. A nested call aborted or left running when its caller settles is aborted through TaskRuntime.abortOwned/ownedTasks and gets abandonOnRestart for non-replay-safe callers, so area c must be in first. Structured output validation reuses the TypeBox-compatible validator in Internal/PiAi/Validation.cs. The record JSON changes (input.kind, result.kind, NestedCallDoc, nestedTools, ToolEventCall.taskId) must match upstream byte for byte for decision 0005 compatibility; the written compat captures for tool scenarios switch to the v1.2.0 corpus from area m here. harness/types.ts, events.ts, live.ts and generation.ts are also edited earlier by areas b, i and j; this area owns their rows because it lands last among them. nested-images-bench and scheduler-fanout-bench are here because they drive executeTool, not images or the scheduler alone."
+    },
+    {
+      "id": "b",
+      "title": "Storage failure, Session lifecycle and document cache retention",
+      "summary": "Any error a Storage method throws now fails the Session for good: it seals admission, runs close listeners, closes Storage itself, and every later call or pending wait rejects with SessionFailed (cause = the storage error). StorageRejected is removed; StorageRequestError marks an invalid read request that fails only that call. Session.closed settles with { reason: closed | failed }, WatchEnd gains session_failed, commit/close listeners that throw are reported through onReport instead of failing the operation, and onReport/now are made safe. The Session document cache becomes bounded: an unobserved document leaves memory after documentRetentionMs (default 10 minutes, 0 = right after use) and reloads from Storage.",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "A throwing Storage method fails and closes the Session; later calls reject with SessionFailed; nothing retries"
+        },
+        {
+          "package": "durable",
+          "item": "StorageRejected removed; StorageRequestError fails only the invalid read"
+        },
+        {
+          "package": "durable",
+          "item": "Session.closed promise and WatchEnd reason session_failed"
+        },
+        {
+          "package": "durable",
+          "item": "Throwing subscribeCommits/subscribeClose listeners are reported via onReport, not propagated"
+        },
+        {
+          "package": "durable",
+          "item": "onReport and now() made safe; watch listener errors are reported and end the watch"
+        },
+        {
+          "package": "durable",
+          "item": "A failed fault write no longer reruns the task in the same process"
+        },
+        {
+          "package": "durable",
+          "item": "Session document cache evicts unobserved documents after documentRetentionMs (HarnessSettings and createSession option)"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/errors.ts",
+          "change": "modified",
+          "lines": 39
+        },
+        {
+          "path": "packages/durable/src/session/session.ts",
+          "change": "modified",
+          "lines": 604
+        },
+        {
+          "path": "packages/durable/src/session/observation.ts",
+          "change": "modified",
+          "lines": 61
+        },
+        {
+          "path": "packages/durable/src/storage/memory.ts",
+          "change": "modified",
+          "lines": 18
+        },
+        {
+          "path": "packages/durable/src/storage/jsonl/storage.ts",
+          "change": "modified",
+          "lines": 3
+        },
+        {
+          "path": "packages/durable/src/storage/sqlite/storage.ts",
+          "change": "modified",
+          "lines": 22
+        },
+        {
+          "path": "packages/durable/src/storage/scan.ts",
+          "change": "modified",
+          "lines": 10
+        },
+        {
+          "path": "packages/durable/src/testing/storage-conformance.ts",
+          "change": "modified",
+          "lines": 5
+        },
+        {
+          "path": "packages/durable/src/harness/view.ts",
+          "change": "modified",
+          "lines": 47
+        },
+        {
+          "path": "packages/durable/src/harness/task-graph.ts",
+          "change": "modified",
+          "lines": 34
+        },
+        {
+          "path": "packages/durable/src/harness/util.ts",
+          "change": "modified",
+          "lines": 7
+        },
+        {
+          "path": "packages/durable/test/harness-storage-failure.test.ts",
+          "change": "added",
+          "lines": 649
+        },
+        {
+          "path": "packages/durable/test/session-document-retention.test.ts",
+          "change": "added",
+          "lines": 593
+        },
+        {
+          "path": "packages/durable/test/setup-document-retention.ts",
+          "change": "added",
+          "lines": 7
+        },
+        {
+          "path": "packages/durable/test/session-documents.test.ts",
+          "change": "modified",
+          "lines": 6
+        },
+        {
+          "path": "packages/durable/test/session-forks.test.ts",
+          "change": "modified",
+          "lines": 17
+        },
+        {
+          "path": "packages/durable/test/session-support.ts",
+          "change": "modified",
+          "lines": 9
+        },
+        {
+          "path": "packages/durable/test/sqlite-facade.test.ts",
+          "change": "modified",
+          "lines": 5
+        },
+        {
+          "path": "packages/durable/test/harness-lifecycle.test.ts",
+          "change": "modified",
+          "lines": 7
+        },
+        {
+          "path": "packages/durable/test/harness-conversations.test.ts",
+          "change": "modified",
+          "lines": 6
+        },
+        {
+          "path": "packages/durable/test/harness-generation.test.ts",
+          "change": "modified",
+          "lines": 1
+        },
+        {
+          "path": "packages/durable/test/harness-tasks.test.ts",
+          "change": "modified",
+          "lines": 80
+        },
+        {
+          "path": "packages/durable/test/session-document-cache-bench.ts",
+          "change": "added",
+          "lines": 105
+        },
+        {
+          "path": "packages/durable/test/heap-retained.ts",
+          "change": "added",
+          "lines": 26
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable/Errors.cs",
+        "src/PiSharp.Durable/Session/Session.cs",
+        "src/PiSharp.Durable/Session/Observation.cs",
+        "src/PiSharp.Durable/Storage/Memory.cs",
+        "src/PiSharp.Durable/Storage/Jsonl/JsonlStorage.cs",
+        "src/PiSharp.Durable/Storage/Scan.cs",
+        "src/PiSharp.Durable.Sqlite/Storage.cs",
+        "src/PiSharp.Durable/Testing/StorageConformance.cs",
+        "src/PiSharp.Durable/Harness/View.cs",
+        "src/PiSharp.Durable/Harness/TaskGraph.cs",
+        "src/PiSharp.Durable/Harness/Util.cs",
+        "src/PiSharp.Durable/Harness/Harness.cs (storage guard, safeReport/safeNow, documentRetentionMs; row owned by c)",
+        "src/PiSharp.Durable/Harness/Scheduler.cs (a failed scheduler commit fails the Session; row owned by c)",
+        "src/PiSharp.Durable/TypesSession.cs, TypesStorage.cs, Types.cs (Session.Closed, SessionEnd, WatchEnd session_failed; types.ts row owned by c)",
+        "src/PiSharp.Durable/Harness/Types.cs (HarnessSettings.DocumentRetentionMs, OnReport contract; row owned by a)",
+        "src/PiSharp.Durable/Harness/Events.cs (CommittedWatch reports listener errors; row owned by a)",
+        "src/PiSharp.Durable/Harness/Submissions.cs (observeCommits, closedError(session); row owned by i)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/HarnessStorageFailureCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/SessionDocumentRetentionCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/Program.cs (second pass with retention 0, as upstream setup-document-retention.ts / PI_DURABLE_DOCUMENT_RETENTION_MS)",
+        "tests/PiSharp.Durable.Tests/Session/SessionDocumentsCases.cs",
+        "tests/PiSharp.Durable.Tests/Session/SessionForksCases.cs",
+        "tests/PiSharp.Durable.Tests/Session/SessionSupport.cs",
+        "tests/PiSharp.Durable.Tests/Storage/SqliteFacadeCases.cs",
+        "tests/PiSharp.Durable.Tests/Storage/MemoryStorageCases.cs, JsonlStorageCases.cs, SqliteStorageCases.cs (conformance: StorageRejected checks become plain errors)",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessLifecycleCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessConversationsCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessTasksCases.cs",
+        "tests/PiSharp.Durable.Tests/Crash/CrashCases.cs (reopen after a failed Session)",
+        "benchmarks/PiSharp.Durable.Benchmarks/SessionDocumentCacheBench.cs (new)",
+        "benchmarks/PiSharp.Durable.Benchmarks/HeapRetained.cs (new helper)"
+      ],
+      "upstreamLines": 2361,
+      "size": "L",
+      "dependsOn": [
+        "f"
+      ],
+      "notes": "Removing StorageRejected and the retry paths changes recovery semantics that crash tests and the SQLite facade rely on: a failed commit is now final and the process reopens the Session. Every Storage call goes through one guard in SessionImpl (upstream SessionImpl.storage); in C# wrap the IStorage the Harness receives, and treat OperationCanceledException from the caller's token like upstream treats a context abort (fails only that read). Retention needs a timer that does not keep the process alive and a line job for retention 0; upstream runs its whole suite a second time with retention 0, so add an equivalent pass (env var or test-runner flag) to tests/PiSharp.Durable.Tests rather than only the new retention cases. Chord replicatedState gains an onError option in area f that the view, task-graph and document-state observers use here. Harness.cs, Scheduler.cs, types.ts, harness/types.ts, events.ts and submissions.ts get their b-parts here but their rows belong to the areas that finish them (c, a, i). heap-retained.ts is a bench helper (the port map points it at benchmarks/PiSharp.Durable.Benchmarks/HeapRetained.cs)."
+    },
+    {
+      "id": "c",
+      "title": "Scheduler: ownership indexes, abandonOnRestart, abortOwned/ownedTasks, wait cycles",
+      "summary": "The scheduler stops visiting every live task per pass: an in-memory ownership index drives abort cascades (only from tasks with cancellation intent), owned-live and idle-scope walks, with separate candidate sets for reservation, finalization and failFast, and the index is bounded by live work (it forgets ended chains and reloads them from storage). TaskOptions.abandonOnRestart marks tasks whose creator awaits them only in memory; a later Harness abort-marks them with abortReason restart, cascading, before they run again. TaskRuntime gains abortOwned and ownedTasks. commit() rejects a wait that would close any wait-for cycle, and no task below an owner with cancellation intent starts a run phase.",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "TaskOptions.abandonOnRestart with abortReason restart, cascading at the next Harness start"
+        },
+        {
+          "package": "durable",
+          "item": "TaskRuntime.abortOwned(id) and TaskRuntime.ownedTasks()"
+        },
+        {
+          "package": "durable",
+          "item": "No run phase starts below an owner with cancellation intent"
+        },
+        {
+          "package": "durable",
+          "item": "Waits closing a cycle through waits and held owners are rejected with the cycle named (#10411)"
+        },
+        {
+          "package": "durable",
+          "item": "Scheduler walks an ownership index instead of all live tasks; large fan-outs and long chains settle much faster"
+        },
+        {
+          "package": "durable",
+          "item": "Ownership indexes bounded by live work; queued input no longer scans all queued submissions"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/harness/scheduler.ts",
+          "change": "modified",
+          "lines": 808
+        },
+        {
+          "path": "packages/durable/src/types.ts",
+          "change": "modified",
+          "lines": 59
+        },
+        {
+          "path": "packages/durable/src/session/transaction.ts",
+          "change": "modified",
+          "lines": 1
+        },
+        {
+          "path": "packages/durable/src/harness/harness.ts",
+          "change": "modified",
+          "lines": 83
+        },
+        {
+          "path": "packages/durable/test/harness-ownership.test.ts",
+          "change": "modified",
+          "lines": 469
+        },
+        {
+          "path": "packages/durable/test/harness-structured.test.ts",
+          "change": "modified",
+          "lines": 268
+        },
+        {
+          "path": "packages/durable/test/harness-scheduler-indexes.test.ts",
+          "change": "added",
+          "lines": 259
+        },
+        {
+          "path": "packages/durable/test/harness-scheduler-retention.test.ts",
+          "change": "added",
+          "lines": 583
+        },
+        {
+          "path": "packages/durable/test/harness-cancellation-barrier.test.ts",
+          "change": "added",
+          "lines": 223
+        },
+        {
+          "path": "packages/durable/test/scheduler-memory-bench.ts",
+          "change": "added",
+          "lines": 130
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable/Harness/Scheduler.cs",
+        "src/PiSharp.Durable/Types.cs",
+        "src/PiSharp.Durable/TypesTasks.cs",
+        "src/PiSharp.Durable/Tasks.cs",
+        "src/PiSharp.Durable/Session/Transaction.cs",
+        "src/PiSharp.Durable/Harness/Harness.cs",
+        "src/PiSharp.Durable/Internal/RecordJson.cs (abortReason, abandonOnRestart on task records)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessOwnershipSupport.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessStructuredCases.cs",
+        "tests/PiSharp.Durable.Tests/HarnessSchedulerIndexesCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/HarnessSchedulerRetentionCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/HarnessCancellationBarrierCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessTaskGraphCases.cs, HarnessTasksRecoveryCases.cs (regressions)",
+        "benchmarks/PiSharp.Durable.Benchmarks/SchedulerMemoryBench.cs (new)"
+      ],
+      "upstreamLines": 2883,
+      "size": "L",
+      "dependsOn": [
+        "b"
+      ],
+      "notes": "scheduler.ts is a rewrite (663+/145-); port it as a whole against the v1.2.0 text instead of patching the C# line by line, keeping the C# concurrency model (the Scheduler.cs header documents its threading). The index-size test hook (SCHEDULER_INDEX_SIZES symbol) needs an internal C# accessor (InternalsVisibleTo the test project). Wait-cycle detection reads owner chains from storage for unloaded nodes, so it is async inside commit(). abandonOnRestart and abortReason are new optional task-record fields; RecordJson must write them only when set to keep records byte-equal to upstream. harness.ts and src/types.ts carry area b changes as well; this area owns their rows because it lands after b. scheduler-fanout-bench is in area a because it needs executeTool."
+    },
+    {
+      "id": "d",
+      "title": "Durable code mode",
+      "summary": "New @earendil-works/pi-durable/codemode: a replay-safe codemode tool (createCodemodeExtension({ sandbox })) whose scripts call the conversation's tools as nested calls and survive a restart by replaying the script deterministically from a journal (pi.codemode.run, pi.codemode.journal, pi.codemode.store documents), reattaching to nested calls by key. It adds a codemode prompt section with namespaces and an inline token budget, searchTools/describeTool/describeNamespace, output layout with truncation and spill files, models.* (catalog, classify, generateImages as internal nested tools, at most four at once) and the Lark grammar for constrained sampling. Divergence, a changed sandbox fingerprint or module version, or a passed deadline ends the call with an error.",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "New codemode tool and extension: scripts call tools as nested calls and replay deterministically after a restart"
+        },
+        {
+          "package": "durable",
+          "item": "codemode prompt section, script-side tool search/describe, result layout with spill and saved images, per-conversation store()/load()"
+        },
+        {
+          "package": "durable",
+          "item": "models.* in scripts (catalog, classify, generateImages) run as internal nested tools"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/codemode/codemode.ts",
+          "change": "added",
+          "lines": 1037
+        },
+        {
+          "path": "packages/durable/src/codemode/describe.ts",
+          "change": "added",
+          "lines": 157
+        },
+        {
+          "path": "packages/durable/src/codemode/index.ts",
+          "change": "added",
+          "lines": 13
+        },
+        {
+          "path": "packages/durable/src/codemode/models.ts",
+          "change": "added",
+          "lines": 285
+        },
+        {
+          "path": "packages/durable/src/codemode/output.ts",
+          "change": "added",
+          "lines": 206
+        },
+        {
+          "path": "packages/durable/test/codemode.test.ts",
+          "change": "added",
+          "lines": 1073
+        },
+        {
+          "path": "packages/durable/test/codemode-describe.test.ts",
+          "change": "added",
+          "lines": 99
+        },
+        {
+          "path": "packages/durable/test/codemode-models.test.ts",
+          "change": "added",
+          "lines": 271
+        },
+        {
+          "path": "packages/durable/test/codemode-bench.ts",
+          "change": "added",
+          "lines": 93
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable.Tools/Codemode/Codemode.cs (new)",
+        "src/PiSharp.Durable.Tools/Codemode/Describe.cs (new)",
+        "src/PiSharp.Durable.Tools/Codemode/Models.cs (new)",
+        "src/PiSharp.Durable.Tools/Codemode/Output.cs (new)",
+        "src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj (ProjectReference to PiSharp.Codemode)",
+        "src/PiSharp.Codemode/Runtime/CodemodeSandbox.cs, CodemodeEngineRunner.cs, CodemodeWorkerProtocol.cs, codemode-prelude.js (deterministic Start(): additive main-line seam)",
+        "src/PiSharp.Codemode/CodemodeTypes.cs (CodemodeRun, CodemodeHostCall, run options: startedAt, seed, onStarted, onCall, onIdle, deliver, finished)",
+        "src/PiSharp.Durable/Harness/Models.cs, src/PiSharp.Durable/Models/NativeDurableModels.cs, src/PiSharp.Cli/Durable/DurableModels.cs (catalog, classify and image generation for models.*)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/CodemodeCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/CodemodeDescribeCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/CodemodeModelsCases.cs (new)",
+        "benchmarks/PiSharp.Durable.Benchmarks/CodemodeBench.cs (new)",
+        "tests/PiSharp.Codemode.Tests: deterministic Start() cases ported from packages/codemode/test/deterministic.test.ts (outside this diff)"
+      ],
+      "upstreamLines": 3234,
+      "size": "XL",
+      "dependsOn": [
+        "a",
+        "k"
+      ],
+      "notes": "Sized XL although the line count says L, because the deterministic Jint runner is new C# with no upstream file in this diff. Biggest risk of the sync. Durable code mode needs pi-codemode 1.2.0's deterministic sandbox.start() (virtual clock from startedAt, Math.random from seed, UTC, no WeakRef/FinalizationRegistry, results applied in host-numbered order, onStarted fingerprint, onIdle with issued-call counts, run.deliver(), run.finished). The main-line sync (decision 0006, applicability entry codemode.new-sandboxes) EXCLUDED sandbox.start() because PiSharp runs code mode on Jint, so PiSharp.Codemode has no deterministic mode today; it has to be added to the Jint runner as an additive seam, flagged for upstreaming to main per decision 0005, with packages/codemode/test/deterministic.test.ts ported as its test. The replay guarantee depends on Jint being deterministic for the same inputs (property order, Date, Math.random, promise job order); the fingerprint must change whenever the Jint engine or prelude changes. PiSharp.Durable.Tools gains a dependency on PiSharp.Codemode (and Jint) that decision 0005 section 4 does not list; record it. models.* needs model catalog, classifier and image-generation calls that IDurableModels does not expose; bridge to PiSharp.AI ModelOperations (ClassifierShared, OpenRouterImages) or leave models.* unsupported with a recorded difference. Search.cs (rankDocuments) comes from area k. The codemode section must leave deferred tools out (area a semantics)."
+    },
+    {
+      "id": "e",
+      "title": "Images: read returns images, image processor",
+      "summary": "read returns PNG, JPEG, GIF and WebP files within the model's image limits (default 2000x2000 px, 4.5 MB of base64) as one image block instead of an unsupported_image error; with createCodingTools({ images }) an ImageProcessor orients, converts and shrinks them to fit, and a model without image input gets a diagnostic about the placeholder it sees. The new images entry point provides a Photon (WebAssembly) processor with EXIF orientation, plus a Node loader that prepares images in a worker thread that exits after 30 s idle. tools/image.ts gains streaming MIME detection and header dimension parsing.",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "read returns images as an image block within ImageLimits; createCodingTools({ images }) prepares them with an ImageProcessor"
+        },
+        {
+          "package": "durable",
+          "item": "New images entry point: Photon processor with EXIF orientation; Node loader runs it in a worker thread"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/tools/read.ts",
+          "change": "modified",
+          "lines": 158
+        },
+        {
+          "path": "packages/durable/src/tools/image.ts",
+          "change": "modified",
+          "lines": 50
+        },
+        {
+          "path": "packages/durable/src/tools/image-processor.ts",
+          "change": "added",
+          "lines": 69
+        },
+        {
+          "path": "packages/durable/src/tools/index.ts",
+          "change": "modified",
+          "lines": 28
+        },
+        {
+          "path": "packages/durable/src/images/index.ts",
+          "change": "added",
+          "lines": 140
+        },
+        {
+          "path": "packages/durable/src/images/exif.ts",
+          "change": "added",
+          "lines": 70
+        },
+        {
+          "path": "packages/durable/src/images/node.ts",
+          "change": "added",
+          "lines": 130
+        },
+        {
+          "path": "packages/durable/src/images/node-worker.ts",
+          "change": "added",
+          "lines": 35
+        },
+        {
+          "path": "packages/durable/test/tools-images.test.ts",
+          "change": "added",
+          "lines": 550
+        },
+        {
+          "path": "packages/durable/test/images-wasm-module.test.ts",
+          "change": "added",
+          "lines": 17
+        },
+        {
+          "path": "packages/durable/test/tools-read-differential.test.ts",
+          "change": "modified",
+          "lines": 14
+        },
+        {
+          "path": "packages/durable/test/tools.test.ts",
+          "change": "modified",
+          "lines": 75
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable.Tools/Tools/Read.cs",
+        "src/PiSharp.Durable.Tools/Tools/Image.cs",
+        "src/PiSharp.Durable.Tools/Tools/ImageProcessor.cs (new)",
+        "src/PiSharp.Durable.Tools/Tools/Tools.cs (CreateCodingTools(images), DefaultImageLimits)",
+        "src/PiSharp.Durable.Tools/Images/Images.cs (new)",
+        "src/PiSharp.Durable.Tools/Images/Exif.cs (new)",
+        "src/PiSharp.Durable.Tools/Images/Node.cs (new)",
+        "src/PiSharp.Durable.Tools/Images/NodeWorker.cs (new)",
+        "src/PiSharp.Cli/Durable/DurableHarnessSetup.cs (pisharp durable installs CreateCodingTools with the image processor)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/ToolsImagesCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/ImagesWasmModuleCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/ToolsReadDifferentialCases.cs",
+        "tests/PiSharp.Durable.Tests/ToolsCases.cs",
+        "tests/PiSharp.Durable.Tests/ToolsNodeCases.cs",
+        "tests/PiSharp.DurableCli.Tests/SetupCases.cs (coding tools with images)"
+      ],
+      "upstreamLines": 1336,
+      "size": "M",
+      "dependsOn": [
+        "a"
+      ],
+      "notes": "Do not port Photon WebAssembly: PiSharp.Tools/Images already holds main's Photon-equivalent pipeline (RasterImage \"the pixel model Photon's PhotonImage uses\", ExifOrientation.cs, ImageProcessing.cs, optional PiSharp.Tools.Skia codec), and PiSharp.Durable.Tools already references PiSharp.Tools; implement ImageProcessor over it and check its output against upstream's Photon results (resize filter, JPEG quality steps). Images/Node.cs and NodeWorker.cs (worker thread, 30 s idle exit) map to a processor that runs on the thread pool or a dedicated worker with the same idle exit; images-wasm-module.test.ts checks lazy loading of the module and maps to a check that nothing loads the processor unless asked. read resolves the conversation model through api.agent() and api.models.getModel() and reads pi-ai 1.2.0's model.inputLimits.images.resize; neither DurableModel nor PiSharp.AI has an InputLimits field today, so add it to DurableModel (and the catalog mapping in src/PiSharp.Durable/Models) or fall back to DEFAULT_IMAGE_LIMITS with a recorded difference. tools.test.ts also carries area a's bash/powershell nonzero-exit cases; it lands here because e follows a."
+    },
+    {
+      "id": "f",
+      "title": "Chord subset: replicated state move, delta append performance, json/context/types split",
+      "summary": "Chord 1.2.0 moved replicatedState from services/state.ts to state.ts, folded the state-internals registration into the class (no WeakMap), dropped the source-listener path and the ops argument of publish, and added a ReplicatedStateSourceOptions.onError report hook. JsonValue/JsonRepresentation now live in json.ts, Context/ContextKey in context/index.ts, and Draft is exported from delta; types.ts keeps only host-runtime types. The delta tracker plans order-preserving inserts and removals from the changed ranges alone, and applyImmutable builds an appended array with one copy, so array appends no longer walk the whole array.",
+      "changelog": [
+        {
+          "package": "chord",
+          "item": "replicatedState, copyJson, isJsonValue, Context, JsonValue, JsonRepresentation and Draft keep their names; ./context also exports Context and ContextKey"
+        },
+        {
+          "package": "chord",
+          "item": "Delta tracker plans order-preserving array edits from changed ranges; applyImmutable appends with one copy (32k appends 11.3 s -> 1.4 s)"
+        },
+        {
+          "package": "durable",
+          "item": "Document array appends no longer cost a walk over the array per commit (bench:document-append)"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/chord/src/state.ts",
+          "change": "renamed",
+          "lines": 278,
+          "renamedFrom": "packages/chord/src/services/state.ts"
+        },
+        {
+          "path": "packages/chord/src/services/state-internals.ts",
+          "change": "removed",
+          "lines": 19
+        },
+        {
+          "path": "packages/chord/src/types.ts",
+          "change": "modified",
+          "lines": 374
+        },
+        {
+          "path": "packages/chord/src/json.ts",
+          "change": "modified",
+          "lines": 17
+        },
+        {
+          "path": "packages/chord/src/context/index.ts",
+          "change": "modified",
+          "lines": 14
+        },
+        {
+          "path": "packages/chord/src/delta/index.ts",
+          "change": "modified",
+          "lines": 43
+        },
+        {
+          "path": "packages/chord/src/delta/tracker.ts",
+          "change": "modified",
+          "lines": 44
+        },
+        {
+          "path": "packages/chord/src/delta/diff.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/chord/src/delta/apply-immutable-trusted.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/chord/src/delta/revision-validator.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/chord/test/replicated-state.test.ts",
+          "change": "added",
+          "lines": 351
+        },
+        {
+          "path": "packages/chord/test/replicated-state-delivery.test.ts",
+          "change": "renamed",
+          "lines": 94,
+          "renamedFrom": "packages/chord/test/state-delivery.test.ts"
+        },
+        {
+          "path": "packages/chord/test/state-diff.test.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/chord/test/delta-apply-immutable.test.ts",
+          "change": "modified",
+          "lines": 39
+        },
+        {
+          "path": "packages/chord/test/delta-diff.test.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/chord/test/delta-tracker/tracker.test.ts",
+          "change": "modified",
+          "lines": 53
+        },
+        {
+          "path": "packages/durable/test/session-states.test.ts",
+          "change": "modified",
+          "lines": 13
+        },
+        {
+          "path": "packages/durable/test/document-append-bench.ts",
+          "change": "added",
+          "lines": 52
+        },
+        {
+          "path": "packages/durable/test/chord-guide.test.ts",
+          "change": "removed",
+          "lines": 394
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable/Chord/ReplicatedState.cs",
+        "src/PiSharp.Durable/Chord/ReplicatedStateInternals.cs (retire or keep as an internal seam)",
+        "src/PiSharp.Durable/Chord/ReplicatedStateTypes.cs",
+        "src/PiSharp.Durable/Chord/JsonValue.cs",
+        "src/PiSharp.Durable/Chord/DurableContext.cs",
+        "src/PiSharp.Durable/Chord/Delta/Ops.cs",
+        "src/PiSharp.Durable/Chord/Delta/Apply.cs (append fast path of applyImmutable)",
+        "src/PiSharp.Durable/Chord/Delta/Tracker.cs",
+        "src/PiSharp.Durable/Chord/Delta/Draft.cs",
+        "src/PiSharp.Durable/Chord/Delta/Diff.cs",
+        "src/PiSharp.Durable/Chord/Delta/ApplyImmutableTrusted.cs",
+        "src/PiSharp.Durable/Chord/Delta/RevisionValidator.cs",
+        "src/PiSharp.Durable/Session/Session.cs (document states publish without ops; row owned by b)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/Chord/StateCases.cs (re-source from replicated-state.test.ts and replicated-state-delivery.test.ts)",
+        "tests/PiSharp.Durable.Tests/Chord/TrackerCases.cs",
+        "tests/PiSharp.Durable.Tests/Chord/DeltaCases.cs",
+        "tests/PiSharp.Durable.Tests/Chord/DiffCases.cs",
+        "tests/PiSharp.Durable.Tests/Chord/FuzzCases.cs",
+        "tests/PiSharp.Durable.Tests/Compat/CompatOpsCases.cs (ops corpus still replays)",
+        "tests/PiSharp.Durable.Tests/Session/SessionStatesCases.cs",
+        "tests/PiSharp.Durable.Tests/Session/ChordGuideCases.cs (retire)",
+        "benchmarks/PiSharp.Durable.Benchmarks/DocumentAppendBench.cs (new)"
+      ],
+      "upstreamLines": 1795,
+      "size": "M",
+      "dependsOn": [],
+      "notes": "Foundation; land first. Most of chord/src/types.ts (374 changed lines) and chord-guide.test.ts (394) are deletions of facet/service/wire material PiSharp never ported, so the C# effort is M although the line count says L. The upstream state.test.ts now tests host-runtime cells (excluded); the old transactional replicated-state cases moved to replicated-state.test.ts, so StateCases.cs re-cites that file. PiSharp replaced the Proxy tracker with an explicit copy-on-write Draft API (decision 0005 note on the tracker row); port the ordered-array plan (orderedArrayPlan vs elementArrayPlan) into that design and the appendCopy fast path into applyImmutable, and confirm the produced ops are unchanged (CompatOpsCases replays upstream's corpus). chord-guide.test.ts was deleted with the old Chord guide; ChordGuideCases.cs (status removed-upstream) should be retired here unless the owner wants it kept as PiSharp-authored coverage, in which case the row becomes pisharp-only. The services/state-internals.ts row (removed-upstream) retires ReplicatedStateInternals.cs or records it as an internal C# seam with successor state.ts."
+    },
+    {
+      "id": "g",
+      "title": "Execution environment listFiles",
+      "summary": "FileSystem gains an optional listFiles(path, options, context) for bounded, gitignore-aware tree listings (ListFilesOptions: hidden, gitignore, exclude, maxEntries, maxBytes, timeoutMs; FileListing with depth-first entries and truncated). The env conformance kit gains a listFiles option that checks it. Upstream implements it only in pi-env, not in durable's Node environment.",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "Optional ExecutionEnv listFiles with ListFilesOptions, FileListing and FileListEntry; registerEnvConformance gets a listFiles switch"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/env/index.ts",
+          "change": "modified",
+          "lines": 49
+        },
+        {
+          "path": "packages/durable/src/testing/env-conformance.ts",
+          "change": "modified",
+          "lines": 122
+        },
+        {
+          "path": "packages/durable/src/testing/runner.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/src/testing/types.ts",
+          "change": "modified",
+          "lines": 2
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable/Env/Env.cs",
+        "src/PiSharp.Durable/Env/FileSystem.cs (optional ListFilesAsync)",
+        "src/PiSharp.Durable/Testing/EnvConformance.cs",
+        "src/PiSharp.Durable/Testing/Runner.cs",
+        "src/PiSharp.Durable/Testing/Types.cs"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/EnvNodeConformanceCases.cs (listFiles off for the local env, as upstream's node env)"
+      ],
+      "upstreamLines": 175,
+      "size": "S",
+      "dependsOn": [],
+      "notes": "Independent and small. Model the optional method as a nullable capability or a default interface member that reports unsupported, mirroring the optional TypeScript member. Upstream's only implementation is in packages/env (pi-env, excluded by decision 0005), so PiSharp's LocalFileSystem need not implement it; if it does later, it needs gitignore semantics (work tree .gitignore files, info/exclude, global excludes) that PiSharp.Tools find/grep may already provide, and the conformance then runs with listFiles: true."
+    },
+    {
+      "id": "h",
+      "title": "Examples and closing bookkeeping",
+      "summary": "The seven changed examples only follow the content -> output rename. This area also closes the sync: every needs-sync/planned row is ported, decision 0005 and docs/durable-benchmarks.md describe v1.2.0, and the port map counts are updated.",
+      "changelog": [],
+      "upstream": [
+        {
+          "path": "packages/durable/test/examples/06-harness.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/examples/07-configuration.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/examples/10-registry-reload.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/examples/11-extension-state.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/examples/22-subagent-foreground.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/examples/27-plan-mode.ts",
+          "change": "modified",
+          "lines": 2
+        },
+        {
+          "path": "packages/durable/test/examples/31-reload-and-restart.ts",
+          "change": "modified",
+          "lines": 2
+        }
+      ],
+      "pisharp": [
+        "samples/Durable.Examples/ExamplesHarness.cs",
+        "samples/Durable.Examples/ExamplesSubagent.cs",
+        "samples/Durable.Examples/ExamplesAgents.cs",
+        "samples/Durable.Examples/ExamplesReload.cs",
+        "docs/decisions/0005-pi-durable-experimental.md",
+        "docs/durable-benchmarks.md",
+        "compatibility/durable-port-map.json",
+        "tools/DurablePortMap/build-port-map.mjs"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/ExamplesCases.cs",
+        "tests/PiSharp.Durable.Tests/BenchmarksCases.cs"
+      ],
+      "upstreamLines": 14,
+      "size": "S",
+      "dependsOn": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "i",
+        "j",
+        "k",
+        "l",
+        "m"
+      ],
+      "notes": "The example edits are trivial, but samples/Durable.Examples will not compile after area a renames ToolExecutionResult.Content, so a can fold them in; the rows still move here. Decision 0005 needs: the new baseline (1.2.0, 06a46693); the pi-durable dependencies added (PiSharp.Codemode/Jint for code mode, no Photon); the upstream durable coding agent being gone (section 1 and 7, and section 6 which says either tool continues the other's sessions; see area l); the new test and benchmark counts. Benchmarks stay report-only."
+    },
+    {
+      "id": "i",
+      "title": "Input entries and display-only writes",
+      "summary": "Input submissions take entry: { kind, data } (InputEntry): the input is placed as an entry of that kind with the user message as its model content, instead of pi.user, and is otherwise a normal input; queued inputs carry it in their pi.inbox item and the kind must not start with pi. A display-only write (only kind and data, no model/head/edits) is appended and settled done at once even while the conversation is busy or has queued items, unless a queued reset would hide it.",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "Input submissions accept entry { kind, data } to place the input as an application entry (#10407)"
+        },
+        {
+          "package": "durable",
+          "item": "Display-only write submissions append and settle immediately instead of queueing in pi.inbox (#10407)"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/harness/inbox.ts",
+          "change": "modified",
+          "lines": 52
+        },
+        {
+          "path": "packages/durable/src/harness/submissions.ts",
+          "change": "modified",
+          "lines": 62
+        },
+        {
+          "path": "packages/durable/test/harness-input-entries.test.ts",
+          "change": "added",
+          "lines": 456
+        },
+        {
+          "path": "packages/durable/test/harness-inbox.test.ts",
+          "change": "modified",
+          "lines": 39
+        },
+        {
+          "path": "packages/durable/test/types.test.ts",
+          "change": "modified",
+          "lines": 6
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable/Harness/Inbox.cs",
+        "src/PiSharp.Durable/Harness/Submissions.cs",
+        "src/PiSharp.Durable/Entries.cs",
+        "src/PiSharp.Durable/Harness/Types.cs (InputEntry, SubmissionDraft input entry; row owned by a)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/HarnessInputEntriesCases.cs (new)",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessInboxCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessInboxDifferentialCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessSubmissionsCases.cs",
+        "tests/PiSharp.Durable.Tests/TypesCases.cs"
+      ],
+      "upstreamLines": 615,
+      "size": "M",
+      "dependsOn": [
+        "b"
+      ],
+      "notes": "Small and self-contained once b is in (Submissions.cs uses observeCommits and closedError(session) from b). types.test.ts is a TypeScript compile-time check (an input entry has no model); in C# it is a TypesCases check that the input entry type has no Model member or that a Model is rejected. The display-only fast path changes inbox record order versus v1.1.0, so the captured inbox fixture (Fixtures/inbox.upstream.json) must come from the v1.2.0 capture (area m)."
+    },
+    {
+      "id": "j",
+      "title": "Compaction failure visibility and blocking-threshold fix",
+      "summary": "pi.live.compactionFailure keeps the newest failed compaction (task, reason, error) until a compaction produces a summary; the agent events snapshot carries it and compaction_end carries error. A generation whose blocking threshold compaction failed, faulted, was orphaned or aborted now fails with model_error (Compaction failed: ...) instead of sending an oversized request; the prepare checkpoint records threshold: true. The summarization transcript no longer includes thinking.",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "pi.live.compactionFailure and compaction_end error make failed compactions visible"
+        },
+        {
+          "package": "durable",
+          "item": "A failed blocking-threshold compaction fails the generation with model_error instead of sending the request"
+        },
+        {
+          "package": "durable",
+          "item": "Compaction summaries leave thinking out of the summarization request"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/harness/compaction.ts",
+          "change": "modified",
+          "lines": 23
+        },
+        {
+          "path": "packages/durable/test/harness-compaction.test.ts",
+          "change": "modified",
+          "lines": 162
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable/Harness/Compaction.cs",
+        "src/PiSharp.Durable/Harness/Live.cs (CompactionFailure, failCompactionStatus; row owned by a)",
+        "src/PiSharp.Durable/Harness/Generation.cs (threshold checkpoint, compactionFailure -> model_error; row owned by a)",
+        "src/PiSharp.Durable/Harness/Events.cs (snapshot compactionFailure, compaction_end error; row owned by a)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessCompactionDifferentialCases.cs",
+        "tests/PiSharp.Durable.Tests/Harness/HarnessGenerationCases.cs, HarnessGenerationRecoveryCases.cs"
+      ],
+      "upstreamLines": 185,
+      "size": "S",
+      "dependsOn": [
+        "i"
+      ],
+      "notes": "Depends on i only because harness-compaction.test.ts adds a case that never cuts at a display-only entry. The thinking removal changes the summarization request text, so the compaction differential capture (Fixtures/compaction.upstream.json) and the compaction compat scenario switch to the v1.2.0 capture from area m here. Most of the code lands in live.ts, generation.ts and events.ts, whose rows area a owns."
+    },
+    {
+      "id": "k",
+      "title": "tool_search extension and BM25 ranking",
+      "summary": "New @earendil-works/pi-durable/tool-search: the coding agent's tool_search tool, which ranks the conversation's deferred tools with BM25 over name, description and schema text (search.ts rankDocuments) and loads the matches through control.addTools. search.ts is shared with code mode's searchTools().",
+      "changelog": [
+        {
+          "package": "durable",
+          "item": "tool-search entry point: tool_search finds deferred tools with BM25 and loads them"
+        }
+      ],
+      "upstream": [
+        {
+          "path": "packages/durable/src/search.ts",
+          "change": "added",
+          "lines": 85
+        },
+        {
+          "path": "packages/durable/src/tool-search/index.ts",
+          "change": "added",
+          "lines": 7
+        },
+        {
+          "path": "packages/durable/src/tool-search/tool-search.ts",
+          "change": "added",
+          "lines": 92
+        },
+        {
+          "path": "packages/durable/test/tool-search.test.ts",
+          "change": "added",
+          "lines": 204
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Durable/Search.cs (new)",
+        "src/PiSharp.Durable.Tools/ToolSearch/ToolSearch.cs (new)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/ToolSearchCases.cs (new)"
+      ],
+      "upstreamLines": 388,
+      "size": "M",
+      "dependsOn": [
+        "a"
+      ],
+      "notes": "Needs deferred tools, Agent.deferred and modelTools.add from area a. Main already ports the coding agent's BM25 ranking (src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs), but PiSharp.Durable may reference only Contracts and AI (decision 0005), so port search.ts into PiSharp.Durable and compare its stemming and tokenization with ToolSearchRanker rather than reference it."
+    },
+    {
+      "id": "l",
+      "title": "pisharp durable CLI adaptation (PiSharp-only mode)",
+      "summary": "Upstream v1.2.0 deleted its experimental durable coding agent; PiSharp keeps pisharp durable as a PiSharp-only experimental mode (owner decision 2026-10-14) and adapts it to the library changes: the content -> output rename, SessionFailed and Session.closed, onReport for listener failures, compaction failures from pi.live.compactionFailure, and nested tool slots and tool event taskIds in the TUI. Wiring an image processor into its coding tools belongs to area e.",
+      "changelog": [],
+      "upstream": [],
+      "portMapRows": [
+        {
+          "path": "packages/coding-agent/src/experimental/durable/harness-setup.ts",
+          "status": "pisharp-only",
+          "reason": "Removed upstream in v1.2.0 (outside packages/durable and packages/chord); PiSharp keeps its v1.1.0 port by owner decision 2026-10-14."
+        },
+        {
+          "path": "packages/coding-agent/src/experimental/durable/main.ts",
+          "status": "pisharp-only",
+          "reason": "Removed upstream in v1.2.0 (outside packages/durable and packages/chord); PiSharp keeps its v1.1.0 port by owner decision 2026-10-14."
+        },
+        {
+          "path": "packages/coding-agent/src/experimental/durable/prompt.ts",
+          "status": "pisharp-only",
+          "reason": "Removed upstream in v1.2.0 (outside packages/durable and packages/chord); PiSharp keeps its v1.1.0 port by owner decision 2026-10-14."
+        },
+        {
+          "path": "packages/coding-agent/src/experimental/durable/runtime.ts",
+          "status": "pisharp-only",
+          "reason": "Removed upstream in v1.2.0 (outside packages/durable and packages/chord); PiSharp keeps its v1.1.0 port by owner decision 2026-10-14."
+        },
+        {
+          "path": "packages/coding-agent/src/experimental/durable/sessions.ts",
+          "status": "pisharp-only",
+          "reason": "Removed upstream in v1.2.0 (outside packages/durable and packages/chord); PiSharp keeps its v1.1.0 port by owner decision 2026-10-14."
+        },
+        {
+          "path": "packages/coding-agent/src/experimental/durable/subagent.ts",
+          "status": "pisharp-only",
+          "reason": "Removed upstream in v1.2.0 (outside packages/durable and packages/chord); PiSharp keeps its v1.1.0 port by owner decision 2026-10-14."
+        },
+        {
+          "path": "packages/coding-agent/src/experimental/durable/tui.ts",
+          "status": "pisharp-only",
+          "reason": "Removed upstream in v1.2.0 (outside packages/durable and packages/chord); PiSharp keeps its v1.1.0 port by owner decision 2026-10-14."
+        }
+      ],
+      "pisharp": [
+        "src/PiSharp.Cli/Durable/DurableHarnessSetup.cs (CodingTools API changes; optional tool_search/codemode)",
+        "src/PiSharp.Cli/Durable/DurableSubagent.cs (Content -> Output)",
+        "src/PiSharp.Cli/Durable/DurableRuntime.cs (Session.Closed / SessionFailed notice and exit; compactionFailure instead of polling compaction outcomes)",
+        "src/PiSharp.Cli/Durable/DurableTuiView.cs, DurableTuiState.cs, DurableTuiComponents.cs (nested tool slots under their parent, display-only entries)",
+        "src/PiSharp.Cli/Durable/DurableModels.cs (if area d extends IDurableModels)",
+        "src/PiSharp.Cli/Durable/DurableSessions.cs"
+      ],
+      "tests": [
+        "tests/PiSharp.DurableCli.Tests/RuntimeCases.cs",
+        "tests/PiSharp.DurableCli.Tests/RuntimeTuiCases.cs",
+        "tests/PiSharp.DurableCli.Tests/SetupCases.cs",
+        "tests/PiSharp.DurableCli.Tests/TuiStateCases.cs",
+        "tests/PiSharp.DurableCli.Tests/TuiTranscriptCases.cs",
+        "tests/PiSharp.DurableCli.Tests/SessionsCases.cs (sessions.interop.pinned-upstream-under-node)"
+      ],
+      "upstreamLines": 0,
+      "size": "M",
+      "dependsOn": [
+        "a",
+        "b",
+        "i",
+        "j"
+      ],
+      "notes": "Sized M by C# effort (no upstream lines). No upstream text to follow any more: the 7 files of packages/coding-agent/src/experimental/durable (harness-setup.ts, main.ts, prompt.ts, runtime.ts, sessions.ts, subagent.ts, tui.ts) were deleted in v1.2.0 and their port-map rows are pisharp-only; they stay pisharp-only after this area (listed in portMapRows, not counted in upstreamLines). Keep behaviour as the v1.1.0 port and change only what the library API forces, plus surfacing the new failure signals. sessions.interop.pinned-upstream-under-node runs upstream experimental/durable/sessions.ts, which no longer exists at the new pin: pin it explicitly to a v1.1.0 checkout or retire it. pisharp durable sessions now carry pi.tool v2 records that v1.1.0 Pi cannot resume, and v1.2.0 Pi has no durable agent, so the decision 0005 section 6 claim that either tool continues the other's sessions no longer holds for the CLI; only the library-level compatibility (area m) remains. Whether pisharp durable should install tool_search or codemode (upstream's main coding agent has both) is an owner decision; default to not changing the tool set."
+    },
+    {
+      "id": "m",
+      "title": "Upstream capture corpus at v1.2.0",
+      "summary": "The compat and differential suites compare PiSharp with records and outputs captured from pi-durable at v1.1.0 (tools/DurableFixtures, tests/PiSharp.Durable.Tests/Fixtures/capture-*.mjs and *.upstream.json, Fixtures/upstream-sessions, the ops corpus). They must be recaptured at v1.2.0, while the v1.1.0 sessions stay as upgrade coverage (v1 pi.tool tasks migrate on open).",
+      "changelog": [],
+      "upstream": [],
+      "pisharp": [
+        "tools/DurableFixtures/capture.mjs, scenarios.mjs, ops-corpus.mjs, verify-reverse.mjs (PI_COMMIT -> 06a46693)",
+        "tests/PiSharp.Durable.Tests/Fixtures/capture-*.mjs and *.upstream.json(l)",
+        "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/** (add a v1.2.0 set; keep the v1.1.0 set for read/harness/resume)"
+      ],
+      "tests": [
+        "tests/PiSharp.Durable.Tests/Compat/CompatCases.cs, CompatOpsCases.cs, CompatScenarios.cs",
+        "tests/PiSharp.Durable.Tests/Harness/*DifferentialCases.cs",
+        "tests/PiSharp.Durable.Tests/EnvLineScanCases.cs, PiAiUtilsCases.cs, PiAiValidationCases.cs (re-pin headers)"
+      ],
+      "upstreamLines": 0,
+      "size": "M",
+      "dependsOn": [],
+      "notes": "Sized M by effort (no upstream lines). No upstream source file of its own: this is PiSharp evidence tooling, but without it no area that changes written records (j, a, i) can land with its tests passing. Land it early: produce the v1.2.0 corpus next to the v1.1.0 one, switch the scenarios v1.2.0 writes identically at once, and let j (compaction), i (inbox) and a (tool scenarios) switch theirs. The reverse case (compat.reverse.upstream-reads-pisharp-sessions) must run pi-durable at v1.2.0. Capture needs Node and the v1.2.0 checkout with node_modules, as before."
+    }
+  ],
+  "excluded": [
+    {
+      "paths": [
+        "packages/chord/src/cell.ts",
+        "packages/chord/src/cluster.ts",
+        "packages/chord/src/connection.ts",
+        "packages/chord/src/contract.ts",
+        "packages/chord/src/declare.ts",
+        "packages/chord/src/errors.ts",
+        "packages/chord/src/host.ts",
+        "packages/chord/src/link.ts",
+        "packages/chord/src/loader.ts",
+        "packages/chord/src/manager.ts",
+        "packages/chord/src/publish.ts",
+        "packages/chord/src/record.ts",
+        "packages/chord/src/registry.ts",
+        "packages/chord/src/reload.ts",
+        "packages/chord/src/remote.ts",
+        "packages/chord/src/schema.ts",
+        "packages/chord/src/websocket.ts",
+        "packages/chord/src/wire.ts",
+        "packages/chord/src/node.ts",
+        "packages/chord/src/index.ts",
+        "packages/chord/src/api.ts",
+        "packages/chord/src/bundler.ts",
+        "packages/chord/src/facets/host.ts",
+        "packages/chord/src/facets/loader.ts",
+        "packages/chord/src/node/bundle-loader.ts",
+        "packages/chord/src/node/bundle.ts",
+        "packages/chord/src/node/manifest.ts",
+        "packages/chord/src/node/package.ts",
+        "packages/chord/src/services/consumer.ts",
+        "packages/chord/src/services/errors.ts",
+        "packages/chord/src/services/handle.ts",
+        "packages/chord/src/services/instances.ts",
+        "packages/chord/src/services/loopback.ts",
+        "packages/chord/src/services/provider.ts",
+        "packages/chord/src/services/state-codec.ts",
+        "packages/chord/src/services/wire.ts"
+      ],
+      "reason": "Chord host runtime (cells, clusters, contracts, hosts, links, loaders, manager, records, registry, reload, remote, schema, WebSocket, wire) that replaced the facet/service runtime, plus the removed facet, service, bundle and bundler files. Out of scope like facets/services/wire under decision 0005: pi-durable imports none of it. src/index.ts and src/node.ts are barrels; the names pi-durable imports from the root (replicatedState, copyJson, Context, JsonValue, JsonRepresentation, Draft, replicated-state types) keep their names, and their implementations are covered by area f."
+    },
+    {
+      "paths": [
+        "packages/chord/test/cluster.test.ts",
+        "packages/chord/test/contract.test.ts",
+        "packages/chord/test/eager-reload.test.ts",
+        "packages/chord/test/fixtures/echo.ts",
+        "packages/chord/test/fixtures/loader.ts",
+        "packages/chord/test/fixtures/worker.ts",
+        "packages/chord/test/host.test.ts",
+        "packages/chord/test/link.test.ts",
+        "packages/chord/test/links-review.test.ts",
+        "packages/chord/test/loader.test.ts",
+        "packages/chord/test/manager.test.ts",
+        "packages/chord/test/readiness.test.ts",
+        "packages/chord/test/reload.test.ts",
+        "packages/chord/test/requests.test.ts",
+        "packages/chord/test/review.test.ts",
+        "packages/chord/test/tutorial.test.ts",
+        "packages/chord/test/websocket.test.ts",
+        "packages/chord/test/state.test.ts",
+        "packages/chord/test/bundle.test.ts",
+        "packages/chord/test/facet-loader.test.ts",
+        "packages/chord/test/facets.test.ts",
+        "packages/chord/test/helpers.ts",
+        "packages/chord/test/service-delivery.test.ts",
+        "packages/chord/test/service-wire.test.ts",
+        "packages/chord/test/services.test.ts"
+      ],
+      "reason": "Tests and fixtures of the Chord host runtime and of the removed facet/service runtime. test/state.test.ts now tests host-runtime state cells; its former replicated-state cases moved to test/replicated-state.test.ts (area f). test/helpers.ts only re-exported the removed loopback service transport."
+    },
+    {
+      "paths": [
+        "packages/chord/CHANGELOG.md",
+        "packages/chord/PLANNING.md",
+        "packages/chord/README.md",
+        "packages/chord/docs/guide.md",
+        "packages/chord/docs/spec.md",
+        "packages/chord/docs/tutorial.md",
+        "packages/chord/package.json",
+        "packages/chord/src/delta/README.md"
+      ],
+      "reason": "Chord docs and packaging; no C# counterpart. The guide, spec and tutorial describe the excluded host runtime; delta/README.md documents the delta format area f ports (read it as reference); package.json swaps esbuild for typebox, irrelevant to the C# subset."
+    },
+    {
+      "paths": [
+        "packages/durable/CHANGELOG.md",
+        "packages/durable/README.md",
+        "packages/durable/docs/spec.md",
+        "packages/durable/docs/chord-delta-findings.md",
+        "packages/durable/docs/pico-v5-chord-usage.md",
+        "packages/durable/docs/pico-v5-handoff.md",
+        "packages/durable/package.json",
+        "packages/durable/tsconfig.build.json",
+        "packages/durable/vitest.config.ts"
+      ],
+      "reason": "pi-durable docs and packaging; no C# counterpart. docs/spec.md (709+/116-) is the normative reference every area ports against (decision 0005 says the port follows it) and README gains an Errors section relevant to area b; the three deleted docs were design notes. package.json adds the codemode, tool-search, images, images/node and images/cloudflare entry points (C# namespaces in areas d, k, e), the pi-codemode and Photon dependencies (see areas d and e), the bench scripts (benchmarks in their areas) and a second test pass with document retention 0, which vitest.config.ts wires through test/setup-document-retention.ts (area b). tsconfig.build.json only adds the Photon WASM ambient declarations."
+    },
+    {
+      "paths": [
+        "packages/durable/src/images/cloudflare.ts",
+        "packages/durable/src/images/photon-wasm.d.ts"
+      ],
+      "reason": "Cloudflare Images loader (Cloudflare adapters are out of scope, decision 0005) and the TypeScript ambient declaration of the Photon WebAssembly module, which has no C# counterpart. Port map rows are excluded."
+    },
+    {
+      "paths": [
+        "packages/durable/test/system-order-cache-e2e.test.ts"
+      ],
+      "reason": "Needs live provider credentials; its port-map row stays skipped. The change is only the content -> output rename (area a)."
+    }
+  ],
+  "order": [
+    "f: foundation; the Chord delta/state changes have no dependencies and b uses replicatedState onError",
+    "g: independent and small; can land any time",
+    "m: recapture the upstream corpus at v1.2.0 before any area changes written records",
+    "b: storage-failure and Session semantics, which the scheduler and every later area build on",
+    "i: input entries and display-only writes; small, needs only b",
+    "j: compaction failure visibility; needs i for the display-only cut case and must precede a, which owns live/events/generation",
+    "c: scheduler rewrite with abandonOnRestart, abortOwned, ownedTasks; needed by nested calls",
+    "a: tool task v2, the core API change; lands after b, c, i and j because it owns the shared harness rows they also edit",
+    "l: adapt pisharp durable right after a, since the content -> output rename breaks its build (or fold the rename into a)",
+    "k: tool_search on top of deferred tools from a",
+    "e: images in read, after a (output rename, tools.test.ts carries a's bash cases); also wires the processor into pisharp durable",
+    "d: durable code mode last among features: needs a, k and the new deterministic Start() in PiSharp.Codemode",
+    "h: examples, decision 0005 and port-map close-out once every other area has landed"
+  ]
+}

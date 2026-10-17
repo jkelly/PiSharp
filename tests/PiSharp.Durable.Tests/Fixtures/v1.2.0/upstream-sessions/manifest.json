@@ -1,0 +1,1215 @@
+{
+ "description": "Durable sessions written by the pinned upstream pi-durable with pi-ai's faux provider, and a Chord tracker ops corpus. Captured upstream evidence for PiSharp's compat.* cases; regenerate with the command below, never edit by hand.",
+ "upstream": {
+  "package": "@earendil-works/pi-durable@1.2.0 (sources)",
+  "release": "Pi v1.2.0",
+  "commit": "06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+  "piAi": "@earendil-works/pi-ai 1.2.0 (published build)",
+  "chord": "@earendil-works/chord 1.2.0 (sources)",
+  "codemode": "@earendil-works/pi-codemode 1.2.0 (sources)"
+ },
+ "node": "v22.18.0",
+ "sqlite": "3.50.2",
+ "command": "node --no-warnings --conditions=source --experimental-strip-types tools/DurableFixtures/capture.mjs <pi checkout at the commit> --commit 06a466935536f8c9bcacb2d5efc0fc021be1bdff",
+ "clock": {
+  "harnessNow": 1767225600000,
+  "fauxTimestamp": 1000
+ },
+ "varies": [
+  {
+   "field": "sessionId in pi.provider documents",
+   "why": "pi-ai uuidv7() on first use: random bits and Date.now(); upstream takes no seed"
+  },
+  {
+   "field": "durationMs of tool result messages",
+   "why": "performance.now() around the tool call"
+  },
+  {
+   "field": "SQLite page layout and file bytes",
+   "why": "SQLite; the records, not the pages, are the evidence"
+  },
+  {
+   "field": "durationMs anywhere: nested call results (pi.tool.nested documents, observed results, tool events)",
+   "why": "performance.now() around each call"
+  },
+  {
+   "field": "the seconds in \"Wall time <seconds> seconds\" of codemode results",
+   "why": "the script's wall time, measured by upstream"
+  },
+  {
+   "field": "seed, startedAt and deadline of pi.codemode.run's start, and `at` of pi.codemode.journal entries",
+   "why": "code mode's own VM clock (Date.now()) and seed (crypto.getRandomValues), which it journals so a replay sees the same ones"
+  }
+ ],
+ "normalized": "replace every sessionId string with \"<session>\", every durationMs number with \"<duration>\", the seconds of \"Wall time <seconds> seconds\" with \"<seconds>\", and code mode's clock and seed fields as listed, on both sides; nothing else (normalize() in tools/DurableFixtures/compare-captures.mjs)",
+ "scenarios": [
+  {
+   "name": "chat",
+   "description": "One input answered: tagged and untagged prompt sections, an offered tool, a request ID.",
+   "resumable": false
+  },
+  {
+   "name": "tool-interrupted",
+   "description": "A call to an unsafe (not replay-safe) tool, closed while the tool runs after writing output and details: the file holds the execute checkpoint. Resumed: the call settles as interrupted with its durable partial output, then the model answers.",
+   "resumable": true
+  },
+  {
+   "name": "follow-up",
+   "description": "An input whose generation is in flight and a follow-up queued behind it, closed while the model is still answering. Resumed: the generation reruns and answers, then the queued follow-up runs.",
+   "resumable": true
+  },
+  {
+   "name": "compaction",
+   "description": "Three turns, a manual compaction placed at once while idle, then one more turn over the compacted context.",
+   "resumable": false
+  },
+  {
+   "name": "subagent",
+   "description": "A foreground subagent tool (upstream example 22): the call creates a child conversation its task owns, runs one input there, and returns the child's answer to the parent, which answers.",
+   "resumable": false
+  },
+  {
+   "name": "fork",
+   "description": "Two turns, an ownerless fork at the first answer, and a turn in the fork.",
+   "resumable": false
+  },
+  {
+   "name": "task-graph",
+   "description": "A conversation-owned task that creates a conversation it owns and a child task it owns; the child creates a grandchild task it owns and waits for it; each waits (allSettled) and completes once its owned work is done.",
+   "resumable": false
+  },
+  {
+   "name": "nested-tools",
+   "description": "A model-issued tool makes nested calls (harness-nested-tools.test.ts, harness-callers.test.ts): two parallel calls of a tools-only echo (one under an explicit key), a schema tool, a missing tool and invalid arguments; each nested call is its own pi.tool task owned by the caller with a pi.tool.nested document, and the caller returns what it received to the model.",
+   "resumable": false,
+   "since": "1.2.0",
+   "areas": [
+    "a"
+   ]
+  },
+  {
+   "name": "structured-output",
+   "description": "Structured tool output (harness-structured-output.test.ts): model-issued calls of a schema tool (its value stays out of the transcript) and of one whose value breaks its schema (the call stands, the host gets a report); then nested calls of an image tool, an error result without a schema, the broken schema tool, a schema tool's error result keeping its value, and a valid one.",
+   "resumable": false,
+   "since": "1.2.0",
+   "areas": [
+    "a"
+   ]
+  },
+  {
+   "name": "deferred-tool-search",
+   "description": "Deferred tools and tool_search (tool-search.test.ts): two deferred tools stay out of the request until tool_search loads the best match, which pi.agent records in modelTools.add and a pi.system entry appends; the model then calls it.",
+   "resumable": false,
+   "since": "1.2.0",
+   "areas": [
+    "a",
+    "k"
+   ]
+  },
+  {
+   "name": "codemode",
+   "description": "Durable code mode (codemode.test.ts): a codemode script calls echo, then the replay-safe hold, then echo, each a nested call journaled before delivery; closed while hold runs. Resumed: the script replays from its journal without running the finished echo again, hold reruns, and the script finishes; the model answers.",
+   "resumable": true,
+   "since": "1.2.0",
+   "areas": [
+    "d"
+   ]
+  },
+  {
+   "name": "read-image",
+   "description": "read returns images (tools-images.test.ts), without an image processor: a 1x1 PNG within the limits comes back as one image block with an info diagnostic; a BMP, which needs converting, is an unsupported_image error result.",
+   "resumable": false,
+   "since": "1.2.0",
+   "areas": [
+    "e"
+   ]
+  },
+  {
+   "name": "input-entries",
+   "description": "Input entries (harness-input-entries.test.ts): an idle input placed as a chat.mention entry carrying its data, with the content as its user message; then an input whose generation is in flight, with a steer (p2.input, no data) and a follow-up (chat.mention) queued in pi.inbox with their entries; closed. Resumed: the generation reruns, then the queued inputs are placed as their entries.",
+   "resumable": true,
+   "since": "1.2.0",
+   "areas": [
+    "i"
+   ]
+  },
+  {
+   "name": "display-only-write",
+   "description": "Display-only writes while busy (harness-input-entries.test.ts, #10407): with a generation in flight and a follow-up queued, a write of only kind and data is appended and settled done at once, while writes with a model message or edits queue; once a reset is queued, a display-only write waits behind it. The answer, the reset, and the follow-up then run in order.",
+   "resumable": false,
+   "since": "1.2.0",
+   "areas": [
+    "i"
+   ]
+  },
+  {
+   "name": "compaction-failure",
+   "description": "Compaction failure (harness-compaction.test.ts): three turns, then a turn whose background threshold compaction fails (pi.live.compactionFailure, compaction_end with error); then a turn over the blocking threshold whose compaction fails too, so the run fails with model_error \"Compaction failed: ...\" without sending its request.",
+   "resumable": false,
+   "since": "1.2.0",
+   "areas": [
+    "j"
+   ]
+  },
+  {
+   "name": "session-failed",
+   "description": "Storage failure closes the Session (harness-storage-failure.test.ts): one input answered, then the storage fails the next commit; the call that hit it rejects with the storage error, later calls with SessionFailed (cause: that error), the event stream ends with session_failed and Harness.closed settles { reason: \"failed\" }. The files hold what was committed before.",
+   "resumable": false,
+   "since": "1.2.0",
+   "areas": [
+    "b"
+   ]
+  },
+  {
+   "name": "nested-tools-restart",
+   "description": "Nested calls across a restart (harness-nested-tools-restart.test.ts): a replay-unsafe caller makes two nested calls, a replay-safe one that publishes output and details and runs, and one a beforeTool hook holds before intent; closed. Resumed: both are abandoned (abandonOnRestart, abortReason \"restart\") before they run again, ending interrupted and abandoned, and the caller settles with an error result; the model answers.",
+   "resumable": true,
+   "since": "1.2.0",
+   "areas": [
+    "a",
+    "c"
+   ]
+  },
+  {
+   "name": "abandon-on-restart",
+   "description": "TaskOptions.abandonOnRestart (harness-nested-tools-restart.test.ts): a replay-unsafe tool creates a child task it owns with api.createTask() and awaits it in memory; closed while the child runs. Resumed: the child is marked with abortReason \"restart\" and its abort handler ends it aborted before any phase runs again; the tool call ends interrupted and the model answers.",
+   "resumable": true,
+   "since": "1.2.0",
+   "areas": [
+    "c"
+   ]
+  },
+  {
+   "name": "wait-cycle",
+   "description": "Wait-cycle rejection (harness-structured.test.ts, #10411): conversation-owned task a waits on b; then b commits a wait on a, which closes the cycle a -> b -> a: runtime.commit() rejects it naming the cycle, b ends faulted, and a resumes and completes.",
+   "resumable": false,
+   "since": "1.2.0",
+   "areas": [
+    "c"
+   ]
+  }
+ ],
+ "upgrades": {
+  "directory": "upgrade-from-v1.1.0",
+  "what": "opened.json and resumed.json (as for a scenario) of copies of the v1.1.0 sessions",
+  "scenarios": [
+   {
+    "name": "chat",
+    "from": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/chat",
+    "resumable": false
+   },
+   {
+    "name": "tool-interrupted",
+    "from": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/tool-interrupted",
+    "resumable": true
+   },
+   {
+    "name": "follow-up",
+    "from": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/follow-up",
+    "resumable": true
+   },
+   {
+    "name": "compaction",
+    "from": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/compaction",
+    "resumable": false
+   },
+   {
+    "name": "subagent",
+    "from": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/subagent",
+    "resumable": false
+   },
+   {
+    "name": "fork",
+    "from": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/fork",
+    "resumable": false
+   },
+   {
+    "name": "task-graph",
+    "from": "tests/PiSharp.Durable.Tests/Fixtures/upstream-sessions/task-graph",
+    "resumable": false
+   }
+  ]
+ },
+ "files": [
+  {
+   "path": "abandon-on-restart/events.json",
+   "bytes": 20266
+  },
+  {
+   "path": "abandon-on-restart/jsonl/doc-2.jsonl",
+   "bytes": 407
+  },
+  {
+   "path": "abandon-on-restart/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "abandon-on-restart/jsonl/doc-4.jsonl",
+   "bytes": 310
+  },
+  {
+   "path": "abandon-on-restart/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "abandon-on-restart/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "abandon-on-restart/jsonl/main.jsonl",
+   "bytes": 2921
+  },
+  {
+   "path": "abandon-on-restart/jsonl/task-12.jsonl",
+   "bytes": 1006
+  },
+  {
+   "path": "abandon-on-restart/jsonl/task-13.jsonl",
+   "bytes": 633
+  },
+  {
+   "path": "abandon-on-restart/jsonl/task-9.jsonl",
+   "bytes": 1329
+  },
+  {
+   "path": "abandon-on-restart/observed.json",
+   "bytes": 246
+  },
+  {
+   "path": "abandon-on-restart/opened.json",
+   "bytes": 9948
+  },
+  {
+   "path": "abandon-on-restart/records.json",
+   "bytes": 9948
+  },
+  {
+   "path": "abandon-on-restart/resumed.json",
+   "bytes": 13340
+  },
+  {
+   "path": "abandon-on-restart/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "chat/jsonl/doc-2.jsonl",
+   "bytes": 135
+  },
+  {
+   "path": "chat/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "chat/jsonl/doc-4.jsonl",
+   "bytes": 310
+  },
+  {
+   "path": "chat/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "chat/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "chat/jsonl/main.jsonl",
+   "bytes": 2847
+  },
+  {
+   "path": "chat/opened.json",
+   "bytes": 7784
+  },
+  {
+   "path": "chat/records.json",
+   "bytes": 7784
+  },
+  {
+   "path": "chat/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "codemode/events.json",
+   "bytes": 52324
+  },
+  {
+   "path": "codemode/jsonl/doc-13.jsonl",
+   "bytes": 1951
+  },
+  {
+   "path": "codemode/jsonl/doc-14.jsonl",
+   "bytes": 147
+  },
+  {
+   "path": "codemode/jsonl/doc-15.jsonl",
+   "bytes": 665
+  },
+  {
+   "path": "codemode/jsonl/doc-16.jsonl",
+   "bytes": 390
+  },
+  {
+   "path": "codemode/jsonl/doc-18.jsonl",
+   "bytes": 148
+  },
+  {
+   "path": "codemode/jsonl/doc-2.jsonl",
+   "bytes": 1576
+  },
+  {
+   "path": "codemode/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "codemode/jsonl/doc-4.jsonl",
+   "bytes": 315
+  },
+  {
+   "path": "codemode/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "codemode/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "codemode/jsonl/main.jsonl",
+   "bytes": 8883
+  },
+  {
+   "path": "codemode/jsonl/task-12.jsonl",
+   "bytes": 1740
+  },
+  {
+   "path": "codemode/jsonl/task-19.jsonl",
+   "bytes": 1286
+  },
+  {
+   "path": "codemode/jsonl/task-9.jsonl",
+   "bytes": 1329
+  },
+  {
+   "path": "codemode/observed.json",
+   "bytes": 364
+  },
+  {
+   "path": "codemode/opened.json",
+   "bytes": 29016
+  },
+  {
+   "path": "codemode/records.json",
+   "bytes": 29016
+  },
+  {
+   "path": "codemode/resumed.json",
+   "bytes": 25796
+  },
+  {
+   "path": "codemode/sqlite/session.sqlite",
+   "bytes": 126976
+  },
+  {
+   "path": "compaction/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "compaction/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "compaction/jsonl/doc-4.jsonl",
+   "bytes": 316
+  },
+  {
+   "path": "compaction/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "compaction/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "compaction/jsonl/main.jsonl",
+   "bytes": 11290
+  },
+  {
+   "path": "compaction/opened.json",
+   "bytes": 23112
+  },
+  {
+   "path": "compaction/records.json",
+   "bytes": 23112
+  },
+  {
+   "path": "compaction/sqlite/session.sqlite",
+   "bytes": 126976
+  },
+  {
+   "path": "compaction-failure/events.json",
+   "bytes": 54226
+  },
+  {
+   "path": "compaction-failure/jsonl/doc-2.jsonl",
+   "bytes": 232
+  },
+  {
+   "path": "compaction-failure/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "compaction-failure/jsonl/doc-4.jsonl",
+   "bytes": 316
+  },
+  {
+   "path": "compaction-failure/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "compaction-failure/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "compaction-failure/jsonl/main.jsonl",
+   "bytes": 17090
+  },
+  {
+   "path": "compaction-failure/observed.json",
+   "bytes": 900
+  },
+  {
+   "path": "compaction-failure/opened.json",
+   "bytes": 33266
+  },
+  {
+   "path": "compaction-failure/records.json",
+   "bytes": 33266
+  },
+  {
+   "path": "compaction-failure/sqlite/session.sqlite",
+   "bytes": 131072
+  },
+  {
+   "path": "deferred-tool-search/events.json",
+   "bytes": 30442
+  },
+  {
+   "path": "deferred-tool-search/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "deferred-tool-search/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "deferred-tool-search/jsonl/doc-4.jsonl",
+   "bytes": 318
+  },
+  {
+   "path": "deferred-tool-search/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "deferred-tool-search/jsonl/doc-6.jsonl",
+   "bytes": 405
+  },
+  {
+   "path": "deferred-tool-search/jsonl/main.jsonl",
+   "bytes": 9031
+  },
+  {
+   "path": "deferred-tool-search/observed.json",
+   "bytes": 1138
+  },
+  {
+   "path": "deferred-tool-search/opened.json",
+   "bytes": 20490
+  },
+  {
+   "path": "deferred-tool-search/records.json",
+   "bytes": 20490
+  },
+  {
+   "path": "deferred-tool-search/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "display-only-write/events.json",
+   "bytes": 20038
+  },
+  {
+   "path": "display-only-write/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "display-only-write/jsonl/doc-3.jsonl",
+   "bytes": 146
+  },
+  {
+   "path": "display-only-write/jsonl/doc-4.jsonl",
+   "bytes": 311
+  },
+  {
+   "path": "display-only-write/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "display-only-write/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "display-only-write/jsonl/main.jsonl",
+   "bytes": 6286
+  },
+  {
+   "path": "display-only-write/observed.json",
+   "bytes": 930
+  },
+  {
+   "path": "display-only-write/opened.json",
+   "bytes": 12724
+  },
+  {
+   "path": "display-only-write/records.json",
+   "bytes": 12724
+  },
+  {
+   "path": "display-only-write/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "follow-up/jsonl/doc-2.jsonl",
+   "bytes": 334
+  },
+  {
+   "path": "follow-up/jsonl/doc-3.jsonl",
+   "bytes": 344
+  },
+  {
+   "path": "follow-up/jsonl/doc-4.jsonl",
+   "bytes": 157
+  },
+  {
+   "path": "follow-up/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "follow-up/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "follow-up/jsonl/main.jsonl",
+   "bytes": 1740
+  },
+  {
+   "path": "follow-up/jsonl/task-9.jsonl",
+   "bytes": 970
+  },
+  {
+   "path": "follow-up/opened.json",
+   "bytes": 5494
+  },
+  {
+   "path": "follow-up/records.json",
+   "bytes": 5494
+  },
+  {
+   "path": "follow-up/resumed.json",
+   "bytes": 9472
+  },
+  {
+   "path": "follow-up/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "fork/jsonl/doc-16.jsonl",
+   "bytes": 183
+  },
+  {
+   "path": "fork/jsonl/doc-17.jsonl",
+   "bytes": 137
+  },
+  {
+   "path": "fork/jsonl/doc-18.jsonl",
+   "bytes": 147
+  },
+  {
+   "path": "fork/jsonl/doc-19.jsonl",
+   "bytes": 312
+  },
+  {
+   "path": "fork/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "fork/jsonl/doc-20.jsonl",
+   "bytes": 187
+  },
+  {
+   "path": "fork/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "fork/jsonl/doc-4.jsonl",
+   "bytes": 309
+  },
+  {
+   "path": "fork/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "fork/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "fork/jsonl/main.jsonl",
+   "bytes": 6616
+  },
+  {
+   "path": "fork/opened.json",
+   "bytes": 17792
+  },
+  {
+   "path": "fork/records.json",
+   "bytes": 17792
+  },
+  {
+   "path": "fork/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "input-entries/events.json",
+   "bytes": 23500
+  },
+  {
+   "path": "input-entries/jsonl/doc-2.jsonl",
+   "bytes": 337
+  },
+  {
+   "path": "input-entries/jsonl/doc-3.jsonl",
+   "bytes": 633
+  },
+  {
+   "path": "input-entries/jsonl/doc-4.jsonl",
+   "bytes": 307
+  },
+  {
+   "path": "input-entries/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "input-entries/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "input-entries/jsonl/main.jsonl",
+   "bytes": 3585
+  },
+  {
+   "path": "input-entries/jsonl/task-13.jsonl",
+   "bytes": 974
+  },
+  {
+   "path": "input-entries/observed.json",
+   "bytes": 420
+  },
+  {
+   "path": "input-entries/opened.json",
+   "bytes": 9760
+  },
+  {
+   "path": "input-entries/records.json",
+   "bytes": 9760
+  },
+  {
+   "path": "input-entries/resumed.json",
+   "bytes": 13298
+  },
+  {
+   "path": "input-entries/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "nested-tools/events.json",
+   "bytes": 22378
+  },
+  {
+   "path": "nested-tools/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "nested-tools/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "nested-tools/jsonl/doc-4.jsonl",
+   "bytes": 315
+  },
+  {
+   "path": "nested-tools/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "nested-tools/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "nested-tools/jsonl/main.jsonl",
+   "bytes": 11194
+  },
+  {
+   "path": "nested-tools/observed.json",
+   "bytes": 1868
+  },
+  {
+   "path": "nested-tools/opened.json",
+   "bytes": 19312
+  },
+  {
+   "path": "nested-tools/records.json",
+   "bytes": 19312
+  },
+  {
+   "path": "nested-tools/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "nested-tools-restart/events.json",
+   "bytes": 27062
+  },
+  {
+   "path": "nested-tools-restart/jsonl/doc-13.jsonl",
+   "bytes": 148
+  },
+  {
+   "path": "nested-tools-restart/jsonl/doc-15.jsonl",
+   "bytes": 148
+  },
+  {
+   "path": "nested-tools-restart/jsonl/doc-2.jsonl",
+   "bytes": 1499
+  },
+  {
+   "path": "nested-tools-restart/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "nested-tools-restart/jsonl/doc-4.jsonl",
+   "bytes": 311
+  },
+  {
+   "path": "nested-tools-restart/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "nested-tools-restart/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "nested-tools-restart/jsonl/main.jsonl",
+   "bytes": 4065
+  },
+  {
+   "path": "nested-tools-restart/jsonl/task-12.jsonl",
+   "bytes": 1415
+  },
+  {
+   "path": "nested-tools-restart/jsonl/task-14.jsonl",
+   "bytes": 1337
+  },
+  {
+   "path": "nested-tools-restart/jsonl/task-16.jsonl",
+   "bytes": 856
+  },
+  {
+   "path": "nested-tools-restart/jsonl/task-9.jsonl",
+   "bytes": 1329
+  },
+  {
+   "path": "nested-tools-restart/observed.json",
+   "bytes": 308
+  },
+  {
+   "path": "nested-tools-restart/opened.json",
+   "bytes": 14582
+  },
+  {
+   "path": "nested-tools-restart/records.json",
+   "bytes": 14582
+  },
+  {
+   "path": "nested-tools-restart/resumed.json",
+   "bytes": 16116
+  },
+  {
+   "path": "nested-tools-restart/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "ops-corpus.json",
+   "bytes": 208950
+  },
+  {
+   "path": "read-image/events.json",
+   "bytes": 24630
+  },
+  {
+   "path": "read-image/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "read-image/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "read-image/jsonl/doc-4.jsonl",
+   "bytes": 317
+  },
+  {
+   "path": "read-image/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "read-image/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "read-image/jsonl/main.jsonl",
+   "bytes": 7568
+  },
+  {
+   "path": "read-image/opened.json",
+   "bytes": 16878
+  },
+  {
+   "path": "read-image/records.json",
+   "bytes": 16878
+  },
+  {
+   "path": "read-image/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "session-failed/events.json",
+   "bytes": 5842
+  },
+  {
+   "path": "session-failed/jsonl/doc-2.jsonl",
+   "bytes": 135
+  },
+  {
+   "path": "session-failed/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "session-failed/jsonl/doc-4.jsonl",
+   "bytes": 307
+  },
+  {
+   "path": "session-failed/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "session-failed/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "session-failed/jsonl/main.jsonl",
+   "bytes": 2482
+  },
+  {
+   "path": "session-failed/observed.json",
+   "bytes": 1070
+  },
+  {
+   "path": "session-failed/opened.json",
+   "bytes": 6658
+  },
+  {
+   "path": "session-failed/records.json",
+   "bytes": 6658
+  },
+  {
+   "path": "session-failed/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "structured-output/events.json",
+   "bytes": 36184
+  },
+  {
+   "path": "structured-output/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "structured-output/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "structured-output/jsonl/doc-4.jsonl",
+   "bytes": 316
+  },
+  {
+   "path": "structured-output/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "structured-output/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "structured-output/jsonl/main.jsonl",
+   "bytes": 15484
+  },
+  {
+   "path": "structured-output/observed.json",
+   "bytes": 2334
+  },
+  {
+   "path": "structured-output/opened.json",
+   "bytes": 26884
+  },
+  {
+   "path": "structured-output/records.json",
+   "bytes": 26884
+  },
+  {
+   "path": "structured-output/sqlite/session.sqlite",
+   "bytes": 126976
+  },
+  {
+   "path": "subagent/jsonl/doc-14.jsonl",
+   "bytes": 137
+  },
+  {
+   "path": "subagent/jsonl/doc-15.jsonl",
+   "bytes": 146
+  },
+  {
+   "path": "subagent/jsonl/doc-16.jsonl",
+   "bytes": 310
+  },
+  {
+   "path": "subagent/jsonl/doc-17.jsonl",
+   "bytes": 186
+  },
+  {
+   "path": "subagent/jsonl/doc-18.jsonl",
+   "bytes": 219
+  },
+  {
+   "path": "subagent/jsonl/doc-2.jsonl",
+   "bytes": 136
+  },
+  {
+   "path": "subagent/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "subagent/jsonl/doc-4.jsonl",
+   "bytes": 316
+  },
+  {
+   "path": "subagent/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "subagent/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "subagent/jsonl/main.jsonl",
+   "bytes": 8183
+  },
+  {
+   "path": "subagent/opened.json",
+   "bytes": 19427
+  },
+  {
+   "path": "subagent/records.json",
+   "bytes": 19427
+  },
+  {
+   "path": "subagent/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "task-graph/jsonl/doc-10.jsonl",
+   "bytes": 146
+  },
+  {
+   "path": "task-graph/jsonl/doc-11.jsonl",
+   "bytes": 158
+  },
+  {
+   "path": "task-graph/jsonl/doc-12.jsonl",
+   "bytes": 186
+  },
+  {
+   "path": "task-graph/jsonl/doc-13.jsonl",
+   "bytes": 182
+  },
+  {
+   "path": "task-graph/jsonl/doc-2.jsonl",
+   "bytes": 135
+  },
+  {
+   "path": "task-graph/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "task-graph/jsonl/doc-4.jsonl",
+   "bytes": 157
+  },
+  {
+   "path": "task-graph/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "task-graph/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "task-graph/jsonl/doc-9.jsonl",
+   "bytes": 135
+  },
+  {
+   "path": "task-graph/jsonl/main.jsonl",
+   "bytes": 3689
+  },
+  {
+   "path": "task-graph/opened.json",
+   "bytes": 9072
+  },
+  {
+   "path": "task-graph/records.json",
+   "bytes": 9072
+  },
+  {
+   "path": "task-graph/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-2.jsonl",
+   "bytes": 753
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-4.jsonl",
+   "bytes": 310
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "tool-interrupted/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "tool-interrupted/jsonl/main.jsonl",
+   "bytes": 2901
+  },
+  {
+   "path": "tool-interrupted/jsonl/task-12.jsonl",
+   "bytes": 1018
+  },
+  {
+   "path": "tool-interrupted/jsonl/task-9.jsonl",
+   "bytes": 1329
+  },
+  {
+   "path": "tool-interrupted/opened.json",
+   "bytes": 9182
+  },
+  {
+   "path": "tool-interrupted/records.json",
+   "bytes": 9182
+  },
+  {
+   "path": "tool-interrupted/resumed.json",
+   "bytes": 12538
+  },
+  {
+   "path": "tool-interrupted/sqlite/session.sqlite",
+   "bytes": 118784
+  },
+  {
+   "path": "upgrade-from-v1.1.0/chat/opened.json",
+   "bytes": 7784
+  },
+  {
+   "path": "upgrade-from-v1.1.0/compaction/opened.json",
+   "bytes": 23112
+  },
+  {
+   "path": "upgrade-from-v1.1.0/follow-up/opened.json",
+   "bytes": 5494
+  },
+  {
+   "path": "upgrade-from-v1.1.0/follow-up/resumed.json",
+   "bytes": 9472
+  },
+  {
+   "path": "upgrade-from-v1.1.0/fork/opened.json",
+   "bytes": 17792
+  },
+  {
+   "path": "upgrade-from-v1.1.0/subagent/opened.json",
+   "bytes": 19335
+  },
+  {
+   "path": "upgrade-from-v1.1.0/task-graph/opened.json",
+   "bytes": 9072
+  },
+  {
+   "path": "upgrade-from-v1.1.0/tool-interrupted/opened.json",
+   "bytes": 9138
+  },
+  {
+   "path": "upgrade-from-v1.1.0/tool-interrupted/resumed.json",
+   "bytes": 12538
+  },
+  {
+   "path": "wait-cycle/jsonl/doc-2.jsonl",
+   "bytes": 135
+  },
+  {
+   "path": "wait-cycle/jsonl/doc-3.jsonl",
+   "bytes": 145
+  },
+  {
+   "path": "wait-cycle/jsonl/doc-4.jsonl",
+   "bytes": 157
+  },
+  {
+   "path": "wait-cycle/jsonl/doc-5.jsonl",
+   "bytes": 185
+  },
+  {
+   "path": "wait-cycle/jsonl/doc-6.jsonl",
+   "bytes": 181
+  },
+  {
+   "path": "wait-cycle/jsonl/main.jsonl",
+   "bytes": 2073
+  },
+  {
+   "path": "wait-cycle/observed.json",
+   "bytes": 498
+  },
+  {
+   "path": "wait-cycle/opened.json",
+   "bytes": 4998
+  },
+  {
+   "path": "wait-cycle/records.json",
+   "bytes": 4998
+  },
+  {
+   "path": "wait-cycle/sqlite/session.sqlite",
+   "bytes": 118784
+  }
+ ]
+}

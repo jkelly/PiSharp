@@ -1,0 +1,48 @@
+{
+ "sqlite": {
+  "run": {
+   "background": {
+    "conversationId": 1,
+    "type": "input",
+    "status": "done",
+    "entry": 20,
+    "id": 21,
+    "answer": 24
+   },
+   "blocking": {
+    "conversationId": 1,
+    "type": "input",
+    "status": "unanswered",
+    "entry": 25,
+    "id": 26,
+    "reason": "model_error",
+    "detail": "Compaction failed: Summarization failed: still bad"
+   },
+   "unusedAgentReplies": 0,
+   "unusedSummaries": 0
+  }
+ },
+ "jsonl": {
+  "run": {
+   "background": {
+    "conversationId": 1,
+    "type": "input",
+    "status": "done",
+    "entry": 20,
+    "id": 21,
+    "answer": 24
+   },
+   "blocking": {
+    "conversationId": 1,
+    "type": "input",
+    "status": "unanswered",
+    "entry": 25,
+    "id": 26,
+    "reason": "model_error",
+    "detail": "Compaction failed: Summarization failed: still bad"
+   },
+   "unusedAgentReplies": 0,
+   "unusedSummaries": 0
+  }
+ }
+}

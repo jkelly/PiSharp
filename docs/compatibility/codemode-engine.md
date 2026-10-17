@@ -105,12 +105,95 @@ speaking upstream's protocol (start, call, output, done, crash, result, plus `re
   `codemode` servers when the built-in one is disabled. A server that connects meanwhile has its tools published during the run, and the
   script's nested calls reach them through the invoker of that catalog until the run's next request declares it.
 
+## Deterministic runs: `Start()` (branch `feature/pi-durable` only)
+
+Pi 1.2.0's `sandbox.start()` runs a script deterministically and lets the host answer its calls, so durable code mode can
+replay a script after a restart. On the durable branch, `CodemodeSandbox.Start(code, CodemodeRunOptions, CancellationToken)`
+ports it ([decision 0005](../decisions/0005-pi-durable-experimental.md), "Codemode `Start()`"). `main` still excludes it
+([decision 0006](../decisions/0006-pi-1.2.0-sync.md)), and `ExecuteAsync()` is unchanged.
+
+**API** (upstream name in brackets):
+- `CodemodeRunOptions`:
+  - `StartedAt` (ms since the epoch) and `Seed` (`uint`; upstream validates a 32-bit unsigned number);
+  - `Tools` (`CodemodeDeclaredTool`: `Name`, `JsName`, `Description`) and `Globals` (`CodemodeDeclaredGlobal`: `Name`, `Spread`);
+  - `Store` and `TimeoutMs` (default none);
+  - `OnStarted(fingerprint)`, `OnCall(CodemodeHostCall)` and `OnIdle(seq, issued)`;
+  - `AbortMessage` and the `CancellationToken`, which together stand for `signal` and its reason.
+- `CodemodeRun`:
+  - `Result` (`result`) and `Finished` (`finished`);
+  - `Deliver(seq, now, id, CodemodeOutcome)` (`deliver`). `CodemodeOutcome.Success(value)` and `CodemodeOutcome.Failure(message, properties)`
+    stand for `{ ok: true, value }` and `{ ok: false, message, properties }`.
+  - `AbortAsync(message)`: aborting the signal with an `Error` reason.
+- `CodemodeResult.During` (`during`).
+- No callback runs before `Start` returns, as in JavaScript, where `start()` returns before any callback can run.
+
+**What it guarantees.** The same script, start time, seed, tools, globals and store, answered with the same results in the same
+`seq` order, makes the same calls with the same arguments and ends with the same outcome and output, on any engine with the same
+fingerprint. The worker-process and thread hosts share one runner, so a run can resume on either. The upstream
+`deterministic.test.ts` cases are ported (`deterministic.<host>.*`). Two are not ported as written:
+- the remote-transport case, because PiSharp has no remote host;
+- the unserializable-answer case, which is adapted because a `JsonData` always holds JSON.
+
+The authored `replay-from-a-midpoint` case interrupts a run
+after 0, 1, 3 and all but one of its results, replays the journal on the other host and continues live, and checks the calls, the
+issued counts and the outcome against an uninterrupted run.
+
+**How the engine is made deterministic** (`Runtime/CodemodeDeterministicClock.cs`, `CodemodeEngineRunner.cs`):
+- **Time.** Jint's time system reads a virtual clock: `StartedAt`, then the `now` of the result being processed, never going
+  backwards. `Date.now()` and `new Date()` read it rounded to a millisecond, and `performance.now()` reads the rounded milliseconds since
+  `StartedAt`, as quickjs-wasi's WASI clock shim does. `Temporal.Now` uses the same clock. Jint has no `performance` object, so a
+  deterministic run adds one with `now()`. `ExecuteAsync()` still has none.
+- **Randomness.** `Math.random()` is QuickJS's xorshift64\* in the state quickjs-wasi gives it for the seed: `seed + 1`, after the
+  one draw that creating the context consumes. Every seed therefore yields upstream's exact values, which pinned tests and the
+  differential check. `ShadowRealm`, whose realm has its own unseeded `Math.random`, is removed. Jint has no other source of
+  randomness a script can reach.
+- **Zone and locale.** The engine runs in UTC with the invariant culture, and Temporal's default zone is `UTC`. Jint bases
+  `Intl.DateTimeFormat` on the host's zone, so a wrapper gives it `timeZone: "UTC"` unless the options name one. Its `name`,
+  `length`, `prototype`, `instanceof` and `supportedLocalesOf` stay the originals'.
+- **Garbage collection.** `WeakRef` and `FinalizationRegistry` are removed.
+- **Order.** Results carry a `seq` and are applied strictly in that order; early ones are buffered. After each drain the
+  engine reports `idle` with the number of calls issued. `done` carries `during`.
+- **Interrupt budget.** `CodemodeSandboxOptions.InterruptBudget` (upstream: `InlineCodemodeSandbox`'s `interruptBudget`) counts Jint
+  statements from the moment the script starts, over the whole execution. It fails the run as a `timeout`,
+  `Execution exceeded its interrupt budget of N`, at the same statement every time. It also applies to `ExecuteAsync()`. It is
+  off by default, as on upstream's worker sandbox.
+
+**Fingerprint (an intentional difference).** Upstream's fingerprint names QuickJS:
+`quickjs-wasi 3.6.2, quickjs 0.17.0, prelude 8c6c9242, deterministic 1, stack 524288, heap none, budget none`. PiSharp's names
+what decides a Jint script's behaviour:
+`jint 4.16.3, acornima 1.7.0, prelude 8c6c9242, shim <fnv1a>, deterministic 1, dotnet <runtime>, os <os>-<arch>, recursion 10000, heap <bytes>, total <bytes>, budget none`.
+- The prelude hash is upstream's FNV-1a over the same source, so it equals upstream's (`differential.deterministic-prelude-hash`).
+- `shim` hashes the Jint shims, and `deterministic` is `CodemodeEngineRunner.DeterministicVersion`. Bump it when the runner changes
+  what a deterministic script observes.
+- The .NET runtime and platform are included because Jint uses .NET's math, regular expressions and globalization.
+
+The fingerprints never match, so durable code mode cannot move a running script between Pi and PiSharp. Its fingerprint check
+refuses such a resume with an error instead of letting the script diverge silently.
+
+**Differential.** `Deterministic/gen-deterministic-goldens.mjs` runs 16 scenarios on the real `@earendil-works/pi-codemode`
+1.2.0 `start()` and records `deterministic-goldens.json`. The scenarios cover:
+- the clock, seeds 0, 1, 77, 12345 and 2^32-1, and random branching;
+- microtask order, out-of-order delivery, globals, rejections with properties;
+- the store, throw, `exit()`, stalls, a clock behind the start, fractional clocks and UTC dates.
+
+`differential.deterministic-runs.<host>` replays each scenario with the same answers. It checks equality of the events (`started`,
+each call, each `idle` with its count), the calls with their arguments, the value, output, store writes, error kind, name and
+message, and `during`.
+
+**Not deterministic, as upstream or by engine:**
+- The deadline (`TimeoutMs`) and the caller's cancellation.
+- Jint's allocation budgets (`MemoryLimitBytes`, `TotalAllocationLimitBytes`) count bytes .NET allocates, which can vary between runs
+  of the same script near the limit.
+- The regex timeout.
+- Time zones and locale data a script names explicitly (for example `timeZone: "Asia/Kolkata"`) come from the host's tz and ICU
+  data.
+
 ## Not ported
 
-- The sandbox hosts Pi 1.2.0 added besides `CodemodeSandbox` (`RemoteCodemodeSandbox` and the `/cloudflare` entry,
-  `InlineCodemodeSandbox`, the `/portable` entry with `CodemodeSandboxBase`) and deterministic `sandbox.start()` runs, which
-  the coding agent does not use ([decision 0006](../decisions/0006-pi-1.2.0-sync.md)). The prelude's `settle()` takes their
-  optional `propertiesJson`; PiSharp passes none.
+- The sandbox hosts Pi 1.2.0 added besides `CodemodeSandbox`: `RemoteCodemodeSandbox` and the `/cloudflare` entry,
+  `InlineCodemodeSandbox`, and the `/portable` entry with `CodemodeSandboxBase`. The coding agent does not use them
+  ([decision 0006](../decisions/0006-pi-1.2.0-sync.md)). On `main`, deterministic `sandbox.start()` runs are excluded too, and
+  `ExecuteAsync()` passes no `propertiesJson` to the prelude's `settle()`.
 
 - `wasm.ts` and the `workerUrl`/`wasm` options configure QuickJS and Node workers; PiSharp's equivalent is
   `CodemodeWorkerLauncher`.

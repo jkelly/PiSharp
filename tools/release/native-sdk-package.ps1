@@ -6,7 +6,7 @@ function Assert-PiSharpNativeSdkPackage {
     param([Parameter(Mandatory)][string]$Package,
         [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.Tools.Skia','PiSharp.CodingAgent',
             'PiSharp.PromptTemplates.Yaml','PiSharp.Rpc','PiSharp.Tui','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime',
-            'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode')][string]$PackageId,
+            'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode','PiSharp.Durable','PiSharp.Durable.Tools','PiSharp.Durable.Sqlite')][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
         [Parameter(Mandatory)][string]$Repo,
@@ -20,6 +20,10 @@ function Assert-PiSharpNativeSdkPackage {
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$required+='licenses/YamlDotNet.LICENSE.txt'}
     if($PackageId-ceq'PiSharp.Tools.Skia'){$required+=@('licenses/SkiaSharp.LICENSE.txt','licenses/SkiaSharp.THIRD-PARTY-NOTICES.txt')}
     if($PackageId-ceq'PiSharp.Codemode'){$required+=@('licenses/Jint.LICENSE.txt','licenses/Jint.CREDITS.txt','licenses/Acornima.LICENSE.txt','licenses/Acornima.NOTICE.txt')}
+    # Decision 0005 (experimental, released from 1.2.0.1): the durable packages carry the licenses of what they port or bundle.
+    if($PackageId-ceq'PiSharp.Durable'){$required+='licenses/ripgrep-ignore.LICENSE-MIT.txt'}
+    if($PackageId-ceq'PiSharp.Durable.Tools'){$required+='licenses/jsdiff.LICENSE.txt'}
+    if($PackageId-ceq'PiSharp.Durable.Sqlite'){$required+=@('licenses/Microsoft.Data.Sqlite.LICENSE.txt','licenses/SQLitePCLRaw.LICENSE.txt','licenses/SQLitePCLRaw.NOTICE.txt','licenses/SQLite.NOTICE.txt')}
     foreach($name in $required){if(-not$files.ContainsKey($name)){throw 'Required native SDK package member absent.'}}
     # SDK 10 deterministic pack names the core-properties part nuget.psmdcp; older packs use a random hex name.
     foreach($name in $files.Keys){if($name-cnotin$required-and$name-cnotmatch'^package/services/metadata/core-properties/(?:[0-9a-f]+|nuget)\.psmdcp$'){throw 'Unexpected SDK package member.'}}
@@ -61,6 +65,8 @@ function Assert-PiSharpNativeSdkPackage {
         'PiSharp.Extensions.Agent'=@('PiSharp.Agent','PiSharp.Extensions.Runtime')
         'PiSharp.Compatibility.Node'=@('PiSharp.Contracts','PiSharp.ExtensionHost','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime')
         'PiSharp.Codemode'=@('PiSharp.Contracts','PiSharp.Extensions.Abstractions')
+        'PiSharp.Durable'=@('PiSharp.Contracts','PiSharp.AI');'PiSharp.Durable.Tools'=@('PiSharp.Durable','PiSharp.Tools','PiSharp.Codemode')
+        'PiSharp.Durable.Sqlite'=@('PiSharp.Durable')
     }
     $external=@{}
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$external['YamlDotNet']='16.3.0'}
@@ -70,6 +76,11 @@ function Assert-PiSharpNativeSdkPackage {
     }
     # Decision 0003: Jint is pinned exactly; its parser Acornima is transitive and not a package dependency of its own.
     if($PackageId-ceq'PiSharp.Codemode'){$external['Jint']='4.16.3'}
+    # Decision 0005: Microsoft.Data.Sqlite and the SQLitePCLRaw e_sqlite3 packages it bundles are pinned exactly.
+    if($PackageId-ceq'PiSharp.Durable.Sqlite'){
+        $external['Microsoft.Data.Sqlite']='10.0.12'
+        foreach($id in @('SQLitePCLRaw.bundle_e_sqlite3','SQLitePCLRaw.core','SQLitePCLRaw.lib.e_sqlite3','SQLitePCLRaw.provider.e_sqlite3')){$external[$id]='2.1.12'}
+    }
     $expected=[Collections.Generic.HashSet[string]]::new([string[]]@($siblings[$PackageId]+@($external.Keys)),[StringComparer]::Ordinal)
     if($dependencies.Count-ne$expected.Count){throw 'SDK dependency identity/version differs.'}
     foreach($dependency in $dependencies){

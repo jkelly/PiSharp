@@ -7,7 +7,8 @@ internal sealed record PiExtensionFlag(string Name, string Type, string? Descrip
 internal static class PiHelp
 {
     /// <summary>Source printHelp. The command name is PiSharp's (<see cref="PiConfig.DisplayName"/>); the option list adds PiSharp's
-    /// <c>--tool-policy</c> (decision 0004) and the commands list adds PiSharp's native <c>session</c> verbs.</summary>
+    /// <c>--tool-policy</c> (decision 0004) and the commands list adds PiSharp's native <c>session</c> verbs and the experimental
+    /// <c>durable</c> mode (decision 0005; PiSharp-only since Pi v1.2.0 removed its durable agent).</summary>
     internal static string Text(IReadOnlyList<PiExtensionFlag>? extensionFlags = null, bool color = false)
     {
         string Bold(string text) => color ? "\u001b[1m" + text + "\u001b[22m" : text;
@@ -31,6 +32,7 @@ internal static class PiHelp
   {app} auth <command>            Print credentials or check provider readiness
   {app} mcp <command>             Check MCP servers, sign in to or out of OAuth servers
   {app} session <verb>            PiSharp explicit-path session commands (create, prompt, resume, rpc, terminal, ...)
+  {app} durable [--continue]      EXPERIMENTAL: PiSharp's crash-safe durable agent (-c continues the newest session)
   {app} <command> --help          Show help for install/remove/uninstall/update/list/config/auth/mcp
 
 {Bold("Options:")}

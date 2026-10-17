@@ -1,0 +1,1168 @@
+{
+ "sqlite": {
+  "run": [
+   {
+    "type": "snapshot",
+    "entries": [],
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "look",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "user",
+       "content": "look",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "entry": 7,
+     "id": 8
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "system",
+     "content": "",
+     "toolsAdded": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "parameters": {
+        "type": "object",
+        "required": [
+         "path"
+        ],
+        "properties": {
+         "path": {
+          "type": "string",
+          "description": "Path to the file to read (relative or absolute)"
+         },
+         "offset": {
+          "type": "number",
+          "description": "Line number to start reading from (1-indexed)"
+         },
+         "limit": {
+          "type": "number",
+          "description": "Maximum number of lines to read"
+         }
+        }
+       }
+      }
+     ],
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "toolCall",
+       "id": "c1",
+       "name": "read",
+       "arguments": {
+        "path": "pixel.png"
+       }
+      },
+      {
+       "type": "toolCall",
+       "id": "c2",
+       "name": "read",
+       "arguments": {
+        "path": "pixel.bmp"
+       }
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 168,
+      "output": 13,
+      "cacheRead": 0,
+      "cacheWrite": 168,
+      "totalTokens": 349,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "toolUse",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "c1",
+         "name": "read",
+         "arguments": {
+          "path": "pixel.png"
+         }
+        },
+        {
+         "type": "toolCall",
+         "id": "c2",
+         "name": "read",
+         "arguments": {
+          "path": "pixel.bmp"
+         }
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 168,
+        "output": 13,
+        "cacheRead": 0,
+        "cacheWrite": 168,
+        "totalTokens": 349,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 168,
+       "output": 13,
+       "cacheRead": 0,
+       "cacheWrite": 168,
+       "totalTokens": 349,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "c1",
+    "toolName": "read",
+    "taskId": 12,
+    "args": {
+     "path": "pixel.png"
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "c1",
+    "toolName": "read",
+    "taskId": 12,
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c1",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "image",
+         "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+         "mimeType": "image/png"
+        },
+        {
+         "type": "text",
+         "text": "<harness>\n[info] Read image file [image/png].\n</harness>"
+        }
+       ],
+       "isError": false,
+       "durationMs": 2,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": [
+       {
+        "severity": "info",
+        "code": "image",
+        "message": "Read image file [image/png]."
+       }
+      ]
+     },
+     "kind": "pi.tool-result",
+     "id": 13,
+     "conversationId": 1,
+     "byTaskId": 12
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "toolResult",
+     "toolCallId": "c1",
+     "toolName": "read",
+     "content": [
+      {
+       "type": "image",
+       "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+       "mimeType": "image/png"
+      },
+      {
+       "type": "text",
+       "text": "<harness>\n[info] Read image file [image/png].\n</harness>"
+      }
+     ],
+     "isError": false,
+     "durationMs": 2,
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c1",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "image",
+         "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+         "mimeType": "image/png"
+        },
+        {
+         "type": "text",
+         "text": "<harness>\n[info] Read image file [image/png].\n</harness>"
+        }
+       ],
+       "isError": false,
+       "durationMs": 2,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": [
+       {
+        "severity": "info",
+        "code": "image",
+        "message": "Read image file [image/png]."
+       }
+      ]
+     },
+     "kind": "pi.tool-result",
+     "id": 13,
+     "conversationId": 1,
+     "byTaskId": 12
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "c2",
+    "toolName": "read",
+    "taskId": 14,
+    "args": {
+     "path": "pixel.bmp"
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "c2",
+    "toolName": "read",
+    "taskId": 14,
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c2",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "<harness>\n[error] pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured\n</harness>"
+        }
+       ],
+       "isError": true,
+       "durationMs": 1,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": [
+       {
+        "severity": "error",
+        "code": "unsupported_image",
+        "message": "pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured"
+       }
+      ]
+     },
+     "kind": "pi.tool-result",
+     "id": 15,
+     "conversationId": 1,
+     "byTaskId": 14
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "toolResult",
+     "toolCallId": "c2",
+     "toolName": "read",
+     "content": [
+      {
+       "type": "text",
+       "text": "<harness>\n[error] pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured\n</harness>"
+      }
+     ],
+     "isError": true,
+     "durationMs": 1,
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c2",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "<harness>\n[error] pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured\n</harness>"
+        }
+       ],
+       "isError": true,
+       "durationMs": 1,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": [
+       {
+        "severity": "error",
+        "code": "unsupported_image",
+        "message": "pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured"
+       }
+      ]
+     },
+     "kind": "pi.tool-result",
+     "id": 15,
+     "conversationId": 1,
+     "byTaskId": 14
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "a red pixel"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 75,
+      "output": 3,
+      "cacheRead": 168,
+      "cacheWrite": 75,
+      "totalTokens": 321,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "a red pixel"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 75,
+        "output": 3,
+        "cacheRead": 168,
+        "cacheWrite": 75,
+        "totalTokens": 321,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 17,
+     "conversationId": 1,
+     "byTaskId": 16
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "entry": 7,
+     "id": 8,
+     "answer": 17
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 243,
+       "output": 16,
+       "cacheRead": 168,
+       "cacheWrite": 243,
+       "totalTokens": 670,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   }
+  ]
+ },
+ "jsonl": {
+  "run": [
+   {
+    "type": "snapshot",
+    "entries": [],
+    "tools": [],
+    "nestedTools": [],
+    "compactions": [],
+    "inbox": [],
+    "agent": {
+     "model": {
+      "provider": "faux",
+      "modelId": "faux-1"
+     }
+    },
+    "usage": {
+     "models": {},
+     "tools": {}
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "user",
+     "content": "look",
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "user",
+       "content": "look",
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.user",
+     "id": 7,
+     "conversationId": 1
+    }
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "placed",
+     "entry": 7,
+     "id": 8
+    }
+   },
+   {
+    "type": "run_start",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "system",
+     "content": "",
+     "toolsAdded": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "parameters": {
+        "type": "object",
+        "required": [
+         "path"
+        ],
+        "properties": {
+         "path": {
+          "type": "string",
+          "description": "Path to the file to read (relative or absolute)"
+         },
+         "offset": {
+          "type": "number",
+          "description": "Line number to start reading from (1-indexed)"
+         },
+         "limit": {
+          "type": "number",
+          "description": "Maximum number of lines to read"
+         }
+        }
+       }
+      }
+     ],
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "system",
+       "content": "",
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         }
+        }
+       ],
+       "timestamp": 1767225600000
+      }
+     ],
+     "kind": "pi.system",
+     "id": 10,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "toolCall",
+       "id": "c1",
+       "name": "read",
+       "arguments": {
+        "path": "pixel.png"
+       }
+      },
+      {
+       "type": "toolCall",
+       "id": "c2",
+       "name": "read",
+       "arguments": {
+        "path": "pixel.bmp"
+       }
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 168,
+      "output": 13,
+      "cacheRead": 0,
+      "cacheWrite": 168,
+      "totalTokens": 349,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "toolUse",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "c1",
+         "name": "read",
+         "arguments": {
+          "path": "pixel.png"
+         }
+        },
+        {
+         "type": "toolCall",
+         "id": "c2",
+         "name": "read",
+         "arguments": {
+          "path": "pixel.bmp"
+         }
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 168,
+        "output": 13,
+        "cacheRead": 0,
+        "cacheWrite": 168,
+        "totalTokens": 349,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 11,
+     "conversationId": 1,
+     "byTaskId": 9
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 168,
+       "output": 13,
+       "cacheRead": 0,
+       "cacheWrite": 168,
+       "totalTokens": 349,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "c1",
+    "toolName": "read",
+    "taskId": 12,
+    "args": {
+     "path": "pixel.png"
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "c1",
+    "toolName": "read",
+    "taskId": 12,
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c1",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "image",
+         "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+         "mimeType": "image/png"
+        },
+        {
+         "type": "text",
+         "text": "<harness>\n[info] Read image file [image/png].\n</harness>"
+        }
+       ],
+       "isError": false,
+       "durationMs": 1,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": [
+       {
+        "severity": "info",
+        "code": "image",
+        "message": "Read image file [image/png]."
+       }
+      ]
+     },
+     "kind": "pi.tool-result",
+     "id": 13,
+     "conversationId": 1,
+     "byTaskId": 12
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "toolResult",
+     "toolCallId": "c1",
+     "toolName": "read",
+     "content": [
+      {
+       "type": "image",
+       "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+       "mimeType": "image/png"
+      },
+      {
+       "type": "text",
+       "text": "<harness>\n[info] Read image file [image/png].\n</harness>"
+      }
+     ],
+     "isError": false,
+     "durationMs": 1,
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c1",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "image",
+         "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+         "mimeType": "image/png"
+        },
+        {
+         "type": "text",
+         "text": "<harness>\n[info] Read image file [image/png].\n</harness>"
+        }
+       ],
+       "isError": false,
+       "durationMs": 1,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": [
+       {
+        "severity": "info",
+        "code": "image",
+        "message": "Read image file [image/png]."
+       }
+      ]
+     },
+     "kind": "pi.tool-result",
+     "id": 13,
+     "conversationId": 1,
+     "byTaskId": 12
+    }
+   },
+   {
+    "type": "tool_execution_start",
+    "toolCallId": "c2",
+    "toolName": "read",
+    "taskId": 14,
+    "args": {
+     "path": "pixel.bmp"
+    }
+   },
+   {
+    "type": "tool_execution_end",
+    "toolCallId": "c2",
+    "toolName": "read",
+    "taskId": 14,
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c2",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "<harness>\n[error] pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured\n</harness>"
+        }
+       ],
+       "isError": true,
+       "durationMs": 1,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": [
+       {
+        "severity": "error",
+        "code": "unsupported_image",
+        "message": "pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured"
+       }
+      ]
+     },
+     "kind": "pi.tool-result",
+     "id": 15,
+     "conversationId": 1,
+     "byTaskId": 14
+    }
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "toolResult",
+     "toolCallId": "c2",
+     "toolName": "read",
+     "content": [
+      {
+       "type": "text",
+       "text": "<harness>\n[error] pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured\n</harness>"
+      }
+     ],
+     "isError": true,
+     "durationMs": 1,
+     "timestamp": 1767225600000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "toolResult",
+       "toolCallId": "c2",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "<harness>\n[error] pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured\n</harness>"
+        }
+       ],
+       "isError": true,
+       "durationMs": 1,
+       "timestamp": 1767225600000
+      }
+     ],
+     "data": {
+      "diagnostics": [
+       {
+        "severity": "error",
+        "code": "unsupported_image",
+        "message": "pixel.bmp is an image (image/bmp) that needs converting, and no image processor is configured"
+       }
+      ]
+     },
+     "kind": "pi.tool-result",
+     "id": 15,
+     "conversationId": 1,
+     "byTaskId": 14
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "turn_start"
+   },
+   {
+    "type": "message_start",
+    "message": {
+     "role": "assistant",
+     "content": [
+      {
+       "type": "text",
+       "text": "a red pixel"
+      }
+     ],
+     "api": "faux",
+     "provider": "faux",
+     "model": "faux-1",
+     "usage": {
+      "input": 75,
+      "output": 3,
+      "cacheRead": 168,
+      "cacheWrite": 75,
+      "totalTokens": 321,
+      "cost": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "total": 0
+      }
+     },
+     "stopReason": "stop",
+     "timestamp": 1000
+    }
+   },
+   {
+    "type": "message_end",
+    "entry": {
+     "model": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "a red pixel"
+        }
+       ],
+       "api": "faux",
+       "provider": "faux",
+       "model": "faux-1",
+       "usage": {
+        "input": 75,
+        "output": 3,
+        "cacheRead": 168,
+        "cacheWrite": 75,
+        "totalTokens": 321,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1000
+      }
+     ],
+     "kind": "pi.assistant",
+     "id": 17,
+     "conversationId": 1,
+     "byTaskId": 16
+    }
+   },
+   {
+    "type": "turn_end"
+   },
+   {
+    "type": "run_end",
+    "inputs": [
+     8
+    ]
+   },
+   {
+    "type": "submission",
+    "record": {
+     "conversationId": 1,
+     "type": "input",
+     "status": "done",
+     "entry": 7,
+     "id": 8,
+     "answer": 17
+    }
+   },
+   {
+    "type": "usage_changed",
+    "usage": {
+     "models": {
+      "faux/faux-1": {
+       "input": 243,
+       "output": 16,
+       "cacheRead": 168,
+       "cacheWrite": 243,
+       "totalTokens": 670,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      }
+     },
+     "tools": {}
+    }
+   }
+  ]
+ }
+}

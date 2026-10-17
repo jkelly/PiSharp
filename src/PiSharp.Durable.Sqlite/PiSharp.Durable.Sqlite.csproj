@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0005: SQLite storage for PiSharp.Durable. Microsoft.Data.Sqlite is admitted in phase P5. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Tests" />
+    <InternalsVisibleTo Include="PiSharp.Cli" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
+    <!-- Decision 0005: PiSharp's fourth external runtime dependency, scoped to this project. Exact pins. Microsoft.Data.Sqlite.Core
+         follows Microsoft.Data.Sqlite exactly; the SQLitePCLRaw packages (e_sqlite3 native assets for every RID) are pinned
+         directly so that a later Microsoft.Data.Sqlite servicing release cannot move them silently. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="[10.0.12]" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" Version="[2.1.12]" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../third-party/Microsoft.Data.Sqlite.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+    <None Include="../../third-party/SQLitePCLRaw.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+    <None Include="../../third-party/SQLitePCLRaw.NOTICE.txt" Pack="true" PackagePath="licenses/" />
+    <None Include="../../third-party/SQLite.NOTICE.txt" Pack="true" PackagePath="licenses/" />
+  </ItemGroup>
+</Project>

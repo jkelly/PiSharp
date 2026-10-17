@@ -1,0 +1,114 @@
+{
+ "sqlite": {
+  "run": {
+   "offered": [
+    "counter",
+    "batch"
+   ],
+   "callable": [
+    "echo",
+    "counter",
+    "batch"
+   ],
+   "received": [
+    {
+     "taskId": 14,
+     "structuredOutput": "echo a",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 16,
+     "structuredOutput": "echo b",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 18,
+     "structuredOutput": {
+      "count": 3
+     },
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 20,
+     "isError": true,
+     "diagnostics": [
+      {
+       "severity": "error",
+       "code": "tool_unavailable",
+       "message": "Tool missing is not available"
+      }
+     ]
+    },
+    {
+     "taskId": 22,
+     "structuredOutput": "echo 5",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   ]
+  }
+ },
+ "jsonl": {
+  "run": {
+   "offered": [
+    "counter",
+    "batch"
+   ],
+   "callable": [
+    "echo",
+    "counter",
+    "batch"
+   ],
+   "received": [
+    {
+     "taskId": 14,
+     "structuredOutput": "echo a",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 16,
+     "structuredOutput": "echo b",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 18,
+     "structuredOutput": {
+      "count": 3
+     },
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    },
+    {
+     "taskId": 20,
+     "isError": true,
+     "diagnostics": [
+      {
+       "severity": "error",
+       "code": "tool_unavailable",
+       "message": "Tool missing is not available"
+      }
+     ]
+    },
+    {
+     "taskId": 22,
+     "structuredOutput": "echo 5",
+     "isError": false,
+     "diagnostics": [],
+     "durationMs": 0
+    }
+   ]
+  }
+ }
+}

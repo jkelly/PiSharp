@@ -14,6 +14,7 @@ pisharp list
 pisharp config [-l]
 pisharp auth <check|print-api-key|print-bearer-token>
 pisharp mcp <add|remove|list|login|logout>
+pisharp durable [--continue]   # experimental, PiSharp-only
 ```
 
 ## Modes
@@ -57,6 +58,9 @@ Skills, prompt templates, themes and context files have their own `--skill`, `--
 
 - `--tool-policy pi|explicit` sets how far the built-in tools reach. See [Tool policy](/docs/reference/configuration/#tool-policy).
 - `pisharp session <verb>` keeps PiSharp's earlier explicit-path commands (`create`, `prompt`, `resume`, `rpc`, `terminal`, `copy`, `migrate` and more). They use the `explicit` tool policy and their `--allow-*` grants. New scripts should use the Pi options above.
+- `pisharp durable [--continue]` runs the experimental durable agent, whose sessions survive a crash. See [Pi Durable](/docs/guides/durable/).
+
+`pisharp --help` lists these three additions with Pi's commands and options; Pi's help has none of them.
 
 ## Packages
 

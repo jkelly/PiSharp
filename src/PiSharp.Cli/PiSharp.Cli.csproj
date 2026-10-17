@@ -2,6 +2,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <EnablePromptTemplateYaml Condition="'$(EnablePromptTemplateYaml)' == ''">true</EnablePromptTemplateYaml>
+    <!-- Decision 0005: the experimental `pisharp durable` mode uses the [Experimental] durable packages. -->
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
     <!-- The disabled CLI graph has its own coordinator-generated lock; normal locks stay intact. -->
     <NuGetLockFilePath Condition="'$(EnablePromptTemplateYaml)' == 'false'">$(MSBuildProjectDirectory)/packages.prompt-yaml-disabled.lock.json</NuGetLockFilePath>
     <DefineConstants Condition="'$(EnablePromptTemplateYaml)' == 'true'">$(DefineConstants);PISHARP_PROMPT_YAML</DefineConstants>
@@ -17,6 +19,8 @@
     <InternalsVisibleTo Include="PiSharp.CliParity.Tests" />
     <InternalsVisibleTo Include="PiSharp.ExtensionParity.Tests" />
     <InternalsVisibleTo Include="PiSharp.InteractiveParity.Tests" />
+    <!-- Decision 0005 (P12). -->
+    <InternalsVisibleTo Include="PiSharp.DurableCli.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
@@ -29,6 +33,10 @@
     <ProjectReference Include="../PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
     <ProjectReference Include="../PiSharp.Codemode/PiSharp.Codemode.csproj" />
     <ProjectReference Include="../PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
+    <!-- Decision 0005 (P12): the experimental `pisharp durable` mode. -->
+    <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The Node extension host (IMPL-E): TypeScript/JavaScript extensions run in the user's Node with these scripts. -->
@@ -44,6 +52,15 @@
     <!-- The read tool's SkiaSharp image codec (owner decision 0004) and its native Skia components. -->
     <None Include="../../third-party/SkiaSharp.LICENSE.txt" Link="licenses/SkiaSharp.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <None Include="../../third-party/SkiaSharp.THIRD-PARTY-NOTICES.txt" Link="licenses/SkiaSharp.THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <!-- Decision 0005 (experimental, released from 1.2.0.1): `pisharp durable` stores sessions with Microsoft.Data.Sqlite and SQLitePCLRaw's
+         e_sqlite3. Like SkiaSharp's, these licenses ship in the tool package through the publish output (tools/net10.0/any/licenses/). -->
+    <None Include="../../third-party/Microsoft.Data.Sqlite.LICENSE.txt" Link="licenses/Microsoft.Data.Sqlite.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <None Include="../../third-party/SQLitePCLRaw.LICENSE.txt" Link="licenses/SQLitePCLRaw.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <None Include="../../third-party/SQLitePCLRaw.NOTICE.txt" Link="licenses/SQLitePCLRaw.NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <None Include="../../third-party/SQLite.NOTICE.txt" Link="licenses/SQLite.NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <!-- The durable edit tool ports jsdiff 8.0.4 (BSD-3-Clause) and the durable environment's file listing the ignore and globset crates (MIT). -->
+    <None Include="../../third-party/jsdiff.LICENSE.txt" Link="licenses/jsdiff.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <None Include="../../third-party/ripgrep-ignore.LICENSE-MIT.txt" Link="licenses/ripgrep-ignore.LICENSE-MIT.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <!-- The interactive syntax highlighter ports highlight.js 10.7.3 (BSD-3-Clause). -->
     <None Include="../../third-party/highlight.js.LICENSE.txt" Link="licenses/highlight.js.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <!-- The interactive Mermaid renderer ports grok-mermaid 0.2.3 (Apache-2.0). -->

@@ -16,7 +16,8 @@
     "ported-with-deferral": "Ported except the part the deferred field names; decision 0006 records the deferral.",
     "already-ported": "PiSharp already has the behaviour; the evidence field cites the file and any tests the sync added.",
     "no-op": "Nothing to change in PiSharp; the evidence field says why.",
-    "exclude": "Outside native scope per the linked decision; no port."
+    "exclude": "Outside native scope per the linked decision; no port.",
+    "branch-port": "Ported on branch feature/pi-durable (decision 0005) and released to main as experimental in 1.2.0.1; the row names the port map and work list that track it."
   },
   "notesMeaning": "A row's notes are the planning notes written before its port and describe the code as it was then; status, evidence and deferred record the outcome.",
   "areas": [
@@ -33,14 +34,15 @@
   ],
   "changelogBullets": "Bullet ids are <package>/<section>#<n>, numbered in order under ## [1.2.0] of packages/<package>/CHANGELOG.md at v1.2.0. agent has no 1.2.0 entries. \"New Features\" bullets summarise Added/Breaking bullets and map to the same rows.",
   "summary": {
-    "rows": 56,
+    "rows": 57,
     "changelogBullets": 70,
     "byStatus": {
       "ported": 38,
       "no-op": 7,
       "already-ported": 3,
-      "exclude": 6,
-      "ported-with-deferral": 2
+      "exclude": 5,
+      "ported-with-deferral": 2,
+      "branch-port": 2
     },
     "byArea": {
       "ai": 7,
@@ -49,7 +51,7 @@
       "coding-agent-cli": 2,
       "tools": 2,
       "tui": 8,
-      "codemode": 12,
+      "codemode": 13,
       "mcp": 4,
       "node-bridge": 1,
       "docs": 3
@@ -1206,8 +1208,7 @@
       "changelog": [
         "codemode/Added#1",
         "codemode/Added#2",
-        "codemode/Added#3",
-        "codemode/Added#4"
+        "codemode/Added#3"
       ],
       "upstream": [
         "packages/codemode/src/runtime/remote.ts",
@@ -1218,10 +1219,49 @@
         "packages/codemode/src/cloudflare.ts",
         "packages/codemode/examples/cloudflare/**"
       ],
-      "change": "RemoteCodemodeSandbox (Cloudflare Durable Object), InlineCodemodeSandbox, the portable entry with CodemodeSandboxBase, and deterministic sandbox.start() runs.",
+      "change": "RemoteCodemodeSandbox (Cloudflare Durable Object), InlineCodemodeSandbox and the portable entry with CodemodeSandboxBase. On branch feature/pi-durable, deterministic sandbox.start() runs (Added#4) are split out as codemode.deterministic-start.",
       "pisharp": [],
       "release": "1.2.0",
-      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: sandbox hosting options the coding agent does not use (its codemode extension still runs CodemodeSandbox); PiSharp runs codemode on Jint."
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: sandbox hosting options the coding agent does not use (its codemode extension still runs CodemodeSandbox); PiSharp runs codemode on Jint. On main this row also excludes sandbox.start(); on feature/pi-durable that part is ported (codemode.deterministic-start, decision 0005)."
+    },
+    {
+      "id": "codemode.deterministic-start",
+      "area": "codemode",
+      "status": "branch-port",
+      "changelog": [
+        "codemode/Added#4"
+      ],
+      "upstream": [
+        "packages/codemode/src/runtime/execution.ts",
+        "packages/codemode/src/runtime/vm.ts",
+        "packages/codemode/src/runtime/protocol.ts",
+        "packages/codemode/src/types.ts",
+        "packages/codemode/test/deterministic.test.ts"
+      ],
+      "change": "Deterministic sandbox.start(): the host answers the script's calls (onCall, run.deliver()) so it can replay the script after a restart; a virtual clock from startedAt, randomness from seed, UTC, no WeakRef/FinalizationRegistry, results applied in the order the host numbers them, the VM's fingerprint (onStarted), the calls issued after each result (onIdle), run.finished and result.during. execute() is unchanged.",
+      "pisharp": [
+        "src/PiSharp.Codemode/Runtime/CodemodeSandbox.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeRun.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeEngineRunner.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeDeterministicClock.cs",
+        "src/PiSharp.Codemode/Runtime/CodemodeWorkerProtocol.cs",
+        "src/PiSharp.Codemode/CodemodeTypes.cs"
+      ],
+      "release": "1.2.0.1 (experimental)",
+      "test": [
+        "tests/PiSharp.Codemode.Tests/DeterministicCases.cs",
+        "tests/PiSharp.Codemode.Tests/Deterministic/deterministic-goldens.json"
+      ],
+      "decision": "docs/decisions/0005-pi-durable-experimental.md (Codemode Start()): the prerequisite of durable code mode (durable work list area d), an additive seam to PiSharp.Codemode flagged for upstreaming to main; on main it stays excluded under codemode.new-sandboxes (decision 0006). Intentional difference: the fingerprint names Jint and .NET instead of QuickJS, so a run cannot move between Pi and PiSharp.",
+      "notes": "docs/compatibility/codemode-engine.md, section Deterministic runs, describes the API, the determinism design and the fingerprint. The remote-transport case of deterministic.test.ts has no PiSharp host.",
+      "evidence": {
+        "commits": [
+          "ca3f1d1"
+        ],
+        "tests": [
+          "tests/PiSharp.Codemode.Tests/DeterministicCases.cs"
+        ]
+      }
     },
     {
       "id": "codemode.node-watch-messages",
@@ -1519,18 +1559,30 @@
       "decision": "docs/decisions/0006-pi-1.2.0-sync.md (as 0002)."
     },
     {
-      "id": "exclude.durable",
+      "id": "port.durable",
       "area": "coding-agent-core",
-      "status": "exclude",
+      "status": "branch-port",
       "changelog": [],
       "upstream": [
         "packages/durable/**",
+        "packages/chord/src/{json,types,state}.ts",
+        "packages/chord/src/{context,delta}/**",
         "packages/coding-agent/src/experimental/durable/**"
       ],
       "change": "pi-durable: durable code mode, deferred tools and tool_search, nested calls, image processing, listFiles; upstream deleted coding-agent/src/experimental/durable.",
-      "pisharp": [],
-      "release": "1.2.0",
-      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: stays on feature/pi-durable, re-pinned there separately; the owner keeps pisharp durable as a PiSharp-only mode."
+      "pisharp": [
+        "src/PiSharp.Durable",
+        "src/PiSharp.Durable.Sqlite",
+        "src/PiSharp.Durable.Tools",
+        "src/PiSharp.Cli/Durable"
+      ],
+      "release": "1.2.0.1 (experimental)",
+      "test": [
+        "tests/PiSharp.Durable.Tests",
+        "tests/PiSharp.DurableCli.Tests"
+      ],
+      "decision": "docs/decisions/0005-pi-durable-experimental.md: retargeted to Pi v1.2.0 on the branch (stage 3a); on main this row is exclude.durable (decision 0006). pisharp durable stays a PiSharp-only mode of the v1.1.0 agent, which upstream deleted (owner decision 2026-10-14). The Chord host runtime that replaced facets and services stays excluded (exclude.chord); only the Chord subset pi-durable imports is ported.",
+      "notes": "Per-file progress in compatibility/durable-port-map.json (needs-sync rows still follow v1.1.0); remaining work by area in compatibility/durable-sync-1.2.0-worklist.json; header re-pins in compatibility/durable-sync-1.2.0-repin.json."
     },
     {
       "id": "exclude.chord",
@@ -1543,7 +1595,7 @@
       "change": "Chord's facet and service runtime is replaced by the chord2 host runtime.",
       "pisharp": [],
       "release": "1.2.0",
-      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: Chord is not ported and the coding agent no longer depends on it."
+      "decision": "docs/decisions/0006-pi-1.2.0-sync.md: Chord is not ported and the coding agent no longer depends on it. On branch feature/pi-durable, the subset pi-durable imports (JSON values, delta, context, replicated state) is ported under port.durable (decision 0005); the host runtime stays excluded there too."
     },
     {
       "id": "exclude.evals",
@@ -1746,7 +1798,7 @@
       "codemode.new-sandboxes"
     ],
     "codemode/Added#4": [
-      "codemode.new-sandboxes"
+      "codemode.deterministic-start"
     ],
     "codemode/Changed#1": [
       "codemode.declaration-constraints"
