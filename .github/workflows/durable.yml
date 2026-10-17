@@ -2,7 +2,8 @@ name: Durable
 
 # Branch CI for the experimental pi-durable port (decision 0005). Runs on feature/pi-durable only; the release and macOS
 # workflows stay unchanged until the branch is merged. The test job's storage.sqlite.native case loads e_sqlite3 on each OS;
-# sqlite-publish checks that a publish for each release RID carries that RID's e_sqlite3 native asset.
+# sqlite-publish checks that a publish for each release RID carries that RID's e_sqlite3 native asset; mssql runs the SQL Server
+# storage groups against a SQL Server container.
 on:
   push:
     branches: [feature/pi-durable]
@@ -79,6 +80,47 @@ jobs:
         with:
           name: durable-retention-0-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-retention-0-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
+  # Decision 0007: the SQL Server storage groups need a server, so they run here against a throwaway SQL Server container (Linux runners
+  # only run containers); the test job above has no server, and those groups are empty there.
+  mssql:
+    name: Durable SQL Server storage (SQL Server 2022)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Start SQL Server
+        shell: bash
+        run: |
+          password="Pi#$(openssl rand -hex 16)"
+          echo "::add-mask::$password"
+          docker run -d --name mssql -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=$password" -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+          for attempt in $(seq 1 60); do
+            if docker exec mssql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$password" -Q "SELECT 1" > /dev/null 2>&1; then break; fi
+            if [ "$attempt" = 60 ]; then docker logs mssql; exit 1; fi
+            sleep 2
+          done
+          echo "PISHARP_DURABLE_MSSQL_CONNECTION_STRING=Server=localhost,1433;User ID=sa;Password=$password;TrustServerCertificate=True" >> "$GITHUB_ENV"
+
+      - name: Run the SQL Server groups of PiSharp.Durable.Tests
+        shell: bash
+        run: |
+          dotnet run --project tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj -c Release \
+            -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
+            -- --only storage.mssql.,session.mssql.,harness.tasks.mssql.,harness.events.mssql.,harness.ownership.mssql.,harness.tools-recovery.mssql. \
+            --report "$RUNNER_TEMP/durable-mssql.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-mssql-report
+          path: ${{ runner.temp }}/durable-mssql.json
           if-no-files-found: ignore
 
   sqlite-publish:

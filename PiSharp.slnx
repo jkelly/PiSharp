@@ -18,6 +18,7 @@
     <Project Path="src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
     <Project Path="src/PiSharp.Codemode/PiSharp.Codemode.csproj" />
     <Project Path="src/PiSharp.Durable/PiSharp.Durable.csproj" />
+    <Project Path="src/PiSharp.Durable.MSSQL/PiSharp.Durable.MSSQL.csproj" />
     <Project Path="src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <Project Path="src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
   </Folder>

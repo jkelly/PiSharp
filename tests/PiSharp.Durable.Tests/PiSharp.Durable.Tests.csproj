@@ -6,6 +6,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <!-- Decision 0007: the storage.mssql.* groups (Storage/SqlServerStorageCases.cs). -->
+    <ProjectReference Include="../../src/PiSharp.Durable.MSSQL/PiSharp.Durable.MSSQL.csproj" />
     <ProjectReference Include="../../src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
     <!-- Work list area e: the image processor's cases decode, encode and prepare images with the coding agent's Skia codec, as upstream's
          tools-images.test.ts does with Photon (ToolsImagesCases.cs). -->
