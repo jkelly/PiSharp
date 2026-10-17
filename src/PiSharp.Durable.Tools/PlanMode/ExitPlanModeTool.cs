@@ -82,9 +82,11 @@ internal static class ExitPlanModeTool
             return Encoding.UTF8.GetByteCount(inline) > MaxPlanBytes ? (null, null, $"The plan is larger than {MaxPlanBytes / 1024} KiB.") : (inline, null, null);
         var env = ToolEnv.Require(api);
         var name = Text("planFile") is { } given && Js.Trim(given).Length > 0 ? given : PlanMode.DefaultPlanFile;
+        var scope = new PlanScopedEnv(env, directory);
+        if (PlanScopedEnv.RawProblem(name) is { } problem) return (null, null, scope.Denied(name, problem).Message);
         var joined = Path.IsPathRooted(name) ? name : (await env.JoinPathAsync([directory, name], context).ConfigureAwait(false)).GetOrThrow();
         var path = (await env.AbsolutePathAsync(joined, context).ConfigureAwait(false)).GetOrThrow();
-        if (await new PlanScopedEnv(env, directory).CheckAsync(path, context).ConfigureAwait(false) is { } denied) return (null, null, denied.Message);
+        if (await scope.CheckAsync(path, context).ConfigureAwait(false) is { } denied) return (null, null, denied.Message);
         var info = await env.FileInfoAsync(path, context).ConfigureAwait(false);
         if (!info.IsOk)
             return (null, null, info.Error.Code == FileErrorCode.NotFound

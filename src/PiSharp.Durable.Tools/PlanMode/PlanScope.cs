@@ -25,6 +25,7 @@ internal static class PlanScope
             var scoped = new PlanScopedEnv(ToolEnv.Require(api), root);
             if (arguments is JsonObjectValue args && args.TryGetValue("path", out var value) && value is JsonStringValue path)
             {
+                if (PlanScopedEnv.RawProblem(path.Value) is { } problem) throw scoped.Denied(path.Value, problem);
                 var absolutePath = await PathUtils.ResolveToolPathAsync(scoped, path.Value, context).ConfigureAwait(false);
                 if (await scoped.CheckAsync(absolutePath, context).ConfigureAwait(false) is { } denied) throw denied;
             }
@@ -183,13 +184,32 @@ internal sealed class PlanScopedEnv(IExecutionEnv inner, string root) : IExecuti
         return null;
     }
 
+    /// <summary>
+    /// Why a path as the model wrote it is refused before it is resolved, or null: a name (other than <c>.</c> and <c>..</c>) that ends in a
+    /// dot or white space, which Windows path normalization drops so the file written is not the one named, or a colon anywhere but a drive
+    /// designator. Both <c>/</c> and <c>\</c> separate names here.
+    /// </summary>
+    internal static string? RawProblem(string path)
+    {
+        var names = path.Split('/', '\\');
+        for (var index = 0; index < names.Length; index++)
+        {
+            var name = names[index];
+            if (name.Length == 0 || name is "." or "..") continue;
+            if (index == 0 && name.Length == 2 && name[1] == ':' && char.IsAsciiLetter(name[0])) continue;
+            if (name.EndsWith('.') || char.IsWhiteSpace(name[^1])) return $"the name \"{name}\" ends in a dot or space";
+            if (name.Contains(':')) return $"the name \"{name}\" contains a colon (an alternate data stream)";
+        }
+        return null;
+    }
+
     /// <summary>A device, extended-length or UNC prefix.</summary>
     internal static bool HasDevicePrefix(string path) =>
         path.StartsWith(@"\\", StringComparison.Ordinal) || path.StartsWith("//", StringComparison.Ordinal) ||
         path.StartsWith(@"\??\", StringComparison.Ordinal) || path.StartsWith(@"/??/", StringComparison.Ordinal) ||
         path.StartsWith(@"\/", StringComparison.Ordinal) || path.StartsWith(@"/\", StringComparison.Ordinal);
 
-    private FileError Denied(string path, string? reason) =>
+    internal FileError Denied(string path, string? reason) =>
         new(FileErrorCode.PermissionDenied, $"Plan mode: {path} is outside the plan directory {Root}" + (reason is null ? "" : $" ({reason})"), path);
 
     private async Task<Result<T, FileError>> Checked<T>(string path, DurableContext context, Func<Task<Result<T, FileError>>> mutate) =>

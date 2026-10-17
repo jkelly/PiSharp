@@ -103,6 +103,11 @@ internal static class CrashTests
         new("abort", "task-mark", r => AbortedToolRound(r)),
         new("abort", "conversation-mark", r => AbortedToolRound(r)),
         new("abort", "request-mark", AbortedRequest),
+        // PiSharp-only ask_user_question and plan mode (InteractionCrashScenarios.cs): a call waiting for the user, an answer and an approval
+        // that landed before their call settled.
+        new("ask-user", "waiting", InteractionCrash.VerifyWaiting),
+        new("ask-user", "answered", InteractionCrash.VerifyAnswered),
+        new("plan-approval", "approved", InteractionCrash.VerifyApproved),
     ];
 
     // ─── Case driver ────────────────────────────────────────────────────────
@@ -117,7 +122,7 @@ internal static class CrashTests
         var setup = BuildSetup(point.Scenario, point.Checkpoint, CrashGate.Parent, directory);
         // The retry backoff of the killed child is 60 s; the reopened host's clock is past it.
         if (point.Checkpoint == "retry") setup.Now = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 120_000;
-        var opened = await OpenChat(await OpenStorage(backend, path), setup);
+        var opened = await OpenChat(await OpenStorage(backend, path), setup, EnvFor(point.Scenario, directory));
         try
         {
             var recovery = new Recovery(backend, path, setup, opened);
