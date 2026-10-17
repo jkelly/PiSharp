@@ -673,10 +673,14 @@ internal sealed class DurableCodemodeCall
 
     private void OnCall(CodemodeHostCall made)
     {
-        if (Stopped) return;
+        if (ended is not null || failure is not null) return;
         var call = AsToolCall(made);
         if (call.Target == CodemodeCallTarget.Tool) StartedRow(call);
         issued = Math.Max(issued, call.Id);
+        // The sandbox forwards a call before it finishes the script, but this post can run once the run has finished (a call the script
+        // made and never awaited before returning). Upstream handles it inside the sandbox's message, before the finish: its row is kept
+        // (it shows as cancelled) and nothing is launched.
+        if (run?.Finished == true) return;
         var index = replaying ? replayIndex.GetValueOrDefault(call.Id, -1) : -1;
         if (index == -1)
         {
