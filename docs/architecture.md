@@ -46,7 +46,7 @@ Matching command names or providing similar features is not enough to claim pari
 
 - Include the coding-agent SDK, interactive CLI, print/JSON/RPC modes, built-in tools, sessions and branching, compaction and context editing, model/provider selection, configuration and authentication flows required by the pinned product, resource loading, commands, prompts, skills, themes, native extensions, and required MCP/codemode behavior.
 - Inventory all provider and model transport capabilities at the baseline. Implement representative providers first; finish the mandatory provider matrix before calling the native v1 port complete. An earlier preview may ship with a clearly stated subset.
-- Defer separate server/client products, full Chord/Pico or durable APIs, alternate SQLite backends (on branch `feature/pi-durable`, decision 0005 ports `pi-durable` experimentally), browser/web interfaces and unrelated monorepo services unless the baseline proves a dependency is required for stable CLI behavior.
+- Defer separate server/client products, full Chord/Pico or durable APIs, alternate SQLite backends (on branch `feature/pi-durable`, decision 0005 ports `pi-durable` experimentally), browser/web interfaces and unrelated monorepo services unless the baseline proves a dependency is required for stable CLI behavior. Decision 0008 starts that expansion for durable sessions only: a device host, a device server and a web UI, on branch `feature/durable-network`.
 - Do not make a desktop GUI, a hosted service, a new agent framework or unrestricted JavaScript compatibility prerequisites for the first native port.
 ## 3 Proposed architecture
 
