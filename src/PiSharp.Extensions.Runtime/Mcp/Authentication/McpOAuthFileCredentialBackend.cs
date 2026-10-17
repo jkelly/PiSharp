@@ -43,8 +43,11 @@ public sealed class McpOAuthFileCredentialBackend : IMcpOAuthCredentialBackend
         // One writer per process at a time; the lock file excludes other processes.
         lock (gate)
         {
-            EnsureParentDirectory(); EnsureFileExists();
+            EnsureParentDirectory();
             using var held = AcquireLock();
+            // Created under the lock: the original creates it first because proper-lockfile resolves the file's real path, but here the
+            // lock is a separate file, and creating it outside the lock let its exclusive handle collide with another holder's read.
+            EnsureFileExists();
             var current = File.Exists(FilePath) ? File.ReadAllText(FilePath, Utf8) : null;
             var (result, next) = update(current);
             if (next is not null) Write(next);
