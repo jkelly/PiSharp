@@ -1,6 +1,6 @@
 # Experimental port of pi-durable
 
-Status: approved by the project owner on 2026-10-12, on branch `feature/pi-durable` only. Released as experimental in PiSharp 1.2.0.1 by owner decision on 2026-10-16 (see [Release in 1.2.0.1](#release-in-1201)). It supersedes the `pi-durable` and experimental `durable` exclusions in [0002-pi-1.1.0-sync.md](0002-pi-1.1.0-sync.md) for that branch. Retargeted to Pi v1.2.0 on 2026-10-15 (see [Pi v1.2.0 retarget](#pi-v120-retarget)), and the v1.2.0 update was completed the same day (see [Pi v1.2.0 update complete](#pi-v120-update-complete)); the `exclude.durable` and `exclude.chord` rows of [0006-pi-1.2.0-sync.md](0006-pi-1.2.0-sync.md), and its exclusion of codemode's `sandbox.start()`, apply to `main` only (see [Codemode `Start()`](#codemode-start)).
+Status: approved by the project owner on 2026-10-12, on branch `feature/pi-durable` only. Released as experimental in PiSharp 1.2.0.1 by owner decision on 2026-10-16 (see [Release in 1.2.0.1](#release-in-1201)). It supersedes the `pi-durable` and experimental `durable` exclusions in [0002-pi-1.1.0-sync.md](0002-pi-1.1.0-sync.md) for that branch. Retargeted to Pi v1.2.0 on 2026-10-15 (see [Pi v1.2.0 retarget](#pi-v120-retarget)), and the v1.2.0 update was completed the same day (see [Pi v1.2.0 update complete](#pi-v120-update-complete)); the `exclude.durable` and `exclude.chord` rows of [0006-pi-1.2.0-sync.md](0006-pi-1.2.0-sync.md), and its exclusion of codemode's `sandbox.start()`, apply to `main` only (see [Codemode `Start()`](#codemode-start)). Two PiSharp-only additions, the `ask_user_question` tool and plan mode, were decided on 2026-10-17 (see [PiSharp-only additions](#pisharp-only-additions-ask_user_question-and-plan-mode)).
 
 ## Context
 
@@ -299,3 +299,61 @@ Area h ran every v1.2.0 example under Node and moved the seven changed examples 
 - **Main's `tool_search` U+0130 lowercasing** was fixed by [PR #19](https://github.com/jkelly/PiSharp/pull/19) on `main` (merged 2026-10-15, in PiSharp 1.2.0) and merged into this branch; the ranking differential now includes U+0130. Closed.
 - **The durable TUI's edit cards.** They use `BuiltInToolRenderers.CreateAllToolRenderers()`, while interactive mode resolves edit's own shell, so the cards differ slightly. Not in the update's scope.
 - **`Fixtures/v1.2.0/index.json`** still describes its fixtures as unread by any suite. It is written only by `tools/DurableFixtures/capture-all.mjs`, and every suite now reads the v1.2.0 set where one exists.
+
+## PiSharp-only additions: ask_user_question and plan mode
+
+Decided by the owner on 2026-10-17. Upstream pi-durable has neither; both are PiSharp-only, like `pisharp durable` (section 8), and have no port-map rows. Their sources carry a "PiSharp-only (decision 0005)" header instead of a `// Pi <sha>` pin. This section records the library half, in `src/PiSharp.Durable.Tools/Interaction` and `src/PiSharp.Durable.Tools/PlanMode`. The `pisharp durable` UI (the `/plan` command, the question form and the plan review) is a separate change.
+
+**What the owner decided:**
+- `ask_user_question` behaves like Claude Code's AskUserQuestion: 1-4 questions, 2-4 options each, multi-select, and a free-text "Other" answer the user always has. The call stays open durably, through a close or crash, until the user answers or declines, and the answers come back as the tool result in the same turn.
+- Plan mode works like Claude Code's and Codex's, except that the agent may create and edit files inside a plan directory (the plan file, notes, prototypes). `write` and `edit` are confined to it. The host picks the directory; `pisharp durable` will default to `<session dir>/plans/<conversationId>`, outside the repository.
+- **`bash` and `powershell` stay available in plan mode and are not restricted.** The prompt tells the agent not to change anything outside the plan directory through the shell, but nothing enforces it. This is a known limitation (see below).
+- No new ls, find or grep tools.
+- `exit_plan_mode` is always offered: it lives in the `user-interaction` extension with `ask_user_question`. Outside plan mode it returns an error result.
+- No Codex-style `update_plan` checklist.
+
+**Mechanism.** No scheduler change. A tool waits for a person the way upstream `spec.md` §9.2 intends. It commits a task-scoped document, publishes its pending state in its `pi.live` tool slot details (which every conversation view mounts), and watches the document. The host answers by committing a response into that document, in one conversation commit that reads only through the transaction. Both tools are `Replay = Safe` and `Callers = [Model]`. After a close or crash the call reruns, finds its document, and either waits again (publishing the same pending state) or returns the stored response. The settle commit appends the result entry once.
+
+**Documents:**
+- `pisharp.interaction` (version 1, task-scoped, so it retires with the call): `{kind: "questions", questions, createdAt, response?}` or `{kind: "plan-approval", plan, planFile?, directory, createdAt, response?}`. A response is `{status: "answered"|"declined", answers?, at}` for questions and `{status: "approved"|"rejected"|"cancelled", stop?, feedback?, at}` for a plan.
+- `pisharp.plan-mode` (version 1, a rewindable conversation document forked `asOf`, like `pi.agent`, so a fork sees the mode its agent has): `{mode: "plan"|"default", directory, enteredAt, saved: {extensions, tools}, submissions: [{taskId, callId, planFile?, status, at}] (the last 20), approved?}`.
+- The tool slot details are `{kind: "pisharp.questions", version: 1, state, questions, answers?}` and `{kind: "pisharp.plan-approval", version: 1, state, plan, planFile?, directory, stop?, feedback?}`, with `state` `pending` while the call waits.
+- The `at`, `createdAt` and `enteredAt` times are wall-clock milliseconds. Neither tools nor host commits can read the Harness clock, so they are informational only.
+
+**Host API** (no CLI needed):
+- `UserInteraction.CreateExtension()` (`user-interaction`) and `PlanMode.CreateExtension(PlanModeOptions?)` (`plan-mode`).
+- `UserInteraction.PendingAsync(conversation)`, `PendingIn(view)` and `PendingOf(conversationId, slot)` list what waits.
+- `UserQuestions.AnswerAsync` and `DeclineAsync` respond to questions.
+- `PlanMode.EnterAsync`, `ExitAsync`, `ApproveAsync(stop)` and `RejectAsync(feedback)` drive plan mode; `PlanMode.StateAsync`, `StateOf` and `IsActive` read it.
+- A response to a call that no longer waits throws `InteractionNotPendingException`; repeating the same response is a no-op.
+
+**Plan mode in one commit each:**
+- `EnterAsync` saves the stored `pi.agent` `extensions` and `tools`, adds `plan-mode` to the selection, and sets the tool filter to the allowed tools (default `read`, `write`, `edit`, `bash`, `powershell`, `ask_user_question`, `exit_plan_mode`, narrowed by a stored filter, with `exit_plan_mode` always kept).
+- `ExitAsync` restores them and cancels a pending review; its `exit_plan_mode` call returns and ends the run.
+- `ApproveAsync` writes the call's response, the restored agent and the approved state in one commit, so a crash can never leave an approved plan with plan mode still on, or the reverse.
+- `RejectAsync` keeps plan mode, and the call returns the feedback.
+- The host keeps `plan-mode` out of its default extension selection, as `pisharp durable` keeps `tool-search` out.
+- `EnterAsync` refuses a directory that is relative, a device or network path, a file system root, the home directory or one of its ancestors, or the conversation's working directory or one of its ancestors. It also refuses when the registry lacks `plan-mode` or `exit_plan_mode`.
+
+**Containment security model.** The `plan-mode` extension wraps `write` and `edit`. The wrapped tool reads the plan directory from `pisharp.plan-mode` when it executes; without one it fails. The check does not depend on the mode, so a wrapped call that runs after plan mode ended is still confined. The wrapper checks the path argument, then runs the tool with an execution environment whose every mutation is checked: write, append, truncate, flush, rename (both paths), directory creation and removal. That environment never runs commands, creates temporary files or watches. A path is allowed only when all of these hold, and any error while checking denies it:
+- The path as written has no name ending in a dot or space (Windows normalization would drop it) and no colon outside a drive designator.
+- It has no device or UNC prefix (`\\?\`, `\\.\`, `\??\`, `\\server`, `//`).
+- Its absolute form lies strictly below the plan directory's, so the directory itself is never a target.
+- No name below the directory is a Windows device name (CON, PRN, AUX, NUL, COM0-9, LPT0-9, CONIN$, CONOUT$, any extension), ends in a dot or space, contains a colon (an alternate data stream) or a character Windows reserves, or looks like an 8.3 short name (`~` and a digit). These names are refused on every platform.
+- No existing component below the directory is a symbolic link or junction, checked without following links. A link pointing back inside is refused too.
+- The canonical path of its deepest existing ancestor, joined with the names that do not exist yet, lies below the canonical directory. The directory is created when missing.
+
+The denial is `FileError(PermissionDenied)` with "Plan mode: <path> is outside the plan directory <dir>", and the reason when there is one. `exit_plan_mode` reads its plan file through the same check, at most 256 KiB.
+
+**Residual risks:**
+- **Bash and powershell are not restricted in plan mode, by owner decision.** The agent can change any file through the shell; only the prompt asks it not to.
+- **TOCTOU.** Another process can swap a checked component for a link between the check and the write.
+- **Hard links and mounts.** A hard link inside a user-chosen plan directory to a file outside it, or a bind mount, is not detected.
+- **Spelling.** The plan directory is compared as spelled in the state document (a drive letter in any case). A path that spells it differently, such as another case on Windows, is denied rather than resolved.
+- A host whose default selection includes `plan-mode` confines `write` and `edit` everywhere and fails them when no plan directory is set.
+
+**Tests** (`tests/PiSharp.Durable.Tests`):
+- `questions.*` and `plan.*` flow cases run on memory, JSONL and SQLite. They cover pending state committed before it is shown, answers (single, multi, other), validation, idempotence and conflicts, decline, abort, restart while waiting, an answer whose settle commit fails in Storage, and two parallel questions.
+- They also cover entering and leaving plan mode, approve, approve-and-stop and reject with feedback, restart awaiting approval, an approval whose settle commit fails, a manual exit cancelling the review, forks as of their entry, and a wrapped write running after the approval.
+- The `plan.*` containment cases run the wrapped tools against relative, absolute, `..`, `@` and Unicode-space paths, file and directory links, dangling links, junctions, Windows names, 8.3 aliases and device prefixes. Link cases skip, with the reason, where the process cannot create the link: symbolic links on Windows without the privilege, junctions off Windows.
+- `crash.<sqlite|jsonl>.ask-user.waiting` and `.answered`, and `crash.<sqlite|jsonl>.plan-approval.approved`, kill a real child process while a question waits, right after an answer landed, and right after an approval landed. They then check that the same call completes once and that the approval was atomic.
