@@ -313,7 +313,9 @@ internal sealed class TuiRun : IAsyncDisposable
     {
         if (!Run.IsCompleted)
         {
+            // Ctrl+C exits from the editor; a question form or plan review takes it as an abort, and Ctrl+D exits from it.
             Terminal.Send("\u0003");
+            Terminal.Send("\u0004");
             try { await Run.WaitAsync(TimeSpan.FromSeconds(20)); }
             catch (TimeoutException) { await cancellation.CancelAsync(); }
         }
