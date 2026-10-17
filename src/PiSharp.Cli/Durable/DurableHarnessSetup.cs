@@ -3,6 +3,8 @@
 // getCompactionSettings, getRetrySettings, getSteeringMode, getFollowUpMode) are ported here over PiSettings' merged layers, read at every
 // access. The coding registry installs the durable CodingTools (PiSharp.Durable.Tools), as upstream installs pi-durable's own CodingTools
 // and not the coding agent's tools; only the tools' prompt contributions come from the coding agent (DurablePrompt).
+// PiSharp-only (decision 0005, "PiSharp-only additions"): the registry also installs ask_user_question and exit_plan_mode (user-interaction)
+// and plan mode (plan-mode, kept out of the default selection); PlanDirectory picks where plan mode may write.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Commands;
@@ -27,8 +29,9 @@ internal sealed class PiHarnessSettings(PiSettings settings, IRegistryReader? re
     /// <summary>
     /// Every installed extension but <c>tool-search</c>, which is selected only while an installed tool is deferred (PiSharp-only, durable
     /// work list area l): as the coding agent registers <c>tool_search</c> and activates it only for deferred tools, so the tools the model
-    /// is offered stay the same until something defers one. <c>pisharp durable</c> defers none. Null without a registry: every installed
-    /// extension.
+    /// is offered stay the same until something defers one. <c>pisharp durable</c> defers none. <c>plan-mode</c> is never selected by
+    /// default: it confines write and edit to the plan directory, so only <c>/plan</c> selects it for a conversation (PiSharp-only, decision
+    /// 0005). Null without a registry: every installed extension.
     /// </summary>
     public override IReadOnlyList<Extension>? Extensions
     {
@@ -37,7 +40,8 @@ internal sealed class PiHarnessSettings(PiSettings settings, IRegistryReader? re
             if (registry is null) return null;
             var snapshot = registry.Snapshot();
             var deferred = snapshot.Tools().Any(tool => tool.Tool.Deferred);
-            return [.. snapshot.Installed().Where(extension => deferred || extension.Name != DurableHarnessSetup.ToolSearchExtensionName)];
+            return [.. snapshot.Installed().Where(extension => extension.Name != PlanMode.ExtensionName &&
+                (deferred || extension.Name != DurableHarnessSetup.ToolSearchExtensionName))];
         }
     }
 
@@ -171,7 +175,9 @@ internal static class DurableHarnessSetup
     /// tools' read returns images; <c>pisharp durable</c> gives it an image processor on the coding agent's Skia codec, on a worker thread
     /// (durable work list area e; upstream's equivalent is <c>createCodingTools({ images: await createNodePhotonImages() })</c>). It also
     /// installs <c>tool_search</c> (pi-durable 1.2.0's <c>tool-search</c> extension), which the settings of
-    /// <see cref="CreateHarnessSettings"/> leave unselected until a tool is deferred (durable work list area l).
+    /// <see cref="CreateHarnessSettings"/> leave unselected until a tool is deferred (durable work list area l). PiSharp-only (decision
+    /// 0005): it installs <c>user-interaction</c> (<c>ask_user_question</c>, <c>exit_plan_mode</c>) and <c>plan-mode</c>, which the settings
+    /// leave unselected until <c>/plan</c> selects it for a conversation.
     /// </summary>
     internal static IRegistry CreateCodingRegistry(PiSettings settings, string cwd, DurablePromptResources resources)
     {
@@ -179,7 +185,25 @@ internal static class DurableHarnessSetup
         registry.Install(CodingTools.CreateCodingTools(new ReadToolOptions { Images = CodingImages.Value }));
         registry.Install(DurablePrompt.Create(settings, cwd, resources));
         registry.Install(ToolSearch.CreateExtension());
+        registry.Install(UserInteraction.CreateExtension());
+        registry.Install(PlanMode.CreateExtension());
         return registry;
+    }
+
+    /// <summary>
+    /// Where plan mode lets <paramref name="conversation"/> write (PiSharp-only, decision 0005): <c>&lt;session dir&gt;/plans/&lt;conversation
+    /// id&gt;</c>, outside the repository; or, with the setting <c>planMode.directory</c> (absolute, <c>~</c>, or relative to the session's
+    /// working directory), <c>&lt;planMode.directory&gt;/&lt;session id&gt;-&lt;conversation id&gt;</c>.
+    /// </summary>
+    internal static string PlanDirectory(DurableSessionLocation location, ConversationId conversation, PiSettings settings, string home)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+        ArgumentNullException.ThrowIfNull(settings);
+        var id = conversation.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (settings.Merged["planMode"] is JsonObject planMode && planMode["directory"] is JsonValue value && value.TryGetValue<string>(out var configured) &&
+            PiArgs.JsTrim(configured).Length > 0)
+            return Path.Join(PiPaths.ResolvePath(configured, location.Cwd, home, trim: true), $"{location.Id}-{id}");
+        return Path.Join(location.Directory, "plans", id);
     }
 
     /// <summary>The model a new root conversation starts with: an explicit provider and model, or pi's default resolution (upstream

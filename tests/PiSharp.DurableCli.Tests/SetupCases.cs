@@ -67,8 +67,8 @@ internal static partial class Program
                 var installed = registry.Snapshot().GetExtension("tool-search");
                 Equal(ToolSearch.ToolName, Names(installed?.Tools ?? []), "tool_search installed");
                 var off = Resolve();
-                Equal("read,write,edit,bash,subagent", Names(off.Tools), "the tools offered without deferred tools");
-                Equal("coding-tools,pi-prompt,subagent", string.Join(",", off.Extensions.Select(extension => extension.Name)), "selected extensions");
+                Equal("read,write,edit,bash,ask_user_question,exit_plan_mode,subagent", Names(off.Tools), "the tools offered without deferred tools");
+                Equal("coding-tools,pi-prompt,user-interaction,subagent", string.Join(",", off.Extensions.Select(extension => extension.Name)), "selected extensions");
                 Check(off.Deferred.IsEmpty, "nothing deferred");
 
                 // An extension with a deferred tool turns it on: the model is offered tool_search, which loads the deferred tool.
@@ -82,11 +82,11 @@ internal static partial class Program
                 var tickets = Define.Extension(new Extension { Name = "tickets", Tools = [lookup] });
                 registry.Install(tickets);
                 var on = Resolve();
-                Equal("read,write,edit,bash,tool_search,subagent", Names(on.Tools), "tool_search offered");
+                Equal("read,write,edit,bash,tool_search,ask_user_question,exit_plan_mode,subagent", Names(on.Tools), "tool_search offered");
                 Equal("lookup_ticket", Names(on.Deferred), "the deferred tool");
                 // And off again once nothing is deferred.
                 registry.Uninstall(tickets);
-                Equal("read,write,edit,bash,subagent", Names(Resolve().Tools), "off again");
+                Equal("read,write,edit,bash,ask_user_question,exit_plan_mode,subagent", Names(Resolve().Tools), "off again");
             }
             finally { Directory.Delete(directory, recursive: true); }
         }),

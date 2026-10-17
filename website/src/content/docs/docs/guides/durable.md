@@ -34,7 +34,7 @@ pisharp durable --continue             # reopen the newest durable session for t
 
 `pisharp durable` takes one option. `--continue` (or `-c`) reopens the newest session for the current folder, and without it each run starts a new session. Any other argument fails with `Unknown argument`. The command is listed in `pisharp --help` as experimental and prints a one-line experimental notice when it starts.
 
-It reads the same settings, credentials and models as `pisharp`, so providers you have signed in to work here too. The model gets the `read`, `write`, `edit` and `bash` tools, with images from `read`, and a `subagent` tool.
+It reads the same settings, credentials and models as `pisharp`, so providers you have signed in to work here too. The model gets the `read`, `write`, `edit` and `bash` tools, with images from `read`, a `subagent` tool, and two PiSharp-only tools that wait for you: `ask_user_question` and `exit_plan_mode` (see [Questions from the agent](#questions-from-the-agent) and [Plan mode](#plan-mode)).
 
 ### In a session
 
@@ -46,10 +46,45 @@ It reads the same settings, credentials and models as `pisharp`, so providers yo
 | `/tasks` | Shows or hides running tasks. |
 | `/agents` | Switches between the main conversation and its subagents. |
 | `/compact [instructions]` | Compacts the conversation. |
+| `/plan` | Turns [plan mode](#plan-mode) on, or off when it is on. |
+| `/plan <message>` | Turns plan mode on and sends the message. |
 | Escape | Aborts the turn. |
 | Ctrl+D | Exits. |
 
 Your [key bindings](/docs/guides/interactive/#key-bindings) apply, including the keys for the model selector and the thinking level.
+
+### Questions from the agent
+
+When the agent needs a decision from you, it calls `ask_user_question` with one to four multiple-choice questions, and a form replaces the editor until you answer. Whatever you had typed stays in the editor and comes back afterwards.
+
+- **Tabs.** The top row has a tab for each question, named by its short header, and a Submit tab. ←/→ or Tab/Shift+Tab move between them. A ✓ marks the questions you have answered.
+- **Choosing.** ↑/↓ move over the options, shown as "label — description". A digit jumps to that row.
+  - A single-choice question takes Enter or the option's digit, then moves to the next tab.
+  - A multiple-choice question toggles options with Space or their digits, and Enter moves on.
+- **Other.** Every question has an "Other…" row for your own text. It opens an inline input: Enter keeps the text, Escape goes back to the options.
+- **Submit.** The Submit tab sums up your answers and offers "Submit answers" and "Decline to answer". If you decline, the agent proceeds on its own judgement.
+- **Abort or leave.** Escape (or Ctrl+C) aborts the turn. Ctrl+D exits and leaves the question waiting: the question is saved, so `pisharp durable --continue` shows the form again, even after a crash.
+
+The status line says "Waiting for your answer...", and the tool card shows the questions and, once you answer, your answers. The answers go back to the agent as the tool's result in the same turn.
+
+### Plan mode
+
+Plan mode is for agreeing on a plan before anything in the project changes, as in Claude Code and Codex.
+
+- **Turning it on.** `/plan` turns it on for the conversation you are looking at, and `/plan <message>` turns it on and sends the message. The footer shows a **plan mode** badge.
+- **What the agent can do.** `write` and `edit` work only inside a plan directory, for the plan file, notes and prototypes. `read` and `bash` work as usual, and the agent can ask you questions. `/plan` tells you where the directory is: by default `plans/<conversation id>` in the session's folder, outside your project. To put plans elsewhere, set `planMode.directory` in `settings.json` to an absolute path, a `~` path or a path relative to the project; each conversation then gets `<session id>-<conversation id>` inside it.
+- **Reviewing the plan.** When the plan is ready, the agent calls `exit_plan_mode`, and a review replaces the editor. It shows the plan and its file, and offers four choices:
+
+  | Choice | What happens |
+  | --- | --- |
+  | Yes, implement it | Plan mode ends, the agent gets all its tools back and starts on the plan. |
+  | Yes, but don't start yet | Plan mode ends and the turn stops. Tell the agent when to start. |
+  | No, keep planning (give feedback) | Opens an editor for your feedback. The agent stays in plan mode and revises the plan. |
+  | No, keep planning | The agent stays in plan mode and revises the plan. |
+
+- **Turning it off.** `/plan` while plan mode is on turns it off. A plan still waiting for review is then cancelled and the turn ends.
+
+Like questions, a plan review survives closing and crashing: `--continue` shows it again.
 
 ### Where sessions are stored
 
@@ -71,6 +106,7 @@ The layout and the lock are those of Pi v1.1.0's experimental durable agent, so 
 - **A lost lock fails the session.** Pi's agent ends its process when its session lock is lost; PiSharp fails the session instead, so the TUI can say why before it exits with 1. Either way nothing more is saved.
 - **Images use SkiaSharp.** Upstream resizes images with Photon compiled to WebAssembly. PiSharp applies the same rules through the image codec its main `read` tool uses.
 - **No Cloudflare adapters.** The Cloudflare Durable Object storage and image processor are not ported.
+- **Questions and plan mode are PiSharp's.** `pi-durable` has no `ask_user_question` tool and no plan mode. PiSharp adds both, in `PiSharp.Durable.Tools` and in `pisharp durable`, so a session that used them stores two document kinds that Pi doesn't know (`pisharp.interaction` and `pisharp.plan-mode`).
 
 ## Libraries
 
@@ -101,6 +137,9 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
 
 - JSONL storage keeps the records it wrote in memory, so a long session on JSONL grows (about 400 MiB where Node holds 1 MiB in one benchmark). SQLite storage, which `pisharp durable` uses, does not. See [durable-benchmarks.md](https://github.com/jkelly/PiSharp/blob/main/docs/durable-benchmarks.md).
 - `pisharp durable`'s edit cards differ slightly from interactive mode's.
+- **Plan mode does not restrict `bash`.** Only `write` and `edit` are confined to the plan directory. The agent is told not to change anything outside it through the shell, but nothing enforces that, so it could change any file with a command. This was a deliberate choice, so that the agent can still inspect the project with commands such as `git log`, builds and tests.
+- Plan mode's containment of `write` and `edit` has other limits. Another process could swap a folder for a link between the check and the write, and a hard link or mount inside a plan directory you chose yourself can lead outside it.
+- Subagents can't ask you questions or use plan mode: only the conversation you are looking at can show a form.
 
 ## Status
 
