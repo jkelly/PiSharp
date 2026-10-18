@@ -152,10 +152,21 @@ public enum DeviceChangeKind
     Catalog,
     /// <summary>A session committed something, or became unavailable.</summary>
     Session,
+    /// <summary>The device's App State changed.</summary>
+    AppState,
 }
 
 /// <summary>One change notification; <see cref="SessionId"/> names the session when there is one.</summary>
 public sealed record DeviceChange(DeviceChangeKind Kind, string? SessionId);
+
+/// <summary>An agent's optional extensions and the built-in ones it always has.</summary>
+public sealed record AgentExtensions(IReadOnlyList<HostedExtension> Optional, IReadOnlyList<string> BuiltIn);
+
+/// <summary>An optional extension and whether the agent has it on.</summary>
+public sealed record HostedExtension(string Name, string Title, string Description, bool Enabled, IReadOnlyList<AgentPrompt> Prompts);
+
+/// <summary>A prompt file of <c>system-prompts</c> and whether the agent has it checked.</summary>
+public sealed record AgentPrompt(string Id, string Description, string Text, bool Enabled);
 
 /// <summary>A directory listing for choosing a working directory (durable-pi <c>GET /v1/fs/dirs</c>).</summary>
 /// <param name="Path">The listed directory; empty for the start directories.</param>

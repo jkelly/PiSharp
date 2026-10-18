@@ -91,10 +91,12 @@ public sealed record SessionCompactionChange
     public double? KeepRecentTokens { get; init; }
 }
 
-/// <summary>A session's Harness settings: the host's settings with the session's compaction, read at every use.</summary>
-internal sealed class SessionHarnessSettings(HarnessSettings? inner, Func<SessionCompaction> compaction) : HarnessSettings
+/// <summary>A session's Harness settings: the host's settings with the session's compaction, read at every use. Without a host extension
+/// selection, every installed extension but the optional ones is selected.</summary>
+internal sealed class SessionHarnessSettings(HarnessSettings? inner, Func<SessionCompaction> compaction, Func<IReadOnlyList<Extension>>? defaultExtensions = null)
+    : HarnessSettings
 {
-    public override IReadOnlyList<Extension>? Extensions => inner?.Extensions;
+    public override IReadOnlyList<Extension>? Extensions => inner?.Extensions ?? defaultExtensions?.Invoke();
     public override ConversationStreamOptions? Stream => inner?.Stream;
     public override RetrySettings? Retry => inner?.Retry;
     public override CompactionSettings? Compaction => compaction().ToSettings();

@@ -81,9 +81,9 @@ internal static partial class Program
 
     /// <summary>The default registry plus <c>probe</c> (reads, answers "ok") and <c>hang</c> (unsafe; waits for the gate's release, then
     /// answers "released").</summary>
-    internal static Func<HostedSessionContext, IRegistry> RegistryWith(TestGate gate) => _ =>
+    internal static Func<HostedSessionContext, IRegistry> RegistryWith(TestGate gate) => context =>
     {
-        var registry = DurableDeviceHost.DefaultRegistry();
+        var registry = DurableDeviceHost.DefaultRegistry(context);
         registry.Install(Define.Extension(new Extension
         {
             Name = "test-tools",

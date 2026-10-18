@@ -15,12 +15,13 @@ namespace PiSharp.Durable.Hosting;
 internal sealed record CatalogSession(string Id, string Name, string Cwd, long CreatedAt, string? Provider, string? Model, string? Compaction);
 
 /// <summary>
-/// The device catalog in SQLite: sessions, custom agent names, spawn records and the device identity. Schema version 1 (in
-/// <c>PRAGMA user_version</c>); a newer catalog is refused rather than misread. One connection, serialized by a lock.
+/// The device catalog in SQLite: sessions, custom agent names, spawn records, the device identity, and the device's shared App State with
+/// its receipts. Schema version 2 (in <c>PRAGMA user_version</c>; version 1 had no App State); a newer catalog is refused rather than
+/// misread. One connection, serialized by a lock.
 /// </summary>
 internal sealed class SessionCatalog : IDisposable
 {
-    internal const int SchemaVersion = 1;
+    internal const int SchemaVersion = 2;
 
     private const string Schema = """
         CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -40,6 +41,11 @@ internal sealed class SessionCatalog : IDisposable
           PRIMARY KEY (session_id, conversation_id)
         );
         CREATE TABLE session_spawns (key TEXT PRIMARY KEY, session_id TEXT NOT NULL);
+        """;
+
+    private const string SchemaV2 = """
+        CREATE TABLE app_state (id INTEGER PRIMARY KEY CHECK (id = 1), value TEXT NOT NULL, revision INTEGER NOT NULL);
+        CREATE TABLE app_state_receipts (key TEXT PRIMARY KEY, value TEXT NOT NULL, revision INTEGER NOT NULL, created_at INTEGER NOT NULL);
         """;
 
     private readonly Lock gate = new();
@@ -65,10 +71,11 @@ internal sealed class SessionCatalog : IDisposable
             var version = (long)(Scalar(connection, null, "PRAGMA user_version;") ?? 0L);
             if (version > SchemaVersion)
                 throw new InvalidDataException($"The device catalog {path} has schema version {version}; this host reads version {SchemaVersion}.");
-            if (version < 1)
+            if (version < SchemaVersion)
             {
                 using var transaction = connection.BeginTransaction();
-                Execute(connection, transaction, Schema);
+                if (version < 1) Execute(connection, transaction, Schema);
+                Execute(connection, transaction, SchemaV2);
                 Execute(connection, transaction, $"PRAGMA user_version = {SchemaVersion};");
                 transaction.Commit();
             }
@@ -187,6 +194,49 @@ internal sealed class SessionCatalog : IDisposable
             Execute(connection, transaction, "DELETE FROM sessions WHERE id = $id;", ("$id", id));
             transaction.Commit();
         }
+    }
+
+    /// <summary>The App State and its revision; null before the first write.</summary>
+    public (string Value, long Revision)? AppState()
+    {
+        lock (gate) return ReadAppState(null);
+    }
+
+    /// <summary>
+    /// Changes the App State in one transaction: <paramref name="change"/> maps the current value and revision (null before the first
+    /// write) to the new value, which is stored with the next revision. With <paramref name="receiptKey"/>, a key already used returns its
+    /// stored result and changes nothing, so a replayed tool call applies once.
+    /// </summary>
+    public (string Value, long Revision) ChangeAppState(Func<(string Value, long Revision)?, string> change, string? receiptKey, long createdAt)
+    {
+        lock (gate)
+        {
+            using var transaction = connection.BeginTransaction();
+            if (receiptKey is not null)
+            {
+                using var receipt = Command(connection, transaction, "SELECT value, revision FROM app_state_receipts WHERE key = $key;", [("$key", receiptKey)]);
+                using var reader = receipt.ExecuteReader();
+                if (reader.Read()) return (reader.GetString(0), reader.GetInt64(1));
+            }
+            var current = ReadAppState(transaction);
+            var value = change(current);
+            var revision = (current?.Revision ?? 0) + 1;
+            Execute(connection, transaction,
+                "INSERT INTO app_state (id, value, revision) VALUES (1, $value, $revision) ON CONFLICT (id) DO UPDATE SET value = excluded.value, revision = excluded.revision;",
+                ("$value", value), ("$revision", revision));
+            if (receiptKey is not null)
+                Execute(connection, transaction, "INSERT INTO app_state_receipts (key, value, revision, created_at) VALUES ($key, $value, $revision, $created);",
+                    ("$key", receiptKey), ("$value", value), ("$revision", revision), ("$created", createdAt));
+            transaction.Commit();
+            return (value, revision);
+        }
+    }
+
+    private (string Value, long Revision)? ReadAppState(SqliteTransaction? transaction)
+    {
+        using var command = Command(connection, transaction, "SELECT value, revision FROM app_state WHERE id = 1;", []);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? (reader.GetString(0), reader.GetInt64(1)) : null;
     }
 
     /// <summary>The number of catalog rows that mention the session, across its three tables (tests).</summary>

@@ -48,10 +48,33 @@ public sealed record DurableDeviceOptions
 
     /// <summary>How many event batches an <see cref="AgentEventFeed"/> holds before its watch waits.</summary>
     public int FeedCapacity { get; init; } = 64;
+
+    /// <summary>The durable jobs agents and people can run on this device.</summary>
+    public IReadOnlyList<JobDefinition> Jobs { get; init; } = SampleJobs.All;
+
+    /// <summary>Where the <c>system-prompts</c> extension finds its prompt files (<c>*.md</c>); null is <c>prompts</c> under the data
+    /// directory.</summary>
+    public string? PromptsDirectory { get; init; }
+
+    /// <summary>The prompt files an agent has checked until it changes its checklist.</summary>
+    public IReadOnlyList<string> DefaultPrompts { get; init; } = [];
+
+    /// <summary>The <c>command-guard</c> extension's judge for commands its offline rules allow, for example a model classifier; null uses
+    /// the offline rules only. A null verdict allows the command.</summary>
+    public Func<string, CancellationToken, Task<CommandVerdict?>>? CommandJudge { get; init; }
+
+    /// <summary>Whether a command runs when <see cref="CommandJudge"/> fails (durable-pi's guard fails open).</summary>
+    public bool CommandGuardFailOpen { get; init; } = true;
 }
 
 /// <summary>The session a registry is made for.</summary>
 /// <param name="SessionId">The session's UUID.</param>
 /// <param name="Cwd">Its working directory.</param>
 /// <param name="Directory">Its directory under the data directory.</param>
-public sealed record HostedSessionContext(string SessionId, string Cwd, string Directory);
+public sealed record HostedSessionContext(string SessionId, string Cwd, string Directory)
+{
+    /// <summary>The device's extensions for this session: <c>durable-apps</c> (App State, history, subagent, sessions, handoff and job tools
+    /// and the job tasks), then the optional <c>system-prompts</c> and <c>command-guard</c>. A custom registry installs them to offer
+    /// them.</summary>
+    public IReadOnlyList<Extension> Apps { get; init; } = [];
+}

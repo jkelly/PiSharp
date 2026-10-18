@@ -3,6 +3,7 @@
 // read-only switch, per-session compaction, and model re-routing on reopen.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
+using PiSharp.Durable.Tools;
 
 namespace PiSharp.Durable.Hosting;
 
@@ -25,6 +26,13 @@ public sealed class HostedSession
     private IHarness? harness;
     private FileLock? fileLock;
     private IDisposable? commits;
+    private IRegistry? registry;
+    private IReadOnlyDictionary<string, DurableTask> jobTasks = new Dictionary<string, DurableTask>();
+    private readonly SemaphoreSlim creations = new(1, 1);
+
+    /// <summary>A creation key's record (<c>{conversation, request}</c>), written in the commit that creates the conversation, so a retried
+    /// creation finds the first one's agent (the device server's <c>Idempotency-Key</c>).</summary>
+    private static readonly SessionDocFamilyToken CreationKeys = Documents.DefineSessionDocFamily("pisharp.creation-key", 1, _ => JsonObjectValue.Empty);
 
     internal HostedSession(DurableDeviceHost host, CatalogSession row)
     {
@@ -140,49 +148,94 @@ public sealed class HostedSession
     }
 
     /// <summary>A new root agent that starts with <paramref name="from"/>'s model, thinking level, instructions and working directory
-    /// (default Main's), and an empty conversation.</summary>
-    public async Task<HostedAgent> CreateAgentAsync(long? from = null, string? agentName = null, CancellationToken cancellationToken = default)
+    /// (default Main's), and an empty conversation. With <paramref name="creationKey"/>, a retry returns the agent the first call
+    /// created.</summary>
+    /// <exception cref="HostInvalidException">The creation key was used for a different request.</exception>
+    public async Task<HostedAgent> CreateAgentAsync(long? from = null, string? agentName = null, string? creationKey = null,
+        CancellationToken cancellationToken = default)
     {
         var custom = HostNames.Agent(agentName, 0);
         var opened = GetHarness();
         var context = Context(cancellationToken);
-        var source = await ConversationAsync(opened, from ?? ConversationId.Root.Value, context).ConfigureAwait(false);
-        var agent = await source.AgentAsync(context).ConfigureAwait(false);
-        var created = await opened.CreateConversationAsync(new ConversationCreateOptions(ConversationOwnership.Ownerless)
+        var request = $"agent:{from ?? ConversationId.Root.Value}:{custom}";
+        return await CreateOnceAsync(opened, creationKey, request, async init =>
         {
-            Agent = new AgentChange
+            var source = await ConversationAsync(opened, from ?? ConversationId.Root.Value, context).ConfigureAwait(false);
+            var agent = await source.AgentAsync(context).ConfigureAwait(false);
+            var created = await opened.CreateConversationAsync(new ConversationCreateOptions(ConversationOwnership.Ownerless)
             {
-                Model = agent.Model is { } chosen ? chosen : (Patch<ModelRef>?)null,
-                ThinkingLevel = agent.ThinkingLevel,
-                Instructions = agent.Instructions is { } instructions ? instructions : (Patch<string>?)null,
-                Cwd = agent.Cwd is { } cwd ? cwd : (Patch<string>?)null,
-            },
-        }, context).ConfigureAwait(false);
-        if (custom is not null) SetAgentName(created.Id.Value, custom);
-        return await AgentAsync(created.Id.Value, cancellationToken).ConfigureAwait(false);
+                Agent = new AgentChange
+                {
+                    Model = agent.Model is { } chosen ? chosen : (Patch<ModelRef>?)null,
+                    ThinkingLevel = agent.ThinkingLevel,
+                    Instructions = agent.Instructions is { } instructions ? instructions : (Patch<string>?)null,
+                    Cwd = agent.Cwd is { } cwd ? cwd : (Patch<string>?)null,
+                },
+                Init = init,
+            }, context).ConfigureAwait(false);
+            if (custom is not null) SetAgentName(created.Id.Value, custom);
+            return created.Id.Value;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Forks an agent at one of its visible entries. The fork keeps the conversation up to that entry, and the agent as it was
-    /// then; both carry on separately.</summary>
-    /// <exception cref="HostInvalidException">The entry is not visible to the agent.</exception>
-    public async Task<HostedAgent> ForkAsync(long agentId, long entryId, string? forkName = null, CancellationToken cancellationToken = default)
+    /// then; both carry on separately. With <paramref name="creationKey"/>, a retry returns the fork the first call made.</summary>
+    /// <exception cref="HostInvalidException">The entry is not visible to the agent, or the creation key was used for a different
+    /// request.</exception>
+    public async Task<HostedAgent> ForkAsync(long agentId, long entryId, string? forkName = null, string? creationKey = null,
+        CancellationToken cancellationToken = default)
     {
         var custom = HostNames.Agent(forkName, 0);
         var opened = GetHarness();
         var context = Context(cancellationToken);
-        var source = await ConversationAsync(opened, agentId, context).ConfigureAwait(false);
-        IConversation fork;
+        return await CreateOnceAsync(opened, creationKey, $"fork:{agentId}:{entryId}:{custom}", async init =>
+        {
+            var source = await ConversationAsync(opened, agentId, context).ConfigureAwait(false);
+            IConversation fork;
+            try
+            {
+                fork = await source.ForkAsync(new EntryId(entryId), new ConversationCreateOptions(ConversationOwnership.Ownerless) { Init = init },
+                    context).ConfigureAwait(false);
+            }
+            catch (Exception failure) when (failure is ArgumentException or InvalidOperationException)
+            {
+                throw new HostInvalidException($"Cannot fork agent {agentId} at entry {entryId}: {failure.Message}");
+            }
+            await RerouteAsync(fork, context).ConfigureAwait(false);
+            if (custom is not null) SetAgentName(fork.Id.Value, custom);
+            return fork.Id.Value;
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Runs a creation once per key: the key's record is written in the creating commit, so a retry after a lost response, or after
+    /// a crash, finds the agent the first call created.</summary>
+    private async Task<HostedAgent> CreateOnceAsync(IHarness opened, string? creationKey, string request, Func<ConversationInit?, Task<long>> create,
+        CancellationToken cancellationToken)
+    {
+        if (creationKey is null) return await AgentAsync(await create(null).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+        if (creationKey.Length is 0 or > 200) throw new HostInvalidException("A creation key must have 1 to 200 characters.");
+        await creations.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            fork = await source.ForkAsync(new EntryId(entryId), new ConversationCreateOptions(ConversationOwnership.Ownerless), context).ConfigureAwait(false);
+            var record = await opened.SnapshotAsync(CreationKeys, creationKey, Context(cancellationToken)).ConfigureAwait(false);
+            if (record is not null && record.TryGetValue("conversation", out var value) && value is JsonNumberValue earlier)
+            {
+                if (!(record.TryGetValue("request", out var used) && used is JsonStringValue text && text.Value == request))
+                    throw new HostInvalidException("This creation key was already used for a different request.");
+                return await AgentAsync((long)earlier.Value, cancellationToken).ConfigureAwait(false);
+            }
+            var id = await create(async (tx, conversationId) =>
+            {
+                var doc = await tx.DocAsync(CreationKeys, creationKey, JsonObjectValue.Empty).ConfigureAwait(false);
+                doc.Set("conversation", conversationId.Value);
+                doc.Set("request", request);
+            }).ConfigureAwait(false);
+            return await AgentAsync(id, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception failure) when (failure is ArgumentException or InvalidOperationException)
+        finally
         {
-            throw new HostInvalidException($"Cannot fork agent {agentId} at entry {entryId}: {failure.Message}");
+            creations.Release();
         }
-        await RerouteAsync(fork, context).ConfigureAwait(false);
-        if (custom is not null) SetAgentName(fork.Id.Value, custom);
-        return await AgentAsync(fork.Id.Value, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Gives an agent a custom name; blank restores its derived name.</summary>
@@ -223,6 +276,32 @@ public sealed class HostedSession
             return await SubmissionAnswers.ResultAsync(opened, record, SendStatus.Queued, context).ConfigureAwait(false);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(wait);
+        try
+        {
+            record = await submission.WaitAsync(DurableContext.Background.WithCancellation(timeout.Token)).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new SendResult(record.Id, SendStatus.Pending);
+        }
+        return await SubmissionAnswers.ResultAsync(opened, record, SendStatus.Pending, context).ConfigureAwait(false);
+    }
+
+    /// <summary>Where a submission of this session stands; with <paramref name="wait"/>, waits up to that long for it to settle (durable-pi
+    /// <c>GET /v1/sessions/:s/submissions/:id?waitMs=</c>).</summary>
+    /// <exception cref="HostNotFoundException">No such submission.</exception>
+    public async Task<SendResult> SubmissionAsync(long submissionId, TimeSpan? wait = null, CancellationToken cancellationToken = default)
+    {
+        var opened = GetHarness();
+        var context = Context(cancellationToken);
+        var submission = await opened.SubmissionAsync(new SubmissionId(submissionId), context).ConfigureAwait(false)
+            ?? throw new HostNotFoundException($"No submission {submissionId} in {Name}.");
+        var record = await submission.StatusAsync(context).ConfigureAwait(false);
+        if (record.Status is SubmissionStatus.Done or SubmissionStatus.Unanswered || wait is not { } limit || limit <= TimeSpan.Zero)
+            return await SubmissionAnswers.ResultAsync(opened, record, record.Status == SubmissionStatus.Queued ? SendStatus.Queued : SendStatus.Pending,
+                context).ConfigureAwait(false);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(limit);
         try
         {
             record = await submission.WaitAsync(DurableContext.Background.WithCancellation(timeout.Token)).ConfigureAwait(false);
@@ -362,6 +441,213 @@ public sealed class HostedSession
     /// <summary>Attaches to the session's live task graph. Dispose to stop.</summary>
     public Task<TaskGraphFeed> WatchTaskGraphAsync() => TaskGraphFeed.StartAsync(GetHarness());
 
+    /// <summary>The live tasks of the session (for a task panel).</summary>
+    public async Task<TaskGraph> TaskGraphAsync(CancellationToken cancellationToken = default)
+    {
+        using var graph = await GetHarness().TaskGraphAsync(Context(cancellationToken)).ConfigureAwait(false);
+        return graph.Value;
+    }
+
+    /// <summary>Aborts one task, such as a job run; its owned work stops first.</summary>
+    public async Task<TaskAbortResult> AbortTaskAsync(long taskId, CancellationToken cancellationToken = default) =>
+        await GetHarness().AbortTaskAsync(new TaskId(taskId), Context(cancellationToken)).ConfigureAwait(false);
+
+    // ─── Extensions ─────────────────────────────────────────────────────────
+
+    /// <summary>The agent's optional extensions (on or off, with the prompt checklist) and the built-in ones it always has.</summary>
+    public async Task<AgentExtensions> ExtensionsAsync(long agentId, CancellationToken cancellationToken = default)
+    {
+        var opened = GetHarness();
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(opened, agentId, context).ConfigureAwait(false);
+        var agent = await conversation.AgentAsync(context).ConfigureAwait(false);
+        var selected = agent.Extensions.Select(extension => extension.Name).ToHashSet(StringComparer.Ordinal);
+        var checklist = await opened.SnapshotAsync(SystemPrompts.ChecklistDoc, conversation.Id, context).ConfigureAwait(false);
+        var checkedPrompts = SystemPrompts.Enabled(checklist, host.Options.DefaultPrompts);
+        var installed = Installed();
+        var optional = new List<HostedExtension>();
+        if (installed.GetExtension(SystemPrompts.ExtensionName) is not null)
+            optional.Add(new HostedExtension(SystemPrompts.ExtensionName, "System prompts",
+                "Adds the checked prompt files from the device's prompts folder to this agent's system prompt.", selected.Contains(SystemPrompts.ExtensionName),
+                [.. SystemPrompts.Load(host.PromptsDirectory).Select(prompt => new AgentPrompt(prompt.Id, prompt.Description, prompt.Text, checkedPrompts.Contains(prompt.Id)))]));
+        if (installed.GetExtension(CommandGuard.ExtensionName) is not null)
+            optional.Add(new HostedExtension(CommandGuard.ExtensionName, "Command guard",
+                "Checks every bash and powershell command before it runs and blocks destructive or irreversible ones. Each verdict is a durable memo, so a restart never asks twice.",
+                selected.Contains(CommandGuard.ExtensionName), []));
+        return new AgentExtensions(optional, [.. agent.Extensions.Select(extension => extension.Name).Where(extensionName => !DeviceApps.Optional.Contains(extensionName))]);
+    }
+
+    /// <summary>Turns an optional extension on or off for the agent, from its next request.</summary>
+    /// <exception cref="HostInvalidException">Not an optional extension of this device.</exception>
+    public async Task<AgentExtensions> SetExtensionAsync(long agentId, string extensionName, bool enabled, CancellationToken cancellationToken = default)
+    {
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
+        var installed = Installed();
+        if (!DeviceApps.Optional.Contains(extensionName) || installed.GetExtension(extensionName) is null)
+            throw new HostInvalidException($"{extensionName} is not an optional extension of this device.");
+        var current = (await conversation.AgentAsync(context).ConfigureAwait(false)).Extensions.Select(extension => extension.Name).ToHashSet(StringComparer.Ordinal);
+        if (enabled) current.Add(extensionName); else current.Remove(extensionName);
+        await conversation.ConfigureAsync(new AgentChange
+        {
+            Extensions = ExtensionSelection.Only(installed.Installed().Where(extension => current.Contains(extension.Name))),
+        }, context).ConfigureAwait(false);
+        return await ExtensionsAsync(agentId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Checks or unchecks one prompt file of the agent's <c>system-prompts</c> checklist.</summary>
+    public async Task<AgentExtensions> SetPromptAsync(long agentId, string promptId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        if (SystemPrompts.Load(host.PromptsDirectory).All(prompt => prompt.Id != promptId)) throw new HostNotFoundException($"No prompt {promptId}.");
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
+        await conversation.CommitAsync(async tx =>
+        {
+            var doc = await tx.DocAsync(SystemPrompts.ChecklistDoc, conversation.Id).ConfigureAwait(false);
+            var next = SystemPrompts.Enabled(doc.ToValue() as JsonObjectValue, host.Options.DefaultPrompts).Where(id => id != promptId).ToList();
+            if (enabled) next.Add(promptId);
+            doc.Set("enabled", JsonValue.Array(next.Select(id => (JsonValue)id)));
+        }, context).ConfigureAwait(false);
+        return await ExtensionsAsync(agentId, cancellationToken).ConfigureAwait(false);
+    }
+
+    // ─── Jobs ───────────────────────────────────────────────────────────────
+
+    /// <summary>Starts a job for the agent, owned by its conversation in the background, with an anchor entry in its transcript where the
+    /// run's card shows.</summary>
+    public async Task<TaskId> RunJobAsync(long agentId, string jobId, JsonObjectValue? input = null, CancellationToken cancellationToken = default)
+    {
+        var job = host.Options.Jobs.FirstOrDefault(definition => definition.Id == jobId) ?? throw new HostNotFoundException($"No job {jobId} on {host.Info.Name}.");
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
+        return await conversation.CommitAsync(async tx =>
+        {
+            var id = await Jobs.StartAsync(tx, conversation.Id, job, jobTasks[job.Id], input, TaskOwnership.Conversation, background: true, "you", null,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ConfigureAwait(false);
+            await tx.AppendEntryAsync(conversation.Id, new EntryDraft
+            {
+                Kind = "pisharp.job",
+                Data = JsonValue.Object([new("taskId", id.Value), new("job", job.Id), new("text", $"Started {job.Title}")]),
+            }).ConfigureAwait(false);
+            return id;
+        }, context).ConfigureAwait(false);
+    }
+
+    /// <summary>The agent's job runs, newest first, as their run records.</summary>
+    public async Task<JsonArrayValue> JobRunsAsync(long agentId, CancellationToken cancellationToken = default)
+    {
+        var opened = GetHarness();
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(opened, agentId, context).ConfigureAwait(false);
+        return JsonValue.Array(Jobs.Items(await opened.SnapshotAsync(Jobs.RunsDoc, conversation.Id, context).ConfigureAwait(false), "items"));
+    }
+
+    /// <summary>Approves or declines a job run's pending approval. The job resumes from its saved checkpoint.</summary>
+    /// <exception cref="AppStateConflictException">The run does not wait for approval, or was decided the other way.</exception>
+    public async Task DecideJobAsync(long agentId, long jobTaskId, bool approved, CancellationToken cancellationToken = default)
+    {
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
+        await conversation.CommitAsync(tx => Jobs.DecideAsync(tx, conversation.Id, new TaskId(jobTaskId), approved, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+            context).ConfigureAwait(false);
+    }
+
+    // ─── App State and questions ────────────────────────────────────────────
+
+    /// <summary>Changes the device's App State on the agent's behalf and notes the change in its transcript. With
+    /// <paramref name="expectedRevision"/>, a stale change is refused.</summary>
+    public async Task<AppStateValue> ChangeAppStateAsync(long agentId, AppStateChange change, long? expectedRevision = null, CancellationToken cancellationToken = default)
+    {
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
+        var result = host.AppState.Change(change, expectedRevision);
+        await conversation.SubmitAsync(SubmissionDraft.Write(new EntryDraft { Kind = AppTools.StateChangeEntry, Data = DeviceAppState.Describe(change, result.Revision) }),
+            context).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>The agent's tool calls that wait for a person: question forms and plan reviews.</summary>
+    public async Task<IReadOnlyList<PendingInteraction>> PendingInteractionsAsync(long agentId, CancellationToken cancellationToken = default)
+    {
+        var context = Context(cancellationToken);
+        return await UserInteraction.PendingAsync(await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false), context).ConfigureAwait(false);
+    }
+
+    /// <summary>Answers, or declines with a null response, the questions of a waiting <c>ask_user_question</c> call.</summary>
+    /// <exception cref="AppStateConflictException">The call no longer waits.</exception>
+    public async Task AnswerQuestionsAsync(long agentId, long toolTaskId, QuestionResponse? response, CancellationToken cancellationToken = default)
+    {
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
+        try
+        {
+            if (response is null) await UserQuestions.DeclineAsync(conversation, new TaskId(toolTaskId), context).ConfigureAwait(false);
+            else await UserQuestions.AnswerAsync(conversation, new TaskId(toolTaskId), response, context).ConfigureAwait(false);
+        }
+        catch (InteractionNotPendingException stale)
+        {
+            throw new AppStateConflictException(stale.Message);
+        }
+        catch (ArgumentException invalid)
+        {
+            throw new HostInvalidException(invalid.Message);
+        }
+    }
+
+    /// <summary>Whether the agent is in plan mode.</summary>
+    public async Task<bool> PlanModeAsync(long agentId, CancellationToken cancellationToken = default)
+    {
+        var opened = GetHarness();
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(opened, agentId, context).ConfigureAwait(false);
+        return (await conversation.AgentAsync(context).ConfigureAwait(false)).Extensions.Any(extension => extension.Name == PlanMode.ExtensionName);
+    }
+
+    /// <summary>Enters or leaves plan mode. In plan mode the agent may only read, write its plan under the session's <c>plans</c> folder and
+    /// ask; <c>exit_plan_mode</c> then submits the plan for review (<see cref="ReviewPlanAsync"/>). Leaving cancels a pending review.</summary>
+    public async Task<bool> SetPlanModeAsync(long agentId, bool enabled, CancellationToken cancellationToken = default)
+    {
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
+        var installed = registry ?? throw new SessionUnavailableException($"Session {Name} is not open.", null);
+        if (enabled)
+        {
+            var directory = Path.Join(DirectoryPath, "plans", agentId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Directory.CreateDirectory(directory);
+            try { await PlanMode.EnterAsync(conversation, installed, directory, context).ConfigureAwait(false); }
+            catch (InvalidOperationException missing) { throw new HostInvalidException(missing.Message); }
+        }
+        else await PlanMode.ExitAsync(conversation, installed, context).ConfigureAwait(false);
+        return await PlanModeAsync(agentId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Approves or rejects (with feedback) the plan a waiting <c>exit_plan_mode</c> call submitted.</summary>
+    /// <exception cref="AppStateConflictException">The call no longer waits.</exception>
+    public async Task ReviewPlanAsync(long agentId, long toolTaskId, bool approved, string? feedback = null, CancellationToken cancellationToken = default)
+    {
+        var context = Context(cancellationToken);
+        var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
+        var installed = registry ?? throw new SessionUnavailableException($"Session {Name} is not open.", null);
+        try
+        {
+            if (approved) await PlanMode.ApproveAsync(conversation, installed, new TaskId(toolTaskId), stop: false, context).ConfigureAwait(false);
+            else await PlanMode.RejectAsync(conversation, new TaskId(toolTaskId), feedback, context).ConfigureAwait(false);
+        }
+        catch (InteractionNotPendingException stale)
+        {
+            throw new AppStateConflictException(stale.Message);
+        }
+        catch (ArgumentException invalid)
+        {
+            throw new HostInvalidException(invalid.Message);
+        }
+    }
+
+    internal async Task<IConversation> ConversationForToolAsync(ConversationId id, DurableContext context) =>
+        await GetHarness().ConversationAsync(id, context).ConfigureAwait(false) ?? throw new HostNotFoundException($"No agent {id.Value} in {Name}.");
+
+    private IRegistrySnapshot Installed() => (registry ?? throw new SessionUnavailableException($"Session {Name} is not open.", null)).Snapshot();
+
     internal async Task OpenAsync(ModelRef? createModel, string? createThinking)
     {
         var context = DurableContext.Background;
@@ -376,12 +662,17 @@ public sealed class HostedSession
             storage = host.Options.OpenStorage is { } open
                 ? await open(DatabasePath).ConfigureAwait(false)
                 : await SqliteStorage.OpenAsync(DatabasePath).ConfigureAwait(false);
-            var registry = host.Options.CreateRegistry?.Invoke(new HostedSessionContext(Id, Cwd, DirectoryPath)) ?? DurableDeviceHost.DefaultRegistry();
+            var (apps, tasks) = DeviceApps.Create(host, this);
+            var sessionContext = new HostedSessionContext(Id, Cwd, DirectoryPath) { Apps = apps };
+            var created = host.Options.CreateRegistry?.Invoke(sessionContext) ?? DurableDeviceHost.DefaultRegistry(sessionContext);
+            registry = created;
+            jobTasks = tasks;
             opened = await Harness.OpenAsync(storage, new HarnessOptions
             {
                 Models = host.Options.Models,
-                Registry = registry,
-                Settings = new SessionHarnessSettings(host.Options.Settings, () => Compaction),
+                Registry = created,
+                Settings = new SessionHarnessSettings(host.Options.Settings, () => Compaction,
+                    () => [.. created.Snapshot().Installed().Where(extension => !DeviceApps.Optional.Contains(extension.Name))]),
                 Env = envs.EnvAsync,
                 TimeProvider = host.Options.TimeProvider,
                 OnReport = report => host.Options.OnReport?.Invoke(Id, report),
@@ -525,8 +816,20 @@ public sealed class HostedSession
         var custom = names.TryGetValue(record.Id.Value, out var customName) ? customName : null;
         return new HostedAgent(record.Id.Value, custom ?? HostNames.Derived(record.Id.Value, kind), custom is not null, kind,
             record.Parent?.ConversationId.Value, record.Parent?.At.Value, record.Owner?.ConversationId.Value, record.Owner?.TaskId.Value,
-            nodes.Any(node => node.ConversationId == record.Id && !node.Background),
+            nodes.Any(node => node.ConversationId == record.Id && !InBackground(node, nodes)),
             nodes.Count(node => node.ConversationId == record.Id && node.Background));
+    }
+
+    /// <summary>Whether a task is background work: it is, or a task that owns it is (a job's approval task under a background run).</summary>
+    private static bool InBackground(TaskGraphNode node, IReadOnlyList<TaskGraphNode> nodes)
+    {
+        for (var (current, guard) = (node, 0); current is not null && guard < 64; guard++)
+        {
+            if (current.Background) return true;
+            var owner = current.Owner;
+            current = owner is null ? null! : nodes.FirstOrDefault(other => other.Id == owner);
+        }
+        return false;
     }
 
     /// <summary>The tools the agent's extensions provide to the model, a later extension's tool replacing an earlier one of the same

@@ -28,10 +28,20 @@ public sealed class DurableDeviceHost : IAsyncDisposable
         this.deviceLock = deviceLock;
         Catalog = catalog;
         Info = info;
+        AppState = new DeviceAppState(this);
     }
 
     /// <summary>What the device is.</summary>
     public DeviceInfo Info { get; }
+
+    /// <summary>The device's shared App State.</summary>
+    public DeviceAppState AppState { get; }
+
+    /// <summary>The durable jobs of the device.</summary>
+    public IReadOnlyList<JobDefinition> Jobs => Options.Jobs;
+
+    /// <summary>Where the <c>system-prompts</c> extension finds its prompt files.</summary>
+    public string PromptsDirectory => Options.PromptsDirectory ?? Path.Join(Info.DataDirectory, "prompts");
 
     internal DurableDeviceOptions Options { get; }
     internal SessionCatalog Catalog { get; }
@@ -309,12 +319,16 @@ public sealed class DurableDeviceHost : IAsyncDisposable
         return Directory.Exists(full) ? full : throw new HostInvalidException($"The working directory {full} does not exist on {Info.Name}.");
     }
 
-    /// <summary>The registry of a session when the host passes none.</summary>
-    internal static IRegistry DefaultRegistry()
+    /// <summary>The registry of a session when the host passes none: the durable coding tools, <c>user-interaction</c>, <c>plan-mode</c>
+    /// (installed, selected only while an agent plans) and the device's extensions (<see cref="HostedSessionContext.Apps"/>).</summary>
+    public static IRegistry DefaultRegistry(HostedSessionContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
         var registry = Registry.Create();
         registry.Install(CodingTools.CreateCodingTools());
         registry.Install(UserInteraction.CreateExtension());
+        registry.Install(PlanMode.CreateExtension());
+        foreach (var extension in context.Apps) registry.Install(extension);
         return registry;
     }
 
