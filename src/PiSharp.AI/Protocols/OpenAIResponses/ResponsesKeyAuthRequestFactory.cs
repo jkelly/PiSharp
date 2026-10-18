@@ -84,7 +84,8 @@ public sealed class ResponsesKeyAuthRequestFactory
         ResponsesTranscriptProjectionOptions projectionOptions, ResponsesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
-        _withSession = session => new(endpoint, expectedModel, projectionOptions, _options with { SessionId = session });
+        _withScope = (session, tier) => new(endpoint, expectedModel, projectionOptions,
+            _options with { SessionId = session ?? _options.SessionId, ServiceTier = tier ?? _options.ServiceTier });
         if (_options.OnPayload?.GetInvocationList().Length > 1 || _options.OnResponse?.GetInvocationList().Length > 1 ||
             _options.OnProviderStreamEvent?.GetInvocationList().Length > 1)
             throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
@@ -158,15 +159,17 @@ public sealed class ResponsesKeyAuthRequestFactory
             ? ",\"prompt_cache_retention\":\"24h\"" : "";
     }
 
-    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
-    private readonly Func<string, ResponsesKeyAuthRequestFactory> _withSession;
-    private sealed record SessionScoped(string Id, ResponsesKeyAuthRequestFactory Factory);
-    private SessionScoped? _sessionScoped;
+    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id). PiSharp-only:
+    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier.
+    private readonly Func<string?, string?, ResponsesKeyAuthRequestFactory> _withScope;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?), ResponsesKeyAuthRequestFactory> _scoped = new();
     private ResponsesKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
     {
-        if (request?.SessionId is not { } id || _options.SessionId is not null) return null;
-        if (Volatile.Read(ref _sessionScoped) is { } cached && cached.Id == id) return cached.Factory;
-        var created = _withSession(id); Volatile.Write(ref _sessionScoped, new(id, created)); return created;
+        var session = _options.SessionId is null ? request?.SessionId : null;
+        var tier = request?.ServiceTier is { } requested && ServiceTiers.OpenAI(requested) is { } wire && wire != _options.ServiceTier ? wire : null;
+        if (session is null && tier is null) return null;
+        if (_scoped.Count > 32) _scoped.Clear();
+        return _scoped.GetOrAdd((session, tier), key => _withScope(key.Item1, key.Item2));
     }
 
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)

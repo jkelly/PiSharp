@@ -85,7 +85,7 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (ownedRequest.Options.TryGetValue(ResponsesKeyAuthRequestFactory.RequestedServiceTierKey, out var tier) &&
-                tier.RequestedTier != _requestedServiceTier)
+                tier.RequestedTier != _requestedServiceTier && tier.RequestedTier != ServiceTiers.OpenAI(request.ServiceTier))
                 throw new ResponsesKeyAuthRequestException(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
             var factory = _factory;
             if (factory is not null && factory.Policy.OnPayload is { } payloadHook)

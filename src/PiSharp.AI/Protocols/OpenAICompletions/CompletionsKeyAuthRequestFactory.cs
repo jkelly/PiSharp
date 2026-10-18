@@ -34,6 +34,8 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     /// <summary>The body's model field when it differs from the catalog id, as Pi 06a46693 providers/azure.ts withDeploymentName
     /// sends an Azure deployment name. The model identity, metadata binding and hooks keep the catalog id.</summary>
     public string? RequestModelId { get; init; }
+    /// <summary>PiSharp-only: <c>service_tier</c> (OpenAI and OpenRouter: auto, default, flex, priority, fast, ultrafast); null omits it.</summary>
+    public string? ServiceTier { get; init; }
 }
 
 /// <summary>Pure configured key request construction. No send, environment, clock, credential discovery or retry.</summary>
@@ -65,7 +67,8 @@ public sealed class CompletionsKeyAuthRequestFactory
         CompletionsTranscriptProjectionOptions? projectionOptions = null, CompletionsKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new(); _projectionOptions = projectionOptions ?? new();
-        _withSession = session => new(endpoint, expectedModel, projectionOptions, _options with { SessionId = session });
+        _withScope = (session, tier) => new(endpoint, expectedModel, projectionOptions,
+            _options with { SessionId = session ?? _options.SessionId, ServiceTier = tier ?? _options.ServiceTier });
         if (endpoint is null || expectedModel is null || !endpoint.IsAbsoluteUri || endpoint.Scheme is not ("http" or "https") ||
             endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
             expectedModel.Api != "openai-completions" || !Identity(expectedModel.Id) || !Identity(expectedModel.Provider) ||
@@ -184,15 +187,17 @@ public sealed class CompletionsKeyAuthRequestFactory
         _headers = headers.ToImmutableArray();
     }
 
-    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
-    private readonly Func<string, CompletionsKeyAuthRequestFactory> _withSession;
-    private sealed record SessionScoped(string Id, CompletionsKeyAuthRequestFactory Factory);
-    private SessionScoped? _sessionScoped;
+    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id). PiSharp-only:
+    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier.
+    private readonly Func<string?, string?, CompletionsKeyAuthRequestFactory> _withScope;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?), CompletionsKeyAuthRequestFactory> _scoped = new();
     private CompletionsKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
     {
-        if (request?.SessionId is not { } id || _options.SessionId is not null) return null;
-        if (Volatile.Read(ref _sessionScoped) is { } cached && cached.Id == id) return cached.Factory;
-        var created = _withSession(id); Volatile.Write(ref _sessionScoped, new(id, created)); return created;
+        var session = _options.SessionId is null ? request?.SessionId : null;
+        var tier = request?.ServiceTier is { } requested && ServiceTiers.OpenAI(requested) is { } wire && wire != _options.ServiceTier ? wire : null;
+        if (session is null && tier is null) return null;
+        if (_scoped.Count > 32) _scoped.Clear();
+        return _scoped.GetOrAdd((session, tier), key => _withScope(key.Item1, key.Item2));
     }
 
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
@@ -236,6 +241,7 @@ public sealed class CompletionsKeyAuthRequestFactory
         if (tools.Value.GetArrayLength() != 0 || HasToolHistory(request)) Add("tools", tools);
         if (_zaiToolStream && tools.Value.GetArrayLength() != 0) Add("tool_stream", JsonData.Parse("true"));
         if (_priority is not null) Add("priority", _priority);
+        if (_options.ServiceTier is { } serviceTier) Add("service_tier", Text(serviceTier));
         if (_toolChoice is not null) Add("tool_choice", _toolChoice);
         AddThinkingFields(Add, cancellationToken);
         if (_openRouterRouting is not null) Add("provider", _openRouterRouting);

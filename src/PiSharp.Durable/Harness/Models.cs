@@ -139,6 +139,8 @@ public sealed record DurableStreamOptions
     public JsonValue? Deferred { get; init; }
     /// <summary>Maximum output tokens.</summary>
     public double? MaxTokens { get; init; }
+    /// <summary>PiSharp-only (decision 0007): the conversation's service tier (<c>ChatRequest.ServiceTier</c>).</summary>
+    public string? ServiceTier { get; init; }
 }
 
 /// <summary>A provider-side deferred response (pi-ai <c>DeferredHandle</c>), kept as its wire JSON <c>{provider, modelId, api, id,

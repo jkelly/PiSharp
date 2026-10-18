@@ -186,7 +186,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         body["tool_choice"] = _options.ToolChoice ?? "auto";
         body["parallel_tool_calls"] = true;
         if (_options.Temperature is { } temperature) body["temperature"] = temperature;
-        if (_options.ServiceTier is { } tier) body["service_tier"] = tier;
+        // PiSharp-only: a request's own tier (ChatRequest.ServiceTier) wins over the configured one.
+        if ((request.ServiceTier is { } requested ? ServiceTiers.Codex(requested) : _options.ServiceTier) is { } tier) body["service_tier"] = tier;
         if (tools is { Count: > 0 }) body["tools"] = tools;
         var (offPresent, off) = ProviderTranscript.MappedLevel(_metadata, "off");
         if (effort is not null)

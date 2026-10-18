@@ -131,6 +131,9 @@ internal interface IDurableController
     /// <summary>Use <paramref name="model"/> for the shown conversation.</summary>
     Task SetModelAsync(ModelRef model);
 
+    /// <summary>PiSharp-only (decision 0007): use <paramref name="tier"/> for the shown conversation's requests; null clears it.</summary>
+    Task SetServiceTierAsync(string? tier) => Task.FromException(new NotSupportedException("Service tiers are not supported here"));
+
     /// <summary>Open or close the task panel (the view's <see cref="DurableView.Tasks"/>).</summary>
     Task ToggleTasksAsync();
 
@@ -146,6 +149,9 @@ internal sealed record OpenDurableOptions
 
     /// <summary>Reopen the newest session for the working directory instead of starting one.</summary>
     public bool ContinueSession { get; init; }
+
+    /// <summary>PiSharp-only (decision 0007): the main conversation's service tier for this run (<c>--tier</c>).</summary>
+    public string? ServiceTier { get; init; }
 }
 
 /// <summary>An open durable session (upstream <c>OpenDurableResult</c>); disposing closes it and releases its lock.</summary>

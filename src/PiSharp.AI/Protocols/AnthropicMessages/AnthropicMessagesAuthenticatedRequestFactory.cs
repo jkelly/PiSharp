@@ -28,7 +28,8 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
-        _withSession = session => new(baseUri, expectedModel, projectionOptions, authentication, _options with { SessionId = session });
+        _withScope = (session, tier) => new(baseUri, expectedModel, projectionOptions, authentication,
+            AnthropicMessagesKeyAuthRequestFactory.TierOptions(_options with { SessionId = session ?? _options.SessionId }, tier));
         _createWithoutPreferredStrict = () => new(baseUri, expectedModel, projectionOptions with { DisablePreferredStrictTools = true }, authentication, _options);
         ArgumentNullException.ThrowIfNull(authentication); _authentication = authentication;
         if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation
@@ -107,15 +108,17 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
     private AnthropicMessagesAuthenticatedRequestFactory? _withoutPreferredStrict;
     private AnthropicMessagesAuthenticatedRequestFactory WithoutPreferredStrict() =>
         Volatile.Read(ref _withoutPreferredStrict) ?? Interlocked.CompareExchange(ref _withoutPreferredStrict, _createWithoutPreferredStrict(), null) ?? _withoutPreferredStrict!;
-    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
-    private readonly Func<string, AnthropicMessagesAuthenticatedRequestFactory> _withSession;
-    private sealed record SessionScoped(string Id, AnthropicMessagesAuthenticatedRequestFactory Factory);
-    private SessionScoped? _sessionScoped;
+    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id). PiSharp-only:
+    // the request's service tier (ChatRequest.ServiceTier) also selects a factory configured with that tier.
+    private readonly Func<string?, string?, AnthropicMessagesAuthenticatedRequestFactory> _withScope;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string?, string?), AnthropicMessagesAuthenticatedRequestFactory> _scoped = new();
     private AnthropicMessagesAuthenticatedRequestFactory? ScopedTo(ChatRequest? request)
     {
-        if (request?.SessionId is not { } id || _options.SessionId is not null) return null;
-        if (Volatile.Read(ref _sessionScoped) is { } cached && cached.Id == id) return cached.Factory;
-        var created = _withSession(id); Volatile.Write(ref _sessionScoped, new(id, created)); return created;
+        var session = _options.SessionId is null ? request?.SessionId : null;
+        var tier = request?.ServiceTier is { } requested && ServiceTiers.Normalize(requested) is { } wire && wire != _options.PiSharpTier ? wire : null;
+        if (session is null && tier is null) return null;
+        if (_scoped.Count > 32) _scoped.Clear();
+        return _scoped.GetOrAdd((session, tier), key => _withScope(key.Item1, key.Item2));
     }
 
     public HttpRequestMessage Create(ChatRequest request, CancellationToken cancellationToken = default)
@@ -127,7 +130,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
         var details = _projector.ProjectWithDetails(request, cancellationToken);
-        var projected = AnthropicMessagesPreparedRequest.Project(details.Payload, Raw, cancellationToken);
+        var projected = AnthropicMessagesPreparedRequest.Project(AnthropicServiceTier.Apply(details.Payload, _options), Raw, cancellationToken);
         _ = PreparedHeaders(projected);
         return new(projected, _options, (payload, token) => CreateCore(request, token, payload), cancellationToken)
         { Fallback = details.HasPreferredStrictTools ? token => WithoutPreferredStrict().Prepare(request, token) : null };
@@ -138,7 +141,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
         var details = prepared is null ? _projector.ProjectWithDetails(request, cancellationToken) : null;
-        var projected = prepared ?? details!.Payload;
+        var projected = prepared ?? AnthropicServiceTier.Apply(details!.Payload, _options);
         CheckDepth(projected.Value, 0, cancellationToken);
         var headers = PreparedHeaders(projected);
         // Count the exact compact raw representation before allocating UTF-8 or acquiring an HTTP request/content.

@@ -29,6 +29,13 @@ public sealed class GoogleKeyAuthRequestFactory(ModelDescriptor model, GoogleGen
         var name = requestModel.StartsWith("models/", StringComparison.Ordinal) ? requestModel[7..] : requestModel;
         var endpoint = new Uri(baseUrl.TrimEnd('/') + "/models/" + Uri.EscapeDataString(name) + ":streamGenerateContent?alt=sse");
         var body = GoogleData.Admit(JsonData.Parse(JsonUtf16.ToJsonString(GoogleRequestProjector.WireBody(parameters))), options);
+        // PiSharp-only: the request's service tier (ChatRequest.ServiceTier), else the configured one, as serviceTier.
+        if ((request.ServiceTier is { } requested ? ServiceTiers.Google(requested) : options.ServiceTier) is { } serviceTier &&
+            System.Text.Json.Nodes.JsonNode.Parse(body.ToString()) is System.Text.Json.Nodes.JsonObject tiered && !tiered.ContainsKey("serviceTier"))
+        {
+            tiered["serviceTier"] = serviceTier;
+            body = JsonData.Parse(tiered.ToJsonString());
+        }
         // The body (images included) is bounded by the payload budget, not by the projection's 1 MiB string defaults.
         var projected = EcmaScriptJsonProjection.Project(body, new(MaximumInputCharacters: options.MaximumPayloadBytes,
             MaximumInputBytes: options.MaximumPayloadBytes, MaximumOutputCharacters: options.MaximumPayloadBytes,

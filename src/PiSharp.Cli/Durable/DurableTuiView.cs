@@ -357,6 +357,7 @@ internal sealed class DurableTuiView
         footerHints.SetText(
             theme.Fg(label == "main" ? "dim" : "accent", label) + theme.Fg("dim",
                 $" · {model} · thinking:{agent.ThinkingLevel ?? "off"} ({KeybindingHints.KeyText("app.thinking.cycle")}) · " +
+                (DurableTuiState.ServiceTierOf(view.Conversation) is { } tier ? $"tier:{tier} (/tier) · " : "") +
                 $"{KeybindingHints.KeyText("app.model.select")} or /model · /agents · /compact · /tasks · " +
                 $"{KeybindingHints.KeyText("app.message.followUp")} follow-up · {KeybindingHints.KeyText("app.clear")} exit"));
     }

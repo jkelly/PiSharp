@@ -98,6 +98,13 @@ internal static class DurableTui
                             if (trimmed.Length == 0 || source.Current.Failure is not null) return;
                             if (trimmed == "/model") { SelectModel(); return; }
                             if (trimmed == "/tasks") { Fire(controller.ToggleTasksAsync); return; }
+                            // PiSharp-only (decision 0007): /tier <tier> for the shown conversation; /tier none clears it.
+                            if (trimmed.StartsWith("/tier ", StringComparison.Ordinal))
+                            {
+                                var tier = TextUtils.JsTrim(trimmed["/tier".Length..]);
+                                Fire(() => controller.SetServiceTierAsync(tier is "none" or "clear" ? null : tier));
+                                return;
+                            }
                             if (trimmed == "/agents") { SelectConversation(); return; }
                             if (trimmed == "/compact" || trimmed.StartsWith("/compact ", StringComparison.Ordinal))
                             {

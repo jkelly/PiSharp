@@ -336,7 +336,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
         {
             var levels = routed is IThinkingLevelTransport capability ? capability.GetSupportedThinkingLevels(model.Descriptor) : ["off"];
             var hosted = ThinkingLevels.Clamp(levels, options?.Reasoning ?? "off");
-            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp) { ThinkingLevel = hosted, SessionId = options?.SessionId });
+            return new(routed, null, new ChatRequest(model.Descriptor, Transcript(messages), timestamp) { ThinkingLevel = hosted, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier });
         }
         if (!providers.ContainsKey(model.Provider)) throw new InvalidOperationException($"Unknown provider: {model.Provider}");
         var metadata = Metadata(model);
@@ -362,7 +362,7 @@ public sealed class NativeDurableModels : IDurableModels, IDisposable
                 provider.Dispose();
                 provider = NativeModelRoutes.Bind(descriptor, metadata, key, settings with { MaxTokens = thinkingCap }, handler);
             }
-            var request = new ChatRequest(descriptor, transcript, timestamp) { ThinkingLevel = level, SessionId = options?.SessionId };
+            var request = new ChatRequest(descriptor, transcript, timestamp) { ThinkingLevel = level, SessionId = options?.SessionId, ServiceTier = options?.ServiceTier };
             return new(provider.Transport, provider, request);
         }
         catch

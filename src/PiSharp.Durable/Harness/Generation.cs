@@ -201,6 +201,8 @@ internal static class GenerationPhases
                 .Add("model", model.ToJson())
                 .Add("thinkingLevel", agent.ThinkingLevel)
                 .Add("streamOptions", StreamOptionsJson(settings.Stream))
+                // PiSharp-only (decision 0007): pinned only when set, so upstream records keep their shape.
+                .Add("serviceTier", agent.ServiceTier)
                 .Add("cutoff", tail.ToJson())
                 .Build();
             return (TaskState?)NextTaskState.Running(request);
@@ -214,6 +216,7 @@ internal static class GenerationPhases
         var compacted = OptionalTask(checkpoint, "compacted");
         var reference = ModelRef.FromJson(checkpoint["model"])!;
         var thinkingLevel = ((JsonStringValue)checkpoint["thinkingLevel"]).Value;
+        var serviceTier = checkpoint.TryGetValue("serviceTier", out var tier) && tier is JsonStringValue tierText ? tierText.Value : null;
         var streamOptions = checkpoint.TryGetValue("streamOptions", out var pinned) && pinned is JsonObjectValue options ? options : JsonObjectValue.Empty;
         var cutoff = new EntryId(Id(checkpoint["cutoff"]));
         var conversationId = runtime.ConversationId;
@@ -240,6 +243,7 @@ internal static class GenerationPhases
         {
             SessionId = await ProviderIdentity.EnsureProviderSessionIdAsync(runtime, context).ConfigureAwait(false),
             Reasoning = thinkingLevel == "off" ? null : thinkingLevel,
+            ServiceTier = serviceTier,
         };
         var message = await StreamResponseAsync(runtime, model, messages, request, attempt, context).ConfigureAwait(false);
         await ClassifyAsync(runtime, new Request(attempt, compacted, reference, cutoff) { Messages = view.Messages }, message, context).ConfigureAwait(false);

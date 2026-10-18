@@ -62,6 +62,12 @@ internal sealed class DurableModels : IDurableModels, IAsyncDisposable
     /// <summary>The registry the models and their auth come from.</summary>
     internal ModelRegistry Registry { get; }
 
+    /// <summary>The runtime's HTTP handler every request goes through (caller-owned; null for the default transport).</summary>
+    internal HttpMessageHandler? HttpHandler => handler;
+
+    /// <summary>The runtime the models were created over.</summary>
+    internal LiveSessionRuntime Runtime => runtime;
+
     /// <summary>Whether <paramref name="entry"/> is a chat model the CLI can stream (a live route, or an extension stream).</summary>
     private bool Routable(RegistryModel entry) => entry.Type == CatalogModelType.Chat && !VirtualModels.IsVirtual(entry) &&
         (LiveSessionSelection.SupportedApi(entry.Provider, entry.Api) || Registry.CustomStream(entry.Api) is not null);
