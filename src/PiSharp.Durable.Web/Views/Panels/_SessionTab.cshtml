@@ -1,0 +1,102 @@
+@model SessionTabModel
+@{
+    var session = Model.Session;
+    var agent = Model.Agent;
+    var model = Model.Model;
+    var window = model?.ContextWindow ?? 0;
+    var compaction = Model.Compaction;
+    var (wait, auto) = compaction.Thresholds(window);
+    var provider = agent.Config.Model?.Provider ?? "";
+    var logo = Display.ProviderLogo(provider);
+    var thinking = agent.Config.ThinkingLevel ?? "off";
+}
+<div data-session-tab data-window="@window" data-reserve="@compaction.ReserveTokens" data-background="@compaction.BackgroundTokens" data-keep="@compaction.KeepRecentTokens"
+     data-enabled="@(compaction.Enabled ? "true" : "false")" data-cwd="@session.Cwd" data-session-name="@session.Name" data-agent-name="@agent.Name"
+     data-provider="@provider" data-model="@agent.Config.Model?.ModelId">
+  <div class="ins-section">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <h2 class="ins-title">@session.Name</h2>
+      <button class="btn btn-icon ms-auto" type="button" title="Rename session" aria-label="Rename session" data-action="rename-session" data-device="@Model.Device.Id" data-session="@session.Id" data-name="@session.Name"><i class="bi bi-pencil"></i></button>
+    </div>
+    <button class="cwd-button" type="button" title="Show full working directory" aria-label="Show full working directory" data-action="show-path"><span dir="ltr">@session.Cwd</span></button>
+    <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+      <span class="ps-chip" data-live-status="idle">Idle</span>
+      <span class="ps-chip" data-tone="ok" data-live-status="working" hidden>Working</span>
+      <span class="ps-chip" data-tone="warn" data-live-status="waiting" hidden>Waiting for you</span>
+      <span class="ps-chip" data-live-background hidden></span>
+      <span class="ms-auto fs-7 text-ps-faint text-nowrap"><i class="bi @Display.PlatformIcon(Model.Device) me-1"></i>@Model.Device.Id</span>
+    </div>
+  </div>
+
+  <div class="ins-section">
+    <h3>Agent</h3>
+    <button class="model-button" type="button" data-action="pick-model" aria-label="Change model (@(model?.Name ?? agent.Config.Model?.ModelId ?? "none"))">
+      <span class="provider-logo">@if (logo is not null)
+        {<img class="provider-logo-mark" src="@logo" alt="">}
+        else
+        {<i class="bi bi-cpu"></i>}</span>
+      <span class="min-w-0"><span class="mb-name d-block">@(model?.Name ?? agent.Config.Model?.ModelId ?? "No model")</span><span class="mb-sub d-block">@(model is null ? Display.ProviderName(provider) : Display.ModelLine(model))</span></span>
+      <i class="bi bi-chevron-down"></i>
+    </button>
+    <div class="d-flex align-items-center mt-2">
+      <label class="fs-7 text-secondary" for="thinkingLevel">Thinking</label>
+      <select id="thinkingLevel" class="form-select form-select-sm inline-select ms-auto" aria-label="Thinking level" data-action-change="thinking">
+        @foreach (var level in DurableWire.ThinkingLevels)
+        {
+          <option selected="@(level == thinking)">@level</option>
+        }
+      </select>
+    </div>
+    <div class="d-flex align-items-center mt-2">
+      <label class="fs-7 text-secondary" for="planMode">Plan mode</label>
+      <div class="form-check form-switch mb-0 ms-auto"><input class="form-check-input" type="checkbox" role="switch" id="planMode" aria-label="Plan mode" data-action-change="plan-mode" checked="@agent.Extensions.Contains("plan-mode")"></div>
+    </div>
+    <div class="fs-8 text-ps-faint mt-1">In plan mode the agent can only read, write its plan and ask; <code>exit_plan_mode</code> then asks you to approve the plan.</div>
+  </div>
+
+  <div class="ins-section">
+    <h3>Context <button class="btn btn-sm btn-ghost ms-auto py-0" type="button" data-action="compaction-details"><i class="bi bi-info-circle me-1"></i>Details</button></h3>
+    <div class="ctx-numbers">
+      <span class="used" data-ctx-used>0</span>
+      <span class="of">of @Display.Tokens(window) tokens</span>
+      <span class="pct" data-ctx-pct>0%</span>
+      <span class="ps-chip compacting ms-auto" data-tone="warn" data-ctx-compacting hidden>Compacting</span>
+    </div>
+    @if (window > 0)
+    {
+      <div class="ctx-bar @(compaction.Enabled ? "" : "off")" data-window="@window" data-hint="#ctxHint">
+        <div class="ctx-fill" style="width:0%" data-ctx-fill></div>
+        <div class="ctx-reserve"></div>
+        <span class="ctx-label above"></span>
+        <button class="ctx-marker auto" type="button" role="slider" aria-label="Automatic compaction starts at" aria-valuemin="4096" aria-valuemax="@(window - 1024)" aria-valuenow="@(auto ?? Math.Max(4096, wait - 32768))"></button>
+        <button class="ctx-marker wait" type="button" role="slider" aria-label="The next request waits for a summary at" aria-valuemin="5120" aria-valuemax="@(window - 1024)" aria-valuenow="@wait"></button>
+        <span class="ctx-label below"></span>
+      </div>
+      <div class="fs-7 text-secondary" id="ctxHint"></div>
+    }
+    @if (!compaction.Enabled)
+    {
+      <div class="fs-7 text-ps-faint mt-1">Automatic compaction is off for this session.</div>
+    }
+    <div class="alert alert-warning py-2 fs-7 mt-2 mb-0" data-ctx-failure hidden></div>
+  </div>
+
+  <div class="ins-section">
+    <h3>Stats</h3>
+    <div class="stat-grid">
+      <div class="stat"><div class="v" data-stat="tokens">0</div><div class="k">total tokens</div></div>
+      <div class="stat"><div class="v" data-stat="cost">$0.0000</div><div class="k">agent cost</div></div>
+      <div class="stat"><div class="v">@agent.Tools.Count(tool => tool.Offered)</div><div class="k">tools</div></div>
+    </div>
+    <table class="table usage-table">
+      <thead><tr><th>Type</th><th class="text-end">Tokens</th><th class="text-end">Cost (USD)</th></tr></thead>
+      <tbody>
+        <tr><td>Input</td><td class="text-end" data-stat="input">0</td><td class="text-end" data-stat="inputCost">$0.0000</td></tr>
+        <tr><td>Output</td><td class="text-end" data-stat="output">0</td><td class="text-end" data-stat="outputCost">$0.0000</td></tr>
+        <tr><td>Cache read</td><td class="text-end" data-stat="cacheRead">0</td><td class="text-end" data-stat="cacheReadCost">$0.0000</td></tr>
+        <tr><td>Cache write</td><td class="text-end" data-stat="cacheWrite">0</td><td class="text-end" data-stat="cacheWriteCost">$0.0000</td></tr>
+      </tbody>
+    </table>
+    <div class="fs-8 text-ps-faint">Failed and interrupted attempts count too.</div>
+  </div>
+</div>

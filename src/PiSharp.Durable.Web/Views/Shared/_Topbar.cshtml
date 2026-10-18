@@ -1,0 +1,41 @@
+@model IReadOnlyList<NetworkDevice>
+@{
+    var page = (string?)ViewData["Page"] ?? "network";
+    var online = Model.Count(device => device.Status == "online");
+}
+<header class="dn-topbar">
+  @if (page == "network")
+  {
+    <button class="btn btn-icon d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#netTree" aria-controls="netTree" aria-label="Open network"><i class="bi bi-layout-sidebar"></i></button>
+  }
+  <a class="dn-brand" href="/" aria-label="PiSharp Durable home"><img src="/img/mark.svg" alt="" width="24" height="20"><span>PiSharp Durable</span></a>
+  <span class="ps-chip d-none d-sm-inline-flex ms-1" title="Devices online"><i class="bi bi-diagram-3"></i><span data-online-summary>@(Model.Count == 0 ? "No devices" : $"{online} of {Model.Count} online")</span></span>
+  <div class="ms-auto d-flex align-items-center gap-1">
+    <span class="ps-chip d-none d-md-inline-flex me-1" data-tone="warn" title="The live stream to the hub" data-connection>Connecting</span>
+    @if (page == "network")
+    {
+      <button class="btn btn-sm btn-outline-secondary d-none d-lg-inline-flex" type="button" data-action="new-agent" disabled><i class="bi bi-plus-lg me-1"></i>New agent</button>
+      <button class="btn btn-sm btn-primary" type="button" data-action="new-session"><i class="bi bi-plus-lg"></i><span class="d-none d-sm-inline ms-1">New session</span></button>
+    }
+    else
+    {
+      <a class="btn btn-sm btn-outline-secondary" href="/"><i class="bi bi-arrow-left me-1"></i>Network</a>
+    }
+    <div class="dropdown">
+      <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More" aria-label="More"><i class="bi bi-three-dots"></i></button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        @if (page == "network")
+        {
+          <li><a class="dropdown-item" href="/devices"><i class="bi bi-hdd-network me-2"></i>Devices</a></li>
+        }
+        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modal-shortcuts"><i class="bi bi-keyboard me-2"></i>Keyboard shortcuts</a></li>
+        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modal-help"><i class="bi bi-question-circle me-2"></i>How this works</a></li>
+      </ul>
+    </div>
+    <button class="btn btn-icon" type="button" data-theme-toggle title="Toggle theme" aria-label="Toggle theme"><i class="bi bi-moon-stars" data-theme-icon></i></button>
+    @if (page == "network")
+    {
+      <button class="btn btn-icon d-xl-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#inspector" aria-controls="inspector" aria-label="Open inspector" title="Inspector" data-needs-agent hidden><i class="bi bi-layout-sidebar-reverse"></i></button>
+    }
+  </div>
+</header>

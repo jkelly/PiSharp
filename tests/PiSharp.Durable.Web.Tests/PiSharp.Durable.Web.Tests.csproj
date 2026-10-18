@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0008, Phase 8: PiSharp Durable Web (src/PiSharp.Durable.Web) as a child process, against an in-process faux device. Covers
+       the hub's guard, registry, proxy, pages, panels and the per-tab stream's rendered view frames over HTTP. The browser checks of
+       PLAN.md Appendix C are tests/PiSharp.Durable.Web.BrowserTests. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
+    <!-- Built first; the tests start its output (bin/<configuration>/net10.0/PiSharp.Durable.Web.dll) as a child process. -->
+    <ProjectReference Include="../../src/PiSharp.Durable.Web/PiSharp.Durable.Web.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>WebProject</_Parameter1>
+      <_Parameter2>$(MSBuildProjectDirectory)/../../src/PiSharp.Durable.Web</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Configuration</_Parameter1>
+      <_Parameter2>$(Configuration)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

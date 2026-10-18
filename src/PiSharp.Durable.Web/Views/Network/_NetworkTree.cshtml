@@ -1,0 +1,93 @@
+@model NetworkPage
+@{
+    var tree = NetworkTree.Build(Model.Devices);
+    string Under(params string[] keys) => string.Join(' ', keys);
+}
+<div class="tree-body" id="treeBody">
+  @if (Model.Devices.Count == 0)
+  {
+    <div class="tree-empty">
+      <p class="mb-2">No devices yet.</p>
+      <p class="mb-3">Run <code>pisharp durable serve</code> on a machine, then add it with its URL and token.</p>
+      <a class="btn btn-sm btn-outline-secondary" href="/devices?add=1"><i class="bi bi-plus-lg me-1"></i>Add a device</a>
+    </div>
+  }
+  else
+  {
+    <div class="tree-list" role="tree" aria-label="Devices, sessions and agents" tabindex="0">
+      @foreach (var deviceNode in tree)
+      {
+        var device = deviceNode.Device!;
+        var online = device.Status == "online";
+        var meta = device.Status switch
+        {
+            "online" => $"{device.Tree?.Sessions.Count ?? 0} session{((device.Tree?.Sessions.Count ?? 0) == 1 ? "" : "s")}",
+            "checking" => "checking…",
+            "offline" => device.LastSeenAt is { } seen ? $"offline · {Display.Ago(seen)}" : "offline",
+            "unauthorized" => "token rejected",
+            "mismatch" => "identity changed",
+            "incompatible" => "incompatible",
+            _ => device.Status,
+        };
+        <div class="tree-row device" role="treeitem" aria-level="1" data-key="@device.Id" data-device="@device.Id" data-status="@device.Status" tabindex="-1"
+             title="@device.Name · @device.Url@(device.Error is { } error ? "\n" + error : "")">
+          <i class="bi bi-chevron-right chev"></i>
+          <span class="status-dot @Display.StatusDot(device.Status)" role="img" aria-label="@Display.StatusText(device.Status)"></span>
+          <i class="bi @Display.PlatformIcon(device) row-icon" aria-hidden="true"></i>
+          <span class="row-name">@device.Id</span>
+          <span class="ps-chip kind-chip" data-tone="outline">@device.Kind</span>
+          <span class="row-end">
+            <span class="row-status row-meta @(device.Status is "unauthorized" or "mismatch" or "incompatible" ? "danger" : "")">@meta</span>
+            <span class="row-actions">
+              <button class="btn btn-icon" type="button" title="New session on @device.Id" aria-label="New session on @device.Id" data-action="new-session" data-device="@device.Id" disabled="@(!online)"><i class="bi bi-plus-lg"></i></button>
+              <button class="btn btn-icon" type="button" title="Check @device.Id" aria-label="Check @device.Id" data-action="check-device" data-device="@device.Id"><i class="bi bi-arrow-clockwise"></i></button>
+            </span>
+          </span>
+        </div>
+        @foreach (var sessionNode in deviceNode.Children)
+        {
+          var session = sessionNode.Session!;
+          var background = session.Agents.Sum(agent => agent.Background);
+          <div class="tree-row session @(deviceNode.Stale ? "stale" : "")" role="treeitem" aria-level="2" data-key="@sessionNode.Key" data-parent="@device.Id" data-under="@device.Id"
+               data-device="@device.Id" data-session="@session.Id" style="--depth:1" tabindex="-1" title="@session.Name&#10;@session.Cwd@(session.Error is { } failure ? "\n" + failure : "")">
+            <i class="bi bi-chevron-right chev"></i>
+            <i class="bi bi-folder2-open row-icon" aria-hidden="true"></i>
+            <span class="row-name">@session.Name</span>
+            <span class="row-path">@Display.ShortPath(session.Cwd)</span>
+            <span class="row-end">
+              <span class="row-status d-inline-flex align-items-center gap-2">
+                @if (session.Error is not null)
+                {
+                  <span class="status-dot danger" title="Unavailable: @session.Error"></span>
+                }
+                else if (session.Busy)
+                {
+                  <span class="status-dot live" title="Working"></span>
+                }
+                @if (background > 0)
+                {
+                  <span class="bg-count" title="@background background task@(background == 1 ? "" : "s")">@background bg</span>
+                }
+              </span>
+              @if (!deviceNode.Stale)
+              {
+                <span class="row-actions">
+                  <button class="btn btn-icon" type="button" title="New agent in @session.Name" aria-label="New agent in @session.Name" data-action="new-agent" data-device="@device.Id" data-session="@session.Id"><i class="bi bi-plus-lg"></i></button>
+                  <button class="btn btn-icon" type="button" title="Rename session @session.Name" aria-label="Rename session @session.Name" data-action="rename-session" data-device="@device.Id" data-session="@session.Id" data-name="@session.Name"><i class="bi bi-pencil"></i></button>
+                  <button class="btn btn-icon" type="button" title="Archive session @session.Name" aria-label="Archive session @session.Name" data-action="archive-session" data-device="@device.Id" data-session="@session.Id" data-name="@session.Name"><i class="bi bi-archive"></i></button>
+                </span>
+              }
+            </span>
+          </div>
+          @await Html.PartialAsync("~/Views/Network/_AgentRows.cshtml", (sessionNode.Children, 2, Under(device.Id, sessionNode.Key), sessionNode.Key, deviceNode.Stale))
+        }
+      }
+    </div>
+  }
+</div>
+<template id="railTemplate">
+  @foreach (var device in Model.Devices)
+  {
+    <button class="btn btn-icon rail-device" type="button" data-toggle-class="tree-collapsed" data-target="#workspace" title="@device.Id · @Display.StatusText(device.Status).ToLowerInvariant()" aria-label="@device.Id, @Display.StatusText(device.Status).ToLowerInvariant()"><i class="bi @Display.PlatformIcon(device)"></i><span class="status-dot @Display.StatusDot(device.Status)"></span></button>
+  }
+</template>

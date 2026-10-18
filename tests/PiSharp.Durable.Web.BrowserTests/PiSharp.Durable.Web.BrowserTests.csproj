@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0008, Phase 8: PLAN.md Appendix C in a browser. PiSharp Durable Web (src/PiSharp.Durable.Web) runs as a child process against an
+       in-process faux device, as in PiSharp.Durable.Web.Tests, and headless Chromium drives it through Microsoft.Playwright. The browser is not
+       restored with the package: install it once with `pwsh bin/<configuration>/net10.0/playwright.ps1 install chromium`. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Playwright" Version="[1.63.0]" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
+    <!-- Built first; the tests start its output (bin/<configuration>/net10.0/PiSharp.Durable.Web.dll) as a child process. -->
+    <ProjectReference Include="../../src/PiSharp.Durable.Web/PiSharp.Durable.Web.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>WebProject</_Parameter1>
+      <_Parameter2>$(MSBuildProjectDirectory)/../../src/PiSharp.Durable.Web</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Configuration</_Parameter1>
+      <_Parameter2>$(Configuration)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,115 @@
+@model TranscriptItemModel
+@{
+    var item = Model.Item;
+    var context = Model.Context;
+}
+@switch (item)
+{
+    case UserItem user:
+        <article class="msg msg-user" data-key="@user.Key" data-entry="@user.Id">
+          <div class="msg-body">
+            <div class="msg-content msg-plain">@user.Text</div>
+            @foreach (var image in user.Images)
+            {
+              <img class="msg-image" src="@image.DataUrl" alt="Attached image">
+            }
+            <div class="entry-hover"><span class="entry-id">#@user.Id</span></div>
+          </div>
+        </article>
+        break;
+
+    case AssistantItem assistant:
+        <article class="msg msg-assistant" data-key="@assistant.Key" data-entry="@assistant.Id">
+          <div class="msg-body">
+            @if (assistant.Streaming)
+            {
+              <div class="msg-role"><span class="status-dot live"></span>Working</div>
+            }
+            @foreach (var block in assistant.Blocks)
+            {
+              switch (block)
+              {
+                  case ThinkingBlockView thinking:
+                    <details class="thinking" data-detail="thinking-@assistant.Key-@thinking.Text.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)"><summary><i class="bi bi-chevron-right"></i>Thinking</summary><div class="thinking-body">@thinking.Text</div></details>
+                    break;
+                  case TextBlockView text:
+                    <div class="msg-content">@Html.Raw(context.Markdown.Render(text.Text))</div>
+                    break;
+                  case ToolBlockView tool:
+                    @await Html.PartialAsync("~/Views/Fragments/_ToolCall.cshtml", new ToolCallModel(tool.Call, context, false))
+                    break;
+              }
+            }
+            @if (assistant.Error is { } error)
+            {
+              <div class="msg-error"><i class="bi bi-exclamation-circle me-1"></i>@error</div>
+            }
+            @if (!assistant.Streaming)
+            {
+              <div class="msg-footer">
+                @if (assistant.Model is { Length: > 0 } modelName)
+                {
+                  <span title="Model">@modelName</span>
+                }
+                <span class="msg-actions"><span class="entry-id">#@assistant.Id</span>
+                  @if (assistant.Blocks.OfType<TextBlockView>().Any())
+                  {
+                    <button class="btn btn-icon" type="button" title="Copy" aria-label="Copy" data-action="copy-entry"><i class="bi bi-copy"></i></button>
+                  }
+                  <button class="btn btn-icon" type="button" title="Fork from this entry. App State stays shared." aria-label="Fork at entry @assistant.Id" data-action="fork" data-entry="@assistant.Id"><i class="bi bi-signpost-split"></i></button>
+                </span>
+              </div>
+            }
+          </div>
+        </article>
+        break;
+
+    case ToolResultItem result:
+        <article class="msg msg-assistant" data-key="@result.Key" data-entry="@result.Id">
+          <div class="msg-body">
+            <details class="tool-card @(result.IsError ? "is-error" : "")" data-detail="@result.Key">
+              <summary><span class="tool-icon"><i class="bi @(result.IsError ? "bi-exclamation-circle" : "bi-check2")"></i></span><span class="tool-name">@result.Name</span><span class="tool-args-summary">Result of a call before this context</span><span class="tool-status">@(result.IsError ? "Error" : "Done")</span></summary>
+              <div class="tool-body"><div class="ps-term"><pre class="wrap">@result.Text</pre></div></div>
+            </details>
+            <div class="msg-footer"><span class="msg-actions"><span class="entry-id">#@result.Id</span><button class="btn btn-icon" type="button" title="Fork from this entry" aria-label="Fork at entry @result.Id" data-action="fork" data-entry="@result.Id"><i class="bi bi-signpost-split"></i></button></span></div>
+          </div>
+        </article>
+        break;
+
+    case ToolItem tool:
+        <article class="msg msg-assistant" data-key="@tool.Key">
+          <div class="msg-body">@await Html.PartialAsync("~/Views/Fragments/_ToolCall.cshtml", new ToolCallModel(tool.Call, context, false))</div>
+        </article>
+        break;
+
+    case EventItem entry when entry.EntryKind == "pisharp.job" && entry.Data is JsonObject data && Display.Long(data, "taskId") is { } task && context.Run(task) is { } run:
+        <div class="event-block" data-key="@entry.Key" data-entry="@entry.Id">
+          @await Html.PartialAsync("~/Views/Fragments/_JobCard.cshtml", new JobCardModel(run, Display.Str(run, "job") is { } job && context.Jobs.TryGetValue(job, out var definition) ? definition : null, context))
+        </div>
+        break;
+
+    case EventItem entry:
+        {
+            var icon = entry.EntryKind switch
+            {
+                "pi.reset" => "bi-arrow-counterclockwise",
+                "pi.compaction" => "bi-layers",
+                "pisharp.state-change" => "bi-braces",
+                "pisharp.job" => "bi-diagram-3",
+                _ => "bi-info-circle",
+            };
+            var noteTitle = entry.EntryKind == "pi.reset" ? "Handoff note" : "Context note";
+            <div class="event-group" data-key="@entry.Key" data-entry="@entry.Id">
+              <div class="event-line"><span class="ev-text"><i class="bi @icon"></i><span>@entry.Text</span><span class="entry-id">#@entry.Id</span><button class="btn btn-icon" type="button" title="Fork from this entry" aria-label="Fork at entry @entry.Id" data-action="fork" data-entry="@entry.Id"><i class="bi bi-signpost-split"></i></button></span></div>
+              @if (entry.Note is { Length: > 0 } note)
+              {
+                <div class="event-block">
+                  <details class="context-note" data-detail="note-@entry.Key" open="@(entry.EntryKind == "pi.reset")"><summary>@noteTitle</summary>
+                    <div class="note-body">@Html.Raw(context.Markdown.Render(note))</div>
+                  </details>
+                </div>
+              }
+            </div>
+        }
+        break;
+}

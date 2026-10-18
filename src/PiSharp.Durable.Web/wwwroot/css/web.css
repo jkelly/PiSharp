@@ -1,0 +1,18 @@
+/* PiSharp Durable Web: what the live app adds to the mockups' styles (durable.css). */
+.d-contents { display: contents; }
+.msg-plain { white-space: pre-wrap; }
+.msg-image { display: block; max-width: min(100%, 28rem); max-height: 20rem; border-radius: .5rem; border: 1px solid var(--ps-border, rgba(127,127,127,.25)); margin-top: .5rem; }
+.msg-error { color: var(--bs-danger); font-size: .85rem; margin-top: .25rem; }
+.msg-content > :last-child { margin-bottom: 0; }
+.msg-content pre { white-space: pre-wrap; }
+.event-group { display: block; }
+.plan-text { max-height: 18rem; overflow-y: auto; }
+.pending-body fieldset { border: 0; padding: 0; margin: 0; }
+.pending-body legend { font-size: inherit; float: none; width: auto; margin-bottom: .35rem; }
+.pending-panel { max-height: 50vh; overflow-y: auto; }
+.chat-scroll[hidden], [data-connecting][hidden] { display: none !important; }
+.dn-center[hidden], .dn-agent[hidden], .dn-inspector[hidden] { display: none !important; }
+.tree-body { display: contents; }
+.job-card { scroll-margin: 6rem; }
+.signature { white-space: pre-wrap; }
+.tool-card .ps-term pre { max-height: 22rem; overflow: auto; }

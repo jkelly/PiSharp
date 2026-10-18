@@ -1,0 +1,29 @@
+@model TasksModel
+@if (Model.Rows.Count == 0)
+{
+  <div class="fs-7 text-ps-faint py-2">Nothing running. Send a message or run a job.</div>
+}
+else
+{
+  foreach (var (task, depth) in Model.Rows)
+  {
+    var (text, tone) = Display.TaskStatus(task);
+    var agent = Model.Agents.TryGetValue(task.ConversationId, out var owner) ? owner.Name : $"agent #{task.ConversationId}";
+    <div class="task-row" style="--depth:@depth" data-task="@task.Id">
+      <i class="bi @Display.TaskIcon(task)"></i>
+      <div class="min-w-0 flex-grow-1">
+        <div><span class="t-name">@Display.TaskName(task)</span> <span class="ps-chip" data-tone="@tone">@text</span>@if (task.State.Phase is { } phase)
+          { <span class="fs-8 text-ps-faint ms-1">@phase</span> }</div>
+        <div class="t-meta">#@task.Id @task.Kind · @agent@(task.Background ? " · background" : "")</div>
+      </div>
+      @if (task.ConversationId != Model.AgentId)
+      {
+        <a class="btn btn-icon" href="#" title="Open @agent" aria-label="Open @agent" data-action="open-agent" data-agent="@task.ConversationId"><i class="bi bi-box-arrow-up-right"></i></a>
+      }
+      @if (task.Background && task.Aborting != true)
+      {
+        <button class="btn btn-icon" type="button" title="Stop task #@task.Id" aria-label="Stop task @task.Id" data-action="stop-task" data-task="@task.Id"><i class="bi bi-stop-circle"></i></button>
+      }
+    </div>
+  }
+}

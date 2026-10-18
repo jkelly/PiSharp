@@ -1,0 +1,127 @@
+@model JobCardModel
+@{
+    var run = Model.Run;
+    var definition = Model.Definition;
+    var task = Display.Long(run, "id") ?? 0;
+    var status = Display.Str(run, "status");
+    var (statusText, tone) = Display.JobStatus(status);
+    var started = Display.Number(run, "startedAt");
+    var ended = Display.Number(run, "endedAt");
+    var elapsed = started > 0 ? (ended > 0 ? ended : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) - started : 0;
+    var phases = Display.Objects(run, "phases").ToList();
+    var inputs = run["input"] as JsonObject;
+    var resumed = Display.Long(run, "resumed") ?? 0;
+    var approval = run["approval"] as JsonObject;
+    var waiting = status == "waiting" && Display.Str(approval, "status") == "pending";
+    var live = status is "running" or "waiting";
+    string StepIcon(string? kind) => kind switch
+    {
+        "command" => "bi-terminal",
+        "agent" => "bi-robot",
+        "state" => "bi-braces",
+        "checkpoint" => "bi-flag",
+        _ => "bi-dot",
+    };
+}
+<article class="job-card @(waiting ? "is-waiting" : "")" id="job-@task" data-job-run="@task">
+  <div class="job-head">
+    <span class="job-tile"><i class="bi bi-diagram-3"></i></span>
+    <div class="min-w-0 flex-grow-1"><div class="job-sub">Durable job · run #@(Display.Long(run, "run") ?? 1)</div><h3 class="job-title">@(Display.Str(run, "title") ?? Display.Str(definition, "title"))</h3></div>
+    <span class="ps-chip" data-tone="@tone">@statusText</span>
+  </div>
+  @if (Display.Str(definition, "summary") is { } summary)
+  {
+    <p class="job-summary">@summary</p>
+  }
+  <div class="job-meta">
+    <span>task #@task</span>
+    <span>@(Display.Str(run, "startedBy") == "agent" ? "started by the agent" : "started by you")</span>
+    @if (elapsed > 0)
+    {
+      <span>@Display.Duration(elapsed)</span>
+    }
+    @if (inputs is not null)
+    {
+      foreach (var (name, value) in inputs)
+      {
+        <span>@name=@Transcript.Describe(value)</span>
+      }
+    }
+    @if (resumed > 0)
+    {
+      <span class="text-ps-warn">resumed @(resumed)× after a restart</span>
+    }
+  </div>
+  <div class="phase-steps">
+    @for (var i = 0; i < phases.Count; i++)
+    {
+      var phase = phases[i];
+      var phaseStatus = Display.Str(phase, "status");
+      var chip = phaseStatus switch { "done" => "done", "running" => "running", "waiting" => "waiting", "error" or "failed" or "aborted" => "failed", _ => "" };
+      var steps = Display.Objects(phase, "steps").Count(step => Display.Str(step, "kind") == "checkpoint" || Display.Str(step, "kind") == "command");
+      <span class="phase-chip @chip"><span class="ph-dot">@switch (chip)
+      {
+        case "done": <i class="bi bi-check"></i> break;
+        case "running": <span class="spinner-border" aria-hidden="true"></span> break;
+        case "waiting": <i class="bi bi-pause-fill"></i> break;
+        case "failed": <i class="bi bi-x"></i> break;
+        default: @(i + 1) break;
+      }</span>@Display.Str(phase, "label")@if (Display.Str(phase, "kind") == "repeat" && steps > 0)
+      {<span class="ph-progress">@steps</span>}</span>
+      @if (i < phases.Count - 1)
+      {
+        <i class="bi bi-arrow-right phase-arrow"></i>
+      }
+    }
+  </div>
+  <div class="job-phases">
+    @for (var i = 0; i < phases.Count; i++)
+    {
+      var phase = phases[i];
+      var phaseStarted = Display.Number(phase, "startedAt");
+      var phaseEnded = Display.Number(phase, "endedAt");
+      var steps = Display.Objects(phase, "steps").ToList();
+      if (Display.Str(phase, "status") == "pending" && steps.Count == 0) { continue; }
+      <details class="job-phase" data-detail="job-@task-@Display.Str(phase, "id")" open="@(Display.Str(phase, "status") is "running" or "waiting")"><summary><span class="n">@(i + 1)</span><span class="lbl">@Display.Str(phase, "label")</span><span class="sum">@Display.Str(phase, "summary")</span><span class="dur">@(phaseStarted > 0 && phaseEnded > 0 ? Display.Duration(phaseEnded - phaseStarted) : "")</span></summary>
+        <div class="job-steps">
+          @foreach (var step in steps)
+          {
+            var conversation = Display.Long(step, "conversationId");
+            <div class="job-step" title="@Display.Str(step, "detail")"><i class="bi @StepIcon(Display.Str(step, "kind"))"></i><span class="step-label">@if (Display.Str(step, "kind") is "command" or "state")
+              {<code>@Display.Str(step, "label")</code>}
+              else
+              {@Display.Str(step, "label")}</span>@if (conversation is { } child)
+              {<a class="fs-8 ms-2" href="@Model.Context.AgentHref(child)" data-nav>Open subagent #@child</a>}<span class="step-end">@if (Display.Str(step, "status") == "done" && Display.Str(step, "kind") != "checkpoint")
+              {<i class="bi bi-check2"></i>}
+              else if (Display.Str(step, "status") == "error")
+              {<i class="bi bi-x text-danger"></i>}
+              @(Display.Number(step, "ms") > 0 ? $" {(Display.Number(step, "ms") >= 1000 ? Display.Duration(Display.Number(step, "ms")) : Display.Number(step, "ms").ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " ms")}" : Display.Str(step, "kind") == "checkpoint" ? "resumed" : "")</span></div>
+          }
+          @if (Display.Str(phase, "kind") == "approval" && Display.Str(phase, "status") == "done")
+          {
+            <div class="job-step"><i class="bi bi-shield-check"></i><span class="step-label">Waited on a saved checkpoint, then @(Display.Str(approval, "status") ?? "decided")</span></div>
+          }
+        </div></details>
+    }
+  </div>
+  @if (Display.Str(run, "error") is { } failure)
+  {
+    <div class="alert alert-danger py-2 fs-7 mb-2"><i class="bi bi-exclamation-octagon me-1"></i>@failure</div>
+  }
+  @if (waiting)
+  {
+    var phaseLabel = phases.FirstOrDefault(phase => Display.Str(phase, "id") == Display.Str(approval, "phase")) is { } waitingPhase ? Display.Str(waitingPhase, "summary") ?? Display.Str(waitingPhase, "label") : null;
+    <div class="job-approval">
+      <div class="ttl"><i class="bi bi-shield-check me-1"></i>Approve to continue</div>
+      <p>@(phaseLabel ?? "This job waits for your approval.") The job is paused on a saved checkpoint, so it keeps waiting through a restart.</p>
+      <div class="d-flex gap-2"><button class="btn btn-sm btn-primary" type="button" data-action="approve-job" data-task="@task" data-approved="true">Approve and continue</button><button class="btn btn-sm btn-outline-secondary" type="button" data-action="approve-job" data-task="@task" data-approved="false">Decline</button></div>
+    </div>
+  }
+  <div class="job-foot">
+    <span>@(Display.Bool(run, "background") ? "Runs in the background: Interrupt does not stop it." : "Runs in the foreground.")</span>
+    @if (live)
+    {
+      <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-action="stop-task" data-task="@task">Stop</button>
+    }
+  </div>
+</article>

@@ -1,0 +1,41 @@
+<div class="modal fade" id="modal-help" tabindex="-1" aria-labelledby="help-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title" id="help-title">What makes this durable?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <ol class="help-steps">
+          <li><strong>Pick a device and start a session.</strong> The session is a database and a working directory on that device.</li>
+          <li><strong>Send work, then close this tab.</strong> The agent keeps running on the device. Open the page again and it shows where the run is.</li>
+          <li><strong>Change App State, then fork.</strong> Forks keep their own conversation but share the device's App State.</li>
+          <li><strong>Interrupt on purpose.</strong> Esc stops foreground work. Background jobs keep running until you stop them.</li>
+          <li><strong>Try the limits.</strong> Turn on Read only, or the command guard, and ask the agent to delete something.</li>
+          <li><strong>Restart the device mid-tool.</strong> The run resumes from its checkpoint. A tool that may have half-run comes back as interrupted instead of running twice.</li>
+        </ol>
+        <div class="alert alert-info mb-0">Durable means checkpointed, not exactly-once. A message is admitted once, but an outside effect (a payment, a deploy) may have happened just before a crash. Effects still need their own idempotency.</div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-shortcuts" tabindex="-1" aria-labelledby="keys-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title" id="keys-title">Keyboard shortcuts</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr><td><kbd class="ps-kbd">Enter</kbd></td><td>Send</td></tr>
+            <tr><td><kbd class="ps-kbd">Shift</kbd> <kbd class="ps-kbd">Enter</kbd></td><td>New line</td></tr>
+            <tr><td><kbd class="ps-kbd">/</kbd></td><td>Slash commands</td></tr>
+            <tr><td><kbd class="ps-kbd">Esc</kbd></td><td>Close a dialog, otherwise interrupt the agent</td></tr>
+            <tr><td><kbd class="ps-kbd">Alt</kbd> <kbd class="ps-kbd">Shift</kbd> <kbd class="ps-kbd">N</kbd></td><td>Show or hide the network (Ctrl N on macOS)</td></tr>
+            <tr><td><kbd class="ps-kbd">Alt</kbd> <kbd class="ps-kbd">Shift</kbd> <kbd class="ps-kbd">T</kbd></td><td>Show or hide the inspector (Ctrl T on macOS)</td></tr>
+            <tr><td><kbd class="ps-kbd">↑</kbd> <kbd class="ps-kbd">↓</kbd></td><td>Move in the network tree</td></tr>
+            <tr><td><kbd class="ps-kbd">→</kbd> <kbd class="ps-kbd">←</kbd></td><td>Expand or collapse a row</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

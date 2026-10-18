@@ -1,0 +1,84 @@
+@model ToolCallModel
+@{
+    var call = Model.Call;
+    var (cardClass, icon, statusText) = call.Status switch
+    {
+        ToolStatus.Error => ("is-error", "<i class=\"bi bi-exclamation-circle\"></i>", "Error"),
+        ToolStatus.Done => ("", "<i class=\"bi bi-check2\"></i>", "Done"),
+        ToolStatus.Running => ("is-running", "<span class=\"spinner-border spinner-border-sm\" style=\"width:.8rem;height:.8rem;border-width:.12em\" aria-hidden=\"true\"></span>", "running"),
+        _ => ("is-running", "<span class=\"status-dot waiting\"></span>", "pending"),
+    };
+    var args = call.Args as JsonObject;
+    var script = call.Name == "codemode" ? Display.Str(args, "code") ?? Display.Str(args, "script") : null;
+    var interrupted = call.Status == ToolStatus.Error && (call.Result ?? "").Contains("interrupted", StringComparison.OrdinalIgnoreCase);
+    var waitsForYou = call.Status == ToolStatus.Running && call.Name is "ask_user_question" or "exit_plan_mode";
+    if (waitsForYou)
+    {
+        icon = "<span class=\"status-dot waiting\"></span>";
+        statusText = "Waiting for you";
+    }
+    var nestedCount = call.Nested.Count;
+    var open = call.Status == ToolStatus.Running && call.Output is not null || call.Status == ToolStatus.Error;
+}
+<details class="tool-card @cardClass" data-detail="call-@call.CallId" open="@open">
+  <summary><span class="tool-icon">@Html.Raw(icon)</span><span class="tool-name">@call.Name</span><span class="tool-args-summary">@(script is not null ? Display.Cut(script.ReplaceLineEndings(" "), 140) : Display.ArgsSummary(call.Args))</span>@if (interrupted)
+    {<span class="ps-chip" data-tone="danger">interrupted</span>}<span class="tool-status">@statusText@(nestedCount > 0 ? $" · {nestedCount} call{(nestedCount == 1 ? "" : "s")}" : "")</span></summary>
+  <div class="tool-body">
+    @if (waitsForYou)
+    {
+      <div class="fs-7 text-secondary mb-2">Answer in the panel above the message box. The question is saved on the device, so it waits through a restart.</div>
+    }
+    @if (script is not null)
+    {
+      <div class="ps-label mb-1">Script</div>
+      <div class="ps-term mb-2"><pre>@script</pre></div>
+    }
+    else if (call.Args is JsonObject { Count: > 0 })
+    {
+      <div class="ps-label mb-1">Input</div>
+      <div class="ps-term mb-2"><pre class="wrap">@Display.Pretty(call.Args)</pre></div>
+    }
+    @if (nestedCount > 0)
+    {
+      <div class="nested-label">Nested calls</div>
+      <div class="nested-calls">
+        @foreach (var nested in call.Nested)
+        {
+          @await Html.PartialAsync("~/Views/Fragments/_ToolCall.cshtml", new ToolCallModel(nested, Model.Context, true))
+        }
+      </div>
+    }
+    @if (call.Result is not null)
+    {
+      <div class="result-head @(nestedCount > 0 ? "mt-2" : "")"><span class="ps-label">Result</span>
+        @if (call.ResultEntryId is { } entry && !Model.Nested)
+        {
+          <button class="btn btn-icon ms-auto" type="button" title="Fork after this result" aria-label="Fork at entry @entry" data-action="fork" data-entry="@entry"><i class="bi bi-signpost-split"></i></button>
+        }
+      </div>
+      <div class="ps-term"><pre class="wrap">@call.Result</pre></div>
+      @foreach (var image in call.Images)
+      {
+        <img class="msg-image mt-2" src="@image.DataUrl" alt="Image from @call.Name">
+      }
+    }
+    else if (call.Output is { Length: > 0 } output)
+    {
+      <div class="ps-label mb-1">Live output</div>
+      <div class="ps-term"><pre class="live-output">@output</pre></div>
+    }
+    @if (call.Name == "subagent" && call.Status == ToolStatus.Done && Model.Context.Agents.Values.Where(agent => agent.Kind == "subagent" && agent.OwnerAgentId == Model.Context.AgentId).ToList() is { Count: > 0 } subagents)
+    {
+      <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+        @foreach (var subagent in subagents.TakeLast(3))
+        {
+          <a class="btn btn-sm btn-outline-secondary" href="@Model.Context.AgentHref(subagent.Id)" data-nav><i class="bi bi-arrow-return-right me-1"></i>Open @subagent.Name</a>
+        }
+      </div>
+    }
+    @if (interrupted)
+    {
+      <div class="fs-8 text-ps-faint mt-2">The device restarted during this call. @call.Name is not replay safe, so the agent got this result instead of a silent rerun.</div>
+    }
+  </div>
+</details>

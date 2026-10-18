@@ -1,0 +1,63 @@
+@model OfflineModel
+@{
+    var device = Model.Device;
+    var local = device.Kind == "local";
+    var host = Uri.TryCreate(device.Url, UriKind.Absolute, out var parsed) ? parsed.Host : device.Url;
+    var serve = local ? "pisharp durable serve" : $"pisharp durable serve --host {(host is "127.0.0.1" or "localhost" ? "127.0.0.1" : "0.0.0.0")}";
+}
+<div class="offline-panel" data-offline-device="@device.Id">
+  @switch (device.Status)
+  {
+    case "checking":
+      <div class="offline-icon"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span></div>
+      <div class="fs-8 text-ps-faint mb-1"><span class="ps-mono">@device.Kind · @device.Url</span></div>
+      <h2>Checking @device.Id…</h2>
+      <p class="lead-text">Asking <span class="ps-mono">/v1/device</span> who answers at this address.</p>
+      break;
+    case "unauthorized":
+      <div class="offline-icon danger"><i class="bi bi-shield-exclamation"></i></div>
+      <div class="fs-8 text-ps-faint mb-1"><span class="ps-mono">@device.Kind · @device.Url</span></div>
+      <h2>@device.Id rejected its token</h2>
+      <p class="lead-text">The device answered, but the token stored here is missing, wrong or was rotated.</p>
+      @if (device.Error is { } error)
+      {
+        <p class="err">@error</p>
+      }
+      <div class="ps-term"><div class="ps-term-bar">On @device.Id<button class="btn btn-icon ms-auto" type="button" data-copy="#cmd-token" title="Copy" aria-label="Copy command"><i class="bi bi-copy"></i></button></div><pre id="cmd-token">pisharp durable token</pre></div>
+      <div class="fs-7 text-ps-faint mt-2">Run it on @device.Id to print the current token, then enter it here.</div>
+      <div class="d-flex gap-2 mt-3 justify-content-center"><a class="btn btn-primary" href="/devices?token=@device.Id">Enter token</a><button class="btn btn-outline-secondary" type="button" data-action="check-device" data-device="@device.Id">Check now</button></div>
+      break;
+    case "mismatch":
+      <div class="offline-icon danger"><i class="bi bi-shield-exclamation"></i></div>
+      <div class="fs-8 text-ps-faint mb-1"><span class="ps-mono">@device.Kind · @device.Url</span></div>
+      <h2>@device.Id answers as a different device</h2>
+      <p class="lead-text">This address now reaches a device with another identity. If you rebuilt @device.Id or moved its data folder on purpose, forget the old identity. Otherwise, check the address.</p>
+      @if (device.Error is { } mismatch)
+      {
+        <p class="err">@mismatch</p>
+      }
+      <div class="d-flex gap-2 mt-3 justify-content-center"><button class="btn btn-primary" type="button" data-action="forget-identity" data-device="@device.Id">Forget old identity</button><a class="btn btn-outline-secondary" href="/devices?edit=@device.Id">Edit device</a></div>
+      break;
+    case "incompatible":
+      <div class="offline-icon danger"><i class="bi bi-plug"></i></div>
+      <div class="fs-8 text-ps-faint mb-1"><span class="ps-mono">@device.Kind · @device.Url</span></div>
+      <h2>@device.Id speaks another API version</h2>
+      <p class="lead-text">@(device.Error ?? "It reports another API version.") Update PiSharp on the device.</p>
+      <div class="ps-term"><div class="ps-term-bar">On @device.Id<button class="btn btn-icon ms-auto" type="button" data-copy="#cmd-update" title="Copy" aria-label="Copy command"><i class="bi bi-copy"></i></button></div><pre id="cmd-update">dotnet tool update -g PiSharp</pre></div>
+      <button class="btn btn-primary mt-3" type="button" data-action="check-device" data-device="@device.Id">Check now</button>
+      break;
+    default:
+      <div class="offline-icon"><i class="bi bi-wifi-off"></i></div>
+      <div class="fs-8 text-ps-faint mb-1"><span class="ps-mono">@device.Kind · @device.Url</span></div>
+      <h2>@device.Id is offline</h2>
+      <p class="lead-text">Last seen @Display.Ago(device.LastSeenAt). Its agents keep their state on the device and resume when it is back. The tree shows the last sessions it reported.</p>
+      @if (device.Error is { } offline)
+      {
+        <p class="err">@offline</p>
+      }
+      <div class="ps-term"><div class="ps-term-bar">On @device.Id<button class="btn btn-icon ms-auto" type="button" data-copy="#cmd-offline" title="Copy" aria-label="Copy command"><i class="bi bi-copy"></i></button></div><pre id="cmd-offline">@serve</pre></div>
+      <div class="fs-7 text-ps-faint mt-2">Run it on @device.Id, or start its service, then press Check now.</div>
+      <button class="btn btn-primary mt-3" type="button" data-action="check-device" data-device="@device.Id">Check now</button>
+      break;
+  }
+</div>

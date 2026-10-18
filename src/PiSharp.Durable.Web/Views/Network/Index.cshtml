@@ -1,0 +1,189 @@
+@model NetworkPage
+@{
+    ViewData["Title"] = "Network";
+    ViewData["Page"] = "network";
+}
+<div class="dn-shell" id="app" data-device="@Model.Selection.DeviceId" data-session="@Model.Selection.SessionId" data-agent="@Model.Selection.AgentId">
+
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+
+  <div class="dn-banner-wrap" id="errorBanner" hidden>
+    <div class="app-banner danger" role="alert">
+      <i class="bi bi-exclamation-octagon"></i>
+      <span data-banner-text></span>
+      <button type="button" class="btn-close ms-auto" aria-label="Dismiss error" data-dismiss-banner></button>
+    </div>
+  </div>
+
+  <div class="dn-workspace" id="workspace">
+
+    <aside class="dn-tree offcanvas-md offcanvas-start" tabindex="-1" id="netTree" aria-label="Network">
+      <div class="dn-pane-head">
+        <h2 class="dn-pane-title">Network</h2>
+        <a class="btn btn-icon ms-auto" href="/devices" title="Manage devices" aria-label="Manage devices"><i class="bi bi-hdd-network"></i></a>
+        <button class="btn btn-icon d-none d-md-inline-flex" type="button" data-toggle-class="tree-collapsed" data-target="#workspace" title="Collapse network (Alt+Shift+N)" aria-label="Collapse network"><i class="bi bi-layout-sidebar"></i></button>
+        <button type="button" class="btn-close d-md-none ms-1" data-bs-dismiss="offcanvas" data-bs-target="#netTree" aria-label="Close network"></button>
+      </div>
+      <partial name="~/Views/Network/_NetworkTree.cshtml" model="Model" />
+      <div class="dn-rail" aria-label="Network, collapsed">
+        <button class="btn btn-icon" type="button" data-toggle-class="tree-collapsed" data-target="#workspace" title="Expand network (Alt+Shift+N)" aria-label="Expand network"><i class="bi bi-layout-sidebar"></i></button>
+        <span class="rail-sep"></span>
+        <div class="d-contents" id="railDevicesSlot"></div>
+      </div>
+      <div class="tree-resizer" role="separator" aria-orientation="vertical" aria-label="Resize network panel" tabindex="0"></div>
+    </aside>
+
+    <aside class="dn-inspector offcanvas-xl offcanvas-end" tabindex="-1" id="inspector" aria-label="Session details" data-needs-agent hidden>
+      <div class="d-flex flex-column flex-grow-1" style="min-height:0" id="insPanes" data-panes>
+        <div class="ins-tabs">
+          <div class="d-flex flex-grow-1" role="tablist" aria-label="Session details">
+            <button class="ins-tab" type="button" role="tab" data-show-pane="ins-session" data-pane-indicator="ins-session"><i class="bi bi-folder2-open"></i>Session</button>
+            <button class="ins-tab" type="button" role="tab" data-show-pane="ins-state" data-pane-indicator="ins-state"><i class="bi bi-braces"></i>State</button>
+            <button class="ins-tab" type="button" role="tab" data-show-pane="ins-tasks" data-pane-indicator="ins-tasks"><i class="bi bi-activity"></i>Tasks<span class="tab-count" data-task-count hidden>0</span></button>
+            <button class="ins-tab" type="button" role="tab" data-show-pane="ins-tools" data-pane-indicator="ins-tools"><i class="bi bi-wrench"></i>Tools</button>
+            <button class="ins-tab" type="button" role="tab" data-show-pane="ins-extend" data-pane-indicator="ins-extend"><i class="bi bi-puzzle"></i>Extend</button>
+          </div>
+          <button class="btn btn-icon align-self-center d-none d-xl-inline-flex" type="button" data-toggle-class="ins-collapsed" data-target="#workspace" title="Collapse inspector (Alt+Shift+T)" aria-label="Collapse inspector"><i class="bi bi-layout-sidebar-inset-reverse"></i></button>
+          <button type="button" class="btn-close align-self-center d-xl-none ms-1 me-2" data-bs-dismiss="offcanvas" data-bs-target="#inspector" aria-label="Close inspector"></button>
+        </div>
+
+        <div class="ins-body">
+          <div data-pane="ins-session" data-pane-default role="tabpanel">
+            <div data-panel="session"><div class="ins-section fs-7 text-ps-faint">Loading…</div></div>
+          </div>
+
+          <div data-pane="ins-state" role="tabpanel">
+            <partial name="~/Views/Panels/_StateTab.cshtml" />
+          </div>
+
+          <div data-pane="ins-tasks" role="tabpanel">
+            <div data-panel="jobs"><div class="ins-section fs-7 text-ps-faint">Loading…</div></div>
+            <div class="ins-section">
+              <h3>Agent activity <span class="ms-auto fs-8 text-ps-faint" data-activity-count>Nothing running</span></h3>
+              <p class="ins-hint">Tasks of this agent and the subagents it owns. Interrupt (Esc) stops foreground work. Stop all also stops background work.</p>
+              <div data-live-panel="tasks"></div>
+              <button class="btn btn-sm btn-outline-danger mt-2" type="button" data-action="stop-all"><i class="bi bi-stop-circle me-1"></i>Stop all</button>
+            </div>
+            <div class="ins-section">
+              <details data-runtime>
+                <summary class="fs-7 text-secondary">Runtime details</summary>
+                <div data-panel="runtime"><div class="fs-7 text-ps-faint mt-2">Loading…</div></div>
+              </details>
+            </div>
+          </div>
+
+          <div data-pane="ins-tools" role="tabpanel">
+            <div data-panel="tools"><div class="ins-section fs-7 text-ps-faint">Loading…</div></div>
+          </div>
+
+          <div data-pane="ins-extend" role="tabpanel">
+            <div data-panel="extend"><div class="ins-section fs-7 text-ps-faint">Loading…</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dn-rail" aria-label="Inspector, collapsed">
+        <button class="btn btn-icon" type="button" data-toggle-class="ins-collapsed" data-target="#workspace" title="Expand inspector (Alt+Shift+T)" aria-label="Expand inspector"><i class="bi bi-layout-sidebar-inset-reverse"></i></button>
+        <span class="rail-sep"></span>
+        <button class="btn btn-icon rail-tab" type="button" data-show-pane="ins-session" data-panes-target="#insPanes" data-expand="ins-collapsed" title="Open Session" aria-label="Open Session"><i class="bi bi-folder2-open"></i></button>
+        <button class="btn btn-icon rail-tab" type="button" data-show-pane="ins-state" data-panes-target="#insPanes" data-expand="ins-collapsed" title="Open State" aria-label="Open State"><i class="bi bi-braces"></i></button>
+        <button class="btn btn-icon rail-tab" type="button" data-show-pane="ins-tasks" data-panes-target="#insPanes" data-expand="ins-collapsed" title="Open Tasks" aria-label="Open Tasks"><i class="bi bi-activity"></i><span class="tab-count" data-task-count hidden>0</span></button>
+        <button class="btn btn-icon rail-tab" type="button" data-show-pane="ins-tools" data-panes-target="#insPanes" data-expand="ins-collapsed" title="Open Tools" aria-label="Open Tools"><i class="bi bi-wrench"></i></button>
+        <button class="btn btn-icon rail-tab" type="button" data-show-pane="ins-extend" data-panes-target="#insPanes" data-expand="ins-collapsed" title="Open Extend" aria-label="Open Extend"><i class="bi bi-puzzle"></i></button>
+      </div>
+    </aside>
+
+    <section class="dn-agent" aria-label="Agent" id="agentView" data-needs-agent hidden>
+      <div class="agent-head">
+        <nav class="crumbs" aria-label="Conversation lineage" data-crumbs></nav>
+        <button class="btn btn-icon flex-none" type="button" title="Rename agent" aria-label="Rename agent" data-action="rename-agent"><i class="bi bi-pencil"></i></button>
+        <div class="dropdown">
+          <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Browse conversations" aria-label="Browse conversations"><i class="bi bi-chevron-down"></i></button>
+          <div class="dropdown-menu agent-picker" data-agent-picker></div>
+        </div>
+        <span class="agent-status">
+          <span class="ps-chip" data-tone="ok" data-status="working" hidden>Working</span>
+          <span class="ps-chip" data-tone="warn" data-status="waiting" hidden>Waiting for you</span>
+          <span class="ps-chip" data-tone="danger" data-status="disconnected" hidden>Reconnecting</span>
+        </span>
+      </div>
+      <div class="agent-source" data-agent-source hidden></div>
+
+      <div class="center-note flex-grow-1" data-connecting>
+        <div class="spinner-border spinner-border-sm text-secondary mb-3" role="status"><span class="visually-hidden">Connecting</span></div>
+        <h2 class="h5 text-body">Connecting to the agent…</h2>
+        <p class="fs-7">The agent keeps working on its device while this view connects.</p>
+      </div>
+
+      <div class="chat-scroll" data-testid="chat" id="chatScroll" hidden>
+        <div class="empty-hero" data-empty-hero hidden>
+          <h2>A conversation that outlives this window</h2>
+          <p class="text-secondary mb-4">Messages, tools and state live on <strong class="text-body" data-device-name></strong>. Close the tab and the agent keeps working.</p>
+          <div class="d-flex flex-wrap justify-content-center gap-2">
+            <button class="suggestion" type="button" data-fill-composer="Inspect this directory with your tools and give me a brief overview. Do not change any files."><i class="bi bi-folder2-open"></i>Explore this directory</button>
+            <button class="suggestion" type="button" data-fill-composer="Use read_state, then update_state to add a field called progress with value 1 and a boolean called ready with value false."><i class="bi bi-braces"></i>Make a state change</button>
+            <button class="suggestion" type="button" data-fill-composer="List the durable jobs on this device, then run Workspace snapshot and wait for it."><i class="bi bi-diagram-3"></i>Run a durable job</button>
+          </div>
+        </div>
+        <div class="chat-thread" id="thread"></div>
+        <div class="chat-thread pt-0" data-working hidden><div class="typing" aria-label="The agent is working"><span></span><span></span><span></span></div></div>
+      </div>
+
+      <div class="chat-composer-wrap">
+        <div data-live-panel="pending"></div>
+        <div class="composer">
+          <div class="composer-queue" data-live-panel="queue"></div>
+          <div class="slash-menu" id="slashMenu" role="listbox" aria-label="Slash commands" hidden>
+            <button class="slash-item" type="button" role="option" data-cmd="compact"><span class="cmd">/compact</span><span class="args">[instructions]</span><span class="desc">Summarise older entries now</span></button>
+            <button class="slash-item" type="button" role="option" data-cmd="reset"><span class="cmd">/reset</span><span class="args">[handoff note]</span><span class="desc">Start a new context; history stays stored</span></button>
+            <button class="slash-item" type="button" role="option" data-cmd="tasks"><span class="cmd">/tasks</span><span class="desc">Open the Tasks tab</span></button>
+            <button class="slash-item" type="button" role="option" data-cmd="new"><span class="cmd">/new</span><span class="args">[name]</span><span class="desc">New agent in this session</span></button>
+            <button class="slash-item" type="button" role="option" data-cmd="fork"><span class="cmd">/fork</span><span class="args">[entry] [name]</span><span class="desc">Fork at an entry, or the last answer</span></button>
+            <button class="slash-item" type="button" role="option" data-cmd="name" data-needs-arg><span class="cmd">/name</span><span class="args">&lt;name&gt;</span><span class="desc">Rename this agent</span></button>
+            <button class="slash-item" type="button" role="option" data-cmd="model"><span class="cmd">/model</span><span class="desc">Choose a model</span></button>
+            <button class="slash-item" type="button" role="option" data-cmd="thinking" data-needs-arg><span class="cmd">/thinking</span><span class="args">&lt;level&gt;</span><span class="desc">off, minimal, low, medium, high, xhigh</span></button>
+            <button class="slash-item" type="button" role="option" data-cmd="help"><span class="cmd">/help</span><span class="desc">How this works</span></button>
+          </div>
+          <label class="visually-hidden" for="composerInput">Message your agent</label>
+          <textarea id="composerInput" class="form-control" rows="2" placeholder="Give your agent something to do, or type / for commands"></textarea>
+          <div class="composer-toolbar">
+            <select class="form-select form-select-sm when-busy" id="whenBusy" aria-label="When busy" title="Follow-up waits for this run. Steer joins after the current tool round. Reject if busy refuses the message while the agent works.">
+              <option value="followUp" selected>Follow-up</option>
+              <option value="steer">Steer</option>
+              <option value="reject">Reject if busy</option>
+            </select>
+            <span class="ms-auto d-flex align-items-center gap-2">
+              <button class="btn btn-sm btn-outline-secondary" type="button" title="Interrupt foreground work (Esc)" data-action="interrupt" disabled><i class="bi bi-stop-circle me-1"></i>Interrupt</button>
+              <button class="btn btn-primary btn-send" type="button" title="Send (Enter)" aria-label="Send message" data-action="send"><i class="bi bi-arrow-up"></i></button>
+            </span>
+          </div>
+        </div>
+        <div class="composer-hint"><span class="status-dot ok"></span>Closing this window never interrupts your agent.</div>
+      </div>
+    </section>
+
+    <section class="dn-center" aria-label="Device status" id="offlineCenter" hidden></section>
+
+    <section class="dn-center" aria-label="Welcome" id="welcome">
+      <div class="welcome">
+        <img src="/img/mark.svg" width="48" height="40" alt="" class="mb-3">
+        <h2>Close the tab. The work continues.</h2>
+        <p>Agents run on your devices. This page is only a window into them.</p>
+        <button class="btn btn-primary mt-2" type="button" data-action="new-session" data-welcome="devices" @(Model.Devices.Count == 0 ? "hidden" : "")>Create a session</button>
+        <a class="btn btn-primary mt-2" href="/devices?add=1" data-welcome="nodevices" @(Model.Devices.Count == 0 ? "" : "hidden")>Add a device</a>
+        <div class="welcome-points">
+          <div class="wp"><i class="bi bi-database"></i><div class="t">SQLite on each device</div><div class="d">Messages, queues and checkpoints are saved before anything is shown.</div></div>
+          <div class="wp"><i class="bi bi-signpost-split"></i><div class="t">Fork any agent</div><div class="d">Branch at any entry. Forks share the device's App State.</div></div>
+          <div class="wp"><i class="bi bi-display"></i><div class="t">Watch from anywhere</div><div class="d">The browser, the terminal or one HTTP call reach the same agent.</div></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<partial name="~/Views/Network/_Modals.cshtml" model="Model" />
+
+@section Scripts {
+  <script type="module" src="/js/app.js" asp-append-version="true"></script>
+}
