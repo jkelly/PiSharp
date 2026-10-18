@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0008, Phase 4 (PiSharp-only, branch feature/durable-network): a durable device's v1 HTTP and SSE API over
+       PiSharp.Durable.Hosting, wire-compatible with durable-pi's dpi-backend (MIT). An ASP.NET Core library: `pisharp durable serve` and the
+       tests host it in Kestrel. Not packed until the owner decides a release; every public type is [Experimental("PISHARP_DURABLE001")]. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Durable.Server.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Client/PiSharp.Durable.Client.csproj" />
+  </ItemGroup>
+</Project>

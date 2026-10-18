@@ -109,6 +109,8 @@
           "PiSharp.CodingAgent": "[1.1.0.6, )",
           "PiSharp.Compatibility.Node": "[1.1.0.6, )",
           "PiSharp.Durable": "[1.1.0.6, )",
+          "PiSharp.Durable.Hosting": "[1.1.0.6, )",
+          "PiSharp.Durable.Server": "[1.1.0.6, )",
           "PiSharp.Durable.Sqlite": "[1.1.0.6, )",
           "PiSharp.Durable.Tools": "[1.1.0.6, )",
           "PiSharp.Extensions.Agent": "[1.1.0.6, )",
@@ -152,6 +154,24 @@
         "dependencies": {
           "PiSharp.AI": "[1.1.0.6, )",
           "PiSharp.Contracts": "[1.1.0.6, )"
+        }
+      },
+      "pisharp.durable.client": {
+        "type": "Project"
+      },
+      "pisharp.durable.hosting": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Durable": "[1.1.0.6, )",
+          "PiSharp.Durable.Sqlite": "[1.1.0.6, )",
+          "PiSharp.Durable.Tools": "[1.1.0.6, )"
+        }
+      },
+      "pisharp.durable.server": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Durable.Client": "[1.1.0.6, )",
+          "PiSharp.Durable.Hosting": "[1.1.0.6, )"
         }
       },
       "pisharp.durable.sqlite": {

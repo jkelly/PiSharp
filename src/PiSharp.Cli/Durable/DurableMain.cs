@@ -29,6 +29,13 @@ internal static class DurableMain
     /// <summary>Runs <c>pisharp durable</c> with the arguments after <c>durable</c>; returns the exit code.</summary>
     internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken cancellationToken)
     {
+        // Decision 0008 (PiSharp-only): `serve` runs this machine as a durable device, `token` prints or rotates its token.
+        if (args is ["serve", .. var serve])
+        {
+            await host.Stderr.WriteLineAsync(ExperimentalNotice).ConfigureAwait(false);
+            return await DurableServe.ServeAsync(serve, host, cancellationToken).ConfigureAwait(false);
+        }
+        if (args is ["token", .. var token]) return await DurableServe.TokenAsync(token, host).ConfigureAwait(false);
         OpenDurableOptions options;
         try { options = ParseArgs(args); }
         catch (ArgumentException error)

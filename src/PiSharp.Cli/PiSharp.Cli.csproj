@@ -37,6 +37,9 @@
     <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
     <ProjectReference Include="../PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <ProjectReference Include="../PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+    <!-- Decision 0008: `pisharp durable serve` hosts a durable device (ASP.NET Core, through the server's framework reference). -->
+    <ProjectReference Include="../PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The Node extension host (IMPL-E): TypeScript/JavaScript extensions run in the user's Node with these scripts. -->
