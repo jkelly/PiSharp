@@ -68,6 +68,36 @@ jobs:
           if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
           dotnet run --project tests/PiSharp.Durable.Hosting.Tests/PiSharp.Durable.Hosting.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-hosting-${{ matrix.os }}.json"
 
+      # Decision 0008, Phase 4: the device server and the network client's reducers, in Kestrel on a free port with the faux model.
+      - name: Run PiSharp.Durable.Server.Tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.Durable.Server.Tests/PiSharp.Durable.Server.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-server-${{ matrix.os }}.json"
+
+      # Decision 0008, Phase 8: PiSharp Durable Web as a child process against an in-process faux device (no browser).
+      - name: Run PiSharp.Durable.Web.Tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.Durable.Web.Tests/PiSharp.Durable.Web.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-web-${{ matrix.os }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-web-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/durable-web-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-server-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/durable-server-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -94,6 +124,47 @@ jobs:
         with:
           name: durable-retention-0-report-${{ matrix.os }}
           path: ${{ runner.temp }}/durable-retention-0-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
+  # Decision 0008, Phase 8: PLAN.md Appendix C in headless Chromium (Microsoft.Playwright). Playwright's browser is not part of the
+  # package, so it is installed from the build output, with the system libraries it needs.
+  browser:
+    name: Durable Web browser tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Build PiSharp.Durable.Web.BrowserTests
+        run: >-
+          dotnet build tests/PiSharp.Durable.Web.BrowserTests/PiSharp.Durable.Web.BrowserTests.csproj -c Release
+          -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false
+
+      - name: Install Playwright's Chromium
+        shell: pwsh
+        run: ./tests/PiSharp.Durable.Web.BrowserTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run PiSharp.Durable.Web.BrowserTests
+        shell: bash
+        run: |
+          dotnet run --project tests/PiSharp.Durable.Web.BrowserTests/PiSharp.Durable.Web.BrowserTests.csproj -c Release --no-build \
+            -- --report "$RUNNER_TEMP/durable-web-browser-${{ matrix.os }}.json" --artifacts "$RUNNER_TEMP/durable-web-browser-artifacts"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-web-browser-report-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/durable-web-browser-${{ matrix.os }}.json
+            ${{ runner.temp }}/durable-web-browser-artifacts
           if-no-files-found: ignore
 
   sqlite-publish:

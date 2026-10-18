@@ -21,6 +21,9 @@
     <Project Path="src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <Project Path="src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
     <Project Path="src/PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
+    <Project Path="src/PiSharp.Durable.Client/PiSharp.Durable.Client.csproj" />
+    <Project Path="src/PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
+    <Project Path="src/PiSharp.Durable.Web/PiSharp.Durable.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj" />
@@ -193,6 +196,15 @@
   </Folder>
   <Folder Name="/tests/parity/PiSharp.Durable.Hosting.Tests/">
     <Project Path="tests/PiSharp.Durable.Hosting.Tests/PiSharp.Durable.Hosting.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.Durable.Server.Tests/">
+    <Project Path="tests/PiSharp.Durable.Server.Tests/PiSharp.Durable.Server.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.Durable.Web.Tests/">
+    <Project Path="tests/PiSharp.Durable.Web.Tests/PiSharp.Durable.Web.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.Durable.Web.BrowserTests/">
+    <Project Path="tests/PiSharp.Durable.Web.BrowserTests/PiSharp.Durable.Web.BrowserTests.csproj" />
   </Folder>
   <Folder Name="/tests/parity/PiSharp.InteractiveParity.Tests/">
     <Project Path="tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj" />

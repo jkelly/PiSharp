@@ -154,3 +154,14 @@ The experimental durable environment's `listFiles` (`src/PiSharp.Durable/Env/Loc
 ## Durable network design (durable-pi)
 
 The experimental durable network (decision 0008, branch `feature/durable-network`; not released) adapts designs of durable-pi (github.com/disler/durable-pi at commit `37165c619573dbaf425463038bbffecfe576beec`; MIT License, Copyright (c) 2026 IndyDevDan): the device, session and agent model and its catalog, addressing by id or name with derived agent names, the per-session compaction defaults (`apps/dpi-sdk/src/api.ts` `defaultCompaction`), the read-only tool classification and the faux model's prompt grammar (`apps/dpi-backend/src/{store,faux}.ts`). `src/PiSharp.Durable.Hosting` is a native reimplementation; no durable-pi code, Node package, model icon or brand mark is bundled. The license text is `third-party/durable-pi.LICENSE.txt`.
+
+The device server, client and web hub (`src/PiSharp.Durable.{Server,Client,Web}`) also follow durable-pi's wire contract, stream frames, reducers, hub monitor, proxy and stream multiplexer (`apps/dpi-sdk/src/{api,client,models,transcript}.ts`, `apps/dpi-backend/src/{routes,streams}.ts`, `apps/dpi-playground/apps/dpi-playground-hub/src/{monitor,mux,proxy,guard}.ts`), as native reimplementations.
+
+## PiSharp Durable Web (not packed)
+
+`src/PiSharp.Durable.Web` (decision 0008) uses, on branch `feature/durable-network` only:
+- Markdig 0.41.3 (BSD-2-Clause, Copyright (c) Alexandre Mutel; github.com/xoofx/markdig);
+- HtmlSanitizer 9.0.886 (MIT, Copyright 2013-2025 Michael Ganss) and its dependencies AngleSharp 0.17.1 (MIT, Copyright 2013-2022 AngleSharp) and AngleSharp.Css (MIT, Copyright 2016-2023 AngleSharp);
+- vendored under `wwwroot`: Bootstrap 5.3.3 and Bootstrap Icons 1.11.3 (MIT, Copyright (c) 2011-2024 The Bootstrap Authors; their license texts are `wwwroot/lib/*/LICENSE`), and the provider logos of Lobe Icons (`@lobehub/icons-static-svg` 1.95.1, MIT, Copyright (c) 2023 LobeHub; `wwwroot/img/providers/LICENSE`).
+
+Its browser tests (`tests/PiSharp.Durable.Web.BrowserTests`, decision 0008; a test project, never packed or shipped) use Microsoft.Playwright 1.63.0 (MIT, Copyright (c) Microsoft Corporation; github.com/microsoft/playwright-dotnet) and its dependencies Microsoft.Bcl.AsyncInterfaces and System.ComponentModel.Annotations (MIT, Copyright (c) .NET Foundation and Contributors). The package carries the Playwright driver (Apache-2.0, Copyright (c) Microsoft Corporation) and a Node.js runtime (MIT, Copyright Node.js contributors) that it starts as a child process. Chromium is downloaded on the test machine by the package's `playwright.ps1 install chromium` (BSD-3-Clause, Copyright The Chromium Authors, with its own third-party notices) and is not part of this repository.
