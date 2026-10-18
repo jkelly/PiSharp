@@ -647,6 +647,20 @@ internal static class MediaTests
             Equal("image_url", body.GetProperty("messages")[0].GetProperty("content")[1].GetProperty("type").GetString(), "image part");
         });
 
+        yield return Case(prefix + "music.base64-split-at-any-boundary-is-joined", async () =>
+        {
+            var full = Convert.ToBase64String([0x49, 0x44, 0x33, 4, 5, 6, 7, 8, 9]);
+            var http = new MediaFakeHttp((_, _) => MediaFakeHttp.Sse(
+                $$$$"""{"choices":[{"delta":{"audio":{"data":"{{{{full[..5]}}}}"}}}]}""",
+                $$$$"""{"choices":[{"delta":{"audio":{"data":"{{{{full[5..]}}}}"}}}]}"""));
+            var registry = Registry(http);
+            var result = await registry.ComposeAsync(Model(registry, MediaKind.Music, "openrouter/google/lyria-3-clip-preview"), new MusicRequest("x"));
+            Equal(ModelOperationStopReason.Stop, result.StopReason, "stop " + result.ErrorMessage);
+            Equal(9, result.Audio!.Data.Length, "joined before decoding");
+            Equal(9, OpenRouterChatAudio.DecodePieces([Convert.ToBase64String([1, 2, 3, 4]), Convert.ToBase64String([5, 6, 7, 8, 9])]).Length,
+                "independently padded pieces");
+        });
+
         yield return Case(prefix + "rerank.orders-by-score", async () =>
         {
             var http = MediaFakeHttp.Json("""{"results":[{"index":0,"relevance_score":0.1},{"index":2,"relevance_score":0.9}],"usage":{"cost":0.002}}""");
@@ -740,8 +754,10 @@ internal static class MediaTests
             Equal("hi there", await File.ReadAllTextAsync(Path.Combine(cwd, "talk.txt")), "transcript file");
             Check(Text(transcript).Contains("hi there", StringComparison.Ordinal), "transcript text");
             var music = await MediaTools.CreateMusicTool(new MediaToolsOptions { Media = options.Media }).Execute(
-                JsonValue.Parse("""{"prompt":"calm piano"}"""), new MediaToolApi(new LocalExecutionEnv(cwd)), Context);
+                JsonValue.Parse("""{"prompt":"calm piano","seed":4294967295}"""), new MediaToolApi(new LocalExecutionEnv(cwd)), Context);
             Check(Text(music).Contains("(audio/wav,", StringComparison.Ordinal), Text(music));
+            var musicRequest = http.Requests.Single(request => request.Url.EndsWith("/chat/completions", StringComparison.Ordinal));
+            Equal(4294967295L, Json(musicRequest.Body).GetProperty("seed").GetInt64(), "64-bit seed");
         });
 
         // ----- through the Harness -----

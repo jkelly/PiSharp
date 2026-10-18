@@ -131,7 +131,7 @@ public static partial class MediaTools
                 Count = Integer(args, "count"), Size = Text(args, "size"), AspectRatio = Text(args, "aspect_ratio"), Resolution = Text(args, "resolution"),
                 Quality = Text(args, "quality"), Background = Text(args, "background"), OutputFormat = Text(args, "output_format"),
                 OutputCompression = Integer(args, "output_compression", allowZero: true), Moderation = Text(args, "moderation"),
-                InputFidelity = Text(args, "input_fidelity"), Seed = Integer(args, "seed", allowZero: true),
+                InputFidelity = Text(args, "input_fidelity"), Seed = Seed(args),
                 Mask = Text(args, "mask") is { } maskPath ? await ReadImageAsync(env, maskPath, context).ConfigureAwait(false) : null,
                 Options = await TierRoutingAsync(api, model, Options(args), context).ConfigureAwait(false),
             };
@@ -153,7 +153,7 @@ public static partial class MediaTools
             var summary = (JsonObjectValue)await api.MemoAsync(ResultMemo, Summary(model, files, text, null, cost), context).ConfigureAwait(false);
             var output = new List<JsonValue> { TextBlock(Describe("image", summary)) };
             if (options.ShowImages && await AcceptsImagesAsync(api, context).ConfigureAwait(false))
-                output.AddRange(images.Take(4).Where(image => image.Data.Length <= ImageLimits.Default.MaxBytes)
+                output.AddRange(images.Take(4).Where(Showable)
                     .Select(image => JsonValue.Object([new("type", "image"), new("data", image.Data), new("mimeType", image.MimeType)])));
             return new ToolExecutionResult
             {
@@ -210,7 +210,7 @@ public static partial class MediaTools
                 LastFrame = Text(args, "last_frame") is { } lastPath ? await ReadImageAsync(env, lastPath, context).ConfigureAwait(false) : null,
                 References = references.ToImmutable(),
                 DurationSeconds = Integer(args, "duration_seconds"), AspectRatio = Text(args, "aspect_ratio"), Resolution = Text(args, "resolution"),
-                Size = Text(args, "size"), NegativePrompt = Text(args, "negative_prompt"), Seed = Integer(args, "seed", allowZero: true),
+                Size = Text(args, "size"), NegativePrompt = Text(args, "negative_prompt"), Seed = Seed(args),
                 GenerateAudio = Flag(args, "generate_audio"), PreviousJobId = Text(args, "previous_job_id"), Options = Options(args),
             };
             var resume = await api.MemoAsync(JobMemo, context).ConfigureAwait(false) is JsonStringValue job ? job.Value : null;
@@ -471,6 +471,16 @@ public static partial class MediaTools
     private static MediaKind ParseKind(string text) => MediaCatalog.Parse(text)
         ?? throw new InvalidOperationException($"Unknown kind \"{text}\": use image, video, speech, transcription, music, embedding, rerank or decision");
 
+    /// <summary>Whether a generated image fits the read tool's limits (bytes and pixels), so it can be shown to the model as it is;
+    /// a larger one is only saved.</summary>
+    private static bool Showable(ImageContent image)
+    {
+        var limits = ImageLimits.Default;
+        if (image.Data.Length > limits.MaxBytes) return false;
+        var dimensions = ImageDetection.ImageDimensions(Convert.FromBase64String(image.Data), image.MimeType);
+        return dimensions is { } size && size.Width <= limits.MaxWidth && size.Height <= limits.MaxHeight;
+    }
+
     /// <summary>Whether the conversation's model takes image input; an unknown model counts as one that does, as the read tool assumes.</summary>
     private static async Task<bool> AcceptsImagesAsync(IToolExecutionApi api, DurableContext context)
     {
@@ -656,6 +666,15 @@ public static partial class MediaTools
         if (!double.IsFinite(number.Value) || Math.Floor(number.Value) != number.Value || number.Value < (allowZero ? 0 : 1) || number.Value > int.MaxValue)
             throw new InvalidOperationException($"{name} must be a {(allowZero ? "non-negative" : "positive")} integer");
         return (int)number.Value;
+    }
+
+    /// <summary>A non-negative whole <c>seed</c> up to 2^53 (the largest integer JSON numbers keep exactly), or null.</summary>
+    private static long? Seed(JsonObjectValue args)
+    {
+        if (!args.TryGetValue("seed", out var value) || value is not JsonNumberValue number) return null;
+        if (!double.IsFinite(number.Value) || Math.Floor(number.Value) != number.Value || number.Value < 0 || number.Value > 9007199254740991)
+            throw new InvalidOperationException("seed must be a non-negative integer");
+        return (long)number.Value;
     }
 
     private static PiSharp.Contracts.JsonData? Options(JsonObjectValue args) =>

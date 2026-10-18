@@ -48,6 +48,10 @@ internal static partial class Program
         Equal("flex", (await Body(configured, new(model, [Ask], 1))).GetProperty("service_tier").GetString()!);
         var both = await Body(configured, new(model, [Ask], 1) { ServiceTier = "priority", SessionId = "s1" });
         Equal("priority", both.GetProperty("service_tier").GetString()!);
+        // Other providers on the OpenAI API (Groq here) take no service_tier values of these names.
+        var groq = new ModelDescriptor("llama-tier", "openai-completions", "groq");
+        var other = new CompletionsKeyAuthRequestFactory(new("https://groq.invalid/openai/v1/chat/completions"), groq, null);
+        TierCheck(!(await Body(other, new(groq, [Ask], 1) { ServiceTier = "priority" })).TryGetProperty("service_tier", out _), "no tier for groq");
     }
 
     private static async Task ServiceTierResponses()
@@ -68,26 +72,33 @@ internal static partial class Program
     private static async Task ServiceTierAnthropic()
     {
         var options = new AnthropicMessagesRequestOptions(256);
-        var factory = new AnthropicMessagesKeyAuthRequestFactory(new("https://anthropic.invalid"), Haiku, options);
-        async Task<(JsonElement Body, string? Beta)> Send(ChatRequest request)
+        var opus = new ModelDescriptor("claude-opus-5-5", "anthropic-messages", "anthropic");
+        async Task<(JsonElement Body, string? Beta)> Send(ModelDescriptor model, ChatRequest request)
         {
+            var factory = new AnthropicMessagesKeyAuthRequestFactory(new("https://anthropic.invalid"), model, options);
             using var http = factory.Create(request, Key);
             var beta = http.Headers.TryGetValues("anthropic-beta", out var values) ? string.Join(",", values) : null;
             return (TierBody(await http.Content!.ReadAsStringAsync()), beta);
         }
-        var plain = await Send(new(Haiku, [Ask], 1));
+        var plain = await Send(Haiku, new(Haiku, [Ask], 1));
         TierCheck(!plain.Body.TryGetProperty("service_tier", out _) && !plain.Body.TryGetProperty("speed", out _), "nothing by default");
-        var fast = await Send(new(Haiku, [Ask], 1) { ServiceTier = "fast" });
+        // Fast mode only on the models that serve it.
+        var fast = await Send(opus, new(opus, [Ask], 1) { ServiceTier = "fast" });
         Equal("fast", fast.Body.GetProperty("speed").GetString()!);
         TierCheck(!fast.Body.TryGetProperty("service_tier", out _), "fast mode sends no service_tier");
         TierCheck(fast.Beta?.Contains("fast-mode-2026-02-01", StringComparison.Ordinal) == true, "fast-mode beta: " + fast.Beta);
-        var normal = await Send(new(Haiku, [Ask], 1) { ServiceTier = "normal", SessionId = "s3" });
+        var haikuFast = await Send(Haiku, new(Haiku, [Ask], 1) { ServiceTier = "ultrafast" });
+        TierCheck(!haikuFast.Body.TryGetProperty("speed", out _), "no speed for a model without fast mode");
+        Equal("auto", haikuFast.Body.GetProperty("service_tier").GetString()!);
+        TierCheck(haikuFast.Beta?.Contains("fast-mode", StringComparison.Ordinal) != true, "no fast-mode beta for haiku");
+        var normal = await Send(Haiku, new(Haiku, [Ask], 1) { ServiceTier = "normal", SessionId = "s3" });
         Equal("standard_only", normal.Body.GetProperty("service_tier").GetString()!);
         TierCheck(!normal.Body.TryGetProperty("speed", out _), "normal is not fast");
-        Equal("auto", (await Send(new(Haiku, [Ask], 1) { ServiceTier = "priority" })).Body.GetProperty("service_tier").GetString()!);
-        // The prepared path (strict-tool fallback) carries the same fields.
-        var prepared = factory.Prepare(new(Haiku, [Ask], 1) { ServiceTier = "ultrafast" }, Key);
-        TierCheck(prepared.Payload.Value.GetProperty("speed").GetString() == "fast", "prepared payload carries speed");
+        Equal("auto", (await Send(Haiku, new(Haiku, [Ask], 1) { ServiceTier = "priority" })).Body.GetProperty("service_tier").GetString()!);
+        // An Anthropic-compatible provider (MiniMax) gets no Anthropic tier fields.
+        var minimax = new ModelDescriptor("MiniMax-M3", "anthropic-messages", "minimax");
+        var third = await Send(minimax, new(minimax, [Ask], 1) { ServiceTier = "fast" });
+        TierCheck(!third.Body.TryGetProperty("speed", out _) && !third.Body.TryGetProperty("service_tier", out _), "no fields for minimax");
     }
 
     private static async Task ServiceTierGoogle()

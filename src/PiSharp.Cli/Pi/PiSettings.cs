@@ -53,15 +53,22 @@ internal sealed class PiSettings
     /// <c>settings.json.lock</c>, migrated, given the field (other keys kept, a null value removes it) and written as
     /// <c>JSON.stringify(settings, null, 2)</c>. A layer that failed to load is not written; write failures are recorded as errors.
     /// The project layer refuses writes when the project is untrusted.</summary>
+    /// <summary>PiSharp-only: why the last <see cref="SetField"/> could not write its file, or null when it did (or the settings are in
+    /// memory only). The change itself always applies to the running session.</summary>
+    internal string? LastWriteError { get; private set; }
+
     internal void SetField(string scope, string field, JsonNode? value)
     {
+        LastWriteError = null;
         var project = scope == "project";
         if (project && !ProjectTrusted) throw new InvalidOperationException("Project is not trusted; refusing to write project settings");
         var layer = project ? Project : Global;
         if (value is null) layer.Remove(field); else layer[field] = value.DeepClone();
         Merged = Merge(Global, Project);
         var path = project ? ProjectPath : GlobalPath;
-        if (inMemory || loadFailures.Any(error => error.Scope == (project ? "project" : "global"))) return;
+        if (inMemory) return;
+        if (loadFailures.Any(error => error.Scope == (project ? "project" : "global")))
+        { LastWriteError = $"{path} failed to load, so it was not written"; return; }
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -75,7 +82,7 @@ internal sealed class PiSettings
             });
         }
         catch (Exception error) when (error is JsonException or IOException or UnauthorizedAccessException or InvalidOperationException)
-        { errors.Add(new(project ? "project" : "global", path, error.Message)); }
+        { errors.Add(new(project ? "project" : "global", path, error.Message)); LastWriteError = $"{path}: {error.Message}"; }
     }
 
     private readonly HashSet<PiSettingsError> loadFailures = [];

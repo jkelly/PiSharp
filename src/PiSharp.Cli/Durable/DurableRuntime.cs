@@ -587,6 +587,16 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
     });
 
     /// <inheritdoc/>
+    public Task ShowServiceTierAsync()
+    {
+        var tier = DurableTuiState.ServiceTierOf(Current.Conversation) ?? "none (provider default)";
+        Notice(DurableNoticeLevel.Info, $"Service tier: {tier}. Choices: " +
+            string.Join("; ", PiSharp.AI.ServiceTiers.All.Select(name => $"{name} ({PiSharp.AI.ServiceTiers.Describe(name)})")) +
+            ". Use /tier <tier>, or /tier none to clear it.");
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     public Task ToggleTasksAsync() => Command(async () =>
     {
         if (tasks is not null)

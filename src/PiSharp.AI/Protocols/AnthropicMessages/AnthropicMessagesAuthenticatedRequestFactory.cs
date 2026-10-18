@@ -29,7 +29,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
     {
         _options = options ?? new();
         _withScope = (session, tier) => new(baseUri, expectedModel, projectionOptions, authentication,
-            AnthropicMessagesKeyAuthRequestFactory.TierOptions(_options with { SessionId = session ?? _options.SessionId }, tier));
+            AnthropicMessagesKeyAuthRequestFactory.TierOptions(_options with { SessionId = session ?? _options.SessionId }, tier, expectedModel));
         _createWithoutPreferredStrict = () => new(baseUri, expectedModel, projectionOptions with { DisablePreferredStrictTools = true }, authentication, _options);
         ArgumentNullException.ThrowIfNull(authentication); _authentication = authentication;
         if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation
@@ -130,7 +130,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
         var details = _projector.ProjectWithDetails(request, cancellationToken);
-        var projected = AnthropicMessagesPreparedRequest.Project(AnthropicServiceTier.Apply(details.Payload, _options), Raw, cancellationToken);
+        var projected = AnthropicMessagesPreparedRequest.Project(details.Payload, Raw, cancellationToken);
         _ = PreparedHeaders(projected);
         return new(projected, _options, (payload, token) => CreateCore(request, token, payload), cancellationToken)
         { Fallback = details.HasPreferredStrictTools ? token => WithoutPreferredStrict().Prepare(request, token) : null };
@@ -141,7 +141,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
         var details = prepared is null ? _projector.ProjectWithDetails(request, cancellationToken) : null;
-        var projected = prepared ?? AnthropicServiceTier.Apply(details!.Payload, _options);
+        var projected = prepared ?? details!.Payload;
         CheckDepth(projected.Value, 0, cancellationToken);
         var headers = PreparedHeaders(projected);
         // Count the exact compact raw representation before allocating UTF-8 or acquiring an HTTP request/content.
@@ -153,6 +153,9 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
             bytes += Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(property.Name)) + 1L + Encoding.UTF8.GetByteCount(raw) + (fields++ == 0 ? 0 : 1);
             if (bytes > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         }
+        var tierFields = AnthropicServiceTier.Fields(_options, projected.Value).ToList();
+        bytes += AnthropicServiceTier.Bytes(tierFields, ref fields);
+        if (bytes > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         cancellationToken.ThrowIfCancellationRequested();
         using var buffer = new MemoryStream((int)bytes);
         using (var writer = new Utf8JsonWriter(buffer))
@@ -164,6 +167,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
                 if (property.Name == "betas") continue;
                 writer.WritePropertyName(property.Name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText(), skipInputValidation: true);
             }
+            foreach (var (name, value) in tierFields) writer.WriteString(name, value);
             writer.WriteEndObject();
         }
         if (buffer.Length > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
@@ -202,6 +206,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         headers["content-type"] = "application/json"; // SDK's JSON encoder body headers override client defaults.
         if (projected.Value.TryGetProperty("betas", out var betas))
             headers["anthropic-beta"] = string.Join(',', betas.EnumerateArray().Select(value => value.GetString()));
+        AnthropicServiceTier.AddBeta(headers, _options);
         if (Federation is null && !(headers.TryGetValue("x-api-key", out var admittedKey) && admittedKey.Length != 0) &&
             !(headers.TryGetValue("authorization", out var admittedBearer) && admittedBearer.Length != 0) && removedAuth.Count == 0)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);

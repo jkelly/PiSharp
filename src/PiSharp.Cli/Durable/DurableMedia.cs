@@ -62,6 +62,7 @@ internal static class DurableMedia
             media[name] = entry;
         }
         settings.SetField(scope, "media", media.Count == 0 ? null : media);
+        if (settings.LastWriteError is { } error) throw new InvalidOperationException($"The defaults apply to this session but were not saved: {error}");
     }
 
     /// <summary>A media registry over the CLI registry: the built-in media catalog plus the registry's image models (OpenRouter's).</summary>
@@ -69,8 +70,15 @@ internal static class DurableMedia
     {
         var registry = models.Registry;
         var environment = MediaAuth.Environment(models.Runtime.ReadEnvironment);
-        RegistryModel? ChatModel(string provider) => registry.GetAll().FirstOrDefault(entry =>
-            entry.Provider == provider && entry.Type == CatalogModelType.Chat && !VirtualModels.IsVirtual(entry));
+        // Each provider's first chat model, which carries its auth and base URL; built once, not scanned per request.
+        var chatModels = new Lazy<Dictionary<string, RegistryModel>>(() =>
+        {
+            var table = new Dictionary<string, RegistryModel>(StringComparer.Ordinal);
+            foreach (var entry in registry.GetAll())
+                if (entry.Type == CatalogModelType.Chat && !VirtualModels.IsVirtual(entry)) table.TryAdd(entry.Provider, entry);
+            return table;
+        });
+        RegistryModel? ChatModel(string provider) => chatModels.Value.GetValueOrDefault(provider);
         ValueTask<ProviderAuthResult?> AuthAsync(ProviderAuthRequest request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

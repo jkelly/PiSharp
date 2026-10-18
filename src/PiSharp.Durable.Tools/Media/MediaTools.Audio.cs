@@ -151,7 +151,7 @@ public static partial class MediaTools
             var prompt = RequiredText(args, "prompt");
             var images = ImmutableArray.CreateBuilder<ImageContent>();
             foreach (var imagePath in Strings(args, "images")) images.Add(await ReadImageAsync(env, imagePath, context).ConfigureAwait(false));
-            var request = new MusicRequest(prompt) { Images = images.ToImmutable(), Seed = Integer(args, "seed", allowZero: true), Options = Options(args) };
+            var request = new MusicRequest(prompt) { Images = images.ToImmutable(), Seed = Seed(args), Options = Options(args) };
             var result = await options.Media.ComposeAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
             if (result.Audio is not { } audio) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "music generation failed"}");
             var path = OutputPaths(Text(args, "output_path"), options.OutputDirectory, Stem("music", prompt), [Extension(audio.MimeType)])[0];

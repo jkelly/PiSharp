@@ -179,6 +179,13 @@ internal static partial class MediaHttp
     internal static double? Number(JsonElement value, string name) =>
         Field(value, name) is { ValueKind: JsonValueKind.Number } field && field.TryGetDouble(out var number) && double.IsFinite(number) ? number : null;
 
+    /// <summary>A downloaded video's MIME type from its <c>content-type</c>, else <c>video/mp4</c>.</summary>
+    internal static string VideoMime(IEnumerable<KeyValuePair<string, string>> headers)
+    {
+        var type = headers.FirstOrDefault(pair => pair.Key == "content-type").Value?.Split(';')[0].Trim();
+        return type is { Length: > 0 } && type.StartsWith("video/", StringComparison.Ordinal) ? type : "video/mp4";
+    }
+
     /// <summary>The MIME type of an image file name or format name (<c>png</c>, <c>jpeg</c>, <c>webp</c>).</summary>
     internal static string ImageMime(string? format) => format?.ToLowerInvariant() switch
     {

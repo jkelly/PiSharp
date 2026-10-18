@@ -65,11 +65,12 @@ The owner also wants to switch priority tiers for chat requests: normal, priorit
    - `ChatRequest.ServiceTier` carries the tier per request. Each protocol maps it to its own field (`PiSharp.AI.ServiceTiers`).
    - Protocols without tiers ignore it (Mistral, Bedrock, Azure, Pi messages).
 2. **Mapping:**
-   - **OpenAI and OpenRouter** (`service_tier` on Responses and Chat Completions): `auto`, `default`, `flex`, `priority`, `fast`, `ultrafast`.
+   - **OpenAI and OpenRouter** (`service_tier` on Responses and Chat Completions): `auto`, `default`, `flex`, `priority`, `fast`, `ultrafast`. Only the `openai` and `openrouter` providers get the field; other providers on the OpenAI APIs (Groq, DeepSeek, xAI, local servers) use other values or reject it.
    - **Anthropic Messages:**
      - `normal` and `economy` send `service_tier: standard_only`.
      - `auto` and `priority` send `service_tier: auto`, which uses priority capacity where the organization has a commitment.
-     - `fast` and `ultrafast` send `speed: "fast"` with the `fast-mode-2026-02-01` beta.
+     - `fast` and `ultrafast` send `speed: "fast"` with the `fast-mode-2026-02-01` beta, but only for the models that serve fast mode (Opus 5.5, Opus 5, Opus 4.8). Other models reject `speed`, so they get `service_tier: auto` instead.
+     - Only the `anthropic` and `openrouter` providers get these fields; Anthropic-compatible providers (MiniMax, Kimi Coding, GitHub Copilot) get none.
    - **OpenAI Codex:** `economy` sends `flex`; `priority`, `fast` and `ultrafast` send `priority`, because the backend rejects `fast`.
    - **Google:** `standard`, `flex` or `priority`.
 3. **Per-request plumbing:**

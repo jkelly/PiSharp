@@ -25,29 +25,34 @@ public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = 
     public string? PiSharpTier { get; init; }
 }
 
-/// <summary>PiSharp-only: the service tier fields of an Anthropic payload.</summary>
+/// <summary>PiSharp-only: the service tier fields of an Anthropic request, written after the payload's own fields.</summary>
 internal static class AnthropicServiceTier
 {
     internal const string FastModeBeta = "fast-mode-2026-02-01";
 
-    /// <summary>The payload with <c>service_tier</c> and <c>speed</c> added (unless it already sets them), and fast mode's beta added to
-    /// <c>betas</c>, which becomes the <c>anthropic-beta</c> header.</summary>
-    internal static JsonData Apply(JsonData payload, AnthropicMessagesKeyAuthRequestOptions options)
+    /// <summary><c>service_tier</c> and <c>speed</c> as the options set them, leaving out any the payload already has.</summary>
+    internal static IEnumerable<(string Name, string Value)> Fields(AnthropicMessagesKeyAuthRequestOptions options, JsonElement payload)
     {
-        if (options.ServiceTier is null && options.Speed is null || payload.Value.ValueKind != JsonValueKind.Object) return payload;
-        var node = System.Text.Json.Nodes.JsonNode.Parse(payload.ToString())!.AsObject();
-        if (options.ServiceTier is { } tier && !node.ContainsKey("service_tier")) node["service_tier"] = tier;
-        if (options.Speed is { } speed && !node.ContainsKey("speed"))
-        {
-            node["speed"] = speed;
-            if (speed == "fast")
-            {
-                var betas = node["betas"] as System.Text.Json.Nodes.JsonArray ?? [];
-                if (!betas.Any(beta => beta?.GetValue<string>() == FastModeBeta)) betas.Add(FastModeBeta);
-                node["betas"] = betas.DeepClone();
-            }
-        }
-        return JsonData.Parse(node.ToJsonString());
+        if (options.ServiceTier is { } tier && !payload.TryGetProperty("service_tier", out _)) yield return ("service_tier", tier);
+        if (options.Speed is { } speed && !payload.TryGetProperty("speed", out _)) yield return ("speed", speed);
+    }
+
+    /// <summary>Fast mode's beta added to the <c>anthropic-beta</c> header.</summary>
+    internal static void AddBeta(Dictionary<string, string> headers, AnthropicMessagesKeyAuthRequestOptions options)
+    {
+        if (options.Speed != "fast") return;
+        var current = headers.TryGetValue("anthropic-beta", out var value) ? value : "";
+        if (current.Split(',').Any(beta => beta.Trim() == FastModeBeta)) return;
+        headers["anthropic-beta"] = current.Length == 0 ? FastModeBeta : current + "," + FastModeBeta;
+    }
+
+    /// <summary>The bytes the fields add to a payload of <paramref name="fields"/> written fields.</summary>
+    internal static long Bytes(IEnumerable<(string Name, string Value)> extra, ref int fields)
+    {
+        long bytes = 0;
+        foreach (var (name, value) in extra)
+            bytes += Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(name)) + 1L + Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(value)) + (fields++ == 0 ? 0 : 1);
+        return bytes;
     }
 }
 public enum AnthropicMessagesKeyAuthRequestFailure { InvalidConfiguration, InvalidRequest, InvalidKey, UnsupportedOptions, ResourceLimit }
@@ -77,7 +82,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         AnthropicMessagesRequestOptions projectionOptions, AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
-        _withScope = (session, tier) => new(baseUri, expectedModel, projectionOptions, TierOptions(_options with { SessionId = session ?? _options.SessionId }, tier));
+        _withScope = (session, tier) => new(baseUri, expectedModel, projectionOptions, TierOptions(_options with { SessionId = session ?? _options.SessionId }, tier, expectedModel));
         _createWithoutPreferredStrict = () => new(baseUri, expectedModel, projectionOptions with { DisablePreferredStrictTools = true }, _options);
         if (baseUri is null || expectedModel is null || projectionOptions is null ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
@@ -161,10 +166,10 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
     }
 
     /// <summary>Options carrying a PiSharp tier's Anthropic fields.</summary>
-    internal static AnthropicMessagesKeyAuthRequestOptions TierOptions(AnthropicMessagesKeyAuthRequestOptions options, string? tier)
+    internal static AnthropicMessagesKeyAuthRequestOptions TierOptions(AnthropicMessagesKeyAuthRequestOptions options, string? tier, ModelDescriptor model)
     {
         if (tier is null) return options;
-        var (serviceTier, speed) = ServiceTiers.Anthropic(tier);
+        var (serviceTier, speed) = ServiceTiers.Anthropic(tier, model.Provider, model.Id);
         return options with { ServiceTier = serviceTier, Speed = speed, PiSharpTier = tier };
     }
 
@@ -181,7 +186,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (explicitApiKey.Any(value => value is < '!' or > '~')) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
         if (explicitApiKey.Contains("sk-ant-oat", StringComparison.Ordinal)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
         var details = _projector.ProjectWithDetails(request, cancellationToken);
-        var projected = AnthropicMessagesPreparedRequest.Project(AnthropicServiceTier.Apply(details.Payload, _options), Raw, cancellationToken);
+        var projected = AnthropicMessagesPreparedRequest.Project(details.Payload, Raw, cancellationToken);
         _ = PreparedHeaders(projected, explicitApiKey);
         return new(projected, _options, (payload, token) => CreateCore(request, explicitApiKey, token, payload), cancellationToken)
         { Fallback = details.HasPreferredStrictTools ? token => WithoutPreferredStrict().Prepare(request, explicitApiKey, token) : null };
@@ -196,7 +201,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (explicitApiKey.Any(value => value is < '!' or > '~')) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
         if (explicitApiKey.Contains("sk-ant-oat", StringComparison.Ordinal)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
         var details = prepared is null ? _projector.ProjectWithDetails(request, cancellationToken) : null;
-        var projected = prepared ?? AnthropicServiceTier.Apply(details!.Payload, _options);
+        var projected = prepared ?? details!.Payload;
         CheckDepth(projected.Value, 0, cancellationToken);
         var headers = PreparedHeaders(projected, explicitApiKey);
         // Count the exact compact raw representation before allocating UTF-8 or acquiring an HTTP request/content.
@@ -208,6 +213,9 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
             bytes += Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(property.Name)) + 1L + Encoding.UTF8.GetByteCount(raw) + (fields++ == 0 ? 0 : 1);
             if (bytes > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         }
+        var tierFields = AnthropicServiceTier.Fields(_options, projected.Value).ToList();
+        bytes += AnthropicServiceTier.Bytes(tierFields, ref fields);
+        if (bytes > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         cancellationToken.ThrowIfCancellationRequested();
         using var buffer = new MemoryStream((int)bytes);
         using (var writer = new Utf8JsonWriter(buffer))
@@ -219,6 +227,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
                 if (property.Name == "betas") continue;
                 writer.WritePropertyName(property.Name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText(), skipInputValidation: true);
             }
+            foreach (var (name, value) in tierFields) writer.WriteString(name, value);
             writer.WriteEndObject();
         }
         if (buffer.Length > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
@@ -249,6 +258,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         headers["content-type"] = "application/json"; // SDK's JSON encoder body headers override client defaults.
         if (projected.Value.TryGetProperty("betas", out var betas))
             headers["anthropic-beta"] = string.Join(',', betas.EnumerateArray().Select(value => value.GetString()));
+        AnthropicServiceTier.AddBeta(headers, _options);
         if (!headers.TryGetValue(keyHeader, out var admittedKey) || admittedKey.Length == 0)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
         CheckHeaders(headers);

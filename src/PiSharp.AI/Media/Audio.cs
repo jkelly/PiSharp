@@ -193,6 +193,20 @@ public sealed class OpenAITranscription : ITranscriptionApi
 [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_MEDIA001")]
 public sealed class OpenRouterChatAudio : IMusicApi
 {
+    /// <summary>The audio of streamed base64 pieces: the pieces split one base64 text anywhere, so they are joined before decoding;
+    /// pieces that are each padded base64 of their own (which do not join into valid base64) are decoded one by one.</summary>
+    public static byte[] DecodePieces(IReadOnlyList<string> pieces)
+    {
+        var joined = string.Concat(pieces);
+        try { return Convert.FromBase64String(joined); }
+        catch (FormatException) when (pieces.Count > 1)
+        {
+            var audio = new MemoryStream();
+            foreach (var piece in pieces) audio.Write(Convert.FromBase64String(piece));
+            return audio.ToArray();
+        }
+    }
+
     public const string ApiId = "openrouter-chat-audio";
     public static OpenRouterChatAudio Instance { get; } = new();
     public string Api => ApiId;
@@ -214,7 +228,7 @@ public sealed class OpenRouterChatAudio : IMusicApi
         MediaHttp.MergeOptions(body, request.Options);
         var (_, raw) = await MediaHttp.SendAsync(HttpMethod.Post, MediaHttp.Url(endpoint.BaseUrl, "chat/completions"),
             MediaHttp.BearerHeaders(endpoint, "text/event-stream"), MediaHttp.Json(body), options, options.MaxRetries ?? 0, cancellationToken).ConfigureAwait(false);
-        var audio = new MemoryStream();
+        var pieces = new List<string>();
         var transcript = new System.Text.StringBuilder();
         var answer = new System.Text.StringBuilder();
         double? cost = null;
@@ -235,13 +249,13 @@ public sealed class OpenRouterChatAudio : IMusicApi
             if (delta is not { } part) continue;
             if (MediaHttp.String(part, "content") is { Length: > 0 } words) answer.Append(words);
             if (MediaHttp.Field(part, "audio") is not { ValueKind: JsonValueKind.Object } piece) continue;
-            if (MediaHttp.String(piece, "data") is { Length: > 0 } data) { var bytes = Convert.FromBase64String(data); audio.Write(bytes); }
+            if (MediaHttp.String(piece, "data") is { Length: > 0 } data) pieces.Add(data);
             if (MediaHttp.String(piece, "transcript") is { Length: > 0 } said) transcript.Append(said);
         }
         var text = transcript.Length > 0 ? transcript.ToString() : answer.ToString();
-        if (audio.Length == 0)
+        if (pieces.Count == 0)
             throw new InvalidDataException($"{model.Provider} returned no audio" + (text.Length > 0 ? ": " + text[..Math.Min(text.Length, 300)] : ""));
-        var result = audio.ToArray();
+        var result = DecodePieces(pieces);
         return new MediaResult(model.Provider, model.Id, ModelOperationStopReason.Stop)
         {
             Audio = new GeneratedAudio(result, AudioShared.Sniff(result, "audio/pcm")), Text = text.Length > 0 ? text : null, Cost = cost,

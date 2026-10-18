@@ -69,14 +69,9 @@ public sealed class GoogleVideos : IVideosApi
         var headers = MediaHttp.GoogleHeaders(sameHost ? endpoint : endpoint with { ApiKey = null }, "video/mp4, */*");
         var (response, body) = await MediaHttp.SendAsync(HttpMethod.Get, uri, headers, null, options, options.MaxRetries ?? 3, cancellationToken)
             .ConfigureAwait(false);
-        return new GeneratedVideo(body, VideoMime(response.Headers));
+        return new GeneratedVideo(body, MediaHttp.VideoMime(response.Headers));
     }
 
-    private static string VideoMime(IEnumerable<KeyValuePair<string, string>> headers)
-    {
-        var type = headers.FirstOrDefault(pair => pair.Key == "content-type").Value?.Split(';')[0].Trim();
-        return type is { Length: > 0 } && type.StartsWith("video/", StringComparison.Ordinal) ? type : "video/mp4";
-    }
 }
 
 /// <summary>
@@ -152,12 +147,7 @@ public sealed class OpenRouterVideos : IVideosApi
     {
         var (response, body) = await MediaHttp.SendAsync(HttpMethod.Get, MediaHttp.Url(endpoint.BaseUrl, $"videos/{Uri.EscapeDataString(jobId)}/content?index=0"),
             MediaHttp.BearerHeaders(endpoint, "video/*, */*"), null, options, options.MaxRetries ?? 3, cancellationToken).ConfigureAwait(false);
-        return new GeneratedVideo(body, VideoMime(response.Headers));
+        return new GeneratedVideo(body, MediaHttp.VideoMime(response.Headers));
     }
 
-    private static string VideoMime(IEnumerable<KeyValuePair<string, string>> headers)
-    {
-        var type = headers.FirstOrDefault(pair => pair.Key == "content-type").Value?.Split(';')[0].Trim();
-        return type is { Length: > 0 } && type.StartsWith("video/", StringComparison.Ordinal) ? type : "video/mp4";
-    }
 }

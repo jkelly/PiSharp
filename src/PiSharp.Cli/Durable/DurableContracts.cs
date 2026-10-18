@@ -134,6 +134,9 @@ internal interface IDurableController
     /// <summary>PiSharp-only (decision 0007): use <paramref name="tier"/> for the shown conversation's requests; null clears it.</summary>
     Task SetServiceTierAsync(string? tier) => Task.FromException(new NotSupportedException("Service tiers are not supported here"));
 
+    /// <summary>PiSharp-only (decision 0007): show the shown conversation's service tier and the choices.</summary>
+    Task ShowServiceTierAsync() => Task.CompletedTask;
+
     /// <summary>Open or close the task panel (the view's <see cref="DurableView.Tasks"/>).</summary>
     Task ToggleTasksAsync();
 

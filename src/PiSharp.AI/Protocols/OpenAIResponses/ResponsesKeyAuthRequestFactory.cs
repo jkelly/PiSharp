@@ -166,7 +166,7 @@ public sealed class ResponsesKeyAuthRequestFactory
     private ResponsesKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
     {
         var session = _options.SessionId is null ? request?.SessionId : null;
-        var tier = request?.ServiceTier is { } requested && ServiceTiers.OpenAI(requested) is { } wire && wire != _options.ServiceTier ? wire : null;
+        var tier = request?.ServiceTier is { } requested && ServiceTiers.OpenAI(requested, _model.Provider) is { } wire && wire != _options.ServiceTier ? wire : null;
         if (session is null && tier is null) return null;
         if (_scoped.Count > 32) _scoped.Clear();
         return _scoped.GetOrAdd((session, tier), key => _withScope(key.Item1, key.Item2));
