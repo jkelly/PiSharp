@@ -68,13 +68,18 @@ public static class DurableDeviceApi
         {
             var body = await BodyAsync(http, options).ConfigureAwait(false);
             var key = IdempotencyKey(http);
+            var cwd = String(body, "cwd") ?? "";
+            var name = String(body, "name");
+            var model = ModelOf(body["model"]);
+            var thinking = String(body, "thinkingLevel");
             var session = await host.CreateSessionAsync(new SessionCreateRequest
             {
-                Cwd = String(body, "cwd") ?? "",
-                Name = String(body, "name"),
-                Model = ModelOf(body["model"]),
-                ThinkingLevel = String(body, "thinkingLevel"),
+                Cwd = cwd,
+                Name = name,
+                Model = model,
+                ThinkingLevel = thinking,
                 SpawnKey = key is null ? null : "http:" + key,
+                SpawnRequest = key is null ? null : JsonSerializer.Serialize(new { cwd, name, model, thinking }),
             }, http.RequestAborted).ConfigureAwait(false);
             return Json(await service.SessionAsync(session, http.RequestAborted).ConfigureAwait(false), 201);
         }));

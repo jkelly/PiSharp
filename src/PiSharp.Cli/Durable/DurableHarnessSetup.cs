@@ -146,8 +146,9 @@ internal static class DurableHarnessSetup
 {
     /// <summary>pi's HTTP setup (upstream <c>configureHarnessHttp</c>): the global <c>httpProxy</c> fills HTTP_PROXY and HTTPS_PROXY when
     /// they are unset (applyHttpProxySettings), and provider requests time out when headers or body data stall for
-    /// <c>httpIdleTimeoutMs</c> (configureHttpDispatcher), through the live routes' HTTP handlers.</summary>
-    /// <exception cref="InvalidDataException">An invalid <c>httpIdleTimeoutMs</c> setting.</exception>
+    /// <c>httpIdleTimeoutMs</c> (configureHttpDispatcher), through the live routes' HTTP handlers. Codex WebSocket handshakes use
+    /// <c>websocketConnectTimeoutMs</c>.</summary>
+    /// <exception cref="InvalidDataException">An invalid HTTP idle or WebSocket connect timeout setting.</exception>
     internal static LiveSessionRuntime ConfigureHarnessHttp(PiSettings settings, LiveSessionRuntime runtime, Func<string, string?> getEnvironment,
         Action<string, string?> setEnvironment)
     {
@@ -157,7 +158,8 @@ internal static class DurableHarnessSetup
             foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY" })
                 if (getEnvironment(name) is null) setEnvironment(name, trimmed);
         var idle = PiHttpIdleTimeout.FromSettings(settings.Merged);
-        return runtime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(runtime.CreateHttpHandler, idle) };
+        return runtime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(runtime.CreateHttpHandler, idle),
+            WebSocketConnectTimeout = PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(settings.Merged) };
     }
 
     /// <summary>The image processor of <c>pisharp durable</c>'s read tool: one worker thread per process, started on the first image.</summary>

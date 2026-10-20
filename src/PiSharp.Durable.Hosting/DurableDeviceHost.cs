@@ -21,6 +21,7 @@ public sealed class DurableDeviceHost : IAsyncDisposable
     private readonly List<Action<DeviceChange>> listeners = [];
     private readonly FileLock deviceLock;
     private int disposed;
+    private Task? disposal;
 
     private DurableDeviceHost(DurableDeviceOptions options, FileLock deviceLock, SessionCatalog catalog, DeviceInfo info)
     {
@@ -98,7 +99,18 @@ public sealed class DurableDeviceHost : IAsyncDisposable
                 cancellationToken.ThrowIfCancellationRequested();
                 var session = new HostedSession(host, row);
                 lock (host.gate) host.sessions.Add(session);
-                await session.OpenAsync(null, null).ConfigureAwait(false);
+                if (row.ArchivePath is { } archive)
+                {
+                    try { host.FinishArchive(session, archive); }
+                    catch (Exception failure)
+                    {
+                        session.MarkUnavailable(failure);
+                        options.OnReport?.Invoke(row.Id, failure);
+                    }
+                    continue;
+                }
+                await session.OpenAsync(row.InitialThinking is null ? null : new ModelRef(row.Provider!, row.Model!), row.InitialThinking)
+                    .ConfigureAwait(false);
             }
         }
         catch
@@ -143,6 +155,8 @@ public sealed class DurableDeviceHost : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(request);
         ThrowIfDisposed();
         if (request.SpawnKey is { Length: 0 or > 256 }) throw new HostInvalidException("A spawn key must be 1 to 256 characters.");
+        if (request.SpawnRequest is not null && request.SpawnKey is null)
+            throw new HostInvalidException("A request identity requires a spawn key.");
         var model = request.Model ?? Options.DefaultModel ?? throw new HostInvalidException($"Choose a model: {Info.Name} has no default model.");
         RequireModel(model);
         var thinking = HostNames.Thinking(request.ThinkingLevel ?? Options.DefaultThinkingLevel);
@@ -151,11 +165,12 @@ public sealed class DurableDeviceHost : IAsyncDisposable
         await mutations.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (request.SpawnKey is { } key && Catalog.SpawnedSession(key) is { } spawned)
+            ThrowIfDisposed();
+            if (request.SpawnKey is { } key && Catalog.SpawnedSession(key, request.SpawnRequest) is { } spawned)
                 return Sessions.FirstOrDefault(session => session.Id == spawned) ?? throw new HostNotFoundException($"The session spawned by {key} is gone.");
             var row = new CatalogSession(Guid.NewGuid().ToString("D"), name, cwd, Options.TimeProvider.GetUtcNow().ToUnixTimeMilliseconds(),
-                model.Provider, model.ModelId, null);
-            Catalog.AddSession(row, request.SpawnKey);
+                model.Provider, model.ModelId, null, thinking);
+            Catalog.AddSession(row, request.SpawnKey, request.SpawnRequest);
             var session = new HostedSession(this, row);
             lock (gate) sessions.Add(session);
             await session.OpenAsync(model, thinking).ConfigureAwait(false);
@@ -171,9 +186,11 @@ public sealed class DurableDeviceHost : IAsyncDisposable
     /// <summary>Renames a session; blank is "New session".</summary>
     public async Task<HostedSession> RenameSessionAsync(string address, string? name, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         await mutations.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            ThrowIfDisposed();
             var session = ResolveSession(address);
             var trimmed = HostNames.Session(name);
             Catalog.RenameSession(session.Id, trimmed);
@@ -193,28 +210,49 @@ public sealed class DurableDeviceHost : IAsyncDisposable
     /// </summary>
     public async Task<string> ArchiveSessionAsync(string address, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         await mutations.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            ThrowIfDisposed();
             var session = ResolveSession(address);
-            lock (gate) sessions.Remove(session);
             await session.StopAndCloseAsync().ConfigureAwait(false);
-            Directory.CreateDirectory(ArchiveDirectory);
-            var target = Path.Join(ArchiveDirectory, $"{session.Id}-{Options.TimeProvider.GetUtcNow():yyyyMMddHHmmss}");
-            if (Directory.Exists(session.DirectoryPath))
+            try
             {
-                // Pooled SQLite connections would keep the database open on Windows.
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-                Directory.Move(session.DirectoryPath, target);
+                var target = Catalog.ArchivePath(session.Id) ??
+                    Path.Join(ArchiveDirectory, $"{session.Id}-{Options.TimeProvider.GetUtcNow():yyyyMMddHHmmss}-{Guid.NewGuid():N}");
+                Catalog.BeginArchive(session.Id, target);
+                FinishArchive(session, target);
+                return target;
             }
-            Catalog.RemoveSession(session.Id);
-            Notify(new DeviceChange(DeviceChangeKind.Catalog, session.Id));
-            return target;
+            catch (Exception failure)
+            {
+                session.MarkUnavailable(failure);
+                throw;
+            }
         }
         finally
         {
             mutations.Release();
         }
+    }
+
+    private void FinishArchive(HostedSession session, string target)
+    {
+        var sourceExists = Directory.Exists(session.DirectoryPath);
+        var targetExists = Directory.Exists(target);
+        if (sourceExists && targetExists)
+            throw new IOException($"Archive destination already exists: {target}");
+        if (!sourceExists && !targetExists)
+            throw new IOException($"Neither the session directory nor its archive exists for {session.Id}.");
+        if (sourceExists)
+        {
+            Directory.CreateDirectory(ArchiveDirectory);
+            Directory.Move(session.DirectoryPath, target);
+        }
+        Catalog.RemoveSession(session.Id);
+        lock (gate) sessions.Remove(session);
+        Notify(new DeviceChange(DeviceChangeKind.Catalog, session.Id));
     }
 
     /// <summary>The chat models the device can run now: the models' available catalog (providers with complete auth).</summary>
@@ -277,15 +315,37 @@ public sealed class DurableDeviceHost : IAsyncDisposable
     }
 
     /// <summary>Closes every session and releases the data directory.</summary>
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
-        HostedSession[] all;
-        lock (gate) { all = [.. sessions]; sessions.Clear(); listeners.Clear(); }
-        foreach (var session in all) await session.CloseAsync().ConfigureAwait(false);
-        Catalog.Dispose();
-        deviceLock.Dispose();
-        mutations.Dispose();
+        lock (gate)
+        {
+            if (disposal is null)
+            {
+                Volatile.Write(ref disposed, 1);
+                disposal = DisposeCoreAsync();
+            }
+            return new ValueTask(disposal);
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        await Task.Yield();
+        // Close admission first, then join the already admitted create/rename/archive operation. Keep the semaphore alive so
+        // queued callers can acquire it, see the closed admission, and release it safely.
+        await mutations.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            HostedSession[] all;
+            lock (gate) { all = [.. sessions]; sessions.Clear(); listeners.Clear(); }
+            try { foreach (var session in all) await session.CloseAsync().ConfigureAwait(false); }
+            finally
+            {
+                try { Catalog.Dispose(); }
+                finally { deviceLock.Dispose(); }
+            }
+        }
+        finally { mutations.Release(); }
     }
 
     internal void Notify(DeviceChange change)

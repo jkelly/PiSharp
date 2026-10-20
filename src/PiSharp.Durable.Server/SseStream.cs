@@ -76,14 +76,18 @@ internal sealed class SseStream : IAsyncDisposable
     private void Enqueue(string type, string json)
     {
         if (closed.IsCancellationRequested) return;
-        string text;
-        lock (gate) text = SseReader.Format(++sequence, type, json);
+        lock (gate) EnqueueText(SseReader.Format(++sequence, type, json));
+    }
+
+    private void EnqueueText(string text)
+    {
+        if (closed.IsCancellationRequested) return;
         if (Interlocked.Add(ref backlog, Encoding.UTF8.GetByteCount(text)) > options.MaxStreamBacklogBytes)
         {
             Close();
             return;
         }
-        queue.Writer.TryWrite(text);
+        if (!queue.Writer.TryWrite(text)) Interlocked.Add(ref backlog, -Encoding.UTF8.GetByteCount(text));
     }
 
     private async Task PumpAsync()
@@ -117,7 +121,7 @@ internal sealed class SseStream : IAsyncDisposable
     {
         while (await timer.WaitForNextTickAsync(closed.Token).ConfigureAwait(false))
             if (Environment.TickCount64 - Interlocked.Read(ref lastWrite) >= options.PingInterval.TotalMilliseconds && Interlocked.Read(ref backlog) == 0)
-                queue.Writer.TryWrite(": ping\n\n");
+                EnqueueText(": ping\n\n");
     }
 
     /// <summary>Ends the stream.</summary>

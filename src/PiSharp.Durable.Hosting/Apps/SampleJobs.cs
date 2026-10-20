@@ -50,7 +50,7 @@ public static class SampleJobs
                 Run = async context =>
                 {
                     var summary = context.Data.SetItem("at", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-                    await context.SaveStateAsync("/jobs/workspace-snapshot", summary).ConfigureAwait(false);
+                    summary = (JsonObjectValue)await context.SaveStateAsync("/jobs/workspace-snapshot", summary).ConfigureAwait(false);
                     return JobPhaseResult.Next("Saved /jobs/workspace-snapshot", summary);
                 },
             },
@@ -111,7 +111,7 @@ public static class SampleJobs
                 Run = async context =>
                 {
                     var record = context.Data.SetItem("approvedAt", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-                    await context.SaveStateAsync("/jobs/release-check", record).ConfigureAwait(false);
+                    record = (JsonObjectValue)await context.SaveStateAsync("/jobs/release-check", record).ConfigureAwait(false);
                     return JobPhaseResult.Next("Saved /jobs/release-check", record);
                 },
             },
@@ -172,7 +172,7 @@ public static class SampleJobs
                     var changes = (JsonArrayValue)context.Data["changes"];
                     var report = JsonValue.Object([new("checks", changes.Count), new("changes", changes),
                         new("at", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture))]);
-                    await context.SaveStateAsync("/jobs/change-watch", report).ConfigureAwait(false);
+                    report = (JsonObjectValue)await context.SaveStateAsync("/jobs/change-watch", report).ConfigureAwait(false);
                     return JobPhaseResult.Next($"Saved {changes.Count} checks", report);
                 },
             },

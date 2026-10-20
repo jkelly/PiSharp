@@ -47,6 +47,16 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> GapCases() =>
     [
+        ("settings.websocket-connect-timeout-ms", () =>
+        {
+            Equal(TimeSpan.FromSeconds(15), PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(new JsonObject()), "default handshake deadline");
+            foreach (var value in new[] { "0", "\"disabled\"" })
+                Equal(TimeSpan.Zero, PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(JsonNode.Parse("{\"websocketConnectTimeoutMs\":" + value + "}")!.AsObject()), "disabled handshake deadline");
+            Equal(TimeSpan.FromMilliseconds(123), PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(new JsonObject { ["websocketConnectTimeoutMs"] = 123.9 }), "floored handshake deadline");
+            Equal(TimeSpan.FromMilliseconds(int.MaxValue), PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(new JsonObject { ["websocketConnectTimeoutMs"] = 1e30 }), "large deadline saturates without overflowing");
+            Equal("Invalid websocketConnectTimeoutMs setting: -1", Throws<InvalidDataException>(() => PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(new JsonObject { ["websocketConnectTimeoutMs"] = -1 }), "invalid").Message, "invalid deadline");
+            return Task.CompletedTask;
+        }),
         ("rpc.background-catalog-refresh-unless-offline", async () =>
         {
             foreach (var offline in new[] { false, true })
@@ -72,6 +82,9 @@ internal static partial class Program
         {
             long? Parse(string json) => PiHttpIdleTimeout.Parse(JsonNode.Parse("{\"v\":" + json + "}")!["v"]);
             Equal<long?>(1500, Parse("1500.7"), "floored"); Equal<long?>(0, Parse("0"), "zero"); Equal<long?>(0, Parse("\" Disabled \""), "disabled");
+            Equal<long?>(long.MaxValue, Parse("1e30"), "large timeout saturates");
+            Equal<long?>(null, PiHttpIdleTimeout.Parse(JsonValue.Create(double.PositiveInfinity)), "programmatic infinity");
+            Equal<long?>(null, PiHttpIdleTimeout.Parse(JsonValue.Create(float.NaN)), "programmatic NaN");
             Equal<long?>(2000, Parse("\" 2000 \""), "numeric string"); Equal<long?>(16, Parse("\"0x10\""), "hex string");
             Equal<long?>(null, Parse("-1"), "negative"); Equal<long?>(null, Parse("\"abc\""), "text"); Equal<long?>(null, Parse("\"\""), "empty");
             Equal<long?>(null, Parse("true"), "boolean"); Equal<long?>(null, Parse("\"Infinity\""), "infinite");

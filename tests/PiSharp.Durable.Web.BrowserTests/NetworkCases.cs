@@ -12,6 +12,40 @@ internal static partial class Program
     // The network: devices, the tree, sessions, selection, rails and layouts (PLAN.md Appendix C items 1-3, 18, 19, 21-27, 32 and 33).
     internal static IEnumerable<(string, Func<Task>)> NetworkCases() =>
     [
+        Browse("browser.deep-link-before-tree-catches-up", async (hub, window) =>
+        {
+            var session = await hub.SessionAsync("new-deep-link");
+            var page = window.Page;
+            await page.GotoAsync("/");
+            await Expect(page.Row(session)).ToBeVisibleAsync();
+            await page.WaitForFunctionAsync("() => window.durableApp?.devices.some(d => d.id === 'local' && d.tree)");
+            var retained = await page.EvaluateAsync<bool>("""
+                (session) => {
+                  const app = window.durableApp;
+                  const fresh = structuredClone(app.devices);
+                  const stale = structuredClone(fresh);
+                  stale.find(d => d.id === 'local').tree.sessions = [];
+                  app.devices = stale;
+                  app.select({ device: 'local', session, agent: 1 });
+                  app.network({ devices: structuredClone(stale), html: '' });
+                  const retained = app.selection.session === session;
+                  app.network({ devices: fresh, html: '' });
+                  return retained;
+                }
+                """, session);
+            Check(retained, "a stale initial tree cannot discard the deep link");
+            await page.AgentReadyAsync();
+            await Expect(page).ToHaveURLAsync(new Regex($"/d/local/s/{Regex.Escape(session)}/a/1$"));
+            await page.EvaluateAsync("""
+                () => {
+                  const app = window.durableApp;
+                  const removed = structuredClone(app.devices);
+                  removed.find(d => d.id === 'local').tree.sessions = [];
+                  app.network({ devices: removed, html: '' });
+                }
+                """);
+            await Expect(page).ToHaveURLAsync(new Regex("/d/local$"));
+        }),
         // Items 1, 2 and 23: a device from dpi-network.yaml has no token until one is entered; a wrong token is refused; Check finds it online.
         Browse("browser.devices-yaml-token-and-check", async (hub, window) =>
         {

@@ -16,6 +16,7 @@ internal static partial class Program
         public ModelRef? DefaultModel { get; init; }
         public Func<HostedSessionContext, IRegistry>? Registry { get; init; }
         public Func<string, Task<IStorage>>? Storage { get; init; }
+        public IReadOnlyList<JobDefinition>? Jobs { get; init; }
     }
 
     /// <summary>A device on a fresh temporary data directory with one start directory, <see cref="Work"/>.</summary>
@@ -51,6 +52,7 @@ internal static partial class Program
             CreateRegistry = setup?.Registry,
             OpenStorage = setup?.Storage,
             ToolEffects = ToolEffects.Default.With("probe", ToolEffect.Read),
+            Jobs = setup?.Jobs ?? SampleJobs.All,
         };
 
         /// <summary>Closes the host and opens the data directory again, as a device restart does.</summary>

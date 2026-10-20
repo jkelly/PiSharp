@@ -522,14 +522,8 @@ public sealed class HostedSession
         var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
         return await conversation.CommitAsync(async tx =>
         {
-            var id = await Jobs.StartAsync(tx, conversation.Id, job, jobTasks[job.Id], input, TaskOwnership.Conversation, background: true, "you", null,
+            return await Jobs.StartAsync(tx, conversation.Id, job, jobTasks[job.Id], input, TaskOwnership.Conversation, background: true, "you", null,
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ConfigureAwait(false);
-            await tx.AppendEntryAsync(conversation.Id, new EntryDraft
-            {
-                Kind = "pisharp.job",
-                Data = JsonValue.Object([new("taskId", id.Value), new("job", job.Id), new("text", $"Started {job.Title}")]),
-            }).ConfigureAwait(false);
-            return id;
         }, context).ConfigureAwait(false);
     }
 
@@ -656,6 +650,10 @@ public sealed class HostedSession
         IHarness? opened = null;
         try
         {
+            // Only an explicitly pending creation may create storage. A missing established database is a recovery error,
+            // including legacy archives interrupted between moving the directory and deleting its catalog row.
+            if (createModel is null && host.Options.OpenStorage is null && !File.Exists(DatabasePath))
+                throw new FileNotFoundException($"The session database is missing: {DatabasePath}");
             Directory.CreateDirectory(DirectoryPath);
             acquired = FileLock.TryAcquire(Path.Join(DirectoryPath, "session.lock"), $"pid {Environment.ProcessId}")
                 ?? throw new IOException($"Session {Id} is open in another process.");
@@ -677,12 +675,21 @@ public sealed class HostedSession
                 TimeProvider = host.Options.TimeProvider,
                 OnReport = report => host.Options.OnReport?.Invoke(Id, report),
             }, context).ConfigureAwait(false);
-            await opened.RootAsync(context, createModel is null ? null : new AgentChange
+            if (createModel is null)
             {
-                Cwd = Cwd,
-                Model = createModel,
-                ThinkingLevel = createThinking ?? "off",
-            }).ConfigureAwait(false);
+                if (await opened.ConversationAsync(ConversationId.Root, context).ConfigureAwait(false) is null)
+                    throw new InvalidDataException($"The established session has no root conversation: {Id}");
+            }
+            else
+            {
+                await opened.RootAsync(context, new AgentChange
+                {
+                    Cwd = Cwd,
+                    Model = createModel,
+                    ThinkingLevel = createThinking ?? "off",
+                }).ConfigureAwait(false);
+                host.Catalog.CompleteInitialization(Id);
+            }
             await RerouteAllAsync(opened, context).ConfigureAwait(false);
             commits = opened.SubscribeCommits((_, _) => host.Notify(new DeviceChange(DeviceChangeKind.Session, Id)));
             fileLock = acquired;
@@ -701,6 +708,8 @@ public sealed class HostedSession
             host.Options.OnReport?.Invoke(Id, failure);
         }
     }
+
+    internal void MarkUnavailable(Exception failure) => error = failure;
 
     /// <summary>Stops all of the session's work, background too, waiting at most 10 s, then closes it (archive).</summary>
     internal async Task StopAndCloseAsync()

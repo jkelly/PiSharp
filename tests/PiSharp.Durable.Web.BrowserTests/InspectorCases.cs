@@ -170,10 +170,12 @@ internal static partial class Program
             await Expect(release.Locator(".job-head .ps-chip")).ToHaveTextAsync("Completed", new() { Timeout = 60_000 });
             await Expect(page.Locator(".pending-panel")).ToHaveCountAsync(0);
 
-            // durable-pi shows an agent-started run's card "started by the agent". Here the run_durable_job tool appends no anchor entry (only
-            // HostedSession.RunJobAsync does), so the run shows in its tool result and the Jobs tab; decision 0008 lists the missing card.
+            // Agent-started jobs have the same transcript card as manual starts, with their origin visible.
             await page.SendAsync("""tool: run_durable_job {"job":"workspace-snapshot"}""");
             await Expect(page.Thread()).ToContainTextAsync("Tool finished: run_durable_job: Started Workspace snapshot");
+            var agentSnapshot = page.JobCard("Workspace snapshot").Filter(new() { HasText = "started by the agent" });
+            await Expect(agentSnapshot).ToHaveCountAsync(1);
+            await Expect(agentSnapshot.Locator(".job-head .ps-chip")).ToHaveTextAsync("Completed", new() { Timeout = 30_000 });
             var activity = page.Locator("[data-activity-count]");
             await Expect(activity).ToHaveTextAsync("Nothing running", new() { Timeout = 30_000 });
             await page.TabAsync("session");

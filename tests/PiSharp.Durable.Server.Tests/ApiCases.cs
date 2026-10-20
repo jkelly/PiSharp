@@ -76,6 +76,23 @@ internal static partial class Program
             Equal(2, (await server.Get("/v1/sessions"))!.AsArray().Count, "archived");
         }),
 
+        Case("api.session-creation-keys-reject-conflicting-requests", async () =>
+        {
+            await using var server = await TestServer.StartAsync("api-key-conflict");
+            var original = await server.Post("/v1/sessions", new JsonObject { ["name"] = "alpha" }, "creation-key");
+            var retry = await server.Post("/v1/sessions", new JsonObject { ["name"] = "alpha" }, "creation-key");
+            Equal(original!["id"]!.GetValue<string>(), retry!["id"]!.GetValue<string>(), "identical retry");
+            foreach (var changed in new[]
+            {
+                new JsonObject { ["name"] = "beta" },
+                new JsonObject { ["name"] = "alpha", ["thinkingLevel"] = "high" },
+                new JsonObject { ["name"] = "alpha", ["cwd"] = server.Work },
+                new JsonObject { ["name"] = "alpha", ["model"] = new JsonObject { ["provider"] = "faux", ["modelId"] = "echo-small" } },
+            })
+                await FailsAsync(() => server.Post("/v1/sessions", changed, "creation-key"), "invalid", "conflicting creation request");
+            Equal(1, server.Host.Sessions.Count, "no extra sessions created");
+        }),
+
         Case("api.messages-waits-busy-and-transcript", async () =>
         {
             await using var server = await TestServer.StartAsync("api-messages");

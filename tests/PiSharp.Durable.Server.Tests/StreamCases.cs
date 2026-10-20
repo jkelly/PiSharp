@@ -7,6 +7,19 @@ internal static partial class Program
 {
     internal static IEnumerable<(string, Func<Task>)> StreamCases() =>
     [
+        Case("streams.idle-heartbeats-continue-and-data-follows-them", async () =>
+        {
+            var http = new DefaultHttpContext();
+            using var body = new HeartbeatBody();
+            http.Response.Body = body;
+            await using var stream = await SseStream.OpenAsync(http, new JsonObject { ["kind"] = "device" },
+                new DurableDeviceServerOptions { Token = DeviceTokens.Generate(), PingInterval = TimeSpan.FromSeconds(1) });
+            await body.TwoPings.Task.WaitAsync(Patience);
+            stream.Send(new JsonObject { ["type"] = "after-pings" });
+            await body.DataAfterPings.Task.WaitAsync(Patience);
+            Check(!stream.Closed.IsCancellationRequested, "heartbeats do not corrupt backlog accounting");
+        }),
+
         Case("streams.agent-frames-reduce-to-the-transcript", async () =>
         {
             await using var server = await TestServer.StartAsync("streams-agent");
@@ -125,6 +138,21 @@ internal static partial class Program
                 "unauthorized ends the enumeration");
         }),
     ];
+
+    private sealed class HeartbeatBody : MemoryStream
+    {
+        private int pings;
+        internal TaskCompletionSource TwoPings { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource DataAfterPings { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await base.WriteAsync(buffer, cancellationToken);
+            var text = System.Text.Encoding.UTF8.GetString(buffer.Span);
+            if (text == ": ping\n\n" && ++pings >= 2) TwoPings.TrySetResult();
+            if (text.Contains("after-pings", StringComparison.Ordinal)) DataAfterPings.TrySetResult();
+        }
+    }
 
     /// <summary>A response body whose writes complete only after the first, until released: a client that stopped reading.</summary>
     private sealed class StalledStream : Stream

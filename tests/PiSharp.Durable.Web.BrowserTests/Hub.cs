@@ -117,8 +117,8 @@ internal static partial class Program
 
         public Task<(int Status, JsonNode? Body, string Text)> Post(string path, JsonNode? body) => SendAsync(HttpMethod.Post, path, body ?? new JsonObject());
 
-        /// <summary>A session made through the proxy, as another client would, once the hub's tree lists it. (A page that opens it sooner
-        /// may get a network frame whose tree is older than the session, and the page then leaves the selection.)</summary>
+        /// <summary>A session made through the proxy, as another client would, once the hub's tree lists it for stable tree assertions.
+        /// The deep-link regression separately exercises a page whose initial tree is older than its selected session.</summary>
         public async Task<string> SessionAsync(string name)
         {
             var created = await Post("/api/devices/local/v1/sessions", new JsonObject { ["name"] = name, ["cwd"] = Work });

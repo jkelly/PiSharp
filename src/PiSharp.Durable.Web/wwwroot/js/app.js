@@ -141,7 +141,10 @@ class App {
     const online = this.devices.filter((d) => d.status === 'online').length;
     $$('[data-online-summary]').forEach((el) => { el.textContent = this.devices.length ? `${online} of ${this.devices.length} online` : 'No devices'; });
     const after = this.device();
-    if (this.selection.session && after?.status === 'online' && after.tree && !after.tree.sessions.some((s) => s.id === this.selection.session)) {
+    // A deep link can reach a new session before the hub's cached tree does. Only a session that was listed before can disappear;
+    // an actually unknown deep link is rejected by the agent stream's not_found fault.
+    if (this.selection.session && before?.tree?.sessions.some((s) => s.id === this.selection.session) &&
+        after?.status === 'online' && after.tree && !after.tree.sessions.some((s) => s.id === this.selection.session)) {
       this.toast('That session is no longer on the device.');
       this.select({ device: this.selection.device, session: null, agent: null }, { replace: true });
       return;

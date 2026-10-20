@@ -236,6 +236,15 @@ internal static partial class Program
             Equal($"<cwd>\n{durable.Location.Cwd.Replace('\\', '/')}\n</cwd>", Section("cwd"), "cwd");
             Equal("preamble,tools,rules,docs,project_context,cwd", string.Join(",", sections.Select(pair => pair.Key)), "pi's section order");
         }),
+        Case("runtime.settings.websocket-connect-timeout", () =>
+        {
+            var settings = PiSettings.FromObjects(new JsonObject { ["websocketConnectTimeoutMs"] = 250 });
+            var runtime = new LiveSessionRuntime(_ => null, () => null);
+            LiveSessionRuntime Configure() => DurableHarnessSetup.ConfigureHarnessHttp(settings, runtime, _ => null, (_, _) => { });
+            Equal<TimeSpan?>(TimeSpan.FromMilliseconds(250), Configure().WebSocketConnectTimeout, "configured handshake deadline");
+            settings.ApplyOverrides(new JsonObject { ["websocketConnectTimeoutMs"] = "disabled" });
+            Equal<TimeSpan?>(TimeSpan.Zero, Configure().WebSocketConnectTimeout, "disabled handshake deadline");
+        }),
         Case("runtime.settings.bridge-reads-at-each-access", () =>
         {
             var settings = PiSettings.FromObjects(new JsonObject());

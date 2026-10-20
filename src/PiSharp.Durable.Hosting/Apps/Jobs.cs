@@ -89,6 +89,7 @@ public sealed class JobContext
     private readonly DeviceAppState state;
     private readonly string sessionId;
     private int steps;
+    private int agentCalls;
 
     internal JobContext(JobDefinition job, JobPhase phase, int iteration, JsonObjectValue input, JsonObjectValue data, string cwd, ITaskRuntime runtime,
         RunningTask task, DurableContext durable, DeviceAppState state, string sessionId)
@@ -149,11 +150,13 @@ public sealed class JobContext
     /// <summary>Records a note on the phase.</summary>
     public Task NoteAsync(string text) => StepAsync("note", text, "done", 0, null);
 
-    /// <summary>Saves a value in the device's App State, creating missing parents. A rerun of the same phase run saves once.</summary>
-    public async Task SaveStateAsync(string path, JsonValue value)
+    /// <summary>Saves a value in the device's App State, creating missing parents. A rerun of the same phase run saves once and returns
+    /// the value originally saved, so the next checkpoint uses the committed result even when the candidate changed on restart.</summary>
+    public async Task<JsonValue> SaveStateAsync(string path, JsonValue value)
     {
-        state.Set(path, value, $"job:{sessionId}:{task.Id.Value}:{Phase.Id}:{Iteration}:{path}");
+        var saved = state.Set(path, value, $"job:{sessionId}:{task.Id.Value}:{Phase.Id}:{Iteration}:{path}");
         await StepAsync("state", path, "done", 0, null).ConfigureAwait(false);
+        return AppStateDocument.Read(saved.Value, path) ?? throw new InvalidOperationException("The state receipt has no saved value.");
     }
 
     /// <summary>Reads a value from the device's App State.</summary>
@@ -163,6 +166,7 @@ public sealed class JobContext
     /// question.</summary>
     public async Task<string> AskAgentAsync(string question)
     {
+        var callIndex = Interlocked.Increment(ref agentCalls) - 1;
         var started = Stopwatch.StartNew();
         ConversationId child = default;
         await runtime.CommitAsync(async (tx, running) =>
@@ -177,9 +181,18 @@ public sealed class JobContext
         }, durable).ConfigureAwait(false);
         var handle = await runtime.ConversationAsync(child, durable).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Subagent {child.Value} is gone.");
-        var submission = await handle.SubmitAsync(SubmissionDraft.Input(question, requestId: $"job:{task.Id.Value}:{Phase.Id}:{Iteration}"), durable).ConfigureAwait(false);
+        // Keep the original first-call key for jobs already waiting at this checkpoint. Later calls in the same phase need their
+        // own replay identity; otherwise the submission deduplicator answers every question with the first question's result.
+        var requestId = $"job:{task.Id.Value}:{Phase.Id}:{Iteration}" + (callIndex == 0 ? "" : $":{callIndex}");
+        var submission = await handle.SubmitAsync(SubmissionDraft.Input(question, requestId: requestId), durable).ConfigureAwait(false);
         var settled = await submission.WaitAsync(durable).ConfigureAwait(false);
-        var answer = settled.Answer is { } entry ? SubmissionAnswers.TextOf(await runtime.EntryAsync(Entries.AssistantEntry, entry, durable).ConfigureAwait(false)) : "";
+        var answer = "";
+        if (settled.Answer is { } entry)
+            await runtime.CommitAsync(async (tx, _) =>
+            {
+                // Runtime.EntryAsync only reads entries visible in the parent's conversation. The answer belongs to our child.
+                answer = SubmissionAnswers.TextOf(await tx.GetEntryAsync(Entries.AssistantEntry, entry).ConfigureAwait(false));
+            }, durable).ConfigureAwait(false);
         await StepAsync("agent", $"Subagent #{child.Value}", settled.Status == SubmissionStatus.Done ? "done" : "error", started.ElapsedMilliseconds,
             answer.Length > 2000 ? answer[..2000] + "…" : answer, child.Value).ConfigureAwait(false);
         if (settled.Status != SubmissionStatus.Done) throw new InvalidOperationException($"Subagent #{child.Value} did not answer: {settled.Reason}");
@@ -304,6 +317,11 @@ public static class Jobs
         ]);
         doc.Set("items", JsonValue.Array(new JsonValue[] { run }.Concat(Items(doc.ToValue() as JsonObjectValue, "items")).Take(MaxRuns)));
         doc.Set("counters", counters.SetItem(job.Id, number));
+        await tx.AppendEntryAsync(conversation, new EntryDraft
+        {
+            Kind = "pisharp.job",
+            Data = JsonValue.Object([new("taskId", id.Value), new("job", job.Id), new("text", $"Started {job.Title}")]),
+        }).ConfigureAwait(false);
         return id;
     }
 

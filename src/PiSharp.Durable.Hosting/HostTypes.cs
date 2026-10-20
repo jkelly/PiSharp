@@ -85,6 +85,10 @@ public sealed record SessionCreateRequest
     /// <summary>Makes creation exactly-once: a key that already created a session returns that session (Phase 3's
     /// <c>start_session</c>).</summary>
     public string? SpawnKey { get; init; }
+
+    /// <summary>Optional stable request identity for a spawn key. A different identity is refused, including legacy keys whose original
+    /// request was not recorded. Omit for key-only tool replay semantics.</summary>
+    public string? SpawnRequest { get; init; }
 }
 
 /// <summary>How an agent runs (durable-pi <c>AgentConfig</c>).</summary>

@@ -84,6 +84,8 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
     internal Action<PiSharp.Cli.Models.ModelRegistry>? ConfigureRegistry { get; init; }
     /// <summary>StreamOptions.transport for providers with a WebSocket transport (OpenAI Codex), read per request; null is "auto".</summary>
     internal Func<string?>? Transport { get; init; }
+    /// <summary>Codex WebSocket handshake deadline from websocketConnectTimeoutMs; null keeps the provider default.</summary>
+    internal TimeSpan? WebSocketConnectTimeout { get; init; }
     /// <summary>Whether the built-in llama.cpp extension (and so its provider) is loaded, read when a registry composes its providers;
     /// null: loaded.</summary>
     internal Func<bool>? LlamaProvider { get; init; }

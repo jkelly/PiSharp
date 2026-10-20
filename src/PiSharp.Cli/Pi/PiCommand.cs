@@ -387,11 +387,17 @@ internal static class PiCommand
         // main.ts configureHttpDispatcher(settingsManager.getHttpIdleTimeoutMs()): provider requests time out when headers or body data
         // stall; an invalid setting stops startup.
         long idleTimeout;
-        try { idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged); }
+        TimeSpan websocketConnectTimeout;
+        try
+        {
+            idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged);
+            websocketConnectTimeout = PiHttpIdleTimeout.WebSocketConnectTimeoutFromSettings(settings.Merged);
+        }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         // sdk.ts transport: settingsManager.getTransport() ("auto" by default); /settings changes it for the running session.
         PiTransportSetting.Start(settings.String("transport"));
         var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout),
+            WebSocketConnectTimeout = websocketConnectTimeout,
             Transport = host.LiveRuntime.Transport ?? (() => PiTransportSetting.Current()),
             // extensions/llama: the llama.cpp provider is the built-in llama.cpp extension's registration.
             LlamaProvider = () => builtins.IsEnabled(PiBuiltinExtensions.Llama) };

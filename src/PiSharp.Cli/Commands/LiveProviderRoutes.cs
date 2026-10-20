@@ -116,7 +116,8 @@ internal sealed class LiveProviderRoute
                 {
                     CacheRetention = summary ? "none" : null,
                     ModelHeaders = Headers(definition),
-                    Transport = runtime.Transport
+                    Transport = runtime.Transport,
+                    WebSocketConnectTimeout = runtime.WebSocketConnectTimeout,
                 }, async token => (await CurrentAsync(token).ConfigureAwait(false)).ApiKey ?? throw new InvalidOperationException("No API key for provider: openai-codex"),
                     handler, plain && Levels(definition).Contains("off") ? "off" : null);
             case "google-vertex":

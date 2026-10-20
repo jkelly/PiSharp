@@ -12,16 +12,17 @@ namespace PiSharp.Durable.Hosting;
 /// <param name="Provider">Main's model provider, kept in step with Main.</param>
 /// <param name="Model">Main's model ID.</param>
 /// <param name="Compaction">The session's compaction settings as JSON; null follows the defaults of Main's model window.</param>
-internal sealed record CatalogSession(string Id, string Name, string Cwd, long CreatedAt, string? Provider, string? Model, string? Compaction);
+internal sealed record CatalogSession(string Id, string Name, string Cwd, long CreatedAt, string? Provider, string? Model, string? Compaction,
+    string? InitialThinking = null, string? ArchivePath = null);
 
 /// <summary>
 /// The device catalog in SQLite: sessions, custom agent names, spawn records, the device identity, and the device's shared App State with
-/// its receipts. Schema version 2 (in <c>PRAGMA user_version</c>; version 1 had no App State); a newer catalog is refused rather than
+/// its receipts and pending session lifecycle operations. Schema version 3 (in <c>PRAGMA user_version</c>); a newer catalog is refused rather than
 /// misread. One connection, serialized by a lock.
 /// </summary>
 internal sealed class SessionCatalog : IDisposable
 {
-    internal const int SchemaVersion = 2;
+    internal const int SchemaVersion = 3;
 
     private const string Schema = """
         CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -46,6 +47,12 @@ internal sealed class SessionCatalog : IDisposable
     private const string SchemaV2 = """
         CREATE TABLE app_state (id INTEGER PRIMARY KEY CHECK (id = 1), value TEXT NOT NULL, revision INTEGER NOT NULL);
         CREATE TABLE app_state_receipts (key TEXT PRIMARY KEY, value TEXT NOT NULL, revision INTEGER NOT NULL, created_at INTEGER NOT NULL);
+        """;
+
+    private const string SchemaV3 = """
+        ALTER TABLE sessions ADD COLUMN initial_thinking TEXT;
+        ALTER TABLE sessions ADD COLUMN archive_path TEXT;
+        ALTER TABLE session_spawns ADD COLUMN request TEXT;
         """;
 
     private readonly Lock gate = new();
@@ -75,7 +82,8 @@ internal sealed class SessionCatalog : IDisposable
             {
                 using var transaction = connection.BeginTransaction();
                 if (version < 1) Execute(connection, transaction, Schema);
-                Execute(connection, transaction, SchemaV2);
+                if (version < 2) Execute(connection, transaction, SchemaV2);
+                Execute(connection, transaction, SchemaV3);
                 Execute(connection, transaction, $"PRAGMA user_version = {SchemaVersion};");
                 transaction.Commit();
             }
@@ -106,37 +114,58 @@ internal sealed class SessionCatalog : IDisposable
         lock (gate)
         {
             using var command = connection.CreateCommand();
-            command.CommandText = "SELECT id, name, cwd, created_at, provider, model, compaction FROM sessions ORDER BY created_at, id;";
+            command.CommandText = "SELECT id, name, cwd, created_at, provider, model, compaction, initial_thinking, archive_path FROM sessions ORDER BY created_at, id;";
             using var reader = command.ExecuteReader();
             var sessions = new List<CatalogSession>();
             while (reader.Read())
                 sessions.Add(new CatalogSession(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3),
                     reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5),
-                    reader.IsDBNull(6) ? null : reader.GetString(6)));
+                    reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7),
+                    reader.IsDBNull(8) ? null : reader.GetString(8)));
             return sessions;
         }
     }
 
     /// <summary>The session a spawn key created, or null.</summary>
-    public string? SpawnedSession(string key)
+    public string? SpawnedSession(string key, string? request = null)
     {
-        lock (gate) return Scalar(connection, null, "SELECT session_id FROM session_spawns WHERE key = $key;", ("$key", key)) as string;
+        lock (gate)
+        {
+            using var command = Command(connection, null, "SELECT session_id, request FROM session_spawns WHERE key = $key;", [("$key", key)]);
+            using var reader = command.ExecuteReader();
+            if (!reader.Read()) return null;
+            if (request is not null && (reader.IsDBNull(1) || reader.GetString(1) != request))
+                throw new HostInvalidException("This creation key was already used for a different request, or predates request verification.");
+            return reader.GetString(0);
+        }
     }
 
     /// <summary>Adds a session and, with <paramref name="spawnKey"/>, its spawn record, in one transaction.</summary>
-    public void AddSession(CatalogSession session, string? spawnKey)
+    public void AddSession(CatalogSession session, string? spawnKey, string? request = null)
     {
         lock (gate)
         {
             using var transaction = connection.BeginTransaction();
             Execute(connection, transaction,
-                "INSERT INTO sessions (id, name, cwd, created_at, provider, model, compaction) VALUES ($id, $name, $cwd, $created, $provider, $model, $compaction);",
+                "INSERT INTO sessions (id, name, cwd, created_at, provider, model, compaction, initial_thinking) VALUES ($id, $name, $cwd, $created, $provider, $model, $compaction, $thinking);",
                 ("$id", session.Id), ("$name", session.Name), ("$cwd", session.Cwd), ("$created", session.CreatedAt), ("$provider", session.Provider),
-                ("$model", session.Model), ("$compaction", session.Compaction));
+                ("$model", session.Model), ("$compaction", session.Compaction), ("$thinking", session.InitialThinking));
             if (spawnKey is not null)
-                Execute(connection, transaction, "INSERT INTO session_spawns (key, session_id) VALUES ($key, $id);", ("$key", spawnKey), ("$id", session.Id));
+                Execute(connection, transaction, "INSERT INTO session_spawns (key, session_id, request) VALUES ($key, $id, $request);",
+                    ("$key", spawnKey), ("$id", session.Id), ("$request", request));
             transaction.Commit();
         }
+    }
+
+    /// <summary>The initial root and its configuration are now committed in the session database.</summary>
+    public void CompleteInitialization(string id) => Update("UPDATE sessions SET initial_thinking = $value WHERE id = $id;", id, null);
+
+    /// <summary>Records an archive destination before moving any files. Recovery completes this same move.</summary>
+    public void BeginArchive(string id, string path) => Update("UPDATE sessions SET archive_path = $value WHERE id = $id;", id, path);
+
+    public string? ArchivePath(string id)
+    {
+        lock (gate) return Scalar(connection, null, "SELECT archive_path FROM sessions WHERE id = $id;", ("$id", id)) as string;
     }
 
     /// <summary>Renames a session.</summary>
