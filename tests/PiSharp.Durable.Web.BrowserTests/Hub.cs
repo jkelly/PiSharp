@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PiSharp.Durable.Hosting;
 using PiSharp.Durable.Hosting.Testing;
 using PiSharp.Durable.Server;
+using Chord = PiSharp.Durable.Chord;
 
 internal static partial class Program
 {
@@ -50,9 +51,16 @@ internal static partial class Program
                 DataDirectory = Path.Join(hub.DeviceDirectory, "data"),
                 StartDirectories = [hub.Work],
                 DeviceName = "faux-box",
-                Models = new FauxDurableModels(),
+                Models = new FauxDurableModels
+                {
+                    // The policy pages' classifier: every item is relevant at 0.7, which a policy's confirm threshold sends to review.
+                    Classify = (_, _) => Task.FromResult(Chord.JsonValue.Object([new("label", Chord.JsonValue.Object([new("type", "choice"),
+                        new("choice", "relevant"), new("probabilities", Chord.JsonValue.Object([new("relevant", 0.7), new("ignore", 0.3)])), new("confidence", 0.7)]))])),
+                },
                 DefaultModel = FauxDurableModels.EchoRef,
                 PromptsDirectory = prompts,
+                // The sources page's feed is served on loopback.
+                Retrieval = new RetrievalOptions { AllowedPrivateHosts = ["127.0.0.1"] },
             });
             await hub.StartDeviceAsync("http://127.0.0.1:0");
             new DeviceConfig { Port = hub.DeviceUrl.Port }.Save(hub.DeviceDirectory);

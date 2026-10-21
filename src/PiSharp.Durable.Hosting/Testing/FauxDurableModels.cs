@@ -20,7 +20,7 @@ public sealed record FauxChat(string ModelId, string? Reasoning, string Text);
 /// Model access without a provider. Each request answers the newest user message or tool result:
 /// <list type="bullet">
 /// <item><c>!command</c> calls <c>bash</c> with the command.</item>
-/// <item><c>tool: name {json}</c> calls any tool with the JSON object as its arguments (default <c>{}</c>).</item>
+/// <item><c>tool: name {json}</c> calls any tool with the JSON object as its arguments (default <c>{}</c>); so does a scripted answer of that form.</item>
 /// <item><c>slow: text</c> answers the text a word at a time, <see cref="SlowDelay"/> apart.</item>
 /// <item>A tool result is answered <c>Tool finished: &lt;tool&gt;: &lt;its first 200 characters&gt;</c>.</item>
 /// <item>Anything else is answered <c>Echo: &lt;text&gt;</c>.</item>
@@ -67,7 +67,8 @@ public sealed class FauxDurableModels : IDurableModels
     /// <summary>Usage reported with each classification (pi-ai Usage JSON); null reports none, so the cost is unknown.</summary>
     public JsonObjectValue? ClassifierUsage { get; init; }
 
-    /// <summary>Scripted chat answers: given the newest user text, an answer, or null for the default grammar.</summary>
+    /// <summary>Scripted chat answers: given the newest user text, an answer, or null for the default grammar. An answer of the form
+    /// <c>tool: name {json}</c> calls that tool.</summary>
     public Func<string, string?>? Respond { get; init; }
 
     /// <summary>Scripted chat answers that may wait or throw (a thrown error fails the generation): given the request, an answer, or null
@@ -125,8 +126,8 @@ public sealed class FauxDurableModels : IDurableModels
         var asked = LastUserText(messages);
         var awaited = RespondAsync is { } respondAsync && asked is not null
             ? await respondAsync(new FauxChat(model.Id, options?.Reasoning, asked), cancellationToken).ConfigureAwait(false) : null;
-        var reply = awaited is not null ? FauxReply.Answer(awaited)
-            : Respond is { } respond && asked is not null && respond(asked) is { } scripted ? FauxReply.Answer(scripted) : Reply(messages);
+        var reply = awaited is not null ? Scripted(awaited)
+            : Respond is { } respond && asked is not null && respond(asked) is { } scripted ? Scripted(scripted) : Reply(messages);
         yield return new StreamStarted(partial);
         if (reply.Call is { } call)
         {
@@ -186,24 +187,30 @@ public sealed class FauxDurableModels : IDurableModels
         }
         var input = TextOf(last).Trim();
         if (input.StartsWith('!')) return FauxReply.Calling("bash", JsonValue.Object([new("command", input[1..].Trim())]));
-        if (input.StartsWith("tool:", StringComparison.Ordinal))
-        {
-            var rest = input[5..].Trim();
-            var space = rest.IndexOfAny([' ', '\n', '\t']);
-            var toolName = space < 0 ? rest : rest[..space];
-            JsonObjectValue arguments;
-            try
-            {
-                arguments = space < 0 ? JsonObjectValue.Empty : JsonValue.Parse(rest[space..].Trim()) as JsonObjectValue ?? JsonObjectValue.Empty;
-            }
-            catch (Exception)
-            {
-                arguments = JsonObjectValue.Empty;
-            }
-            return FauxReply.Calling(toolName, arguments);
-        }
+        if (input.StartsWith("tool:", StringComparison.Ordinal)) return ToolCall(input);
         if (input.StartsWith("slow:", StringComparison.Ordinal)) return FauxReply.Answer(input[5..].Trim(), slow: true);
         return FauxReply.Answer("Echo: " + input);
+    }
+
+    /// <summary>A scripted answer: a tool call when it is <c>tool: name {json}</c>, else the text.</summary>
+    private static FauxReply Scripted(string answer) => answer.StartsWith("tool:", StringComparison.Ordinal) ? ToolCall(answer) : FauxReply.Answer(answer);
+
+    /// <summary>The call of <c>tool: name {json}</c>; arguments that do not parse as an object are <c>{}</c>.</summary>
+    private static FauxReply ToolCall(string input)
+    {
+        var rest = input[5..].Trim();
+        var space = rest.IndexOfAny([' ', '\n', '\t']);
+        var toolName = space < 0 ? rest : rest[..space];
+        JsonObjectValue arguments;
+        try
+        {
+            arguments = space < 0 ? JsonObjectValue.Empty : JsonValue.Parse(rest[space..].Trim()) as JsonObjectValue ?? JsonObjectValue.Empty;
+        }
+        catch (Exception)
+        {
+            arguments = JsonObjectValue.Empty;
+        }
+        return FauxReply.Calling(toolName, arguments);
     }
 
     private static DurableModel ToDurable(FauxModel model) => new()

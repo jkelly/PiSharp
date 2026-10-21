@@ -170,6 +170,7 @@ function read() {
   };
   const sourceIds = [...root.querySelectorAll('[data-source]:checked')].map(box => box.value);
   const requests = $('[data-requests]', root).value;
+  const pages = $('[data-pages]', root).value;
   return {
     question,
     angles: angles.length ? angles : undefined,
@@ -180,6 +181,7 @@ function read() {
     maxAttempts: Number($('[data-attempts]', root).value) || undefined,
     angleDeadlineSeconds: Number($('[data-deadline]', root).value) || undefined,
     requireAll: $('[data-require-all]', root).checked || undefined,
+    retrieval: pages === '' ? undefined : { maxFetches: Number(pages) },
     policyId: $('[data-policy]', root).value || undefined,
     budget: requests ? { requests: Number(requests) } : undefined,
   };

@@ -41,10 +41,12 @@
           <div class="col-md-3"><label class="form-label" for="research-attempts">Attempts per angle</label><input id="research-attempts" data-attempts class="form-control" type="number" min="1" max="3" value="2" /></div>
           <div class="col-md-3"><label class="form-label" for="research-deadline">Angle deadline (seconds)</label><input id="research-deadline" data-deadline class="form-control" type="number" min="30" max="3600" value="600" /></div>
           <div class="col-md-3"><label class="form-label" for="research-requests">Request budget</label><input id="research-requests" data-requests class="form-control" type="number" min="1" max="1000" placeholder="Device default" />
-            <div class="form-text">The most model calls this run may make.</div></div>
-          <div class="col-md-6"><label class="form-label" for="research-policy">Judge before publishing</label><select id="research-policy" data-policy class="form-select"></select>
+            <div class="form-text">The most model calls and page fetches this run may make.</div></div>
+          <div class="col-md-3"><label class="form-label" for="research-pages">Pages per angle</label><input id="research-pages" data-pages class="form-control" type="number" min="0" max="10" value="3" />
+            <div class="form-text">Fetched only from the URLs in the material; 0 fetches none.</div></div>
+          <div class="col-md-5"><label class="form-label" for="research-policy">Judge before publishing</label><select id="research-policy" data-policy class="form-select"></select>
             <div class="form-text">A policy's confirm and human routes wait for your review here.</div></div>
-          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="research-require-all" data-require-all /><label class="form-check-label" for="research-require-all">Fail the run unless every angle is answered</label></div></div>
+          <div class="col-md-4 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="research-require-all" data-require-all /><label class="form-check-label" for="research-require-all">Fail the run unless every angle is answered</label></div></div>
           <div class="col-12"><button class="btn btn-primary" type="submit">Start research</button> <span class="ms-2" role="status" data-started></span></div>
         </form>
       </section>

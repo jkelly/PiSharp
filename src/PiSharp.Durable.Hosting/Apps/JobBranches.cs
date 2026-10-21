@@ -21,8 +21,12 @@ public sealed record JobBranch(string Id, string Prompt)
     public string? ThinkingLevel { get; init; }
     /// <summary>Instructions for the child, rendered as its instructions section (at most 8000 characters).</summary>
     public string? Instructions { get; init; }
-    /// <summary>The tools the child may use, a subset of <see cref="JobBranches.ReadOnlyTools"/>.</summary>
+    /// <summary>The tools the child may use: a subset of <see cref="JobBranches.ReadOnlyTools"/>, and <c>fetch_page</c> when the branch has a
+    /// <see cref="Retrieval"/>.</summary>
     public IReadOnlyList<string> Tools { get; init; } = JobBranches.ReadOnlyTools;
+    /// <summary>What the child may fetch with <c>fetch_page</c>; null gives it nothing to fetch. Its fetches count against the run's
+    /// limits.</summary>
+    public JobRetrieval? Retrieval { get; init; }
 }
 
 /// <summary>How <see cref="JobContext.FanOutAsync"/> runs its branches.</summary>
@@ -67,8 +71,9 @@ public static class JobBranches
             if (branch.Title is { Length: > 200 } || branch.Instructions is { Length: > 8000 }) throw new HostInvalidException($"Branch {branch.Id} has too long a title or instructions.");
             if (branch.ThinkingLevel is { } level && !HostNames.ThinkingLevels.Contains(level, StringComparer.Ordinal))
                 throw new HostInvalidException($"Branch {branch.Id} has an unknown thinking level {level}.");
-            if (branch.Tools.Any(tool => !ReadOnlyTools.Contains(tool, StringComparer.Ordinal)))
-                throw new HostInvalidException($"Branch {branch.Id} may only use {string.Join(", ", ReadOnlyTools)}.");
+            if (branch.Tools.Any(tool => !ReadOnlyTools.Contains(tool, StringComparer.Ordinal) && !(tool == BranchRetrieval.ToolName && branch.Retrieval is not null)))
+                throw new HostInvalidException($"Branch {branch.Id} may only use {string.Join(", ", ReadOnlyTools)}, and {BranchRetrieval.ToolName} with a retrieval allowance.");
+            if (branch.Retrieval is { } retrieval) BranchRetrieval.Normalize(branch.Id, retrieval);
         }
     }
 
@@ -79,6 +84,10 @@ public static class JobBranches
     internal static IReadOnlyList<string> OpenRequests(JsonObjectValue run) =>
         [.. Jobs.Items(run, "branches").OfType<JsonObjectValue>().SelectMany(row => Jobs.Items(row, "attempts").OfType<JsonObjectValue>())
             .Where(attempt => Jobs.String(attempt, "status") == "running").Select(attempt => Jobs.String(attempt, "requestId")).OfType<string>()];
+
+    /// <summary>The child conversations of a run record's branches.</summary>
+    internal static IReadOnlyList<long> Children(JsonObjectValue run) =>
+        [.. Jobs.Items(run, "branches").OfType<JsonObjectValue>().Select(row => Jobs.Long(row, "conversationId")).OfType<long>()];
 
     /// <summary>Marks the branches still planned or running as <c>cancelled</c> when a run ends.</summary>
     internal static JsonObjectValue Close(JsonObjectValue run, double now) =>
@@ -108,6 +117,8 @@ public sealed partial class JobContext
         ArgumentNullException.ThrowIfNull(branches);
         options ??= new JobFanOutOptions();
         JobBranches.Check(branches, options);
+        if (branches.Any(Fetches) && runtime.Registry.GetExtension(BranchRetrieval.ExtensionName) is null)
+            throw new HostInvalidException($"This device's registry has no {BranchRetrieval.ExtensionName} extension, so no branch can fetch pages.");
         var agent = await runtime.AgentAsync(durable).ConfigureAwait(false);
         foreach (var branch in branches)
             if ((branch.Model ?? agent.Model) is { } model) Host.RequireModel(model);
@@ -148,6 +159,13 @@ public sealed partial class JobContext
                 var tools = runtime.Registry.Tools().Select(registered => registered.Tool).Where(tool => branch.Tools.Contains(tool.Name, StringComparer.Ordinal)).ToList();
                 var change = new AgentChange { Model = model, ThinkingLevel = branch.ThinkingLevel ?? "off", Tools = ToolSelection.Only(tools) };
                 if (branch.Instructions is { } instructions) change = change with { Instructions = instructions };
+                if (Fetches(branch))
+                {
+                    // Only this child selects fetch_page's extension, and its allowance lives on the child, written in the same commit.
+                    change = change with { Extensions = ExtensionSelection.Edit(add: [runtime.Registry.GetExtension(BranchRetrieval.ExtensionName)!]) };
+                    var allowance = await tx.DocAsync(BranchRetrieval.AllowanceDoc, created.Id).ConfigureAwait(false);
+                    allowance.Set("allowance", BranchRetrieval.Allowance(BranchRetrieval.Normalize(branch.Id, branch.Retrieval!), RunKey, TaskId, Budget));
+                }
                 await Agents.ConfigureAsync(tx, created.Id, change).ConfigureAwait(false);
                 children[branch.Id] = created.Id.Value;
                 added.Add(JsonValue.Object(
@@ -164,6 +182,8 @@ public sealed partial class JobContext
         }, durable).ConfigureAwait(false);
         return children;
     }
+
+    private static bool Fetches(JobBranch branch) => branch.Retrieval is not null && branch.Tools.Contains(BranchRetrieval.ToolName, StringComparer.Ordinal);
 
     private async Task<JobBranchResult> RunBranchAsync(JobBranch branch, long child, JobFanOutOptions options, Func<JobBranchResult, Task<JsonObjectValue?>>? completed)
     {
@@ -258,6 +278,7 @@ public sealed partial class JobContext
             catch (OperationCanceledException) { /* The answer came first. */ }
         }
         var settled = await waiting.ConfigureAwait(false);
+        if (Fetches(branch)) await BranchRetrieval.CloseAsync(Host, runtime, new ConversationId(child), durable).ConfigureAwait(false);
         string? answer = null;
         if (!expired && settled.Status == SubmissionStatus.Done && settled.Answer is { } entry)
         {

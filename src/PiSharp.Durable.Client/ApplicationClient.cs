@@ -178,8 +178,9 @@ public sealed partial class DurableDeviceClient
         SendAsync(HttpMethod.Post, $"{Session(session)}/source-checks", request, idempotencyKey, cancellationToken: cancellationToken);
 
     /// <summary>Starts supervised research from <c>{agentId?, question, angles?, sourceIds?, evidenceIds?, research?, synthesis?, concurrency?,
-    /// requireAll?, maxAttempts?, angleDeadlineSeconds?, policyId?, version?, budget?}</c>: <c>{sessionId, agentId, taskId, executionUrl}</c>. The
-    /// execution's run lists each angle's progress under <c>branches</c>.</summary>
+    /// requireAll?, maxAttempts?, angleDeadlineSeconds?, retrieval?, policyId?, version?, budget?}</c>: <c>{sessionId, agentId, taskId, executionUrl}</c>.
+    /// <c>retrieval</c> is <c>{maxFetches?, origins?}</c>: how many pages each angle may fetch (0 to 10, default 3) from the URLs its material
+    /// lists, and origins any page of which it may fetch as well. The execution's run lists each angle's progress under <c>branches</c>.</summary>
     public Task<JsonNode?> StartResearchAsync(string session, JsonObject request, string? idempotencyKey = null, CancellationToken cancellationToken = default) =>
         SendAsync(HttpMethod.Post, $"{Session(session)}/research", request, idempotencyKey, cancellationToken: cancellationToken);
 

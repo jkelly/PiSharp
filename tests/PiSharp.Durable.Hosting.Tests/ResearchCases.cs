@@ -20,6 +20,8 @@ internal static partial class Program
         public ConcurrentDictionary<string, TaskCompletionSource> Holds { get; } = new(StringComparer.Ordinal);
         /// <summary>How many more times a key's call throws.</summary>
         public ConcurrentDictionary<string, int> Failures { get; } = new(StringComparer.Ordinal);
+        /// <summary>What an angle answers instead of "Answer for &lt;key&gt;.", by key.</summary>
+        public ConcurrentDictionary<string, string> Replies { get; } = new(StringComparer.Ordinal);
         /// <summary>The planner's answer to its n-th call (1-based).</summary>
         public Func<int, string> Plan { get; set; } = _ => """Here: [{"title":"Cost","prompt":"What does it cost?"},{"title":"Risk"}]""";
 
@@ -60,7 +62,7 @@ internal static partial class Program
                     "plan" => Plan(Interlocked.Increment(ref plans)),
                     "synthesis" => "Combined: " + chat.Text.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + " characters of answers. " +
                         (chat.Text.Contains("Not answered:", StringComparison.Ordinal) ? "Some angles were not answered." : "Every angle answered."),
-                    _ => $"Answer for {key}.",
+                    _ => Replies.TryGetValue(key, out var scripted) ? scripted : $"Answer for {key}.",
                 };
             }
             finally

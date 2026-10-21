@@ -175,14 +175,15 @@ failures and next retry, edits them, starts checks and shows retrieval health.
 
 The application job `pisharp-research` takes `{question (≤ 4000), angles?[1..5] {id?, title, prompt?}, sourceIds? (≤ 20), evidenceIds?
 (≤ 50), research {model?, thinking?}, synthesis {model?, thinking?}, concurrency 1–5 (default 2), requireAll (default false), maxAttempts 1–3
-(default 2), angleDeadlineSeconds 30–3600 (default 600), policyId?, version?, budget?}` (128 KiB at most). Admission refuses duplicate angle
-IDs, unknown sources, a model the device does not have, a thinking level other than `off` on a model that does not reason, an unknown
-policy, and a version without a policy, each as a field error. It freezes each stage's model and thinking level (the device default when
+(default 2), angleDeadlineSeconds 30–3600 (default 600), retrieval {maxFetches 0–10 (default 3), origins? (≤ 20)}, policyId?, version?,
+budget?}` (128 KiB at most). Admission refuses duplicate angle IDs, unknown sources, a model the device does not have, a thinking level other
+than `off` on a model that does not reason, an unknown policy, a version without a policy, and an origin that is not `http(s)://host[:port]`
+with no path, each as a field error. It freezes each stage's model and thinking level (the device default when
 none is given), the sources' revisions and the policy version.
 
 `JobContext.FanOutAsync(branches, {concurrency ≤ 5, maxAttempts ≤ 3, deadline ≤ 1 h}, completed?)` is the public fan-out: up to 10
 branches, each a child conversation owned by the job task with its own model, thinking level, instructions and tools from the read-only
-allowlist (`read`, `search_history`). The children and their rows in the run record's `branches` are written in one commit before any
+allowlist (`read`, `search_history`), plus `fetch_page` for a branch given a retrieval allowance (below). The children and their rows in the run record's `branches` are written in one commit before any
 branch starts, so a restart finds the same children. A row is `{key, id, phase, iteration, title, conversationId, model, thinking, status:
 planned | running | completed | failed | cancelled, attempts[], answerEntryId, answerChars, error, published, startedAt, endedAt}`; an
 attempt is `{attempt, requestId: job:<task>:<phase>:<iteration>:branch:<id>:<n>, status: running | completed | failed | expired | limited |
@@ -195,17 +196,34 @@ answer. `completed` runs once per completed branch, including after a restart, a
 Aborting the run cascades to the children; their rows and running attempts become `cancelled` and the open reservations `uncertain`, since
 an interrupted call may have been billed. Shutdown leaves them running for the restart.
 
+A branch's `retrieval {urls, origins, maxFetches 1–10 (default 3), maxChars 500–20 000 (default 8000)}` is its allowance for `fetch_page
+{url}`: the exact URLs it may fetch, compared in canonical form (at most 500), origins any page of which it may fetch (at most 20, so the
+model chooses the path there: name only origins the run may send requests to), how many pages, and how much of a page's text one fetch
+returns. The `branch-retrieval` extension that provides the tool is installed on every session but selected only for such a branch: the
+child's extensions and the allowance document (`{allowance: {runKey, runTaskId, budget, urls, origins, maxFetches, maxChars}, fetches}` on
+the child, which a fork does not copy) are written in the same commit as the child, so any other conversation is refused. A fetch is
+admitted and counted in one commit, keyed by its tool call; a URL outside the allowance, a fetch past the count and an origin cooling down
+are refused with a message the model can act on. Admitted fetches are direct HTTP under the device's address policy, with no credential, no
+fallback provider and the source checks' size and redirect limits; each has an operation ID (`retrieve:{run}:c{child}:t{call}`), a receipt
+(`@fetch_page`) and a reservation of one request against the run's limits, and failures feed the origin's health. The page is kept as
+session evidence (parser `page`), and the tool returns its evidence ID, URL and title, the fetches left, and its text bounded to `maxChars`,
+marked as untrusted data. A rerun of the same call after a restart reuses the recorded page; one interrupted before its receipt finished
+calls again under the same operation. When an attempt ends or the run is aborted, a fetch still in flight becomes `uncertain` and its
+reservation settles at the one request.
+
 Phases: `plan` (the given angles, or a planner child's JSON array with one repair before the run fails; the material, numbered `[n]` source
 items and `[eN]` evidence of at most 12 000 characters quoted as untrusted data, is kept in the checkpoint so a restart asks the same
-questions), `research` (one branch per angle; each answer is saved at once as a `finding` keyed `angle:<id>` with provenance `{angleId}`, so
-there is one per angle whatever the order or restarts; check `research:answers` needs one answer, or all with `requireAll`), `synthesize` (a
+questions; the material's item and evidence URLs are kept with it), `research` (one branch per angle; unless `retrieval.maxFetches` is 0
+or there is nothing to fetch, an angle may fetch `maxFetches` pages, 6000 characters each, from the material's URLs and the run's
+`origins`, and the run record's `research.fetchesPerAngle` says how many; each answer is saved at once as a `finding` keyed `angle:<id>` with
+provenance `{angleId}` that cites the run's evidence and the pages its angle fetched, so there is one per angle whatever the order or restarts; check `research:answers` needs one answer, or all with `requireAll`), `synthesize` (a
 separate phase, so a retry does not research again: the accepted answers in plan order, hashed with `CanonicalJson.Hash` and told which
 angles were not answered; check `research:synthesis`), `gate` (with a policy: the synthesis as `{title, summary}` projected onto the policy's
 input schema, judged at the frozen version), `review` (an approval when the route is `confirm` or `human`), `publish` (the synthesis as a
 `finding` with provenance `{synthesis hash, judgmentId, policyId, policyVersion, decision}`; result `{artifactId, angles, missing,
 synthesisHash}`). Required checks: `research:answers`, `research:synthesis`, `artifact:finding`. Route: `POST /v1/sessions/{s}/research`
-(202, `Idempotency-Key`). The hub's `/research` page starts runs, follows each angle's status and attempts, shows the findings kept so far and
-the run's spend, and offers cancel and the review decision.
+(202, `Idempotency-Key`). The hub's `/research` page starts runs (with how many pages each angle may fetch), follows each angle's status and
+attempts, shows the findings kept so far and the run's spend, and offers cancel and the review decision.
 
 ## Feedback and preferences
 
@@ -262,7 +280,10 @@ unchanged tick.
 explicit unsupported reasons. `application-api.manifest-matches-routes-client-and-device-features` in the Server tests compares it with the mapped
 endpoints and the client's public methods, and requires every binding to be present or to say why not;
 `remote.manifest-cli-bindings-match-the-command-table` in the DurableCli tests compares the `cli` bindings with the command table both ways,
-and checks that removing a command or a manifest binding is caught. Clients check `features` before showing a control and report an
+and checks that removing a command or a manifest binding is caught; `hub.manifest-web-bindings-match-the-hub-pages` in the Web tests
+requires each `web` page to be served with the automation view it names and every automation page the hub links to be bound (`/schedules`
+belongs to decision 0009 and is exempt), and checks that a dropped page, an unknown page and a feature with neither pages nor a reason are
+caught. Clients check `features` before showing a control and report an
 unsupported feature distinctly from authorization and offline errors. Retention is CLI and client only: the manifest says the hub does
 not offer it.
 

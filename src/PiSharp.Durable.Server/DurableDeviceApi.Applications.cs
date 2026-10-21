@@ -192,7 +192,7 @@ public static partial class DurableDeviceApi
             var session = host.ResolveSession(s);
             var agent = await session.ResolveAgentAsync(body["agentId"] is JsonNode given ? Transcript.Describe(given) : "main", http.RequestAborted).ConfigureAwait(false);
             var request = new JsonObject();
-            foreach (var key in new[] { "question", "angles", "sourceIds", "evidenceIds", "research", "synthesis", "concurrency", "requireAll", "maxAttempts",
+            foreach (var key in new[] { "question", "angles", "sourceIds", "evidenceIds", "research", "synthesis", "concurrency", "requireAll", "maxAttempts", "retrieval",
                 "angleDeadlineSeconds", "policyId", "version" })
                 if (body[key] is JsonNode value) request[key] = value.DeepClone();
             var start = await session.StartExecutionAsync(agent.Id, "pisharp-research", (Chord.JsonObjectValue)DeviceService.ToChord(request), Budget(body),

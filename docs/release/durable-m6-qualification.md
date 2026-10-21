@@ -6,8 +6,8 @@ committed, packed, published, deployed or installed.
 
 ## What was tested
 
-- Branch `feature/durable-network` at `cd65d88`, plus the uncommitted working tree that holds the work of decisions 0009 and 0010. No
-  commit records this state yet.
+- Branch `feature/durable-network` at `cd65d88`, plus the uncommitted working tree that holds the work of decisions 0009 and 0010. That
+  state was later committed as `a85e264` (not pushed). The follow-up below was run on `a85e264` plus its own uncommitted changes.
 - Windows 11 Pro 10.0.26300 (x64), .NET runtime 10.0.11, Release builds. `global.json` pins SDK 10.0.401, which is not installed on this
   machine, so every project was built with the installed 10.0.400 SDK's `MSBuild.dll` directly and each test executable was run with
   `dotnet <assembly>`.
@@ -49,12 +49,41 @@ neither `PiSharp.slnx` nor CI. Its assembly is named `PiSharp.CodingAgent.Tests.
 
 | Gate | Evidence | Result |
 | --- | --- | --- |
-| Removing a manifest binding is caught | `remote.manifest-cli-bindings-match-the-command-table` (DurableCli) removes a command and a manifest binding and expects both to be reported; `application-api.manifest-matches-routes-client-and-device-features` (Server) checks routes and client methods | Pass |
+| Removing a manifest binding is caught | `remote.manifest-cli-bindings-match-the-command-table` (DurableCli) removes a command and a manifest binding and expects both to be reported; `application-api.manifest-matches-routes-client-and-device-features` (Server) checks routes and client methods; `hub.manifest-web-bindings-match-the-hub-pages` (Web, follow-up) checks the `web` pages against the hub and expects a dropped page, an unknown page and a feature with neither pages nor a reason to be reported | Pass |
 | `attach` survives a restart without duplicate input | `attach.survives-a-device-restart-without-duplicates-and-retries-with-the-same-request-id` | Pass |
 | `doctor` is safe on damaged or old stores | `maintenance.doctor-reads-without-writing-and-survives-damaged-old-and-newer-stores` (byte-for-byte unchanged directory) and `ops.doctor-fails-a-weak-token-warns-a-wide-listener-and-never-prints-the-token` | Pass |
 | A restore reproduces a watcher run and its evidence | `release-watcher.a-restored-backup-replays-the-run-and-its-evidence`, `maintenance.backup-restores-into-a-clean-root-and-detects-damage` and the backup steps of `ops.serve-stops-on-sigterm-and-doctor-backup-and-restore-work-around-it` | Pass |
 | Service start and stop work | `ops.serve-stops-on-sigterm-and-doctor-backup-and-restore-work-around-it` starts `serve` with a service manager's arguments, delivers SIGTERM through the shutdown-signal path and expects exit 0 and a released lock; `ops.service-definitions-run-serve-hold-no-token-and-install-nothing` checks the three definitions | Pass, in process only. **Not run:** installing, starting and stopping a definition under systemd, launchd or Task Scheduler |
 | The release evidence lists actual results | This record | Done |
+
+## Follow-up: branch retrieval, browser coverage and the web manifest check
+
+Run on 2026-10-21, same machine and toolchain, faux models and loopback fixtures only. Logs are under `artifacts/retrieval/final/`
+(git-ignored). It adds `fetch_page` for job branches and research angles (decision 0010, Research), six browser cases for the application
+pages and the web binding check.
+
+| Suite | Cases | Passed | Failed | Skipped | Time | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `PiSharp.Durable.Hosting.Tests` | 114 | 114 | 0 | 0 | 10 s | Three new `branch-retrieval.*` cases, which also passed three runs in a row on their own |
+| `PiSharp.Durable.Server.Tests` | 26 | 26 | 0 | 0 | 25 s | The research route case now sends `retrieval` and checks a bad origin's field error |
+| `PiSharp.Durable.Web.Tests` | 9 | 9 | 0 | 0 | 8 s | New `hub.manifest-web-bindings-match-the-hub-pages` |
+| `PiSharp.Durable.Web.BrowserTests` (headless Chromium) | 33 | 33 | 0 | 0 | 87 s | Six new `browser.applications.*` cases |
+| `PiSharp.DurableCli.Tests` | 111 | 111 | 0 | 0 | 95 s | |
+| `PiSharp.CliParity.Tests` | 195 | 191 | 0 | 4 | 36 s | Four `unix.*` cases run on Linux and macOS only |
+| `PiSharp.DurableMessages.Tests` | 8 | 5 | 3 | 0 | 1 s | The same three pre-existing `native-initializer.*` failures as above |
+
+The engine suite (`PiSharp.Durable.Tests`) was not run again: none of the projects it builds changed.
+
+The browser cases cover, at 1440 × 900: publishing a policy version (and an invalid spec's field errors), evaluating it and approving the
+pending judgment with a reason (`policies-publish-evaluate-and-decide`); saving request and money limits that survive a reload and
+reconciling an uncertain reservation as not charged (`budgets-limits-and-reconciliation`); adding a feed source served on loopback,
+checking it, reading its items and fetch receipts, editing, disabling, enabling and deleting it (`sources-add-check-edit-and-delete`);
+starting research from the form with a page allowance, following it to completion and giving an artifact card more-like-this, labels,
+undo and an empty-label error (`research-run-and-artifact-feedback`); and preference weights, examples, settings, forgetting an example
+and reset (`preferences-weights-examples-settings-and-reset`). `phone-layout` visits the policy, budget, source, research, preference and
+execution pages at 390 × 844 with data on each, dismisses an artifact from its card, and finds no error and no sideways scroll. The first
+runs failed three times on the tests' own expectations (labels are shown sorted, the feedback API needs a `requestId`, and the labels box
+keeps its text after undo), each fixed in the test; the product was not changed.
 
 ## Not run
 

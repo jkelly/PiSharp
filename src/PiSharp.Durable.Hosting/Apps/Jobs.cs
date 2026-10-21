@@ -398,11 +398,13 @@ public static class Jobs
             Abort = async (task, runtime, context) =>
             {
                 IReadOnlyList<string> open = [];
+                IReadOnlyList<long> children = [];
                 await runtime.CommitAsync(async (tx, running) =>
                 {
                     await UpdateRunAsync(tx, running.ConversationId, running.Id, run =>
                     {
                         open = JobBranches.OpenRequests(run);
+                        children = JobBranches.Children(run);
                         return Finish(run, "aborted", "aborted", runtime.Now());
                     }).ConfigureAwait(false);
                     return (TaskState?)NextTaskState.Aborted();
@@ -410,6 +412,7 @@ public static class Jobs
                 // A branch attempt the abort interrupted may have been billed: its reservation keeps counting until someone resolves it.
                 foreach (var operation in open)
                     if (host.Budgets.Get(operation) is { Status: "reserved" }) host.Budgets.MarkUncertain(operation, "The run was aborted during the attempt.");
+                foreach (var child in children) await BranchRetrieval.CloseAsync(host, runtime, new ConversationId(child), context).ConfigureAwait(false);
             },
         });
     }

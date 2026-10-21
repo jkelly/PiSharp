@@ -310,7 +310,12 @@ internal static partial class Program
                 ["question"] = "Should we upgrade?",
                 ["angles"] = new JsonArray(new JsonObject { ["title"] = "Cost" }, new JsonObject { ["id"] = "risk", ["title"] = "Risk", ["prompt"] = "What breaks?" }),
                 ["budget"] = new JsonObject { ["requests"] = 10 },
+                ["retrieval"] = new JsonObject { ["maxFetches"] = 2, ["origins"] = new JsonArray("https://example.com") },
             };
+            var origin = await SendRawAsync(server, HttpMethod.Post, $"/v1/sessions/{session}/research",
+                new JsonObject { ["question"] = "Why?", ["retrieval"] = new JsonObject { ["origins"] = new JsonArray("https://example.com/path") } });
+            Equal(400, origin.Status, "an origin with a path");
+            Check(origin.Body!["error"]!["fields"]!.AsArray().Any(field => field!["path"]!.GetValue<string>() == "/retrieval/origins/0"), "the retrieval field reaches the job");
             var invalid = await SendRawAsync(server, HttpMethod.Post, $"/v1/sessions/{session}/research",
                 new JsonObject { ["question"] = "Why?", ["research"] = new JsonObject { ["model"] = "faux/echo", ["thinking"] = "high" } });
             Equal(400, invalid.Status, "thinking on a model that does not think");
@@ -326,6 +331,7 @@ internal static partial class Program
             var branches = execution["run"]!["branches"]!.AsArray();
             Equal("a1,risk,synthesis", string.Join(",", branches.Select(row => row!["id"]!.GetValue<string>())), "an angle each and the synthesis");
             Check(branches.All(row => row!["status"]!.GetValue<string>() == "completed"), "all answered");
+            Equal(2, execution["run"]!["research"]!["fetchesPerAngle"]!.GetValue<int>(), "each angle may fetch two pages of the named origin");
             var artifacts = (await server.Client.ExecutionArtifactsAsync(session, taskId))!["items"]!.AsArray();
             Equal(3, artifacts.Count, "a finding per angle and the synthesis");
             Check(artifacts.All(artifact => artifact!["kind"]!.GetValue<string>() == "finding"), "findings");

@@ -710,7 +710,7 @@ public sealed partial class HostedSession
                 Models = host.Options.Models,
                 Registry = created,
                 Settings = new SessionHarnessSettings(host.Options.Settings, () => Compaction,
-                    () => [.. created.Snapshot().Installed().Where(extension => !DeviceApps.Optional.Contains(extension.Name))]),
+                    () => [.. created.Snapshot().Installed().Where(extension => DeviceApps.IsDefault(extension.Name))]),
                 Env = envs.EnvAsync,
                 TimeProvider = host.Options.TimeProvider,
                 OnReport = report => host.Options.OnReport?.Invoke(Id, report),
