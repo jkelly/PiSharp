@@ -1,6 +1,6 @@
 # PiSharp Durable: remaining feature plan
 
-Status: proposed implementation plan, 2026-10-20. This request creates documentation only. Future work packages are pending; no implementation or release is implied.
+Status: implemented on `feature/durable-network`, not released. The contracts are in [decision 0010](../decisions/0010-durable-application-contracts.md) and the results of the qualification run in [release/durable-m6-qualification.md](../release/durable-m6-qualification.md). The rest of this document is the plan as proposed on 2026-10-20; where the decision differs, the decision is what was built.
 
 ## Baseline and scope
 

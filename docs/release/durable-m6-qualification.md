@@ -7,7 +7,8 @@ committed, packed, published, deployed or installed.
 ## What was tested
 
 - Branch `feature/durable-network` at `cd65d88`, plus the uncommitted working tree that holds the work of decisions 0009 and 0010. That
-  state was later committed as `a85e264` (not pushed). The follow-up below was run on `a85e264` plus its own uncommitted changes.
+  state was later committed as `a85e264` (not pushed). The first follow-up below was run on `a85e264` plus its own changes, since
+  committed as `feac749`; the second on `feac749` plus its own uncommitted changes.
 - Windows 11 Pro 10.0.26300 (x64), .NET runtime 10.0.11, Release builds. `global.json` pins SDK 10.0.401, which is not installed on this
   machine, so every project was built with the installed 10.0.400 SDK's `MSBuild.dll` directly and each test executable was run with
   `dotnet <assembly>`.
@@ -84,6 +85,29 @@ and reset (`preferences-weights-examples-settings-and-reset`). `phone-layout` vi
 execution pages at 390 × 844 with data on each, dismisses an artifact from its card, and finds no error and no sideways scroll. The first
 runs failed three times on the tests' own expectations (labels are shown sorted, the feedback API needs a `requestId`, and the labels box
 keeps its text after undo), each fixed in the test; the product was not changed.
+
+## Second follow-up: fetch display, device logs, stuck fetches and older devices
+
+Run on 2026-10-21, same machine, toolchain and limits. Logs are under `artifacts/gaps/final/` (git-ignored). It adds the pages each
+research angle fetched to the execution detail and the `/research` page (with a field for the sites angles may browse), `serve --log`
+with size rotation for the launchd and Windows definitions, the doctor's `fetches` check, and a browser case for a device that reports no
+features.
+
+| Suite | Cases | Passed | Failed | Skipped | Time | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `PiSharp.Durable.Hosting.Tests` | 115 | 115 | 0 | 0 | 10 s | New `maintenance.doctor-reports-a-fetch-left-calling`; the research retrieval case checks the execution's pages |
+| `PiSharp.Durable.Server.Tests` | 26 | 26 | 0 | 0 | 27 s | |
+| `PiSharp.Durable.Web.Tests` | 9 | 9 | 0 | 0 | 8 s | |
+| `PiSharp.Durable.Web.BrowserTests` (headless Chromium) | 34 | 34 | 0 | 0 | 89 s | New `browser.applications.an-older-device-shows-what-it-does-not-offer`; the research case fetches a page through a named site |
+| `PiSharp.DurableCli.Tests` | 112 | 112 | 0 | 0 | 93 s | New `ops.serve-logs-to-a-rotating-file-that-backups-leave-out`; the service case checks `--log` |
+| `PiSharp.CliParity.Tests` | 195 | 191 | 0 | 4 | 37 s | Four `unix.*` cases run on Linux and macOS only |
+| `PiSharp.DurableMessages.Tests` | 8 | 5 | 3 | 0 | 1 s | The same three pre-existing `native-initializer.*` failures |
+
+The older-device case intercepts the hub's `/v1/device` call in the browser and removes `features`, as a device from before decision 0010
+reports none: each application page shows that the device does not offer it, the execution detail has no artifact cards, and the hub
+calls no application route. It does not run an older build of the device. The first runs failed three times on the tests themselves (a
+log read that did not share the file with its writer, a selector scoped to the wrong element, and a route pattern that matched the hub's
+own `/research` page), each fixed in the test.
 
 ## Not run
 

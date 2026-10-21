@@ -93,6 +93,10 @@ internal static partial class Program
             slow.SetResult();
         });
 
+        // An execution's research rows by angle title.
+        static Dictionary<string, JsonObjectValue> Angled(JsonObjectValue execution) => Jobs.Items((JsonObjectValue)execution["run"], "branches")
+            .OfType<JsonObjectValue>().Where(row => Jobs.String(row, "phase") == "research").ToDictionary(row => Jobs.String(row, "title")!);
+
         yield return Case("branch-retrieval.research-angles-fetch-material-pages-and-their-findings-cite-them", async () =>
         {
             await using var server = new FixtureServer(request => Page("Notes " + request.Path, "Release notes at " + request.Path + "."));
@@ -121,11 +125,19 @@ internal static partial class Program
             Equal(saved, string.Join(",", Jobs.Items(findings["Risk"], "evidenceIds").OfType<JsonStringValue>().Select(id => id.Value)), "the refused angle cites only the run's");
             Check(Jobs.String((JsonObjectValue)findings["Risk"]["props"], "details")!.Contains("is not a URL in your material", StringComparison.Ordinal),
                 "the refused angle was told why");
+            var rows = Angled(await session.ExecutionAsync(taskId));
+            var costPages = Jobs.Items((JsonObjectValue)rows["Cost"]["retrieval"], "pages").OfType<JsonObjectValue>().ToList();
+            Equal(server.Url("/notes"), string.Join(",", costPages.Select(page => Jobs.String(page, "url"))), "the execution shows the page the Cost angle fetched");
+            Equal("fetched", Jobs.String(costPages[0], "status"), "as fetched");
+            Equal(cost[1], Jobs.String(costPages[0], "evidenceId"), "with its evidence");
+            Equal(3, Jobs.Long((JsonObjectValue)rows["Cost"]["retrieval"], "maxFetches"), "and the angle's allowance");
+            Equal(0, Jobs.Items((JsonObjectValue)rows["Risk"]["retrieval"], "pages").Count(), "a refused fetch is not a page");
 
             var off = await StartResearchAsync(session, Angles("Cost").SetItem("evidenceIds", JsonValue.Array([saved]))
                 .SetItem("retrieval", Json("""{"maxFetches":0}""")));
             var quiet = await WaitForRunAsync(session, off, "completed");
             Equal(0, Jobs.Long((JsonObjectValue)quiet["research"], "fetchesPerAngle"), "fetching can be turned off");
+            Check(!Angled(await session.ExecutionAsync(off))["Cost"].ContainsKey("retrieval"), "and an angle without an allowance shows no pages");
             Equal(1, server.Count("/notes"), "and then nothing is fetched");
         });
 

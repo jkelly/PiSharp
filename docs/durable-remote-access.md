@@ -102,8 +102,14 @@ overwrites a file and holds no token. The device keeps the listener from `device
 | Manager | Definition | Starts | Stops |
 | --- | --- | --- | --- |
 | systemd (user unit) | `pisharp-durable.service` | at login; `loginctl enable-linger` keeps it after logout | `systemctl --user stop` sends SIGTERM; the device shuts down as on Ctrl+C |
-| launchd (LaunchAgent) | `dev.pisharp.durable.plist` | at login; restarted after a failure | `launchctl bootout` sends SIGTERM; logs go to `<data>/service.log` |
+| launchd (LaunchAgent) | `dev.pisharp.durable.plist` | at login; restarted after a failure | `launchctl bootout` sends SIGTERM |
 | Windows | `pisharp-durable-task.ps1` registers a scheduled task | at logon; restarted every minute after a failure | `Stop-ScheduledTask` ends the process |
+
+systemd keeps the device's output in the journal (`journalctl --user -u pisharp-durable`). The launchd and Windows definitions run
+`serve --log <data>/logs/device.log`: the device writes its own output and its server's warnings there, each line with a UTC timestamp,
+and rotates the file at 10 MiB, keeping three older files (`device.log.1` to `.3`). launchd's own `<data>/logs/launchd.log` only gets what
+the runtime prints outside that log, such as a crash. `serve --log <file>` works the same way when you start the device by hand. Backups
+leave `logs/` out.
 
 Windows uses a per-user scheduled task rather than a Windows service: the console binary does not speak the service control protocol, and
 the device needs your profile (Pi settings, model credentials, start directories), which a service account would not have. Ending the
@@ -113,9 +119,9 @@ does after a crash.
 ## Checking it
 
 - `pisharp durable doctor` reads the data directory without writing to it: the lock, free space, catalog and session stores, schedules,
-  trigger credentials, budget reservations, blobs, retention, failing sources, the listener and the token. `--probe` also calls the
-  running device's `/v1/device`; `--verify-blobs` hashes every blob; `--repair` (device stopped) migrates the catalog and collects
-  unreferenced blobs. `--json` gives the same checks as data; the exit code is 1 when a check fails.
+  trigger credentials, budget reservations, blobs, retention, failing sources, fetches left in progress, the listener and the token.
+  `--probe` also calls the running device's `/v1/device`; `--verify-blobs` hashes every blob; `--repair` (device stopped) migrates the
+  catalog and collects unreferenced blobs. `--json` gives the same checks as data; the exit code is 1 when a check fails.
 - `pisharp durable backup create --out <dir>` copies a stopped device's data with SQLite's backup API and a manifest of sizes and hashes;
   `backup verify <dir>` checks it; `backup restore <dir> --data-dir <empty dir>` verifies, then restores. A backup taken without
   `--include-secrets` restores without a token; `serve` creates a new one.

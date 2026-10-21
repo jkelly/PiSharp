@@ -134,6 +134,24 @@ internal static partial class Program
             try { Directory.Delete(root, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }),
 
+        Case("maintenance.doctor-reports-a-fetch-left-calling", async () =>
+        {
+            var clock = new JumpClock();
+            var device = await TestDevice.OpenAsync("doctor-fetches", new DeviceSetup { Time = clock });
+            device.Host.Sources.BeginReceipt("fetch:run-1:releases:p1:a1", "releases", "run-1", "direct", new Uri("https://example.com/feed.xml"));
+            device.Host.Sources.BeginReceipt("retrieve:run-2:c3:t4", "@fetch_page", "run-2", "direct", new Uri("https://example.com/notes"));
+            device.Host.Sources.FinishReceipt("retrieve:run-2:c3:t4", "uncertain", null, null, "uncertain: the attempt ended during the fetch");
+            await device.Host.DisposeAsync();
+            var fresh = DeviceDoctor.Check(device.Data, new DoctorOptions { TimeProvider = clock }).Single(check => check.Id == "fetches");
+            Equal("info", fresh.Status, "a call that may still be running is not stuck, and an uncertain fetch is noted: " + fresh.Message);
+            Check(fresh.Message.Contains("1 ended uncertain", StringComparison.Ordinal), fresh.Message);
+            clock.Advance(TimeSpan.FromMinutes(11));
+            var stuck = DeviceDoctor.Check(device.Data, new DoctorOptions { TimeProvider = clock }).Single(check => check.Id == "fetches");
+            Equal("warn", stuck.Status, "a call in progress for 11 minutes is stuck");
+            Check(stuck.Message.StartsWith("1 fetches", StringComparison.Ordinal) && stuck.Message.Contains("fetch:run-1:releases:p1:a1", StringComparison.Ordinal),
+                "it names the fetch: " + stuck.Message);
+            Check(stuck.Fix!.Contains("Start the device", StringComparison.Ordinal), "and says what to do");
+        }),
         Case("maintenance.doctor-reads-without-writing-and-survives-damaged-old-and-newer-stores", async () =>
         {
             var device = await TestDevice.OpenAsync("doctor");

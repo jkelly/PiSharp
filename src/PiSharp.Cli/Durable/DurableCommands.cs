@@ -134,7 +134,7 @@ internal static partial class DurableRemote
 
         // ─── Research ───────────────────────────────────────────────────────
         new("research", "start", $"{InSession} --file <request.json> [--request <id>]",
-            "Starts supervised research: {question, evidenceIds?, angles?, budget?}.", "research",
+            "Starts supervised research: {question, angles?, sourceIds?, evidenceIds?, retrieval? {maxFetches?, origins?}, policyId?, budget?}.", "research",
             call => call.Client.StartResearchAsync(call.Session, call.File("--file"), call.RequestId, call.Token)),
 
         // ─── Feedback and preferences ───────────────────────────────────────

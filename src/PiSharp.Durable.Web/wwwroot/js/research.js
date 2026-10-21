@@ -115,6 +115,15 @@ async function poll(task) {
   catch (failure) { showError(failure); }
 }
 
+/** A URL short enough for a table cell: host and path, the path cut in the middle. */
+function shorten(url) {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname + parsed.search;
+    return parsed.host + (path.length > 40 ? path.slice(0, 18) + '…' + path.slice(-18) : path === '/' ? '' : path);
+  } catch { return url; }
+}
+
 function render(execution, artifacts, usage) {
   const record = execution.run || {};
   const input = record.input || {};
@@ -130,11 +139,14 @@ function render(execution, artifacts, usage) {
     const attempts = item.attempts || [];
     const last = attempts[attempts.length - 1];
     const finding = item.artifactId && findings.get(item.artifactId);
+    const fetching = item.retrieval;
+    const pages = fetching ? `${(fetching.pages || []).length} of ${fetching.maxFetches}${(fetching.pages || []).length ? `<ul class="list-unstyled small mb-0">${fetching.pages.map(page =>
+      `<li><a href="${esc(page.url)}" rel="noopener noreferrer" target="_blank">${esc(shorten(page.url))}</a>${page.status === 'fetched' ? '' : ` <span class="text-body-secondary">· ${esc(page.status !== 'admitted' ? page.status : item.status === 'running' ? 'fetching' : 'not finished')}</span>`}${page.error ? `<br/><small class="text-danger">${esc(page.error)}</small>` : ''}</li>`).join('')}</ul>` : ''}` : '—';
     return `<tr><td>${esc(item.title)}<br/><small class="text-body-secondary"><code>${esc(item.id)}</code></small></td>
       <td>${esc(item.model)}${item.thinking && item.thinking !== 'off' ? ` <small class="text-body-secondary">· ${esc(item.thinking)}</small>` : ''}</td>
       <td>${chip(item.status)}</td><td>${attempts.length}${last?.status === 'running' && last.deadlineAt ? `<br/><small class="text-body-secondary">until ${esc(date(last.deadlineAt))}</small>` : ''}</td>
       <td>${item.error ? `<small class="text-danger">${esc(item.error)}</small>` : item.answerChars != null ? `${item.answerChars} characters` : '—'}</td>
-      <td>${finding ? esc(finding.title) : '—'}</td></tr>`;
+      <td>${pages}</td><td>${finding ? esc(finding.title) : '—'}</td></tr>`;
   };
   panel.innerHTML = `<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
       <div><h2 class="h5 mb-1" id="run-title">Research #${execution.id}: ${esc(input.question || '')}</h2>
@@ -145,8 +157,8 @@ function render(execution, artifacts, usage) {
         <a class="btn btn-sm btn-outline-secondary" href="/executions?device=${enc(device.value)}&session=${enc(session.value)}&task=${execution.id}">Execution details</a>
       </div></div>
     ${record.error ? `<div class="alert alert-danger mt-3 mb-0" role="alert">${esc(record.error)}</div>` : ''}
-    <div class="table-responsive mt-3"><table class="table table-sm align-middle"><thead><tr><th>Angle</th><th>Model</th><th>Status</th><th>Attempts</th><th>Answer</th><th>Finding</th></tr></thead>
-      <tbody>${angles.map(row).join('') || '<tr><td colspan="6" class="text-body-secondary">The angles are being planned.</td></tr>'}</tbody></table></div>
+    <div class="table-responsive mt-3"><table class="table table-sm align-middle"><thead><tr><th>Angle</th><th>Model</th><th>Status</th><th>Attempts</th><th>Answer</th><th>Pages</th><th>Finding</th></tr></thead>
+      <tbody>${angles.map(row).join('') || '<tr><td colspan="7" class="text-body-secondary">The angles are being planned.</td></tr>'}</tbody></table></div>
     ${helpers.length ? `<p class="small text-body-secondary mb-2">${helpers.map(item => `${esc(item.title)}: ${esc(item.status)}${item.error ? ` (${esc(item.error)})` : ''}`).join(' · ')}</p>` : ''}
     <p class="small mb-3">Spent: ${totals.requests ?? 0} request(s), ${totals.tokens ?? 0} tokens${totals['money:USD'] != null ? `, $${(totals['money:USD'] / 1e6).toFixed(4)}` : ''}${usage.costKnown === false ? ' <span class="text-body-secondary">(some cost is not known)</span>' : ''}</p>
     <h3 class="h6">Findings so far</h3>
@@ -171,6 +183,7 @@ function read() {
   const sourceIds = [...root.querySelectorAll('[data-source]:checked')].map(box => box.value);
   const requests = $('[data-requests]', root).value;
   const pages = $('[data-pages]', root).value;
+  const origins = $('[data-origins]', root).value.split(/[\s,]+/).filter(Boolean);
   return {
     question,
     angles: angles.length ? angles : undefined,
@@ -181,7 +194,8 @@ function read() {
     maxAttempts: Number($('[data-attempts]', root).value) || undefined,
     angleDeadlineSeconds: Number($('[data-deadline]', root).value) || undefined,
     requireAll: $('[data-require-all]', root).checked || undefined,
-    retrieval: pages === '' ? undefined : { maxFetches: Number(pages) },
+    retrieval: pages === '' && !origins.length ? undefined
+      : { maxFetches: pages === '' ? undefined : Number(pages), origins: origins.length ? origins : undefined },
     policyId: $('[data-policy]', root).value || undefined,
     budget: requests ? { requests: Number(requests) } : undefined,
   };

@@ -1,7 +1,8 @@
 // PiSharp-only (decision 0010, M6): the operator commands of src/PiSharp.Cli/Durable/DurableOps.cs through `pisharp durable`. `serve` runs
 // in process as a service manager would start it and stops on SIGTERM (delivered through ShutdownSignals, as the process registration
 // does); doctor, backup and restore run against it while it serves and after it stops. Service definitions are generated, parsed and
-// checked for the serve command and the absence of the token; nothing is installed.
+// checked for the serve command and the absence of the token; nothing is installed. `serve --log` writes a timestamped, size-rotated log that
+// backups leave out.
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using System.Xml;
@@ -79,6 +80,58 @@ internal static partial class Program
             foreach (var text in new[] { output.Text, errors.Text, probe.Out, stopped.Out, created.Out, verified.Out, doctorRestored.Out, damaged.Out })
                 Check(!text.Contains(token, StringComparison.Ordinal), "no output shows the token");
         }),
+        Case("ops.serve-logs-to-a-rotating-file-that-backups-leave-out", async () =>
+        {
+            var root = Temp("ops-log");
+            var data = Path.Combine(root, "data");
+            var logFile = Path.Combine(data, "logs", "device.log");
+            var port = ClosedPort();
+            var output = new Capture();
+            var errors = new Capture();
+            using var signals = new ShutdownSignals(register: false);
+            var host = new PiHost
+            {
+                Cwd = root, Home = root, GetEnvironment = _ => null, Stdout = output, Stderr = errors,
+                LiveRuntime = new LiveSessionRuntime(_ => null, () => null), Signals = () => signals,
+            };
+            // Read as a log viewer does, sharing the file with the device that writes it.
+            string Logged()
+            {
+                if (!File.Exists(logFile)) return "";
+                using var reader = new StreamReader(new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+                return reader.ReadToEnd();
+            }
+            var serving = DurableMain.RunAsync(["serve", "--provider", "faux", "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "--data-dir", data, "--start-dirs", Path.Combine(root, "work"), "--log", logFile], host, CancellationToken.None);
+            await UntilAsync(() => Task.FromResult(Logged().Contains("PiSharp durable device", StringComparison.Ordinal) || serving.IsCompleted), "the device logged its start");
+            Check(!serving.IsCompleted, "serving: " + errors.Text + Logged());
+            Check(output.Text.Contains("Logging to " + logFile, StringComparison.Ordinal) && !output.Text.Contains("PiSharp durable device", StringComparison.Ordinal),
+                "the console only says where the log is: " + output.Text);
+            Check(System.Text.RegularExpressions.Regex.IsMatch(Logged(), @"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z PiSharp durable device", System.Text.RegularExpressions.RegexOptions.Multiline),
+                "each line starts with a UTC timestamp: " + Logged());
+            signals.Signal(PosixSignal.SIGTERM);
+            Equal(0, await serving.WaitAsync(TimeSpan.FromSeconds(30)), "SIGTERM stops the device: " + Logged());
+            Check(!Logged().Contains(File.ReadAllText(Path.Combine(data, "token")).Trim(), StringComparison.Ordinal), "the log never holds the token");
+            var backup = Path.Combine(root, "backup");
+            Equal(DurableExit.Ok, (await CliAsync(root, NoEnvironment, "backup", "create", "--out", backup, "--data-dir", data)).Exit, "backup");
+            Check(!Directory.Exists(Path.Combine(backup, "logs")), "a backup leaves the logs out");
+            Equal(true, JsonNode.Parse((await CliAsync(root, NoEnvironment, "backup", "verify", backup, "--json")).Out)!["ok"]!.GetValue<bool>(), "and verifies");
+
+            // A small limit shows the rotation: whole lines per file, the newest in device.log and three older files kept.
+            var folder = Path.Combine(root, "rotating");
+            using (var small = new DeviceLog(Path.Combine(folder, "device.log"), maxBytes: 200, keep: 3))
+                for (var line = 0; line < 40; line++) small.WriteLine($"line {line:D2} " + new string('x', 20));
+            var files = Directory.GetFiles(folder).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
+            Equal("device.log,device.log.1,device.log.2,device.log.3", string.Join(",", files), "three rotated files are kept");
+            Check(File.ReadAllText(Path.Combine(folder, "device.log")).Contains("line 39", StringComparison.Ordinal), "the newest line is in device.log");
+            foreach (var file in files)
+            {
+                var text = File.ReadAllText(Path.Combine(folder, file!));
+                Check(new FileInfo(Path.Combine(folder, file!)).Length <= 200 && text.EndsWith('\n') && !text.StartsWith('\r') && !text.StartsWith('\n'),
+                    file + " holds whole lines within the limit: " + text);
+            }
+            Check(!files.Any(file => File.ReadAllText(Path.Combine(folder, file!)).Contains("line 00", StringComparison.Ordinal)), "the oldest lines were dropped");
+        }),
         Case("ops.doctor-fails-a-weak-token-warns-a-wide-listener-and-never-prints-the-token", async () =>
         {
             var root = Temp("ops-doctor");
@@ -124,13 +177,17 @@ internal static partial class Program
                 Check(content.Contains("serve", StringComparison.Ordinal) && content.Contains("data dir", StringComparison.Ordinal), kind + " runs serve on the data directory");
                 Check(!content.Contains("QWERTY", StringComparison.Ordinal), kind + " holds no token");
                 Equal(DurableExit.Failed, (await CliAsync(root, NoEnvironment, "service", kind, "--out", output, "--data-dir", data)).Exit, kind + " never overwrites");
+                if (kind != "systemd")
+                    Check(content.Contains(Path.Combine(data, "logs", "device.log"), StringComparison.Ordinal) && written.Out.Contains("Logs: ", StringComparison.Ordinal),
+                        kind + " has the device write its own rotated log, and says where");
             }
             using (var reader = XmlReader.Create(Path.Combine(output, "dev.pisharp.durable.plist"), new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore }))
             {
                 var plist = XDocument.Load(reader);
                 var arguments = plist.Descendants("array").Single().Elements("string").Select(element => element.Value).ToList();
                 Equal(exec, arguments[0], "launchd runs the executable");
-                Equal("durable,serve,--data-dir," + data, string.Join(",", arguments.Skip(1)), "with serve's arguments, one per string");
+                Equal("durable,serve,--data-dir," + data + ",--log," + Path.Combine(data, "logs", "device.log"), string.Join(",", arguments.Skip(1)),
+                    "with serve's arguments, one per string");
             }
             var script = File.ReadAllText(Path.Combine(output, "pisharp-durable-task.ps1"));
             Check(script.Contains("Register-ScheduledTask", StringComparison.Ordinal) && script.Contains("-AtLogOn", StringComparison.Ordinal), "a per-user logon task");

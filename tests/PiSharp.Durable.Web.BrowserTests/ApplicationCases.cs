@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -55,17 +57,19 @@ internal static partial class Program
         await page.ScreenshotAsync(new() { Path = Path.Join(artifacts, name + ".png"), FullPage = true });
     }
 
-    /// <summary>An RSS feed on 127.0.0.1, for the sources page.</summary>
-    private static async Task<(WebApplication App, string Url)> FeedAsync()
+    /// <summary>A site on 127.0.0.1: an RSS feed for the sources page at <c>/feed.xml</c> and a page for research angles at <c>/notes</c>.</summary>
+    private static async Task<(WebApplication App, string Origin)> SiteAsync()
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         var app = builder.Build();
         app.MapGet("/feed.xml", () => Results.Text(ReleasesFeed, "application/rss+xml"));
+        app.MapGet("/notes", () => Results.Text("<html><head><title>Upgrade notes</title></head><body><p>Version 2 costs nothing extra.</p></body></html>",
+            "text/html"));
         await app.StartAsync();
         var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
-        return (app, address.TrimEnd('/') + "/feed.xml");
+        return (app, address.TrimEnd('/'));
     }
 
     /// <summary>Runs research with two given angles through the hub's proxy and waits for it: two findings and the synthesis.</summary>
@@ -154,8 +158,9 @@ internal static partial class Program
         }),
         Browse("browser.applications.sources-add-check-edit-and-delete", async (hub, window) =>
         {
-            var (feed, url) = await FeedAsync();
-            await using var _ = feed;
+            var (site, origin) = await SiteAsync();
+            await using var _ = site;
+            var url = origin + "/feed.xml";
             await hub.SessionAsync("monitor");
             var page = window.Page;
             await page.GotoAsync("/sources");
@@ -200,6 +205,8 @@ internal static partial class Program
         }),
         Browse("browser.applications.research-run-and-artifact-feedback", async (hub, window) =>
         {
+            var (site, origin) = await SiteAsync();
+            await using var _ = site;
             var session = await hub.SessionAsync("research");
             var page = window.Page;
             await page.GotoAsync("/research");
@@ -208,18 +215,27 @@ internal static partial class Program
             await Expect(page.Locator("[data-pages]")).ToHaveValueAsync("3");
             await page.Locator("[data-question]").FillAsync("Should we upgrade the framework?");
             await page.Locator("#angle-title-1").FillAsync("Cost");
+            await page.Locator("#angle-prompt-1").FillAsync($"What does it cost? fetch: {origin}/notes");
             await page.Locator("#angle-title-2").FillAsync("Risk");
             await page.Locator("[data-pages]").FillAsync("1");
+            await page.Locator("[data-origins]").FillAsync(origin);
             await page.GetByRole(AriaRole.Button, new() { Name = "Start research" }).ClickAsync();
             await Expect(page.Locator("[data-started]")).ToContainTextAsync("Started run #");
             var panel = page.Locator("[data-run]");
             await Expect(panel.Locator(".ps-chip").First).ToHaveTextAsync("completed", new() { Timeout = 30_000 });
             await Expect(panel.Locator("tbody tr")).ToHaveCountAsync(2);
-            await Expect(panel.Locator("li")).ToHaveCountAsync(3);
+            await Expect(panel.Locator(".d-grid > li")).ToHaveCountAsync(3);
+            var cost = panel.Locator("tbody tr", new() { HasText = "Cost" });
+            await Expect(cost).ToContainTextAsync("1 of 1");
+            var fetched = cost.GetByRole(AriaRole.Link, new() { Name = new Uri(origin).Authority + "/notes" });
+            await Expect(fetched).ToHaveAttributeAsync("href", origin + "/notes");
+            await Expect(fetched).ToHaveAttributeAsync("rel", "noopener noreferrer");
+            await Expect(panel.Locator("tbody tr", new() { HasText = "Risk" })).ToContainTextAsync("0 of 1");
             await Expect(page.Locator("[data-recent] tr")).ToHaveCountAsync(1);
             var task = long.Parse((await page.Locator("[data-started]").TextContentAsync())!.Split('#')[1].TrimEnd('.'), System.Globalization.CultureInfo.InvariantCulture);
             var execution = (await hub.Get($"/api/devices/local/v1/sessions/{session}/executions/{task}")).Body!;
             Equal(1, execution["run"]!["input"]!["retrieval"]!["maxFetches"]!.GetValue<int>(), "the page's fetch allowance reaches the run");
+            Equal(origin, execution["run"]!["input"]!["retrieval"]!["origins"]![0]!.GetValue<string>(), "with the site it may browse");
             await ShotAsync(page, "research-desktop");
 
             await panel.GetByRole(AriaRole.Link, new() { Name = "Execution details" }).ClickAsync();
@@ -228,6 +244,7 @@ internal static partial class Program
             await Expect(cards).ToHaveCountAsync(3);
             var card = cards.First;
             var state = card.Locator("[data-feedback-state]");
+            await Expect(page.Locator(".artifact-evidence summary").First).ToHaveTextAsync("Evidence (1)");
             await card.GetByRole(AriaRole.Button, new() { Name = "More like this" }).ClickAsync();
             await Expect(state).ToHaveTextAsync("Saved: More like this · profile default r1");
             await Expect(card.GetByRole(AriaRole.Button, new() { Name = "More like this" })).ToHaveAttributeAsync("aria-pressed", "true");
@@ -273,6 +290,40 @@ internal static partial class Program
             await IdleAsync(page);
             await Expect(page.Locator("[data-weights]")).ToContainTextAsync("No weights yet.");
             await Expect(page.Locator("[data-error]")).ToBeHiddenAsync();
+        }),
+        Browse("browser.applications.an-older-device-shows-what-it-does-not-offer", async (hub, window) =>
+        {
+            var session = await hub.SessionAsync("older");
+            var task = await ResearchRunAsync(hub, session);
+            var page = window.Page;
+            // A device from before decision 0010 reports no features. The hub must say what the device does not offer and call none of it.
+            await page.RouteAsync(url => new Uri(url).AbsolutePath.EndsWith("/v1/device", StringComparison.Ordinal), async route =>
+            {
+                var response = await route.FetchAsync();
+                var info = JsonNode.Parse(await response.TextAsync())!.AsObject();
+                info.Remove("features");
+                await route.FulfillAsync(new() { Response = response, Body = info.ToJsonString() });
+            });
+            var called = new ConcurrentQueue<string>();
+            page.Request += (_, request) => called.Enqueue(new Uri(request.Url).AbsolutePath);
+            foreach (var path in new[] { "/policies", "/budgets", "/sources", "/research", "/preferences" })
+            {
+                await page.GotoAsync(path);
+                await Expect(page.Locator("[data-automation]")).Not.ToHaveAttributeAsync("aria-busy", "true");
+                await Expect(page.Locator("[data-unsupported]")).ToBeVisibleAsync();
+                await Expect(page.Locator("[data-unsupported]")).ToContainTextAsync("This device does not offer");
+                await Expect(page.Locator("[data-supported]")).ToBeHiddenAsync();
+                await Expect(page.Locator("[data-error]")).ToBeHiddenAsync();
+                if (path == "/research") await ShotAsync(page, "older-device-research-desktop");
+            }
+            await page.GotoAsync($"/executions?device=local&session={session}&task={task}");
+            await Expect(page.Locator("[data-detail] h2")).ToContainTextAsync($"#{task}");
+            await Expect(page.Locator("[data-detail]")).ToContainTextAsync("Completion audit");
+            await Expect(page.Locator("[data-artifacts]")).ToHaveCountAsync(0);
+            await Expect(page.Locator("[data-feedback]")).ToHaveCountAsync(0);
+            await Expect(page.Locator("[data-error]")).ToBeHiddenAsync();
+            var offered = called.Where(path => Regex.IsMatch(path, "/v1/(policies|judgments|budgets|sources|retrieval|preferences)|/v1/sessions/[^/]+/research|/artifacts")).Distinct().ToList();
+            Equal("", string.Join(", ", offered), "the hub called nothing the device does not offer");
         }),
         Browse("browser.applications.phone-layout", async (hub, window) =>
         {

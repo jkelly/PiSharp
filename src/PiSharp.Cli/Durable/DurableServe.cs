@@ -2,11 +2,13 @@
 // behind PiSharp.Durable.Server's v1 API, which durable-pi's hub and TUI, and PiSharp Durable Web, can drive. `pisharp durable token` prints
 // or rotates the device token. The device's directory holds device.json, the token file (readable by the user only), the catalog and the
 // sessions; it defaults to ~/.pi/agent/experimental/durable-device. Models are the CLI's own (auth.json, models.json, the environment), or
-// the faux model with --provider faux. The server binds loopback unless --host says otherwise: a device token is a shell.
+// the faux model with --provider faux. The server binds loopback unless --host says otherwise: a device token is a shell. With --log the
+// device's output and its server's log go to a size-rotated file instead (DeviceLog), for service managers that keep no journal.
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using PiSharp.AI;
 using PiSharp.Cli.Pi;
 using PiSharp.Contracts;
@@ -24,7 +26,7 @@ internal static class DurableServe
 {
     internal const string ServeUsage =
         "Usage: pisharp durable serve [--port <n>] [--host <address>] [--name <name>] [--start-dirs <dir>[,<dir>...]] [--data-dir <dir>] " +
-        "[--provider faux] [--model <provider>/<id>] [--save]";
+        "[--provider faux] [--model <provider>/<id>] [--log <file>] [--save]";
 
     internal const string TokenUsage = "Usage: pisharp durable token [--rotate] [--data-dir <dir>]";
 
@@ -38,6 +40,7 @@ internal static class DurableServe
         public string? DataDir { get; init; }
         public bool Faux { get; init; }
         public string? Model { get; init; }
+        public string? Log { get; init; }
         public bool Save { get; init; }
     }
 
@@ -61,6 +64,7 @@ internal static class DurableServe
                 "--data-dir" => options with { DataDir = Value() },
                 "--provider" => Value() == "faux" ? options with { Faux = true } : throw new ArgumentException("--provider only takes faux; real models come from your Pi configuration."),
                 "--model" => options with { Model = Value() },
+                "--log" => options with { Log = Value() },
                 "--save" => options with { Save = true },
                 _ => throw new ArgumentException($"Unknown argument: {args[i]}\n{ServeUsage}"),
             };
@@ -75,6 +79,20 @@ internal static class DurableServe
         try { options = ParseServe(args); }
         catch (ArgumentException error) { return await FailAsync(host, error.Message).ConfigureAwait(false); }
         var directory = Path.GetFullPath(options.DataDir is { } data ? PiPaths.NormalizePath(data, host.Home) : DeviceConfig.DefaultDirectory(host.Home), host.Cwd);
+        var logPath = options.Log is { } file ? Path.GetFullPath(PiPaths.NormalizePath(file, host.Home), host.Cwd) : null;
+        DeviceLog? log;
+        try { log = logPath is null ? null : new DeviceLog(logPath); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return await FailAsync(host, $"Cannot open the log {logPath}: {error.Message}").ConfigureAwait(false);
+        }
+        using var owned = log;
+        if (log is not null)
+        {
+            await host.Stdout.WriteLineAsync($"Logging to {logPath} (rotated at {DeviceLog.DefaultMaxBytes / (1024 * 1024)} MiB, {DeviceLog.DefaultKeep} kept).").ConfigureAwait(false);
+            await host.Stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+            host = host with { Stdout = log, Stderr = log };
+        }
         DeviceConfig config;
         string token;
         try
@@ -149,6 +167,11 @@ internal static class DurableServe
             {
                 Token = token,
                 OnError = failure => host.Stderr.WriteLine("[device] stream update failed: " + failure.Message),
+                ConfigureLogging = log is null ? null : logging =>
+                {
+                    logging.ClearProviders();
+                    logging.AddProvider(new DeviceLogProvider(log));
+                },
             }, $"http://{(config.Host.Contains(':', StringComparison.Ordinal) ? $"[{config.Host}]" : config.Host)}:{config.Port}");
             await app.StartAsync(cancellationToken).ConfigureAwait(false);
             var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()?.Addresses.FirstOrDefault() ?? $"http://{config.Host}:{config.Port}";

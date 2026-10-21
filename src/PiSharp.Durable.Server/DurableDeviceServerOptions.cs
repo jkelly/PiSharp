@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace PiSharp.Durable.Server;
 
 /// <summary>How a device serves its API.</summary>
@@ -26,4 +28,7 @@ public sealed record DurableDeviceServerOptions
 
     /// <summary>Hears failures of stream updates, which a stream survives.</summary>
     public Action<Exception>? OnError { get; init; }
+
+    /// <summary>Changes the server's logging after its defaults: for example, to write it to a file instead of the console.</summary>
+    public Action<ILoggingBuilder>? ConfigureLogging { get; init; }
 }

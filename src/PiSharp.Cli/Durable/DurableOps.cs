@@ -233,6 +233,9 @@ internal static class DurableOps
             : (process, []);
     }
 
+    private static string LogNote(string data) =>
+        $"Logs: {DeviceLog.DefaultPath(data)} (rotated at {DeviceLog.DefaultMaxBytes / (1024 * 1024)} MiB, {DeviceLog.DefaultKeep} kept)";
+
     /// <summary>A service definition: its file name, content and the install commands (printed, never run).</summary>
     internal static (string File, string Content, string Install) ServiceTemplate(string kind, string executable, IReadOnlyList<string> arguments, string data, string home)
     {
@@ -270,8 +273,10 @@ internal static class DurableOps
             }
             case "launchd":
             {
-                var items = string.Join("\n", new[] { executable }.Concat(arguments).Select(argument => $"    <string>{SecurityElement.Escape(argument)}</string>"));
-                var logs = SecurityElement.Escape(Path.Join(data, "service.log"));
+                var items = string.Join("\n", new[] { executable }.Concat(arguments).Concat(["--log", DeviceLog.DefaultPath(data)])
+                    .Select(argument => $"    <string>{SecurityElement.Escape(argument)}</string>"));
+                // The device rotates its own log; launchd's file only gets what the runtime prints outside it, such as a crash.
+                var logs = SecurityElement.Escape(Path.Join(data, "logs", "launchd.log"));
                 var content = $"""
                     <?xml version="1.0" encoding="UTF-8"?>
                     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -300,15 +305,15 @@ internal static class DurableOps
                     </dict>
                     </plist>
                     """;
-                return ("dev.pisharp.durable.plist", content + "\n", """
+                return ("dev.pisharp.durable.plist", content + "\n", $"""
                     cp dev.pisharp.durable.plist ~/Library/LaunchAgents/
                     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.pisharp.durable.plist
-                    Stop: launchctl bootout gui/$(id -u)/dev.pisharp.durable
+                    Stop: launchctl bootout gui/$(id -u)/dev.pisharp.durable    {LogNote(data)}
                     """);
             }
             case "windows":
             {
-                var argumentLine = string.Join(' ', arguments.Select(Windows));
+                var argumentLine = string.Join(' ', arguments.Concat(["--log", DeviceLog.DefaultPath(data)]).Select(Windows));
                 var content = $"""
                     # {Notice}
                     # Registers a scheduled task that starts the device when you log on and restarts it if it fails. It runs as you, with your
@@ -318,10 +323,11 @@ internal static class DurableOps
                     $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
                     Register-ScheduledTask -TaskName 'PiSharp durable device' -Action $action -Trigger $trigger -Settings $settings -Description 'PiSharp durable device ({data.Replace("'", "''", StringComparison.Ordinal)})'
                     """;
-                return ("pisharp-durable-task.ps1", content + "\n", """
+                return ("pisharp-durable-task.ps1", content + "\n", $"""
                     powershell -ExecutionPolicy Bypass -File .\pisharp-durable-task.ps1
                     Start-ScheduledTask -TaskName 'PiSharp durable device'
                     Stop: Stop-ScheduledTask -TaskName 'PiSharp durable device'    Remove: Unregister-ScheduledTask -TaskName 'PiSharp durable device'
+                    {LogNote(data)}
                     """);
             }
             default:

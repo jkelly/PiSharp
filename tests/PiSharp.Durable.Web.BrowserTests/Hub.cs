@@ -54,12 +54,17 @@ internal static partial class Program
                 Models = new FauxDurableModels
                 {
                     // The policy pages' classifier: every item is relevant at 0.7, which a policy's confirm threshold sends to review.
+                    // A research angle whose prompt says "fetch: <url>" reads that page with fetch_page; after the tool result the faux model
+                    // reports it, so it fetches once.
+                    Respond = asked => asked.StartsWith("Research question:", StringComparison.Ordinal) &&
+                        System.Text.RegularExpressions.Regex.Match(asked, @"fetch: (\S+)") is { Success: true } fetch
+                            ? $$"""tool: fetch_page {"url":"{{fetch.Groups[1].Value}}"}""" : null,
                     Classify = (_, _) => Task.FromResult(Chord.JsonValue.Object([new("label", Chord.JsonValue.Object([new("type", "choice"),
                         new("choice", "relevant"), new("probabilities", Chord.JsonValue.Object([new("relevant", 0.7), new("ignore", 0.3)])), new("confidence", 0.7)]))])),
                 },
                 DefaultModel = FauxDurableModels.EchoRef,
                 PromptsDirectory = prompts,
-                // The sources page's feed is served on loopback.
+                // The sources page's feed and the research page's notes are served on loopback.
                 Retrieval = new RetrievalOptions { AllowedPrivateHosts = ["127.0.0.1"] },
             });
             await hub.StartDeviceAsync("http://127.0.0.1:0");

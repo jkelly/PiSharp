@@ -141,6 +141,8 @@ public static class DeviceDoctor
         return actions;
     }
 
+    /// <summary>How long a fetch may show a call in progress before the doctor calls it stuck, in milliseconds.</summary>
+    private const long StuckFetch = 10L * 60_000;
     private const string RestoreFix = "Stop the device and restore the newest backup into a new data directory (pisharp durable restore).";
 
     private static DoctorCheck Running(string data)
@@ -233,8 +235,19 @@ public static class DeviceDoctor
         var sources = Count(catalog, "SELECT COUNT(*) FROM sources WHERE deleted_at IS NULL;");
         yield return failingSources.Count > 0
             ? new DoctorCheck("sources", "warn", $"{failingSources.Count} of {sources} sources are failing: {string.Join(", ", failingSources.Take(5))}.",
-                "pisharp durable sources health <id> shows the last error.")
+                "pisharp durable sources show <id> shows the last error.")
             : new DoctorCheck("sources", "ok", $"{sources} sources; none failing.");
+        // A fetch writes its receipt as `calling` before the call and settles it after; a live one never takes 10 minutes (30 s, 3 attempts).
+        var calling = Rows(catalog, "SELECT operation_id FROM fetch_receipts WHERE status = 'calling' AND updated_at < $at ORDER BY updated_at, operation_id;",
+            reader => reader.GetString(0), ("$at", now - StuckFetch));
+        var uncertainFetches = Count(catalog, "SELECT COUNT(*) FROM fetch_receipts WHERE status = 'uncertain' AND updated_at >= $at;", ("$at", now - 7L * 86_400_000));
+        yield return calling.Count > 0
+            ? new DoctorCheck("fetches", "warn", $"{calling.Count} fetches still show a call in progress after 10 minutes: {string.Join(", ", calling.Take(3))}.",
+                "Start the device so their runs resume: a source check calls again under the same operation, and a job branch closes its fetches " +
+                "when its attempt ends. One left after that belongs to a run that has ended; pisharp durable budgets show lists its reservation.")
+            : uncertainFetches > 0
+                ? new DoctorCheck("fetches", "info", $"No fetch is stuck; {uncertainFetches} ended uncertain in the last 7 days (the device stopped or an attempt ended during the call).")
+                : new DoctorCheck("fetches", "ok", "No fetch is stuck.");
     }
 
     private static DoctorCheck Blobs(SqliteConnection catalog, string data, DoctorOptions options)
@@ -279,10 +292,11 @@ public static class DeviceDoctor
     private static long Count(SqliteConnection connection, string sql, params (string Name, object? Value)[] parameters) =>
         Convert.ToInt64(Scalar(connection, sql, parameters), CultureInfo.InvariantCulture);
 
-    private static List<T> Rows<T>(SqliteConnection connection, string sql, Func<SqliteDataReader, T> map)
+    private static List<T> Rows<T>(SqliteConnection connection, string sql, Func<SqliteDataReader, T> map, params (string Name, object? Value)[] parameters)
     {
         using var command = connection.CreateCommand();
         command.CommandText = sql;
+        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
         using var reader = command.ExecuteReader();
         var rows = new List<T>();
         while (reader.Read()) rows.Add(map(reader));

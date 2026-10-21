@@ -20,6 +20,7 @@ public static class DurableDeviceServer
         builder.WebHost.UseUrls(url);
         builder.Logging.SetMinimumLevel(logLevel);
         builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", logLevel);
+        options.ConfigureLogging?.Invoke(builder.Logging);
         builder.WebHost.ConfigureKestrel(kestrel =>
         {
             kestrel.AddServerHeader = false;

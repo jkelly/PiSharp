@@ -34,7 +34,8 @@ public sealed partial class HostedSession
         return JsonValue.Object([new("items", JsonValue.Array(result)), new("next", next is { } more ? more : JsonValue.Null)]);
     }
 
-    /// <summary>An execution with all descendant tasks, owned subagents and recorded model/tool entries, plus aggregate recorded usage.</summary>
+    /// <summary>An execution with all descendant tasks, owned subagents and recorded model/tool entries, plus aggregate recorded usage. A job
+    /// branch given a retrieval allowance carries its pages on its row (<c>retrieval</c>).</summary>
     public async Task<JsonObjectValue> ExecutionAsync(long taskId, CancellationToken cancellationToken = default)
     {
         TaskRecord? root = null;
@@ -91,6 +92,7 @@ public sealed partial class HostedSession
                 .SetItem("usage", JsonValue.Object([new("totalTokens", tokens), new("cost", cost)]));
         }, context).ConfigureAwait(false);
         var run = await RunRecordAsync(root!, context).ConfigureAwait(false);
+        if (run is not null) run = await BranchRetrieval.WithFetchesAsync(run, GetHarness(), context).ConfigureAwait(false);
         return ExecutionSummary(root!, run).SetItem("tasks", detail["tasks"]).SetItem("entries", detail["entries"]).SetItem("usage", detail["usage"])
             .SetItem("ledger", host.Budgets.Usage(RunKey(taskId)));
     }

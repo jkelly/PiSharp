@@ -90,6 +90,30 @@ public static class BranchRetrieval
                 .Select(fetch => fetch.Value is JsonObjectValue row ? Jobs.String(row, "evidenceId") : null).OfType<string>().Distinct(StringComparer.Ordinal)]
             : [];
 
+    /// <summary>A run record with each fetching branch's pages on its row: <c>retrieval: {maxFetches, pages: [{url, status, evidenceId?,
+    /// finalUrl?, error?}]}</c>, read from the branch's child in the order the fetches were admitted.</summary>
+    internal static async Task<JsonObjectValue> WithFetchesAsync(JsonObjectValue run, IDocumentReader reader, DurableContext context)
+    {
+        if (run.GetValueOrDefault("branches") is not JsonArrayValue branches) return run;
+        var rows = new List<JsonValue>(branches.Count);
+        var changed = false;
+        foreach (var item in branches)
+        {
+            if (item is JsonObjectValue row && Jobs.Long(row, "conversationId") is { } child &&
+                await reader.SnapshotAsync(AllowanceDoc, new ConversationId(child), context).ConfigureAwait(false) is { } doc &&
+                doc.GetValueOrDefault("allowance") is JsonObjectValue allowance)
+            {
+                var fetches = doc.GetValueOrDefault("fetches") as JsonObjectValue ?? JsonObjectValue.Empty;
+                var pages = fetches.OrderBy(fetch => long.Parse(fetch.Key, CultureInfo.InvariantCulture)).Select(fetch => fetch.Value).OfType<JsonObjectValue>();
+                rows.Add(row.SetItem("retrieval", JsonValue.Object(
+                    [new("maxFetches", Jobs.Long(allowance, "maxFetches") ?? 0), new("pages", JsonValue.Array(pages.Select(page => (JsonValue)page)))])));
+                changed = true;
+            }
+            else rows.Add(item);
+        }
+        return changed ? run.SetItem("branches", JsonValue.Array(rows)) : run;
+    }
+
     /// <summary>
     /// Closes the fetches of a branch's child that an ended attempt or run interrupted: their tool calls will not run again, so a receipt
     /// still <c>calling</c> becomes <c>uncertain</c> and its reservation settles at the one request that may have been sent. A fetch that

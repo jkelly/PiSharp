@@ -1,9 +1,10 @@
 // PiSharp-only (decision 0010, M6): backup, verification and restore of a device's data directory. A backup is a quiesced copy: it takes
 // the device lock (so the device must be stopped), copies every SQLite database with SQLite's backup API (which includes the WAL) and turns
 // each copy into a rollback-journal database so it can be checked read-only, copies blobs, prompts, the archive and device.json as they
-// are, and writes a manifest of every file's size and SHA-256 last. Secrets (the device token) stay out unless asked for; trigger
-// credentials are stored as hashes and travel with the catalog. Verification rechecks every listed file and every database's integrity;
-// restore verifies first and only writes into an empty directory, so a restore never mixes with a live device.
+// are, and writes a manifest of every file's size and SHA-256 last. Logs (logs/) are not device state and stay out, and so do secrets (the
+// device token) unless asked for; trigger credentials are stored as hashes and travel with the catalog. Verification rechecks every listed
+// file and every database's integrity; restore verifies first and only writes into an empty directory, so a restore never mixes with a
+// live device.
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -228,7 +229,7 @@ public static class DeviceBackup
         relative is "catalog.lock" || relative.EndsWith("-wal", StringComparison.Ordinal) || relative.EndsWith("-shm", StringComparison.Ordinal) ||
         relative.EndsWith("-journal", StringComparison.Ordinal) || relative.StartsWith("blobs/tmp/", StringComparison.Ordinal) ||
         relative.StartsWith("catalog.v", StringComparison.Ordinal) && relative.Contains(".bak", StringComparison.Ordinal) ||
-        relative.EndsWith(".tmp", StringComparison.Ordinal);
+        relative.EndsWith(".tmp", StringComparison.Ordinal) || relative.StartsWith("logs/", StringComparison.Ordinal);
 
     private static void CopyDatabase(string source, string target)
     {

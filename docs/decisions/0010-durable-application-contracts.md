@@ -222,8 +222,10 @@ angles were not answered; check `research:synthesis`), `gate` (with a policy: th
 input schema, judged at the frozen version), `review` (an approval when the route is `confirm` or `human`), `publish` (the synthesis as a
 `finding` with provenance `{synthesis hash, judgmentId, policyId, policyVersion, decision}`; result `{artifactId, angles, missing,
 synthesisHash}`). Required checks: `research:answers`, `research:synthesis`, `artifact:finding`. Route: `POST /v1/sessions/{s}/research`
-(202, `Idempotency-Key`). The hub's `/research` page starts runs (with how many pages each angle may fetch), follows each angle's status and
-attempts, shows the findings kept so far and the run's spend, and offers cancel and the review decision.
+(202, `Idempotency-Key`). An execution's detail (`GET /v1/sessions/{s}/executions/{task}`) adds to each branch row with an allowance
+`retrieval {maxFetches, pages: [{url, status, evidenceId?, finalUrl?, error?}]}`, read from the child in admission order. The hub's
+`/research` page starts runs (with how many pages each angle may fetch and the sites it may browse), follows each angle's status, attempts
+and fetched pages, shows the findings kept so far and the run's spend, and offers cancel and the review decision.
 
 ## Feedback and preferences
 
@@ -319,7 +321,8 @@ open read-only, as `immutable` when no WAL or shared-memory file exists, so a ch
 directory byte for byte before and after. Checks: the directory, the device lock (running or not), free disk, the catalog version
 (missing, older, newer than this build) and `quick_check`, each session store, schedules, trigger credentials, application records (skipped
 on catalogs older than version 5), uncertain or stuck budget reservations, blobs (missing, size, and with `--verify-blobs` hash; orphan
-files), retention, failing sources and leftover migration copies. A damaged, old or newer store is reported, never fatal. The CLI adds
+files), retention, failing sources, fetches (`warn` for a receipt still `calling` after 10 minutes, which no live fetch takes; `info` for
+fetches that ended `uncertain` in the last 7 days) and leftover migration copies. A damaged, old or newer store is reported, never fatal. The CLI adds
 the listener (`warn` beyond loopback, pointing at [durable-remote-access.md](../durable-remote-access.md)), the token (`fail` when weak,
 `warn` when others can read it; never shown) and, with `--probe`, a call to the running device. `--repair` needs the device stopped:
 it migrates the catalog (keeping its backup copy), collects unreferenced blobs and makes the token owner-only.
@@ -327,7 +330,10 @@ it migrates the catalog (keeping its backup copy), collects unreferenced blobs a
 ## Service definitions (M6)
 
 `pisharp durable service systemd|launchd|windows` prints, or writes with `--out`, a definition that runs `durable serve --data-dir` as
-the user, with the install, stop and log commands. It installs nothing, refuses to overwrite and holds no token. `serve` links SIGTERM
+the user, with the install, stop and log commands. It installs nothing, refuses to overwrite and holds no token. systemd keeps the output
+in the journal; the launchd and Windows definitions add `--log <data>/logs/device.log`, with which `serve` (`DeviceLog`) writes its output
+and its server's log (through `DurableDeviceServerOptions.ConfigureLogging`) to a file with a UTC timestamp per line, rotated at 10 MiB with
+three older files kept. A failed log write is dropped, never fatal. `serve` links SIGTERM
 (and SIGHUP off Windows) to its cancellation, so `systemctl stop` and `launchctl bootout` stop the device as Ctrl+C does. **Deviation:**
 Windows gets a per-user scheduled task at logon with restart on failure, not a Windows service: the console binary does not implement
 the service control protocol, and the device needs the user's profile and model credentials. `Stop-ScheduledTask` ends the process; the
@@ -338,8 +344,8 @@ next start resumes as after a crash. Loopback stays the default; reverse proxy w
 
 `DeviceBackup` (`src/PiSharp.Durable.Hosting/Storage/DeviceBackup.cs`) and `pisharp durable backup create|verify|restore`. **Deviation:**
 backups are offline only: `create` takes the device lock, so a running device gets exit 4. Each `.sqlite` file is copied with SQLite's
-backup API and left in rollback-journal mode; other files are copied; lock files, WAL and journal files, `blobs/tmp`, temporary files and
-migration copies are skipped. `pisharp-backup.json`, written last, records the format and version, the time, the device's ID, the catalog
+backup API and left in rollback-journal mode; other files are copied; lock files, WAL and journal files, `blobs/tmp`, temporary files,
+migration copies and `logs/` are skipped. `pisharp-backup.json`, written last, records the format and version, the time, the device's ID, the catalog
 version, the sessions, whether secrets are included, and every file's size and SHA-256. The token is left out unless `--include-secrets`.
 `verify` checks the manifest, paths, sizes, hashes, SQLite integrity and unlisted files (exit 8 when damaged); `restore` needs an empty
 target, verifies first and restores the token owner-only. `release-watcher.a-restored-backup-replays-the-run-and-its-evidence` restores the
