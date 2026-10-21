@@ -43,7 +43,7 @@ internal static partial class Program
                 DataDirectory = Path.Join(hub.DeviceDirectory, "data"),
                 StartDirectories = [hub.Work],
                 DeviceName = "faux-box",
-                Models = new FauxDurableModels(),
+                Models = Judging(),
                 DefaultModel = FauxDurableModels.EchoRef,
             });
             hub.DeviceApp = DurableDeviceServer.Build(hub.Device, new DurableDeviceServerOptions { Token = hub.Token }, "http://127.0.0.1:0");

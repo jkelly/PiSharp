@@ -17,7 +17,7 @@ using PiSharp.Durable.Tools;
 namespace PiSharp.Durable.Server;
 
 /// <summary>Maps a durable device's v1 API.</summary>
-public static class DurableDeviceApi
+public static partial class DurableDeviceApi
 {
     /// <summary>Maps <c>/healthz</c> and the <c>/v1</c> routes for <paramref name="host"/>.</summary>
     public static IEndpointRouteBuilder MapDurableDeviceApi(this IEndpointRouteBuilder endpoints, DurableDeviceHost host, DurableDeviceServerOptions options)
@@ -38,10 +38,16 @@ public static class DurableDeviceApi
             var http = context.HttpContext;
             var presented = http.Request.Headers.Authorization.ToString() is { Length: > 7 } header && header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
                 ? header[7..].Trim() : http.Request.Headers["X-DPI-Token"].ToString();
-            if (!DeviceTokens.Matches(presented, tokenHash))
-                return Error(DurableErrorCodes.Unauthorized, "A valid device token is required (Authorization: Bearer <token>).");
             try
             {
+                if (!DeviceTokens.Matches(presented, tokenHash))
+                {
+                    var credential = host.AuthenticateTriggerCredential(presented);
+                    if (credential is null) return Error(DurableErrorCodes.Unauthorized, "A valid bearer token is required.");
+                    if (http.GetEndpoint()?.Metadata.GetMetadata<ScheduleTriggerEndpoint>() is null ||
+                        credential.ScheduleId is { } restricted && !string.Equals(restricted, http.Request.RouteValues["id"]?.ToString(), StringComparison.OrdinalIgnoreCase))
+                        return Error(DurableErrorCodes.Forbidden, "This credential may only tick its authorized schedules.");
+                }
                 return await next(context).ConfigureAwait(false);
             }
             catch (Exception failure) when (!http.Response.HasStarted)
@@ -55,6 +61,8 @@ public static class DurableDeviceApi
         });
 
         // ─── Device ─────────────────────────────────────────────────────────
+        MapAutomation(v1, host, options);
+        MapApplications(v1, host, options);
         v1.MapGet("/device", H(async http => Json(await service.InfoAsync(http.RequestAborted).ConfigureAwait(false))));
         v1.MapGet("/tree", H(async http => Json(await service.TreeAsync(http.RequestAborted).ConfigureAwait(false))));
         v1.MapGet("/events", H(http => DeviceStreams.DeviceAsync(service, http)));
@@ -491,6 +499,10 @@ public static class DurableDeviceApi
 
     private static IResult Failure(Exception failure, HttpContext http) => failure switch
     {
+        HostValidationException invalid => Json(new ApiErrorBody(new ApiError(invalid.Code, invalid.Message)
+        {
+            Fields = [.. invalid.Fields.Select(field => new ApiFieldError(field.Path, field.Message))],
+        }), DurableErrorCodes.Status(invalid.Code)),
         DurableHostException known => Error(known.Code, known.Message),
         OperationCanceledException when http.RequestAborted.IsCancellationRequested => Results.Empty,
         ArgumentException or FormatException or InvalidCastException or JsonException => Error(DurableErrorCodes.Invalid, failure.Message),

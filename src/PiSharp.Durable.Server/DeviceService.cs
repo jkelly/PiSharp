@@ -24,7 +24,7 @@ internal sealed class DeviceService(DurableDeviceHost host, DurableDeviceServerO
     public static readonly IReadOnlyList<string> AgentDocKinds = ["pisharp.job-runs", "pisharp.system-prompts"];
 
     /// <summary>What a PiSharp device can do beyond durable-pi's core.</summary>
-    public static readonly IReadOnlyList<string> Capabilities = ["events", "docs", "demo", "jobs", "state", "interactions", "extensions", "plan-mode", "transcript"];
+    public static readonly IReadOnlyList<string> Capabilities = ["events", "docs", "demo", "jobs", "state", "interactions", "extensions", "plan-mode", "transcript", "schedules", "trigger-credentials", "executions", "job-audits"];
 
     private readonly ConcurrentDictionary<(string Session, long Task), (string? Label, string? CallId)> labels = new();
     private readonly DateTimeOffset started = DateTimeOffset.UtcNow;
@@ -58,6 +58,7 @@ internal sealed class DeviceService(DurableDeviceHost host, DurableDeviceServerO
             Storage = new DeviceStorage(info.DataDirectory, catalog, catalog),
             CodeDir = AppContext.BaseDirectory,
             Capabilities = Capabilities,
+            Features = CapabilityManifest.Features,
             Jobs = new JsonArray([.. host.Jobs.Select(job => ToNode(job.ToJson()))]),
         };
     }

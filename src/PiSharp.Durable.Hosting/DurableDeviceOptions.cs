@@ -52,6 +52,12 @@ public sealed record DurableDeviceOptions
     /// <summary>The durable jobs agents and people can run on this device.</summary>
     public IReadOnlyList<JobDefinition> Jobs { get; init; } = SampleJobs.All;
 
+    /// <summary>Run persisted schedules in this host. False lets an embedding host supply ticks itself.</summary>
+    public bool RunSchedules { get; init; } = true;
+
+    /// <summary>How often the host checks for due schedules; scheduling uses <see cref="TimeProvider"/>.</summary>
+    public TimeSpan SchedulePollInterval { get; init; } = TimeSpan.FromSeconds(15);
+
     /// <summary>Where the <c>system-prompts</c> extension finds its prompt files (<c>*.md</c>); null is <c>prompts</c> under the data
     /// directory.</summary>
     public string? PromptsDirectory { get; init; }
@@ -65,6 +71,12 @@ public sealed record DurableDeviceOptions
 
     /// <summary>Whether a command runs when <see cref="CommandJudge"/> fails (durable-pi's guard fails open).</summary>
     public bool CommandGuardFailOpen { get; init; } = true;
+
+    /// <summary>How sources are fetched: hard limits, private hosts that may be reached, credentials and optional fallback providers.</summary>
+    public RetrievalOptions Retrieval { get; init; } = new();
+
+    /// <summary>How long the catalog keeps settled application records (see <see cref="DeviceRetention"/>).</summary>
+    public RetentionPolicy Retention { get; init; } = new();
 }
 
 /// <summary>The session a registry is made for.</summary>

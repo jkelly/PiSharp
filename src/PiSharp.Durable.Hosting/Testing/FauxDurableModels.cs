@@ -10,7 +10,11 @@ using PiSharp.Durable.Chord;
 namespace PiSharp.Durable.Hosting.Testing;
 
 /// <summary>One faux chat model.</summary>
-public sealed record FauxModel(string Id, string Name, double ContextWindow, double MaxTokens = 8192);
+public sealed record FauxModel(string Id, string Name, double ContextWindow, double MaxTokens = 8192, bool Reasoning = false);
+
+/// <summary>A chat request <see cref="FauxDurableModels.RespondAsync"/> answers: the model, its thinking level (null when off) and the newest
+/// user text.</summary>
+public sealed record FauxChat(string ModelId, string? Reasoning, string Text);
 
 /// <summary>
 /// Model access without a provider. Each request answers the newest user message or tool result:
@@ -53,13 +57,59 @@ public sealed class FauxDurableModels : IDurableModels
     /// <summary><c>faux/echo</c>.</summary>
     public static ModelRef EchoRef { get; } = new(ProviderId, Echo.Id);
 
+    /// <summary>The faux classifier's model ID, <c>faux/judge</c>, listed when <see cref="Classify"/> is set.</summary>
+    public const string JudgeId = "judge";
+
+    /// <summary>Answers classifier requests (pi-ai <c>classify</c>): given the classifier context, the <c>answers</c> object. Null leaves the
+    /// provider without classification.</summary>
+    public Func<JsonObjectValue, CancellationToken, Task<JsonObjectValue>>? Classify { get; init; }
+
+    /// <summary>Usage reported with each classification (pi-ai Usage JSON); null reports none, so the cost is unknown.</summary>
+    public JsonObjectValue? ClassifierUsage { get; init; }
+
+    /// <summary>Scripted chat answers: given the newest user text, an answer, or null for the default grammar.</summary>
+    public Func<string, string?>? Respond { get; init; }
+
+    /// <summary>Scripted chat answers that may wait or throw (a thrown error fails the generation): given the request, an answer, or null
+    /// for <see cref="Respond"/> and the default grammar. Called before <see cref="Respond"/>.</summary>
+    public Func<FauxChat, CancellationToken, Task<string?>>? RespondAsync { get; init; }
+
+    /// <summary>How many classifications were requested.</summary>
+    public int ClassifyCalls => Volatile.Read(ref classifyCalls);
+
+    private int classifyCalls;
+
+    /// <inheritdoc/>
+    public async Task<JsonObjectValue> ClassifyAsync(JsonObjectValue model, JsonObjectValue context, CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        Interlocked.Increment(ref classifyCalls);
+        if (Classify is not { } classify)
+            return DurableModelOperations.ClassifierError(model, "Provider faux does not support classification", cancellationToken.IsCancellationRequested);
+        cancellationToken.ThrowIfCancellationRequested();
+        var answers = await classify(context, cancellationToken).ConfigureAwait(false);
+        var result = JsonValue.Object([new("api", ProviderId), new("provider", ProviderId), new("model", JudgeId), new("answers", answers),
+            new("stopReason", "stop"), new("timestamp", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())]);
+        return ClassifierUsage is { } usage ? result.SetItem("usage", usage) : result;
+    }
+
+    /// <inheritdoc/>
+    public JsonObjectValue? GetModelOfType(string type, string provider, string id) =>
+        GetModelsOfType(type, provider).FirstOrDefault(model => model.TryGetValue("id", out var value) && value is JsonStringValue text && text.Value == id);
+
     /// <inheritdoc/>
     public DurableModel? GetModel(string provider, string modelId) =>
         provider == ProviderId && Models.FirstOrDefault(model => model.Id == modelId) is { } found ? ToDurable(found) : null;
 
     /// <inheritdoc/>
-    public ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) =>
-        type == "chat" && provider is null or ProviderId ? [.. Models.Select(Json)] : [];
+    public ImmutableArray<JsonObjectValue> GetModelsOfType(string type, string? provider) => provider is null or ProviderId ? type switch
+    {
+        "chat" => [.. Models.Select(Json)],
+        "classifier" when Classify is not null => [JsonValue.Object([new("id", JudgeId), new("name", "Judge"), new("api", ProviderId), new("provider", ProviderId),
+            new("type", "classifier"), new("baseUrl", "http://localhost:0"), new("input", JsonValue.Array(["text"])),
+            new("cost", JsonValue.Object([new("input", 0.0), new("output", 0.0), new("cacheRead", 0.0), new("cacheWrite", 0.0)]))])],
+        _ => [],
+    } : [];
 
     /// <inheritdoc/>
     public Task<ImmutableArray<JsonObjectValue>> GetAvailableOfTypeAsync(string type, string? provider, CancellationToken cancellationToken) =>
@@ -72,7 +122,11 @@ public sealed class FauxDurableModels : IDurableModels
         await Task.Yield();
         var partial = new AssistantMessage(model.Api, model.Provider, model.Id, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), [], TokenUsage.Zero,
             StopReason.Pending);
-        var reply = Reply(messages);
+        var asked = LastUserText(messages);
+        var awaited = RespondAsync is { } respondAsync && asked is not null
+            ? await respondAsync(new FauxChat(model.Id, options?.Reasoning, asked), cancellationToken).ConfigureAwait(false) : null;
+        var reply = awaited is not null ? FauxReply.Answer(awaited)
+            : Respond is { } respond && asked is not null && respond(asked) is { } scripted ? FauxReply.Answer(scripted) : Reply(messages);
         yield return new StreamStarted(partial);
         if (reply.Call is { } call)
         {
@@ -159,6 +213,7 @@ public sealed class FauxDurableModels : IDurableModels
         Api = ProviderId,
         Provider = ProviderId,
         BaseUrl = "http://localhost:0",
+        Reasoning = model.Reasoning,
         Input = ["text"],
         ContextWindow = model.ContextWindow,
         MaxTokens = model.MaxTokens,
@@ -172,12 +227,15 @@ public sealed class FauxDurableModels : IDurableModels
         new("api", ProviderId),
         new("provider", ProviderId),
         new("baseUrl", "http://localhost:0"),
-        new("reasoning", false),
+        new("reasoning", model.Reasoning),
         new("input", JsonValue.Array(["text"])),
         new("cost", JsonValue.Object([new("input", 0.0), new("output", 0.0), new("cacheRead", 0.0), new("cacheWrite", 0.0)])),
         new("contextWindow", model.ContextWindow),
         new("maxTokens", model.MaxTokens),
     ]);
+
+    private static string? LastUserText(ImmutableArray<JsonValue> messages) =>
+        messages.OfType<JsonObjectValue>().LastOrDefault(message => Role(message) is "user" or "toolResult") is { } last && Role(last) == "user" ? TextOf(last).Trim() : null;
 
     private static string? Role(JsonObjectValue message) => String(message, "role");
 

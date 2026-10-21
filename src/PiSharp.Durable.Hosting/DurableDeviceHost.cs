@@ -13,7 +13,7 @@ namespace PiSharp.Durable.Hosting;
 /// directory at a time. A session that fails to open is listed with its error and answers <see cref="SessionUnavailableException"/>; the
 /// others are not affected.
 /// </summary>
-public sealed class DurableDeviceHost : IAsyncDisposable
+public sealed partial class DurableDeviceHost : IAsyncDisposable
 {
     private readonly Lock gate = new();
     private readonly SemaphoreSlim mutations = new(1, 1);
@@ -30,6 +30,15 @@ public sealed class DurableDeviceHost : IAsyncDisposable
         Catalog = catalog;
         Info = info;
         AppState = new DeviceAppState(this);
+        Blobs = new BlobStore(Path.Join(info.DataDirectory, "blobs"), catalog, options.TimeProvider);
+        Budgets = new BudgetLedger(catalog, options.TimeProvider);
+        Policies = new PolicyStore(catalog, options.Models, options.TimeProvider);
+        Sources = new SourceStore(catalog, options.Retrieval, options.TimeProvider);
+        Preferences = new PreferenceStore(catalog, options.TimeProvider);
+        Retention = new DeviceRetention(this);
+        DirectRetrieval = new DirectRetrievalProvider(options.Retrieval, options.TimeProvider);
+        ApplicationJobs = ApplicationJobDefinitions.Create(this);
+        AllJobs = [.. options.Jobs, .. ApplicationJobs];
     }
 
     /// <summary>What the device is.</summary>
@@ -40,6 +49,34 @@ public sealed class DurableDeviceHost : IAsyncDisposable
 
     /// <summary>The durable jobs of the device.</summary>
     public IReadOnlyList<JobDefinition> Jobs => Options.Jobs;
+
+    /// <summary>The host's application jobs (decision 0010): judgment, source checks and research. They run and schedule like
+    /// <see cref="Jobs"/>, but their IDs are reserved and agents do not list them.</summary>
+    public IReadOnlyList<JobDefinition> ApplicationJobs { get; }
+
+    /// <summary>The device's content-addressed blob store.</summary>
+    public BlobStore Blobs { get; }
+
+    /// <summary>The device's reservation and usage ledger.</summary>
+    public BudgetLedger Budgets { get; }
+
+    /// <summary>The device's judgment policies.</summary>
+    public PolicyStore Policies { get; }
+
+    /// <summary>The device's monitored sources.</summary>
+    public SourceStore Sources { get; }
+
+    /// <summary>The device's feedback events and preference profiles.</summary>
+    public PreferenceStore Preferences { get; }
+
+    /// <summary>Retention of the catalog's settled application records.</summary>
+    public DeviceRetention Retention { get; }
+
+    /// <summary>Direct HTTP retrieval under the device's address policy.</summary>
+    internal DirectRetrievalProvider DirectRetrieval { get; }
+
+    /// <summary><see cref="Jobs"/> and <see cref="ApplicationJobs"/>.</summary>
+    internal IReadOnlyList<JobDefinition> AllJobs { get; }
 
     /// <summary>Where the <c>system-prompts</c> extension finds its prompt files.</summary>
     public string PromptsDirectory => Options.PromptsDirectory ?? Path.Join(Info.DataDirectory, "prompts");
@@ -70,6 +107,32 @@ public sealed class DurableDeviceHost : IAsyncDisposable
             throw new ArgumentException($"The default model {fallback.Provider}/{fallback.ModelId} is not one of the device's models.", nameof(options));
         HostNames.Thinking(options.DefaultThinkingLevel);
         if (options.FeedCapacity < 1) throw new ArgumentOutOfRangeException(nameof(options), "FeedCapacity must be at least 1.");
+        if (options.SchedulePollInterval <= TimeSpan.Zero || options.SchedulePollInterval.TotalMilliseconds > int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(options), "SchedulePollInterval must be positive and no greater than 2147483647 milliseconds.");
+        if (options.Jobs.Select(job => job.Id).Distinct(StringComparer.Ordinal).Count() != options.Jobs.Count ||
+            options.Jobs.Any(job => string.IsNullOrWhiteSpace(job.Id) || job.Phases.Count == 0 ||
+                job.Phases.Select(phase => phase.Id).Distinct(StringComparer.Ordinal).Count() != job.Phases.Count ||
+                job.RequiredChecks.Any(check => string.IsNullOrWhiteSpace(check) || check.Length > 100) ||
+                job.RequiredChecks.Distinct(StringComparer.Ordinal).Count() != job.RequiredChecks.Count))
+            throw new ArgumentException("Jobs require unique IDs, nonempty unique phases and valid audit check names.", nameof(options));
+        if (options.Retrieval.Limits is { MaxResponseBytes: < 1024 or > 64 * 1024 * 1024 } or { MaxTextCharacters: < 1024 or > 4 * 1024 * 1024 } or
+            { MaxRedirects: < 0 or > 20 } or { MaxAttempts: < 1 or > 10 } or { MaxPages: < 1 or > 20 } ||
+            options.Retrieval.Limits.Timeout <= TimeSpan.Zero || options.Retrieval.Limits.Timeout > TimeSpan.FromMinutes(10) ||
+            options.Retrieval.Limits.MaxRetryWait < TimeSpan.Zero || options.Retrieval.Limits.MaxRetryWait > TimeSpan.FromDays(1) ||
+            !Uri.TryCreate(options.Retrieval.GitHubApi, UriKind.Absolute, out var githubApi) || githubApi.Scheme is not ("http" or "https") ||
+            options.Retrieval.Fallbacks.Any(provider => provider.Id is null or "" or DirectRetrievalProvider.ProviderId || provider.Id.Length > 100) ||
+            options.Retrieval.Fallbacks.Select(provider => provider.Id).Distinct(StringComparer.Ordinal).Count() != options.Retrieval.Fallbacks.Count)
+            throw new ArgumentException("Retrieval limits must be within their hard ceilings, the GitHub API an http(s) URL, and fallback IDs unique, " +
+                "nonempty and not \"direct\".", nameof(options));
+        if (options.Jobs.FirstOrDefault(job => job.Id.StartsWith(ApplicationJobDefinitions.Prefix, StringComparison.Ordinal)) is { } reserved)
+            throw new ArgumentException($"Job IDs starting with {ApplicationJobDefinitions.Prefix} are reserved: {reserved.Id}.", nameof(options));
+        foreach (var job in options.Jobs.Where(job => job.InputSchema is not null))
+        {
+            var problems = InputSchema.Check(job.InputSchema!);
+            if (problems.Count > 0 || job.MaxInputBytes is < 2 or > 256 * 1024)
+                throw new ArgumentException($"Job {job.Id} has an invalid input schema: " + string.Join("; ", problems.Take(3).Select(problem => problem.Path + " " + problem.Message)) +
+                    (job.MaxInputBytes is < 2 or > 256 * 1024 ? " MaxInputBytes must be 2 to 262144." : ""), nameof(options));
+        }
 
         var data = Path.GetFullPath(ExpandHome(options.DataDirectory));
         Directory.CreateDirectory(data);
@@ -118,6 +181,7 @@ public sealed class DurableDeviceHost : IAsyncDisposable
             await host.DisposeAsync().ConfigureAwait(false);
             throw;
         }
+        host.StartSchedules();
         return host;
     }
 
@@ -331,6 +395,8 @@ public sealed class DurableDeviceHost : IAsyncDisposable
     private async Task DisposeCoreAsync()
     {
         await Task.Yield();
+        scheduleStop.Cancel();
+        await scheduleLoop.ConfigureAwait(false);
         // Close admission first, then join the already admitted create/rename/archive operation. Keep the semaphore alive so
         // queued callers can acquire it, see the closed admission, and release it safely.
         await mutations.WaitAsync().ConfigureAwait(false);
@@ -341,8 +407,8 @@ public sealed class DurableDeviceHost : IAsyncDisposable
             try { foreach (var session in all) await session.CloseAsync().ConfigureAwait(false); }
             finally
             {
-                try { Catalog.Dispose(); }
-                finally { deviceLock.Dispose(); }
+                try { Catalog.Dispose(); DirectRetrieval.Dispose(); }
+                finally { deviceLock.Dispose(); scheduleStop.Dispose(); }
             }
         }
         finally { mutations.Release(); }

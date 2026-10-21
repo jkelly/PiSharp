@@ -16,13 +16,15 @@ internal static partial class Program
     /// <summary>How long a case waits for something to happen.</summary>
     internal static readonly TimeSpan Patience = TimeSpan.FromSeconds(20);
 
-    internal static DurableDeviceOptions DeviceOptions(string data, string work, string name = "test-box") => new()
+    internal static DurableDeviceOptions DeviceOptions(string data, string work, string name = "test-box", FauxDurableModels? models = null,
+        RetrievalOptions? retrieval = null) => new()
     {
         DataDirectory = data,
         StartDirectories = [work],
         DeviceName = name,
-        Models = new FauxDurableModels(),
+        Models = models ?? new FauxDurableModels(),
         DefaultModel = FauxDurableModels.EchoRef,
+        Retrieval = retrieval ?? new RetrievalOptions(),
     };
 
     /// <summary>A device and its server on a free loopback port, on a fresh temporary directory.</summary>
@@ -46,10 +48,11 @@ internal static partial class Program
         public DurableDeviceClient Client { get; private set; } = null!;
         public HttpClient Raw { get; } = new() { Timeout = TimeSpan.FromSeconds(60) };
 
-        public static async Task<TestServer> StartAsync(string name, string deviceName = "test-box")
+        public static async Task<TestServer> StartAsync(string name, string deviceName = "test-box", FauxDurableModels? models = null,
+            RetrievalOptions? retrieval = null)
         {
             var server = new TestServer(Temp(name));
-            server.Host = await DurableDeviceHost.OpenAsync(DeviceOptions(server.Data, server.Work, deviceName));
+            server.Host = await DurableDeviceHost.OpenAsync(DeviceOptions(server.Data, server.Work, deviceName, models, retrieval));
             server.App = DurableDeviceServer.Build(server.Host, new DurableDeviceServerOptions { Token = server.Token }, "http://127.0.0.1:0");
             await server.App.StartAsync();
             var address = server.App.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();

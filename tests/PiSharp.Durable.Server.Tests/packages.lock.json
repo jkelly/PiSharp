@@ -60,25 +60,31 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
+      "durable.releasewatcher": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Durable.Server": "[1.2.0.1, )"
+        }
+      },
       "pisharp.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.AI": "[1.2.0.1, )",
+          "PiSharp.Contracts": "[1.2.0.1, )"
         }
       },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.2.0.1, )"
         }
       },
       "pisharp.codemode": {
         "type": "Project",
         "dependencies": {
           "Jint": "[4.16.3, 4.16.3]",
-          "PiSharp.Contracts": "[1.1.0.6, )",
-          "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.2.0.1, )",
+          "PiSharp.Extensions.Abstractions": "[1.2.0.1, )"
         }
       },
       "pisharp.contracts": {
@@ -87,8 +93,8 @@
       "pisharp.durable": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.AI": "[1.2.0.1, )",
+          "PiSharp.Contracts": "[1.2.0.1, )"
         }
       },
       "pisharp.durable.client": {
@@ -97,23 +103,23 @@
       "pisharp.durable.hosting": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Durable": "[1.1.0.6, )",
-          "PiSharp.Durable.Sqlite": "[1.1.0.6, )",
-          "PiSharp.Durable.Tools": "[1.1.0.6, )"
+          "PiSharp.Durable": "[1.2.0.1, )",
+          "PiSharp.Durable.Sqlite": "[1.2.0.1, )",
+          "PiSharp.Durable.Tools": "[1.2.0.1, )"
         }
       },
       "pisharp.durable.server": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Durable.Client": "[1.1.0.6, )",
-          "PiSharp.Durable.Hosting": "[1.1.0.6, )"
+          "PiSharp.Durable.Client": "[1.2.0.1, )",
+          "PiSharp.Durable.Hosting": "[1.2.0.1, )"
         }
       },
       "pisharp.durable.sqlite": {
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, 10.0.12]",
-          "PiSharp.Durable": "[1.1.0.6, )",
+          "PiSharp.Durable": "[1.2.0.1, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.core": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.lib.e_sqlite3": "[2.1.12, 2.1.12]",
@@ -123,22 +129,22 @@
       "pisharp.durable.tools": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Codemode": "[1.1.0.6, )",
-          "PiSharp.Durable": "[1.1.0.6, )",
-          "PiSharp.Tools": "[1.1.0.6, )"
+          "PiSharp.Codemode": "[1.2.0.1, )",
+          "PiSharp.Durable": "[1.2.0.1, )",
+          "PiSharp.Tools": "[1.2.0.1, )"
         }
       },
       "pisharp.extensions.abstractions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.Contracts": "[1.2.0.1, )"
         }
       },
       "pisharp.tools": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0.6, )",
-          "PiSharp.Contracts": "[1.1.0.6, )"
+          "PiSharp.Agent": "[1.2.0.1, )",
+          "PiSharp.Contracts": "[1.2.0.1, )"
         }
       }
     }

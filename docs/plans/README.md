@@ -17,6 +17,10 @@ The compatibility target is [Pi v0.99.1](https://github.com/earendil-works/pi/re
 7. [Optional Node bridge](07-node-bridge.md)
 8. [Hardening and packaging](08-hardening-and-packaging.md)
 
+## Durable application roadmap
+
+[Remaining PiSharp Durable features](09-durable-remaining-features.md) plans versioned judgment policies, structured artifacts, source monitoring, supervised research, feedback/preferences, a release-watcher sample, client parity and operations. It builds on the recurring-jobs/history/audits milestone in decision 0009 and is separate from the eight original compatibility phases above. Its contracts are frozen in [decision 0010](../decisions/0010-durable-application-contracts.md), which records how each milestone was implemented and where it deviates; [the M6 qualification record](../release/durable-m6-qualification.md) lists the suites run and their results.
+
 ## Dependency and release rules
 
 - Phase 1 freezes the source/artifact baseline, compatibility manifest, shared contracts and reference harness

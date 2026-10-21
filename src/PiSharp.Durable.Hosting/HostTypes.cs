@@ -179,3 +179,7 @@ public sealed record DirectoryListing(string Path, string? Parent, IReadOnlyList
 
 /// <summary>One directory of a <see cref="DirectoryListing"/>.</summary>
 public sealed record DirectoryEntry(string Name, string Path);
+
+/// <summary>A started (or replayed) execution: the job task and the agent whose conversation owns it.</summary>
+/// <param name="Replayed">Whether an Idempotency-Key matched an earlier start, which this returns.</param>
+public sealed record ExecutionStart(TaskId TaskId, long AgentId, bool Replayed);

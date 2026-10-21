@@ -11,7 +11,7 @@ using System.Text.Json.Nodes;
 namespace PiSharp.Durable.Client;
 
 /// <summary>A client for one durable device.</summary>
-public sealed class DurableDeviceClient : IDisposable
+public sealed partial class DurableDeviceClient : IDisposable
 {
     private readonly HttpClient http;
     private readonly bool ownsClient;
@@ -157,7 +157,7 @@ public sealed class DurableDeviceClient : IDisposable
         try
         {
             if (DurableWire.Read<ApiErrorBody>(JsonNode.Parse(text)) is { Error: { } error })
-                return new DurableApiException(error.Code, error.Message, (int)status);
+                return new DurableApiException(error.Code, error.Message, (int)status) { Fields = error.Fields ?? [] };
         }
         catch (System.Text.Json.JsonException) { /* Not an error envelope. */ }
         var code = status switch
@@ -166,6 +166,8 @@ public sealed class DurableDeviceClient : IDisposable
             HttpStatusCode.NotFound => DurableErrorCodes.NotFound,
             HttpStatusCode.BadRequest => DurableErrorCodes.Invalid,
             HttpStatusCode.Conflict => DurableErrorCodes.Conflict,
+            HttpStatusCode.TooManyRequests => DurableErrorCodes.Limited,
+            HttpStatusCode.RequestEntityTooLarge => DurableErrorCodes.TooLarge,
             HttpStatusCode.ServiceUnavailable or HttpStatusCode.BadGateway or HttpStatusCode.GatewayTimeout => DurableErrorCodes.Offline,
             _ => DurableErrorCodes.Internal,
         };

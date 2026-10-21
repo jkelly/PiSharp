@@ -21,6 +21,7 @@ public static class SampleJobs
         Title = "Workspace snapshot",
         Summary = "Lists the working directory, counts files by extension and saves the summary to App State.",
         ResultPath = "/jobs/workspace-snapshot",
+        RequiredChecks = ["saved-result"],
         EstimatedSeconds = 6,
         Phases =
         [
@@ -58,9 +59,7 @@ public static class SampleJobs
             {
                 Run = context =>
                 {
-                    var saved = context.ReadState("/jobs/workspace-snapshot");
-                    if (!JsonValue.DeepEquals(saved, context.Data)) throw new InvalidOperationException("The saved summary does not match.");
-                    return Task.FromResult(JobPhaseResult.Next("App State matches", context.Data));
+                    return VerifySavedAsync(context, "/jobs/workspace-snapshot");
                 },
             },
         ],
@@ -73,6 +72,7 @@ public static class SampleJobs
         Title = "Release check",
         Summary = "Plans the release, gathers evidence with a subagent, waits for your approval, then publishes and verifies.",
         ResultPath = "/jobs/release-check",
+        RequiredChecks = ["saved-result"],
         EstimatedSeconds = 40,
         Inputs = [new JobInput("commits", 10, 1, 50, "How many recent commits to review.")],
         Phases =
@@ -119,9 +119,7 @@ public static class SampleJobs
             {
                 Run = context =>
                 {
-                    if (!JsonValue.DeepEquals(context.ReadState("/jobs/release-check"), context.Data))
-                        throw new InvalidOperationException("The release record does not match.");
-                    return Task.FromResult(JobPhaseResult.Next("Release record verified", context.Data));
+                    return VerifySavedAsync(context, "/jobs/release-check");
                 },
             },
         ],
@@ -178,6 +176,14 @@ public static class SampleJobs
             },
         ],
     };
+
+    private static async Task<JobPhaseResult> VerifySavedAsync(JobContext context, string path)
+    {
+        var matches = JsonValue.DeepEquals(context.ReadState(path), context.Data);
+        await context.CheckAsync("saved-result", matches, "Read the saved result back from App State.").ConfigureAwait(false);
+        if (!matches) throw new InvalidOperationException("The saved result does not match.");
+        return JobPhaseResult.Next("Saved result verified", context.Data);
+    }
 
     private static List<string> Files(string root, int limit)
     {

@@ -70,3 +70,33 @@ public sealed record JobsTabModel(NetworkDevice Device, IReadOnlyList<JsonObject
 
 /// <summary>The offline, checking or rejected panel of a device.</summary>
 public sealed record OfflineModel(NetworkDevice Device);
+
+/// <summary>Artifact cards (decision 0010): the artifacts, the evidence they cite, where they live and, when the device takes feedback, the
+/// default profile's current feedback on each.</summary>
+public sealed record ArtifactsModel(IReadOnlyList<JsonObject> Items, IReadOnlyDictionary<string, JsonObject> Evidence, string DeviceId, string SessionId,
+    MarkdownRenderer Markdown, IReadOnlyDictionary<string, JsonObject>? Feedback = null)
+{
+    /// <summary>The feedback controls' labels by action.</summary>
+    public static IReadOnlyDictionary<string, string> Votes { get; } = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["more"] = "More like this", ["less"] = "Less like this", ["dismiss"] = "Dismiss",
+    };
+
+    /// <summary>Kinds this hub renders as cards; others get a bounded JSON fallback.</summary>
+    public static IReadOnlyList<string> Kinds { get; } = ["finding", "comparison", "evidence-list", "timeline", "action-request"];
+
+    /// <summary>Whether <paramref name="url"/> may become a link: absolute HTTP(S) only.</summary>
+    public static bool IsSafeUrl(string? url) => Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
+
+    /// <summary>The proxy path of a session route, for links the browser follows.</summary>
+    public string Api(string path) => $"/api/devices/{Uri.EscapeDataString(DeviceId)}/v1/sessions/{Uri.EscapeDataString(SessionId)}/{path}";
+}
+
+/// <summary>One artifact card.</summary>
+public sealed record ArtifactCardModel(JsonObject Artifact, ArtifactsModel Owner)
+{
+    public JsonObject Props => Artifact["props"] as JsonObject ?? [];
+
+    /// <summary>The evidence record a card cites, when the hub has it.</summary>
+    public JsonObject? Evidence(string? id) => id is not null && Owner.Evidence.TryGetValue(id, out var found) ? found : null;
+}

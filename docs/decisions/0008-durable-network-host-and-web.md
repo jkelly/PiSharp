@@ -61,7 +61,7 @@ The CLI starts using the library in Phase 4, when `pisharp durable serve` passes
 
 **Locks.** Each lock is a file held open with `FileShare.None` for as long as the host or session is open. The operating system releases it when the process dies, so there is no stale-lock detection (durable-pi writes a PID with O_EXCL and probes it with `kill(pid, 0)`). On Unix, .NET implements `FileShare.None` with an advisory `flock`. A second host on the same data directory fails with `DeviceLockedException`.
 
-**Catalog** (SQLite, `PRAGMA user_version` 3; versions 1 and 2 migrate transactionally):
+**Catalog** (SQLite, `PRAGMA user_version` 4; versions 1–3 migrate transactionally):
 
 | Table | Columns | Purpose |
 |---|---|---|
@@ -214,3 +214,5 @@ Phase 3 lives in `src/PiSharp.Durable.Hosting/Apps`, not in the released `PiShar
 - Adapting durable-pi's designs is recorded in `THIRD-PARTY-NOTICES.md` under its MIT notice. Its model icons and brand mark are not copied.
 - New dependencies, all in the unpacked web app except the ASP.NET Core framework reference: Markdig (BSD-2-Clause), HtmlSanitizer and AngleSharp (MIT), YamlDotNet and Microsoft.Data.Sqlite (already used); vendored Bootstrap, Bootstrap Icons and Lobe Icons (MIT); for the browser tests only, Microsoft.Playwright 1.63.0 (MIT; it carries the Apache-2.0 Playwright driver and a Node.js runtime, and downloads Chromium on the test machine). `PiSharp.Cli` gains the ASP.NET Core shared framework through `PiSharp.Durable.Server`.
 - `docs/architecture.md` lists browser and web interfaces as deferred; this branch is the expansion that ends that deferral for durable sessions.
+
+Recurring schedules, trigger credentials, execution history and completion audits are documented in [decision 0009](0009-recurring-jobs-and-execution-history.md).

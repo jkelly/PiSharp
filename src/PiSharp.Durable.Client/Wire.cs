@@ -43,23 +43,33 @@ public static class DurableWire
 public static class DurableErrorCodes
 {
     public const string Unauthorized = "unauthorized";
+    public const string Forbidden = "forbidden";
     public const string NotFound = "not_found";
     public const string Invalid = "invalid";
     public const string Busy = "busy";
     public const string Conflict = "conflict";
     public const string Ambiguous = "ambiguous";
     public const string Unavailable = "unavailable";
+    /// <summary>A local budget or admission limit refused the work.</summary>
+    public const string Limited = "limited";
+    /// <summary>A value is larger than its limit.</summary>
+    public const string TooLarge = "too_large";
     public const string Internal = "internal";
     /// <summary>A client-side code: the device did not answer.</summary>
     public const string Offline = "offline";
+    /// <summary>A client-side code: the device does not offer the feature (see <see cref="DeviceInfo.Supports"/>).</summary>
+    public const string Unsupported = "unsupported";
 
     /// <summary>The HTTP status of a code.</summary>
     public static int Status(string code) => code switch
     {
         Unauthorized => 401,
+        Forbidden => 403,
         Invalid => 400,
         NotFound => 404,
         Busy or Conflict or Ambiguous => 409,
+        Limited => 429,
+        TooLarge => 413,
         Unavailable => 503,
         _ => 500,
     };
@@ -68,8 +78,18 @@ public static class DurableErrorCodes
 /// <summary><c>{error: {code, message}}</c>.</summary>
 public sealed record ApiErrorBody(ApiError Error);
 
-/// <summary>An error's code and message.</summary>
-public sealed record ApiError(string Code, string Message);
+/// <summary>An error's code and message; a validation error may say which fields are invalid.</summary>
+public sealed record ApiError(string Code, string Message)
+{
+    /// <summary>The invalid fields (JSON Pointers into the request), when the device names them.</summary>
+    public IReadOnlyList<ApiFieldError>? Fields { get; init; }
+}
+
+/// <summary>One invalid field: a JSON Pointer and what is wrong.</summary>
+public sealed record ApiFieldError(string Path, string Message);
+
+/// <summary>A feature a device supports, with its version (decision 0010).</summary>
+public sealed record DeviceFeature(string Id, int Version);
 
 /// <summary>A device or hub answered with an error, or could not be reached (<see cref="DurableErrorCodes.Offline"/>).</summary>
 public sealed class DurableApiException(string code, string message, int status = 0, Exception? innerException = null) : Exception(message, innerException)
@@ -79,6 +99,9 @@ public sealed class DurableApiException(string code, string message, int status 
 
     /// <summary>The HTTP status; 0 when no response arrived.</summary>
     public int Status { get; } = status;
+
+    /// <summary>The invalid fields of a validation error; empty otherwise.</summary>
+    public IReadOnlyList<ApiFieldError> Fields { get; init; } = [];
 }
 
 /// <summary>A chat model of a device (durable-pi <c>ModelInfo</c>). Costs are USD per million tokens.</summary>
@@ -119,6 +142,11 @@ public sealed record DeviceInfo
     public DeviceStorage? Storage { get; init; }
     public string? CodeDir { get; init; }
     public IReadOnlyList<string> Capabilities { get; init; } = [];
+    /// <summary>PiSharp: application features with versions (decision 0010); null from older devices.</summary>
+    public IReadOnlyList<DeviceFeature>? Features { get; init; }
+
+    /// <summary>Whether the device offers <paramref name="feature"/> at <paramref name="version"/> or later.</summary>
+    public bool Supports(string feature, int version = 1) => Features?.Any(item => item.Id == feature && item.Version >= version) == true;
     /// <summary>The device's job definitions.</summary>
     public JsonArray? Jobs { get; init; }
 }

@@ -8,7 +8,7 @@ using PiSharp.Durable.Tools;
 namespace PiSharp.Durable.Hosting;
 
 /// <summary>One durable session of a device: one Harness on one SQLite file, in its own directory. Agents are its conversations.</summary>
-public sealed class HostedSession
+public sealed partial class HostedSession
 {
     /// <summary>The longest instructions an agent keeps.</summary>
     public const int MaxInstructionsLength = 12000;
@@ -515,15 +515,50 @@ public sealed class HostedSession
 
     /// <summary>Starts a job for the agent, owned by its conversation in the background, with an anchor entry in its transcript where the
     /// run's card shows.</summary>
-    public async Task<TaskId> RunJobAsync(long agentId, string jobId, JsonObjectValue? input = null, CancellationToken cancellationToken = default)
+    public async Task<TaskId> RunJobAsync(long agentId, string jobId, JsonObjectValue? input = null, CancellationToken cancellationToken = default) =>
+        (await StartExecutionAsync(agentId, jobId, input, null, null, cancellationToken).ConfigureAwait(false)).TaskId;
+
+    /// <summary>
+    /// Starts a job run (an application job too) with optional run limits, frozen at admission. With an <paramref name="idempotencyKey"/>
+    /// the start is recorded in the same commit as the task (decision 0010): a repeat of the same request returns the first run, a
+    /// different request under the key conflicts.
+    /// </summary>
+    /// <exception cref="HostConflictException">The key was used for a different request.</exception>
+    public async Task<ExecutionStart> StartExecutionAsync(long agentId, string jobId, JsonObjectValue? input, JsonObjectValue? budget, string? idempotencyKey,
+        CancellationToken cancellationToken = default)
     {
-        var job = host.Options.Jobs.FirstOrDefault(definition => definition.Id == jobId) ?? throw new HostNotFoundException($"No job {jobId} on {host.Info.Name}.");
+        var job = host.AllJobs.FirstOrDefault(definition => definition.Id == jobId) ?? throw new HostNotFoundException($"No job {jobId} on {host.Info.Name}.");
+        if (idempotencyKey is { Length: 0 or > 200 }) throw new HostInvalidException("An Idempotency-Key must have 1 to 200 characters.");
+        var limits = budget is null ? null : BudgetLedger.ToJson(BudgetLedger.Amounts(budget, "/budget"));
+        var requestHash = CanonicalJson.Hash(JsonValue.Object([new("agentId", agentId), new("jobId", jobId), new("input", input ?? JsonObjectValue.Empty),
+            new("budget", limits ?? (JsonValue)JsonValue.Null)]));
+        // Validate before the commit so an invalid input never holds the session's commit line.
+        Jobs.Normalize(job, input);
         var context = Context(cancellationToken);
         var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
         return await conversation.CommitAsync(async tx =>
         {
-            return await Jobs.StartAsync(tx, conversation.Id, job, jobTasks[job.Id], input, TaskOwnership.Conversation, background: true, "you", null,
-                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ConfigureAwait(false);
+            PiSharp.Durable.Chord.Delta.DraftObject? receipt = null;
+            if (idempotencyKey is not null)
+            {
+                receipt = await tx.DocAsync(SessionRecords.OperationDoc, idempotencyKey, JsonValue.Null).ConfigureAwait(false);
+                if (receipt.Get("taskId") is JsonNumberValue started)
+                {
+                    if (receipt.Get("requestHash") is JsonStringValue { Value: var earlier } && earlier == requestHash)
+                        return new ExecutionStart(new TaskId((long)started.Value), conversation.Id.Value, true);
+                    throw new HostConflictException("This Idempotency-Key was already used for a different request.");
+                }
+            }
+            var created = await Jobs.StartAsync(tx, conversation.Id, job, jobTasks[job.Id], input, TaskOwnership.Conversation, background: true, "you", null,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), budget: limits).ConfigureAwait(false);
+            if (receipt is not null)
+            {
+                receipt.Set("kind", "job:" + jobId);
+                receipt.Set("requestHash", requestHash);
+                receipt.Set("taskId", created.Value);
+                receipt.Set("agentId", conversation.Id.Value);
+            }
+            return new ExecutionStart(created, conversation.Id.Value, false);
         }, context).ConfigureAwait(false);
     }
 
@@ -538,12 +573,17 @@ public sealed class HostedSession
 
     /// <summary>Approves or declines a job run's pending approval. The job resumes from its saved checkpoint.</summary>
     /// <exception cref="AppStateConflictException">The run does not wait for approval, or was decided the other way.</exception>
-    public async Task DecideJobAsync(long agentId, long jobTaskId, bool approved, CancellationToken cancellationToken = default)
+    public Task DecideJobAsync(long agentId, long jobTaskId, bool approved, CancellationToken cancellationToken = default) =>
+        DecideJobAsync(agentId, jobTaskId, approved, "you", null, cancellationToken);
+
+    /// <summary>Approves or declines a job run's pending approval on behalf of <paramref name="actor"/>, with an optional reason kept in the
+    /// run (and in the judgment the approval reviews).</summary>
+    public async Task DecideJobAsync(long agentId, long jobTaskId, bool approved, string actor, string? reason, CancellationToken cancellationToken = default)
     {
         var context = Context(cancellationToken);
         var conversation = await ConversationAsync(GetHarness(), agentId, context).ConfigureAwait(false);
-        await conversation.CommitAsync(tx => Jobs.DecideAsync(tx, conversation.Id, new TaskId(jobTaskId), approved, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
-            context).ConfigureAwait(false);
+        await conversation.CommitAsync(tx => Jobs.DecideAsync(tx, conversation.Id, new TaskId(jobTaskId), approved, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            actor, reason), context).ConfigureAwait(false);
     }
 
     // ─── App State and questions ────────────────────────────────────────────

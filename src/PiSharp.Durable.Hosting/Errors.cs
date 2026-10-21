@@ -19,6 +19,30 @@ public sealed class HostAmbiguousException(string message) : DurableHostExceptio
 /// <summary>A request is malformed: an unknown model, a bad name, a missing directory or an out-of-range setting (<c>invalid</c>).</summary>
 public sealed class HostInvalidException(string message) : DurableHostException("invalid", message);
 
+/// <summary>One invalid field: a JSON Pointer into the request and what is wrong with it.</summary>
+public sealed record FieldError(string Path, string Message);
+
+/// <summary>A structured value failed validation (<c>invalid</c>); <see cref="Fields"/> says where (decision 0010).</summary>
+public sealed class HostValidationException(string message, IReadOnlyList<FieldError> fields) : DurableHostException("invalid", message)
+{
+    /// <summary>The invalid fields, at most 50.</summary>
+    public IReadOnlyList<FieldError> Fields { get; } = [.. fields.Take(50)];
+
+    /// <summary>A validation failure of <paramref name="fields"/>, described by the first ones.</summary>
+    public static HostValidationException Of(string what, IReadOnlyList<FieldError> fields) =>
+        new($"{what}: " + string.Join("; ", fields.Take(3).Select(field => (field.Path.Length == 0 ? "(root)" : field.Path) + " " + field.Message)) +
+            (fields.Count > 3 ? $"; and {fields.Count - 3} more" : ""), fields);
+}
+
+/// <summary>A revision is stale, or an operation key was used for a different request (<c>conflict</c>).</summary>
+public sealed class HostConflictException(string message) : DurableHostException("conflict", message);
+
+/// <summary>A local budget or admission limit refused the work (<c>limited</c>, HTTP 429). Nothing was started.</summary>
+public sealed class HostLimitException(string message) : DurableHostException("limited", message);
+
+/// <summary>A value is larger than its limit (<c>too_large</c>, HTTP 413).</summary>
+public sealed class HostTooLargeException(string message) : DurableHostException("too_large", message);
+
 /// <summary>A message sent with <see cref="WhenBusy.Reject"/> found the agent busy; nothing was admitted (<c>busy</c>).</summary>
 public sealed class HostBusyException(string message, Exception innerException) : DurableHostException("busy", message, innerException);
 

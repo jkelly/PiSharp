@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0010, M5: the reference release watcher. The watcher itself talks to a device only through DurableDeviceClient's public
+       routes; the offline demo also hosts a device (DurableDeviceHost and DurableDeviceServer) and a fixture feed on loopback, so the whole
+       scenario runs without a network, a provider or a key. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Durable.ReleaseWatcher</AssemblyName>
+    <RootNamespace>PiSharp.Durable.ReleaseWatcher</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="fixtures/*.xml" LogicalName="fixtures/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="watcher.sample.json" LogicalName="watcher.sample.json" />
+    <None Include="watcher.sample.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

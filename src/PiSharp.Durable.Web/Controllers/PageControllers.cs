@@ -32,10 +32,58 @@ public sealed class DevicesController(DeviceMonitor monitor) : Controller
     public IActionResult Table() => PartialView("_DeviceTable", new DevicesPage(monitor.Network()));
 }
 
+/// <summary>Recurring jobs, durable execution history, monitored sources, judgment policies and budgets.</summary>
+public sealed class AutomationController(DeviceMonitor monitor) : Controller
+{
+    [HttpGet("/schedules")]
+    public IActionResult Schedules() => View("~/Views/Automation/Schedules.cshtml", new DevicesPage(monitor.Network()));
+
+    [HttpGet("/executions")]
+    public IActionResult Executions() => View("~/Views/Automation/Executions.cshtml", new DevicesPage(monitor.Network()));
+
+    [HttpGet("/sources")]
+    public IActionResult Sources() => View("~/Views/Automation/Sources.cshtml", new DevicesPage(monitor.Network()));
+
+    [HttpGet("/research")]
+    public IActionResult Research() => View("~/Views/Automation/Research.cshtml", new DevicesPage(monitor.Network()));
+
+    [HttpGet("/policies")]
+    public IActionResult Policies() => View("~/Views/Automation/Policies.cshtml", new DevicesPage(monitor.Network()));
+
+    [HttpGet("/budgets")]
+    public IActionResult Budgets() => View("~/Views/Automation/Budgets.cshtml", new DevicesPage(monitor.Network()));
+
+    [HttpGet("/preferences")]
+    public IActionResult Preferences() => View("~/Views/Automation/Preferences.cshtml", new DevicesPage(monitor.Network()));
+}
+
 /// <summary>Inspector panels and the offline panel, as HTML fragments.</summary>
 [Route("ui")]
-public sealed class PanelsController(DeviceMonitor monitor, DeviceClients clients) : Controller
+public sealed class PanelsController(DeviceMonitor monitor, DeviceClients clients, MarkdownRenderer markdown) : Controller
 {
+    /// <summary>The artifact cards of an execution, with the evidence they cite (at most 100 records).</summary>
+    [HttpGet("{device}/{session}/executions/{taskId:long}/artifacts")]
+    public async Task<IActionResult> Artifacts(string device, string session, long taskId, CancellationToken cancellationToken)
+    {
+        if (Online(device) is not { } known) return Offline(device);
+        using var client = clients.For(device);
+        var items = Display.Objects(await client.ExecutionArtifactsAsync(session, taskId, cancellationToken) as JsonObject, "items").ToList();
+        var evidence = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
+        foreach (var id in items.SelectMany(item => item["evidenceIds"] as JsonArray ?? []).Select(id => id?.GetValue<string>()).OfType<string>().Distinct().Take(100))
+        {
+            try { if (await client.EvidenceAsync(session, id, cancellationToken) is JsonObject record) evidence[id] = record; }
+            catch (DurableApiException missing) when (missing.Code == DurableErrorCodes.NotFound) { /* Shown by its ID. */ }
+        }
+        Dictionary<string, JsonObject>? feedback = null;
+        if (known.Info?.Supports("feedback") == true)
+        {
+            feedback = new(StringComparer.Ordinal);
+            foreach (var id in items.Select(item => Display.Str(item, "id")).OfType<string>().Take(50))
+                if (await client.ArtifactFeedbackAsync(session, id, cancellationToken: cancellationToken) is JsonObject state) feedback[id] = state;
+        }
+        return PartialView("~/Views/Fragments/_Artifacts.cshtml", new ArtifactsModel(items, evidence, device, session, markdown, feedback));
+    }
+
     [HttpGet("{device}/{session}/{agent:long}/session")]
     public async Task<IActionResult> Session(string device, string session, long agent, CancellationToken cancellationToken)
     {

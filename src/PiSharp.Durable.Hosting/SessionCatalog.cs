@@ -17,12 +17,14 @@ internal sealed record CatalogSession(string Id, string Name, string Cwd, long C
 
 /// <summary>
 /// The device catalog in SQLite: sessions, custom agent names, spawn records, the device identity, and the device's shared App State with
-/// its receipts and pending session lifecycle operations. Schema version 3 (in <c>PRAGMA user_version</c>); a newer catalog is refused rather than
-/// misread. One connection, serialized by a lock.
+/// its receipts, recurring schedules, scoped credentials and pending session lifecycle operations; from version 5 the application records
+/// of decision 0010 (operation receipts, blobs, budgets, policies, the judgment cache), from version 6 its source monitoring records and
+/// from version 7 its feedback events and preference profiles. Schema version in <c>PRAGMA user_version</c>; a newer
+/// catalog is refused rather than misread, and an older one is backed up before it is migrated. One connection, serialized by a lock.
 /// </summary>
-internal sealed class SessionCatalog : IDisposable
+internal sealed partial class SessionCatalog : IDisposable
 {
-    internal const int SchemaVersion = 3;
+    internal const int SchemaVersion = 7;
 
     private const string Schema = """
         CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -80,10 +82,17 @@ internal sealed class SessionCatalog : IDisposable
                 throw new InvalidDataException($"The device catalog {path} has schema version {version}; this host reads version {SchemaVersion}.");
             if (version < SchemaVersion)
             {
+                // Decision 0010: a consistent copy (SQLite's backup API, which includes the WAL) before the first changed byte. There is no
+                // in-place downgrade; restoring the copy is the way back.
+                if (version > 0) Backup(connection, path, version);
                 using var transaction = connection.BeginTransaction();
                 if (version < 1) Execute(connection, transaction, Schema);
                 if (version < 2) Execute(connection, transaction, SchemaV2);
-                Execute(connection, transaction, SchemaV3);
+                if (version < 3) Execute(connection, transaction, SchemaV3);
+                if (version < 4) Execute(connection, transaction, SchemaV4);
+                if (version < 5) Execute(connection, transaction, SchemaV5);
+                if (version < 6) Execute(connection, transaction, SchemaV6);
+                if (version < 7) Execute(connection, transaction, SchemaV7);
                 Execute(connection, transaction, $"PRAGMA user_version = {SchemaVersion};");
                 transaction.Commit();
             }
@@ -94,6 +103,17 @@ internal sealed class SessionCatalog : IDisposable
             connection.Dispose();
             throw;
         }
+    }
+
+    /// <summary>Copies the catalog to <c>catalog.v&lt;version&gt;.bak.sqlite</c> beside it (a numbered name when that exists).</summary>
+    private static void Backup(SqliteConnection connection, string path, long version)
+    {
+        var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        var target = Path.Join(directory, $"catalog.v{version}.bak.sqlite");
+        for (var attempt = 2; File.Exists(target); attempt++) target = Path.Join(directory, $"catalog.v{version}.bak-{attempt}.sqlite");
+        using var copy = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = target, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false }.ToString());
+        copy.Open();
+        connection.BackupDatabase(copy);
     }
 
     /// <summary>The device identity: a UUID made on the first open and kept for the catalog's life.</summary>
@@ -219,6 +239,8 @@ internal sealed class SessionCatalog : IDisposable
         {
             using var transaction = connection.BeginTransaction();
             Execute(connection, transaction, "DELETE FROM agent_names WHERE session_id = $id;", ("$id", id));
+            Execute(connection, transaction, "DELETE FROM trigger_credentials WHERE schedule_id IN (SELECT id FROM job_schedules WHERE session_id = $id);", ("$id", id));
+            Execute(connection, transaction, "DELETE FROM job_schedules WHERE session_id = $id;", ("$id", id));
             Execute(connection, transaction, "DELETE FROM session_spawns WHERE session_id = $id;", ("$id", id));
             Execute(connection, transaction, "DELETE FROM sessions WHERE id = $id;", ("$id", id));
             transaction.Commit();

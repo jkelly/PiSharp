@@ -35,7 +35,7 @@
   }
   <div class="job-meta">
     <span>task #@task</span>
-    <span>@(Display.Str(run, "startedBy") == "agent" ? "started by the agent" : "started by you")</span>
+    <span>@(Display.Str(run, "startedBy") == "agent" ? "started by the agent" : Display.Str(run, "startedBy") == "schedule" ? "started by a schedule" : "started by you")</span>
     @if (elapsed > 0)
     {
       <span>@Display.Duration(elapsed)</span>
@@ -52,6 +52,26 @@
       <span class="text-ps-warn">resumed @(resumed)× after a restart</span>
     }
   </div>
+  @if (run["audit"] is JsonObject audit)
+  {
+    <details class="px-3 pb-2 job-audit"><summary>Completion audit: @Display.Str(audit, "status")</summary>
+      @if (audit["missing"] is JsonArray missing && missing.Count > 0)
+      {
+        <p class="text-danger mb-1">Missing: @string.Join(", ", missing.Select(item => item?.GetValue<string>()))</p>
+      }
+      <a href="/executions?device=@Uri.EscapeDataString(Model.Context.DeviceId)&amp;session=@Uri.EscapeDataString(Model.Context.SessionId)&amp;task=@task">View execution</a>
+    </details>
+  }
+  @if (Display.Objects(run, "artifacts").ToList() is { Count: > 0 } saved)
+  {
+    <div class="job-artifacts" data-job-artifacts>
+      <span class="fs-8 text-body-secondary">Artifacts</span>
+      @foreach (var item in saved)
+      {
+        <a class="ps-chip" href="/executions?device=@Uri.EscapeDataString(Model.Context.DeviceId)&amp;session=@Uri.EscapeDataString(Model.Context.SessionId)&amp;task=@task#artifact-@Display.Str(item, "id")"><i class="bi bi-card-text"></i>@Display.Str(item, "kind") · @Display.Cut(Display.Str(item, "title") ?? "", 60)</a>
+      }
+    </div>
+  }
   <div class="phase-steps">
     @for (var i = 0; i < phases.Count; i++)
     {

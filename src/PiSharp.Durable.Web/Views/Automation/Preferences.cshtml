@@ -1,0 +1,53 @@
+@model DevicesPage
+@{
+    ViewData["Title"] = "Preferences";
+    ViewData["Page"] = "preferences";
+}
+<div class="dn-shell">
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+  <main class="dn-content"><div class="page" data-automation="preferences">
+    <div class="page-header"><div><h1>Preferences</h1><p class="text-body-secondary">A device-local profile built only from the feedback you give on artifacts. Judgments freeze the profile's revision when they start, so a change here applies to future runs; to rerank a result, judge it again.</p></div><a href="/" class="btn btn-outline-secondary">Back to agents</a></div>
+    <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+      <label class="form-label">Device<select class="form-select" data-device aria-label="Device">@foreach (var device in Model.Devices) { <option value="@device.Id">@device.Name</option> }</select></label>
+      <label class="form-label">Profile<select class="form-select" data-profile aria-label="Profile"></select></label>
+      <button type="button" class="btn btn-outline-secondary mb-2" data-refresh>Refresh</button>
+      <span class="text-body-secondary mb-2" role="status" data-loading></span>
+    </div>
+    <div class="alert alert-danger" role="alert" data-error hidden></div>
+    <div class="alert alert-secondary" role="status" data-unsupported hidden>This device does not offer preference profiles. Update its PiSharp Durable host to use this page.</div>
+    <div data-supported hidden>
+      <p data-summary></p>
+      <section aria-labelledby="weights-title" class="mb-4">
+        <h2 class="h5" id="weights-title">Label weights</h2>
+        <p class="small text-body-secondary">More like this adds the "more" weight to the artifact's labels, less like this subtracts the "less" weight, and a label adds the "label" weight. Weights stay within -1 and 1 and adjust a judgment's rank, never its confidence or route.</p>
+        <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Label</th><th>Weight</th></tr></thead><tbody data-weights></tbody></table></div>
+      </section>
+      <section aria-labelledby="examples-title" class="mb-4">
+        <h2 class="h5" id="examples-title">Examples</h2>
+        <p class="small text-body-secondary">Artifacts you chose as examples. Judgments see them as data, never as instructions. Forgetting one removes its note too.</p>
+        <ul class="list-unstyled d-grid gap-2" data-examples></ul>
+        <p class="text-body-secondary" data-examples-empty hidden>No examples. Tick "Use as an example" when you give feedback on an artifact.</p>
+      </section>
+      <section aria-labelledby="settings-title" class="mb-4 border-top pt-4">
+        <h2 class="h5" id="settings-title">Settings</h2>
+        <form data-settings class="row g-2 align-items-end">
+          <div class="col-6 col-md-2"><label class="form-label" for="setting-more">More</label><input id="setting-more" class="form-control" type="number" min="0" max="1" step="0.01" data-setting="more" required /></div>
+          <div class="col-6 col-md-2"><label class="form-label" for="setting-less">Less</label><input id="setting-less" class="form-control" type="number" min="0" max="1" step="0.01" data-setting="less" required /></div>
+          <div class="col-6 col-md-2"><label class="form-label" for="setting-label">Label</label><input id="setting-label" class="form-control" type="number" min="0" max="1" step="0.01" data-setting="label" required /></div>
+          <div class="col-6 col-md-2"><label class="form-label" for="setting-examples">Examples</label><input id="setting-examples" class="form-control" type="number" min="0" max="20" step="1" data-setting="maxExamples" required /></div>
+          <div class="col-12 col-md-auto"><button class="btn btn-primary" type="submit">Save settings</button></div>
+        </form>
+      </section>
+      <section aria-labelledby="manage-title" class="border-top pt-4">
+        <h2 class="h5" id="manage-title">Reset, export and delete</h2>
+        <p class="small text-body-secondary">Reset starts the weights and examples over and keeps the history. Delete removes the profile and all its feedback.</p>
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-secondary" data-reset>Reset</button>
+          <a class="btn btn-outline-secondary" data-export download>Export JSON</a>
+          <button type="button" class="btn btn-outline-danger" data-delete>Delete profile</button>
+        </div>
+      </section>
+    </div>
+  </div></main>
+</div>
+@section Scripts { <script type="module" src="/js/preferences.js" asp-append-version="true"></script> }

@@ -3,10 +3,11 @@ export const $ = (selector, root = document) => root.querySelector(selector);
 export const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 export class ApiError extends Error {
-  constructor(code, message, status) {
+  constructor(code, message, status, fields = []) {
     super(message);
     this.code = code;
     this.status = status;
+    this.fields = fields;
   }
 }
 
@@ -27,7 +28,7 @@ export async function api(method, path, body, { idempotencyKey, signal } = {}) {
   try { json = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
   if (!response.ok) {
     const error = json && json.error;
-    throw new ApiError(error ? error.code : 'internal', error ? error.message : `${response.status} ${response.statusText}`, response.status);
+    throw new ApiError(error ? error.code : 'internal', error ? error.message : `${response.status} ${response.statusText}`, response.status, error?.fields || []);
   }
   return json;
 }
@@ -39,6 +40,7 @@ export function deviceApi(deviceId) {
     get: (path) => api('GET', base + path),
     post: (path, body = {}, options) => api('POST', base + path, body, options),
     patch: (path, body, options) => api('PATCH', base + path, body, options),
+    put: (path, body, options) => api('PUT', base + path, body, options),
     del: (path) => api('DELETE', base + path),
   };
 }

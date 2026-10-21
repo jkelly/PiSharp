@@ -13,6 +13,9 @@
     <InternalsVisibleTo Include="PiSharp.Durable.Server.Tests" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../../contracts/durable-capabilities.json" LogicalName="durable-capabilities.json" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
     <ProjectReference Include="../PiSharp.Durable.Client/PiSharp.Durable.Client.csproj" />
   </ItemGroup>

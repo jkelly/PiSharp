@@ -1,0 +1,54 @@
+@model DevicesPage
+@{
+    ViewData["Title"] = "Research";
+    ViewData["Page"] = "research";
+}
+<div class="dn-shell">
+  <partial name="~/Views/Shared/_Topbar.cshtml" model="Model.Devices" />
+  <main class="dn-content"><div class="page" data-automation="research">
+    <div class="page-header"><div><h1>Research</h1><p class="text-body-secondary">Ask a question from up to five angles. Each angle is researched in its own child conversation, a few at a time; every answer is kept as a finding as soon as it arrives, and a final answer combines them. A run survives restarts and can be cancelled at any point.</p></div><a href="/" class="btn btn-outline-secondary">Back to agents</a></div>
+    <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+      <label class="form-label">Device<select class="form-select" data-device aria-label="Device">@foreach (var device in Model.Devices) { <option value="@device.Id">@device.Name</option> }</select></label>
+      <label class="form-label">Session<select class="form-select" data-session aria-label="Session"></select></label>
+      <button type="button" class="btn btn-outline-secondary mb-2" data-refresh>Refresh</button>
+      <span class="text-body-secondary mb-2" role="status" data-loading></span>
+    </div>
+    <div class="alert alert-danger" role="alert" data-error hidden></div>
+    <div class="alert alert-secondary" role="status" data-unsupported hidden>This device does not offer supervised research. Update its PiSharp Durable host to use this page.</div>
+    <div data-supported hidden>
+      <section aria-labelledby="run-title" class="mb-4" data-run aria-live="polite" hidden></section>
+      <section aria-labelledby="recent-title" class="mb-4">
+        <h2 class="h5" id="recent-title">Recent research</h2>
+        <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Run</th><th>Question</th><th>Status</th><th>Started</th></tr></thead><tbody data-recent></tbody></table></div>
+        <p data-recent-empty class="text-body-secondary" hidden>No research in this session yet.</p>
+      </section>
+      <section aria-labelledby="start-title" class="border-top pt-4">
+        <h2 class="h5" id="start-title">Start research</h2>
+        <form data-start class="row g-3">
+          <div class="col-12"><label class="form-label" for="research-question">Question</label><textarea id="research-question" data-question class="form-control" rows="3" maxlength="4000" required></textarea></div>
+          <fieldset class="col-12"><legend class="form-label">Angles</legend>
+            <div class="form-text mb-2">Leave every title empty to let the research model plan the angles.</div>
+            <div data-angles class="d-grid gap-2"></div></fieldset>
+          <fieldset class="col-12" data-sources-field hidden><legend class="form-label">Material from sources</legend>
+            <div data-sources class="d-flex flex-wrap gap-3"></div>
+            <div class="form-text">The current items of the ticked sources are quoted to every angle as untrusted material.</div></fieldset>
+          <div class="col-md-4"><label class="form-label" for="research-model">Research model</label><select id="research-model" data-model="research" class="form-select"></select></div>
+          <div class="col-md-2"><label class="form-label" for="research-thinking">Thinking</label><select id="research-thinking" data-thinking="research" class="form-select"></select></div>
+          <div class="col-md-4"><label class="form-label" for="synthesis-model">Synthesis model</label><select id="synthesis-model" data-model="synthesis" class="form-select"></select></div>
+          <div class="col-md-2"><label class="form-label" for="synthesis-thinking">Thinking</label><select id="synthesis-thinking" data-thinking="synthesis" class="form-select"></select></div>
+          <div class="col-md-3"><label class="form-label" for="research-concurrency">At once</label><input id="research-concurrency" data-concurrency class="form-control" type="number" min="1" max="5" value="2" />
+            <div class="form-text">Angles researched at the same time.</div></div>
+          <div class="col-md-3"><label class="form-label" for="research-attempts">Attempts per angle</label><input id="research-attempts" data-attempts class="form-control" type="number" min="1" max="3" value="2" /></div>
+          <div class="col-md-3"><label class="form-label" for="research-deadline">Angle deadline (seconds)</label><input id="research-deadline" data-deadline class="form-control" type="number" min="30" max="3600" value="600" /></div>
+          <div class="col-md-3"><label class="form-label" for="research-requests">Request budget</label><input id="research-requests" data-requests class="form-control" type="number" min="1" max="1000" placeholder="Device default" />
+            <div class="form-text">The most model calls this run may make.</div></div>
+          <div class="col-md-6"><label class="form-label" for="research-policy">Judge before publishing</label><select id="research-policy" data-policy class="form-select"></select>
+            <div class="form-text">A policy's confirm and human routes wait for your review here.</div></div>
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="research-require-all" data-require-all /><label class="form-check-label" for="research-require-all">Fail the run unless every angle is answered</label></div></div>
+          <div class="col-12"><button class="btn btn-primary" type="submit">Start research</button> <span class="ms-2" role="status" data-started></span></div>
+        </form>
+      </section>
+    </div>
+  </div></main>
+</div>
+@section Scripts { <script type="module" src="/js/research.js" asp-append-version="true"></script> }

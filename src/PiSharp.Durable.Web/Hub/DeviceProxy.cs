@@ -1,7 +1,7 @@
 // PiSharp-only (decision 0008). The browser's device requests, after durable-pi's hub proxy (apps/dpi-playground/apps/dpi-playground-hub/
 // src/proxy.ts, MIT): `/api/devices/{id}/v1/{path}` goes to the device with its token added, so the browser never holds one. Streams are
 // refused here (the per-tab stream carries them), requests time out after 330 s (a send may wait up to 300 s), and `Idempotency-Key` goes
-// up while `Idempotent-Replay` comes back. An unreachable device answers 502 with the `offline` code.
+// up while `Idempotent-Replay` and an export's `Content-Disposition` come back. An unreachable device answers 502 with the `offline` code.
 using System.Net.Http.Headers;
 using PiSharp.Durable.Client;
 
@@ -15,6 +15,7 @@ public sealed class DeviceProxy(DeviceRegistry registry, DeviceMonitor monitor, 
 
     public async Task HandleAsync(HttpContext http, string id, string path)
     {
+        if (path.StartsWith("trigger-credentials", StringComparison.Ordinal)) http.Response.Headers.CacheControl = "no-store";
         var device = registry.Get(id);
         if (device is null)
         {
@@ -64,6 +65,7 @@ public sealed class DeviceProxy(DeviceRegistry registry, DeviceMonitor monitor, 
             http.Response.StatusCode = (int)response.StatusCode;
             http.Response.ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
             if (response.Headers.TryGetValues("Idempotent-Replay", out var replay)) http.Response.Headers["Idempotent-Replay"] = replay.First();
+            if (response.Content.Headers.ContentDisposition is { } disposition) http.Response.Headers.ContentDisposition = disposition.ToString();
             await response.Content.CopyToAsync(http.Response.Body, http.RequestAborted).ConfigureAwait(false);
         }
     }

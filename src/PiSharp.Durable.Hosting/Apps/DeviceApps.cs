@@ -12,7 +12,7 @@ public static class DeviceApps
 
     internal static (IReadOnlyList<Extension> Extensions, IReadOnlyDictionary<string, DurableTask> JobTasks) Create(DurableDeviceHost host, HostedSession session)
     {
-        var jobTasks = host.Options.Jobs.ToDictionary(job => job.Id, job => Jobs.CreateTask(job, host.AppState, session.Id), StringComparer.Ordinal);
+        var jobTasks = host.AllJobs.ToDictionary(job => job.Id, job => Jobs.CreateTask(job, host, session.Id), StringComparer.Ordinal);
         var apps = Define.Extension(new Extension
         {
             Name = ExtensionName,

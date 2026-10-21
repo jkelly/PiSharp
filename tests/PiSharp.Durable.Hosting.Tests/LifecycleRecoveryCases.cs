@@ -152,15 +152,21 @@ internal static partial class Program
             Check(device.Host.ResolveSession(session.Id).IsAvailable, "all locks released for reopen");
         });
 
-        foreach (var version in new[] { 1, 2 })
+        foreach (var version in new[] { 1, 2, 3, 4, 5, 6 })
             yield return Case($"lifecycle.catalog-v{version}-migration-preserves-sessions", async () =>
             {
                 await using var device = await TestDevice.OpenAsync("catalog-migration");
                 var session = await device.CreateAsync("migrated", spawnKey: "old-key");
                 var uid = device.Host.Info.Uid;
                 await device.Host.DisposeAsync();
-                CatalogSql(device, "ALTER TABLE sessions DROP COLUMN initial_thinking; ALTER TABLE sessions DROP COLUMN archive_path; " +
-                    "ALTER TABLE session_spawns DROP COLUMN request; " + (version == 1 ? "DROP TABLE app_state; DROP TABLE app_state_receipts; " : "") +
+                CatalogSql(device, "DROP TABLE preference_profiles; DROP TABLE feedback_events; " +
+                    (version < 6 ? "DROP TABLE sources; DROP TABLE source_state; DROP TABLE source_items; DROP TABLE fetch_receipts; " +
+                    "DROP TABLE retrieval_cache; DROP TABLE retrieval_health; " : "") +
+                    (version < 5 ? "DROP TABLE operations; DROP TABLE blobs; DROP TABLE blob_refs; DROP TABLE budget_limits; DROP TABLE budget_reservations; " +
+                    "DROP TABLE policies; DROP TABLE policy_versions; DROP TABLE judgment_cache; " : "") +
+                    (version < 4 ? "DROP TABLE job_schedules; DROP TABLE trigger_credentials; " : "") +
+                    (version < 3 ? "ALTER TABLE sessions DROP COLUMN initial_thinking; ALTER TABLE sessions DROP COLUMN archive_path; ALTER TABLE session_spawns DROP COLUMN request; " : "") +
+                    (version == 1 ? "DROP TABLE app_state; DROP TABLE app_state_receipts; " : "") +
                     $"PRAGMA user_version = {version};");
                 await device.ReopenAsync();
                 Equal(uid, device.Host.Info.Uid, "device identity retained");
