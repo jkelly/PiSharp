@@ -1,6 +1,8 @@
-@* Decision 0011 (run W2, WU7): the new chat page (GET /chat/new), after the mockups' chat-new: "What can I help with?", the composer and the
-   model switch. Nothing is saved until the first message: sending it creates the chat (POST /api/chats with a request id, so a retry never
-   makes two) with the chosen model, thinking level, speed and the Settings › Tools working directory, then opens /chat/{id}. *@
+@* Decision 0011 (run W2, WU7, WU8): the new chat page (GET /chat/new), after the mockups' chat-new: "What can I help with?", the composer,
+   the suggestions and the model switch. Nothing is saved until the first message: sending it creates the chat (POST /api/chats with a
+   request id, so a retry never makes two) with the chosen model, thinking level, speed and the Settings › Tools working directory, then
+   opens /chat/{id}. With no provider configured it shows the mockups' "Connect a provider to start" card and a "No model" switch instead.
+   The send estimate and the over-cap state belong to the Spend Guard (a later milestone), so they are left out. *@
 @model NewChatPage
 @{
     ViewData["Title"] = "New chat";
@@ -13,6 +15,7 @@
 @{
     var provider = Model.Provider is null ? null : Catalog.FindProvider(Model.Provider);
     var selected = Model.Provider is null || Model.Model is null ? null : Catalog.FindModel(Model.Provider, Model.Model);
+    var codex = Catalog.FindProvider("openai-codex");
 }
 @section Styles {
   <link href="~/css/chat.css" rel="stylesheet" asp-append-version="true">
@@ -25,17 +28,27 @@
       <span data-model-name>@selected.Name</span> <span class="sub" data-provider-name>@(provider?.DisplayName ?? selected.Provider)</span> <i class="bi bi-chevron-down"></i>
     </button>
   }
+  else
+  {
+    <a class="model-switch text-decoration-none" href="/settings/providers" aria-label="No model: connect a provider" data-model-switch>No model <i class="bi bi-chevron-down"></i></a>
+  }
 }
 <div class="chat-layout info-collapsed" id="chatLayout" data-chat-new data-provider="@Model.Provider" data-model="@Model.Model">
-  <section class="chat-main" aria-label="New chat">
+  <section class="chat-main" aria-label="New conversation">
     <div class="chat-scroll">
       <div class="chat-thread">
         @if (selected is null)
         {
-          <div class="empty-hero">
+          <div class="empty-hero" data-state="noproviders">
             <h2 class="mb-2">Connect a provider to start</h2>
-            <p class="text-secondary mb-4 mx-auto chat-hero-text">Add an API key or sign in with a subscription. Keys are encrypted on this computer and only sent to their provider.</p>
-            <a class="btn btn-primary" href="/settings/providers">Open Settings › Providers</a>
+            <p class="text-secondary mb-4 mx-auto chat-hero-text">Sign in with your ChatGPT subscription or add an API key. Keys are encrypted on this computer and only sent to their provider.</p>
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+              @if (codex is not null)
+              {
+                <a class="btn btn-primary" href="/settings/providers/openai-codex">Sign in with ChatGPT</a>
+              }
+              <a class="btn @(codex is null ? "btn-primary" : "btn-outline-secondary")" href="/settings/providers">Add an API key</a>
+            </div>
           </div>
         }
         else
@@ -43,7 +56,14 @@
           <div class="empty-hero">
             <h2>What can I help with?</h2>
             <partial name="_ChatComposer" model="new ChatComposerView(true, Model.Thinking, Model.ThinkingLevels, null)" />
-            <p class="fs-8 text-ps-faint mt-2 mb-0">Working in <span class="ps-mono" data-cwd>@Model.WorkingDirectory</span> · saved when you send the first message</p>
+            <div class="d-flex flex-wrap justify-content-center gap-2 mt-3" data-suggestions>
+              <button class="suggestion" type="button" data-suggestion="Explain this file: "><i class="bi bi-file-earmark-code" aria-hidden="true"></i>Explain a file</button>
+              <button class="suggestion" type="button" data-suggestion="Write tests for "><i class="bi bi-check2-square" aria-hidden="true"></i>Write tests</button>
+              <button class="suggestion" type="button" data-suggestion="Review my uncommitted changes (git diff) and point out bugs."><i class="bi bi-git" aria-hidden="true"></i>Review my diff</button>
+              <a class="suggestion text-decoration-none" href="/compare"><i class="bi bi-layout-three-columns" aria-hidden="true"></i>Compare models</a>
+              <a class="suggestion text-decoration-none" href="/bench"><i class="bi bi-tools" aria-hidden="true"></i>Test tool calling</a>
+            </div>
+            <p class="fs-8 text-ps-faint mt-4 mb-0 text-break">Working in <span class="ps-mono" data-cwd>@Model.WorkingDirectory</span> · saved when you send the first message</p>
           </div>
         }
       </div>

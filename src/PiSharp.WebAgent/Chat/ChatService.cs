@@ -4,7 +4,9 @@
 // are the binding's: a send aligns its agent to them while it is idle, and changing them is refused while the chat runs (409), so a request
 // never changes model or account on its own. A new chat binds the provider's active account (IChatAccounts) and keeps it. Approvals,
 // questions and plan reviews answer the waiting tool calls. Markdown export renders the stored transcript with the Client's Transcript. The
-// sidebar's recent chats come from the bindings, with the device's running flags.
+// sidebar's recent chats come from the bindings, with the device's running flags. WU8 adds Retry (fork before the message an answer replies
+// to and send it again, with the chat's own model and account), the session tree (every branch's entries merged by id), the session
+// details panel, the banners and the automatic compaction switch.
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using PiSharp.Durable;
@@ -95,6 +97,10 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
 {
     private readonly ConcurrentDictionary<string, long> compactions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ChatBranch> branches = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<(string Session, long Agent), AgentDetails> details = new();
+
+    /// <summary>How long an agent's name, tools and instructions are kept for the session details panel before they are read again.</summary>
+    public static TimeSpan DetailsLifetime { get; } = TimeSpan.FromSeconds(5);
 
     private IChatAccounts Accounts => services.GetService<IChatAccounts>() ?? NoChatAccounts.Instance;
 
@@ -243,20 +249,68 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         var session = Session(chatId);
         var source = agentId ?? binding.AgentId;
         var entries = await AgentFrames.ActiveEntriesAsync(session, source, cancellationToken).ConfigureAwait(false);
-        var index = -1;
-        for (var i = 0; i < entries.Count; i++)
-            if (ChatDisplay.Long(entries[i], "id") == entryId) index = i;
+        var index = IndexOf(entries, entryId);
         if (index < 0 || ChatDisplay.Str(entries[index], "kind") != "pi.user")
             throw ChatException.Invalid("Only a message you wrote in this branch's current context can be edited.");
+        var branch = await ResendAsync(session, binding, source, entries, index, text, requestId, "edit:", cancellationToken).ConfigureAwait(false);
+        return Remember($"{chatId}/edit:{requestId}", branch);
+    }
+
+    /// <summary>Retry (and Regenerate): forks the branch just before the message of yours that an answer replies to, and sends that message
+    /// again there, with the chat's own model and account (never another account, and never a model the chat does not show). The chat then
+    /// shows the new branch; the old one, with the failed or earlier answer, stays. A retry with the same request id makes and sends nothing
+    /// new.</summary>
+    public async Task<ChatBranch> RetryAsync(string chatId, long? agentId, long entryId, string requestId, CancellationToken cancellationToken = default)
+    {
+        CheckRequestId(requestId);
+        var binding = Require(chatId);
+        if (branches.TryGetValue($"{chatId}/retry:{requestId}", out var earlier)) return earlier;
+        var session = Session(chatId);
+        var source = agentId ?? binding.AgentId;
+        var entries = await AgentFrames.ActiveEntriesAsync(session, source, cancellationToken).ConfigureAwait(false);
+        var index = IndexOf(entries, entryId);
+        if (index < 0 || ChatDisplay.Str(entries[index], "kind") != "pi.assistant")
+            throw ChatException.Invalid("Only an answer in this branch's current context can be retried.");
+        var user = index - 1;
+        while (user >= 0 && ChatDisplay.Str(entries[user], "kind") != "pi.user") user--;
+        if (user < 0) throw ChatException.Invalid("This answer has no message of yours before it to send again.");
+        var text = string.Join("\n", (entries[user]["model"] as JsonArray ?? []).OfType<JsonObject>().Select(Transcript.MessageText));
+        if (string.IsNullOrWhiteSpace(text)) throw ChatException.Invalid("The message before this answer has no text to send again.");
+        var branch = await ResendAsync(session, binding, source, entries, user, text, requestId, "retry:", cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Chat {Chat}: retried entry {Entry} on {Branch}.", chatId, entryId, branch.Name);
+        return Remember($"{chatId}/retry:{requestId}", branch);
+    }
+
+    /// <summary>Forks <paramref name="source"/> just before <paramref name="entries"/>[<paramref name="index"/>] (a new agent from the same
+    /// start when it is the first entry), points it at the binding's model and sends <paramref name="text"/>; the chat shows the new branch.</summary>
+    private async Task<ChatBranch> ResendAsync(HostedSession session, ChatBinding binding, long source, IReadOnlyList<JsonObject> entries, int index, string text,
+        string requestId, string kind, CancellationToken cancellationToken)
+    {
         var previous = index > 0 ? ChatDisplay.Long(entries[index - 1], "id") : null;
         var branch = previous is { } at
-            ? await session.ForkAsync(source, at, null, "edit:" + requestId, cancellationToken).ConfigureAwait(false)
-            : await session.CreateAgentAsync(source, null, "edit:" + requestId, cancellationToken).ConfigureAwait(false);
+            ? await session.ForkAsync(source, at, null, kind + requestId, cancellationToken).ConfigureAwait(false)
+            : await session.CreateAgentAsync(source, null, kind + requestId, cancellationToken).ConfigureAwait(false);
         await AlignAsync(session, branch.Id, binding, cancellationToken).ConfigureAwait(false);
         await session.SendAsync(branch.Id, new SendRequest(text, requestId), cancellationToken).ConfigureAwait(false);
-        bindings.Update(chatId, current => current with { AgentId = branch.Id, Updated = bindings.Now() });
-        _ = device.RefreshAsync(chatId);
-        return Remember($"{chatId}/edit:{requestId}", new ChatBranch(branch.Id, branch.Name));
+        bindings.Update(binding.SessionId, current => current with { AgentId = branch.Id, Updated = bindings.Now() });
+        _ = device.RefreshAsync(binding.SessionId);
+        return new ChatBranch(branch.Id, branch.Name);
+    }
+
+    private static int IndexOf(IReadOnlyList<JsonObject> entries, long entryId)
+    {
+        for (var i = 0; i < entries.Count; i++)
+            if (ChatDisplay.Long(entries[i], "id") == entryId) return i;
+        return -1;
+    }
+
+    /// <summary>Turns the session's automatic compaction on or off (from the next request of every branch).</summary>
+    public SessionCompaction SetAutoCompaction(string chatId, bool enabled)
+    {
+        Require(chatId);
+        var session = Session(chatId);
+        details.Clear();
+        return session.UpdateCompaction(new SessionCompactionChange { Enabled = enabled });
     }
 
     /// <summary>Compacts a branch's context now. Refused while the chat runs (409). A retry with the same request id starts nothing new.</summary>
@@ -356,13 +410,15 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         var entries = await AgentFrames.ActiveEntriesAsync(session, agent.Id, cancellationToken).ConfigureAwait(false);
         var account = binding.AccountId is { } id ? await Accounts.FindAsync(binding.Provider, id, cancellationToken).ConfigureAwait(false) : null;
         var model = catalog.FindModel(binding.Provider, binding.Model);
+        var items = Transcript.Build(entries);
+        var waiting = broker.Pending(chatId).Any(approval => approval.Request.AgentId == agent.Id);
         return new ChatPage
         {
             Binding = binding,
             Agent = agent,
             Agents = agents,
-            Items = Transcript.Build(entries),
-            Context = RenderContext(binding, agent.Id, account?.Label),
+            Items = items,
+            Context = RenderContext(binding, agent.Id, account?.Label, entries, items, new ChatRunState(agent.Busy, false, waiting, false)),
             Cwd = session.Cwd,
             Provider = catalog.FindProvider(binding.Provider),
             Model = model,
@@ -370,8 +426,194 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             ThinkingLevels = ChatDisplay.HostThinkingLevels(model?.ThinkingLevels),
             ApprovalMode = settings.Get<ToolsSettings>().ApprovalMode,
             Busy = agents.Any(item => item.Busy),
+            Info = await InfoAsync(binding, agent.Id, entries, ContextTokens(entries), null, account?.Label, cancellationToken).ConfigureAwait(false),
+            Banners = Banners(binding, account?.Label, entries),
         };
     }
+
+    /// <summary>The session details of a branch: model, account, context and usage, its tools and instructions, compaction and the
+    /// durable session. The agent's name, tools and instructions are read at most every <see cref="DetailsLifetime"/>.</summary>
+    public async Task<ChatInfoView> InfoAsync(ChatBinding binding, long agentId, IReadOnlyList<JsonObject> entries, double contextTokens, UsageSummary? usage,
+        string? accountLabel, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        ArgumentNullException.ThrowIfNull(entries);
+        var session = device.Host.Sessions.FirstOrDefault(item => item.Id == binding.SessionId);
+        var agent = session is null ? null : await DetailsAsync(session, agentId, cancellationToken).ConfigureAwait(false);
+        var newest = entries.LastOrDefault(entry => ChatDisplay.Str(entry, "kind") == "pi.assistant");
+        SessionCompaction? compaction = null;
+        try { compaction = session?.Compaction; }
+        catch (Exception error) when (error is DurableHostException or InvalidOperationException) { /* Unknown. */ }
+        return new ChatInfoView
+        {
+            Binding = binding,
+            AgentId = agentId,
+            AgentName = agent?.Name ?? $"Agent {agentId}",
+            Provider = catalog.FindProvider(binding.Provider),
+            Model = catalog.FindModel(binding.Provider, binding.Model),
+            AccountLabel = accountLabel,
+            ContextTokens = contextTokens,
+            Usage = usage,
+            Api = ChatEntryMeta.Of(newest)?.Api,
+            ApprovalMode = settings.Get<ToolsSettings>().ApprovalMode,
+            Tools = agent?.Tools ?? [],
+            AskTools = agent?.AskTools ?? [],
+            Instructions = agent?.Instructions,
+            Compaction = compaction,
+            Cwd = session?.Cwd ?? settings.Get<ToolsSettings>().EffectiveWorkingDirectory,
+            SessionPath = session?.DatabasePath,
+            UserCount = entries.Count(entry => ChatDisplay.Str(entry, "kind") == "pi.user"),
+            AssistantCount = entries.Count(entry => ChatDisplay.Str(entry, "kind") == "pi.assistant"),
+            ToolCount = entries.Where(entry => ChatDisplay.Str(entry, "kind") == "pi.tool-result")
+                .Sum(entry => (entry["model"] as JsonArray ?? []).OfType<JsonObject>().Count(message => ChatDisplay.Str(message, "role") == "toolResult")),
+        };
+    }
+
+    /// <summary>The banners of a branch: "No providers configured" when the catalog is empty, and the expired sign-in when the branch's
+    /// newest answer failed because the chat's account could not be used.</summary>
+    public ChatBannersView Banners(ChatBinding binding, string? accountLabel, IReadOnlyList<JsonObject> entries)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        ArgumentNullException.ThrowIfNull(entries);
+        var none = catalog.Providers.Count == 0;
+        var (kind, meta) = ChatFacts.LastFailure(entries);
+        if (kind != ChatFailureKind.Expired) return none ? new ChatBannersView(true) : ChatBannersView.None;
+        var provider = meta?.Provider ?? binding.Provider;
+        return new ChatBannersView(none, provider, catalog.FindProvider(provider)?.DisplayName ?? provider, accountLabel,
+            ChatFailures.Display(meta?.ErrorMessage));
+    }
+
+    /// <summary>About the size of a branch's context: the tokens of its newest answer's request (as AgentModel.ContextTokens).</summary>
+    public static double ContextTokens(IReadOnlyList<JsonObject> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        foreach (var entry in entries.Reverse())
+        {
+            if (ChatDisplay.Str(entry, "kind") != "pi.assistant") continue;
+            if (ChatEntryMeta.Of(entry) is { HasUsage: true } meta) return meta.Input + meta.Output + meta.CacheRead + meta.CacheWrite;
+        }
+        return 0;
+    }
+
+    /// <summary>The session tree: every branch's entries (yours, answers, compactions and resets) merged by entry id, so branches share the
+    /// entries before their fork; each branch's newest entry carries the branch, and a running branch says so.</summary>
+    public async Task<ChatTreeView> TreeAsync(string chatId, long? agentId, CancellationToken cancellationToken = default)
+    {
+        var binding = Require(chatId);
+        var session = Session(chatId);
+        var shown = agentId ?? binding.AgentId;
+        var agents = (await session.AgentsAsync(cancellationToken).ConfigureAwait(false)).Where(agent => agent.Kind != AgentKind.Subagent).ToList();
+        var nodes = new Dictionary<long, ChatTreeNode>();
+        var roots = new List<ChatTreeNode>();
+        long? leaf = null;
+        foreach (var agent in agents.OrderBy(agent => agent.Id == shown ? 0 : 1).ThenBy(agent => agent.Id))
+        {
+            IReadOnlyList<JsonObject> entries;
+            try { entries = await AgentFrames.ActiveEntriesAsync(session, agent.Id, cancellationToken).ConfigureAwait(false); }
+            catch (Exception error) when (ChatErrors.From(error) is not null) { continue; }
+            ChatTreeNode? parent = null;
+            ChatTreeNode? last = null;
+            long? previous = null;
+            foreach (var entry in entries)
+            {
+                var id = ChatDisplay.Long(entry, "id") ?? 0;
+                var role = ChatDisplay.Str(entry, "kind") switch
+                {
+                    "pi.user" => "user",
+                    "pi.assistant" => "assistant",
+                    "pi.compaction" => "compaction",
+                    "pi.reset" => "reset",
+                    _ => null,
+                };
+                if (role is null)
+                {
+                    previous = id;
+                    continue;
+                }
+                if (!nodes.TryGetValue(id, out var node))
+                {
+                    node = new ChatTreeNode { EntryId = id, PreviousId = previous, Role = role, Text = TreeText(entry, role), Tools = ToolCalls(entry), AgentId = agent.Id };
+                    nodes[id] = node;
+                    if (parent is null) roots.Add(node);
+                    else parent.Children.Add(node);
+                }
+                if (agent.Id == shown) node.OnCurrentPath = true;
+                parent = node;
+                last = node;
+                previous = id;
+            }
+            if (last is null) continue;
+            last.LeafOf.Add(agent.Id);
+            if (agent.Busy) last.Running = true;
+            if (agent.Id == shown)
+            {
+                last.Current = true;
+                leaf = last.EntryId;
+            }
+        }
+        static void Sort(List<ChatTreeNode> list)
+        {
+            list.Sort((a, b) => a.EntryId.CompareTo(b.EntryId));
+            foreach (var node in list) Sort(node.Children);
+        }
+        Sort(roots);
+        return new ChatTreeView(chatId, shown, roots, agents.Count, agents.Count(agent => agent.Busy), nodes.Count, leaf,
+            agents.ToDictionary(agent => agent.Id, agent => agent.Name));
+    }
+
+    private static string TreeText(JsonObject entry, string role)
+    {
+        var messages = (entry["model"] as JsonArray ?? []).OfType<JsonObject>().ToList();
+        switch (role)
+        {
+            case "user":
+                return ChatDisplay.Preview(string.Join(" ", messages.Select(Transcript.MessageText)));
+            case "assistant":
+            {
+                var text = ChatDisplay.Preview(string.Join(" ", messages.Where(message => ChatDisplay.Str(message, "role") == "assistant").Select(Transcript.MessageText)));
+                if (text.Length > 0) return text;
+                var meta = ChatEntryMeta.Of(entry);
+                if (meta?.ErrorMessage is { } error) return "Failed: " + ChatDisplay.Preview(ChatFailures.Display(error), 80);
+                var calls = ToolCalls(entry);
+                return calls > 0 ? $"{calls} tool call{(calls == 1 ? "" : "s")}" : "(no text)";
+            }
+            case "compaction":
+                return "Context compacted";
+            default:
+                return "New context started";
+        }
+    }
+
+    private static int ToolCalls(JsonObject entry) =>
+        (entry["model"] as JsonArray ?? []).OfType<JsonObject>().Where(message => ChatDisplay.Str(message, "role") == "assistant")
+            .Sum(message => (message["content"] as JsonArray ?? []).OfType<JsonObject>().Count(block => ChatDisplay.Str(block, "type") == "toolCall"));
+
+    /// <summary>An agent's name, offered tools and instructions, read at most every <see cref="DetailsLifetime"/>.</summary>
+    private async Task<AgentDetails?> DetailsAsync(HostedSession session, long agentId, CancellationToken cancellationToken)
+    {
+        if (details.TryGetValue((session.Id, agentId), out var known) && DateTimeOffset.UtcNow - known.Read < DetailsLifetime) return known;
+        try
+        {
+            var agents = await session.AgentsAsync(cancellationToken).ConfigureAwait(false);
+            var tools = await session.ToolsAsync(agentId, cancellationToken).ConfigureAwait(false);
+            var configuration = await session.ConfigurationAsync(agentId, cancellationToken).ConfigureAwait(false);
+            var offered = tools.Where(tool => tool.Offered).ToList();
+            var read = new AgentDetails(agents.FirstOrDefault(agent => agent.Id == agentId)?.Name ?? $"Agent {agentId}",
+                [.. offered.Select(tool => tool.Name)], [.. offered.Where(tool => tool.Effect != ToolEffect.Read).Select(tool => tool.Name)],
+                string.IsNullOrWhiteSpace(configuration.Instructions) ? null : configuration.Instructions, DateTimeOffset.UtcNow);
+            if (details.Count > 500) details.Clear();
+            details[(session.Id, agentId)] = read;
+            return read;
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            // Best effort: the panel shows what it knew (or leaves the tools out) rather than failing the page.
+            logger.LogDebug(error, "Reading agent {Agent} of chat {Chat} for its details failed.", agentId, session.Id);
+            return known;
+        }
+    }
+
+    private sealed record AgentDetails(string Name, IReadOnlyList<string> Tools, IReadOnlyList<string> AskTools, string? Instructions, DateTimeOffset Read);
 
     /// <summary>The new chat page's defaults.</summary>
     public NewChatPage NewChat()
@@ -385,15 +627,30 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             ChatDisplay.HostThinkingLevels(model.ThinkingLevels), tools.EffectiveWorkingDirectory);
     }
 
-    /// <summary>The render context of an agent of the chat: its pending approvals by call id, and the account label.</summary>
-    public ChatRenderContext RenderContext(ChatBinding binding, long agentId, string? accountLabel)
+    /// <summary>The render context of an agent of the chat: its pending approvals by call id, the account label, the provider's billing
+    /// kind and, with the branch's committed <paramref name="entries"/> and <paramref name="items"/>, the items' facts.</summary>
+    public ChatRenderContext RenderContext(ChatBinding binding, long agentId, string? accountLabel, IReadOnlyList<JsonObject>? entries = null,
+        IReadOnlyList<TranscriptItem>? items = null, ChatRunState? run = null)
     {
         ArgumentNullException.ThrowIfNull(binding);
         var approvals = new Dictionary<string, PendingApproval>(StringComparer.Ordinal);
         foreach (var approval in broker.Pending(binding.SessionId))
             if (approval.Request.AgentId == agentId && approval.Request.ParentCallId is null && approval.Request.CallId.Length > 0)
                 approvals[approval.Request.CallId] = approval;
-        return new ChatRenderContext { SessionId = binding.SessionId, AgentId = agentId, Markdown = markdown, Approvals = approvals, AccountLabel = accountLabel };
+        entries ??= [];
+        return new ChatRenderContext
+        {
+            SessionId = binding.SessionId,
+            AgentId = agentId,
+            Markdown = markdown,
+            Approvals = approvals,
+            AccountLabel = accountLabel,
+            Provider = binding.Provider,
+            Billing = catalog.FindProvider(binding.Provider)?.Billing ?? BillingKind.Unknown,
+            Catalog = catalog,
+            Facts = items is null ? new Dictionary<string, ChatItemFacts>(StringComparer.Ordinal) : ChatFacts.Build(items, entries, run),
+            Results = ChatFacts.ToolResults(entries),
+        };
     }
 
     /// <summary>The account label of a binding, or null.</summary>

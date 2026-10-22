@@ -1,7 +1,8 @@
-@* Decision 0011 (run W2, WU7): a tool call waiting for the user's decision (web-approval), the mockups' inline awaiting-card: Allow once,
-   Deny, and in the menu "Always allow <tool> in this chat", "Always allow" (added to Settings › Tools' allow-list) and "Details and deny
-   reason…" (#modal-tool-approval). It renders under the call's tool card, or in the "Waiting for you" panel for a call with no card in view.
-   The first decision from any tab wins; the prompt comes back after a reload and after a restart that happened while it waited. *@
+@* Decision 0011 (run W2, WU7, WU8): a tool call waiting for the user's decision (web-approval), the mockups' inline awaiting-card: Allow
+   once, Deny, and in the menu "Always allow <tool> in this chat", "Always allow" (added to Settings › Tools' allow-list) and "Details and
+   deny reason…", which opens #modal-tool-approval with this card's call (data-approval, data-tool, data-call, data-agent, the command and
+   the raw arguments). It renders under the call's tool card, or in the "Waiting for you" panel for a call with no card in view. The first
+   decision from any tab wins; the prompt comes back after a reload and after a restart that happened while it waited. *@
 @model ChatApprovalView
 @{
     var request = Model.Approval.Request;
@@ -9,13 +10,14 @@
     var detail = command ?? ChatDisplay.Pretty(request.Arguments);
     var titleId = $"approval-{request.TaskId}-{(Model.Inline ? "inline" : "panel")}";
 }
-<div class="awaiting-card p-3 my-2" role="group" aria-labelledby="@titleId" data-approval="@request.TaskId" data-tool="@request.Tool" data-agent="@request.AgentId">
+<div class="awaiting-card p-3 my-2" role="group" aria-labelledby="@titleId" data-approval="@request.TaskId" data-tool="@request.Tool" data-call="@request.CallId" data-agent="@request.AgentId" data-since="@Model.Approval.Since.ToUnixTimeMilliseconds()">
   <div class="d-flex align-items-center gap-2 mb-2">
     <i class="bi @ChatDisplay.ToolIcon(request.Tool) text-ps-faint" aria-hidden="true"></i>
     <span class="fw-semibold" id="@titleId">Run <span class="ps-mono">@request.Tool</span>?</span>
     <span class="ms-auto fs-8 text-ps-faint">waiting for you</span>
   </div>
-  <div class="ps-term"><pre class="wrap" data-approval-detail>@ChatDisplay.Cut(detail, 4000)</pre></div>
+  <div class="ps-term"><pre class="wrap" data-approval-detail data-command="@(command is null ? "false" : "true")">@ChatDisplay.Cut(detail, 4000)</pre></div>
+  <pre hidden data-approval-raw>@ChatDisplay.Cut(ChatDisplay.Pretty(request.Arguments), 8000)</pre>
   <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
     <button class="btn btn-sm btn-primary" type="button" data-action="approve" data-decision="allow"><i class="bi bi-check2 me-1"></i>Allow once</button>
     <button class="btn btn-sm btn-outline-danger" type="button" data-action="approve" data-decision="deny">Deny</button>

@@ -1,8 +1,10 @@
-@* Decision 0011 (run W2, WU7): a chat (GET /chat/{id}), after the mockups' chat page. It renders the stored transcript of the shown branch
-   (the chat's current one, or ?agent=N), then chat.js subscribes the tab's stream to chat/{id}/{agent}, whose first view replaces it with
-   the live state and whose later views carry each change (committed text about every 150 ms). Closing the tab never stops a run. The top
-   bar holds the model switch and the chat's actions (rename, branches, compact, export, delete); the details panel shows the model,
-   account (by label), working directory, approval mode and usage. *@
+@* Decision 0011 (run W2, WU7, WU8): a chat (GET /chat/{id}), after the mockups' chat page. It renders the stored transcript of the shown
+   branch (the chat's current one, or ?agent=N), then chat.js subscribes the tab's stream to chat/{id}/{agent}, whose first view replaces it
+   with the live state and whose later views carry each change (committed text about every 150 ms) and the panels: pending, queue, notices,
+   banners and info. Closing the tab never stops a run. The top bar holds the model switch, the stream's "Reconnecting…" chip, the session
+   tree and the chat's actions (rename, branches & fork, clone, compact, export, delete); the banners say when the chat's sign-in expired or
+   no provider is configured; the details panel (_ChatInfo) shows the context window, usage, model, tools, instructions and the durable
+   session. A page opened while the chat runs is the mockups' background state (data-busy, then data-background in chat.js). *@
 @model ChatPage
 @{
     var binding = Model.Binding;
@@ -14,8 +16,17 @@
     var modelName = Model.Model?.Name ?? binding.Model;
     var providerName = Model.Provider?.DisplayName ?? binding.Provider;
     var picker = new ProviderModelSelect("mp") { Provider = binding.Provider, Model = binding.Model };
-    var branches = Model.Agents.Where(agent => agent.Kind != PiSharp.Durable.Hosting.AgentKind.Subagent || agent.Id == Model.Agent.Id).ToList();
     var href = "/chat/" + Uri.EscapeDataString(binding.SessionId);
+    var branches = Model.Agents.Count(agent => agent.Kind != PiSharp.Durable.Hosting.AgentKind.Subagent);
+    var lastEntry = Model.Items.Select(item => item switch
+    {
+        UserItem user => user.Id,
+        AssistantItem assistant => assistant.Id,
+        ToolResultItem result => result.Id,
+        ToolItem tool => tool.Call.ResultEntryId,
+        EventItem notice => notice.Id,
+        _ => null,
+    }).Max();
 }
 @section Styles {
   <link href="~/css/chat.css" rel="stylesheet" asp-append-version="true">
@@ -27,24 +38,14 @@
   </button>
 }
 @section TopbarEnd {
-  <span class="ps-chip me-1" data-stream-status role="status" hidden><span class="spinner-border spinner-border-sm chip-spinner" aria-hidden="true"></span>Reconnecting…</span>
-  @if (branches.Count > 1)
-  {
-    <div class="dropdown">
-      <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Branches" aria-label="Branches"><i class="bi bi-diagram-3"></i></button>
-      <ul class="dropdown-menu dropdown-menu-end" data-branches>
-        <li><h6 class="dropdown-header">Branches</h6></li>
-        @foreach (var agent in branches)
-        {
-          <li><a class="dropdown-item@(agent.Id == Model.Agent.Id ? " active" : "")" aria-current="@(agent.Id == Model.Agent.Id ? "page" : null)" href="@href?agent=@agent.Id">@agent.Name@(agent.Kind == PiSharp.Durable.Hosting.AgentKind.Fork && agent.ForkedAt is { } at ? $" · from #{at}" : "")@(agent.Busy ? " · running" : "")</a></li>
-        }
-      </ul>
-    </div>
-  }
+  <span class="ps-chip me-1" data-stream-status role="status" tabindex="0" data-bs-toggle="tooltip" title="The run keeps going on the server. This tab catches up from the last saved point once it reconnects." hidden><span class="spinner-border spinner-border-sm chip-spinner" aria-hidden="true"></span>Reconnecting…</span>
+  <button class="btn btn-icon d-none d-sm-inline-block" type="button" data-bs-toggle="modal" data-bs-target="#modal-session-tree" title="Session tree" aria-label="Session tree (@branches branch@(branches == 1 ? "" : "es"))"><i class="bi bi-diagram-3"></i></button>
   <div class="dropdown">
     <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Chat actions" aria-label="Chat actions"><i class="bi bi-three-dots"></i></button>
     <ul class="dropdown-menu dropdown-menu-end">
       <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-rename-session"><i class="bi bi-pencil me-2"></i>Rename</button></li>
+      <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-session-tree"><i class="bi bi-diagram-3 me-2"></i>Branches &amp; fork</button></li>
+      <li><button class="dropdown-item" type="button" data-action="clone" disabled="@(lastEntry is null)"><i class="bi bi-copy me-2"></i>Clone</button></li>
       <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-compact"><i class="bi bi-arrows-collapse me-2"></i>Compact context</button></li>
       <li><a class="dropdown-item" href="@href/export.md?agent=@Model.Agent.Id" download><i class="bi bi-box-arrow-up me-2"></i>Export as Markdown</a></li>
       <li><hr class="dropdown-divider"></li>
@@ -53,7 +54,13 @@
   </div>
   <button class="btn btn-icon d-none d-xl-inline-block" type="button" data-action="toggle-info" title="Session details" aria-label="Session details"><i class="bi bi-layout-sidebar-reverse"></i></button>
 }
-<div class="chat-layout info-collapsed" id="chatLayout" data-chat="@binding.SessionId" data-agent="@Model.Agent.Id" data-stream-key="@Model.StreamKey" data-busy="@(Model.Busy ? "true" : "false")">
+@section Banners {
+  <div data-panel="banners">
+    <partial name="_ChatBanners" model="Model.Banners" />
+  </div>
+}
+<div class="chat-layout info-collapsed" id="chatLayout" data-chat="@binding.SessionId" data-agent="@Model.Agent.Id" data-stream-key="@Model.StreamKey"
+     data-busy="@(Model.Busy ? "true" : "false")" data-branches="@branches" data-last-entry="@lastEntry" data-title="@binding.Title" data-provider="@binding.Provider">
   <section class="chat-main" aria-label="Conversation">
     <div class="chat-scroll" data-chat-scroll>
       <div class="chat-thread" data-thread aria-live="polite">
@@ -68,49 +75,21 @@
       {
         <div class="run-note chat-branch-note"><i class="bi bi-signpost-split" aria-hidden="true"></i>Viewing @Model.Agent.Name. Sending here makes it the chat's current branch.</div>
       }
+      <div data-panel="notices"></div>
       <div data-panel="pending"></div>
       <partial name="_ChatComposer" model="new ChatComposerView(false, binding.Thinking, Model.ThinkingLevels, binding.Tier)" />
     </div>
   </section>
   <aside class="pane chat-info" aria-label="Session details">
     <div class="pane-header"><h2 class="pane-title">Session details</h2><button class="btn btn-icon ms-auto" type="button" data-action="toggle-info" title="Hide panel" aria-label="Hide panel"><i class="bi bi-x-lg fs-8"></i></button></div>
-    <div class="pane-body">
-      <div class="info-section">
-        <h6>Model</h6>
-        <div class="kv"><span class="k">Provider</span><span class="v" data-info="provider">@binding.Provider</span></div>
-        <div class="kv"><span class="k">Model</span><span class="v" data-info="model">@binding.Model</span></div>
-        <div class="kv"><span class="k">Thinking</span><span class="v" data-info="thinking">@binding.Thinking</span></div>
-        <div class="kv"><span class="k">Speed</span><span class="v" data-info="tier">@(binding.Tier ?? "default")</span></div>
-        <div class="kv"><span class="k">Account</span><span class="v" data-info="account">@(Model.Account?.Label ?? "—")</span></div>
-      </div>
-      <div class="info-section">
-        <h6>Usage this branch</h6>
-        <div class="kv"><span class="k">Input</span><span class="v" data-info="input">—</span></div>
-        <div class="kv"><span class="k">Output</span><span class="v" data-info="output">—</span></div>
-        <div class="kv"><span class="k">Cache read</span><span class="v" data-info="cacheRead">—</span></div>
-        <div class="kv"><span class="k">Context</span><span class="v" data-info="contextTokens">—</span></div>
-      </div>
-      <div class="info-section">
-        <h6 class="d-flex">Tools <a class="ms-auto text-ps-faint" href="/settings/tools">edit</a></h6>
-        <div class="fs-8 text-ps-faint"><i class="bi bi-shield-check me-1"></i>@(Model.ApprovalMode switch
-        {
-            ToolApprovalMode.Auto => "Tools run without asking",
-            ToolApprovalMode.AllowList => "Ask before tools that change things, except the allow-list",
-            _ => "Ask before tools that change things",
-        })</div>
-      </div>
-      <div class="info-section border-0">
-        <h6>Durable session</h6>
-        <div class="kv"><span class="k">Working in</span><span class="v ps-mono text-break">@Model.Cwd</span></div>
-        <div class="kv"><span class="k">Session id</span><span class="v ps-mono">@binding.SessionId</span></div>
-        <div class="kv"><span class="k">Branch</span><span class="v">@Model.Agent.Name</span></div>
-      </div>
+    <div class="pane-body" data-panel="info">
+      <partial name="_ChatInfo" model="Model.Info" />
     </div>
   </aside>
 </div>
 @section Modals {
   <partial name="_ChatModelPicker" model="picker" />
-  <partial name="_ChatModals" model="binding.Title" />
+  <partial name="_ChatModals" model="Model" />
 }
 @section Scripts {
   <script type="module" src="~/js/chat.js" asp-append-version="true"></script>
