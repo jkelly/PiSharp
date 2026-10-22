@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0011 (run W2, WU10): PiSharp Web Agent (src/PiSharp.WebAgent) in a browser. The app runs as a child process with the faux switch,
+       a temporary data folder and a free loopback port, as in PiSharp.WebAgent.Tests, and headless Chromium drives it through
+       Microsoft.Playwright, after tests/PiSharp.Durable.Web.BrowserTests. Every case fails on any page error or console error. The browser is
+       not restored with the package: install it once with `pwsh bin/<configuration>/net10.0/playwright.ps1 install chromium`. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Playwright" Version="[1.63.0]" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Built first; the tests start its output (bin/<configuration>/net10.0/PiSharp.WebAgent.dll) as a child process. -->
+    <ProjectReference Include="../../src/PiSharp.WebAgent/PiSharp.WebAgent.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>WebProject</_Parameter1>
+      <_Parameter2>$(MSBuildProjectDirectory)/../../src/PiSharp.WebAgent</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Configuration</_Parameter1>
+      <_Parameter2>$(Configuration)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>
