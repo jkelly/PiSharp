@@ -108,6 +108,13 @@
           "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
         }
       },
+      "pisharp.codingagent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.1.0.6, )",
+          "PiSharp.Sessions": "[1.1.0.6, )"
+        }
+      },
       "pisharp.contracts": {
         "type": "Project"
       },
@@ -161,6 +168,43 @@
           "PiSharp.Contracts": "[1.1.0.6, )"
         }
       },
+      "pisharp.extensions.agent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.1.0.6, )",
+          "PiSharp.Extensions.Runtime": "[1.1.0.6, )"
+        }
+      },
+      "pisharp.extensions.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
+        }
+      },
+      "pisharp.modelruntime": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.CodingAgent": "[1.1.0.6, )",
+          "PiSharp.Extensions.Agent": "[1.1.0.6, )",
+          "PiSharp.Extensions.Runtime": "[1.1.0.6, )",
+          "PiSharp.Rpc": "[1.1.0.6, )",
+          "PiSharp.Tools": "[1.1.0.6, )"
+        }
+      },
+      "pisharp.rpc": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.CodingAgent": "[1.1.0.6, )",
+          "PiSharp.Contracts": "[1.1.0.6, )",
+          "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
+        }
+      },
+      "pisharp.sessions": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.1.0.6, )"
+        }
+      },
       "pisharp.tools": {
         "type": "Project",
         "dependencies": {
@@ -182,6 +226,7 @@
           "PiSharp.Durable.Client": "[1.1.0.6, )",
           "PiSharp.Durable.Hosting": "[1.1.0.6, )",
           "PiSharp.Durable.Server": "[1.1.0.6, )",
+          "PiSharp.ModelRuntime": "[1.1.0.6, )",
           "PiSharp.Web.Common": "[1.1.0.6, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[2.1.12, 2.1.12]",
           "SQLitePCLRaw.core": "[2.1.12, 2.1.12]",
