@@ -186,13 +186,16 @@ internal static partial class Program
         return 0;
     }
 
-    /// <summary>A server in a child process, which a test can kill.</summary>
+    /// <summary>A server in a child process, which a test can kill. <paramref name="mode"/> picks the child: <c>--serve-child</c> takes the
+    /// directories and token as arguments; any other mode takes the root alone and reads the token from <c>root/token</c>.</summary>
     internal sealed class ChildServer : IAsyncDisposable
     {
+        private readonly string mode;
         private Process? process;
 
-        public ChildServer(string root)
+        public ChildServer(string root, string mode = "--serve-child")
         {
+            this.mode = mode;
             Root = root;
             Data = Path.Join(root, "data");
             Work = Path.Join(root, "work");
@@ -214,7 +217,8 @@ internal static partial class Program
                 UseShellExecute = false,
             };
             if (Path.GetFileNameWithoutExtension(Environment.ProcessPath!) is "dotnet") start.ArgumentList.Add(typeof(Program).Assembly.Location);
-            foreach (var arg in new[] { "--serve-child", Data, Work, Token }) start.ArgumentList.Add(arg);
+            if (mode != "--serve-child") await File.WriteAllTextAsync(Path.Join(Root, "token"), Token);
+            foreach (var arg in mode == "--serve-child" ? new[] { mode, Data, Work, Token } : [mode, Root]) start.ArgumentList.Add(arg);
             process = Process.Start(start)!;
             _ = process.StandardError.ReadToEndAsync();
             using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(60));

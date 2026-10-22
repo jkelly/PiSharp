@@ -2,7 +2,8 @@
 // (apps/dpi-backend/src/streams.ts, MIT). Every stream opens with `hello`. Device: `tree` (deduplicated, at most every 250 ms), `activity`
 // (agents that started or finished, a finished one with a preview of its answer) and requested `doc` frames. Session: `session` once, then
 // `tasks`, `agents` and `usage` when they change. Agent: `snapshot` with the inbox, then one `batch` of pi-durable events per commit
-// (verbatim), `inbox` after a queue change, and requested `doc` frames. A stream is a viewer only: closing it never stops work.
+// (verbatim), `inbox` after a queue change, and requested `doc` frames, all read from AgentFrames (decision 0011), which the web agent
+// reads in-process. A stream is a viewer only: closing it never stops work.
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
 using PiSharp.Durable.Client;
@@ -108,55 +109,24 @@ internal static class DeviceStreams
 
     public static async Task<IResult> AgentAsync(DeviceService service, HttpContext http, HostedSession session, long agentId)
     {
-        var docs = ParseDocs(http.Request.Query["docs"].ToString(), DeviceService.AgentDocKinds);
-        await using var feed = await session.WatchAgentAsync(agentId, http.RequestAborted).ConfigureAwait(false);
+        var docs = ParseDocs(http.Request.Query["docs"].ToString(), AgentFrames.DocKinds);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
+        var options = new AgentFrameOptions { Docs = docs, DocumentCoalesce = service.Options.DocumentCoalesce, OnError = Report(service) };
+        await using var frames = AgentFrames.ReadAsync(session, agentId, options, stop.Token).GetAsyncEnumerator(stop.Token);
+        // The snapshot attaches before the response starts, so an unknown agent is still an error response.
+        if (!await frames.MoveNextAsync().ConfigureAwait(false)) return Results.Empty;
         var sse = await SseStream.OpenAsync(http, new JsonObject { ["kind"] = "agent", ["sessionId"] = session.Id, ["agentId"] = agentId },
             service.Options).ConfigureAwait(false);
         await using (sse.ConfigureAwait(false))
         {
-            sse.Send(new JsonObject
-            {
-                ["type"] = "snapshot",
-                ["snapshot"] = DeviceService.ToNode(feed.Snapshot.ToJson()),
-                ["inbox"] = DurableWire.ToNode(await DeviceService.InboxAsync(session, agentId, sse.Closed).ConfigureAwait(false)),
-            });
-            var pushDocs = new Coalescer();
-            async Task PushDocs()
-            {
-                foreach (var kind in docs)
-                    sse.SendIfChanged("doc:" + kind, new JsonObject
-                    {
-                        ["type"] = "doc",
-                        ["kind"] = kind,
-                        ["value"] = await DeviceService.AgentDocAsync(session, agentId, kind, sse.Closed).ConfigureAwait(false),
-                    });
-            }
-            await PushDocs().ConfigureAwait(false);
-            using var subscription = docs.Count == 0 ? null : service.Host.SubscribeChanges(change =>
-            {
-                if (change.SessionId == session.Id) pushDocs.Trigger();
-            });
-            var documents = pushDocs.RunAsync(PushDocs, service.Options.DocumentCoalesce, Report(service), sse.Closed);
+            using var closed = sse.Closed.Register(stop.Cancel);
+            sse.Send(frames.Current);
             try
             {
-                await foreach (var batch in feed.ReadAllAsync(sse.Closed).ConfigureAwait(false))
-                {
-                    sse.Send(new JsonObject
-                    {
-                        ["type"] = "batch",
-                        ["events"] = new JsonArray([.. batch.Select(item => DeviceService.ToNode(item.ToJson()))]),
-                    });
-                    if (batch.Any(item => item.Type is "inbox_update" or "snapshot"))
-                        sse.Send(new JsonObject
-                        {
-                            ["type"] = "inbox",
-                            ["items"] = DurableWire.ToNode(await DeviceService.InboxAsync(session, agentId, sse.Closed).ConfigureAwait(false)),
-                        });
-                }
+                while (await frames.MoveNextAsync().ConfigureAwait(false)) sse.Send(frames.Current);
             }
             catch (OperationCanceledException) { /* Closed. */ }
             sse.Close();
-            await documents.ConfigureAwait(false);
         }
         return Results.Empty;
     }

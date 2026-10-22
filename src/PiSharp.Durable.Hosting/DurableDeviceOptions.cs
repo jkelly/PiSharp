@@ -1,5 +1,8 @@
 // PiSharp-only (decision 0008). What a host passes in instead of the CLI pieces a library cannot reference: models (the CLI's DurableModels,
-// NativeDurableModels or FauxDurableModels), base Harness settings (the CLI's PiHarnessSettings) and a registry per session.
+// NativeDurableModels or FauxDurableModels), base Harness settings (the CLI's PiHarnessSettings) and a registry per session. SessionStream
+// (decision 0011) lets a host bind each session's model requests to its own routing data, such as the web agent's chat accounts.
+using PiSharp.Durable.Chord;
+
 namespace PiSharp.Durable.Hosting;
 
 /// <summary>How a <see cref="DurableDeviceHost"/> runs.</summary>
@@ -26,8 +29,24 @@ public sealed record DurableDeviceOptions
     public string DefaultThinkingLevel { get; init; } = "low";
 
     /// <summary>Harness settings shared by every session, read at every use; each session replaces only the compaction settings with its
-    /// own. Null: pi-durable's defaults.</summary>
+    /// own, and adds its <see cref="SessionStream"/> metadata. Null: pi-durable's defaults.</summary>
     public HarnessSettings? Settings { get; init; }
+
+    /// <summary>
+    /// The stream metadata of a session's model requests: given the session ID, the fields to send under <c>metadata.pisharp</c> with every
+    /// request the session prepares (the web agent sends the chat's <c>account</c> and <c>tier</c>), or null for none. The host adds
+    /// <c>op</c>, a new operation ID for each prepared request (see <see cref="SessionStreamMetadata"/>).
+    /// <para>The value is read when a generation or summary request is prepared and saved with it in the task's checkpoint, so the request
+    /// keeps its fields and <c>op</c> when it is recovered after a restart, even if the hook answers differently by then. A host changes
+    /// a session's future binding by answering differently: requests prepared later use the new value. A retry prepares again and gets a
+    /// new <c>op</c>.</para>
+    /// <para>Called synchronously whenever a session's Harness resolves its settings, which is more often than requests are prepared:
+    /// keep it cheap and non-blocking. A throw is reported through <see cref="OnReport"/>, and that request carries <c>op</c> alone.
+    /// <see cref="IDurableModels"/> receives the object in <see cref="DurableStreamOptions.Metadata"/>; providers must never see it
+    /// (NativeDurableModels' own routes send only <c>metadata.user_id</c>, and a host route strips it with
+    /// <see cref="SessionStreamMetadata.Strip"/>). Null: requests carry no <c>pisharp</c> metadata.</para>
+    /// </summary>
+    public Func<string, JsonObjectValue?>? SessionStream { get; init; }
 
     /// <summary>The registry of one session. Null: the durable coding tools (<c>read</c>, <c>write</c>, <c>edit</c>, <c>bash</c>) and
     /// <c>user-interaction</c> (<c>ask_user_question</c>, <c>exit_plan_mode</c>).</summary>

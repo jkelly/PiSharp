@@ -1,6 +1,7 @@
 // PiSharp-only (decision 0008): one session of a durable device, after durable-pi's per-session store logic (apps/dpi-backend/src/store.ts):
 // agents by number or name with derived names, busy state from the task graph, idempotent sends that can wait for the answer, forks, the
-// read-only switch, per-session compaction, and model re-routing on reopen.
+// read-only switch, per-session compaction, and model re-routing on reopen. Decision 0011 adds the host's per-session stream metadata
+// (DurableDeviceOptions.SessionStream) to every request a session prepares.
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Sqlite;
 using PiSharp.Durable.Tools;
@@ -441,6 +442,17 @@ public sealed partial class HostedSession
     /// <summary>Attaches to the session's live task graph. Dispose to stop.</summary>
     public Task<TaskGraphFeed> WatchTaskGraphAsync() => TaskGraphFeed.StartAsync(GetHarness());
 
+    /// <summary>Calls <paramref name="listener"/> for every change of this session (its commits, its catalog row, its availability), on
+    /// the thread that made it, as <see cref="DurableDeviceHost.SubscribeChanges"/> does; keep it short. Dispose to stop.</summary>
+    public IDisposable SubscribeChanges(Action<DeviceChange> listener)
+    {
+        ArgumentNullException.ThrowIfNull(listener);
+        return host.SubscribeChanges(change =>
+        {
+            if (change.SessionId == Id) listener(change);
+        });
+    }
+
     /// <summary>The live tasks of the session (for a task panel).</summary>
     public async Task<TaskGraph> TaskGraphAsync(CancellationToken cancellationToken = default)
     {
@@ -710,7 +722,8 @@ public sealed partial class HostedSession
                 Models = host.Options.Models,
                 Registry = created,
                 Settings = new SessionHarnessSettings(host.Options.Settings, () => Compaction,
-                    () => [.. created.Snapshot().Installed().Where(extension => DeviceApps.IsDefault(extension.Name))]),
+                    () => [.. created.Snapshot().Installed().Where(extension => DeviceApps.IsDefault(extension.Name))],
+                    host.Options.SessionStream is null ? null : StreamMetadata),
                 Env = envs.EnvAsync,
                 TimeProvider = host.Options.TimeProvider,
                 OnReport = report => host.Options.OnReport?.Invoke(Id, report),
@@ -747,6 +760,23 @@ public sealed partial class HostedSession
             error = failure;
             host.Options.OnReport?.Invoke(Id, failure);
         }
+    }
+
+    /// <summary>The <c>metadata.pisharp</c> object of the next request this session prepares: the host's
+    /// <see cref="DurableDeviceOptions.SessionStream"/> fields and a new <c>op</c>. A hook that throws is reported, and the request carries
+    /// <c>op</c> alone.</summary>
+    private JsonObjectValue StreamMetadata()
+    {
+        JsonObjectValue? fields = null;
+        try
+        {
+            fields = host.Options.SessionStream?.Invoke(Id);
+        }
+        catch (Exception failure)
+        {
+            host.Options.OnReport?.Invoke(Id, failure);
+        }
+        return SessionStreamMetadata.Create(fields, Guid.NewGuid().ToString("D"));
     }
 
     internal void MarkUnavailable(Exception failure) => error = failure;
