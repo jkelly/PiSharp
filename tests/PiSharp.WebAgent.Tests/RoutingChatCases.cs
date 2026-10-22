@@ -2,7 +2,7 @@
 // here its faux models and catalog are replaced by the routing area's (RuntimeModelCatalog, WebDurableModels through AccountRouter) over the
 // credentials area, a fake environment, an ephemeral key ring and the fake provider (ProviderFake), so every chat request goes through the
 // account its chat was created with: a chat keeps that account when another becomes active, and a chat whose account was removed or expired
-// shows the expired state and sends nothing (never another account). No request leaves the process.
+// shows the expired state (the chat page's banner) and sends nothing (never another account). No request leaves the process.
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -35,6 +35,17 @@ internal static partial class Program
             services.AddCredentialsArea(routed);
             services.AddRoutingArea(routed);
         });
+
+    /// <summary>Checks that the chat page shows routing's account error <paramref name="error"/> as the expired state (WU8's banner and
+    /// failed answer), with its sentence instead of the raw prefix (integration of WU6 and WU8).</summary>
+    internal static async Task ExpiredBannerAsync(ChatHarness chat, string chatId, string? error)
+    {
+        Equal(PiSharp.WebAgent.Chat.ChatFailureKind.Expired, ChatFailures.Classify("error", error), "the chat pages classify it as expired: " + error);
+        var page = await chat.Chats.OpenAsync(chatId);
+        Equal("openai", page.Banners.ExpiredProvider, "the expired banner shows for the chat's provider");
+        Check(page.Banners.Detail is { Length: > 0 } detail && !detail.Contains(AccountRouteErrors.Prefix, StringComparison.Ordinal)
+            && char.IsUpper(detail[0]), "the banner shows the error's sentence: " + page.Banners.Detail);
+    }
 
     /// <summary>The last answer of the chat's current branch.</summary>
     internal static async Task<AssistantItem> LastAnswerAsync(ChatHarness chat, string chatId) =>
@@ -98,6 +109,7 @@ internal static partial class Program
             var error = (await LastAnswerAsync(chat, one.SessionId)).Error;
             Equal(AccountRouteErrors.Expired, AccountRouteErrors.Reason(error), "the chat shows the expired state: " + error);
             Equal(sent, provider.Requests.Count, "nothing was sent");
+            await ExpiredBannerAsync(chat, one.SessionId, error);
 
             var keyB = Planted("sk-proj-b");
             var b = (await accounts.AddApiKeyAsync(new ApiKeyAccountRequest("openai", keyB) { Label = "Work" })).Account.Id;
@@ -108,6 +120,7 @@ internal static partial class Program
             error = (await LastAnswerAsync(chat, one.SessionId)).Error;
             Equal(AccountRouteErrors.Removed, AccountRouteErrors.Reason(error), "a removed account: " + error);
             Equal(sent, provider.Requests.Count, "nothing was sent, with the new active account either");
+            await ExpiredBannerAsync(chat, one.SessionId, error);
             Equal(a, chat.Bindings.Get(one.SessionId)!.AccountId, "the chat did not move to another account");
             NoSecret(await chat.TextAsync(one.SessionId), "the transcript", keyA, keyB, b);
         }),

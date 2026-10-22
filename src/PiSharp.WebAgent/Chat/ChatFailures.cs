@@ -1,9 +1,11 @@
 // Decision 0011 (run W2, WU8): how the chat pages tell a failed answer's kind from what the durable engine stored. A provider failure becomes
 // an assistant entry with stopReason "error" and the exception's message (errorMessage); a dropped stream or a Stop becomes one with
-// stopReason "aborted". The `expired` state (a sign-in that expired, or an account that was removed or revoked) has a stable marker: routing
-// (WU6's AccountRouter) fails such a request with an exception whose message starts with "account_expired:" (AccountExpired builds it), and
-// OAuth refresh failures that mean the same (invalid_grant, refresh_token_reused) count too. The marker is for the page only; Display strips it.
+// stopReason "aborted". The `expired` state (a sign-in that expired, or an account that was removed or revoked) has a stable marker:
+// "account_expired:" (AccountExpired builds it; the marker is for the page only and Display strips it), or the text routing (WU6's
+// AccountRouter) fails such a request with, which starts with AccountRouteErrors.Prefix ("Account expired (<reason>): ...", shown as it is).
+// OAuth refresh failures that mean the same (invalid_grant, refresh_token_reused) count too.
 using System.Text.RegularExpressions;
+using PiSharp.WebAgent.Routing;
 
 namespace PiSharp.WebAgent.Chat;
 
@@ -50,17 +52,21 @@ public static partial class ChatFailures
         return IsExpired(errorMessage) ? ChatFailureKind.Expired : ChatFailureKind.Error;
     }
 
-    /// <summary>Whether a failure says the account can't be used: the marker (also where the engine put words before it), or an OAuth refresh
-    /// that was refused.</summary>
+    /// <summary>Whether a failure says the account can't be used: the marker or routing's account error (also where the engine put words
+    /// before them), or an OAuth refresh that was refused.</summary>
     public static bool IsExpired(string? errorMessage) =>
-        errorMessage is { Length: > 0 } text && (text.Contains(AccountExpiredPrefix, StringComparison.Ordinal) || RefusedRefresh().IsMatch(text));
+        errorMessage is { Length: > 0 } text && (text.Contains(AccountExpiredPrefix, StringComparison.Ordinal)
+            || text.Contains(AccountRouteErrors.Prefix, StringComparison.Ordinal) || RefusedRefresh().IsMatch(text));
 
-    /// <summary>A failure's message for display: from after the marker when it has one, trimmed.</summary>
+    /// <summary>A failure's message for display, trimmed: from after the marker when it has one, or the sentence of routing's account
+    /// error (<see cref="AccountRouteErrors.Detail"/>, capitalized).</summary>
     public static string Display(string? errorMessage)
     {
         var text = (errorMessage ?? "").Trim();
         var at = text.IndexOf(AccountExpiredPrefix, StringComparison.Ordinal);
-        if (at >= 0) text = text[(at + AccountExpiredPrefix.Length)..].Trim();
+        if (at >= 0) return text[(at + AccountExpiredPrefix.Length)..].Trim();
+        at = text.IndexOf(AccountRouteErrors.Prefix, StringComparison.Ordinal);
+        if (at >= 0 && AccountRouteErrors.Detail(text[at..])?.Trim() is { Length: > 0 } detail) return char.ToUpperInvariant(detail[0]) + detail[1..];
         return text;
     }
 
