@@ -139,10 +139,9 @@ internal static partial class Program
     internal static ILocator Layout(this IPage page) => page.Locator("#chatLayout");
 
     /// <summary>Whether a chat page may reload when its busy flag outlives the run (see <see cref="IdleAsync"/>). The view frame's busy state
-    /// includes the device's last-seen running flag (DeviceHostService.IsBusy, polled every 250 ms), but AgentViewHub does not render again
-    /// when only that flag changes, so a page can keep showing Stop after the answer ended until something else changes (W2 WU10 request).
-    /// Set it to false once AgentViewHub renders on DeviceHostService.ActivityChanged.</summary>
-    internal static readonly bool ToleratePageBusyLag = true;
+    /// includes the device's last-seen running flag (DeviceHostService.IsBusy, polled every 250 ms); AgentViewHub now renders again on
+    /// DeviceHostService.ActivityChanged (W2 integration), so a page that keeps showing Stop after the answer ended is a failure again.</summary>
+    internal static readonly bool ToleratePageBusyLag = false;
 
     /// <summary>The run is over: the server says the chat is idle and the page shows it (data-busy="false", Send instead of Stop).</summary>
     internal static async Task IdleAsync(this IPage page, Agent agent, string chatId)

@@ -7,7 +7,8 @@
 // upstream frames it follows (`source`: snapshot, batch, inbox), so a client can tell a catch-up from a live change. WU8 adds the items'
 // facts (ChatFacts: time, usage, failures, restarts, the running tail) to the render context and to each item's fingerprint, and three more
 // panels: `notices` (compacting, a compaction failure, an automatic retry's wait), `banners` (no providers, an expired sign-in) and `info`
-// (the session details).
+// (the session details). The state's busy flag also reads the device's running flag (DeviceHostService), which changes outside the
+// agent's frames, so every feed renders again when that flag changes (ActivityChanged); otherwise a page could keep showing busy after a run.
 using System.Text.Json.Nodes;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Hosting;
@@ -44,6 +45,7 @@ public sealed class AgentViewHub : IAsyncDisposable
         this.logger = logger;
         broker.Changed += Refresh;
         bindings.Changed += Refresh;
+        device.ActivityChanged += RefreshAll;
     }
 
     /// <summary>The feeds open now (one per watched agent, however many tabs watch it).</summary>
@@ -99,11 +101,20 @@ public sealed class AgentViewHub : IAsyncDisposable
         foreach (var feed in matching) feed.Trigger();
     }
 
+    /// <summary>Renders every feed again: some chat's running flag changed (the event does not say which).</summary>
+    private void RefreshAll()
+    {
+        List<Feed> all;
+        lock (gate) all = [.. feeds.Values];
+        foreach (var feed in all) feed.Trigger();
+    }
+
     /// <inheritdoc/>
     public ValueTask DisposeAsync()
     {
         broker.Changed -= Refresh;
         bindings.Changed -= Refresh;
+        device.ActivityChanged -= RefreshAll;
         List<Feed> all;
         lock (gate)
         {
