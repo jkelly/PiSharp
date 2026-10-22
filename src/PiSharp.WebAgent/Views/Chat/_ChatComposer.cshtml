@@ -1,0 +1,38 @@
+@* Decision 0011 (run W2, WU7): the mockups' _Composer. The message box, the thinking level (only the levels the model supports and the durable
+   host accepts) and Speed (the service tier). On a chat page the queue (_ChatQueue) sits above the box, and while a run goes on the box
+   offers Follow-up, Steer and Stop (data-running-controls); Enter sends (steers while running), Alt+Enter queues a follow-up, Esc stops.
+   chat.js posts it as JSON with a request id, so a retry never sends twice. *@
+@model ChatComposerView
+<form class="composer text-start" data-composer data-new-chat="@(Model.NewChat ? "true" : "false")" autocomplete="off">
+  @if (!Model.NewChat)
+  {
+    <div class="composer-queue" data-panel="queue" aria-label="Queued messages"></div>
+  }
+  <label class="visually-hidden" for="composerInput">Message</label>
+  <textarea id="composerInput" class="form-control" rows="2" placeholder="Ask anything" name="text" maxlength="100000" data-composer-input></textarea>
+  <div class="composer-toolbar">
+    <select class="form-select form-select-sm" name="thinking" aria-label="Thinking level" title="Thinking level (limited by the model)" data-thinking-select>
+      @foreach (var level in Model.ThinkingLevels)
+      {
+        <option value="@level" selected="@(level == Model.Thinking)">@ChatDisplay.ThinkingLabel(level)</option>
+      }
+    </select>
+    <select class="form-select form-select-sm" name="tier" aria-label="Speed / service tier" title="Speed for new requests; available tiers depend on the model and account" data-speed-select>
+      @foreach (var (value, label) in ChatDisplay.Tiers)
+      {
+        <option value="@value" selected="@(value == (Model.Tier ?? ""))">@label</option>
+      }
+    </select>
+    <span class="ms-auto d-flex align-items-center gap-2">
+      @if (!Model.NewChat)
+      {
+        <span class="d-flex gap-1" data-running-controls hidden>
+          <button class="btn btn-sm btn-ghost" type="button" title="Queue as follow-up (Alt+Enter)" data-action="follow-up">Follow-up</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" title="Steer the current run (Enter)" data-action="steer">Steer</button>
+          <button class="btn btn-primary btn-send" type="button" title="Stop (Esc)" aria-label="Stop" data-action="stop"><i class="bi bi-stop-fill"></i></button>
+        </span>
+      }
+      <button class="btn btn-primary btn-send" type="submit" title="Send (Enter)" aria-label="Send" data-send><i class="bi bi-arrow-up"></i></button>
+    </span>
+  </div>
+</form>

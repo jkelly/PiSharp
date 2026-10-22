@@ -1,0 +1,78 @@
+@* Decision 0011 (run W2, WU7): one tool call card, after PiSharp Durable Web's _ToolCall and the mockups' tool cards: arguments, live
+   output (committed about every 150 ms), the result and nested calls. A call that waits for the user's approval shows the inline approval
+   card (_ChatApproval) under it, as in the mockups; questions and plan reviews are answered in the "Waiting for you" panel. *@
+@model ChatToolView
+@{
+    var call = Model.Call;
+    var approval = Model.Nested ? null : Model.Context.Approval(call.CallId);
+    var (cardClass, statusText) = call.Status switch
+    {
+        ToolStatus.Error => ("is-error", "Error"),
+        ToolStatus.Done => ("", "Done"),
+        ToolStatus.Running => ("is-running", "running"),
+        _ => ("is-running", "pending"),
+    };
+    var args = call.Args as JsonObject;
+    var command = PiSharp.WebAgent.Chat.ToolAllowList.CommandOf(call.Name, args);
+    var waitsForYou = approval is not null || (call.Status == ToolStatus.Running && call.Name is "ask_user_question" or "exit_plan_mode");
+    if (waitsForYou) statusText = approval is not null ? "Waiting for approval" : "Waiting for you";
+    var interrupted = call.Status == ToolStatus.Error && (call.Result ?? "").Contains("interrupted", StringComparison.OrdinalIgnoreCase);
+    var denied = call.Status == ToolStatus.Error && (call.Result ?? "").StartsWith("The user denied", StringComparison.Ordinal);
+    var nestedCount = call.Nested.Count;
+    var open = (call.Status == ToolStatus.Running && call.Output is not null) || (call.Status == ToolStatus.Error && !denied);
+}
+<details class="tool-card @cardClass" data-detail="call-@call.CallId" data-call="@call.CallId" open="@open">
+  <summary><span class="tool-icon">@if (call.Status is ToolStatus.Running or ToolStatus.Pending && !waitsForYou)
+    {<span class="spinner-border spinner-border-sm chip-spinner" aria-hidden="true"></span>}
+    else if (waitsForYou)
+    {<span class="status-dot waiting" aria-hidden="true"></span>}
+    else
+    {<i class="bi @(call.Status == ToolStatus.Error ? "bi-exclamation-circle" : ChatDisplay.ToolIcon(call.Name))"></i>}</span><span class="tool-name">@call.Name</span><span class="tool-args-summary">@(command is not null ? ChatDisplay.Cut(command.ReplaceLineEndings(" "), 140) : ChatDisplay.ArgsSummary(call.Args))</span>@if (denied)
+    {<span class="ps-chip" data-tone="danger">denied</span>}
+    else if (interrupted)
+    {<span class="ps-chip" data-tone="danger">interrupted</span>}<span class="tool-status">@statusText@(nestedCount > 0 ? $" · {nestedCount} call{(nestedCount == 1 ? "" : "s")}" : "")</span></summary>
+  <div class="tool-body">
+    @if (call.Args is JsonObject { Count: > 0 })
+    {
+      <div class="ps-label mb-1">Input</div>
+      <div class="ps-term mb-2"><pre class="wrap">@(command ?? ChatDisplay.Pretty(call.Args))</pre></div>
+    }
+    @if (nestedCount > 0)
+    {
+      <div class="nested-label">Nested calls</div>
+      <div class="nested-calls">
+        @foreach (var nested in call.Nested)
+        {
+          @await Html.PartialAsync("~/Views/Chat/_ChatToolCall.cshtml", new ChatToolView(nested, Model.Context, true))
+        }
+      </div>
+    }
+    @if (call.Result is not null)
+    {
+      <div class="result-head @(nestedCount > 0 ? "mt-2" : "")"><span class="ps-label">Result</span>
+        @if (call.ResultEntryId is { } entry && !Model.Nested)
+        {
+          <button class="btn btn-icon ms-auto" type="button" title="Fork after this result" aria-label="Fork at entry @entry" data-action="fork" data-entry="@entry"><i class="bi bi-signpost-split"></i></button>
+        }
+      </div>
+      <div class="ps-term"><pre class="wrap">@call.Result</pre></div>
+      @foreach (var image in call.Images)
+      {
+        <img class="msg-image mt-2" src="@image.DataUrl" alt="Image from @call.Name">
+      }
+    }
+    else if (call.Output is { Length: > 0 } output)
+    {
+      <div class="ps-label mb-1">Live output</div>
+      <div class="ps-term"><pre class="live-output">@output<span class="stream-cursor"></span></pre></div>
+    }
+    @if (interrupted)
+    {
+      <div class="fs-8 text-ps-faint mt-2">The app restarted during this call. A command can have side effects, so it was not run again by itself; the model got this result instead.</div>
+    }
+  </div>
+</details>
+@if (approval is not null)
+{
+  @await Html.PartialAsync("~/Views/Chat/_ChatApproval.cshtml", new ChatApprovalView(approval, true))
+}

@@ -1,0 +1,64 @@
+@* Decision 0011 (run W2, WU7): the chat page's dialogs, after the mockups: rename, compact context (with optional focus instructions),
+   edit-and-resend (a new branch from just before the message; the old branch stays) and the tool approval details with a deny reason.
+   chat.js fills and submits them as JSON commands. Model: the chat's title. *@
+@model string
+<div class="modal fade" id="modal-rename-session" tabindex="-1" aria-labelledby="modal-rename-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" data-rename-form>
+      <div class="modal-header"><h2 class="modal-title" id="modal-rename-title">Rename chat</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <label class="form-label" for="rename-title">Name</label>
+        <input class="form-control" id="rename-title" name="title" maxlength="200" required value="@Model">
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Rename</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-compact" tabindex="-1" aria-labelledby="modal-compact-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" data-compact-form>
+      <div class="modal-header"><h2 class="modal-title" id="modal-compact-title">Compact context</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <p class="fs-7 text-secondary">The conversation so far is summarized into a context note, so later requests send less. The full transcript stays in the chat. Waits until the chat is idle.</p>
+        <label class="form-label" for="compact-focus">Focus <span class="text-ps-faint">(optional)</span></label>
+        <textarea class="form-control" id="compact-focus" name="instructions" rows="2" maxlength="4000" placeholder="What the summary should keep"></textarea>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Compact</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-edit-message" tabindex="-1" aria-labelledby="modal-edit-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form class="modal-content" data-edit-form>
+      <div class="modal-header"><h2 class="modal-title" id="modal-edit-title">Edit and resend</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <p class="fs-7 text-secondary">Sends the edited message on a new branch from just before it. The current branch stays as it is.</p>
+        <input type="hidden" name="entryId">
+        <label class="visually-hidden" for="edit-text">Message</label>
+        <textarea class="form-control" id="edit-text" name="text" rows="6" maxlength="100000" required></textarea>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Send on a new branch</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-tool-approval" tabindex="-1" aria-labelledby="modal-tool-approval-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form class="modal-content" data-approval-form>
+      <div class="modal-header"><h2 class="modal-title" id="modal-tool-approval-title">Run <span class="ps-mono" data-approval-tool></span>?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <input type="hidden" name="taskId">
+        <div class="ps-label mb-1">Input</div>
+        <div class="ps-term mb-3"><pre class="wrap" data-approval-input></pre></div>
+        <label class="form-label" for="deny-reason">Reason if you deny it <span class="text-ps-faint">(the model gets it as the tool's result)</span></label>
+        <input class="form-control" id="deny-reason" name="reason" maxlength="2000" placeholder="For example: don't touch the database">
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-outline-danger" data-decision="deny">Deny</button>
+        <button type="submit" class="btn btn-primary" data-decision="allow"><i class="bi bi-check2 me-1"></i>Allow once</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,61 @@
+@* Decision 0011 (run W2, WU7): the new chat page (GET /chat/new), after the mockups' chat-new: "What can I help with?", the composer and the
+   model switch. Nothing is saved until the first message: sending it creates the chat (POST /api/chats with a request id, so a retry never
+   makes two) with the chosen model, thinking level, speed and the Settings › Tools working directory, then opens /chat/{id}. *@
+@model NewChatPage
+@{
+    ViewData["Title"] = "New chat";
+    ViewData[ShellViewData.Nav] = ShellNav.NewChat;
+    ViewData[ShellViewData.ContentClass] = "no-scroll";
+    ViewData[ShellViewData.Page] = "chat-new";
+    var picker = new ProviderModelSelect("mp") { Provider = Model.Provider, Model = Model.Model };
+}
+@inject IModelCatalog Catalog
+@{
+    var provider = Model.Provider is null ? null : Catalog.FindProvider(Model.Provider);
+    var selected = Model.Provider is null || Model.Model is null ? null : Catalog.FindModel(Model.Provider, Model.Model);
+}
+@section Styles {
+  <link href="~/css/chat.css" rel="stylesheet" asp-append-version="true">
+}
+@section TopbarStart {
+  <h1 class="app-title"><span class="visually-hidden">New chat</span></h1>
+  @if (selected is not null)
+  {
+    <button class="model-switch" type="button" data-bs-toggle="modal" data-bs-target="#modal-model-picker" aria-label="Change model (@selected.Name)" data-model-switch>
+      <span data-model-name>@selected.Name</span> <span class="sub" data-provider-name>@(provider?.DisplayName ?? selected.Provider)</span> <i class="bi bi-chevron-down"></i>
+    </button>
+  }
+}
+<div class="chat-layout info-collapsed" id="chatLayout" data-chat-new data-provider="@Model.Provider" data-model="@Model.Model">
+  <section class="chat-main" aria-label="New chat">
+    <div class="chat-scroll">
+      <div class="chat-thread">
+        @if (selected is null)
+        {
+          <div class="empty-hero">
+            <h2 class="mb-2">Connect a provider to start</h2>
+            <p class="text-secondary mb-4 mx-auto chat-hero-text">Add an API key or sign in with a subscription. Keys are encrypted on this computer and only sent to their provider.</p>
+            <a class="btn btn-primary" href="/settings/providers">Open Settings › Providers</a>
+          </div>
+        }
+        else
+        {
+          <div class="empty-hero">
+            <h2>What can I help with?</h2>
+            <partial name="_ChatComposer" model="new ChatComposerView(true, Model.Thinking, Model.ThinkingLevels, null)" />
+            <p class="fs-8 text-ps-faint mt-2 mb-0">Working in <span class="ps-mono" data-cwd>@Model.WorkingDirectory</span> · saved when you send the first message</p>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+</div>
+@section Modals {
+  @if (selected is not null)
+  {
+    <partial name="_ChatModelPicker" model="picker" />
+  }
+}
+@section Scripts {
+  <script type="module" src="~/js/chat.js" asp-append-version="true"></script>
+}

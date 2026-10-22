@@ -1,0 +1,126 @@
+@* Decision 0011 (run W2, WU7): one transcript item of a chat (PiSharp.Durable.Client's TranscriptItem), after PiSharp Durable Web's
+   _TranscriptItem and the mockups' messages. The same partial renders the stored transcript of a page and every streamed change, keyed by
+   the item's Key (data-key), so a reattached tab and its stream agree. User text is encoded; model text goes through Web.Common's sanitizing
+   MarkdownRenderer. Fork and Edit act on an entry id (data-entry); the account label is the chat's (never a credential). *@
+@model ChatItemView
+@{
+    var item = Model.Item;
+    var context = Model.Context;
+}
+@switch (item)
+{
+    case UserItem user:
+        <article class="msg msg-user" data-key="@user.Key" data-entry="@user.Id">
+          <div class="msg-body">
+            <div class="msg-content msg-plain" data-entry-text>@user.Text</div>
+            @foreach (var image in user.Images)
+            {
+              <img class="msg-image" src="@image.DataUrl" alt="Attached image">
+            }
+            <div class="entry-hover">
+              <button class="btn btn-icon" type="button" title="Copy" aria-label="Copy message @user.Id" data-action="copy-entry"><i class="bi bi-copy"></i></button>
+              <button class="btn btn-icon" type="button" title="Edit and resend on a new branch" aria-label="Edit message @user.Id" data-action="edit" data-entry="@user.Id"><i class="bi bi-pencil"></i></button>
+              <span class="entry-id">#@user.Id</span>
+            </div>
+          </div>
+        </article>
+        break;
+
+    case AssistantItem assistant:
+        <article class="msg msg-assistant" data-key="@assistant.Key" data-entry="@assistant.Id">
+          <div class="msg-body">
+            <div class="msg-role">
+              @if (assistant.Model is { Length: > 0 } modelName)
+              {
+                <span class="msg-model">@modelName</span>
+              }
+              @if (assistant.Streaming)
+              {
+                <span class="ms-1"><span class="status-dot live" aria-hidden="true"></span><span class="visually-hidden">Working</span></span>
+              }
+            </div>
+            @foreach (var block in assistant.Blocks)
+            {
+              switch (block)
+              {
+                  case ThinkingBlockView thinking:
+                    <details class="thinking" data-detail="thinking-@assistant.Key-@assistant.Blocks.ToList().IndexOf(block)"><summary><i class="bi bi-chevron-right"></i><i class="bi bi-lightbulb"></i> Thinking</summary><div class="thinking-body">@thinking.Text</div></details>
+                    break;
+                  case TextBlockView text:
+                    <div class="msg-content" data-entry-text>@Html.Raw(context.Markdown.Render(text.Text))</div>
+                    break;
+                  case ToolBlockView tool:
+                    @await Html.PartialAsync("~/Views/Chat/_ChatToolCall.cshtml", new ChatToolView(tool.Call, context, false))
+                    break;
+              }
+            }
+            @if (assistant.Streaming && !assistant.Blocks.Any())
+            {
+              <div class="msg-content"><span class="stream-cursor"></span></div>
+            }
+            @if (assistant.Error is { } error)
+            {
+              <div class="msg-error"><i class="bi bi-exclamation-circle me-1"></i>@error</div>
+            }
+            @if (!assistant.Streaming && assistant.Id is { } entryId)
+            {
+              <div class="msg-footer">
+                <span class="msg-actions">
+                  @if (assistant.Blocks.OfType<TextBlockView>().Any())
+                  {
+                    <button class="btn btn-icon" type="button" title="Copy" aria-label="Copy answer @entryId" data-action="copy-entry"><i class="bi bi-copy"></i></button>
+                  }
+                  <button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @entryId" data-action="fork" data-entry="@entryId"><i class="bi bi-signpost-split"></i></button>
+                  <span class="entry-id">#@entryId</span>
+                  @if (context.AccountLabel is { Length: > 0 } account)
+                  {
+                    <span class="msg-account" title="Provider account of this chat">@account</span>
+                  }
+                </span>
+              </div>
+            }
+          </div>
+        </article>
+        break;
+
+    case ToolResultItem result:
+        <article class="msg msg-assistant" data-key="@result.Key" data-entry="@result.Id">
+          <div class="msg-body">
+            <details class="tool-card @(result.IsError ? "is-error" : "")" data-detail="@result.Key">
+              <summary><span class="tool-icon"><i class="bi @(result.IsError ? "bi-exclamation-circle" : "bi-check2")"></i></span><span class="tool-name">@result.Name</span><span class="tool-args-summary">Result of a call before this context</span><span class="tool-status">@(result.IsError ? "Error" : "Done")</span></summary>
+              <div class="tool-body"><div class="ps-term"><pre class="wrap">@result.Text</pre></div></div>
+            </details>
+            <div class="msg-footer"><span class="msg-actions"><button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @result.Id" data-action="fork" data-entry="@result.Id"><i class="bi bi-signpost-split"></i></button><span class="entry-id">#@result.Id</span></span></div>
+          </div>
+        </article>
+        break;
+
+    case ToolItem tool:
+        <article class="msg msg-assistant" data-key="@tool.Key">
+          <div class="msg-body">@await Html.PartialAsync("~/Views/Chat/_ChatToolCall.cshtml", new ChatToolView(tool.Call, context, false))</div>
+        </article>
+        break;
+
+    case EventItem entry:
+        {
+            var icon = entry.EntryKind switch
+            {
+                "pi.reset" => "bi-arrow-counterclockwise",
+                "pi.compaction" => "bi-layers",
+                _ => "bi-info-circle",
+            };
+            var noteTitle = entry.EntryKind == "pi.reset" ? "Handoff note" : "Context note";
+            <div class="event-group" data-key="@entry.Key" data-entry="@entry.Id">
+              <div class="event-line"><span class="ev-text"><i class="bi @icon"></i><span>@entry.Text</span><span class="entry-id">#@entry.Id</span><button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @entry.Id" data-action="fork" data-entry="@entry.Id"><i class="bi bi-signpost-split"></i></button></span></div>
+              @if (entry.Note is { Length: > 0 } note)
+              {
+                <div class="event-block">
+                  <details class="context-note" data-detail="note-@entry.Key"><summary>@noteTitle</summary>
+                    <div class="note-body">@Html.Raw(context.Markdown.Render(note))</div>
+                  </details>
+                </div>
+              }
+            </div>
+        }
+        break;
+}
