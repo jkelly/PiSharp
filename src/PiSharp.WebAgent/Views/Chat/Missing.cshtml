@@ -1,0 +1,15 @@
+@* Decision 0011 (run W2, WU7): the answer to /chat/{id} for a chat that does not exist or was deleted (404). Model: the id asked for. *@
+@model string
+@{
+    ViewData["Title"] = "Chat not found";
+    ViewData[ShellViewData.Nav] = ShellNav.NewChat;
+    ViewData[ShellViewData.Page] = "chat-missing";
+}
+<div class="page">
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-chat-square-dots"></i></div>
+    <h3 class="mb-2">This chat isn't here</h3>
+    <p class="text-secondary">It was deleted, or the link is wrong.</p>
+    <a class="btn btn-primary btn-sm" href="/chat/new"><i class="bi bi-pencil-square me-1"></i>New chat</a>
+  </div>
+</div>

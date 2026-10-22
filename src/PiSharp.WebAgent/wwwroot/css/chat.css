@@ -1,0 +1,45 @@
+/* Decision 0011 (run W2, WU7): the chat pages' styles that Web.Common's shell.css and the Web Agent's site.css do not have: the transcript
+   pieces of PiSharp Durable Web's fragments (entry ids, event lines, context notes, nested calls, live output, images), the "Waiting for
+   you" panel above the composer and the hero composer of a new chat. Colours are the theme's tokens, so light and dark both work. */
+
+.msg-plain { white-space: pre-wrap; }
+.msg-image { display: block; max-width: min(100%, 28rem); max-height: 20rem; border-radius: .5rem; border: 1px solid var(--ps-border); margin-top: .5rem; }
+
+.entry-id { font-size: .72rem; color: var(--ps-faint); font-variant-numeric: tabular-nums; }
+.msg-user .entry-hover { display: flex; justify-content: flex-end; align-items: center; gap: .25rem; margin-top: .2rem; opacity: 0; transition: opacity .15s ease; }
+.msg-user:hover .entry-hover, .msg-user:focus-within .entry-hover { opacity: 1; }
+.msg-actions .entry-id { align-self: center; margin-left: .35rem; }
+
+.event-group { display: block; }
+.event-line { display: flex; align-items: center; gap: .55rem; font-size: .8125rem; color: var(--ps-faint); margin: 0 0 1.5rem; }
+.event-line::before, .event-line::after { content: ""; height: 1px; background: var(--ps-border); flex: 1; min-width: 1rem; }
+.event-line .ev-text { display: inline-flex; align-items: center; gap: .45rem; max-width: 80%; text-align: center; }
+.event-line .btn-icon { --bs-btn-padding-y: .1rem; --bs-btn-padding-x: .3rem; }
+.event-block { margin: -1rem 0 1.5rem; }
+.event-block .context-note { max-width: 560px; margin: 0 auto; }
+.context-note > summary { list-style: none; cursor: pointer; text-align: center; font-size: .78rem; color: var(--ps-faint); }
+.context-note > summary::-webkit-details-marker { display: none; }
+.context-note > summary:hover { color: var(--ps-text); }
+.context-note .note-body { margin-top: .5rem; font-size: .8125rem; color: var(--ps-muted); background: var(--ps-surface-3); border-radius: 12px; padding: .6rem .8rem; line-height: 1.6; }
+
+.tool-card .tool-status { font-size: .75rem; color: var(--ps-faint); white-space: nowrap; }
+.tool-card .tool-body .result-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
+.nested-calls { margin-top: .6rem; padding-left: .75rem; border-left: 1px solid var(--ps-border-strong); }
+.nested-calls .tool-card { margin: .35rem 0; }
+.nested-label { font-size: .75rem; color: var(--ps-faint); }
+.live-output { max-height: 220px; overflow-y: auto; }
+
+.pending-panel { max-width: 768px; max-height: 50vh; overflow-y: auto; margin: 0 auto .6rem; border: 1px solid var(--bs-warning-border-subtle); border-radius: 18px; background: var(--ps-surface); }
+[data-bs-theme="dark"] .pending-panel { background: var(--ps-elevated); }
+.pending-head { display: flex; align-items: center; gap: .5rem; padding: .6rem 1rem; font-size: .85rem; font-weight: 500; }
+.pending-body { padding: 0 1rem .85rem; }
+.pending-body fieldset { border: 0; padding: 0; margin: 0; }
+.pending-body legend { font-size: inherit; float: none; width: auto; margin-bottom: .35rem; }
+.pending-body .q-text { font-size: .9rem; font-weight: 500; margin-bottom: .55rem; }
+.pending-body .choice-card { padding: .55rem .8rem; margin-bottom: .4rem; }
+.pending-body .awaiting-card { margin: 0 !important; }
+
+.chat-branch-note { max-width: 768px; margin: 0 auto .5rem; }
+.chat-hero-text { max-width: 520px; }
+.empty-hero .composer { margin-top: 1.25rem; }
+.chat-info .pane-body { overflow-y: auto; }
