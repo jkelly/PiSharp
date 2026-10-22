@@ -3,11 +3,13 @@ name: Durable
 # CI for the experimental pi-durable port (decision 0005), released as experimental in 1.2.0.1. Runs on main, on
 # feature/pi-durable and on feature/durable-network (decision 0008, the device host); the release workflow also runs both durable suites on Linux. The test job's storage.sqlite.native case loads
 # e_sqlite3 on each OS; sqlite-publish checks that a publish for each release RID carries that RID's e_sqlite3 native asset.
+# Decision 0011 (run W2): PiSharp Web Agent and the model runtime it shares with the CLI run here too, on feature/web-agent as well; their
+# suites start the app with --faux, so nothing reaches a provider.
 on:
   push:
-    branches: [main, feature/pi-durable, feature/durable-network]
+    branches: [main, feature/pi-durable, feature/durable-network, feature/web-agent]
   pull_request:
-    branches: [main, feature/pi-durable, feature/durable-network]
+    branches: [main, feature/pi-durable, feature/durable-network, feature/web-agent]
   workflow_dispatch:
 
 permissions:
@@ -83,6 +85,38 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
           dotnet run --project tests/PiSharp.Durable.Web.Tests/PiSharp.Durable.Web.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/durable-web-${{ matrix.os }}.json"
+
+      # Decision 0011 (run W2, WU2): PiSharp.ModelRuntime on its own (catalog, credentials, routes), with fake credential sources and
+      # in-process fake HTTP handlers only.
+      - name: Run PiSharp.ModelRuntime.Tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.ModelRuntime.Tests/PiSharp.ModelRuntime.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/model-runtime-${{ matrix.os }}.json"
+
+      # Decision 0011 (run W2): PiSharp Web Agent as a child process with --faux, a temporary data folder and a free port (no browser); the
+      # recovery cases kill it and start it again, and the account-switch case routes to a loopback fake provider.
+      - name: Run PiSharp.WebAgent.Tests
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.WebAgent.Tests/PiSharp.WebAgent.Tests.csproj -c Release             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false             -- --report "$RUNNER_TEMP/webagent-${{ matrix.os }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webagent-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/webagent-${{ matrix.os }}.json
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-runtime-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/model-runtime-${{ matrix.os }}.json
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -165,6 +199,46 @@ jobs:
           path: |
             ${{ runner.temp }}/durable-web-browser-${{ matrix.os }}.json
             ${{ runner.temp }}/durable-web-browser-artifacts
+          if-no-files-found: ignore
+
+  # Decision 0011 (run W2, WU10): PiSharp Web Agent in headless Chromium (Microsoft.Playwright), with --faux. Every case fails on a page
+  # error or a console error; failed cases leave a screenshot, the page's HTML, the errors and the app's log in the artifacts.
+  webagent-browser:
+    name: Web Agent browser tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Build PiSharp.WebAgent.BrowserTests
+        run: >-
+          dotnet build tests/PiSharp.WebAgent.BrowserTests/PiSharp.WebAgent.BrowserTests.csproj -c Release
+          -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false
+
+      - name: Install Playwright's Chromium
+        shell: pwsh
+        run: ./tests/PiSharp.WebAgent.BrowserTests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run PiSharp.WebAgent.BrowserTests
+        shell: bash
+        run: |
+          dotnet run --project tests/PiSharp.WebAgent.BrowserTests/PiSharp.WebAgent.BrowserTests.csproj -c Release --no-build             -- --report "$RUNNER_TEMP/webagent-browser-${{ matrix.os }}.json" --artifacts "$RUNNER_TEMP/webagent-browser-artifacts"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webagent-browser-report-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/webagent-browser-${{ matrix.os }}.json
+            ${{ runner.temp }}/webagent-browser-artifacts
           if-no-files-found: ignore
 
   sqlite-publish:

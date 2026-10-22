@@ -218,6 +218,9 @@
   <Folder Name="/tests/parity/PiSharp.WebAgent.Tests/">
     <Project Path="tests/PiSharp.WebAgent.Tests/PiSharp.WebAgent.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/parity/PiSharp.WebAgent.BrowserTests/">
+    <Project Path="tests/PiSharp.WebAgent.BrowserTests/PiSharp.WebAgent.BrowserTests.csproj" />
+  </Folder>
   <Folder Name="/tests/parity/PiSharp.InteractiveParity.Tests/">
     <Project Path="tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj" />
   </Folder>
