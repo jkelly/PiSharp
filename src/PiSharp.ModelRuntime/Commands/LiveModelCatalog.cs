@@ -20,8 +20,8 @@ namespace PiSharp.Cli.Commands;
 /// route), published into the session runtime's model catalog and offered to RPC set_model/cycle_model/get_available_models.</summary>
 internal sealed class LiveModelCatalog : IAsyncDisposable
 {
-    private readonly LiveSessionRuntime runtime;
-    private readonly Func<ModelDescriptor, LiveSessionRuntime> runtimeFor;
+    private readonly LiveRouteRuntime runtime;
+    private readonly Func<ModelDescriptor, LiveRouteRuntime> runtimeFor;
     private readonly Func<SessionModelBinding, SessionModelBinding> bind;
     private readonly SessionRuntimeRegistry registry;
     private readonly ModelDescriptor primary;
@@ -32,7 +32,7 @@ internal sealed class LiveModelCatalog : IAsyncDisposable
     private ModelRegistry? current;
     private bool disposed;
 
-    internal LiveModelCatalog(LiveSessionRuntime runtime, Func<ModelDescriptor, LiveSessionRuntime> runtimeFor,
+    internal LiveModelCatalog(LiveRouteRuntime runtime, Func<ModelDescriptor, LiveRouteRuntime> runtimeFor,
         Func<SessionModelBinding, SessionModelBinding> bind, SessionRuntimeRegistry registry, ModelDescriptor primary, JsonData primaryWire)
     {
         this.runtime = runtime; this.runtimeFor = runtimeFor; this.bind = bind; this.registry = registry;
@@ -132,7 +132,7 @@ internal sealed class LiveModelCatalog : IAsyncDisposable
 
 /// <summary>A switchable model's session transport: its live route (<see cref="LiveSessionSelection.FromEntry"/>, Anthropic through
 /// its resolved authentication) connects on the first request; thinking levels come from the catalog row.</summary>
-internal sealed class LazyModelTransport(RegistryModel entry, ModelDescriptor model, Func<ModelRegistry> registry, LiveSessionRuntime runtime)
+internal sealed class LazyModelTransport(RegistryModel entry, ModelDescriptor model, Func<ModelRegistry> registry, LiveRouteRuntime runtime)
     : IChatTransport, IThinkingLevelTransport, IAsyncDisposable
 {
     private readonly SemaphoreSlim gate = new(1, 1);
@@ -155,10 +155,10 @@ internal sealed class LazyModelTransport(RegistryModel entry, ModelDescriptor mo
             var selection = LiveSessionSelection.FromEntry(registry().Find(entry.Provider, entry.Id) ?? entry, registry(), null, useModelMaximum: true);
             if (selection.Model.Provider == "anthropic" && selection.Model.Api == "anthropic-messages")
             {
-                var (authentication, handler, reresolve) = await selection.ResolveAnthropicAsync(runtime, token).ConfigureAwait(false);
+                var (authentication, handler, reresolve) = await selection.ResolveAnthropicRouteAsync(runtime, token).ConfigureAwait(false);
                 connection = await selection.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve).ConfigureAwait(false);
             }
-            else connection = selection.Connect(runtime);
+            else connection = selection.ConnectRoute(runtime);
             return connection;
         }
         finally { gate.Release(); }

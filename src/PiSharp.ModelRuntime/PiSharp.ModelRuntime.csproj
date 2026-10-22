@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Web Agent W2 (WU2, plan "Architecture" item 2): the model registry, the built-in catalog, models.json, the provider auth catalog and
+       the live provider routes, moved out of PiSharp.Cli with `git mv` (namespaces kept) so PiSharp.WebAgent can route models without the
+       CLI. An unpacked library. Two seams keep the CLI's own parts in the CLI: IProviderCredentialSource (auth.json stays there as
+       AuthJsonCredentialStore) and IRegistryProviderLayer (the built-in llama.cpp provider stays there). ProviderLoginHost, Llama/,
+       DurableModels and the TUI stay in the CLI. -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Cli" />
+    <InternalsVisibleTo Include="PiSharp.WebAgent" />
+    <InternalsVisibleTo Include="PiSharp.WebAgent.Tests" />
+    <InternalsVisibleTo Include="PiSharp.ModelRuntime.Tests" />
+    <!-- Every test assembly that saw these internals through PiSharp.Cli (its csproj and Properties/*Access.cs). -->
+    <InternalsVisibleTo Include="PiSharp.CodingAgent.Tests" />
+    <InternalsVisibleTo Include="PiSharp.NodeCommandInputPackage.Tests" />
+    <InternalsVisibleTo Include="PiSharp.CliSync.Tests" />
+    <InternalsVisibleTo Include="PiSharp.McpSync.Tests" />
+    <InternalsVisibleTo Include="PiSharp.ToolSearch.Tests" />
+    <InternalsVisibleTo Include="PiSharp.Models.Tests" />
+    <InternalsVisibleTo Include="PiSharp.Codemode.Tests" />
+    <InternalsVisibleTo Include="PiSharp.CliParity.Tests" />
+    <InternalsVisibleTo Include="PiSharp.ExtensionParity.Tests" />
+    <InternalsVisibleTo Include="PiSharp.InteractiveParity.Tests" />
+    <InternalsVisibleTo Include="PiSharp.DurableCli.Tests" />
+    <InternalsVisibleTo Include="PiSharp.McpParity.Tests" />
+    <InternalsVisibleTo Include="PiSharp.ProviderApis.Tests" />
+    <InternalsVisibleTo Include="PiSharp.SessionParity.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
+    <ProjectReference Include="../PiSharp.Rpc/PiSharp.Rpc.csproj" />
+    <!-- PiPayloadBudget (moved whole) also holds the Pi entry's extension dispatch and binding bounds. -->
+    <ProjectReference Include="../PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <ProjectReference Include="../PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The built-in catalog shards stay in src/PiSharp.Cli/Models (PiSharp.Durable and the catalog tests read them there); embedded by
+         link under the CLI's resource names, which BuiltinModelCatalog and CopilotCatalog read. -->
+    <EmbeddedResource Include="../PiSharp.Cli/Models/*.json" Link="Models/%(Filename)%(Extension)" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

@@ -13,10 +13,14 @@ using PiSharp.Contracts;
 
 namespace PiSharp.Cli.Commands;
 
-/// <summary>The live route's effects: the process environment reader (read once per name for the session), the provider HTTP
-/// handler, and the <c>auth.json</c> path (null: no stored credentials) with the client and clock its OAuth refresh uses.</summary>
-internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment, Func<HttpMessageHandler?> CreateHttpHandler,
-    string? AuthPath = null, Func<HttpMessageInvoker>? CreateAuthHttp = null, TimeProvider? Time = null, string? ModelsPath = null)
+/// <summary>
+/// The live route's effects: the process environment reader (read once per name for the session), the provider HTTP handler, the
+/// stored credentials (none: the environment and models.json only) with the client and clock their OAuth refresh uses, and models.json.
+/// PiSharp.Cli's <c>LiveSessionRuntime</c> reads the credentials from its <c>auth.json</c> path and adds the built-in llama.cpp provider;
+/// another host sets <see cref="Credentials"/> (Web Agent W2, WU2: this record was the CLI's LiveSessionRuntime before the move).
+/// </summary>
+internal record LiveRouteRuntime(Func<string, string?> ReadEnvironment, Func<HttpMessageHandler?> CreateHttpHandler,
+    Func<HttpMessageInvoker>? CreateAuthHttp = null, TimeProvider? Time = null, string? ModelsPath = null)
 {
     /// <summary>Provider variables read when the session starts (env-api-keys.ts, anthropic.ts and azure-openai-config.ts).</summary>
     internal static readonly ImmutableArray<string> ProviderVariables =
@@ -29,24 +33,28 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
         "AZURE_OPENAI_API_VERSION", AzureOpenAIConfiguration.DeploymentNameMapVariable
     ];
 
-    // A stored auth.json credential (written by /login) owns the Anthropic provider; the environment is read only without one.
-    internal static LiveSessionRuntime Default => DefaultRuntime.Value;
-    private static readonly Lazy<LiveSessionRuntime> DefaultRuntime = new(() =>
-    {
-        var authPath = PiSharp.Cli.Authentication.AuthJsonCredentialStore.CreateDefault().AuthPath;
-        // model-runtime.ts: models.json (and models-store.json) live in the agent directory next to auth.json.
-        return new(Environment.GetEnvironmentVariable, () => null, authPath, ModelsPath: Path.Combine(Path.GetDirectoryName(authPath)!, "models.json"));
-    });
+    /// <summary>The stored credentials this runtime's routes and registries read (a stored credential owns its provider; the environment
+    /// is read only without one), opened per use. Null: <see cref="OpenStore"/>, the host's own store.</summary>
+    internal Func<PiSharp.Cli.Authentication.IProviderCredentialSource?>? Credentials { get; init; }
+
+    /// <summary>The stored credentials: <see cref="Credentials"/>, else <see cref="OpenStore"/>; null when there are none.</summary>
+    internal PiSharp.Cli.Authentication.IProviderCredentialSource? OpenCredentials() => Credentials is { } credentials ? credentials() : OpenStore();
+
+    /// <summary>The host's own credential store when <see cref="Credentials"/> is not set (the CLI: <c>auth.json</c>); null: none.</summary>
+    protected virtual PiSharp.Cli.Authentication.IProviderCredentialSource? OpenStore() => null;
+
+    /// <summary>The built-in extension providers every registry of this runtime composes (the CLI: llama.cpp over the models store);
+    /// none by default.</summary>
+    protected virtual IReadOnlyList<PiSharp.Cli.Models.IRegistryProviderLayer> RegistryLayers(PiSharp.Cli.Models.FileModelsStore? modelsStore) => [];
 
     /// <summary>The session's model registry (model-runtime.ts create): built-in shards, the runtime's models.json, persisted catalogs
-    /// restored without network, the stored <c>auth.json</c> credentials, and a lazily read environment (each name read once).</summary>
+    /// restored without network, the stored credentials, and a lazily read environment (each name read once).</summary>
     internal async Task<PiSharp.Cli.Models.ModelRegistry> CreateModelRegistryAsync(CancellationToken cancellationToken)
     {
         var environment = new PiSharp.Cli.Authentication.LiveProcessEnvironment(ReadEnvironment, []);
         var stored = new Dictionary<string, ProviderStoredCredential>(StringComparer.Ordinal);
-        if (AuthPath is not null && File.Exists(AuthPath))
+        if (OpenCredentials() is { } store)
         {
-            var store = new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time);
             try
             {
                 foreach (var (provider, _) in await store.ListAsync(cancellationToken).ConfigureAwait(false))
@@ -59,11 +67,11 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
             catch (Exception error) when (error is InvalidDataException or IOException or UnauthorizedAccessException or PiSharp.AI.Authentication.OAuth.OAuthLifecycleException)
             { stored.Clear(); } // An unreadable store leaves the environment as the only credential source, as for availability upstream.
         }
+        var modelsStore = ModelsPath is null ? null : new PiSharp.Cli.Models.FileModelsStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ModelsPath))!, "models-store.json"));
         var registry = await PiSharp.Cli.Models.ModelRegistry.CreateAsync(new()
         {
             ModelsPath = ModelsPath, Environment = environment.Get, StoredCredentials = stored, CatalogBaseUrl = CatalogBaseUrl, CreateCatalogClient = CreateCatalogClient,
-            LlamaProvider = LlamaProvider, ResolveOAuthKey = ResolveCatalogOAuthKeyAsync,
-            ModelsStore =ModelsPath is null ? null : new PiSharp.Cli.Models.FileModelsStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ModelsPath))!, "models-store.json"))
+            ProviderLayers = RegistryLayers(modelsStore), ResolveOAuthKey = ResolveCatalogOAuthKeyAsync, ModelsStore = modelsStore
         }, cancellationToken).ConfigureAwait(false);
         ConfigureRegistry?.Invoke(registry);
         return registry;
@@ -73,9 +81,9 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
     /// expires, for a provider's catalog refresh (OpenRouter's per-key model list).</summary>
     private async Task<string?> ResolveCatalogOAuthKeyAsync(string provider, CancellationToken cancellationToken)
     {
-        if (AuthPath is null || PiSharp.Cli.Authentication.ProviderAuthCatalog.Find(provider) is not { OAuth: not null } entry) return null;
+        if (PiSharp.Cli.Authentication.ProviderAuthCatalog.Find(provider) is not { OAuth: not null } entry || OpenCredentials() is not { } store) return null;
         var authentication = new PiSharp.Cli.Authentication.ProviderLiveAuthentication(entry,
-            new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time), CreateEnvironment(), CreateAuthHttp ?? (() => new HttpClient()), Time,
+            store, CreateEnvironment(), CreateAuthHttp ?? (() => new HttpClient()), Time,
             OAuthFlows is { } flows ? context => flows(provider, context) : null);
         return (await authentication.ResolveAsync(cancellationToken).ConfigureAwait(false))?.ApiKey;
     }
@@ -86,9 +94,6 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
     internal Func<string?>? Transport { get; init; }
     /// <summary>Codex WebSocket handshake deadline from websocketConnectTimeoutMs; null keeps the provider default.</summary>
     internal TimeSpan? WebSocketConnectTimeout { get; init; }
-    /// <summary>Whether the built-in llama.cpp extension (and so its provider) is loaded, read when a registry composes its providers;
-    /// null: loaded.</summary>
-    internal Func<bool>? LlamaProvider { get; init; }
 
     /// <summary>The session's environment, built once from <see cref="ReadEnvironment"/>.</summary>
     internal PiSharp.Cli.Authentication.LiveProcessEnvironment CreateEnvironment() => new(ReadEnvironment, ProviderVariables);
@@ -97,8 +102,7 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
     /// nothing is stored.</param>
     internal PiSharp.Cli.Authentication.AnthropicLiveAuthentication CreateAnthropicAuthentication(PiSharp.Cli.Authentication.LiveProcessEnvironment environment,
         Func<string?>? configuredApiKey = null) =>
-        new(AuthPath is null ? null : new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time), environment,
-            CreateAuthHttp ?? (() => new HttpClient()), Time) { ConfiguredApiKey = configuredApiKey };
+        new(OpenCredentials(), environment, CreateAuthHttp ?? (() => new HttpClient()), Time) { ConfiguredApiKey = configuredApiKey };
 
     /// <summary>The remote model catalog origin (null: https://pi.dev) and its HTTP client (tests).</summary>
     internal string? CatalogBaseUrl { get; init; }
@@ -224,13 +228,14 @@ internal sealed class LiveSessionSelection
         return LiveSessionConnection.ConnectResolvedAsync(this, authentication, handler, cancellationToken, reresolve);
     }
 
-    /// <summary>Anthropic, resolved as upstream resolveProviderAuth does (stored auth.json credential, then the environment's
-    /// AUTH_TOKEN, OAUTH_TOKEN, API_KEY, then workload identity federation) at start and before every request.</summary>
+    /// <summary>Anthropic, resolved as upstream resolveProviderAuth does (stored credential, then the environment's
+    /// AUTH_TOKEN, OAUTH_TOKEN, API_KEY, then workload identity federation) at start and before every request. The CLI's
+    /// <c>ResolveAnthropicAsync(LiveSessionRuntime?)</c> calls this with its default runtime.</summary>
     internal async ValueTask<(AuthenticationResolution Authentication, HttpMessageHandler? Handler,
-        Func<CancellationToken, ValueTask<AuthenticationResolution>> Reresolve)> ResolveAnthropicAsync(LiveSessionRuntime? runtime, CancellationToken cancellationToken)
+        Func<CancellationToken, ValueTask<AuthenticationResolution>> Reresolve)> ResolveAnthropicRouteAsync(LiveRouteRuntime runtime, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(runtime);
         if (Model.Provider != "anthropic") throw new ArgumentException("Anthropic resolution requires an Anthropic selection.");
-        runtime ??= LiveSessionRuntime.Default;
         var registry = Registry;
         var authentication = runtime.CreateAnthropicAuthentication(runtime.CreateEnvironment(), registry is null ? null : () => registry.ConfiguredApiKey("anthropic"));
         AuthenticationResolution resolved;
@@ -297,9 +302,11 @@ internal sealed class LiveSessionSelection
         return new(definition, 1);
     }
 
-    internal LiveSessionConnection Connect(LiveSessionRuntime? runtime)
+    /// <summary>The selection's live connection over a runtime's credentials, environment and HTTP handler. The CLI's
+    /// <c>Connect(LiveSessionRuntime?)</c> calls this with its default runtime.</summary>
+    internal LiveSessionConnection ConnectRoute(LiveRouteRuntime runtime)
     {
-        runtime ??= LiveSessionRuntime.Default;
+        ArgumentNullException.ThrowIfNull(runtime);
         if (IsVirtual && Registry is not null) return LiveSessionConnection.ForVirtual(this, runtime);
         if (CustomStream is { } custom) return LiveSessionConnection.ForCustom(this, custom());
         if (LiveProviderRoute.TryConnect(this, runtime) is { } routed) return routed;
@@ -332,7 +339,7 @@ internal sealed class LiveSessionSelection
         if (Model.Provider == "azure")
         {
             // Azure models ship without a baseUrl: AZURE_OPENAI_BASE_URL, then AZURE_OPENAI_RESOURCE_NAME (azure-openai-config.ts).
-            azure = new() { Environment = environment.Snapshot([.. LiveSessionRuntime.ProviderVariables.Where(name => name.StartsWith("AZURE_OPENAI_", StringComparison.Ordinal))]) };
+            azure = new() { Environment = environment.Snapshot([.. LiveRouteRuntime.ProviderVariables.Where(name => name.StartsWith("AZURE_OPENAI_", StringComparison.Ordinal))]) };
             try { _ = AzureOpenAIConfiguration.ResolveBaseUrl(Definition.BaseUrl, azure); }
             catch (ArgumentException error) { throw new LiveSessionException("LiveAzureEndpoint", error.Message); }
         }
@@ -491,7 +498,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     private readonly List<IDisposable> _virtualConnections = [];
     /// <summary>agent-session.ts with a virtual model: every request asks the router, then streams through the physical model's own
     /// live route (each route's connection is owned here).</summary>
-    internal static LiveSessionConnection ForVirtual(LiveSessionSelection selection, LiveSessionRuntime runtime)
+    internal static LiveSessionConnection ForVirtual(LiveSessionSelection selection, LiveRouteRuntime runtime)
     {
         var connection = new LiveSessionConnection(selection, null, "");
         connection._virtual = PiSharp.Cli.Models.VirtualModelRoutingTransport.ForLive(selection.Registry!, selection.Entry!, runtime, null,

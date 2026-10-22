@@ -36,13 +36,13 @@ internal sealed class LiveProviderRoute
 
     private readonly LiveSessionSelection selection;
     private readonly ProviderLiveAuthentication authentication;
-    private readonly LiveSessionRuntime runtime;
+    private readonly LiveRouteRuntime runtime;
     private readonly PiSharp.Cli.Authentication.LiveProcessEnvironment environment;
 
     /// <summary>The AWS credential chain's client (STS, SSO, container and instance metadata), shared for the session.</summary>
     private readonly Lazy<HttpMessageInvoker> credentialHttp;
 
-    private LiveProviderRoute(LiveSessionSelection selection, ProviderLiveAuthentication authentication, LiveSessionRuntime runtime,
+    private LiveProviderRoute(LiveSessionSelection selection, ProviderLiveAuthentication authentication, LiveRouteRuntime runtime,
         PiSharp.Cli.Authentication.LiveProcessEnvironment environment)
     {
         this.selection = selection; this.authentication = authentication; this.runtime = runtime; this.environment = environment;
@@ -53,14 +53,14 @@ internal sealed class LiveProviderRoute
     /// Connects a routed provider (its auth must resolve now, as upstream refuses an unconfigured provider), or returns a static-key
     /// connection for another catalog provider with a stored auth.json credential. Null leaves the environment-key route unchanged.
     /// </summary>
-    internal static LiveSessionConnection? TryConnect(LiveSessionSelection selection, LiveSessionRuntime runtime)
+    internal static LiveSessionConnection? TryConnect(LiveSessionSelection selection, LiveRouteRuntime runtime)
     {
         var provider = selection.Model.Provider;
         if (provider == "anthropic" || ProviderAuthCatalog.Find(provider) is not { } entry) return null;
-        var store = runtime.AuthPath is null ? null : new AuthJsonCredentialStore(runtime.AuthPath, runtime.Time);
+        var store = runtime.OpenCredentials();
         // Other providers: only a stored OAuth credential (/login) is resolved here; stored api_key entries, models.json and the
-        // environment are the catalog registry's (getApiKeyAndHeaders).
-        if (!Handles(provider) && (provider == "azure" || entry.OAuth is null || store is null || !File.Exists(store.AuthPath) ||
+        // environment are the catalog registry's (getApiKeyAndHeaders). A source that holds nothing yet reads no entry.
+        if (!Handles(provider) && (provider == "azure" || entry.OAuth is null || store is null ||
             store.ReadEntryAsync(provider, CancellationToken.None).GetAwaiter().GetResult() is not { Type: "oauth" })) return null;
         var environment = runtime.CreateEnvironment();
         var authentication = new ProviderLiveAuthentication(entry, store, environment, runtime.CreateAuthHttp ?? (() => new HttpClient()), runtime.Time,

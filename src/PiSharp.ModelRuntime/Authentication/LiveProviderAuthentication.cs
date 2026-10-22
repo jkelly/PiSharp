@@ -88,14 +88,14 @@ internal static class ConfigValueTemplate
 internal sealed class AnthropicLiveAuthentication
 {
     public const string Provider = "anthropic";
-    private readonly AuthJsonCredentialStore? store;
+    private readonly IProviderCredentialSource? store;
     private readonly LiveProcessEnvironment environment;
     private readonly Func<HttpMessageInvoker> createHttp;
     private readonly TimeProvider? time;
     private readonly StoredOAuthLifecycle? lifecycle;
     private readonly Refresh? refresh;
 
-    public AnthropicLiveAuthentication(AuthJsonCredentialStore? store, LiveProcessEnvironment environment,
+    public AnthropicLiveAuthentication(IProviderCredentialSource? store, LiveProcessEnvironment environment,
         Func<HttpMessageInvoker> createHttp, TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(environment); ArgumentNullException.ThrowIfNull(createHttp);
