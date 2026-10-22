@@ -1,7 +1,11 @@
-@* Decision 0011 (run W2, WU7): the mockups' _Composer. The message box, the thinking level (only the levels the model supports and the durable
-   host accepts) and Speed (the service tier). On a chat page the queue (_ChatQueue) sits above the box, and while a run goes on the box
-   offers Follow-up, Steer and Stop (data-running-controls); Enter sends (steers while running), Alt+Enter queues a follow-up, Esc stops.
-   chat.js posts it as JSON with a request id, so a retry never sends twice. *@
+@* Decision 0011 (run W2, WU7, WU8): the mockups' _Composer. The message box, the session commands (the slash dropup: /compact, /tree, /new
+   and /clone on a chat; /new and /clone have no chat to act on before the first message, so the new chat page leaves the dropup out), the
+   thinking level (the levels the model supports and the durable host accepts; a model that can't turn thinking off shows "Thinking: off
+   (unsupported)" disabled, as in the mockups) and Speed (the service tier). On a chat page the queue (_ChatQueue) sits above the box, and
+   while a run goes on the box offers Follow-up, Steer and Stop (data-running-controls); Enter sends (steers while running), Alt+Enter
+   queues a follow-up, Esc stops, Shift+Tab cycles the thinking level and Esc Esc opens the session tree. A typed /compact, /tree, /new or
+   /clone runs the command instead of sending it. chat.js posts the message as JSON with a request id, so a retry never sends twice. Prompt
+   templates, skills and attachments come in later milestones. *@
 @model ChatComposerView
 <form class="composer text-start" data-composer data-new-chat="@(Model.NewChat ? "true" : "false")" autocomplete="off">
   @if (!Model.NewChat)
@@ -11,7 +15,24 @@
   <label class="visually-hidden" for="composerInput">Message</label>
   <textarea id="composerInput" class="form-control" rows="2" placeholder="Ask anything" name="text" maxlength="100000" data-composer-input></textarea>
   <div class="composer-toolbar">
+    @if (!Model.NewChat)
+    {
+      <div class="dropup">
+        <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Commands" aria-label="Commands"><i class="bi bi-slash-square"></i></button>
+        <ul class="dropdown-menu" data-slash-menu>
+          <li><h6 class="dropdown-header">Session</h6></li>
+          <li><button class="dropdown-item fs-7" type="button" data-bs-toggle="modal" data-bs-target="#modal-compact">/compact <span class="text-ps-faint">[focus]</span></button></li>
+          <li><button class="dropdown-item fs-7" type="button" data-bs-toggle="modal" data-bs-target="#modal-session-tree">/tree</button></li>
+          <li><a class="dropdown-item fs-7" href="/chat/new">/new</a></li>
+          <li><button class="dropdown-item fs-7" type="button" data-action="clone">/clone</button></li>
+        </ul>
+      </div>
+    }
     <select class="form-select form-select-sm" name="thinking" aria-label="Thinking level" title="Thinking level (limited by the model)" data-thinking-select>
+      @if (!Model.ThinkingLevels.Contains("off"))
+      {
+        <option value="off" disabled>Thinking: off (unsupported)</option>
+      }
       @foreach (var level in Model.ThinkingLevels)
       {
         <option value="@level" selected="@(level == Model.Thinking)">@ChatDisplay.ThinkingLabel(level)</option>

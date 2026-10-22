@@ -4,7 +4,10 @@
 // the chat page's own partial (_ChatItem) through Web.Common's FragmentRenderer, at most every 150 ms, and only items whose content changed
 // render again. Every subscriber gets `view` frames, as the hub's StreamMux sends them: a new one first gets the whole view (reset), the
 // others the changes. Approvals and question forms render into the item's tool card or the "Waiting for you" panel. A view frame says which
-// upstream frames it follows (`source`: snapshot, batch, inbox), so a client can tell a catch-up from a live change.
+// upstream frames it follows (`source`: snapshot, batch, inbox), so a client can tell a catch-up from a live change. WU8 adds the items'
+// facts (ChatFacts: time, usage, failures, restarts, the running tail) to the render context and to each item's fingerprint, and three more
+// panels: `notices` (compacting, a compaction failure, an automatic retry's wait), `banners` (no providers, an expired sign-in) and `info`
+// (the session details).
 using System.Text.Json.Nodes;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Hosting;
@@ -119,13 +122,17 @@ public sealed class AgentViewHub : IAsyncDisposable
         _ => [],
     };
 
-    /// <summary>What an item's HTML depends on: its JSON, the approvals waiting in its tool cards and the account label.</summary>
+    /// <summary>What an item's HTML depends on: its JSON, its facts (time, usage, failure, restarts, the running tail), its calls' stored
+    /// results and waiting approvals, and the account label.</summary>
     internal static string Print(TranscriptItem item, ChatRenderContext context)
     {
-        var json = Transcript.ToJson([item]).ToJsonString();
+        var json = Transcript.ToJson([item]).ToJsonString() + "|" + context.FactsOf(item);
         foreach (var callId in CallIds(item))
+        {
             if (context.Approval(callId) is { } approval) json += "|approval:" + approval.Request.TaskId;
-        return json + "|" + context.AccountLabel;
+            if (context.Result(callId) is { } result) json += "|result:" + result;
+        }
+        return json + "|" + context.AccountLabel + "|" + context.Billing;
     }
 
     private sealed class Viewer(Action<JsonObject> send)
@@ -289,7 +296,11 @@ public sealed class AgentViewHub : IAsyncDisposable
                     accountFor = binding.Provider + "/" + binding.AccountId;
                     accountRead = true;
                 }
-                var context = hub.chats.RenderContext(binding, agentId, accountLabel);
+                var approvals = hub.broker.Pending(sessionId);
+                var entries = model.Entries;
+                var run = new ChatRunState(model.Running || model.Generating, model.Generating,
+                    approvals.Any(approval => approval.Request.AgentId == agentId), model.Pending.Count > 0);
+                var context = hub.chats.RenderContext(binding, agentId, accountLabel, entries, model.Items, run);
                 var upsert = new JsonArray();
                 var keys = new HashSet<string>(StringComparer.Ordinal);
                 var inline = new HashSet<string>(StringComparer.Ordinal);
@@ -313,14 +324,18 @@ public sealed class AgentViewHub : IAsyncDisposable
                 var reordered = !newOrder.SequenceEqual(order, StringComparer.Ordinal);
                 order = newOrder;
 
-                var approvals = hub.broker.Pending(sessionId);
                 var outside = approvals.Where(approval => !(approval.Request.AgentId == agentId && approval.Request.ParentCallId is null &&
                     inline.Contains(approval.Request.CallId))).ToList();
+                var usage = Transcript.Sum(DurableWire.Read<UsageTotals>(model.Usage));
                 var changedPanels = new JsonObject();
                 await PanelAsync(changedPanels, "pending", "~/Views/Chat/_ChatPending.cshtml", new ChatPendingView(model.Pending, outside, agentId)).ConfigureAwait(false);
                 await PanelAsync(changedPanels, "queue", "~/Views/Chat/_ChatQueue.cshtml", model.Inbox).ConfigureAwait(false);
+                await PanelAsync(changedPanels, "notices", "~/Views/Chat/_ChatNotices.cshtml", new ChatNoticesView(model.Compactions.Count > 0,
+                    model.CompactionFailure, model.Retry?.At, model.Retry?.Error)).ConfigureAwait(false);
+                await PanelAsync(changedPanels, "banners", "~/Views/Chat/_ChatBanners.cshtml", hub.chats.Banners(binding, accountLabel, entries)).ConfigureAwait(false);
+                await PanelAsync(changedPanels, "info", "~/Views/Chat/_ChatInfo.cshtml",
+                    await hub.chats.InfoAsync(binding, agentId, entries, model.ContextTokens, usage, accountLabel, stop.Token).ConfigureAwait(false)).ConfigureAwait(false);
 
-                var usage = Transcript.Sum(DurableWire.Read<UsageTotals>(model.Usage));
                 var waiting = model.Pending.Count + approvals.Count;
                 var nextState = new JsonObject
                 {

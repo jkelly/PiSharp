@@ -1,16 +1,37 @@
-@* Decision 0011 (run W2, WU7): the chat page's dialogs, after the mockups: rename, compact context (with optional focus instructions),
-   edit-and-resend (a new branch from just before the message; the old branch stays) and the tool approval details with a deny reason.
-   chat.js fills and submits them as JSON commands. Model: the chat's title. *@
-@model string
+@* Decision 0011 (run W2, WU7, WU8): the chat page's dialogs, after the mockups: rename (#modal-rename-session), compact context
+   (#modal-compact: the context now, focus instructions and the chat's auto-compaction switch), edit-and-resend (#modal-edit-message),
+   the session tree (#modal-session-tree, whose body chat.js loads from GET /chat/{id}/tree), the tool approval (#modal-tool-approval,
+   filled from an approval card; it reopens after a reload while the call still waits) and the error details (#modal-error-details,
+   filled from a failed answer's data-error-* attributes). chat.js fills and submits them as JSON commands. The shared confirm and
+   shortcuts dialogs come from the layout. The compact dialog leaves out an "after" estimate: nothing measures it before the summary. *@
+@model ChatPage
+@{
+    var binding = Model.Binding;
+    var info = Model.Info;
+    var window = Model.Model?.ContextWindow ?? 0;
+    var compaction = info.Compaction;
+    var keep = compaction?.KeepRecentTokens ?? PiSharp.Durable.Hosting.SessionCompaction.DefaultKeepRecentTokens;
+    var autoText = compaction is not null && window > 0
+        ? $"Auto-compact when the context passes {ChatDisplay.Count(compaction.WaitAt(window))} tokens (window minus reserve)"
+        : compaction is not null ? $"Auto-compact {ChatDisplay.Count(compaction.ReserveTokens)} tokens before the context window fills (window minus reserve)"
+        : "Auto-compact before the context window fills";
+    var policy = Model.ApprovalMode switch
+    {
+        ToolApprovalMode.Auto => "tools run without asking",
+        ToolApprovalMode.AllowList => info.AskTools.Count > 0 ? $"ask for {string.Join(", ", info.AskTools)}, except the allow-list" : "allow-list",
+        _ => info.AskTools.Count > 0 ? $"ask for {string.Join(", ", info.AskTools)}" : "ask before tools that change things",
+    };
+}
 <div class="modal fade" id="modal-rename-session" tabindex="-1" aria-labelledby="modal-rename-title" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form class="modal-content" data-rename-form>
       <div class="modal-header"><h2 class="modal-title" id="modal-rename-title">Rename chat</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <label class="form-label" for="rename-title">Name</label>
-        <input class="form-control" id="rename-title" name="title" maxlength="200" required value="@Model">
+        <input class="form-control" id="rename-title" name="title" maxlength="200" required value="@binding.Title">
+        <div class="form-text">Changes the name in the sidebar only. The chat's id and its folder don't change.</div>
       </div>
-      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Rename</button></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>
   </div>
 </div>
@@ -20,11 +41,22 @@
     <form class="modal-content" data-compact-form>
       <div class="modal-header"><h2 class="modal-title" id="modal-compact-title">Compact context</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
-        <p class="fs-7 text-secondary">The conversation so far is summarized into a context note, so later requests send less. The full transcript stays in the chat. Waits until the chat is idle.</p>
-        <label class="form-label" for="compact-focus">Focus <span class="text-ps-faint">(optional)</span></label>
-        <textarea class="form-control" id="compact-focus" name="instructions" rows="2" maxlength="4000" placeholder="What the summary should keep"></textarea>
+        <p class="text-secondary fs-7">Older messages are summarized into a <span class="ps-mono">compaction</span> entry. The most recent ~@ChatDisplay.Count(keep) tokens are kept verbatim. The full history stays in the chat. It waits until the chat is idle.</p>
+        <div class="ps-panel p-2 mb-3 text-center">
+          <div class="ps-label">Context now</div>
+          <div class="ps-mono fs-5" data-compact-before>@(info.ContextTokens > 0 ? ChatDisplay.Count(info.ContextTokens) : "—")</div>
+        </div>
+        <label class="form-label" for="compact-focus">Custom instructions <span class="text-ps-faint fw-normal">(optional)</span></label>
+        <textarea class="form-control" id="compact-focus" name="instructions" rows="3" maxlength="4000" placeholder="For example: keep the details of the fix and the test names"></textarea>
+        @if (compaction is not null)
+        {
+          <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="compact-auto" name="auto" checked="@compaction.Enabled" data-auto-compaction>
+            <label class="form-check-label fs-7" for="compact-auto">@autoText</label>
+          </div>
+        }
       </div>
-      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Compact</button></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-arrows-collapse me-1"></i>Compact now</button></div>
     </form>
   </div>
 </div>
@@ -39,26 +71,95 @@
         <label class="visually-hidden" for="edit-text">Message</label>
         <textarea class="form-control" id="edit-text" name="text" rows="6" maxlength="100000" required></textarea>
       </div>
-      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Send on a new branch</button></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Send on a new branch</button></div>
     </form>
   </div>
 </div>
 
-<div class="modal fade" id="modal-tool-approval" tabindex="-1" aria-labelledby="modal-tool-approval-title" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <form class="modal-content" data-approval-form>
-      <div class="modal-header"><h2 class="modal-title" id="modal-tool-approval-title">Run <span class="ps-mono" data-approval-tool></span>?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-      <div class="modal-body">
-        <input type="hidden" name="taskId">
-        <div class="ps-label mb-1">Input</div>
-        <div class="ps-term mb-3"><pre class="wrap" data-approval-input></pre></div>
-        <label class="form-label" for="deny-reason">Reason if you deny it <span class="text-ps-faint">(the model gets it as the tool's result)</span></label>
-        <input class="form-control" id="deny-reason" name="reason" maxlength="2000" placeholder="For example: don't touch the database">
+<div class="modal fade" id="modal-session-tree" tabindex="-1" aria-labelledby="modal-session-tree-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="modal-session-tree-title">Session tree</h2>
+          <div class="modal-subtitle">Each entry has a parent. Forking from an entry starts a new branch in the same chat.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" data-tree-host aria-live="polite">
+        <div class="d-flex align-items-center gap-2 text-secondary fs-7"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Loading the tree…</div>
       </div>
       <div class="modal-footer">
-        <button type="submit" class="btn btn-outline-danger" data-decision="deny">Deny</button>
+        <span class="me-auto fs-8 ps-mono text-ps-faint" data-tree-footer></span>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" data-action="tree-switch" disabled>Switch to selected branch</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-tool-approval" tabindex="-1" aria-labelledby="modal-tool-approval-title" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form class="modal-content" data-approval-form>
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-3 min-w-0">
+          <span class="provider-logo lg approval-logo" aria-hidden="true"><i class="bi bi-shield-exclamation"></i></span>
+          <div class="min-w-0">
+            <h2 class="modal-title" id="modal-tool-approval-title">Allow the agent to run <span class="ps-mono" data-approval-tool></span>?</h2>
+            <div class="modal-subtitle text-truncate"><span data-chat-title-copy>@binding.Title</span> · tool call <span class="ps-mono" data-approval-call></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="taskId">
+        <div class="ps-label mb-1" data-approval-input-label>Command</div>
+        <div class="ps-term mb-3"><pre class="wrap" data-approval-input></pre></div>
+        <div class="row g-3 fs-7">
+          <div class="col-sm-6"><div class="kv"><span class="k">Working directory</span><span class="v ps-mono text-break">@Model.Cwd</span></div></div>
+          <div class="col-sm-6"><div class="kv"><span class="k">Policy</span><span class="v">@policy</span></div></div>
+        </div>
+        <details class="mt-3">
+          <summary class="fs-7 text-secondary">Raw arguments</summary>
+          <div class="ps-term mt-2"><pre data-approval-raw-view></pre></div>
+        </details>
+        <div class="mt-3">
+          <label class="form-label" for="deny-reason">Reason if you deny it <span class="text-ps-faint fw-normal">(sent back to the model as the tool result)</span></label>
+          <input class="form-control" id="deny-reason" name="reason" maxlength="2000" placeholder="For example: don't run the full suite, only the one test class">
+        </div>
+        <p class="fs-8 text-ps-faint mt-3 mb-0">The run waits for your answer. Closing or reloading this tab doesn't cancel it: this prompt reopens, and also shows inline in the chat. The first answer from any tab wins.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-outline-danger me-auto" data-decision="deny"><i class="bi bi-x-circle me-1"></i>Deny</button>
+        <button type="submit" class="btn btn-outline-secondary" data-decision="allowChat">Always allow <span class="ps-mono" data-approval-tool></span> in this chat</button>
         <button type="submit" class="btn btn-primary" data-decision="allow"><i class="bi bi-check2 me-1"></i>Allow once</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-error-details" tabindex="-1" aria-labelledby="modal-error-details-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="min-w-0">
+          <h2 class="modal-title" id="modal-error-details-title"><i class="bi bi-x-octagon text-ps-danger me-2" aria-hidden="true"></i>Request failed</h2>
+          <div class="modal-subtitle text-truncate" data-error-subtitle></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" data-error-body>
+        <div class="row g-2 mb-3">
+          <div class="col-sm-6"><div class="ps-panel p-2 h-100"><div class="ps-label">Stop reason</div><div class="ps-mono" data-error-field="stop"></div></div></div>
+          <div class="col-sm-6"><div class="ps-panel p-2 h-100"><div class="ps-label">Attempts</div><div class="ps-mono" data-error-field="attempts"></div></div></div>
+        </div>
+        <div class="ps-label mb-1">Message</div>
+        <div class="ps-term"><pre class="wrap" data-error-field="message"></pre></div>
+        <div class="fs-8 text-ps-faint mt-2">Requests that fail with a rate limit, an overload or a server error are retried automatically before they show here. Retry sends the message again on a new branch with the chat's own model and account.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary me-auto" data-action="copy-error"><i class="bi bi-copy me-1"></i>Copy details</button>
+        <button type="button" class="btn btn-primary" data-action="retry" data-error-retry><i class="bi bi-arrow-repeat me-1"></i>Retry</button>
+      </div>
+    </div>
   </div>
 </div>

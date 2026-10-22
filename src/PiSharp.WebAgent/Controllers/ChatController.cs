@@ -3,7 +3,9 @@
 // /api/chats (HostGuard refuses other content types and cross-origin writes); each is safe to repeat: a create, send, fork, edit or compact
 // carries a requestId and a retry with it changes nothing new, and the rest set a state. A command that needs the chat idle (compact, model
 // change) answers 409 {error: {code: "busy"}} while it runs; a second decision on an approval answers 409 "already_decided". Errors are
-// {error: {code, message}}. No answer carries a credential: a chat names its account by label only.
+// {error: {code, message}}. No answer carries a credential: a chat names its account by label only. WU8 adds /chat/{id}/tree (the session
+// tree modal's body), /api/chats/{id}/retry (Retry and Regenerate fork and send again; a retry with the same requestId makes nothing new)
+// and /api/chats/{id}/compaction (the automatic compaction switch).
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
@@ -38,6 +40,24 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
         {
             Response.StatusCode = 404;
             return View("Missing", id);
+        }
+    }
+
+    /// <summary>The session tree modal's body (<c>_ChatTree</c>): every branch's entries, for forking from any message and switching branch.</summary>
+    [HttpGet("/chat/{id}/tree")]
+    public async Task<IActionResult> Tree(string id, long? agent, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return PartialView("~/Views/Chat/_ChatTree.cshtml", await chats.TreeAsync(id, agent, cancellationToken).ConfigureAwait(false));
+        }
+        catch (ChatException error)
+        {
+            return Error(error.Status, error.Code, error.Message);
+        }
+        catch (Exception error) when (ChatErrors.From(error) is { } mapped)
+        {
+            return Error(mapped.Status, mapped.Code, mapped.Message);
         }
     }
 
@@ -158,6 +178,26 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
         var branch = await chats.EditAsync(id, ChatDisplay.Long(body, "agentId"), entry, Text(body, "text"), Text(body, "requestId"), cancellationToken)
             .ConfigureAwait(false);
         return Ok(new { agentId = branch.AgentId, name = branch.Name, url = ChatUrl(id, branch.AgentId) });
+    });
+
+    /// <summary><c>POST /api/chats/{id}/retry {requestId, entryId, agentId?}</c>: Retry or Regenerate an answer: a new branch from just before
+    /// the message it replies to, which is sent again with the chat's own model and account. Answers <c>{agentId, name, url}</c>.</summary>
+    [HttpPost("/api/chats/{id}/retry")]
+    public Task<IActionResult> Retry(string id, [FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
+    {
+        var entry = ChatDisplay.Long(body, "entryId") ?? throw ChatException.Invalid("entryId is required.");
+        var branch = await chats.RetryAsync(id, ChatDisplay.Long(body, "agentId"), entry, Text(body, "requestId"), cancellationToken).ConfigureAwait(false);
+        return Ok(new { agentId = branch.AgentId, name = branch.Name, url = ChatUrl(id, branch.AgentId) });
+    });
+
+    /// <summary><c>POST /api/chats/{id}/compaction {enabled}</c>: turns automatic compaction on or off for the chat. Answers
+    /// <c>{enabled, reserveTokens, keepRecentTokens}</c>.</summary>
+    [HttpPost("/api/chats/{id}/compaction")]
+    public Task<IActionResult> Compaction(string id, [FromBody] JsonObject? body) => Run(() =>
+    {
+        if (body?["enabled"] is not JsonValue value || !value.TryGetValue<bool>(out var enabled)) throw ChatException.Invalid("enabled is required.");
+        var compaction = chats.SetAutoCompaction(id, enabled);
+        return Task.FromResult<IActionResult>(Ok(new { enabled = compaction.Enabled, reserveTokens = compaction.ReserveTokens, keepRecentTokens = compaction.KeepRecentTokens }));
     });
 
     /// <summary><c>POST /api/chats/{id}/compact {requestId, agentId?, instructions?}</c>: 409 while the chat runs. Answers <c>{taskId}</c>.</summary>

@@ -1,0 +1,21 @@
+@* Decision 0011 (run W2, WU8): the mockups' _GlobalBanners on a chat: "No providers configured", and the chat's sign-in expired when its
+   newest answer failed because the chat's account could not be used (ChatFailures.AccountExpired). The chat keeps its account: Sign in
+   again goes to that provider's settings, and Retry on the failed answer sends again with the same account. The page renders it; the
+   stream re-renders it (panel "banners"). *@
+@model ChatBannersView
+@if (Model.ExpiredProvider is { } provider)
+{
+  <div class="app-banner warn" role="alert" data-banner="expired">
+    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+    <span><strong>@Model.ExpiredProviderName sign-in expired.</strong> @(Model.Detail is { Length: > 0 } detail ? detail : $"The account for {provider} can't be used.") Requests to <span class="ps-mono">@provider</span>@(Model.AccountLabel is { Length: > 0 } label ? $" ({label})" : "") fail until you sign in again.</span>
+    <a class="btn btn-sm btn-warning ms-auto" href="/settings/providers/@Uri.EscapeDataString(provider)">Sign in again</a>
+  </div>
+}
+@if (Model.NoProviders)
+{
+  <div class="app-banner info" role="status" data-banner="noproviders">
+    <i class="bi bi-plug" aria-hidden="true"></i>
+    <span><strong>No providers configured.</strong> Add an API key or sign in with a subscription to start chatting.</span>
+    <a class="btn btn-sm btn-primary ms-auto" href="/settings/providers">Connect a provider</a>
+  </div>
+}

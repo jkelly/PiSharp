@@ -1,6 +1,8 @@
-/* Decision 0011 (run W2, WU7): the chat pages' styles that Web.Common's shell.css and the Web Agent's site.css do not have: the transcript
-   pieces of PiSharp Durable Web's fragments (entry ids, event lines, context notes, nested calls, live output, images), the "Waiting for
-   you" panel above the composer and the hero composer of a new chat. Colours are the theme's tokens, so light and dark both work. */
+/* Decision 0011 (run W2, WU7, WU8): the chat pages' styles that Web.Common's shell.css and the Web Agent's site.css do not have: the
+   transcript pieces of PiSharp Durable Web's fragments (entry ids, event lines, context notes, nested calls, live output, images), the
+   "Waiting for you" panel above the composer and the hero composer of a new chat; and WU8's chat states (background, reconnecting,
+   partial answers, the live footer, tool-use footers on hover), the session tree's buttons and runs, the approval dialog's badge, the
+   kept-running toast and the 375px rules. Colours are the theme's tokens (status colours only for status), so light and dark both work. */
 
 .msg-plain { white-space: pre-wrap; }
 .msg-image { display: block; max-width: min(100%, 28rem); max-height: 20rem; border-radius: .5rem; border: 1px solid var(--ps-border); margin-top: .5rem; }
@@ -43,3 +45,60 @@
 .chat-hero-text { max-width: 520px; }
 .empty-hero .composer { margin-top: 1.25rem; }
 .chat-info .pane-body { overflow-y: auto; }
+
+/* ---------- WU8: chat states ---------- */
+.min-w-0 { min-width: 0; }
+.status-dot.waiting { background: #f59e0b; }
+
+/* background: the "Kept running while you were away" note shows only in a tab that opened during the run (chat.js sets data-background). */
+.run-note[data-run-note] { display: none; }
+.chat-layout[data-background="true"] .run-note[data-run-note] { display: flex; }
+
+/* reconnecting: the live footer says "paused while reconnecting", and the live dot and cursor rest until the stream is back. */
+.msg-live-footer [data-live-status="reconnecting"] { display: none; }
+.chat-layout[data-stream="reconnecting"] .msg-live-footer [data-live-status="live"] { display: none; }
+.chat-layout[data-stream="reconnecting"] .msg-live-footer [data-live-status="reconnecting"] { display: inline; }
+.chat-layout[data-stream="reconnecting"] .msg-role .status-dot.live { animation: none; background: var(--ps-faint); }
+.chat-layout[data-stream="reconnecting"] .stream-cursor::after { animation: none; opacity: .35; }
+
+/* A partial answer (stopped or dropped) stays readable but quieter than a complete one. */
+.msg-partial { color: var(--ps-muted); }
+
+/* An answer that stopped for a tool call is one turn of a run: its numbers show on hover or focus, as the actions do. */
+.msg-assistant[data-stop="toolUse"] > .msg-body > .msg-footer[data-message-metrics] > :not(.msg-actions) { opacity: 0; transition: opacity .15s ease; }
+.msg-assistant[data-stop="toolUse"]:hover > .msg-body > .msg-footer[data-message-metrics] > *,
+.msg-assistant[data-stop="toolUse"]:focus-within > .msg-body > .msg-footer[data-message-metrics] > * { opacity: 1; }
+
+.tool-card > summary .ps-chip { flex: none; }
+.tool-card > summary .tool-status { flex: none; }
+
+/* ---------- WU8: session tree ---------- */
+button.tree-node { width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
+button.tree-node:focus-visible { outline: 2px solid var(--ps-border-strong); outline-offset: 1px; }
+.tree-node.selected { background: var(--ps-hover); box-shadow: inset 0 0 0 1px var(--ps-border-strong); }
+.tree-node:not(.on-path) .text { color: var(--ps-muted); }
+.tree .tree-run { padding-left: 0; margin-left: 0; border-left: 0; }
+.tree .tree-branch + .tree-branch { margin-top: .15rem; }
+
+/* ---------- WU8: dialogs, panels and the toast ---------- */
+.approval-logo { background: var(--ps-warn-bg); color: var(--ps-warn); border-color: transparent; flex: none; }
+.info-clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+[data-panel="notices"] { max-width: 768px; margin: 0 auto; }
+[data-panel="notices"]:empty { display: none; }
+.kept-running-row + .kept-running-row { margin-top: .3rem; }
+.kept-running-row a { color: var(--ps-text); }
+
+/* ---------- WU8: phones (375px) ---------- */
+@media (max-width: 575.98px) {
+  .chat-composer-wrap { padding-left: .75rem; padding-right: .75rem; }
+  .composer-toolbar { flex-wrap: wrap; row-gap: .4rem; }
+  .composer-toolbar .form-select { max-width: 9.5rem; }
+  .msg-footer { gap: .2rem .6rem; }
+  .msg-actions .msg-account { max-width: 45vw; }
+  .tool-card > summary { flex-wrap: wrap; row-gap: .2rem; }
+  .tool-card .tool-args-summary { flex-basis: 40%; }
+  .tree-node .text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .modal-footer > * { margin-top: .25rem; }
+  .app-banner { flex-wrap: wrap; }
+  .app-banner .btn { margin-left: 0 !important; }
+}

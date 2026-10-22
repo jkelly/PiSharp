@@ -1,13 +1,21 @@
-// Decision 0011 (run W2, WU7): the chat pages' behaviour (Views/Chat). The new chat page creates the chat with its first message; a chat page
-// follows its agent over the tab's one stream (Web.Common's MuxStream, key chat/{session}/{agent}) and applies the server-rendered `view`
-// frames with swap.js. Every command is a JSON POST under /api/chats; creates, sends, forks, edits and compacts carry a request id, which a
-// retry reuses, so nothing is sent twice. A 409 (the chat is busy, or another tab decided first) is a toast, never a silent change. Markup
-// comes only from the server's partials; text set here goes through textContent.
+// Decision 0011 (run W2, WU7, WU8): the chat pages' behaviour (Views/Chat). The new chat page creates the chat with its first message; a chat
+// page follows its agent over the tab's one stream (Web.Common's MuxStream, key chat/{session}/{agent}) and applies the server-rendered
+// `view` frames with swap.js: the transcript items and the panels (pending, queue, notices, banners, info). Every command is a JSON POST
+// under /api/chats; creates, sends, forks, clones, retries, edits and compacts carry a request id, which a retry reuses, so nothing is sent
+// twice. A 409 (the chat is busy, or another tab decided first) is a toast, never a silent change. WU8 adds the mockups' states and dialogs:
+// background (data-background while a run that was going when the tab opened goes on), reconnecting (data-stream, the neutral chip and the
+// "paused while reconnecting" footer), the approval dialog (it reopens after a reload while its call still waits, and closes when another
+// tab decides), the error details, Retry (a new branch from before the failed answer, with the chat's own model and account), the session
+// tree (fork before or at any entry, switch branch), compaction, the model switch without a reload, the slash commands and the keys
+// (Shift+Tab cycles the thinking level, Esc Esc opens the tree). Markup comes only from the server's partials; text set here goes through
+// textContent.
 import { MuxStream } from '/_content/PiSharp.Web.Common/js/stream.js';
 import { applyItems, swapHtml, keepPinned } from '/_content/PiSharp.Web.Common/js/swap.js';
 import { showToast, confirmAction, providerModelValue } from './shell.js';
 
 const HOST_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+const APPROVAL_KEY = 'pisharp.chat.approval-dialog';
+const PANELS = ['pending', 'queue', 'notices', 'banners', 'info'];
 
 function newRequestId() {
   if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -47,30 +55,80 @@ function report(result, what) {
   return false;
 }
 
-function hideModal(el) {
-  if (el && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(el).hide();
+function modalOf(el) {
+  return el && window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(el) : null;
 }
 
-function showModal(el) {
-  if (el && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(el).show();
+function hideModal(el) { modalOf(el)?.hide(); }
+
+function showModal(el) { modalOf(el)?.show(); }
+
+function storage() {
+  try { return window.sessionStorage; } catch { return null; }
 }
 
-/** Fills a thinking select with the host's levels of a model (space-separated data-thinking), keeping the choice when it still fits. */
+function remember(key, value) {
+  try {
+    if (value === null) storage()?.removeItem(key);
+    else storage()?.setItem(key, JSON.stringify(value));
+  } catch { /* Private mode or blocked storage: nothing to remember. */ }
+}
+
+function recall(key) {
+  try { return JSON.parse(storage()?.getItem(key) ?? 'null'); } catch { return null; }
+}
+
+// Tooltips are created on first hover or focus (delegated, so streamed fragments get them too) and disposed before their markup is replaced.
+function wireTooltips() {
+  const open = (event) => {
+    const el = event.target.closest?.('[data-bs-toggle="tooltip"]');
+    if (!el || !window.bootstrap || window.bootstrap.Tooltip.getInstance(el)) return;
+    window.bootstrap.Tooltip.getOrCreateInstance(el).show();
+  };
+  document.addEventListener('mouseover', open);
+  document.addEventListener('focusin', open);
+}
+
+function disposeTooltips(container) {
+  if (!container || !window.bootstrap) return;
+  container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => window.bootstrap.Tooltip.getInstance(el)?.dispose());
+}
+
+/** Fills a thinking select with the host's levels of a model, keeping the choice when it still fits; a model that can't turn thinking off
+ * shows "off" disabled, as the server renders it. */
 function fillThinking(select, levels) {
   if (!select) return;
   const supported = (levels || []).filter((level) => HOST_LEVELS.includes(level));
   const list = supported.length ? supported : ['off'];
   const current = select.value;
-  select.replaceChildren(...list.map((level) => {
+  const options = [];
+  if (!list.includes('off')) {
+    const off = document.createElement('option');
+    off.value = 'off';
+    off.disabled = true;
+    off.textContent = 'Thinking: off (unsupported)';
+    options.push(off);
+  }
+  for (const level of list) {
     const option = document.createElement('option');
     option.value = level;
     option.textContent = `Thinking: ${level}`;
-    return option;
-  }));
+    options.push(option);
+  }
+  select.replaceChildren(...options);
   select.value = list.includes(current) ? current : (list.includes('medium') ? 'medium' : list[list.length - 1]);
 }
 
-/** Rebuilds the sidebar's chat list from a `chats` frame (titles as text). */
+/** Selects the next enabled thinking level (Shift+Tab) and announces the change to the select's own handler. */
+function cycleThinking(select) {
+  if (!select) return;
+  const levels = [...select.options].filter((option) => !option.disabled).map((option) => option.value);
+  if (levels.length < 2) return;
+  select.value = levels[(levels.indexOf(select.value) + 1) % levels.length];
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/** Rebuilds the sidebar's chat list from a `chats` frame (titles as text): a running chat carries the live dot. */
 function updateSidebar(frame, activeId) {
   const host = document.querySelector('[data-recent-chats]');
   if (!host || !Array.isArray(frame.items)) return;
@@ -111,14 +169,27 @@ function updateSidebar(frame, activeId) {
   host.replaceChildren(...(label ? [label] : []), ...nodes);
 }
 
-/** Enter sends, Shift+Enter is a new line, Alt+Enter queues a follow-up, Esc stops a run. */
-function wireComposerKeys(input, { send, followUp, stop }) {
+/** Enter sends, Shift+Enter is a new line, Alt+Enter queues a follow-up, Esc stops a run, Esc Esc opens the session tree and Shift+Tab
+ * cycles the thinking level. */
+function wireComposerKeys(input, { send, followUp, stop, tree, thinking }) {
+  let lastEscape = 0;
   input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    if (event.isComposing) return;
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       if (event.altKey && followUp) followUp(); else send();
-    } else if (event.key === 'Escape' && stop) {
-      stop();
+    } else if (event.key === 'Tab' && event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && thinking) {
+      event.preventDefault();
+      cycleThinking(thinking);
+    } else if (event.key === 'Escape') {
+      const now = Date.now();
+      if (tree && now - lastEscape < 500) {
+        lastEscape = 0;
+        tree();
+      } else {
+        lastEscape = now;
+        stop?.();
+      }
     }
   });
 }
@@ -158,8 +229,16 @@ function initNewChat(root) {
   }
 
   form.addEventListener('submit', (event) => { event.preventDefault(); send(); });
-  wireComposerKeys(input, { send });
+  wireComposerKeys(input, { send, thinking });
   input.focus();
+
+  root.addEventListener('click', (event) => {
+    const suggestion = event.target.closest('[data-suggestion]');
+    if (!suggestion) return;
+    input.value = suggestion.dataset.suggestion;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
 
   const picker = document.querySelector('[data-model-picker]');
   picker?.addEventListener('submit', (event) => {
@@ -168,17 +247,23 @@ function initNewChat(root) {
     if (!value?.provider || !value?.model) return;
     root.dataset.provider = value.provider;
     root.dataset.model = value.model;
-    const select = picker.querySelector(`[data-provider="${CSS.escape(value.provider)}"] [data-model-select]`);
-    const option = select?.selectedOptions?.[0];
-    const name = document.querySelector('[data-model-name]');
-    if (name) name.textContent = option?.textContent ?? value.model;
-    const provider = picker.querySelector('[data-provider-select]')?.selectedOptions?.[0];
-    const providerName = document.querySelector('[data-provider-name]');
-    if (providerName) providerName.textContent = provider?.textContent ?? value.provider;
+    showModelName(picker, value);
     fillThinking(thinking, value.thinking);
     hideModal(picker.closest('.modal'));
     input.focus();
   });
+}
+
+/** Shows the chosen model in the top bar's switch. */
+function showModelName(picker, value) {
+  const select = [...picker.querySelectorAll('[data-provider]')].find((pane) => pane.dataset.provider === value.provider)?.querySelector('[data-model-select]');
+  const modelName = select?.selectedOptions?.[0]?.textContent ?? value.model;
+  const providerName = picker.querySelector('[data-provider-select]')?.selectedOptions?.[0]?.textContent ?? value.provider;
+  const name = document.querySelector('[data-model-name]');
+  if (name) name.textContent = modelName;
+  const sub = document.querySelector('[data-provider-name]');
+  if (sub) sub.textContent = providerName;
+  document.querySelector('[data-model-switch]')?.setAttribute('aria-label', `Change model (${modelName})`);
 }
 
 // ─── Chat ────────────────────────────────────────────────────────────────
@@ -196,57 +281,74 @@ function initChat(root) {
   const running = form.querySelector('[data-running-controls]');
   const sendButton = form.querySelector('[data-send]');
   const statusChip = document.querySelector('[data-stream-status]');
+  const approvalModal = document.getElementById('modal-tool-approval');
+  const treeModal = document.getElementById('modal-session-tree');
+  const errorModal = document.getElementById('modal-error-details');
+  const compactModal = document.getElementById('modal-compact');
+  const retries = new Map();
   let busy = root.dataset.busy === 'true';
   let pendingText = null;
   let pendingId = null;
+  let firstView = true;
+  let decidedHere = null;
+
+  // The mockups' background state: the tab opened while a run was going, so the running answer says it kept running while you were away.
+  if (busy) root.dataset.background = 'true';
 
   function setBusy(value) {
     busy = value;
     root.dataset.busy = value ? 'true' : 'false';
+    if (!value) delete root.dataset.background;
     if (running) running.hidden = !value;
     if (sendButton) sendButton.hidden = value;
   }
   setBusy(busy);
   scroller.scrollTop = scroller.scrollHeight;
 
-  function info(name, value) {
-    const el = root.querySelector(`[data-info="${name}"]`);
-    if (el && value !== undefined && value !== null) el.textContent = typeof value === 'number' ? value.toLocaleString() : String(value);
+  function setStream(status) {
+    root.dataset.stream = status;
+    if (statusChip) statusChip.hidden = status !== 'reconnecting';
   }
 
   function onView(frame) {
     if (frame.type === 'view') {
+      disposeTooltips(thread);
       keepPinned(scroller, () => applyItems(thread, frame.items || {}, frame.reset));
       for (const [name, html] of Object.entries(frame.panels || {})) {
-        const panel = root.querySelector(`[data-panel="${CSS.escape(name)}"]`);
-        if (panel) swapHtml(panel, html);
+        if (!PANELS.includes(name)) continue;
+        const panel = document.querySelector(`[data-panel="${CSS.escape(name)}"]`);
+        if (!panel) continue;
+        disposeTooltips(panel);
+        swapHtml(panel, html);
       }
       const state = frame.state || {};
       setBusy(Boolean(state.busy));
-      info('thinking', state.thinking);
-      info('tier', state.tier || 'default');
-      info('input', state.usage?.input);
-      info('output', state.usage?.output);
-      info('cacheRead', state.usage?.cacheRead);
-      if (state.contextTokens) info('contextTokens', Math.round(state.contextTokens));
-      if (statusChip) statusChip.hidden = true;
+      setStream('connected');
+      if (firstView) {
+        firstView = false;
+        restoreApprovalDialog();
+      }
+      followApprovalDialog();
     } else if (frame.type === 'disconnected') {
-      if (statusChip) statusChip.hidden = false;
+      setStream('reconnecting');
     } else if (frame.type === 'fault') {
       showToast({ title: 'This chat stopped streaming', body: frame.error?.message ?? '', tone: 'danger' });
     }
   }
 
   const stream = new MuxStream();
-  stream.status = (status) => { if (statusChip) statusChip.hidden = status === 'connected'; };
+  stream.status = (status) => setStream(status === 'connected' ? 'connected' : 'reconnecting');
   stream.on(root.dataset.streamKey, onView);
   stream.on('chats', (frame) => updateSidebar(frame, chatId));
   stream.start();
   stream.subscribe([root.dataset.streamKey, 'chats']);
 
+  // ── Sending, commands and keys ──
+
   async function send({ steer = false } = {}) {
     const text = input.value;
     if (!text.trim()) return;
+    if (await command(text.trim())) return;
     if (pendingText !== text) {
       pendingText = text;
       pendingId = newRequestId();
@@ -259,19 +361,69 @@ function initChat(root) {
     input.focus();
   }
 
+  /** Runs a typed session command (/compact [focus], /tree, /new, /clone) instead of sending it; returns whether it was one. */
+  async function command(text) {
+    const match = /^\/(compact|tree|new|clone)(?:\s+([\s\S]*))?$/.exec(text);
+    if (!match) return false;
+    input.value = '';
+    if (match[1] === 'compact') {
+      const focus = compactModal?.querySelector('textarea[name="instructions"]');
+      if (focus) focus.value = match[2] ?? '';
+      showModal(compactModal);
+    } else if (match[1] === 'tree') showModal(treeModal);
+    else if (match[1] === 'new') window.location.assign('/chat/new');
+    else await clone();
+    return true;
+  }
+
   async function stop() {
     if (!busy) return;
     report(await post(`${base}/abort`, { agentId }), 'Stopping');
   }
 
+  /** The newest entry of the shown branch, from the rendered items (a tool result's entry included). */
+  function lastEntry() {
+    const ids = [...thread.querySelectorAll('[data-entry]')].map((el) => Number(el.dataset.entry)).filter((id) => Number.isFinite(id) && id > 0);
+    return ids.length ? Math.max(...ids) : Number(root.dataset.lastEntry) || null;
+  }
+
+  async function fork(entryId, branch = agentId) {
+    const result = await post(`${base}/fork`, { requestId: newRequestId(), entryId, agentId: branch });
+    if (report(result, 'Forking')) window.location.assign(result.data.url);
+  }
+
+  async function clone() {
+    const entry = lastEntry();
+    if (!entry) {
+      showToast({ title: 'Nothing to clone yet', body: 'Send a message first.', tone: 'info' });
+      return;
+    }
+    await fork(entry);
+  }
+
+  async function retry(entryId) {
+    if (!retries.has(entryId)) retries.set(entryId, newRequestId());
+    const result = await post(`${base}/retry`, { requestId: retries.get(entryId), entryId, agentId });
+    if (report(result, 'Retrying')) window.location.assign(result.data.url);
+  }
+
   form.addEventListener('submit', (event) => { event.preventDefault(); send({ steer: busy }); });
-  wireComposerKeys(input, { send: () => send({ steer: busy }), followUp: () => send({ steer: false }), stop });
+  wireComposerKeys(input, {
+    send: () => send({ steer: busy }),
+    followUp: () => send({ steer: false }),
+    stop,
+    tree: () => showModal(treeModal),
+    thinking,
+  });
   form.addEventListener('click', (event) => {
     const action = event.target.closest('[data-action]')?.dataset.action;
     if (action === 'follow-up') send({ steer: false });
     else if (action === 'steer') send({ steer: true });
     else if (action === 'stop') stop();
+    else if (action === 'clone') clone();
   });
+
+  // ── Model, thinking and speed ──
 
   async function change(body, select, previous) {
     const result = await post(`${base}/model`, body);
@@ -296,30 +448,166 @@ function initChat(root) {
     event.preventDefault();
     const value = providerModelValue(picker.querySelector('[data-provider-model]'));
     if (!value?.provider || !value?.model) return;
-    const done = await change({ provider: value.provider, model: value.model, thinking: thinking?.value }, null, null);
+    const requested = thinking?.value;
+    const done = await change({ provider: value.provider, model: value.model, thinking: requested }, null, null);
     if (!done) return;
     hideModal(picker.closest('.modal'));
-    window.location.reload();
+    showModelName(picker, value);
+    fillThinking(thinking, value.thinking);
+    if (thinking && done.thinking) thinking.value = done.thinking;
+    root.dataset.provider = done.provider;
+    const clamped = requested && done.thinking && requested !== done.thinking
+      ? ` The thinking level was clamped from ${requested} to ${done.thinking}.` : '';
+    showToast({ title: 'Model switched', body: `Now using ${done.provider}/${done.model}.${clamped}`, tone: 'info' });
   });
 
-  // Delegated actions on rendered fragments (transcript items, the pending panel, the queue) and the top bar.
+  // ── The approval dialog ──
+
+  function fillApprovalDialog(card) {
+    const approvalForm = approvalModal.querySelector('[data-approval-form]');
+    approvalForm.elements.taskId.value = card.dataset.approval;
+    approvalForm.elements.reason.value = '';
+    approvalModal.querySelectorAll('[data-approval-tool]').forEach((el) => { el.textContent = card.dataset.tool; });
+    const call = card.dataset.call ?? '';
+    approvalModal.querySelector('[data-approval-call]').textContent = call.length > 14 ? `${call.slice(0, 13)}…` : call;
+    const detail = card.querySelector('[data-approval-detail]');
+    approvalModal.querySelector('[data-approval-input-label]').textContent = detail?.dataset.command === 'true' ? 'Command' : 'Arguments';
+    approvalModal.querySelector('[data-approval-input]').textContent = detail?.textContent ?? '';
+    approvalModal.querySelector('[data-approval-raw-view]').textContent = card.querySelector('[data-approval-raw]')?.textContent ?? '';
+  }
+
+  function openApprovalDialog(card) {
+    if (!approvalModal || !card) return;
+    fillApprovalDialog(card);
+    decidedHere = null;
+    remember(APPROVAL_KEY, { chat: chatId, task: card.dataset.approval });
+    showModal(approvalModal);
+  }
+
+  /** After a reload: the dialog that was open comes back while its call still waits. */
+  function restoreApprovalDialog() {
+    const saved = recall(APPROVAL_KEY);
+    if (!saved || saved.chat !== chatId) return;
+    const card = document.querySelector(`[data-approval="${CSS.escape(String(saved.task))}"]`);
+    if (card) openApprovalDialog(card);
+    else remember(APPROVAL_KEY, null);
+  }
+
+  /** Another tab decided the call the open dialog shows: close it and say so. */
+  function followApprovalDialog() {
+    if (!approvalModal?.classList.contains('show')) return;
+    const task = approvalModal.querySelector('[data-approval-form]').elements.taskId.value;
+    if (document.querySelector(`[data-approval="${CSS.escape(task)}"]`)) return;
+    hideModal(approvalModal);
+    if (decidedHere !== task) showToast({ title: 'Already decided', body: 'This tool call was answered in another tab.', tone: 'info' });
+  }
+
+  approvalModal?.addEventListener('hidden.bs.modal', () => remember(APPROVAL_KEY, null));
+
+  approvalModal?.querySelector('[data-approval-form]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const approvalForm = event.currentTarget;
+    const decision = event.submitter?.dataset.decision ?? 'allow';
+    const task = approvalForm.elements.taskId.value;
+    const result = await post(`${base}/approvals/${encodeURIComponent(task)}`, {
+      decision,
+      reason: decision === 'deny' ? approvalForm.elements.reason.value || null : null,
+    });
+    if (result.ok || result.status === 409 || result.status === 404) decidedHere = task;
+    if (report(result, 'Deciding') || result.status === 409 || result.status === 404) hideModal(approvalModal);
+  });
+
+  // ── The error details dialog ──
+
+  function openErrorDetails(detail) {
+    if (!errorModal || !detail) return;
+    const article = detail.closest('[data-entry]');
+    const set = (name, text) => { errorModal.querySelector(`[data-error-field="${name}"]`).textContent = text; };
+    errorModal.querySelector('[data-error-subtitle]').textContent =
+      [detail.dataset.errorModel, detail.dataset.errorTime].filter(Boolean).join(' · ');
+    set('stop', detail.dataset.errorStop || 'error');
+    set('attempts', detail.dataset.errorAttempts || '1');
+    set('message', detail.dataset.errorMessage || 'The provider request failed.');
+    const again = errorModal.querySelector('[data-error-retry]');
+    again.dataset.entry = article?.dataset.entry ?? '';
+    again.hidden = !article?.dataset.entry;
+    showModal(errorModal);
+  }
+
+  async function copyText(text, what) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast({ title: `${what} copied`, tone: 'ok', delay: 2000 });
+    } catch {
+      showToast({ title: 'Copy failed', body: 'The browser did not allow it.', tone: 'warn' });
+    }
+  }
+
+  // ── The session tree ──
+
+  const treeHost = treeModal?.querySelector('[data-tree-host]');
+  const treeSwitch = treeModal?.querySelector('[data-action="tree-switch"]');
+  let selectedNode = null;
+
+  treeModal?.addEventListener('show.bs.modal', async () => {
+    selectedNode = null;
+    if (treeSwitch) treeSwitch.disabled = true;
+    let response;
+    try {
+      response = await fetch(`/chat/${encodeURIComponent(chatId)}/tree?agent=${agentId}`, { headers: { Accept: 'text/html' } });
+    } catch {
+      response = null;
+    }
+    if (!response?.ok) {
+      const message = document.createElement('p');
+      message.className = 'text-secondary fs-7 mb-0';
+      message.textContent = 'The tree could not be loaded. Close it and try again.';
+      treeHost.replaceChildren(message);
+      return;
+    }
+    swapHtml(treeHost, await response.text());
+    treeModal.querySelector('[data-tree-footer]').textContent = treeHost.querySelector('[data-tree]')?.dataset.summary ?? '';
+    const current = treeHost.querySelector('.tree-node.current');
+    if (current) {
+      selectNode(current);
+      current.scrollIntoView({ block: 'nearest' });
+    }
+  });
+
+  function selectNode(node) {
+    treeHost.querySelectorAll('.tree-node.selected').forEach((el) => el.classList.remove('selected'));
+    node.classList.add('selected');
+    selectedNode = node;
+    const panel = treeHost.querySelector('[data-tree-selected]');
+    const role = panel.querySelector('[data-tree-selected-role]');
+    role.textContent = node.dataset.role;
+    role.hidden = false;
+    const text = panel.querySelector('[data-tree-selected-text]');
+    text.textContent = node.querySelector('.text')?.textContent ?? '';
+    text.classList.remove('text-secondary');
+    panel.querySelector('[data-action="tree-fork-before"]').disabled = !node.dataset.prev;
+    panel.querySelector('[data-action="tree-fork-at"]').disabled = false;
+    if (treeSwitch) treeSwitch.disabled = Number(node.dataset.agent) === agentId;
+  }
+
+  treeHost?.addEventListener('click', (event) => {
+    const node = event.target.closest('[data-tree-node]');
+    if (node) selectNode(node);
+  });
+
+  // ── Delegated actions on rendered fragments (items, panels, dialogs) and the top bar ──
+
   document.addEventListener('click', async (event) => {
     const target = event.target.closest('[data-action]');
     if (!target || form.contains(target)) return;
     const action = target.dataset.action;
     if (action === 'approve') {
       const card = target.closest('[data-approval]');
-      const result = await post(`${base}/approvals/${card.dataset.approval}`, { decision: target.dataset.decision });
+      const result = await post(`${base}/approvals/${encodeURIComponent(card.dataset.approval)}`, { decision: target.dataset.decision });
+      if (result.ok) decidedHere = card.dataset.approval;
       if (report(result, 'Deciding')) card.querySelectorAll('button').forEach((button) => button.setAttribute('disabled', ''));
     } else if (action === 'approval-details') {
-      const card = target.closest('[data-approval]');
-      const modal = document.getElementById('modal-tool-approval');
-      const approvalForm = modal.querySelector('[data-approval-form]');
-      approvalForm.elements.taskId.value = card.dataset.approval;
-      approvalForm.elements.reason.value = '';
-      modal.querySelector('[data-approval-tool]').textContent = card.dataset.tool;
-      modal.querySelector('[data-approval-input]').textContent = card.querySelector('[data-approval-detail]')?.textContent ?? '';
-      showModal(modal);
+      openApprovalDialog(target.closest('[data-approval]'));
     } else if (action === 'answer-questions' || action === 'decline-questions') {
       const pending = target.closest('[data-pending]');
       const body = { agentId: Number(pending.dataset.agent) };
@@ -343,8 +631,29 @@ function initChat(root) {
     } else if (action === 'withdraw') {
       report(await post(`${base}/withdraw`, { agentId, submissionId: Number(target.dataset.submission) }), 'Removing');
     } else if (action === 'fork') {
-      const result = await post(`${base}/fork`, { requestId: newRequestId(), entryId: Number(target.dataset.entry), agentId });
-      if (report(result, 'Forking')) window.location.assign(result.data.url);
+      await fork(Number(target.dataset.entry));
+    } else if (action === 'clone') {
+      await clone();
+    } else if (action === 'retry') {
+      const entry = Number(target.dataset.entry);
+      if (!entry) return;
+      if (errorModal?.contains(target)) hideModal(errorModal);
+      target.setAttribute('disabled', '');
+      await retry(entry);
+      target.removeAttribute('disabled');
+    } else if (action === 'error-details') {
+      openErrorDetails(target.closest('[data-error-detail]'));
+    } else if (action === 'copy-error') {
+      const text = ['subtitle', 'stop', 'attempts', 'message']
+        .map((name) => errorModal.querySelector(name === 'subtitle' ? '[data-error-subtitle]' : `[data-error-field="${name}"]`)?.textContent ?? '')
+        .filter(Boolean).join('\n');
+      await copyText(text, 'Details');
+    } else if (action === 'tree-fork-before' || action === 'tree-fork-at') {
+      if (!selectedNode) return;
+      const entry = Number(action === 'tree-fork-before' ? selectedNode.dataset.prev : selectedNode.dataset.entry);
+      if (entry) await fork(entry, Number(selectedNode.dataset.agent));
+    } else if (action === 'tree-switch') {
+      if (selectedNode) window.location.assign(`/chat/${encodeURIComponent(chatId)}?agent=${encodeURIComponent(selectedNode.dataset.agent)}`);
     } else if (action === 'edit') {
       const article = target.closest('[data-entry]');
       const modal = document.getElementById('modal-edit-message');
@@ -355,35 +664,23 @@ function initChat(root) {
       showModal(modal);
     } else if (action === 'copy-entry') {
       const article = target.closest('[data-key]');
-      const text = [...article.querySelectorAll('[data-entry-text]')].map((el) => el.innerText).join('\n\n');
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast({ title: 'Copied', tone: 'ok', delay: 2000 });
-      } catch {
-        showToast({ title: 'Copy failed', body: 'The browser did not allow it.', tone: 'warn' });
-      }
+      await copyText([...article.querySelectorAll('[data-entry-text]')].map((el) => el.innerText).join('\n\n'), 'Message');
     } else if (action === 'archive') {
+      const title = root.dataset.title || 'This chat';
+      const branches = Number(root.dataset.branches) || 1;
       const ok = await confirmAction({
         title: 'Delete this chat?',
-        body: 'Its run stops and it leaves the sidebar. The session moves to the app\'s archive; nothing is erased.',
-        ok: 'Delete',
+        body: `“${title}” stops ${busy ? 'its running branch' : 'any running branch'} and moves to the archive`
+          + `${branches > 1 ? ` with its ${branches} branches` : ''}. Nothing is erased.`,
+        detail: 'device\\archive\\',
+        ok: 'Delete chat',
+        icon: 'bi-trash3',
       });
       if (!ok) return;
       if (report(await post(`${base}/archive`, {}), 'Deleting')) window.location.assign('/chat/new');
     } else if (action === 'toggle-info') {
       root.classList.toggle('info-collapsed');
     }
-  });
-
-  document.querySelector('[data-approval-form]')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const approvalForm = event.currentTarget;
-    const decision = event.submitter?.dataset.decision ?? 'allow';
-    const result = await post(`${base}/approvals/${approvalForm.elements.taskId.value}`, {
-      decision,
-      reason: decision === 'deny' ? approvalForm.elements.reason.value || null : null,
-    });
-    if (report(result, 'Deciding')) hideModal(approvalForm.closest('.modal'));
   });
 
   document.querySelector('[data-edit-form]')?.addEventListener('submit', async (event) => {
@@ -405,11 +702,33 @@ function initChat(root) {
     if (!report(result, 'Renaming')) return;
     const title = result.data.title;
     document.querySelector('[data-chat-title]').textContent = title;
+    document.querySelectorAll('[data-chat-title-copy]').forEach((el) => { el.textContent = title; });
+    root.dataset.title = title;
     document.title = `${title} · PiSharp Web Agent`;
     hideModal(renameForm.closest('.modal'));
   });
 
-  document.querySelector('[data-compact-form]')?.addEventListener('submit', async (event) => {
+  // ── Compaction ──
+
+  compactModal?.addEventListener('show.bs.modal', () => {
+    const now = document.querySelector('[data-panel="info"] [data-info="contextTokens"]')?.textContent;
+    const before = compactModal.querySelector('[data-compact-before]');
+    if (before && now) before.textContent = now;
+  });
+
+  compactModal?.querySelector('[data-auto-compaction]')?.addEventListener('change', async (event) => {
+    const box = event.currentTarget;
+    const result = await post(`${base}/compaction`, { enabled: box.checked });
+    if (!report(result, 'Changing auto-compaction')) {
+      box.checked = !box.checked;
+      return;
+    }
+    const info = document.querySelector('[data-panel="info"] [data-info="compaction"]');
+    if (info) info.textContent = result.data.enabled ? `on · reserve ${Number(result.data.reserveTokens).toLocaleString()}` : 'off';
+    showToast({ title: result.data.enabled ? 'Auto-compaction on' : 'Auto-compaction off', tone: 'info', delay: 3000 });
+  });
+
+  compactModal?.querySelector('[data-compact-form]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const compactForm = event.currentTarget;
     compactForm.dataset.requestId ||= newRequestId();
@@ -420,11 +739,13 @@ function initChat(root) {
     });
     if (!report(result, 'Compacting')) return;
     delete compactForm.dataset.requestId;
-    hideModal(compactForm.closest('.modal'));
+    compactForm.elements.instructions.value = '';
+    hideModal(compactModal);
     showToast({ title: 'Compacting', body: 'A context note will appear in the chat.', tone: 'info' });
   });
 }
 
+wireTooltips();
 const chat = document.querySelector('.chat-layout[data-chat]');
 const fresh = document.querySelector('.chat-layout[data-chat-new]');
 if (chat) initChat(chat);

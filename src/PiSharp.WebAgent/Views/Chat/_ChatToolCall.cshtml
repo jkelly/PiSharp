@@ -1,36 +1,50 @@
-@* Decision 0011 (run W2, WU7): one tool call card, after PiSharp Durable Web's _ToolCall and the mockups' tool cards: arguments, live
-   output (committed about every 150 ms), the result and nested calls. A call that waits for the user's approval shows the inline approval
-   card (_ChatApproval) under it, as in the mockups; questions and plan reviews are answered in the "Waiting for you" panel. *@
+@* Decision 0011 (run W2, WU7, WU8): one tool call card, after the mockups' tool cards: the tool's icon, name and arguments, a status chip
+   (a spinner while it runs; done, error or denied; "Not re-run after restart" when a restart cut it off, or "Not started after restart"
+   when it never started) and the stored duration; inside, the input, live output (committed about every 150 ms), the result and nested
+   calls. The restart chip comes from the stored result's diagnostic (interrupted or abandoned), not from its text. A call that waits for
+   the user's approval shows the inline approval card (_ChatApproval) under it; questions and plan reviews wait in the "Waiting for you"
+   panel. *@
 @model ChatToolView
 @{
     var call = Model.Call;
     var approval = Model.Nested ? null : Model.Context.Approval(call.CallId);
-    var (cardClass, statusText) = call.Status switch
-    {
-        ToolStatus.Error => ("is-error", "Error"),
-        ToolStatus.Done => ("", "Done"),
-        ToolStatus.Running => ("is-running", "running"),
-        _ => ("is-running", "pending"),
-    };
+    var stored = Model.Context.Result(call.CallId);
     var args = call.Args as JsonObject;
     var command = PiSharp.WebAgent.Chat.ToolAllowList.CommandOf(call.Name, args);
     var waitsForYou = approval is not null || (call.Status == ToolStatus.Running && call.Name is "ask_user_question" or "exit_plan_mode");
-    if (waitsForYou) statusText = approval is not null ? "Waiting for approval" : "Waiting for you";
-    var interrupted = call.Status == ToolStatus.Error && (call.Result ?? "").Contains("interrupted", StringComparison.OrdinalIgnoreCase);
+    var restarted = stored is { Restarted: true };
+    var stopped = stored?.Code == "aborted";
     var denied = call.Status == ToolStatus.Error && (call.Result ?? "").StartsWith("The user denied", StringComparison.Ordinal);
+    var running = call.Status is ToolStatus.Running or ToolStatus.Pending && !waitsForYou;
+    var cardClass = call.Status switch
+    {
+        ToolStatus.Error when restarted || stopped => "",
+        ToolStatus.Error => "is-error",
+        ToolStatus.Running or ToolStatus.Pending => "is-running",
+        _ => "",
+    };
     var nestedCount = call.Nested.Count;
-    var open = (call.Status == ToolStatus.Running && call.Output is not null) || (call.Status == ToolStatus.Error && !denied);
+    var open = (running && call.Output is not null) || (call.Status == ToolStatus.Error && !denied && !stopped);
+    // The harness's note of a restart or a Stop ends the stored result; the chip and the note below say it instead.
+    var result = call.Result is { } text && (restarted || stopped) ? System.Text.RegularExpressions.Regex.Replace(text, @"\s*<harness>[\s\S]*?</harness>\s*$", "") : call.Result;
 }
-<details class="tool-card @cardClass" data-detail="call-@call.CallId" data-call="@call.CallId" open="@open">
-  <summary><span class="tool-icon">@if (call.Status is ToolStatus.Running or ToolStatus.Pending && !waitsForYou)
-    {<span class="spinner-border spinner-border-sm chip-spinner" aria-hidden="true"></span>}
+<details class="tool-card @cardClass" data-detail="call-@call.CallId" data-call="@call.CallId" data-restart="@(restarted ? stored!.Code : null)" open="@open">
+  <summary><span class="tool-icon"><i class="bi @(call.Status == ToolStatus.Error && !restarted && !stopped ? "bi-exclamation-circle" : ChatDisplay.ToolIcon(call.Name))"></i></span><span class="tool-name">@call.Name</span><span class="tool-args-summary">@(command is not null ? ChatDisplay.Cut(command.ReplaceLineEndings(" "), 140) : ChatDisplay.ArgsSummary(call.Args))</span>@if (restarted)
+    {<span class="ps-chip" title="A restart cut this call off. PiSharp never runs a tool again by itself.">@(stored!.Code == "abandoned" ? "Not started after restart" : "Not re-run after restart")</span>}
     else if (waitsForYou)
-    {<span class="status-dot waiting" aria-hidden="true"></span>}
-    else
-    {<i class="bi @(call.Status == ToolStatus.Error ? "bi-exclamation-circle" : ChatDisplay.ToolIcon(call.Name))"></i>}</span><span class="tool-name">@call.Name</span><span class="tool-args-summary">@(command is not null ? ChatDisplay.Cut(command.ReplaceLineEndings(" "), 140) : ChatDisplay.ArgsSummary(call.Args))</span>@if (denied)
+    {<span class="ps-chip"><span class="status-dot waiting" aria-hidden="true"></span>@(approval is not null ? "waiting for approval" : "waiting for you")</span>}
+    else if (running)
+    {<span class="ps-chip"><span class="spinner-border spinner-border-sm chip-spinner" aria-hidden="true"></span>@(call.Status == ToolStatus.Pending ? "pending" : "running")</span>}
+    else if (denied)
     {<span class="ps-chip" data-tone="danger">denied</span>}
-    else if (interrupted)
-    {<span class="ps-chip" data-tone="danger">interrupted</span>}<span class="tool-status">@statusText@(nestedCount > 0 ? $" · {nestedCount} call{(nestedCount == 1 ? "" : "s")}" : "")</span></summary>
+    else if (stopped)
+    {<span class="ps-chip">stopped</span>}
+    else if (call.Status == ToolStatus.Error)
+    {<span class="ps-chip" data-tone="danger">error</span>}
+    else
+    {<span class="ps-chip" data-tone="ok">done</span>}@if (stored?.DurationMs is { } duration)
+    {<span class="tool-duration">@ChatDisplay.Duration(duration)</span>}@if (nestedCount > 0)
+    {<span class="tool-status">@nestedCount call@(nestedCount == 1 ? "" : "s")</span>}</summary>
   <div class="tool-body">
     @if (call.Args is JsonObject { Count: > 0 })
     {
@@ -47,15 +61,18 @@
         }
       </div>
     }
-    @if (call.Result is not null)
+    @if (result is not null)
     {
-      <div class="result-head @(nestedCount > 0 ? "mt-2" : "")"><span class="ps-label">Result</span>
+      <div class="result-head @(nestedCount > 0 ? "mt-2" : "")"><span class="ps-label">@(restarted ? "Output up to the restart" : "Result")</span>
         @if (call.ResultEntryId is { } entry && !Model.Nested)
         {
           <button class="btn btn-icon ms-auto" type="button" title="Fork after this result" aria-label="Fork at entry @entry" data-action="fork" data-entry="@entry"><i class="bi bi-signpost-split"></i></button>
         }
       </div>
-      <div class="ps-term"><pre class="wrap">@call.Result</pre></div>
+      @if (result.Length > 0)
+      {
+        <div class="ps-term"><pre class="wrap">@result</pre></div>
+      }
       @foreach (var image in call.Images)
       {
         <img class="msg-image mt-2" src="@image.DataUrl" alt="Image from @call.Name">
@@ -66,9 +83,17 @@
       <div class="ps-label mb-1">Live output</div>
       <div class="ps-term"><pre class="live-output">@output<span class="stream-cursor"></span></pre></div>
     }
-    @if (interrupted)
+    @if (restarted && stored!.Code == "abandoned")
     {
-      <div class="fs-8 text-ps-faint mt-2">The app restarted during this call. A command can have side effects, so it was not run again by itself; the model got this result instead.</div>
+      <div class="fs-8 text-ps-faint mt-2">It never started: a restart ended the call before it. PiSharp doesn't start it again by itself; the model got a note that it did not run.</div>
+    }
+    else if (restarted)
+    {
+      <div class="fs-8 text-ps-faint mt-2">Output up to the restart. A command can have side effects, so PiSharp doesn't run it again by itself. The model got this partial output and a note that the command was cut off.</div>
+    }
+    else if (stopped)
+    {
+      <div class="fs-8 text-ps-faint mt-2">Stopped before it finished. The model got the output so far and a note that the call was stopped.</div>
     }
   </div>
 </details>
