@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../PiSharp.Durable.Hosting.Tests/FixtureHttp.cs" Link="FixtureHttp.cs" />
+    <Compile Include="../PiSharp.Durable.Hosting.Tests/ProviderFixtures.cs" Link="ProviderFixtures.cs" />
   </ItemGroup>
 </Project>

@@ -9,6 +9,7 @@ internal static partial class Program
     private static async Task<int> Main(string[] args)
     {
         if (args is ["--serve-child", var data, var work, var token]) return await ServeChildAsync(data, work, token);
+        if (args is ["--serve-metadata-child", var root]) return await ServeMetadataChildAsync(root);
         if (args.Length != 0 && (args.Length != 2 || args[0] is not ("--report" or "--only")))
             throw new ArgumentException("Use [--report <fresh path>] or [--only <case prefix>].");
         var cases = new List<(string Id, Func<Task> Run)>();

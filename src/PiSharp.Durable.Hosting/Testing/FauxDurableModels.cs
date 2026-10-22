@@ -14,7 +14,11 @@ public sealed record FauxModel(string Id, string Name, double ContextWindow, dou
 
 /// <summary>A chat request <see cref="FauxDurableModels.RespondAsync"/> answers: the model, its thinking level (null when off) and the newest
 /// user text.</summary>
-public sealed record FauxChat(string ModelId, string? Reasoning, string Text);
+public sealed record FauxChat(string ModelId, string? Reasoning, string Text)
+{
+    /// <summary>The request's options, with the metadata a host attached (see <see cref="SessionStreamMetadata"/>).</summary>
+    public DurableStreamOptions? Options { get; init; }
+}
 
 /// <summary>
 /// Model access without a provider. Each request answers the newest user message or tool result:
@@ -75,6 +79,10 @@ public sealed class FauxDurableModels : IDurableModels
     /// for <see cref="Respond"/> and the default grammar. Called before <see cref="Respond"/>.</summary>
     public Func<FauxChat, CancellationToken, Task<string?>>? RespondAsync { get; init; }
 
+    /// <summary>Called as each chat request starts, summaries included, with its model and options: a test reads the stream metadata a
+    /// host attached here.</summary>
+    public Action<DurableModel, DurableStreamOptions?>? OnRequest { get; init; }
+
     /// <summary>How many classifications were requested.</summary>
     public int ClassifyCalls => Volatile.Read(ref classifyCalls);
 
@@ -121,11 +129,12 @@ public sealed class FauxDurableModels : IDurableModels
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await Task.Yield();
+        OnRequest?.Invoke(model, options);
         var partial = new AssistantMessage(model.Api, model.Provider, model.Id, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), [], TokenUsage.Zero,
             StopReason.Pending);
         var asked = LastUserText(messages);
         var awaited = RespondAsync is { } respondAsync && asked is not null
-            ? await respondAsync(new FauxChat(model.Id, options?.Reasoning, asked), cancellationToken).ConfigureAwait(false) : null;
+            ? await respondAsync(new FauxChat(model.Id, options?.Reasoning, asked) { Options = options }, cancellationToken).ConfigureAwait(false) : null;
         var reply = awaited is not null ? Scripted(awaited)
             : Respond is { } respond && asked is not null && respond(asked) is { } scripted ? Scripted(scripted) : Reply(messages);
         yield return new StreamStarted(partial);

@@ -20,6 +20,8 @@ internal static partial class Program
         public TimeProvider? Time { get; init; }
         public bool RunSchedules { get; init; }
         public RetrievalOptions? Retrieval { get; init; }
+        /// <summary>Changes the options last, for what the fields above do not cover (another model, a stream metadata hook).</summary>
+        public Func<DurableDeviceOptions, DurableDeviceOptions>? Configure { get; init; }
     }
 
     /// <summary>A device on a fresh temporary data directory with one start directory, <see cref="Work"/>.</summary>
@@ -45,22 +47,26 @@ internal static partial class Program
             return device;
         }
 
-        public DurableDeviceOptions Options(DeviceSetup? setup = null) => new()
+        public DurableDeviceOptions Options(DeviceSetup? setup = null)
         {
-            DataDirectory = Data,
-            StartDirectories = [Work],
-            DeviceName = "test-device",
-            Models = setup?.Models ?? new FauxDurableModels(),
-            DefaultModel = setup?.DefaultModel ?? FauxDurableModels.EchoRef,
-            CreateRegistry = setup?.Registry,
-            OpenStorage = setup?.Storage,
-            ToolEffects = ToolEffects.Default.With("probe", ToolEffect.Read),
-            Jobs = setup?.Jobs ?? SampleJobs.All,
-            TimeProvider = setup?.Time ?? TimeProvider.System,
-            RunSchedules = setup?.RunSchedules ?? false,
-            SchedulePollInterval = TimeSpan.FromMilliseconds(20),
-            Retrieval = setup?.Retrieval ?? new RetrievalOptions(),
-        };
+            var options = new DurableDeviceOptions
+            {
+                DataDirectory = Data,
+                StartDirectories = [Work],
+                DeviceName = "test-device",
+                Models = setup?.Models ?? new FauxDurableModels(),
+                DefaultModel = setup?.DefaultModel ?? FauxDurableModels.EchoRef,
+                CreateRegistry = setup?.Registry,
+                OpenStorage = setup?.Storage,
+                ToolEffects = ToolEffects.Default.With("probe", ToolEffect.Read),
+                Jobs = setup?.Jobs ?? SampleJobs.All,
+                TimeProvider = setup?.Time ?? TimeProvider.System,
+                RunSchedules = setup?.RunSchedules ?? false,
+                SchedulePollInterval = TimeSpan.FromMilliseconds(20),
+                Retrieval = setup?.Retrieval ?? new RetrievalOptions(),
+            };
+            return setup?.Configure?.Invoke(options) ?? options;
+        }
 
         /// <summary>Closes the host and opens the data directory again, as a device restart does.</summary>
         public async Task ReopenAsync(DeviceSetup? setup = null)

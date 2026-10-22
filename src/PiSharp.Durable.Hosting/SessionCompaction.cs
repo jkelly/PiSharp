@@ -2,6 +2,7 @@
 // summary at 200k tokens and a blocking one at 250k, or pi-durable's margins on smaller windows. keepRecentTokens is pi-durable's 20000;
 // durable-pi's SDK says 2000.
 using System.Text.Json;
+using PiSharp.Durable.Chord;
 
 namespace PiSharp.Durable.Hosting;
 
@@ -92,12 +93,15 @@ public sealed record SessionCompactionChange
 }
 
 /// <summary>A session's Harness settings: the host's settings with the session's compaction, read at every use. Without a host extension
-/// selection, every installed extension but the optional ones is selected.</summary>
-internal sealed class SessionHarnessSettings(HarnessSettings? inner, Func<SessionCompaction> compaction, Func<IReadOnlyList<Extension>>? defaultExtensions = null)
+/// selection, every installed extension but the optional ones is selected. With <paramref name="streamMetadata"/>, every read of
+/// <see cref="Stream"/> carries a new <c>metadata.pisharp</c> object; generation and compaction read it once per prepared request and pin
+/// it in the request's checkpoint.</summary>
+internal sealed class SessionHarnessSettings(HarnessSettings? inner, Func<SessionCompaction> compaction, Func<IReadOnlyList<Extension>>? defaultExtensions = null,
+    Func<JsonObjectValue>? streamMetadata = null)
     : HarnessSettings
 {
     public override IReadOnlyList<Extension>? Extensions => inner?.Extensions ?? defaultExtensions?.Invoke();
-    public override ConversationStreamOptions? Stream => inner?.Stream;
+    public override ConversationStreamOptions? Stream => streamMetadata is null ? inner?.Stream : SessionStreamMetadata.Attach(inner?.Stream, streamMetadata());
     public override RetrySettings? Retry => inner?.Retry;
     public override CompactionSettings? Compaction => compaction().ToSettings();
     public override ProgressSettings? Progress => inner?.Progress;
