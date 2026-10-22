@@ -1,0 +1,57 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ConnectedAccounts (settings-provider-codex) and _ApiKeyCard (settings-provider-openai) as one
+   section: the active account select (new chats bind to it; changing it is an explicit POST /activate, and running chats keep theirs), Add
+   key / Add account, and an _AccountCard for every account, so a non-active account can still be tested, renamed or removed. The mockups
+   show only the selected account's card; every card is shown here instead. Model: ProviderPage. *@
+@model ProviderPage
+@{
+    var provider = Model.Provider;
+    var accounts = provider.Accounts;
+    var usable = accounts.Where(account => account.Status == AccountStatus.Connected).ToList();
+    var hasEnvironment = accounts.Any(account => account.Kind == AccountKind.Environment);
+    var hasStored = accounts.Any(account => !account.ReadOnly);
+}
+<section class="settings-section" id="connected-accounts" data-provider-accounts="@provider.Id">
+  <h3>@(provider.SignInOnly ? "Connected accounts" : "Accounts")</h3>
+  <p class="section-desc">Choose the account new @provider.Name chats use. A chat keeps the account it was created with; nothing switches it on its own.</p>
+  <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+    @if (usable.Count > 0)
+    {
+      <div class="flex-grow-1" style="max-width:24rem;min-width:0">
+        <label class="form-label fs-7" for="activeAccount">Active account</label>
+        <select class="form-select form-select-sm" id="activeAccount" data-active-account data-provider-name="@provider.Name">
+          @if (provider.Active is null || provider.Active.Status != AccountStatus.Connected)
+          {
+            <option value="" selected disabled>Choose an account</option>
+          }
+          @foreach (var account in usable)
+          {
+            <option value="@account.Id" selected="@account.IsActive">@(account.Label + " · " + SettingsText.KindChip(account))</option>
+          }
+        </select>
+      </div>
+    }
+    @if (provider.SignsIn)
+    {
+      <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, "Add account", "btn btn-sm btn-outline-secondary") { SignIn = true, Icon = "bi-plus-lg me-1" }' />
+    }
+    @if (provider.TakesApiKey)
+    {
+      <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, hasStored ? "Add key" : "Store a key", hasStored ? "btn btn-sm btn-outline-secondary" : "btn btn-sm btn-primary") { Icon = hasStored ? "bi-plus-lg me-1" : "bi-safe me-1" }' />
+    }
+    <span class="fs-8 text-ps-faint pb-1">@SettingsText.Plural(accounts.Count, "account")</span>
+  </div>
+  @if (hasEnvironment && hasStored && provider.Active is { ReadOnly: false })
+  {
+    <div class="alert alert-info d-flex gap-2 py-2 fs-7">
+      <i class="bi bi-info-circle mt-1" aria-hidden="true"></i>
+      <div>The active account is used before the environment variable. Make the environment account active, or remove the stored key, to use the variable again.</div>
+    </div>
+  }
+  <div class="d-grid gap-3">
+    @foreach (var account in accounts)
+    {
+      <partial name="/Views/Settings/_AccountCard.cshtml" model="new AccountCard(provider, account, Model.Offline)" />
+    }
+  </div>
+  <p class="fs-8 text-ps-faint mt-2 mb-0">Switching changes the account for new chats. Running chats keep their original account; other accounts stay connected.</p>
+</section>

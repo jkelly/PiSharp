@@ -1,0 +1,123 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ProviderRow (settings-providers): logo, name (a link to the provider's page), id, how it is
+   connected (a chip: stored key, env · VARIABLE, a plan, expired) or what connecting it takes (outline chips), one faint detail line, and
+   its actions: Manage (with Replace key, Test connection, Models and Remove key for a stored key), or Sign in and Connect. A stored key shows
+   its masked hint only. data-state, data-auth and data-search drive the page's filters. Model: ProviderEntry. *@
+@model ProviderEntry
+@{
+    var active = Model.Active;
+    var models = Model.Models.Count > 0 ? SettingsText.Plural(Model.Models.Count, "model") : null;
+    var expired = Model.State == ProviderState.Expired ? (active ?? Model.Accounts.FirstOrDefault(account => account.Status == AccountStatus.Expired)) : null;
+    var href = "/settings/providers/" + Uri.EscapeDataString(Model.Id);
+}
+<div class="provider-row" data-provider-row="@Model.Id" data-state="@Model.StateName" data-auth="@Model.AuthTags" data-search="@((Model.Id + " " + Model.Name).ToLowerInvariant())">
+  <partial name="/Views/Settings/_ProviderLogo.cshtml" model="LogoModel.Of(Model)" />
+  <div class="flex-grow-1 provider-row-main" style="min-width:0">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a class="provider-name text-reset text-decoration-none" href="@href">@Model.Name</a><span class="provider-id">@Model.Id</span>
+      @if (Model.NoCredentials)
+      {
+        <span class="ps-chip" data-tone="ok">no key needed</span>
+      }
+      else if (expired is not null)
+      {
+        <span class="ps-chip" data-tone="warn">@(expired.Kind == AccountKind.OAuth ? "sign-in expired" : "key rejected")</span>
+      }
+      else if (active is not null)
+      {
+        <span class="ps-chip" data-tone="@SettingsText.KindTone(active)"><i class="bi @SettingsText.KindIcon(active)"></i>@SettingsText.KindChip(active)</span>
+      }
+      else
+      {
+        @foreach (var chip in SettingsText.ConnectChips(Model))
+        {
+          <span class="ps-chip" data-tone="outline">@chip</span>
+        }
+      }
+      @if (Model.Accounts.Count > 1)
+      {
+        <span class="ps-chip" data-tone="outline">@SettingsText.Plural(Model.Accounts.Count, "account")</span>
+      }
+    </div>
+    <div class="fs-8 text-ps-faint">
+      @if (Model.NoCredentials)
+      {
+        @("Offline test models; nothing leaves this machine" + (models is null ? "" : " · " + models))
+      }
+      else if (expired is not null)
+      {
+        @(expired.StatusReason ?? (expired.Kind == AccountKind.OAuth ? "Sign in again to use it." : "Replace the key to use it."))
+      }
+      else if (active is { Kind: AccountKind.ApiKey })
+      {
+        if (active.Hint.Length > 0)
+        {
+          <span class="ps-mono">@active.Hint</span>
+        }
+        else
+        {
+          <span>settings only</span>
+        }
+        @(" · " + (active.LastTest is { } test ? "last tested " + SettingsText.Ago(test.TestedAt) : "not tested") + (models is null ? "" : " · " + models))
+      }
+      else if (active is { Kind: AccountKind.Environment })
+      {
+        @("Read from the environment of the web host process" + (models is null ? "" : " · " + models))
+      }
+      else if (active is { Kind: AccountKind.Ambient })
+      {
+        @("Found by the provider's SDK on this machine" + (models is null ? "" : " · " + models))
+      }
+      else if (active is not null)
+      {
+        @("Signed in" + (active.ExpiresAt is { } expires ? " · token refreshes automatically, expires " + SettingsText.Until(expires) : "") + (models is null ? "" : " · " + models))
+      }
+      else
+      {
+        if (Model.Variables.Count > 0)
+        {
+          <text>Env:</text>
+          for (var index = 0; index < Model.Variables.Count; index++)
+          {
+            <span class="ps-mono">@Model.Variables[index]</span>@(index < Model.Variables.Count - 1 ? "," : "")
+          }
+          <text>·</text>
+        }
+        @(string.Join(" · ", new[] { Model.Apis.Count > 0 ? string.Join(", ", Model.Apis) : null, models }.Where(part => part is not null)))
+      }
+    </div>
+  </div>
+  <div class="provider-row-actions d-flex flex-wrap gap-1">
+    @if (Model.State == ProviderState.NotConfigured)
+    {
+      @if (Model.SignsIn)
+      {
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(Model, "Sign in", Model.SignInOnly ? "btn btn-sm btn-outline-primary" : "btn btn-sm btn-ghost") { SignIn = true }' />
+      }
+      @if (Model.TakesApiKey)
+      {
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(Model, "Connect", "btn btn-sm btn-outline-primary")' />
+      }
+    }
+    else if (active is { Kind: AccountKind.ApiKey })
+    {
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Manage</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="@href"><i class="bi bi-sliders me-2"></i>Provider settings</a></li>
+          <li><partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(Model, "Replace key…", "") { Account = active, Icon = "bi-pencil me-2", DropdownItem = true }' /></li>
+          <li><button class="dropdown-item" type="button" data-account-action="test" data-account-id="@active.Id" data-account-label="@active.Label"><i class="bi bi-activity me-2"></i>Test connection</button></li>
+          @if (Model.Models.Count > 0)
+          {
+            <li><a class="dropdown-item" href="/settings/models?f=1&amp;provider=@Uri.EscapeDataString(Model.Id)"><i class="bi bi-boxes me-2"></i>Models</a></li>
+          }
+          <li><hr class="dropdown-divider"></li>
+          <li><button class="dropdown-item text-danger" type="button" data-account-action="remove" data-account-id="@active.Id" data-account-label="@active.Label" data-account-kind="apiKey" data-provider-name="@Model.Name"><i class="bi bi-trash3 me-2"></i>Remove key</button></li>
+        </ul>
+      </div>
+    }
+    else
+    {
+      <a class="btn btn-sm btn-outline-secondary" href="@href">Manage</a>
+    }
+  </div>
+</div>

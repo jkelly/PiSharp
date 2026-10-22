@@ -1,0 +1,10 @@
+@* Decision 0011 (run W2, WU9): a mockup section that a later milestone builds, shown as a short note instead of controls that would do
+   nothing. Model: LaterMilestone. *@
+@model LaterMilestone
+<section class="settings-section later-milestone" id="@Model.Id">
+  <h3>@Model.Title</h3>
+  <div class="ps-panel p-3 d-flex gap-2 align-items-start fs-7 text-secondary">
+    <i class="bi bi-hourglass-split mt-1" aria-hidden="true"></i>
+    <div><span class="ps-chip" data-tone="outline">Coming in a later milestone</span> @Model.Text</div>
+  </div>
+</section>

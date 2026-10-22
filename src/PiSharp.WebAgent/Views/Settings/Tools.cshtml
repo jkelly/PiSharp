@@ -1,0 +1,140 @@
+@* Decision 0011 (run W2, WU9): the mockups' settings-tools page (route GET /settings/tools), M0 part: the working directory (typed, or
+   picked with _FolderBrowser) with the context files found in it, and tool approvals: Ask before bash, edit and write (recommended, the
+   default), Ask except the allow list, or Never ask (behind a confirm), with the allow list editor (a tool, and for bash a command pattern).
+   Saved together through POST /api/settings/tools from _SettingsSaveBar. Read-only tools never ask, so the mockups' "Ask before every tool
+   call" has no mode. Recent workspaces, built-in tools, session grants and agent compare are later milestones. Model: ToolsPage. *@
+@model ToolsPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Tools & workspace";
+    ViewData[ShellViewData.SettingsSection] = "tools";
+    var rules = Model.Tools.AllowList ?? [];
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Scripts { <script type="module" src="~/js/settings.js" asp-append-version="true"></script> }
+<header class="settings-header d-flex flex-wrap align-items-end gap-3">
+  <div class="flex-grow-1">
+    <div class="ps-eyebrow">Agent</div>
+    <h2>Tools &amp; workspace</h2>
+    <p>The folder the agent works in, and when it has to ask before using a tool. Tools run on this machine with your account's permissions.</p>
+  </div>
+</header>
+
+<form novalidate autocomplete="off" data-settings-form="tools" data-endpoint="/api/settings/tools" data-saved-title="Tool settings saved">
+  <section class="settings-section" id="workspace">
+    <h3>Workspace</h3>
+    <p class="section-desc">New chats start here. Existing chats keep the folder they started with.</p>
+    <div class="ps-card">
+      <div class="setting-row stack" data-setting-row="workingDirectory">
+        <div>
+          <div class="setting-label d-flex align-items-center gap-2 flex-wrap">Working directory <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+          <div class="setting-desc">Relative paths in tool calls resolve against this folder, and its context files (such as <span class="ps-mono">AGENTS.md</span>) are read into the prompt. Default: your home folder, <span class="ps-mono text-break">@ToolsSettings.DefaultWorkingDirectory</span>.</div>
+          <div class="setting-key">tools.workingDirectory</div>
+        </div>
+        <div class="setting-control d-block">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-folder2-open" aria-hidden="true"></i></span>
+            <input class="form-control font-monospace" id="cwdInput" name="workingDirectory" value="@Model.Directory" spellcheck="false" aria-label="Working directory" maxlength="1024" data-working-directory>
+            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#folderBrowser" aria-expanded="false" aria-controls="folderBrowser"><i class="bi bi-three-dots me-1" aria-hidden="true"></i>Browse</button>
+          </div>
+          @if (!Model.DirectoryExists)
+          {
+            <div class="alert alert-warning py-2 fs-7 mt-2 mb-0 d-flex gap-2" data-missing-folder><i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i><div>This folder doesn't exist on this machine. Choose another one; new chats can't start in it.</div></div>
+          }
+          <div class="d-flex flex-wrap align-items-center gap-1 mt-2 fs-8" data-context-files>
+            @if (Model.ContextFiles.Count > 0)
+            {
+              <span class="text-ps-faint me-1"><i class="bi bi-check-circle text-ps-ok me-1" aria-hidden="true"></i>Context files detected:</span>
+              @foreach (var file in Model.ContextFiles)
+              {
+                <span class="ps-chip" data-tone="ok"><i class="bi @(file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? "bi-filetype-json" : "bi-file-earmark-text")" aria-hidden="true"></i>@file</span>
+              }
+            }
+            else if (Model.DirectoryExists)
+            {
+              <span class="text-ps-faint"><i class="bi bi-dash-circle me-1" aria-hidden="true"></i>No context files (AGENTS.md, CLAUDE.md, .pi/settings.json) in this folder.</span>
+            }
+          </div>
+          <partial name="/Views/Settings/_FolderBrowser.cshtml" model="null" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-section" id="approvals">
+    <h3>Tool approvals</h3>
+    <p class="section-desc">When a tool call needs approval, the chat pauses and shows the call before it runs. If you deny it, your reason goes back to the model as the tool result. <span class="ps-mono">read</span>, <span class="ps-mono">grep</span>, <span class="ps-mono">find</span> and <span class="ps-mono">ls</span> never ask.</p>
+    <div class="d-grid gap-2 mb-1" role="radiogroup" aria-label="Tool approval mode">
+      <input type="radio" class="btn-check" name="approvalMode" id="approveAsk" value="ask" checked="@(Model.Mode == "ask")">
+      <label class="choice-card" for="approveAsk">
+        <span class="choice-title d-flex flex-wrap align-items-center gap-2"><span><i class="bi bi-shield-check me-2 text-ps-blue" aria-hidden="true"></i>Ask before bash, edit and write</span><span class="ps-chip" data-tone="accent">recommended</span></span>
+        <span class="choice-desc d-block">Anything that runs a command or changes a file asks first.</span>
+      </label>
+      <input type="radio" class="btn-check" name="approvalMode" id="approveAllow" value="allowList" checked="@(Model.Mode == "allowList")">
+      <label class="choice-card" for="approveAllow">
+        <span class="choice-title d-block"><i class="bi bi-list-check me-2 text-ps-blue" aria-hidden="true"></i>Ask, except the allow list</span>
+        <span class="choice-desc d-block">As above, but calls that match the allow list below run straight away.</span>
+      </label>
+      <input type="radio" class="btn-check" name="approvalMode" id="approveNever" value="auto" checked="@(Model.Mode == "auto")" data-confirm-mode>
+      <label class="choice-card" for="approveNever">
+        <span class="choice-title d-block"><i class="bi bi-shield-slash me-2 text-ps-warn" aria-hidden="true"></i>Never ask (auto-approve)</span>
+        <span class="choice-desc d-block">Every tool call runs immediately. Only use this in a disposable folder or a container.</span>
+      </label>
+    </div>
+    <div class="setting-key ps-mono fs-8 text-ps-faint mb-3">tools.approvalMode = "<span data-mode-key>@Model.Mode</span>"</div>
+
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="ps-card h-100" data-allow-list-card>
+          <div class="px-3 pt-3 pb-2">
+            <div class="fw-semibold fs-7">Calls that never ask</div>
+            <div class="fs-8 text-ps-faint">Used in "Ask, except the allow list". For <span class="ps-mono">bash</span>, <span class="ps-mono">*</span> matches any arguments and a chained command (<span class="ps-mono">&amp;&amp;</span>, <span class="ps-mono">;</span>, <span class="ps-mono">|</span>) must match for every part. A rule without a pattern allows every call of its tool.</div>
+            <div class="setting-key ps-mono fs-8 text-ps-faint mt-1">tools.allowList</div>
+          </div>
+          <div data-allow-list>
+            @foreach (var rule in rules)
+            {
+              <div class="provider-row py-2" data-allow-rule data-tool="@rule.Tool" data-command="@rule.Command">
+                <span class="ps-chip" data-tone="accent">@rule.Tool</span>
+                <span class="ps-mono fs-7 flex-grow-1 text-break">@(rule.Command ?? "every call")</span>
+                <button class="btn btn-icon" type="button" aria-label="Remove @rule.Tool @(rule.Command ?? "rule")" data-allow-remove><i class="bi bi-x-lg fs-8" aria-hidden="true"></i></button>
+              </div>
+            }
+          </div>
+          <div class="px-3 py-2 fs-8 text-ps-faint" data-allow-empty hidden="@(rules.Count > 0)">No rules yet.</div>
+          <div class="provider-row">
+            <div class="input-group input-group-sm">
+              <label class="visually-hidden" for="newRuleTool">Tool</label>
+              <select class="form-select flex-grow-0 w-auto" id="newRuleTool" data-allow-tool>
+                @foreach (var tool in PiSharp.WebAgent.Settings.SettingsEndpoints.ApprovalTools)
+                {
+                  <option value="@tool">@tool</option>
+                }
+              </select>
+              <input class="form-control font-monospace" id="newRulePattern" placeholder="e.g. dotnet test *" aria-label="Command pattern (bash only)" maxlength="@SettingsEndpoints.MaximumCommandLength" data-allow-pattern>
+              <button class="btn btn-outline-secondary" type="button" data-allow-add><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add</button>
+            </div>
+          </div>
+          <template data-allow-template>
+            <div class="provider-row py-2" data-allow-rule>
+              <span class="ps-chip" data-tone="accent" data-rule-tool></span>
+              <span class="ps-mono fs-7 flex-grow-1 text-break" data-rule-command></span>
+              <button class="btn btn-icon" type="button" aria-label="Remove rule" data-allow-remove><i class="bi bi-x-lg fs-8" aria-hidden="true"></i></button>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="ps-card h-100 p-3">
+          <div class="fw-semibold fs-7">Always allowed this session</div>
+          <div class="fs-8 text-ps-faint mb-2">Granted from the approval prompt; cleared when the server restarts.</div>
+          <span class="ps-chip" data-tone="outline">Coming in a later milestone</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Built-in tools and agent compare", "Which built-in tools new chats start with, recent workspaces, and the defaults of agent compare runs.", "builtin-tools")' />
+
+  <partial name="/Views/Settings/_SettingsSaveBar.cshtml" model="null" />
+</form>

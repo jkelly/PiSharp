@@ -1,0 +1,124 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ModelCatalogToolbar as a GET form (the page filters and pages on the server, so it works without
+   script and a filtered view can be bookmarked): search, the provider multi-select (connected providers first), the capability pills,
+   "Connected providers only" and "Enabled only", and "Enable all shown" / "Disable all shown" (settings-models.js: one POST
+   /api/settings/models/visibility for the rows of this page). settings-models.js submits the form when a filter changes. f=1 marks a
+   submitted form, so an unticked "Connected providers only" stays off. Model: ModelsPage. *@
+@model ModelsPage
+@{
+    var query = Model.Query;
+    var connected = Model.CatalogProviders.Where(entry => entry.IsConnected).ToList();
+    var others = Model.CatalogProviders.Where(entry => !entry.IsConnected).ToList();
+}
+<form class="mb-3" method="get" action="/settings/models" role="search" data-models-filter>
+  <input type="hidden" name="f" value="1">
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    <div class="position-relative flex-grow-1 model-search">
+      <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-ps-faint fs-8" aria-hidden="true"></i>
+      <label class="visually-hidden" for="modelSearch">Search models</label>
+      <input class="form-control form-control-sm ps-4" id="modelSearch" name="q" type="search" value="@query.Search" maxlength="200" placeholder="Search by name, id or provider" autocomplete="off">
+    </div>
+
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-inline-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+        <i class="bi bi-hdd-stack" aria-hidden="true"></i>Providers
+        @if (query.Providers.Count > 0)
+        {
+          <span class="ps-chip" data-tone="accent">@query.Providers.Count</span>
+        }
+      </button>
+      <div class="dropdown-menu filter-menu p-0">
+        <div class="p-2 border-bottom">
+          <label class="visually-hidden" for="providerFilterSearch">Filter providers</label>
+          <input class="form-control form-control-sm" id="providerFilterSearch" type="search" placeholder="Filter @Model.CatalogProviders.Count providers" autocomplete="off" data-provider-menu-search>
+        </div>
+        <div class="filter-menu-list">
+          @if (connected.Count > 0)
+          {
+            <h6 class="dropdown-header pt-2">Connected</h6>
+            <div class="px-3 pb-1">
+              @foreach (var entry in connected)
+              {
+                <partial name="/Views/Settings/_ModelProviderOption.cshtml" model="(entry, query.Providers.Contains(entry.Id))" />
+              }
+            </div>
+          }
+          @if (others.Count > 0)
+          {
+            <h6 class="dropdown-header">Not connected <span class="text-lowercase">(shown when "Connected providers only" is off)</span></h6>
+            <div class="px-3 pb-2">
+              @foreach (var entry in others)
+              {
+                <partial name="/Views/Settings/_ModelProviderOption.cshtml" model="(entry, query.Providers.Contains(entry.Id))" />
+              }
+            </div>
+          }
+        </div>
+        <div class="d-flex gap-2 p-2 border-top">
+          <button class="btn btn-sm btn-ghost" type="button" data-provider-menu="all">Select all</button>
+          <button class="btn btn-sm btn-ghost" type="button" data-provider-menu="none">Clear</button>
+          <button class="btn btn-sm btn-primary ms-auto" type="submit">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-1" role="group" aria-label="Capability filters">
+      <input type="checkbox" class="btn-check" id="capReasoning" name="reasoning" value="1" checked="@query.Reasoning" autocomplete="off" data-filter-auto><label class="btn btn-sm btn-outline-secondary rounded-pill" for="capReasoning"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Reasoning</label>
+      <input type="checkbox" class="btn-check" id="capVision" name="vision" value="1" checked="@query.Vision" autocomplete="off" data-filter-auto><label class="btn btn-sm btn-outline-secondary rounded-pill" for="capVision"><i class="bi bi-image me-1" aria-hidden="true"></i>Vision</label>
+      <input type="checkbox" class="btn-check" id="capFree" name="free" value="1" checked="@query.Free" autocomplete="off" data-filter-auto><label class="btn btn-sm btn-outline-secondary rounded-pill" for="capFree"><i class="bi bi-gift me-1" aria-hidden="true"></i>Free</label>
+      <input type="checkbox" class="btn-check" id="capLong" name="long" value="1" checked="@query.LongContext" autocomplete="off" data-filter-auto><label class="btn btn-sm btn-outline-secondary rounded-pill" for="capLong"><i class="bi bi-arrows-angle-expand me-1" aria-hidden="true"></i>1M+ context</label>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" type="submit" data-filter-submit>Search</button>
+  </div>
+
+  <div class="d-flex flex-wrap gap-2 gap-md-3 align-items-center">
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" role="switch" id="connectedOnly" name="connected" value="1" checked="@query.ConnectedOnly" data-filter-auto>
+      <label class="form-check-label fs-7" for="connectedOnly">Connected providers only</label>
+    </div>
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" role="switch" id="enabledOnly" name="enabled" value="1" checked="@query.EnabledOnly" data-filter-auto>
+      <label class="form-check-label fs-7" for="enabledOnly">Enabled only</label>
+    </div>
+    <div class="ms-md-auto d-flex flex-wrap gap-2">
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-models-bulk="show" disabled="@(Model.Shown == 0)"><i class="bi bi-check2-all me-1" aria-hidden="true"></i>Enable all shown</button>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-models-bulk="hide" disabled="@(Model.Shown == 0)"><i class="bi bi-slash-circle me-1" aria-hidden="true"></i>Disable all shown</button>
+    </div>
+  </div>
+</form>
+
+@if (query.Filtered)
+{
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-3" data-active-filters>
+    <span class="ps-label">Filters</span>
+    @if (query.Search.Length > 0)
+    {
+      <a class="ps-chip text-decoration-none" data-tone="accent" href="@((query with { Search = "", Page = 1 }).Href(1))">search: @query.Search <i class="bi bi-x fs-8" aria-hidden="true"></i><span class="visually-hidden">Clear search</span></a>
+    }
+    @foreach (var provider in query.Providers)
+    {
+      <a class="ps-chip text-decoration-none" data-tone="accent" href="@((query with { Providers = query.Providers.Where(id => id != provider).ToList() }).Href(1))">provider: @provider <i class="bi bi-x fs-8" aria-hidden="true"></i><span class="visually-hidden">Remove</span></a>
+    }
+    @if (query.EnabledOnly)
+    {
+      <a class="ps-chip text-decoration-none" data-tone="accent" href="@((query with { EnabledOnly = false }).Href(1))">enabled only <i class="bi bi-x fs-8" aria-hidden="true"></i><span class="visually-hidden">Turn off</span></a>
+    }
+    @if (query.Reasoning)
+    {
+      <a class="ps-chip text-decoration-none" data-tone="accent" href="@((query with { Reasoning = false }).Href(1))">reasoning <i class="bi bi-x fs-8" aria-hidden="true"></i><span class="visually-hidden">Turn off</span></a>
+    }
+    @if (query.Vision)
+    {
+      <a class="ps-chip text-decoration-none" data-tone="accent" href="@((query with { Vision = false }).Href(1))">vision <i class="bi bi-x fs-8" aria-hidden="true"></i><span class="visually-hidden">Turn off</span></a>
+    }
+    @if (query.Free)
+    {
+      <a class="ps-chip text-decoration-none" data-tone="accent" href="@((query with { Free = false }).Href(1))">free <i class="bi bi-x fs-8" aria-hidden="true"></i><span class="visually-hidden">Turn off</span></a>
+    }
+    @if (query.LongContext)
+    {
+      <a class="ps-chip text-decoration-none" data-tone="accent" href="@((query with { LongContext = false }).Href(1))">1M+ context <i class="bi bi-x fs-8" aria-hidden="true"></i><span class="visually-hidden">Turn off</span></a>
+    }
+    <a class="fs-8" href="/settings/models">Clear all</a>
+    <span class="fs-8 text-ps-faint">· @SettingsText.Plural(Model.Matches, "match", "matches")</span>
+  </div>
+}

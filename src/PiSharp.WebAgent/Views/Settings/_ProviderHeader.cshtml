@@ -1,0 +1,80 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ProviderHeader (settings-provider-openai, settings-provider-codex): logo, what kind of provider
+   it is, its name and id, how it is connected (the active account's chip, "OAuth only", "not signed in", "sign-in expired"), its
+   description, and a panel of facts: APIs, base URL, model count and how it authenticates. Model: ProviderPage. *@
+@model ProviderPage
+@{
+    var provider = Model.Provider;
+    var active = provider.Active;
+    var eyebrow = provider.NoCredentials ? "Offline test provider" : provider.Builtin ? (provider.SignInOnly ? "Built-in provider · subscription" : "Built-in provider") : "Provider";
+    var auth = provider.NoCredentials ? "none needed"
+        : provider.SignInOnly ? "OAuth · " + string.Join(" or ", provider.SignIns.Select(method => method.Method == SignInMethod.Browser ? "PKCE" : "device code"))
+        : provider.KeyForm switch
+        {
+            ApiKeyForm.Bedrock => "bearer token, AWS profile or credential chain",
+            ApiKeyForm.Vertex => "API key, ADC or service account",
+            ApiKeyForm.Cloudflare => "API token + account",
+            ApiKeyForm.Azure => "API key + endpoint",
+            _ => provider.SignsIn ? "API key or sign-in" : "API key",
+        };
+}
+<header class="settings-header">
+  <div class="d-flex flex-wrap align-items-start gap-3">
+    <partial name="/Views/Settings/_ProviderLogo.cshtml" model='LogoModel.Of(provider, "lg")' />
+    <div class="flex-grow-1" style="min-width:0">
+      <div class="ps-eyebrow">@eyebrow</div>
+      <h2 class="d-flex align-items-center flex-wrap gap-2">@provider.Name <span class="provider-id fs-7">@provider.Id</span>
+        @if (provider.SignInOnly)
+        {
+          <span class="ps-chip" data-tone="accent"><i class="bi bi-shield-lock" aria-hidden="true"></i>OAuth only</span>
+        }
+        @if (provider.NoCredentials)
+        {
+          <span class="ps-chip" data-tone="ok">no key needed</span>
+        }
+        else if (Model.ExpiredAccount is { } expired)
+        {
+          <span class="ps-chip" data-tone="warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>@(expired.Kind == AccountKind.OAuth ? "sign-in expired" : "key rejected")</span>
+        }
+        else if (active is not null)
+        {
+          <span class="ps-chip" data-tone="@SettingsText.KindTone(active)"><i class="bi @SettingsText.KindIcon(active)" aria-hidden="true"></i>@SettingsText.KindChip(active)</span>
+        }
+        else
+        {
+          <span class="ps-chip" data-tone="outline">@(provider.SignInOnly ? "not signed in" : "not configured")</span>
+        }
+      </h2>
+      <p>@provider.Description</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="/settings/providers"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All providers</a>
+  </div>
+  <div class="ps-panel p-3 mt-3">
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-3">
+        <div class="ps-label">@(provider.Apis.Count == 1 ? "API" : "APIs")</div>
+        <div class="d-flex flex-wrap gap-1 mt-1">
+          @foreach (var api in provider.Apis)
+          {
+            <span class="ps-chip" data-tone="outline">@api</span>
+          }
+          @if (provider.Apis.Count == 0)
+          {
+            <span class="fs-7 text-ps-faint">—</span>
+          }
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-4">
+        <div class="ps-label">Base URL</div>
+        <div class="ps-mono fs-7 mt-1 text-break">@(active?.Settings.GetValueOrDefault("baseUrl") ?? provider.BaseUrl ?? "—")</div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <div class="ps-label">Models</div>
+        <div class="ps-mono fs-7 mt-1">@(provider.Models.Count > 0 ? provider.Models.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")</div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="ps-label">Auth</div>
+        <div class="ps-mono fs-7 mt-1">@auth</div>
+      </div>
+    </div>
+  </div>
+</header>

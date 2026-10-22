@@ -1,0 +1,23 @@
+@* Decision 0011 (run W2, WU9): renames a stored account (an API key or a sign-in): opened by a [data-account-action="rename"] button,
+   which carries the account's id and current name; settings.js POSTs /api/credentials/accounts/{id}/rename and reloads. Environment and
+   ambient accounts have no rename. Model: none. *@
+<div class="modal fade" id="modal-rename-account" tabindex="-1" aria-labelledby="modal-rename-account-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" novalidate autocomplete="off" data-rename-form>
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-rename-account-title">Rename account</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="renameAccountLabel">Name</label>
+        <input class="form-control" id="renameAccountLabel" maxlength="80" required data-rename-label>
+        <div class="form-text">Chats that use this account keep using it; only the name changes.</div>
+        <div class="alert alert-danger py-2 fs-7 mt-3 mb-0" role="alert" data-rename-error hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Rename</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,71 @@
+@* Decision 0011 (run W2, WU9): one detail view for every provider, mapping the mockups' settings-provider-openai and
+   settings-provider-codex (route GET /settings/providers/{id}): _ProviderHeader; the expired warning (_ExpiredAccountCard) when the active
+   account stopped working; the call to action (_ProviderConnect) while it has no account; its accounts (_ProviderAccounts with an
+   _AccountCard each); its models (_ProviderModels); the sections later milestones build; and _ProviderDangerZone. The credential modals
+   come from _CredentialModals. Model: ProviderPage. *@
+@model ProviderPage
+@{
+    Layout = "_SettingsLayout";
+    var provider = Model.Provider;
+    ViewData["Title"] = provider.Name;
+    ViewData[ShellViewData.SettingsSection] = "providers";
+    ViewData[ShellViewData.Page] = "settings-provider";
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Modals { <partial name="/Views/Settings/_CredentialModals.cshtml" model="Model.Modals" /> }
+@section Scripts { <script type="module" src="~/js/settings.js" asp-append-version="true"></script> }
+<div data-provider-page="@provider.Id">
+  <partial name="/Views/Settings/_ProviderHeader.cshtml" model="Model" />
+  <partial name="/Views/Settings/_OfflineNote.cshtml" model="Model.Offline" />
+
+  @if (Model.ExpiredAccount is { } expired)
+  {
+    <partial name="/Views/Settings/_ExpiredAccountCard.cshtml" model="new AccountCard(provider, expired, Model.Offline)" />
+  }
+
+  @if (provider.NoCredentials)
+  {
+    <section class="settings-section">
+      <div class="ps-panel p-3 fs-7 text-secondary d-flex gap-2"><i class="bi bi-check-circle text-ps-ok mt-1" aria-hidden="true"></i><div>@provider.Name needs no key or sign-in. Its models answer on this machine and nothing leaves it.</div></div>
+    </section>
+  }
+  else if (provider.Accounts.Count == 0)
+  {
+    <partial name="/Views/Settings/_ProviderConnect.cshtml" model="Model" />
+  }
+  else
+  {
+    <partial name="/Views/Settings/_ProviderAccounts.cshtml" model="Model" />
+  }
+
+  @if (provider.Id == SignInFlows.CodexProvider)
+  {
+    <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Usage limits", "Your ChatGPT plan allowance per account, refreshed from the Codex backend.", "usage-limits")' />
+  }
+
+  @if (provider.Models.Count > 0)
+  {
+    <partial name="/Views/Settings/_ProviderModels.cshtml" model="Model" />
+  }
+  else if (!provider.NoCredentials)
+  {
+    <section class="settings-section" id="models">
+      <h3>Models</h3>
+      <p class="section-desc mb-0">@("The model catalog lists no models for " + provider.Name + (Model.Offline ? " while the app runs offline; the faux models stand in." : "."))</p>
+    </section>
+  }
+
+  @if (provider.Id == SignInFlows.CodexProvider)
+  {
+    <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Request defaults for Codex", "Text verbosity, reasoning summary, default thinking level and service tier for Codex requests.", "request-defaults")' />
+  }
+  else if (provider.TakesApiKey && !provider.NoCredentials)
+  {
+    <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Connection settings", "Organization, project and custom headers for every request. A base URL override is set per key today: Replace key › Advanced.", "connection")' />
+  }
+
+  @if (!provider.NoCredentials)
+  {
+    <partial name="/Views/Settings/_ProviderDangerZone.cshtml" model="Model" />
+  }
+</div>
