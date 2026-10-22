@@ -1,0 +1,170 @@
+@* Decision 0011 (run W2, WU9): one account of a provider, as the mockups' _OAuthAccountCard and _ApiKeyCard show it: its name, kind and
+   state chips, "Active" when new chats bind to it, what identifies it (a masked key hint, a short account id, an environment variable),
+   its non-secret settings, its last connection test, and its actions: Test, Replace key or Sign in again, Rename, Make active, Remove or
+   Disconnect. Environment and ambient accounts are read-only here. settings.js runs the actions ([data-account-action]) on
+   /api/credentials/accounts/{id}/... and reloads; making an account active is always the user's explicit choice. Model: AccountCard. *@
+@model AccountCard
+@{
+    var account = Model.Account;
+    var provider = Model.Provider;
+    var oauth = account.Kind == AccountKind.OAuth;
+    var key = account.Kind == AccountKind.ApiKey;
+    var testable = account.Kind != AccountKind.Ambient;
+    var removeLabel = oauth ? "Disconnect" : "Remove key";
+    var plan = account.Details.GetValueOrDefault("plan");
+    var host = account.Details.GetValueOrDefault("host");
+    var models = account.Details.GetValueOrDefault("models");
+}
+<div class="ps-card account-card overflow-hidden" data-account-card="@account.Id" data-account-status="@SettingsText.Status(account)">
+  <div class="p-3 d-flex flex-wrap gap-3 align-items-start">
+    <span class="provider-logo lg" aria-hidden="true"><i class="bi @SettingsText.KindIcon(account)"></i></span>
+    <div class="flex-grow-1" style="min-width:0">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="fw-semibold text-break" data-account-name>@account.Label</span>
+        <span class="ps-chip" data-tone="outline">@SettingsText.KindChip(account)</span>
+        @if (account.IsActive)
+        {
+          <span class="ps-chip" data-tone="ok"><span class="status-dot ok"></span>Active</span>
+        }
+        @if (account.Status == AccountStatus.Expired)
+        {
+          <span class="ps-chip" data-tone="warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>expired</span>
+        }
+        else if (account.Status == AccountStatus.Unavailable)
+        {
+          <span class="ps-chip" data-tone="outline">unavailable</span>
+        }
+      </div>
+      <div class="fs-8 text-secondary mt-1">
+        @if (key)
+        {
+          if (account.Hint.Length > 0)
+          {
+            <text>Key </text><span class="ps-mono" data-account-hint>@account.Hint</span>
+          }
+          else
+          {
+            <text>Settings only, no key stored</text>
+          }
+          <text> · added @SettingsText.Date(account.Created)</text>
+        }
+        else if (oauth)
+        {
+          <text>Account </text><span class="ps-mono">@(account.Identity is null ? "—" : SettingsText.ShortId(account.Identity))</span>
+          if (account.Details.GetValueOrDefault("email") is { } email)
+          {
+            <text> · @email</text>
+          }
+          if (host is not null)
+          {
+            <text> · host </text><span class="ps-mono">@host</span>
+          }
+          if (account.ExpiresAt is { } expires)
+          {
+            <text> · access token @(expires > DateTimeOffset.UtcNow ? "expires " + SettingsText.Until(expires) : SettingsText.Until(expires))</text>
+          }
+        }
+        else if (account.Kind == AccountKind.Environment)
+        {
+          <text>Read from </text><span class="ps-mono">@(account.Source ?? "a variable")</span><text> in the web host's environment on each request. Unset it on the web host to remove it.</text>
+        }
+        else
+        {
+          @("Found by the provider's SDK on this machine" + (account.Source is null ? "" : " (" + account.Source + ")") + ". Nothing is stored here.")
+        }
+      </div>
+      @if (account.StatusReason is { Length: > 0 } reason)
+      {
+        <div class="fs-8 text-ps-warn mt-1">@reason</div>
+      }
+      <div class="fs-8 text-ps-faint mt-1" data-account-last-test>
+        @if (account.LastTest is { } test)
+        {
+          @((test.Ok ? "Last test passed " : "Last test failed ") + SettingsText.Ago(test.TestedAt) + (test.StatusCode is { } status ? " · " + status : "") + (test.LatencyMs is { } ms ? " · " + ms + " ms" : "") + (test.Ok ? "" : " · " + test.Message))
+        }
+        else if (account.LastUsed is { } used)
+        {
+          @("Last used " + SettingsText.Ago(used))
+        }
+        else if (plan is not null || models is not null)
+        {
+          @(plan is not null ? (provider.Id == SignInFlows.CodexProvider ? "Subscription · list cost not counted" : SettingsText.Plan(plan)) : models + " models enabled by policy")
+        }
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 account-actions">
+      @if (testable)
+      {
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-account-action="test" data-account-id="@account.Id" data-account-label="@account.Label"
+                disabled="@Model.Offline" title="@(Model.Offline ? ProviderDirectory.OfflineMessage : null)"><i class="bi bi-activity me-1" aria-hidden="true"></i>@(oauth ? "Test sign-in" : "Test")</button>
+      }
+      @if (key && provider.TakesApiKey)
+      {
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, "Replace key", "btn btn-sm btn-outline-secondary") { Account = account, Icon = "bi-pencil me-1" }' />
+      }
+      @if (oauth && provider.SignsIn)
+      {
+        <partial name="/Views/Settings/_CredentialButton.cshtml" model='new CredentialButton(provider, account.Status == AccountStatus.Connected ? "Sign in again" : "Reconnect", account.Status == AccountStatus.Connected ? "btn btn-sm btn-outline-secondary" : "btn btn-sm btn-warning") { SignIn = true, Account = account }' />
+      }
+      @if (!account.IsActive && account.Status == AccountStatus.Connected)
+      {
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-account-action="activate" data-account-id="@account.Id" data-account-label="@account.Label" data-provider-name="@provider.Name">Make active</button>
+      }
+      @if (!account.ReadOnly)
+      {
+        <div class="dropdown">
+          <button class="btn btn-sm btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions for @account.Label"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><button class="dropdown-item" type="button" data-account-action="rename" data-account-id="@account.Id" data-account-label="@account.Label"><i class="bi bi-input-cursor-text me-2" aria-hidden="true"></i>Rename</button></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><button class="dropdown-item text-danger" type="button" data-account-action="remove" data-account-id="@account.Id" data-account-label="@account.Label"
+                        data-account-kind="@(oauth ? "oauth" : "apiKey")" data-provider-name="@provider.Name"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>@removeLabel</button></li>
+          </ul>
+        </div>
+      }
+      else
+      {
+        <span class="d-inline-block" tabindex="0" title="@(account.Kind == AccountKind.Environment ? "This key comes from " + (account.Source ?? "an environment variable") + ". Unset it on the web host to remove it." : "Ambient credentials belong to the provider's SDK on this machine.")">
+          <button class="btn btn-sm btn-outline-danger" type="button" disabled style="pointer-events:none"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Remove</button>
+        </span>
+      }
+    </div>
+  </div>
+  @if (key && account.Settings.Count > 0)
+  {
+    <details class="border-top px-3 py-2">
+      <summary class="fs-7">Settings</summary>
+      <div class="mt-2">
+        @foreach (var setting in account.Settings.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+          <div class="kv"><span class="k ps-mono">@setting.Key</span><span class="v ps-mono text-break">@setting.Value</span></div>
+        }
+      </div>
+    </details>
+  }
+  @if (oauth)
+  {
+    <details class="border-top px-3 py-2">
+      <summary class="fs-7">Connection details</summary>
+      <div class="mt-2">
+        <div class="kv"><span class="k">Account ID</span><span class="v ps-mono text-break">@(account.Identity ?? "—")</span></div>
+        @if (plan is not null)
+        {
+          <div class="kv"><span class="k">Plan</span><span class="v">@SettingsText.Plan(plan)</span></div>
+        }
+        @if (models is not null)
+        {
+          <div class="kv"><span class="k">Models enabled by policy</span><span class="v ps-mono">@models</span></div>
+        }
+        <div class="kv"><span class="k">Signed in</span><span class="v">@SettingsText.Date(account.Created)</span></div>
+        @if (account.ExpiresAt is { } accessExpires)
+        {
+          <div class="kv"><span class="k">Access expires</span><span class="v">@SettingsText.Date(accessExpires)</span></div>
+        }
+        <div class="kv"><span class="k">Access token</span><span class="v">hidden</span></div>
+        <div class="kv"><span class="k">Refresh token</span><span class="v">stored (encrypted)</span></div>
+      </div>
+    </details>
+  }
+  <div class="border-top px-3 py-2 fs-7" data-account-test-result hidden aria-live="polite"></div>
+</div>

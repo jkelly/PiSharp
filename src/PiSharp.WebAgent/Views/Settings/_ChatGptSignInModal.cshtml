@@ -1,0 +1,133 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ChatGptSignInModal (#modal-chatgpt-signin), the opt-in ChatGPT Plus/Pro sign-in of the
+   openai-codex provider, with the mockups' notice on the first step: there is no API key, and usage counts against the plan. Steps
+   (data-signin-step): method, browser, port-busy (the callback port is taken, so the user pastes the redirect URL), device, success and
+   error. settings-signin.js runs it on WU5's /api/credentials/signin: it starts the flow, opens the authorize URL in a new tab, polls the
+   flow, posts a pasted code or redirect URL once, and cancels the flow when the modal closes early. The page sees no token, verifier or code
+   answer: only the flow's status and, at the end, the account's metadata. The mockups' openai "Sign in with ChatGPT" panes are a later
+   milestone (WU5 has no such flow). Model: CredentialModals. *@
+@model CredentialModals
+<div class="modal fade" id="modal-chatgpt-signin" tabindex="-1" aria-labelledby="modal-chatgpt-signin-title" aria-hidden="true" data-bs-backdrop="static"
+     data-signin-modal="chatgpt" data-callback-port="@Model.CallbackPort">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-3" style="min-width:0">
+          <partial name="/Views/Settings/_ProviderLogo.cshtml" model='new LogoModel("OpenAI Codex", Model.CodexLogo, "lg")' />
+          <div style="min-width:0">
+            <h2 class="modal-title" id="modal-chatgpt-signin-title">Sign in with ChatGPT</h2>
+            <div class="modal-subtitle">OpenAI Codex · <span class="ps-mono">openai-codex</span> · ChatGPT Plus/Pro<span data-signin-again hidden> · signing in <strong data-signin-account-label></strong> again</span></div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <ol class="ps-stepper mb-4" aria-label="Sign-in steps">
+          <li data-signin-indicator="method"><span class="step-num">1</span>Method</li>
+          <li data-signin-indicator="browser port-busy device error"><span class="step-num">2</span>Authorize</li>
+          <li data-signin-indicator="success"><span class="step-num">3</span>Done</li>
+        </ol>
+
+        <div data-signin-step="method">
+          <p class="fs-7 text-secondary mb-3">Use your ChatGPT Plus or Pro subscription for Codex models. There's no API key: usage counts against your plan's limits instead of being billed per token.</p>
+          <p class="fs-8 text-ps-faint mb-3">This sign-in is optional. An OpenAI API key stays the main way to use OpenAI models; chats you start with this account keep using it.</p>
+          <div class="ps-label mb-2">Choose how to sign in</div>
+          <div class="d-grid gap-2">
+            <button type="button" class="choice-card d-flex align-items-center gap-3 text-start" data-signin-start="browser" disabled="@Model.Offline">
+              <i class="bi bi-window-stack fs-4 text-ps-blue" aria-hidden="true"></i>
+              <span class="flex-grow-1" style="min-width:0">
+                <span class="choice-title d-flex align-items-center gap-2 flex-wrap">Browser <span class="ps-chip" data-tone="accent">recommended</span></span>
+                <span class="choice-desc d-block">Opens auth.openai.com in a new tab and returns to <span class="ps-mono">localhost:@Model.CallbackPort</span>.</span>
+              </span>
+              <i class="bi bi-chevron-right text-ps-faint" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="choice-card d-flex align-items-center gap-3 text-start" data-signin-start="deviceCode" disabled="@Model.Offline">
+              <i class="bi bi-phone fs-4 text-ps-blue" aria-hidden="true"></i>
+              <span class="flex-grow-1" style="min-width:0">
+                <span class="choice-title d-block">Device code</span>
+                <span class="choice-desc d-block">Use on another device or when the browser can't reach localhost.</span>
+              </span>
+              <i class="bi bi-chevron-right text-ps-faint" aria-hidden="true"></i>
+            </button>
+          </div>
+          @if (Model.Offline)
+          {
+            <div class="alert alert-secondary fs-7 py-2 mt-3 mb-0">@ProviderDirectory.OfflineMessage</div>
+          }
+          <div class="fs-8 text-ps-faint mt-3"><i class="bi bi-shield-lock me-1" aria-hidden="true"></i>Tokens are encrypted with ASP.NET Data Protection in the app's data folder and refresh automatically before they expire. They never reach this page.</div>
+        </div>
+
+        <div data-signin-step="browser" hidden>
+          <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status"><span class="visually-hidden">Waiting for sign-in</span></div>
+            <h3 class="fs-6 mb-1">Waiting for you to finish signing in…</h3>
+            <p class="fs-7 text-secondary mb-3">A new tab opened at <span class="ps-mono">auth.openai.com</span>. Sign in with the ChatGPT account that has your Plus or Pro plan.</p>
+            <div class="ps-panel d-inline-flex align-items-center gap-2 px-3 py-2 mw-100 text-start">
+              <span class="status-dot live"></span>
+              <span class="ps-mono fs-8 text-break" data-signin-callback></span>
+            </div>
+            <div class="mt-2"><a class="fs-7" href="#" target="_blank" rel="noopener noreferrer" data-signin-authorize><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open sign-in page again</a></div>
+          </div>
+          <details class="ps-panel p-3 mt-3">
+            <summary class="fs-7">Didn't redirect? Paste the authorization code or full redirect URL</summary>
+            <div class="mt-3">
+              <label class="form-label fs-7" for="cgPasteInput">Authorization code or redirect URL</label>
+              <div class="input-group">
+                <input class="form-control font-monospace" id="cgPasteInput" placeholder="http://localhost:@(Model.CallbackPort)/auth/callback?code=…" autocomplete="off" spellcheck="false" data-signin-code>
+                <button class="btn btn-outline-primary" type="button" data-signin-submit-code>Submit</button>
+              </div>
+              <div class="form-text">The <span class="ps-mono">state</span> in a pasted URL must match this sign-in. A bare code works too.</div>
+            </div>
+          </details>
+          <div class="fs-8 text-ps-faint mt-2">The callback listener binds to <span class="ps-mono">@Model.CallbackHost:@Model.CallbackPort</span>. Set <span class="ps-mono">PI_OAUTH_CALLBACK_HOST</span> to use a different host.</div>
+        </div>
+
+        <div data-signin-step="port-busy" hidden>
+          <div class="alert alert-warning d-flex gap-2">
+            <i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i>
+            <div><strong>Port @Model.CallbackPort is in use by another process.</strong> It's often the Codex CLI or another sign-in that hasn't finished. The browser can't hand the code back automatically, so paste it here instead.</div>
+          </div>
+          <ol class="fs-7 text-secondary ps-3 mb-3">
+            <li>Finish signing in in the <span class="ps-mono">auth.openai.com</span> tab.</li>
+            <li>The tab ends on <span class="ps-mono">localhost:@(Model.CallbackPort)/auth/callback?code=…</span>, possibly showing an error page.</li>
+            <li>Copy the full URL from the address bar, or just the <span class="ps-mono">code</span> value.</li>
+          </ol>
+          <label class="form-label" for="cgPortPaste">Authorization code or full redirect URL</label>
+          <input class="form-control font-monospace" id="cgPortPaste" placeholder="http://localhost:@(Model.CallbackPort)/auth/callback?code=…" autocomplete="off" spellcheck="false" data-signin-code>
+          <div class="form-text"><a href="#" target="_blank" rel="noopener noreferrer" data-signin-authorize>Open sign-in page again</a></div>
+        </div>
+
+        <div data-signin-step="device" hidden>
+          <p class="fs-7 text-secondary text-center mb-3">On any device, open the link below and enter this code.</p>
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+            <span class="device-code" id="cgDeviceCode" data-signin-user-code>…</span>
+            <button class="btn btn-icon" type="button" data-copy="#cgDeviceCode" aria-label="Copy code" title="Copy code"><i class="bi bi-copy" aria-hidden="true"></i></button>
+          </div>
+          <div class="ps-panel p-3 mb-3">
+            <div class="ps-label mb-1">Verification page</div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <a class="ps-mono fs-7 text-break flex-grow-1" id="cgDeviceUrl" href="#" target="_blank" rel="noopener noreferrer" data-signin-verification></a>
+              <button class="btn btn-icon" type="button" data-copy="#cgDeviceUrl" aria-label="Copy link" title="Copy link"><i class="bi bi-copy" aria-hidden="true"></i></button>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2 fs-7 flex-wrap">
+            <span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>
+            <span>Waiting for approval…</span>
+            <span class="ms-auto text-ps-faint" data-signin-expiry hidden>Code expires in <span class="countdown" data-signin-countdown></span></span>
+          </div>
+        </div>
+
+        <partial name="/Views/Settings/_SignInResult.cshtml" model="null" />
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost me-auto" data-signin-back data-signin-only="browser port-busy device">Back</button>
+        <a class="btn btn-outline-secondary" href="#" target="_blank" rel="noopener noreferrer" data-signin-verification-button data-signin-only="device"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open on this device</a>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-signin-only="method browser port-busy device error">Cancel</button>
+        <button type="button" class="btn btn-primary" data-signin-submit-code data-signin-only="port-busy">Submit</button>
+        <button type="button" class="btn btn-primary" data-signin-retry data-signin-only="error">Try again</button>
+        <button type="button" class="btn btn-primary" data-signin-done data-signin-only="success">Done</button>
+      </div>
+    </div>
+  </div>
+</div>

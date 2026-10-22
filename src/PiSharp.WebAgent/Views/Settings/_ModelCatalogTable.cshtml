@@ -1,0 +1,97 @@
+@* Decision 0011 (run W2, WU9): the mockups' _ModelCatalogTable: this page's rows grouped by provider. A group row has the provider's logo,
+   name, id, credential chip, counts and "enable all" / "disable all" (the provider's every model); a model row has the On switch (saved at
+   once through POST /api/settings/models/visibility), name and key with the default model's chip, context, max output, input, reasoning, the
+   thinking levels (unsupported ones struck), the list price and a details button (_ModelDetailsModal, filled from data-model). The mockups'
+   API and per-model default thinking columns are left out: the catalog contract has no API per model, and per-model thinking defaults are a
+   later milestone. Model: ModelsPage. *@
+@model ModelsPage
+<div class="ps-table-wrap position-relative mb-2">
+  <table class="table table-hover align-middle model-table" data-models-table>
+    <caption class="visually-hidden">Chat models, grouped by provider</caption>
+    <thead>
+      <tr>
+        <th scope="col">On</th>
+        <th scope="col">Model</th>
+        <th scope="col" class="text-end">Context</th>
+        <th scope="col" class="text-end">Max out</th>
+        <th scope="col">Input</th>
+        <th scope="col">Reasoning</th>
+        <th scope="col" title="Supported thinking levels; struck-through levels are unsupported">Thinking levels</th>
+        <th scope="col" class="text-end">$ in / out · 1M</th>
+        <th scope="col"><span class="visually-hidden">Details</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var group in Model.Groups)
+      {
+        var provider = group.Provider;
+        <tr class="group-row" data-model-group="@provider.Id">
+          <th colspan="9" scope="colgroup">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <partial name="/Views/Settings/_ProviderLogo.cshtml" model='LogoModel.Of(provider, "sm")' />
+              <a class="provider-name text-reset text-decoration-none" href="/settings/providers/@Uri.EscapeDataString(provider.Id)">@provider.Name</a><span>@provider.Id</span>
+              @if (provider.NoCredentials)
+              {
+                <span class="ps-chip" data-tone="ok">no key needed</span>
+              }
+              else if (provider.Active is { } active)
+              {
+                <span class="ps-chip" data-tone="@SettingsText.KindTone(active)"><i class="bi @SettingsText.KindIcon(active)" aria-hidden="true"></i>@SettingsText.KindChip(active)</span>
+              }
+              else
+              {
+                <span class="ps-chip" data-tone="outline">not connected</span>
+              }
+              <span>@(SettingsText.Plural(provider.Models.Count, "model") + " · " + group.Enabled + " enabled" + (Model.Query.Filtered ? " · " + group.Matches + " match" : ""))</span>
+              <span class="text-ps-faint">·</span>
+              <button class="btn btn-link btn-sm p-0 fw-normal" type="button" data-models-provider="@provider.Id" data-hidden="false">enable all</button>
+              <button class="btn btn-link btn-sm p-0 fw-normal" type="button" data-models-provider="@provider.Id" data-hidden="true">disable all</button>
+            </div>
+          </th>
+        </tr>
+        @foreach (var row in group.Rows)
+        {
+          var item = row.Model;
+          <tr class="@(row.Hidden ? "is-off" : null)" data-model-row="@row.Key">
+            <td><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" checked="@(!row.Hidden)" aria-label="Enable @row.Key" data-model-toggle="@row.Key"></div></td>
+            <td><div class="fw-medium">@item.Name @if (row.IsDefault){<span class="ps-chip ms-1" data-tone="accent">default model</span>}</div><div class="ps-mono fs-8 text-ps-faint text-break">@row.Key</div></td>
+            <td class="ps-mono fs-7 text-end" title="@SettingsText.Count(item.ContextWindow) tokens">@CatalogText.Tokens(item.ContextWindow)</td>
+            <td class="ps-mono fs-7 text-end" title="@SettingsText.Count(item.MaxTokens) tokens">@(item.MaxTokens > 0 ? CatalogText.Tokens(item.MaxTokens) : "—")</td>
+            <td class="text-nowrap"><span class="cap" title="Text input"><i class="bi bi-fonts" aria-hidden="true"></i><span class="visually-hidden">text</span></span>
+              @if (item.Input.Contains("image"))
+              {
+                <span class="cap cap-image" title="Image input"><i class="bi bi-image" aria-hidden="true"></i><span class="visually-hidden">image</span></span>
+              }
+              else
+              {
+                <span class="cap opacity-25" title="No image input"><i class="bi bi-image" aria-hidden="true"></i></span>
+              }
+            </td>
+            <td>@if (item.Reasoning){<span class="cap cap-reasoning"><i class="bi bi-lightbulb" aria-hidden="true"></i>yes</span>}else{<span class="cap">no</span>}</td>
+            <td>
+              <span class="lvl-set">
+                @foreach (var level in PiSharp.AI.ThinkingLevels.Ordered)
+                {
+                  var supported = item.ThinkingLevels.Contains(level);
+                  <span class="lvl @(supported ? null : "no")" title="@(supported ? level : level + ": unsupported")">@SettingsText.ShortLevels[level]</span>
+                }
+              </span>
+            </td>
+            <td class="ps-mono fs-8 text-end text-nowrap">
+              @if (provider.Billing == BillingKind.Subscription)
+              {
+                <span class="ps-chip" data-tone="accent" title="Billed through the subscription">subscription</span>
+              }
+              else
+              {
+                @SettingsText.Price(provider.Billing, item)
+              }
+            </td>
+            <td class="text-end"><button class="btn btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#modal-model-details" title="Details" aria-label="Details for @row.Key"
+                                         data-model="@SettingsText.Json(ModelDetails.Of(row))"><i class="bi bi-info-circle" aria-hidden="true"></i></button></td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>

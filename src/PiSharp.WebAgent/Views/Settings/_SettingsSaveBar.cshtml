@@ -1,0 +1,7 @@
+@* Decision 0011 (run W2, WU9): the mockups' _SettingsSaveBar, shown only while its form has unsaved changes: Save changes, Discard, and how
+   many settings changed (by name). settings-forms.js tracks the form and saves it as JSON. Model: none. *@
+<div class="settings-savebar" role="region" aria-label="Unsaved changes" data-savebar hidden>
+  <button class="btn btn-sm btn-primary" type="submit" data-save><i class="bi bi-check2 me-1" aria-hidden="true"></i>Save changes</button>
+  <button class="btn btn-sm btn-outline-secondary" type="button" data-discard>Discard</button>
+  <span class="d-flex align-items-center gap-2 fs-7"><span class="status-dot warn"></span><strong data-savebar-count>Unsaved changes</strong><span class="text-secondary ps-mono fs-8 d-none d-lg-inline" data-savebar-names></span></span>
+</div>

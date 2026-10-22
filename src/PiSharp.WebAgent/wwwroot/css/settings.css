@@ -1,0 +1,59 @@
+/* Decision 0011 (run W2, WU9): the settings pages' own styles, on top of site.css (WU4) and Web.Common's theme. Neutral greys; colour only
+   for status. Everything wraps at 375px: provider rows stack their actions, tables scroll inside .ps-table-wrap, never the page. */
+
+/* Bootstrap's display utilities (d-flex, d-grid) beat the hidden attribute; the settings scripts show and hide with it. */
+.settings-content [hidden],
+.modal [hidden],
+.settings-savebar[hidden] { display: none !important; }
+
+/* A provider without a mark shows its initial. */
+.provider-logo-initial { font-weight: 600; line-height: 1; color: var(--ps-muted); }
+.provider-logo.is-warn { background: var(--ps-warn-bg); color: var(--ps-warn); }
+
+/* Providers: search width, rows that wrap on a phone. */
+.provider-search { min-width: 12rem; max-width: 22rem; }
+.provider-row { flex-wrap: wrap; }
+.provider-row-main { flex: 1 1 14rem; }
+.provider-row-actions { margin-left: auto; }
+.provider-more > .provider-row { border-top: 1px solid var(--ps-border); }
+@media (max-width: 575.98px) {
+  .provider-row { padding: .75rem .85rem; gap: .6rem; }
+  .provider-row-actions { width: 100%; justify-content: flex-start; margin-left: 0; }
+}
+
+/* A provider's page: account cards, their actions, an inline test result. */
+.account-card .account-actions { margin-left: auto; align-items: center; }
+.account-card [data-account-test-result][data-tone="ok"],
+.oauth-card [data-account-test-result][data-tone="ok"] { color: var(--ps-ok); }
+.account-card [data-account-test-result][data-tone="danger"],
+.oauth-card [data-account-test-result][data-tone="danger"] { color: var(--ps-danger); }
+.account-card [data-account-test-result][data-tone="info"],
+.oauth-card [data-account-test-result][data-tone="info"] { color: var(--ps-muted); }
+.expired-card { border-color: var(--bs-warning-border-subtle) !important; }
+@media (max-width: 575.98px) {
+  .account-card .account-actions { width: 100%; margin-left: 0; }
+}
+
+/* Choice cards used as buttons (sign-in methods) keep the card look. */
+button.choice-card { width: 100%; text-align: left; }
+button.choice-card:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Models: the search box, the provider menu's list, the pager. */
+.model-search { min-width: 12rem; max-width: 21rem; }
+.filter-menu-list { max-height: 260px; overflow-y: auto; }
+.model-table .group-row .btn-link { --bs-btn-color: var(--ps-link); font-size: .7rem; text-decoration: none; }
+
+/* Defaults: thinking levels the chosen model doesn't support. */
+label.is-unsupported { text-decoration: line-through; opacity: .6; }
+
+/* Tools: the folder browser's list. */
+.folder-list { max-height: 320px; overflow-y: auto; }
+.folder-list .list-group-item { color: var(--ps-text); }
+
+/* A section a later milestone builds. */
+.later-milestone .ps-panel { border-style: dashed; }
+
+/* The device code wraps on a phone instead of widening the modal. */
+@media (max-width: 575.98px) {
+  .device-code { font-size: 1.4rem; letter-spacing: .12em; padding: .5rem .8rem; }
+}
