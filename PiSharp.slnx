@@ -24,6 +24,7 @@
     <Project Path="src/PiSharp.Durable.Client/PiSharp.Durable.Client.csproj" />
     <Project Path="src/PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
     <Project Path="src/PiSharp.Durable.Web/PiSharp.Durable.Web.csproj" />
+    <Project Path="src/PiSharp.Web.Common/PiSharp.Web.Common.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj" />

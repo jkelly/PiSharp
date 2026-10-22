@@ -3,8 +3,8 @@
 // State. Selecting an agent changes the URL (/d/{device}/s/{session}/a/{agent}), the hub's UI state (so a reload or a second tab opens
 // on it), the stream's subscriptions and the inspector's panels. Every write goes through the hub's proxy to the device.
 import { $, $$, api, deviceApi, fragment, uiState, toast, toastError, initCommon, showPane, restorePanels, savePanels, tokens, count, cost, escapeHtml, uuid, modal } from './core.js';
-import { HubStream } from './stream.js';
-import { applyItems, swapHtml, keepPinned } from './swap.js';
+import { MuxStream } from '/_content/PiSharp.Web.Common/js/stream.js';
+import { applyItems, swapHtml, keepPinned } from '/_content/PiSharp.Web.Common/js/swap.js';
 import { Tree } from './tree.js';
 import { Dialogs, providerName } from './dialogs.js';
 import { Composer } from './composer.js';
@@ -23,7 +23,7 @@ class App {
     this.live = {};
     this.offlineShown = null;
     this.subs = [];
-    this.stream = new HubStream();
+    this.stream = new MuxStream();
     this.tree = new Tree({ onSelect: (selection) => this.select(selection) });
     this.dialogs = new Dialogs(this);
     this.composer = new Composer(this);

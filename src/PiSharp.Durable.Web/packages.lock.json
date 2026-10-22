@@ -2,22 +2,6 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
-      "HtmlSanitizer": {
-        "type": "Direct",
-        "requested": "[9.0.886, 9.0.886]",
-        "resolved": "9.0.886",
-        "contentHash": "qw87Q+bffcs2Fw/Rd3VXWg/QK+K9eIxeE9QidQLz3C/ffgUGuOB0X4MWUuuolUnnBvoD/u6FqXhsqIA67nL4kg==",
-        "dependencies": {
-          "AngleSharp": "[0.17.1]",
-          "AngleSharp.Css": "[0.17.0]"
-        }
-      },
-      "Markdig": {
-        "type": "Direct",
-        "requested": "[0.41.3, 0.41.3]",
-        "resolved": "0.41.3",
-        "contentHash": "i3vSTyGpBGWbJB04aJ3cPJs0T3BV2e1nduW3EUHK/i+xUupYbym75iZPss/XjqhS5JlBErwQYnx7ofK3Zcsozg=="
-      },
       "Microsoft.Data.Sqlite": {
         "type": "Direct",
         "requested": "[10.0.12, 10.0.12]",
@@ -79,6 +63,20 @@
           "AngleSharp": "[0.17.0, 0.18.0)"
         }
       },
+      "HtmlSanitizer": {
+        "type": "Transitive",
+        "resolved": "9.0.886",
+        "contentHash": "qw87Q+bffcs2Fw/Rd3VXWg/QK+K9eIxeE9QidQLz3C/ffgUGuOB0X4MWUuuolUnnBvoD/u6FqXhsqIA67nL4kg==",
+        "dependencies": {
+          "AngleSharp": "[0.17.1]",
+          "AngleSharp.Css": "[0.17.0]"
+        }
+      },
+      "Markdig": {
+        "type": "Transitive",
+        "resolved": "0.41.3",
+        "contentHash": "i3vSTyGpBGWbJB04aJ3cPJs0T3BV2e1nduW3EUHK/i+xUupYbym75iZPss/XjqhS5JlBErwQYnx7ofK3Zcsozg=="
+      },
       "Microsoft.Data.Sqlite.Core": {
         "type": "Transitive",
         "resolved": "10.0.12",
@@ -89,6 +87,13 @@
       },
       "pisharp.durable.client": {
         "type": "Project"
+      },
+      "pisharp.web.common": {
+        "type": "Project",
+        "dependencies": {
+          "HtmlSanitizer": "[9.0.886, 9.0.886]",
+          "Markdig": "[0.41.3, 0.41.3]"
+        }
       }
     }
   }

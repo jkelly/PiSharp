@@ -2,11 +2,11 @@
 // token, edit or remove a device added here, forget a changed identity, and import a dpi-network.yaml. The table refreshes from the hub
 // whenever a device's status changes.
 import { $, api, escapeHtml, fragment, initCommon, modal, toast, toastError } from './core.js';
-import { HubStream } from './stream.js';
+import { MuxStream } from '/_content/PiSharp.Web.Common/js/stream.js';
 
 initCommon();
 
-const stream = new HubStream();
+const stream = new MuxStream();
 stream.status = (status) => {
   const chip = $('[data-connection]');
   if (chip) { chip.textContent = status === 'connected' ? 'Connected' : 'Reconnecting'; chip.setAttribute('data-tone', status === 'connected' ? 'ok' : 'warn'); }

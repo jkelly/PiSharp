@@ -3,7 +3,7 @@
 Source: [Lobe Icons](https://github.com/lobehub/lobe-icons), `@lobehub/icons-static-svg` **1.95.1** from the npm registry.
 License: MIT; see [LICENSE](LICENSE). Brand names and marks belong to their respective owners.
 
-These are unmodified monochrome SVG assets. `app.css` sizes them within the existing provider badge and adapts their contrast for dark/light themes. Relative `<img>` paths work both from disk and through the local server; there are no runtime logo downloads.
+These are unmodified monochrome SVG assets. `css/shell.css` (`.provider-logo`, `.provider-logo-mark`) sizes them within the provider badge and adapts their contrast for dark/light themes. PiSharp.Web.Common serves them from `_content/PiSharp.Web.Common/img/providers/`, and `ProviderLogos` maps PiSharp provider ids to these file names; there are no runtime logo downloads.
 
 OpenAI Codex uses `codex.svg`; the regular OpenAI provider uses `openai.svg`. Custom work gateways and Radius use a neutral network icon because no logo asset is bundled for them. Provider names remain visible alongside the icons.
 

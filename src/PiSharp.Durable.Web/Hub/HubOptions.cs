@@ -16,6 +16,9 @@ public sealed class HubOptions
     /// <summary>Host names the hub answers besides <c>localhost</c>, <c>127.0.0.1</c> and <c>[::1]</c>.</summary>
     public List<string> AllowedHosts { get; set; } = [];
 
+    /// <summary>The ports a Host header may name; empty (the default) allows any, since the hub binds only the ports it is given.</summary>
+    public List<int> AllowedPorts { get; set; } = [];
+
     /// <summary>How long a proxied device request may take.</summary>
     public TimeSpan ProxyTimeout { get; set; } = TimeSpan.FromSeconds(330);
 

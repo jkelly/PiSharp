@@ -1,0 +1,39 @@
+@model ArtifactCardModel
+@{
+    var props = Model.Props;
+    var columns = (props["columns"] as JsonArray ?? []).Select(item => item?.GetValue<string>() ?? "").ToList();
+}
+@if (Display.Str(props, "summary") is { } summary)
+{
+  <p class="artifact-summary">@summary</p>
+}
+<div class="table-responsive"><table class="table table-sm align-middle artifact-table">
+  <thead><tr><th scope="col"><span class="visually-hidden">Item</span></th>
+    @foreach (var column in columns)
+    {
+      <th scope="col">@column</th>
+    }
+  </tr></thead>
+  <tbody>
+    @foreach (var row in Display.Objects(props, "rows"))
+    {
+      var values = (row["values"] as JsonArray ?? []).Select(item => item?.GetValue<string>() ?? "").ToList();
+      <tr>
+        <th scope="row">@Display.Str(row, "label")
+          @if (Display.Str(row, "note") is { } note)
+          {
+            <br /><small class="text-body-secondary">@note</small>
+          }
+        </th>
+        @for (var i = 0; i < columns.Count; i++)
+        {
+          <td>@(i < values.Count ? values[i] : "")</td>
+        }
+      </tr>
+    }
+  </tbody>
+</table></div>
+@if (Display.Str(props, "recommendation") is { } recommendation)
+{
+  <p class="mb-1"><strong>Recommendation:</strong> @recommendation</p>
+}

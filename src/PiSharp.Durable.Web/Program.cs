@@ -1,7 +1,9 @@
 // PiSharp Durable Web (decision 0008): the hub and UI for durable devices. It binds 127.0.0.1:5181 unless --urls says otherwise, keeps its
-// registry under %LOCALAPPDATA%\PiSharpDurableWeb, and lists this computer's `pisharp durable serve` as `local`.
+// registry under %LOCALAPPDATA%\PiSharpDurableWeb, and lists this computer's `pisharp durable serve` as `local`. Its renderers, guard and
+// shared static files come from PiSharp.Web.Common (decision 0011).
 using Microsoft.AspNetCore.DataProtection;
 using PiSharp.Durable.Web.Hub;
+using PiSharp.Web.Common;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
 if (string.IsNullOrEmpty(builder.Configuration["urls"]) && string.IsNullOrEmpty(builder.Configuration["ASPNETCORE_URLS"]))
@@ -21,14 +23,20 @@ builder.Services.AddSingleton<DeviceMonitor>();
 builder.Services.AddHostedService(services => services.GetRequiredService<DeviceMonitor>());
 builder.Services.AddSingleton<DeviceProxy>();
 builder.Services.AddSingleton<StreamMux>();
-builder.Services.AddSingleton<FragmentRenderer>();
-builder.Services.AddSingleton<MarkdownRenderer>();
+builder.Services.AddWebCommon();
+builder.Services.AddHostGuard(guard =>
+{
+    guard.AllowedHosts.AddRange(hub.AllowedHosts);
+    guard.AllowedPorts.AddRange(hub.AllowedPorts);
+    guard.MisdirectedMessage = "Misdirected request: this hub answers only localhost.";
+    guard.ContentSecurityPolicy = HostGuardOptions.DefaultContentSecurityPolicy;
+});
 builder.Services.AddSingleton<DeviceClients>();
 builder.Services.AddHttpClient(DeviceProxy.ClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
-app.UseMiddleware<HostGuard>();
+app.UseHostGuard();
 app.UseStaticFiles();
 app.MapGet("/api/stream", (HttpContext http, StreamMux mux) => mux.OpenAsync(http));
 app.MapPut("/api/stream/{streamId}", async (HttpContext http, string streamId, StreamMux mux) =>

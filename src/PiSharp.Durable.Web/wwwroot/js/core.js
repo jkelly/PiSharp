@@ -1,4 +1,8 @@
 // PiSharp Durable Web: shared helpers. Every device call goes through the hub's proxy (/api/devices/{id}/v1/...), which adds the token.
+// The theme toggle and `element` come from PiSharp.Web.Common (decision 0011), which the Web Agent shares.
+import { initTheme } from '/_content/PiSharp.Web.Common/js/theme.js';
+export { element } from '/_content/PiSharp.Web.Common/js/swap.js';
+
 export const $ = (selector, root = document) => root.querySelector(selector);
 export const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -78,13 +82,6 @@ export function escapeHtml(text) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-/** An element from an HTML string with one root. */
-export function element(html) {
-  const template = document.createElement('template');
-  template.innerHTML = html.trim();
-  return template.content.firstElementChild;
-}
-
 export function toast(text, tone = 'ok') {
   const el = document.getElementById('toast');
   if (!el || !window.bootstrap) return;
@@ -100,25 +97,9 @@ export function toastError(error) {
 
 /** Theme, copy, reveal, toggle-class and pane switching: the page-independent behaviour. */
 export function initCommon() {
-  const THEME_KEY = 'pisharp-durable-theme';
-  const applyTheme = (theme) => {
-    const resolved = theme === 'light' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-bs-theme', resolved);
-    $$('[data-theme-icon]').forEach((icon) => {
-      icon.classList.toggle('bi-moon-stars', resolved === 'dark');
-      icon.classList.toggle('bi-sun', resolved === 'light');
-    });
-  };
-  let stored = null;
-  try { stored = localStorage.getItem(THEME_KEY); } catch { /* storage unavailable */ }
-  applyTheme(stored || 'dark');
+  initTheme({ key: 'pisharp-durable-theme' });
 
   document.addEventListener('click', (e) => {
-    if (e.target.closest('[data-theme-toggle]')) {
-      const next = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
-      try { localStorage.setItem(THEME_KEY, next); } catch { /* storage unavailable */ }
-      applyTheme(next);
-    }
     const copy = e.target.closest('[data-copy]');
     if (copy) {
       const source = copy.getAttribute('data-copy');

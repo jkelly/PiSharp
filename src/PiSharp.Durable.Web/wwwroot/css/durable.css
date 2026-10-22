@@ -1,8 +1,8 @@
 /* =====================================================================
    PiSharp Durable Web: network shell and durable features
-   Loaded after pisharp-theme.css and app.css, which are shared with
-   PiSharp Web Agent (tokens, buttons, chips, messages, tool cards,
-   composer). Layout follows durable-pi: network tree, inspector,
+   Loaded after pisharp-theme.css and shell.css, which PiSharp Web
+   Agent shares through PiSharp.Web.Common (tokens, buttons, chips,
+   messages, tool cards, composer). Layout follows durable-pi: network tree, inspector,
    agent view. The look follows the Web Agent design rules: greys,
    hairlines, system fonts, colour only for status.
    In the MVC app this becomes wwwroot/css/durable.css.
