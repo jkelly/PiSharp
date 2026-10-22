@@ -158,7 +158,7 @@ internal static partial class Program
                 var options = new WebAgentOptions { DataDirectory = data };
                 await using (var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = data })) await app.StopAsync();
                 var first = ReadDb(options.DatabasePath, "SELECT id, applied_at FROM schema_migrations ORDER BY id;", r => (r.GetInt32(0), r.GetInt64(1)));
-                Equal("1,300", string.Join(",", first.Select(row => row.Item1)), "core and settings migrations");
+                Equal("1,100,200,300", string.Join(",", first.Select(row => row.Item1)), "core, accounts, chats and settings migrations");
                 Equal(300L, ReadDb(options.DatabasePath, "PRAGMA user_version;", r => r.GetInt64(0)).Single(), "user_version");
                 Equal("wal", ReadDb(options.DatabasePath, "PRAGMA journal_mode;", r => r.GetString(0)).Single(), "WAL");
                 var keys = Directory.GetFiles(options.KeysDirectory, "key-*.xml");
