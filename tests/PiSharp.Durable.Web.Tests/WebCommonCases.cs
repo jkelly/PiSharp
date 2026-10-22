@@ -186,7 +186,8 @@ internal static partial class Program
             Equal("/_content/PiSharp.Web.Common/img/providers/anthropic.svg", ProviderLogos.Url("anthropic"), "the URL");
             var providers = Path.Join(WebCommonDirectory(), "wwwroot", "img", "providers");
             foreach (var id in new[] { "openai", "openai-codex", "anthropic", "google", "google-vertex", "azure-openai-responses", "amazon-bedrock",
-                         "github-copilot", "openrouter", "xai", "mistral", "deepseek", "lmstudio", "ollama", "cloudflare-workers-ai", "kimi-coding", "moonshot" })
+                         "github-copilot", "openrouter", "xai", "mistral", "deepseek", "lmstudio", "ollama", "cloudflare-workers-ai", "kimi-coding", "moonshot",
+                         "azure", "cloudflare-ai-gateway", "moonshotai", "moonshotai-cn", "meta" })
                 Check(File.Exists(Path.Join(providers, ProviderLogos.Key(id) + ".svg")), $"{id}'s mark is bundled");
             Check(File.Exists(Path.Join(providers, "LICENSE")), "the logos' license is bundled");
         }),

@@ -14,7 +14,7 @@ public static class ProviderLogos
         "anthropic" => "anthropic",
         "google" => "google",
         "google-vertex" => "vertexai",
-        "azure-openai-responses" => "azure",
+        "azure" or "azure-openai-responses" => "azure",
         "amazon-bedrock" => "bedrock",
         "github-copilot" => "githubcopilot",
         "openrouter" => "openrouter",
@@ -23,8 +23,9 @@ public static class ProviderLogos
         "deepseek" => "deepseek",
         "lmstudio" => "lmstudio",
         "ollama" => "ollama",
-        "cloudflare-workers-ai" => "cloudflare",
-        "kimi-coding" or "moonshot" => "kimi",
+        "cloudflare-workers-ai" or "cloudflare-ai-gateway" => "cloudflare",
+        "kimi-coding" or "moonshot" or "moonshotai" or "moonshotai-cn" => "kimi",
+        "meta" => "meta",
         _ => null,
     };
 

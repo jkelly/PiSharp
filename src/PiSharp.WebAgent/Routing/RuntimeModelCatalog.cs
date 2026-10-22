@@ -43,16 +43,6 @@ public sealed class RuntimeModelCatalog : IModelCatalog
         ["github-copilot"] = AuthKind.DeviceCode,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
-    /// <summary>Logo marks for providers <see cref="ProviderLogos.Key"/> does not name (same brand as a bundled mark).</summary>
-    private static readonly FrozenDictionary<string, string> ExtraLogos = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["azure"] = "azure",
-        ["cloudflare-ai-gateway"] = "cloudflare",
-        ["moonshotai"] = "kimi",
-        ["moonshotai-cn"] = "kimi",
-        ["meta"] = "meta",
-    }.ToFrozenDictionary(StringComparer.Ordinal);
-
     /// <summary>One routable model: its registry entry, its catalog row and its durable model.</summary>
     internal sealed record Row(RegistryModel Entry, CatalogModel Model, DurableModel Durable);
 
@@ -152,7 +142,7 @@ public sealed class RuntimeModelCatalog : IModelCatalog
     private static double Number(NodeObject value, string name) =>
         value[name] is NodeValue scalar && scalar.TryGetValue<double>(out var number) && double.IsFinite(number) ? number : 0;
 
-    private static CatalogProvider Describe(string id) => new(id, DefaultName(id), ProviderLogos.Key(id) ?? ExtraLogos.GetValueOrDefault(id), AuthKinds(id),
+    private static CatalogProvider Describe(string id) => new(id, DefaultName(id), ProviderLogos.Key(id), AuthKinds(id),
         SignIns.ContainsKey(id) ? BillingKind.Subscription : BillingKind.Metered);
 
     private static string DefaultName(string id) => id == "openai-codex" ? "OpenAI Codex"

@@ -146,16 +146,6 @@ public sealed record ProviderEntry
 /// <param name="options">The credentials options (offline in --faux mode), when registered.</param>
 public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accounts, ISignInFlows signIn, CredentialsOptions? options = null)
 {
-    // Logos Web.Common's ProviderLogos does not map yet (a request to WU3 asks it to).
-    private static readonly Dictionary<string, string> LogoFallbacks = new(StringComparer.Ordinal)
-    {
-        ["azure"] = "azure",
-        ["cloudflare-ai-gateway"] = "cloudflare",
-        ["meta"] = "meta",
-        ["moonshotai"] = "kimi",
-        ["moonshotai-cn"] = "kimi",
-    };
-
     private static readonly Dictionary<string, string> Descriptions = new(StringComparer.Ordinal)
     {
         ["faux"] = "Offline test models that answer by echoing. They need no key and make no network calls.",
@@ -261,10 +251,8 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
     private static string? Logo(string id, string? catalogKey)
     {
         if (ProviderLogos.Url(id) is { } url) return url;
-        if (LogoFallbacks.TryGetValue(id, out var key)) return ProviderLogos.KeyUrl(key);
         // A catalog's logo key names a mark only when Web.Common has one under that name (WU6 may set it to a provider id).
-        return catalogKey is not null && (ProviderLogos.Url(catalogKey) ?? (LogoFallbacks.TryGetValue(catalogKey, out var other) ? ProviderLogos.KeyUrl(other) : null)) is { } mark
-            ? mark : null;
+        return catalogKey is null ? null : ProviderLogos.Url(catalogKey);
     }
 
     private static string Describe(string name, BuiltinProviderDefinition? builtin, bool signInOnly, bool signsIn)
