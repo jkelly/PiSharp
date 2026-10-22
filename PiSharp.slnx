@@ -25,6 +25,7 @@
     <Project Path="src/PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
     <Project Path="src/PiSharp.Durable.Web/PiSharp.Durable.Web.csproj" />
     <Project Path="src/PiSharp.Web.Common/PiSharp.Web.Common.csproj" />
+    <Project Path="src/PiSharp.WebAgent/PiSharp.WebAgent.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj" />
@@ -209,6 +210,9 @@
   </Folder>
   <Folder Name="/tests/parity/PiSharp.Durable.Web.BrowserTests/">
     <Project Path="tests/PiSharp.Durable.Web.BrowserTests/PiSharp.Durable.Web.BrowserTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.WebAgent.Tests/">
+    <Project Path="tests/PiSharp.WebAgent.Tests/PiSharp.WebAgent.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/parity/PiSharp.InteractiveParity.Tests/">
     <Project Path="tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj" />

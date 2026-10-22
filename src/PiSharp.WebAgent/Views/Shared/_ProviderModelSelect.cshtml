@@ -1,0 +1,67 @@
+@* Decision 0011 (run W2, WU4): the mockups' _ProviderModelSelect: two linked dropdowns, Provider then that provider's Model, never one long
+   list. It reads IModelCatalog and leaves out models hidden in Settings › Models (the selected one always shows). Each provider's model list
+   is its own pane; only the selected provider's list is enabled, so the form posts the right pair even without script, and shell.js swaps
+   the panes when the provider changes. Every model option carries data-summary (its one-line summary, shown under the list) and
+   data-thinking (its thinking levels, space-separated) for the page's thinking control. Model: ProviderModelSelect. *@
+@model ProviderModelSelect
+@inject IModelCatalog Catalog
+@inject ISettingsStore Settings
+@{
+    var prefix = Model.IdPrefix;
+    var size = Model.Small ? " form-select-sm" : "";
+    var hidden = Settings.Get<ModelsSettings>();
+    var offered = Model.Providers;
+    var groups = new List<(CatalogProvider Provider, IReadOnlyList<CatalogModel> Models)>();
+    foreach (var provider in Catalog.Providers)
+    {
+        if (offered is not null && !offered.Contains(provider.Id)) continue;
+        var models = Catalog.Models(provider.Id)
+            .Where(model => Model.IncludeHidden || !hidden.IsHidden(provider.Id, model.Id) || (provider.Id == Model.Provider && model.Id == Model.Model))
+            .ToList();
+        if (models.Count > 0) groups.Add((provider, models));
+    }
+    var selected = groups.FirstOrDefault(group => group.Provider.Id == Model.Provider);
+    if (selected.Provider is null && groups.Count > 0) selected = groups[0];
+}
+<div class="row g-2" data-provider-model="@prefix">
+  <div class="col-sm-6">
+    <label class="form-label" for="@(prefix)-provider">Provider</label>
+    @if (groups.Count == 0)
+    {
+      <select class="form-select@(size)" id="@(prefix)-provider" disabled><option>No providers available</option></select>
+    }
+    else
+    {
+      <select class="form-select@(size)" id="@(prefix)-provider" name="@Model.ProviderField" data-provider-select>
+        @foreach (var group in groups)
+        {
+          <option value="@group.Provider.Id" selected="@(group.Provider.Id == selected.Provider!.Id)">@group.Provider.DisplayName</option>
+        }
+      </select>
+    }
+  </div>
+  <div class="col-sm-6">
+    @if (groups.Count == 0)
+    {
+      <label class="form-label" for="@(prefix)-model-none">Model</label>
+      <select class="form-select@(size)" id="@(prefix)-model-none" disabled><option>No models</option></select>
+      <div class="form-text">Connect a provider in Settings › Providers.</div>
+    }
+    @foreach (var group in groups)
+    {
+      var active = group.Provider.Id == selected.Provider!.Id;
+      var current = (active ? group.Models.FirstOrDefault(model => model.Id == Model.Model) : null) ?? group.Models[0];
+      var part = CatalogText.IdPart(group.Provider.Id);
+      <div data-pane="@(prefix)-@(part)" data-provider="@group.Provider.Id" hidden="@(!active)">
+        <label class="form-label" for="@(prefix)-model-@(part)">Model</label>
+        <select class="form-select@(size)" id="@(prefix)-model-@(part)" name="@Model.ModelField" data-model-select disabled="@(!active)">
+          @foreach (var item in group.Models)
+          {
+            <option value="@item.Id" selected="@(item.Id == current.Id)" data-summary="@CatalogText.Summary(group.Provider, item)" data-thinking="@string.Join(' ', item.ThinkingLevels)">@item.Name</option>
+          }
+        </select>
+        <div class="form-text" data-model-summary>@CatalogText.Summary(group.Provider, current)</div>
+      </div>
+    }
+  </div>
+</div>

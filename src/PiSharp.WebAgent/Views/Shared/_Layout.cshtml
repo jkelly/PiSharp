@@ -1,0 +1,61 @@
+@* Decision 0011 (run W2, WU4): the shell of every page, after the mockups' _Layout: the sidebar (_Sidebar, with _RecentChats), the top bar
+   (the mockups' "_Layout: topbar", here because only a layout can render a page's sections), banners, the page, the shared modals
+   (_ShortcutsModal, _ConfirmModal), the toast area (_Toasts) and the scripts. Dark is the default; theme-boot.js applies a stored light
+   theme before the first paint. No inline script anywhere (the Content-Security-Policy has script-src 'self'). A page sets
+   ViewData["Title"] and ShellViewData keys, and may define these sections: Styles (its stylesheets), TopbarStart (replaces the title: a
+   model switch, a breadcrumb), TopbarEnd (icons before the theme toggle), Banners (under the top bar), Modals (after the app) and Scripts
+   (its modules). *@
+@{
+    var title = ViewData["Title"] as string ?? "PiSharp";
+    var shortcuts = ViewData[ShellViewData.ShortcutsButton] as bool? ?? true;
+}
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>@title · PiSharp Web Agent</title>
+  <partial name="_WebCommonHead" model='"pisharp-theme"' />
+  <link href="~/css/site.css" rel="stylesheet" asp-append-version="true">
+  @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="app-body" data-page="@ViewData[ShellViewData.Page]">
+<div class="app">
+  <partial name="_Sidebar" model="null" />
+  <div class="app-main">
+    <header class="app-topbar">
+      <button class="btn btn-icon d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#appSidebar" aria-controls="appSidebar" aria-label="Open navigation"><i class="bi bi-list"></i></button>
+      @if (IsSectionDefined("TopbarStart"))
+      {
+        @await RenderSectionAsync("TopbarStart")
+      }
+      else
+      {
+        <h1 class="app-title">@title</h1>
+      }
+      <div class="ms-auto d-flex align-items-center gap-1">
+        @await RenderSectionAsync("TopbarEnd", required: false)
+        <button class="btn btn-icon" type="button" data-theme-toggle title="Toggle theme" aria-label="Toggle theme"><i class="bi bi-moon-stars" data-theme-icon></i></button>
+        @if (shortcuts)
+        {
+          <button class="btn btn-icon d-none d-sm-inline-block" type="button" data-bs-toggle="modal" data-bs-target="#modal-shortcuts" title="Keyboard shortcuts" aria-label="Keyboard shortcuts"><i class="bi bi-keyboard"></i></button>
+        }
+      </div>
+    </header>
+    @await RenderSectionAsync("Banners", required: false)
+    <main class="app-content @ViewData[ShellViewData.ContentClass]" id="main">
+      @RenderBody()
+    </main>
+  </div>
+</div>
+
+<partial name="_ShortcutsModal" model="null" />
+<partial name="_ConfirmModal" model="null" />
+@await RenderSectionAsync("Modals", required: false)
+<partial name="_Toasts" model="null" />
+
+<script src="@WebCommonAssets.BootstrapJs"></script>
+<script type="module" src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

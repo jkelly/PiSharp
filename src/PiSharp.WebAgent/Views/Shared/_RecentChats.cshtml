@@ -1,0 +1,28 @@
+@* Decision 0011 (run W2, WU4): the mockups' _RecentChats: the sidebar's chats from IRecentChats, most recent first. A running chat carries a
+   live status dot (and "running" for screen readers), as in the mockups; the open chat (ViewData[ShellViewData.ActiveChat]) is
+   highlighted. Titles are text, never HTML. *@
+@inject IRecentChats RecentChats
+@{
+    var active = ViewData[ShellViewData.ActiveChat] as string;
+    var chats = await RecentChats.ListAsync(ShellNav.RecentChatLimit, Context.RequestAborted);
+}
+<div class="app-chats" aria-label="Recent chats" data-recent-chats>
+  <div class="app-nav-label">Chats</div>
+  @if (chats.Count == 0)
+  {
+    <p class="recent-empty">No chats yet</p>
+  }
+  @foreach (var chat in chats)
+  {
+    var current = chat.Id == active;
+    var href = "/chat/" + Uri.EscapeDataString(chat.Id);
+    if (chat.Running)
+    {
+      <a class="chat-link d-flex align-items-center gap-2@(current ? " active" : "")" aria-current="@(current ? "page" : null)" href="@href" data-chat="@chat.Id" data-running><span class="text-truncate">@chat.Title</span><span class="status-dot live ms-auto" aria-hidden="true"></span><span class="visually-hidden">, running</span></a>
+    }
+    else
+    {
+      <a class="chat-link@(current ? " active" : "")" aria-current="@(current ? "page" : null)" href="@href" data-chat="@chat.Id">@chat.Title</a>
+    }
+  }
+</div>
