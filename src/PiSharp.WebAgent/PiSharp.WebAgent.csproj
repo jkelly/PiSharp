@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Decision 0011 (PiSharp Web Agent, run W2 unit WU4; branch feature/web-agent): a local chat app and model playground on the durable
+       runtime, for one user on this computer. It binds http://127.0.0.1:5180 (loopback only), keeps its data under
+       %LOCALAPPDATA%\PiSharpWebAgent (device\ for durable sessions, keys\ for the Data Protection key ring, webagent.db, credentials.json),
+       and runs fully offline on faux models with the faux switch. The shell, renderers and guard come from PiSharp.Web.Common, the chats are durable
+       sessions hosted in process (PiSharp.Durable.Hosting, .Server, .Client). Areas (Credentials, Chat, Routing, Settings) plug in through
+       their modules. Not packed. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.WebAgent.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Web.Common/PiSharp.Web.Common.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Hosting/PiSharp.Durable.Hosting.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
+    <ProjectReference Include="../PiSharp.Durable.Client/PiSharp.Durable.Client.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- webagent.db, with PiSharp.Durable.Web's (and PiSharp.Durable.Sqlite's) exact pins (decision 0005). -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="[10.0.12]" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="[2.1.12]" />
+    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" Version="[2.1.12]" />
+  </ItemGroup>
+</Project>

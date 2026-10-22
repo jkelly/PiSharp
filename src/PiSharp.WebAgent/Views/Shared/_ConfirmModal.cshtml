@@ -1,0 +1,24 @@
+@* Decision 0011 (run W2, WU4): the mockups' confirm dialog (#modal-confirm), filled by shell.js for every destructive action, so pages need no
+   modal of their own. Script: confirmAction({ title, body, detail, ok, tone }) resolves true or false. Markup: a form (or its submit button)
+   with data-confirm="title" and optional data-confirm-body, data-confirm-detail, data-confirm-ok and data-confirm-tone ("danger" by default,
+   or "primary") asks first and submits only on OK. Texts are set as text, never HTML. *@
+<div class="modal fade" id="modal-confirm" tabindex="-1" aria-labelledby="modal-confirm-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body p-4">
+        <div class="d-flex gap-3">
+          <span class="provider-logo lg confirm-icon is-danger" aria-hidden="true" data-confirm-icon><i class="bi bi-exclamation-triangle"></i></span>
+          <div class="confirm-text">
+            <h2 class="modal-title mb-1" id="modal-confirm-title" data-confirm-title>Are you sure?</h2>
+            <p class="text-secondary fs-7 mb-2" data-confirm-body></p>
+            <div class="ps-mono fs-8 text-ps-faint" data-confirm-detail hidden></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" data-confirm-ok>Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
