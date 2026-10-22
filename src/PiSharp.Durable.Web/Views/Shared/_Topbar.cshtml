@@ -8,7 +8,7 @@
   {
     <button class="btn btn-icon d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#netTree" aria-controls="netTree" aria-label="Open network"><i class="bi bi-layout-sidebar"></i></button>
   }
-  <a class="dn-brand" href="/" aria-label="PiSharp Durable home"><img src="/img/mark.svg" alt="" width="24" height="20"><span>PiSharp Durable</span></a>
+  <a class="dn-brand" href="/" aria-label="PiSharp Durable home"><img src="@WebCommonAssets.Mark" alt="" width="24" height="20"><span>PiSharp Durable</span></a>
   <span class="ps-chip d-none d-sm-inline-flex ms-1" title="Devices online"><i class="bi bi-diagram-3"></i><span data-online-summary>@(Model.Count == 0 ? "No devices" : $"{online} of {Model.Count} online")</span></span>
   <div class="ms-auto d-flex align-items-center gap-1">
     <a class="btn btn-sm btn-outline-secondary d-none d-lg-inline-flex" href="/schedules" aria-current="@(page == "schedules" ? "page" : null)">Schedules</a>

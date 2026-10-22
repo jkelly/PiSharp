@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Decision 0008, Phase 8: PLAN.md Appendix C in a browser. PiSharp Durable Web (src/PiSharp.Durable.Web) runs as a child process against an
        in-process faux device, as in PiSharp.Durable.Web.Tests, and headless Chromium drives it through Microsoft.Playwright. The browser is not
-       restored with the package: install it once with `pwsh bin/<configuration>/net10.0/playwright.ps1 install chromium`. -->
+       restored with the package: install it once with `pwsh bin/<configuration>/net10.0/playwright.ps1 install chromium`. Decision 0011
+       (run W2, WU3): WebCommonCases.cs checks the hub's PiSharp.Web.Common files and modules in the page; it names them by WebCommonAssets. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <NoWarn>$(NoWarn);PISHARP_DURABLE001</NoWarn>
@@ -14,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Durable.Server/PiSharp.Durable.Server.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Web.Common/PiSharp.Web.Common.csproj" />
     <!-- Built first; the tests start its output (bin/<configuration>/net10.0/PiSharp.Durable.Web.dll) as a child process. -->
     <ProjectReference Include="../../src/PiSharp.Durable.Web/PiSharp.Durable.Web.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>

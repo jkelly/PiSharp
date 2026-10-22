@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Web.Hub;
+using PiSharp.Web.Common;
 
 namespace PiSharp.Durable.Web.Models;
 

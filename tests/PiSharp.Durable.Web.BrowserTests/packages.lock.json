@@ -17,6 +17,28 @@
         "resolved": "1.7.0",
         "contentHash": "a2I4O4qkuAdB0oSaGz6/k0n/bXxMbGcLBra5dNTTVSLmTwM7uORA8ebpOrNMmDfFWOMwvuaRL6gPprRV4HTV0w=="
       },
+      "AngleSharp": {
+        "type": "Transitive",
+        "resolved": "0.17.1",
+        "contentHash": "5MPI4bbixlwxb0W/smOMeIR+QlxMy5/5jD+WnIAw4pBC+7AhLPe5bS3cLgQMJyvd6q0A48sG+uYOt/ep406GLA=="
+      },
+      "AngleSharp.Css": {
+        "type": "Transitive",
+        "resolved": "0.17.0",
+        "contentHash": "bg0AcugmX6BFEi/DHG61QrwRU8iuiX4H8LZehdIzYdqOM/dgb3BsCTzNIcc1XADn4+xfQEdVwJYTSwUxroL4vg==",
+        "dependencies": {
+          "AngleSharp": "[0.17.0, 0.18.0)"
+        }
+      },
+      "HtmlSanitizer": {
+        "type": "Transitive",
+        "resolved": "9.0.886",
+        "contentHash": "qw87Q+bffcs2Fw/Rd3VXWg/QK+K9eIxeE9QidQLz3C/ffgUGuOB0X4MWUuuolUnnBvoD/u6FqXhsqIA67nL4kg==",
+        "dependencies": {
+          "AngleSharp": "[0.17.1]",
+          "AngleSharp.Css": "[0.17.0]"
+        }
+      },
       "Jint": {
         "type": "Transitive",
         "resolved": "4.16.3",
@@ -24,6 +46,11 @@
         "dependencies": {
           "Acornima": "1.7.0"
         }
+      },
+      "Markdig": {
+        "type": "Transitive",
+        "resolved": "0.41.3",
+        "contentHash": "i3vSTyGpBGWbJB04aJ3cPJs0T3BV2e1nduW3EUHK/i+xUupYbym75iZPss/XjqhS5JlBErwQYnx7ofK3Zcsozg=="
       },
       "Microsoft.Bcl.AsyncInterfaces": {
         "type": "Transitive",
@@ -159,6 +186,13 @@
         "dependencies": {
           "PiSharp.Agent": "[1.1.0.6, )",
           "PiSharp.Contracts": "[1.1.0.6, )"
+        }
+      },
+      "pisharp.web.common": {
+        "type": "Project",
+        "dependencies": {
+          "HtmlSanitizer": "[9.0.886, 9.0.886]",
+          "Markdig": "[0.41.3, 0.41.3]"
         }
       }
     }

@@ -13,6 +13,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Web.Models;
+using PiSharp.Web.Common;
 
 namespace PiSharp.Durable.Web.Hub;
 

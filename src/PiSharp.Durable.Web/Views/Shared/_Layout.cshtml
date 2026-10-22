@@ -4,16 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>@(ViewData["Title"] ?? "Network") · PiSharp Durable</title>
-  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
-  <script>
-    (function () {
-      try { var theme = localStorage.getItem('pisharp-durable-theme'); if (theme === 'light') document.documentElement.setAttribute('data-bs-theme', 'light'); } catch (e) { }
-    })();
-  </script>
-  <link href="/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/lib/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="/css/pisharp-theme.css" rel="stylesheet" asp-append-version="true">
-  <link href="/css/app.css" rel="stylesheet" asp-append-version="true">
+  @* The favicon, theme, Bootstrap, icons and shared shell styles (PiSharp.Web.Common); the hub's own styles follow. *@
+  <partial name="_WebCommonHead" model='"pisharp-durable-theme"' />
   <link href="/css/durable.css" rel="stylesheet" asp-append-version="true">
   <link href="/css/web.css" rel="stylesheet" asp-append-version="true">
 </head>
@@ -26,7 +18,7 @@
   </div>
 </div>
 
-<script src="/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="@WebCommonAssets.BootstrapJs"></script>
 @RenderSection("Scripts", required: false)
 </body>
 </html>

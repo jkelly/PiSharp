@@ -111,27 +111,8 @@ public static class Display
         _ => provider.Length == 0 ? provider : char.ToUpper(provider[0], Invariant) + provider[1..],
     };
 
-    /// <summary>The Lobe icon of a provider, or null.</summary>
-    public static string? ProviderLogo(string provider) => provider switch
-    {
-        "openai" => "openai",
-        "openai-codex" => "codex",
-        "anthropic" => "anthropic",
-        "google" => "google",
-        "google-vertex" => "vertexai",
-        "azure-openai-responses" => "azure",
-        "amazon-bedrock" => "bedrock",
-        "github-copilot" => "githubcopilot",
-        "openrouter" => "openrouter",
-        "xai" => "xai",
-        "mistral" => "mistral",
-        "deepseek" => "deepseek",
-        "lmstudio" => "lmstudio",
-        "ollama" => "ollama",
-        "cloudflare-workers-ai" => "cloudflare",
-        "kimi-coding" or "moonshot" => "kimi",
-        _ => null,
-    } is { } name ? $"/img/providers/{name}.svg" : null;
+    /// <summary>The URL of a provider's Lobe icon (PiSharp.Web.Common's <see cref="PiSharp.Web.Common.ProviderLogos"/>), or null.</summary>
+    public static string? ProviderLogo(string provider) => PiSharp.Web.Common.ProviderLogos.Url(provider);
 
     /// <summary>A model's context and price line.</summary>
     public static string ModelLine(ModelInfo model)

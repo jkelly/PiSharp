@@ -1,4 +1,4 @@
-/* PiSharp Durable Web: what the live app adds to the mockups' styles (durable.css). */
+/* PiSharp Durable Web: what the live app adds to the mockups' styles (PiSharp.Web.Common's shell.css and durable.css). */
 .d-contents { display: contents; }
 .msg-plain { white-space: pre-wrap; }
 .msg-image { display: block; max-width: min(100%, 28rem); max-height: 20rem; border-radius: .5rem; border: 1px solid var(--ps-border, rgba(127,127,127,.25)); margin-top: .5rem; }

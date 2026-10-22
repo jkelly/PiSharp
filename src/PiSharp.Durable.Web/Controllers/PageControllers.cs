@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Web.Hub;
 using PiSharp.Durable.Web.Models;
+using PiSharp.Web.Common;
 
 namespace PiSharp.Durable.Web.Controllers;
 

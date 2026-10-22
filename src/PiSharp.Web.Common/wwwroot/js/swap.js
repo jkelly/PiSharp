@@ -1,24 +1,39 @@
-// PiSharp Durable Web: applies the hub's fragments. A `view` frame upserts, removes and orders transcript items by key; a panel is
-// replaced whole. Open <details> keep their state across a swap (matched by data-detail), and a thread scrolled to the bottom stays there.
-import { element } from './core.js';
+// PiSharp.Web.Common (decision 0011), from PiSharp Durable Web: applies server-rendered fragments. A `view` frame upserts, removes and
+// orders items by key (each item's root carries data-key); a panel is replaced whole. Open <details> keep their state across a swap
+// (matched by data-detail), and a scroller at the bottom stays there. The HTML comes from the server's Razor partials, which encode and
+// sanitize it; nothing here builds markup from text.
+
+/** An element from an HTML string with one root. */
+export function element(html) {
+  const template = document.createElement('template');
+  template.innerHTML = html.trim();
+  return template.content.firstElementChild;
+}
+
+/** The keyed <details> of a subtree, its root included (an item may itself be a <details>, such as a tool card). */
+function detailsIn(root) {
+  const found = [...root.querySelectorAll('details[data-detail]')];
+  if (root.matches && root.matches('details[data-detail]')) found.unshift(root);
+  return found;
+}
 
 function openDetails(root) {
   const open = new Set();
-  root.querySelectorAll('details[data-detail]').forEach((d) => {
+  detailsIn(root).forEach((d) => {
     open.add(d.getAttribute('data-detail') + (d.open ? ':open' : ':closed'));
   });
   return open;
 }
 
 function restoreDetails(root, states) {
-  root.querySelectorAll('details[data-detail]').forEach((d) => {
+  detailsIn(root).forEach((d) => {
     const key = d.getAttribute('data-detail');
     if (states.has(key + ':open')) d.open = true;
     else if (states.has(key + ':closed')) d.open = false;
   });
 }
 
-/** Applies a view frame's items to the thread; returns whether anything changed. */
+/** Applies a view frame's items ({upsert: [{id, html}], remove: [id], order: [id]}) to a container; returns whether anything changed. */
 export function applyItems(thread, items, reset) {
   if (reset) thread.replaceChildren();
   let changed = false;

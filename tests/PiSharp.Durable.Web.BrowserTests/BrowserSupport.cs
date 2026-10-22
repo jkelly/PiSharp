@@ -42,7 +42,8 @@ internal static partial class Program
         }
     });
 
-    /// <summary>A browser profile on the hub: its own local and session storage. Every tab records uncaught errors.</summary>
+    /// <summary>A browser profile on the hub: its own local and session storage. Every tab records uncaught errors, and anything the hub's
+    /// Content-Security-Policy refused (decision 0011), which the browser reports only on the console.</summary>
     internal sealed class Window : IAsyncDisposable
     {
         private readonly List<string> errors = [];
@@ -77,6 +78,10 @@ internal static partial class Program
         {
             var page = await Context.NewPageAsync();
             page.PageError += (_, error) => { lock (errors) errors.Add(error); };
+            page.Console += (_, message) =>
+            {
+                if (message.Type == "error" && message.Text.Contains("Content Security Policy", StringComparison.Ordinal)) lock (errors) errors.Add(message.Text);
+            };
             pages.Add(page);
             return page;
         }
