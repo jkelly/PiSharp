@@ -1,7 +1,8 @@
 // Pi 06a466935536f8c9bcacb2d5efc0fc021be1bdff (MIT): packages/ai/src/providers/all.ts (builtinProviders), each provider's auth
 // (providers/*.ts: envApiKeyAuth names and variables, amazon-bedrock.ts bedrockAuth, google-vertex.ts vertexAuth,
 // cloudflare-auth.ts cloudflareWorkersAIAuth/cloudflareAIGatewayAuth, the lazyOAuth flows), auth/helpers.ts (envApiKeyAuth login)
-// and auth/oauth/load.ts; packages/coding-agent/src/extensions/llama/provider.ts (the built-in llama.cpp extension's api-key auth).
+// and auth/oauth/load.ts; packages/coding-agent/src/extensions/index.ts (builtInExtensions: the host supplies their providers' auth,
+// the CLI llama.cpp's api-key auth of extensions/llama/provider.ts, through BuiltinExtensions; Web Agent W2, WU2).
 using System.Collections.Immutable;
 using PiSharp.AI.Authentication.OAuth;
 
@@ -90,11 +91,10 @@ internal static class ProviderAuthCatalog
     private static readonly AsyncLocal<Func<IEnumerable<ProviderAuthEntry>>?> ExtensionEntries = new();
     internal static Func<IEnumerable<ProviderAuthEntry>>? Extensions { get => ExtensionEntries.Value; set => ExtensionEntries.Value = value; }
 
-    /// <summary>The built-in extensions' providers (extensions/index.ts builtInExtensions): llama.cpp's api-key method (provider.ts).</summary>
-    public static ImmutableArray<ProviderAuthEntry> BuiltinExtensions { get; } =
-    [
-        new(PiSharp.Cli.Llama.LlamaCatalog.ProviderId, "llama.cpp", "llama.cpp server", ["LLAMA_BASE_URL"], ApiKeyLoginKind.LlamaCpp, null)
-    ];
+    /// <summary>The built-in extensions' providers that are loaded now (extensions/index.ts builtInExtensions), read at every
+    /// <see cref="Entries"/>. The host sets it once: PiSharp.Cli's module initializer supplies llama.cpp's api-key method (provider.ts)
+    /// unless <c>-builtin:llama.cpp</c> or <c>--no-extensions</c> unloaded it. Null: there are none.</summary>
+    internal static Func<IEnumerable<ProviderAuthEntry>>? BuiltinExtensions { get; set; }
 
     /// <summary>Every provider's auth: the built-in ones (an extension's OAuth replacing a built-in provider's), the built-in extensions'
     /// providers, then extension providers.</summary>
@@ -102,8 +102,7 @@ internal static class ProviderAuthCatalog
     {
         var extensions = Extensions?.Invoke().ToList() ?? [];
         // A built-in extension that is not loaded (-builtin:llama.cpp, --no-extensions) registers no provider.
-        var loaded = PiSharp.Cli.Pi.PiEntryOptions.Current?.BuiltinExtensions;
-        var builtins = All.Concat(BuiltinExtensions.Where(entry => loaded?.IsEnabled(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Llama) != false)).ToList();
+        var builtins = All.Concat(BuiltinExtensions?.Invoke() ?? []).ToList();
         foreach (var builtin in builtins) yield return extensions.FirstOrDefault(entry => entry.Id == builtin.Id) ?? builtin;
         foreach (var extension in extensions) if (!builtins.Any(builtin => builtin.Id == extension.Id)) yield return extension;
     }

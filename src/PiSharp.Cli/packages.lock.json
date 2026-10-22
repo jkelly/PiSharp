@@ -198,6 +198,16 @@
           "PiSharp.Extensions.Abstractions": "[1.1.0.6, )"
         }
       },
+      "pisharp.modelruntime": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.CodingAgent": "[1.1.0.6, )",
+          "PiSharp.Extensions.Agent": "[1.1.0.6, )",
+          "PiSharp.Extensions.Runtime": "[1.1.0.6, )",
+          "PiSharp.Rpc": "[1.1.0.6, )",
+          "PiSharp.Tools": "[1.1.0.6, )"
+        }
+      },
       "pisharp.prompttemplates.yaml": {
         "type": "Project",
         "dependencies": {

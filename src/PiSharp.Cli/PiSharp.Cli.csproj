@@ -24,6 +24,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <!-- Web Agent W2 (WU2): the registry, catalog and live provider routes (moved from this project, namespaces kept). -->
+    <ProjectReference Include="../PiSharp.ModelRuntime/PiSharp.ModelRuntime.csproj" />
     <ProjectReference Include="../PiSharp.PromptTemplates.Yaml/PiSharp.PromptTemplates.Yaml.csproj" Condition="'$(EnablePromptTemplateYaml)' == 'true'" />
     <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
     <ProjectReference Include="../PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />
@@ -47,7 +49,7 @@
           Link="node-bridge/pi-host/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Models/*.json" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
+    <!-- Web Agent W2 (WU2): the Models/*.json catalog shards are embedded by PiSharp.ModelRuntime (by link, same resource names). -->
     <!-- The highlight.js 10.7.3 grammars (tools/HljsGrammars/extract-grammars.mjs), read by HljsGrammarData. -->
     <EmbeddedResource Include="Interactive/Mode/Theme/Highlight/hljs-grammars.json.gz" LogicalName="PiSharp.Cli.Hljs.grammars.json.gz" />
   </ItemGroup>

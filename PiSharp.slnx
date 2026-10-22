@@ -9,6 +9,7 @@
     <Project Path="src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
     <Project Path="src/PiSharp.PromptTemplates.Yaml/PiSharp.PromptTemplates.Yaml.csproj" />
     <Project Path="src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <Project Path="src/PiSharp.ModelRuntime/PiSharp.ModelRuntime.csproj" />
     <Project Path="src/PiSharp.Rpc/PiSharp.Rpc.csproj" />
     <Project Path="src/PiSharp.Tui/PiSharp.Tui.csproj" />
     <Project Path="src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
@@ -162,6 +163,9 @@
   </Folder>
   <Folder Name="/tests/parity/PiSharp.Models.Tests/">
     <Project Path="tests/PiSharp.Models.Tests/PiSharp.Models.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.ModelRuntime.Tests/">
+    <Project Path="tests/PiSharp.ModelRuntime.Tests/PiSharp.ModelRuntime.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/parity/PiSharp.ProviderApis.Tests/">
     <Project Path="tests/PiSharp.ProviderApis.Tests/PiSharp.ProviderApis.Tests.csproj" />

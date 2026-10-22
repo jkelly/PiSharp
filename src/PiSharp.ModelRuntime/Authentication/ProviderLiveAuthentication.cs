@@ -26,14 +26,14 @@ internal sealed record ProviderResolvedAuth(string? ApiKey, ImmutableDictionary<
 internal sealed class ProviderLiveAuthentication
 {
     private readonly ProviderAuthEntry provider;
-    private readonly AuthJsonCredentialStore? store;
+    private readonly IProviderCredentialSource? store;
     private readonly LiveProcessEnvironment environment;
     private readonly Func<HttpMessageInvoker> createHttp;
     private readonly TimeProvider? time;
     private readonly Func<OAuthFlowContext, IProviderOAuth>? oauthOverride;
     private readonly StoredOAuthLifecycle? lifecycle;
 
-    public ProviderLiveAuthentication(ProviderAuthEntry provider, AuthJsonCredentialStore? store, LiveProcessEnvironment environment,
+    public ProviderLiveAuthentication(ProviderAuthEntry provider, IProviderCredentialSource? store, LiveProcessEnvironment environment,
         Func<HttpMessageInvoker> createHttp, TimeProvider? time = null, Func<OAuthFlowContext, IProviderOAuth>? oauthOverride = null)
     {
         ArgumentNullException.ThrowIfNull(provider); ArgumentNullException.ThrowIfNull(environment); ArgumentNullException.ThrowIfNull(createHttp);

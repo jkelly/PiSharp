@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Cli.Interactive.Mode.Utilities;
+using PiSharp.Cli.Llama;
 using PiSharp.Cli.Pi;
 using PiSharp.CodingAgent.Usage;
 using PiSharp.CodingAgent.Diagnostics;

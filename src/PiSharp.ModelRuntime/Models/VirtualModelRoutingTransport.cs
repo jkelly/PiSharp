@@ -64,7 +64,7 @@ internal sealed class VirtualModelRoutingTransport(ModelRegistry registry, Regis
     /// API (pi.registerVirtualModel), so no live session selects one yet; a host that admits that registration builds the session
     /// transport here. Each physical target connects through its own live route (<see cref="Commands.LiveSessionSelection.FromEntry"/>),
     /// and every connection opened is added to <paramref name="connections"/> for the host to dispose with the session.</summary>
-    internal static VirtualModelRoutingTransport ForLive(ModelRegistry registry, RegistryModel model, Commands.LiveSessionRuntime? runtime,
+    internal static VirtualModelRoutingTransport ForLive(ModelRegistry registry, RegistryModel model, Commands.LiveRouteRuntime runtime,
         string? maximumTokens, Func<IVirtualModelSession?> session, ICollection<IDisposable> connections)
     {
         ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(connections);
@@ -73,7 +73,7 @@ internal sealed class VirtualModelRoutingTransport(ModelRegistry registry, Regis
         var live = new ConcurrentDictionary<string, Lazy<Commands.LiveSessionConnection>>(StringComparer.Ordinal);
         Commands.LiveSessionConnection Connect(RegistryModel physical) => live.GetOrAdd(physical.Reference, _ => new(() =>
         {
-            var connection = Commands.LiveSessionSelection.FromEntry(physical, registry, maximumTokens, useModelMaximum: maximumTokens is null).Connect(runtime);
+            var connection = Commands.LiveSessionSelection.FromEntry(physical, registry, maximumTokens, useModelMaximum: maximumTokens is null).ConnectRoute(runtime);
             lock (connections) connections.Add(connection);
             return connection;
         })).Value;
