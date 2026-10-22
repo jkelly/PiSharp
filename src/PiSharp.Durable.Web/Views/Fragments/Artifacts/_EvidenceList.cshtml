@@ -1,0 +1,37 @@
+@model ArtifactCardModel
+@{ var props = Model.Props; }
+@if (Display.Str(props, "summary") is { } summary)
+{
+  <p class="artifact-summary">@summary</p>
+}
+<ol class="artifact-evidence-list">
+  @foreach (var item in Display.Objects(props, "items"))
+  {
+    var id = Display.Str(item, "evidenceId");
+    var record = Model.Evidence(id);
+    var url = Display.Str(record, "url");
+    var name = Display.Str(record, "title") ?? id;
+    <li>
+      @if (ArtifactsModel.IsSafeUrl(url))
+      {
+        <a href="@url" target="_blank" rel="noopener noreferrer">@name</a>
+      }
+      else
+      {
+        <span>@name</span>
+      }
+      @if (item["relevance"] is not null)
+      {
+        <span class="ps-chip ms-1">@((Display.Number(item, "relevance") * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture))% relevant</span>
+      }
+      @if (Display.Str(item, "note") is { } note)
+      {
+        <div class="text-body-secondary">@note</div>
+      }
+      @if (Display.Str(record, "excerpt") is { Length: > 0 } excerpt)
+      {
+        <blockquote class="artifact-excerpt">@Display.Cut(excerpt, 400)</blockquote>
+      }
+    </li>
+  }
+</ol>
