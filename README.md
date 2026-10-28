@@ -6,6 +6,13 @@ Install the CLI with `dotnet tool install -g PiSharp.Cli` and run `pisharp` as y
 
 `pisharp durable` and the `PiSharp.Durable`, `PiSharp.Durable.Tools` and `PiSharp.Durable.Sqlite` packages ship as **experimental**: a port of Pi's durable agent harness whose sessions survive a crash. The command, its session format and the libraries' API may change in any release; see the [durable guide](https://pisharp.ai/docs/guides/durable/).
 
+`PiSharp.CustomAgents`, with `PiSharp.CustomAgents.JavaScript` and `PiSharp.CustomAgents.Scripting`, is an experimental library on that harness, not yet packaged:
+- custom agents in C#, with tools written in C#, JavaScript, C# scripts or plugin DLLs, which can change while the agents run;
+- workflows of typed actions over one shared Data object: code, model calls with structured output, or agent runs;
+- subagents that message the orchestrator and each other.
+
+Runs resume after a crash. [Decision 0012](docs/decisions/0012-custom-agents.md) describes the design, and [CustomAgents.Examples](samples/CustomAgents.Examples) runs it on scripted models or a real provider.
+
 Documentation is at [pisharp.ai](https://pisharp.ai/docs/). The full-parity work is tracked in [full-parity-v1.1.0.md](docs/plans/full-parity-v1.1.0.md) and [full-parity-progress.json](docs/plans/full-parity-progress.json), and the Pi 1.2.0 sync in [decision 0006](docs/decisions/0006-pi-1.2.0-sync.md).
 
 ## Native validation tooling

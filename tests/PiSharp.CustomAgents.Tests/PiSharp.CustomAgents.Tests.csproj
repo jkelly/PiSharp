@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: case tables for PiSharp.CustomAgents, run as a console program like PiSharp.Durable.Tests. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" />
+    <ProjectReference Include="../../src/PiSharp.CustomAgents.JavaScript/PiSharp.CustomAgents.JavaScript.csproj" />
+    <ProjectReference Include="../../src/PiSharp.CustomAgents.Scripting/PiSharp.CustomAgents.Scripting.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+    <!-- Plugin fixtures: built first, loaded at run time from their own output folders. -->
+    <ProjectReference Include="../PiSharp.CustomAgents.PluginFixture.V1/PiSharp.CustomAgents.PluginFixture.V1.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../PiSharp.CustomAgents.PluginFixture.V2/PiSharp.CustomAgents.PluginFixture.V2.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../PiSharp.CustomAgents.ExtensionFixture/PiSharp.CustomAgents.ExtensionFixture.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

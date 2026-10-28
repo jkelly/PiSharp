@@ -1,0 +1,49 @@
+name: Custom agents
+
+# CI for the experimental PiSharp.CustomAgents libraries (decision 0012): typed workflows, agents and subagents on the durable harness,
+# with JavaScript and C# script tool sources. Runs on main and on feature/custom-agents.
+on:
+  push:
+    branches: [main, feature/custom-agents]
+  pull_request:
+    branches: [main, feature/custom-agents]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: custom-agents-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Custom agents tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # macOS's TMPDIR (/var/folders/…) is a symlink to /private/var/folders/…; tests use the resolved path, as a Mac process does.
+      - name: Run PiSharp.CustomAgents.Tests
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then export TMPDIR="$(cd "$TMPDIR" && pwd -P)/"; fi
+          dotnet run --project tests/PiSharp.CustomAgents.Tests/PiSharp.CustomAgents.Tests.csproj -c Release \
+            -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
+            -- --report "$RUNNER_TEMP/custom-agents-${{ matrix.os }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: custom-agents-report-${{ matrix.os }}
+          path: ${{ runner.temp }}/custom-agents-${{ matrix.os }}.json
+          if-no-files-found: ignore

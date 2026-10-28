@@ -1,0 +1,5 @@
+{
+  "id": "fixture",
+  "contract": "pisharp.agents/1",
+  "assembly": "AgentsPluginFixture.V1.dll"
+}

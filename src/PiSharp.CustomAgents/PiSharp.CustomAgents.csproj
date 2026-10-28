@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: custom agents in C# on the durable harness (typed workflows over one shared Data class, agents and teams, typed and
+       dynamic tools, messaging and subagents, plugin DLLs). Experimental: every public type is [Experimental("PISHARP_AGENTS001")]. Not
+       packed yet; it joins the release allow-list once the API settles. No third-party code. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.CustomAgents.Tests" />
+    <InternalsVisibleTo Include="PiSharp.CustomAgents.JavaScript" />
+    <InternalsVisibleTo Include="PiSharp.CustomAgents.Scripting" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Durable/PiSharp.Durable.csproj" />
+    <ProjectReference Include="../PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
