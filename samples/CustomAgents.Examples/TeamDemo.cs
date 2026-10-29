@@ -1,7 +1,7 @@
 // Decision 0012: a team of agents. The lead (the orchestrator) answers a customer question with a typed C# tool (lookup_order), a JavaScript
 // tool (shipping_quote), a subagent it delegates to (the researcher, whose check_stock tool is a C# script), and the orders workflow as a
-// tool (run_workflow_orders). The concierge is the agent the workflow's vip-note action runs. Each agent sees only its own tools: a
-// definition selects them, and children never inherit their parent's.
+// tool (run_workflow_orders). The concierge is the agent the workflow's vip-note action runs, and the scout (WebDemo) searches the web.
+// Each agent sees only its own tools: a definition selects them, and children never inherit their parent's.
 using System.ComponentModel;
 using PiSharp.CustomAgents.JavaScript;
 using PiSharp.CustomAgents.Scripting;
@@ -32,7 +32,9 @@ internal static class TeamDemo
         "Ada Lovelace asks whether her order 42 can reach Lisbon by Friday. Find out what she ordered, get a shipping quote, have the " +
         "researcher check stock for her items, and process the order with the orders workflow. Then write the reply to send her.";
 
-    public static async Task RegisterAsync(AgentTeam team, Workflow<OrderData> orders, CSharpScriptHost host, TextWriter output)
+    /// <summary>Registers the lead, the researcher and the concierge; with <paramref name="scout"/> the lead may also delegate to the web
+    /// search scout (<see cref="WebDemo"/>).</summary>
+    public static async Task RegisterAsync(AgentTeam team, Workflow<OrderData> orders, CSharpScriptHost host, TextWriter output, bool scout)
     {
         // A typed C# tool: the parameter schema comes from the record, and the Harness validates the model's arguments against it.
         var lookupOrder = AgentTool.Create<OrderArgs>("lookup_order", "Looks up an order's customer, lines and total.", (args, _) =>
@@ -80,8 +82,9 @@ internal static class TeamDemo
             Name = Lead,
             Description = "Handles customer questions about orders",
             Instructions = "You are the support lead of a small electronics shop. Use your tools for facts, delegate stock checks to the " +
-                "researcher, and use run_workflow_orders to process an order. Finish with the reply to send the customer, at most four sentences.",
-            Subagents = [Researcher],
+                "researcher" + (scout ? ", delegate questions that need the web to the scout" : "") +
+                ", and use run_workflow_orders to process an order. Finish with the reply to send the customer, at most four sentences.",
+            Subagents = scout ? [Researcher, WebDemo.Scout] : [Researcher],
             Tools = [.. Logged(Lead, output, lookupOrder, shippingQuote, runOrders, WorkflowTools.StatusTool())],
         });
         team.Catalog.Register(new AgentDefinition
@@ -117,13 +120,18 @@ internal static class TeamDemo
         return true;
     }
 
-    /// <summary><paramref name="tools"/>, each printing its calls as they start.</summary>
-    private static IEnumerable<ToolRegistration> Logged(string agent, TextWriter output, params ToolRegistration[] tools) => tools.Select(tool => tool with
+    /// <summary><paramref name="tools"/>, each printing its calls as they start and the first line of what they return.</summary>
+    internal static IEnumerable<ToolRegistration> Logged(string agent, TextWriter output, params ToolRegistration[] tools) => tools.Select(tool => tool with
     {
-        Execute = (arguments, api, context) =>
+        Execute = async (arguments, api, context) =>
         {
             output.WriteLine($"  - {agent} calls {tool.Name} {arguments.ToJson()}");
-            return tool.Execute(arguments, api, context);
+            var result = await tool.Execute(arguments, api, context);
+            var text = string.Concat((result.Output?.AsEnumerable() ?? []).OfType<JsonObjectValue>()
+                .Select(part => part.TryGetValue("text", out var value) && value is JsonStringValue piece ? piece.Value : ""));
+            var first = text.Split('\n', 2)[0];
+            output.WriteLine($"    {(result.IsError == true ? "error" : "returned")}: {(first.Length > 160 ? first[..160] + "…" : first)}");
+            return result;
         },
     });
 }

@@ -504,7 +504,7 @@ internal static class Orchestration
             var live = await WaitGraph.LiveAsync(tx, snapshot).ConfigureAwait(false);
             var doc = await Requests.OpenAsync(tx, requestId).ConfigureAwait(false);
             await Mailboxes.EnsureAsync(tx, asker.Address).ConfigureAwait(false);
-            AgentEntry? entry = host ? null : AgentDirectory.Find(snapshot, to) ?? throw new AgentMessagingException($"There is no agent '{to}'; use list_agents.");
+            AgentEntry? entry = host ? null : AgentDirectory.Find(snapshot, to) ?? throw MessagingCore.UnknownAgent(team, asker, to);
             if (entry is { Closed: true }) throw new AgentMessagingException($"Agent '{to}' was stopped.");
             if (entry is not null && asker.Entry is not null && !MessagingCore.CanReach(team, asker, entry))
                 throw new AgentMessagingException($"You may not message '{to}' (outside your messaging scope).");

@@ -187,6 +187,9 @@
   <Folder Name="/samples/CustomAgents.Examples/">
     <Project Path="samples/CustomAgents.Examples/CustomAgents.Examples.csproj" />
   </Folder>
+  <Folder Name="/samples/CustomAgents.Research/">
+    <Project Path="samples/CustomAgents.Research/CustomAgents.Research.csproj" />
+  </Folder>
   <Folder Name="/samples/Durable.Examples/">
     <Project Path="samples/Durable.Examples/Durable.Examples.csproj" />
   </Folder>

@@ -108,6 +108,12 @@ internal static partial class Program
             Check(!MessagingCore.CanReach(team, child, Entry("worker#3", "peer")), "not another root's child");
             var wide = Sender.Of(child.Entry!, definition with { Messaging = MessagingScope.Team });
             Check(MessagingCore.CanReach(team, wide, Entry("worker#3", "peer")), "Team scope reaches everyone");
+            // A subagent that is not running yet: the refusal points to delegate and spawn while the sender has them.
+            var lead = Sender.Of(Entry("lead", null), new AgentDefinition { Name = "lead", Description = "Leads", Subagents = ["scout"] });
+            Check(MessagingCore.UnknownAgent(team, lead, "scout").Message.Contains("delegate", StringComparison.Ordinal), "an unstarted subagent: use delegate or spawn");
+            Equal("There is no agent 'nobody'; use list_agents.", MessagingCore.UnknownAgent(team, lead, "nobody").Message, "anyone else is unknown");
+            var deep = Sender.Of(lead.Entry! with { Depth = team.Options.MaxDepth }, lead.Definition);
+            Check(MessagingCore.UnknownAgent(team, deep, "scout").Message.StartsWith("There is no agent", StringComparison.Ordinal), "no such advice without delegate");
         });
 
         yield return Case("agents.msg.host-send-and-watch", async () =>

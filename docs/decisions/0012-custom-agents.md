@@ -23,7 +23,11 @@ The owner chose (2026-10-27):
    - `PiSharp.CustomAgents.JavaScript` holds JavaScript tools and workflow actions on `PiSharp.Codemode`'s Jint sandbox and `PiSharp.Durable.Tools`' durable codemode.
    - `PiSharp.CustomAgents.Scripting` holds C# scripts, compiled with `Microsoft.CodeAnalysis.CSharp` 5.6.0 (see point 9).
    - `tests/PiSharp.CustomAgents.Tests` is a console case-table runner like `tests/PiSharp.Durable.Tests` (`--only <prefix>`, `--report <path>`, crash children). Three fixture projects supply plugins.
-   - `samples/CustomAgents.Examples` runs the orders workflow and a team demo on scripted models, or on a real provider with `--provider` and `--model`. Its `--crash-in` flag shows a run resuming from SQLite.
+   - `samples/CustomAgents.Examples` runs the orders workflow, a team demo and a web search demo on scripted models, or on a real provider with `--provider` and `--model`. Its `--crash-in` flag shows a run resuming from SQLite.
+   - `samples/CustomAgents.Research` is a research team:
+     - A lead agent splits a topic into parts and delegates each part to its own researcher subagent. The calls are made in one turn, so the researchers run in parallel.
+     - The researchers search posts on X with `x_search` first, then the web with `web_search`.
+     - The lead merges their findings into one Markdown report, and the program writes it to a file.
 2. **No changes to `PiSharp.Durable`.** Everything is built on its public API. Where that API falls short, the library works around it (point 8) instead of changing the harness.
 3. **Workflows.**
    - `Workflow.For<TData>(name)` builds a workflow. Its steps are:
@@ -50,6 +54,23 @@ The owner chose (2026-10-27):
    - `AgentTool.Create<TArgs>` builds a typed tool whose schema comes from `TArgs`.
    - A `DynamicToolSource` adds, removes and replaces tools while agents run.
    - Duplicate tool names across selected sources are refused, because the Harness would otherwise silently keep the last one.
+   - `WebSearchTool.Create(provider)` builds a replay-safe `web_search` tool, with the arguments `query` and optional `count`:
+     - The Harness offers the model only tools that the host runs, so a provider's hosted search (OpenAI's `web_search`, Anthropic's web search, Gemini's `googleSearch`) cannot be switched on for an agent's model. This tool calls a search backend instead.
+     - The tool is independent of the agent's own model: an agent on any provider can use any backend.
+     - Three backends are search APIs: `BraveWebSearch` (`BRAVE_API_KEY`), `TavilyWebSearch` (`TAVILY_API_KEY`) and `FirecrawlWebSearch` (`FireCrawl_API_KEY`, Firecrawl's v2 search, which can add news results; the pages are not scraped).
+     - Four backends ask a model to run its provider's hosted search, and return the model's reply, the pages it cited, then the other pages it consulted. Every search is a paid model request:
+       - `OpenAIWebSearch` (`OPENAI_API_KEY`, default `gpt-5.4-mini`) and `XaiWebSearch` (`XAI_API_KEY`, default `grok-4.7`) use the Responses API's `web_search` tool. xAI's Responses API has OpenAI's shape, so they share one parser.
+       - `XaiWebSearch` can also search posts on X with xAI's `x_search` tool. Its `Sources` is `Web` (the default), `X` or `WebAndX`.
+         - For X it takes a date range (`XFromDate`, `XToDate`) and either the accounts to keep (`XHandles`) or the accounts to leave out (`XExcludedHandles`).
+         - X posts come back as `x.com/i/status/…` links, from the reply's citations and the response's `citations` list.
+         - A citation number that xAI gives as a title is replaced by the host name.
+       - `AnthropicWebSearch` (`ANTHROPIC_API_KEY`, default `claude-opus-5-5`) uses the Messages API's `web_search` server tool, with `anthropic-version: 2026-10-21`. It sends `web_search_20260209` on the models with dynamic filtering and `web_search_20250305` on older ones, low effort where the model takes it, and the server-side refusal fallback (`fallbacks: "default"`) on Fable 5.1, Opus 5.5, Opus 5 and Sonnet 5.5. It resumes a `pause_turn` up to three times, and reports a refusal or a server tool error such as `max_uses_exceeded` as a failed search.
+       - `OpenRouterWebSearch` (`OPENROUTER_API_KEY`, default `openai/gpt-5.4-mini`) uses OpenRouter's web plugin on any model OpenRouter routes to. Without an `Engine`, OpenRouter uses the model provider's native search where it has one (Anthropic's, for a Claude model), else Exa.
+     - `WebSearchTool.ProviderFromEnvironment` picks the first backend whose key is set, in the order of `WebSearchTool.Backends` (Brave, Tavily, Firecrawl, OpenAI, Anthropic, xAI, OpenRouter), or the one it is given by name. A host can implement `IWebSearchProvider` for any other search service.
+     - The model sees a numbered list of results, marked as untrusted content. Programs that call the tool get a `WebSearchResponse`.
+     - A count over `MaxCount`, a failed search and a timeout are error results. Errors name the HTTP status and the key's variable, never the key.
+     - A rate-limited search (HTTP 429) waits for the backend's `Retry-After`, or 10 seconds without one, and retries up to three times within the tool's timeout.
+     - The result header reads `Search for "…" (backend)`, so the same tool can serve X posts, for example as `x_search`.
 5. **Messaging and subagents.**
    - The extension `agents.messaging` adds `list_agents`, `send_message`, `ask_agent` and `reply`.
    - The extension `agents.orchestration` adds `delegate`, `spawn`, `wait_agent` and `stop_agent`. It is withheld when the definition allows no subagents, or when the depth limit is reached.
@@ -108,6 +129,7 @@ The owner chose (2026-10-27):
     - C# tools, plugins and C# scripts run with full trust. Load contexts and reference lists are not sandboxes.
     - JavaScript reaches only the tools on its allowlist, within the sandbox's time, memory and recursion limits. Model-authored JavaScript requires a worker process.
     - Messages between agents are untrusted input. The default messaging scope is the agent's family.
+    - Web search results are untrusted content too, and the `web_search` result tells the model so.
     - Depth, children per agent, total agents and timeouts cap the cost.
 11. **Packaging is deferred.** The projects stay out of `tools/release/PiSharp.NativeSdk.targets` and `build-release-packages.ps1`, and `CHANGELOG.md` gets no entry, until the owner decides to release them. `CHANGELOG.md` is generated from the website's release entries.
 
@@ -132,3 +154,18 @@ The owner chose (2026-10-27):
 - `samples/CustomAgents.Examples` was run on scripted models and against `openai/gpt-5.4-mini` on 2026-10-27:
   - the first process exited inside `summarize` after the model answered;
   - the second attached to the same run, reused the recorded answer, and finished both orders, the team question, the subagent delegation and the workflow tool.
+- The web search demo (`web --provider openai --model gpt-5.4-mini`) was run on 2026-10-28 with OpenAI's hosted search. The lead delegated the question to the scout, the scout searched once, and the lead answered from the scout's result.
+- On 2026-10-28 the web search demo also ran with the agents and the search both on xAI (`grok-4.7`), and with the agents on `anthropic/claude-sonnet-5.5` through OpenRouter, searching with OpenRouter's web plugin on `openai/gpt-5.4-mini` and on `anthropic/claude-sonnet-5.5` (Anthropic's native search). The xAI and OpenRouter test fixtures follow the replies those live requests returned.
+- On 2026-10-28 the demo also ran with Anthropic's search on `claude-opus-5-5`, with the agents on `openai/gpt-5.4-mini` and on `anthropic/claude-opus-5-5`. Each time the scout searched once and the lead answered from what it found.
+- On 2026-10-28 the demo ran three times with Firecrawl's search, with the agents on `openai/gpt-5.4-mini`. Each time the scout searched once (5 results) and the lead answered from what it found.
+- In 3 of the 18 live runs, the lead (`gpt-5.4-mini`) did not delegate. It called `ask_agent("scout")` before the scout was running. The tool refused with "There is no agent 'scout'", `list_agents` listed no agents, and the lead answered from memory.
+  - That refusal now tells an agent to start a subagent from its `Subagents` list with `delegate` or `spawn`, when it has those tools.
+  - `ask_agent` and `send_message` now say they reach running agents only.
+  - The `agents.msg.scope-refuses` case checks the new refusal. No live run has hit it since, so a model recovering from it has not been seen.
+- On 2026-10-28 `samples/CustomAgents.Research` ran twice with all agents on `xai/grok-4.7`, X search on `grok-4.7` and Firecrawl for the web, splitting each topic between 4 researchers:
+  - "How developers use AI coding agents in 2026": 116 s, 68 links in the report, 52 of them X posts.
+    - Firecrawl's per-minute limit refused 11 of its web searches with HTTP 429. The researchers continued with the rest.
+    - The 429 retry was added after this run.
+  - "Humanoid robots in homes and factories": 254 s, 22 X searches and 29 web searches with no errors, 93 links, 56 of them X posts.
+  - The figures and links in the reports are the models' work and were not checked against their sources.
+- The `agents.web` cases test the Brave and Tavily backends against request and response shapes taken from those APIs' documentation. No Brave or Tavily API key was available, so neither has been run against its live service.

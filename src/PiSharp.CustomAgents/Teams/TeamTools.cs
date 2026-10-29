@@ -89,14 +89,14 @@ internal static class TeamTools
                 return string.Join("\n", agents.Select(agent => $"- {agent.Address}: {Relation(caller, agent)}, " +
                     $"{team.Catalog.Find(agent.Definition)?.Description ?? agent.Definition}"));
             }, Safe),
-            AgentTool.Create<SendArgs>("send_message", "Sends a note to another agent; it needs no answer, and you do not wait.", async (args, tool) =>
+            AgentTool.Create<SendArgs>("send_message", "Sends a note to a running agent (one list_agents shows); it needs no answer, and you do not wait.", async (args, tool) =>
                 await GuardAsync(async () =>
                 {
                     var sent = await AgentMessaging.ForTool(tool.Api, team).SendAsync(args.To, args.Text, new AgentSendOptions { Urgent = args.Urgent ?? false },
                         tool.CancellationToken).ConfigureAwait(false);
                     return $"Sent to {sent.To} (message id {sent.Id}).";
                 }).ConfigureAwait(false), Safe),
-            AgentTool.Create<AskArgs>("ask_agent", "Asks another agent a question and waits for its answer.", async (args, tool) =>
+            AgentTool.Create<AskArgs>("ask_agent", "Asks a running agent (one list_agents shows) a question and waits for its answer.", async (args, tool) =>
                 await GuardAsync(() => AgentMessaging.ForTool(tool.Api, team).AskAsync(args.To, args.Question,
                     args.TimeoutSeconds is { } seconds ? TimeSpan.FromSeconds(Math.Clamp(seconds, 1, 3600)) : null, tool.CancellationToken)).ConfigureAwait(false),
                 Safe),

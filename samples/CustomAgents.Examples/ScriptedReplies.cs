@@ -23,6 +23,15 @@ internal static class ScriptedReplies
         models.On(request => request.LastUserText?.StartsWith("Write a one-line thank-you", StringComparison.Ordinal) == true,
             _ => "Thank you, Grace, for order 43: your cables are on their way.");
 
+        // The web question: the lead delegates it to the scout, which searches the web and answers from the results.
+        models.On(request => Is(request, WebDemo.Scout) && !request.AfterTools,
+            _ => FauxReply.ToolCall("web_search", """{"query":"USB Power Delivery revision 240 W first published year","count":2}"""));
+        models.On(request => Is(request, WebDemo.Scout), request => "(scripted) The search found: " + Cut(OneLine(request.LastToolResult ?? ""), 400));
+        models.On(request => Is(request, TeamDemo.Lead) && request.LastUserText == WebDemo.Question && !request.AfterTools,
+            _ => FauxReply.ToolCall("delegate", """{"agent":"scout","task":"Which USB Power Delivery revision first allowed 240 W charging, and when was it published?"}"""));
+        models.On(request => Is(request, TeamDemo.Lead) && request.LastUserText == WebDemo.Question,
+            request => "(scripted) The scout answered: " + Cut(OneLine(request.LastToolResult ?? ""), 400));
+
         // The team: the lead looks the order up, gets a quote, delegates the stock check, runs the workflow, then answers.
         models.On(request => Is(request, TeamDemo.Researcher) && !request.AfterTools,
             _ => FauxReply.ToolCall("check_stock", """{"skus":["KB-01","MS-02"]}"""));
@@ -44,6 +53,8 @@ internal static class ScriptedReplies
     private static bool Is42(FauxRequest request) => request.LastUserText?.Contains("Ada", StringComparison.Ordinal) == true;
 
     private static string OneLine(string text) => text.ReplaceLineEndings(" ").Trim();
+
+    private static string Cut(string text, int max) => text.Length <= max ? text : text[..max] + "…";
 
     /// <summary>Every tool result of the conversation so far (<see cref="FauxRequest.ToolResults"/> holds only the last round's).</summary>
     private static IEnumerable<(string Name, string Text)> ToolResults(FauxRequest request) =>

@@ -370,6 +370,15 @@ internal static class MessagingCore
         };
     }
 
+    /// <summary>The refusal for an address that is not in the directory. A subagent the sender has not started yet is not an agent it can
+    /// message; when the sender has delegate and spawn, the refusal says to use them.</summary>
+    public static AgentMessagingException UnknownAgent(AgentTeam team, Sender sender, string address) =>
+        sender.Definition is { } definition && definition.Subagents.Contains(address, StringComparer.Ordinal) &&
+        (sender.Entry?.Depth ?? 0) < team.Options.MaxDepth
+            ? new($"'{address}' is a subagent you have not started, so it cannot be messaged yet. Give it the work with delegate (to wait for " +
+                "its answer) or spawn (to run it in the background).")
+            : new($"There is no agent '{address}'; use list_agents.");
+
     /// <summary>Resolves <c>parent</c> and <c>self</c>.</summary>
     public static string Resolve(Sender sender, string to) => to switch
     {
@@ -398,7 +407,7 @@ internal static class MessagingCore
             else if (address.StartsWith("workflow.", StringComparison.Ordinal)) { }
             else
             {
-                targetEntry = AgentDirectory.Find(snapshot, address) ?? throw new AgentMessagingException($"There is no agent '{address}'; use list_agents.");
+                targetEntry = AgentDirectory.Find(snapshot, address) ?? throw UnknownAgent(team, sender, address);
                 if (targetEntry.Closed) throw new AgentMessagingException($"Agent '{address}' was stopped.");
                 if (sender.Entry is not null && !CanReach(team, sender, targetEntry))
                     throw new AgentMessagingException($"You may not message '{address}' (outside your messaging scope); use list_agents.");

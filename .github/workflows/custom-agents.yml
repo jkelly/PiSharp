@@ -41,6 +41,15 @@ jobs:
             -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
             -- --report "$RUNNER_TEMP/custom-agents-${{ matrix.os }}.json"
 
+      # The research sample on scripted models and canned searches: offline, so no keys are needed.
+      - name: Run the research sample (scripted)
+        shell: bash
+        run: |
+          dotnet run --project samples/CustomAgents.Research/CustomAgents.Research.csproj -c Release \
+            -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false \
+            -- --parts 3 --dir "$RUNNER_TEMP/research" --out "$RUNNER_TEMP/research.md"
+          grep -q '^# ' "$RUNNER_TEMP/research.md"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
