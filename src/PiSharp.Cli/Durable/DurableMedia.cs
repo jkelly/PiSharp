@@ -47,7 +47,9 @@ internal static class DurableMedia
         entry["options"] is JsonObject options ? (PiSharp.Durable.Chord.JsonObjectValue)PiSharp.Durable.Chord.JsonValue.Parse(options.ToJsonString())
             : PiSharp.Durable.Chord.JsonObjectValue.Empty);
 
-    /// <summary>Writes a kind's defaults into the scope's <c>media</c> object (other keys kept; an empty object is removed).</summary>
+    /// <summary>Writes a kind's defaults into the scope's <c>media</c> object (other keys kept; an empty object is removed). It runs after
+    /// <see cref="MediaDefaults"/> has applied the change to the session, so a file that cannot be written leaves the change in effect,
+    /// and the error says so.</summary>
     internal static void Save(PiSettings settings, MediaKind kind, MediaDefault? value, string scope)
     {
         var layer = scope == "project" ? settings.Project : settings.Global;

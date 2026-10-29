@@ -46,13 +46,17 @@ It offers no 3D generation.
    - `generate_speech`, `transcribe_audio`, `generate_music`, `rerank` and `decide`. These are deferred by default, so `tool_search` finds them and they do not grow every prompt.
    - `list_media_models` (with `all` for OpenRouter's full list) and `set_media_defaults`.
    - Generated files are saved, by default under `.pi/media`, and the tools return their paths. Default file names carry a random id, so parallel calls with the same prompt never overwrite each other's files.
-   - Paid generations are memoized: image, speech and music results, and a video's job id as soon as the job is submitted. Each tool also records that its paid request is going out before it sends it. A rerun after a crash returns the saved result or resumes the job; one that finds the request sent but nothing saved fails instead of sending it again. A rerun therefore never pays twice.
+   - Paid generations and transcriptions are memoized: image, speech, music and transcription results, and a video's job id as soon as the job is submitted. Each of these tools also records that its paid request is going out before it sends it. A rerun after a crash returns the saved result or resumes the job; one that finds the request sent but nothing saved fails instead of sending it again. These calls therefore never pay twice.
+   - `transcribe_audio` gets that guard because it is billed by the length of the audio, up to 25 MB of it, like the speech it reverses. Its transcript is saved as soon as it arrives, before the `output_path` file is written, so a rerun writes the file from the saved transcript rather than losing a paid result.
+   - `embed`, `rerank` and `decide` save their result as well, and a rerun after it was saved reuses it. They do not record the request as sent, so a call interrupted before its result was saved simply runs again. They are cheap per call and change nothing at the provider, and nobody saw the lost answer. Failing instead would cost a model turn to call the tool again, which costs more than the resend. `embed` also writes its `output_path` file from the saved result, so a rerun writes it again.
+   - A rerun that reuses a saved result does not resolve the model again, so a model or credential removed in the meantime does not fail it.
    - `embed` and `rerank` reject blank or non-string entries instead of dropping them, so vectors and ranking indices keep the positions of the call's list.
    - Every tool declares structured output, so programs and nested tool calls (workflow steps) get paths, vectors, rankings and answers.
 4. **Defaults.**
    - Each kind's defaults are a model and default tool arguments, merged under a call's own arguments; the call wins.
    - They live in `settings.json` as `"media": { "<kind>": { "model": "provider/id", "options": { ... } } }`.
    - `set_media_defaults` changes them in the global or project settings file, through the settings lock, and they take effect at once.
+   - The change applies to the session before it is saved, as other settings changes do. When the settings file cannot be written, for example because it failed to load, the tool fails with "The defaults apply to this session but were not saved", and the session keeps the new defaults.
    - Without a default, a kind uses its first available catalog model.
 5. **Durable only.** On the owner's choice, only `pisharp durable` installs the extension, and only when a provider with a media model is configured. Subagents start as copies of their parent's agent, so they get the tools. Auth resolves through the CLI model registry: auth.json, models.json and the environment. An OpenAI ChatGPT-subscription token is not used for media.
 6. **Settings.** `"media": { "enabled", "outputDir", "deferSpecializedTools", "<kind>": { "model", "options" } }`.
@@ -110,8 +114,9 @@ The owner also wants to switch priority tiers for chat requests: normal, priorit
 The `media.*` cases in `tests/PiSharp.Durable.Tests/MediaCases.cs` use fake HTTP handlers. They pin:
 
 - Each API's request shape, retries, errors and redirect credential stripping.
-- The tools' files and default names, memo replay, job resume, and the refusal to resend a request that went out without a saved result.
-- The defaults merge and persistence, and tool deferral.
+- The tools' files and default names, memo replay, job resume, and the refusal to resend a generation or transcription that went out without a saved result.
+- The resend of an `embed`, `rerank` or `decide` call that went out without a saved result, and the reuse of one that was saved.
+- The defaults merge and persistence, a change that applies although it could not be saved, and tool deferral.
 - One run through the Harness that includes a nested `embed` call.
 
 The `tiers.*` cases in `tests/PiSharp.ProviderSync.Tests/ServiceTierCases.cs` pin each protocol's tier fields. The `service-tier.*` durable case covers a conversation tier reaching and leaving requests.
