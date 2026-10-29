@@ -9,8 +9,9 @@ using PiSharp.Contracts.ModelOperations;
 
 namespace PiSharp.Codemode;
 
-/// <summary>The part of the model registry scripts reach through <c>models</c>. Models are JSON catalog entries without
-/// <c>headers</c>. Classification and image generation never throw for provider failures; they return error results.</summary>
+/// <summary>The part of the model registry scripts reach through <c>models</c>. Models are the registry's JSON catalog entries,
+/// <c>headers</c> included; the executor drops <c>headers</c> before a script sees one (execute.ts <c>toModelInfo</c>).
+/// Classification and image generation never throw for provider failures; they return error results.</summary>
 public interface ICodemodeModelRuntime
 {
     ImmutableArray<JsonData> GetModelsOfType(ModelType type, string? provider);

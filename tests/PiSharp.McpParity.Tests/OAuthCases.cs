@@ -248,7 +248,7 @@ internal static partial class Program
             await rpc.Prompt("p2", "again");
             Equal("connected", manager.Servers.Single().State, "reconnected");
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
-            Names(["MCP servers need attention:\n  remote: needs sign-in (run \"PiSharp.Cli mcp login remote\")"], McpDiagnostics(rpc.Error.ToString()), "reported once");
+            Names(["MCP servers need attention:\n  remote: needs sign-in (run \"pisharp mcp login remote\")"], McpDiagnostics(rpc.Error.ToString()), "reported once");
         }
         var requests = provider.Snapshot();
         Check(!ToolNames(requests[0]).Contains("mcp__remote__lookup") && ToolNames(requests[1]).Contains("mcp__remote__lookup"), "declared after the sign-in elsewhere");

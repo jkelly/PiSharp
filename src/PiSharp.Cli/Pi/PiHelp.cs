@@ -7,8 +7,10 @@ internal sealed record PiExtensionFlag(string Name, string Type, string? Descrip
 internal static class PiHelp
 {
     /// <summary>Source printHelp. The command name is PiSharp's (<see cref="PiConfig.DisplayName"/>); the option list adds PiSharp's
-    /// <c>--tool-policy</c> (decision 0004) and the commands list adds PiSharp's native <c>session</c> verbs and the experimental
-    /// <c>durable</c> mode (decision 0005; PiSharp-only since Pi v1.2.0 removed its durable agent).</summary>
+    /// <c>--tool-policy</c> (decision 0004) and the <c>--service-tier</c> alias of <c>--tier</c>; the commands list adds PiSharp's native
+    /// <c>session</c> verbs and the experimental <c>durable</c> mode (decision 0005; PiSharp-only since Pi v1.2.0 removed its durable
+    /// agent), both of which take <c>--help</c>. Built-in Tool Names leaves out <c>powershell</c>: the name is reserved, but the CLI
+    /// registers no such tool.</summary>
     internal static string Text(IReadOnlyList<PiExtensionFlag>? extensionFlags = null, bool color = false)
     {
         string Bold(string text) => color ? "\u001b[1m" + text + "\u001b[22m" : text;
@@ -32,8 +34,8 @@ internal static class PiHelp
   {app} auth <command>            Print credentials or check provider readiness
   {app} mcp <command>             Check MCP servers, sign in to or out of OAuth servers
   {app} session <verb>            PiSharp explicit-path session commands (create, prompt, resume, rpc, terminal, ...)
-  {app} durable [--continue]      EXPERIMENTAL: PiSharp's crash-safe durable agent (-c continues the newest session)
-  {app} <command> --help          Show help for install/remove/uninstall/update/list/config/auth/mcp
+  {app} durable [options]         EXPERIMENTAL: PiSharp's crash-safe durable agent (--continue, --tier <tier>)
+  {app} <command> --help          Show help for install/remove/uninstall/update/list/config/auth/mcp/session/durable
 
 {Bold("Options:")}
   --provider <name>              Provider to search for --model (requires --model)
@@ -63,6 +65,7 @@ internal static class PiHelp
   --tool-policy <policy>         Tool gate: pi (default; any path and command) or explicit (exact grants only)
   --thinking <level>             Set thinking level: off, minimal, low, medium, high, xhigh, max
   --tier <tier>                  Set service tier: auto, normal, economy, priority, fast, ultrafast
+  --service-tier <tier>          Alias for --tier
   --extension, -e <path>         Load an extension file or builtin:<name> (can be used multiple times)
   --no-extensions, -ne           Disable extension discovery and built-in extensions (explicit -e paths still work)
   --no-mcp                       Disable built-in MCP support: no servers connect and no MCP tools
@@ -209,7 +212,6 @@ Extensions can register additional flags (e.g., --plan from plan-mode extension)
 {Bold("Built-in Tool Names:")}
   read       - Read file contents
   bash       - Execute bash commands
-  powershell - Execute PowerShell commands on Windows
   edit       - Edit files with find/replace
   write      - Write files (creates/overwrites)
   grep       - Search file contents (read-only, off by default)

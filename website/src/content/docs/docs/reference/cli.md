@@ -18,7 +18,7 @@ pisharp session <verb> [options]               # PiSharp only
 pisharp durable [--continue] [--tier <tier>]   # PiSharp only, experimental
 ```
 
-`pisharp <command> --help` prints the help of `install`, `remove`, `uninstall`, `update`, `list`, `config`, `auth` and `mcp`.
+`pisharp <command> --help` prints the help of `install`, `remove`, `uninstall`, `update`, `list`, `config`, `auth`, `mcp`, `session` and `durable`.
 
 ## Modes
 
@@ -146,11 +146,14 @@ See [Project trust](/docs/reference/configuration/#project-trust).
 
 The help text and the parser agree, with these exceptions:
 
-- `--service-tier` is an alias of `--tier` that the help doesn't list.
 - `--export` takes an optional output path as the next argument, which the help doesn't show.
-- **Built-in Tool Names** in the help lists `powershell`. The CLI registers no `powershell` tool; see [Built-in tools](/docs/reference/tools/#powershell).
 - The help's environment list leaves out some provider variables, such as `HF_TOKEN`, `COPILOT_GITHUB_TOKEN`, `MINIMAX_CN_API_KEY`, `TYPESAFE_API_KEY`, `RADIUS_API_KEY` and `GOOGLE_CLOUD_API_KEY`. [Environment variables](/docs/reference/environment/) has them all.
-- The `durable` line in the help shows only `--continue`. `pisharp durable` also takes `--tier`.
+
+**Built-in Tool Names** in the help leaves out Pi's `powershell`, which the CLI doesn't register; see [Built-in tools](/docs/reference/tools/#powershell).
+
+:::note[Released builds]
+In PiSharp 1.2.0.1 and earlier, the help doesn't list `--service-tier`, lists `powershell` under **Built-in Tool Names**, and shows only `--continue` on the `durable` line. There `session --help` and `durable --help` print an error instead of help, and the `mcp` help and messages name the command `PiSharp.Cli`.
+:::
 
 ## Packages
 
@@ -240,11 +243,11 @@ pisharp auth check --provider anthropic --json
 | `--exposure <mode>` | both | `codemode` (default), `deferred`, `direct` or `hidden`. |
 | `--description <text>` | both | What the server offers, shown in the system prompt. |
 
-An HTTP option on a stdio server, or `--env` or `--cwd` on an HTTP server, is an error. `login` and `logout` work only for HTTP servers that use OAuth, not for servers with their own `Authorization` header. The mcp help prints `PiSharp.Cli` as the command name; type `pisharp`.
+An HTTP option on a stdio server, or `--env` or `--cwd` on an HTTP server, is an error. `login` and `logout` work only for HTTP servers that use OAuth, not for servers with their own `Authorization` header.
 
 ## session
 
-`pisharp session <verb>` keeps PiSharp's older explicit-path commands. They take absolute paths, use the `explicit` tool policy and reach only what their `--allow-*` options grant. They suit tests and scripted runs. Most of them run against an offline script of authored provider responses (`--offline-script`), so they make no provider request; `rpc`, `chat` and `terminal` also take `--live`. For everyday use, prefer the Pi options above. There is no `session --help`. A bad command line prints one JSON line, a `session_command_result` with `"code":"InvalidArguments"`, and exits with code 2. The tables below list each verb's options.
+`pisharp session <verb>` keeps PiSharp's older explicit-path commands. They take absolute paths, use the `explicit` tool policy and reach only what their `--allow-*` options grant. They suit tests and scripted runs. Most of them run against an offline script of authored provider responses (`--offline-script`), so they make no provider request; `rpc`, `chat` and `terminal` also take `--live`. For everyday use, prefer the Pi options above. `pisharp session`, `session --help` and `session -h` list the verbs, and `session <verb> --help` prints that verb's usage. A bad command line prints one JSON line, a `session_command_result` with `"code":"InvalidArguments"`, and exits with code 2. The tables below list each verb's options.
 
 | Verb | Required | Optional |
 | --- | --- | --- |
@@ -310,6 +313,7 @@ Reports go to stdout. Failures go to stderr as one JSON line such as `{"schemaVe
 | --- | --- |
 | `-c`, `--continue` | Continues the newest durable session. |
 | `--tier <tier>`, `--service-tier <tier>` | Service tier for a new session (experimental, unreleased). Without it, a new session takes the `serviceTier` setting. A session that `--continue` reopens keeps its stored tier; change it with `/tier`. |
+| `-h`, `--help` | Prints the durable help and exits without opening a session. |
 
 Any other argument is an error, `Unknown argument: <arg>`. The command prints a notice on stderr that it is experimental. `--tier` and the media tools in `pisharp durable` are not in any release yet and need a CLI built from source.
 
