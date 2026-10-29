@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Decision 0012: a research team. A lead agent splits a topic into parts, gives each part to its own researcher subagent (in parallel),
+       and merges what they found into one Markdown report. Researchers search posts on X with xAI's X search and the web with web_search.
+       Scripted models and canned results by default, or a real provider; runs are kept in SQLite and resume after a crash. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CustomAgents.Research</AssemblyName>
+    <RootNamespace>PiSharp.CustomAgents.Research</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_AGENTS001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

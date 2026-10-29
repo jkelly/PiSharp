@@ -20,6 +20,9 @@
     <Project Path="src/PiSharp.Durable/PiSharp.Durable.csproj" />
     <Project Path="src/PiSharp.Durable.Sqlite/PiSharp.Durable.Sqlite.csproj" />
     <Project Path="src/PiSharp.Durable.Tools/PiSharp.Durable.Tools.csproj" />
+    <Project Path="src/PiSharp.CustomAgents/PiSharp.CustomAgents.csproj" />
+    <Project Path="src/PiSharp.CustomAgents.JavaScript/PiSharp.CustomAgents.JavaScript.csproj" />
+    <Project Path="src/PiSharp.CustomAgents.Scripting/PiSharp.CustomAgents.Scripting.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj" />
@@ -181,6 +184,12 @@
   <Folder Name="/benchmarks/PiSharp.Durable.Benchmarks/">
     <Project Path="benchmarks/PiSharp.Durable.Benchmarks/PiSharp.Durable.Benchmarks.csproj" />
   </Folder>
+  <Folder Name="/samples/CustomAgents.Examples/">
+    <Project Path="samples/CustomAgents.Examples/CustomAgents.Examples.csproj" />
+  </Folder>
+  <Folder Name="/samples/CustomAgents.Research/">
+    <Project Path="samples/CustomAgents.Research/CustomAgents.Research.csproj" />
+  </Folder>
   <Folder Name="/samples/Durable.Examples/">
     <Project Path="samples/Durable.Examples/Durable.Examples.csproj" />
   </Folder>
@@ -189,6 +198,12 @@
   </Folder>
   <Folder Name="/tests/parity/PiSharp.Durable.Tests/">
     <Project Path="tests/PiSharp.Durable.Tests/PiSharp.Durable.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/PiSharp.CustomAgents.Tests/">
+    <Project Path="tests/PiSharp.CustomAgents.Tests/PiSharp.CustomAgents.Tests.csproj" />
+    <Project Path="tests/PiSharp.CustomAgents.PluginFixture.V1/PiSharp.CustomAgents.PluginFixture.V1.csproj" />
+    <Project Path="tests/PiSharp.CustomAgents.PluginFixture.V2/PiSharp.CustomAgents.PluginFixture.V2.csproj" />
+    <Project Path="tests/PiSharp.CustomAgents.ExtensionFixture/PiSharp.CustomAgents.ExtensionFixture.csproj" />
   </Folder>
   <Folder Name="/tests/parity/PiSharp.InteractiveParity.Tests/">
     <Project Path="tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj" />
