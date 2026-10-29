@@ -224,6 +224,38 @@ internal static partial class Program
             Check(DateTimeOffset.UtcNow - started >= TimeSpan.FromMilliseconds(45), "waited");
         });
 
+        yield return Case("run.sleep-before-composite-and-end", async () =>
+        {
+            long napped = 0, ran = 0;
+            var child = Workflow.For<ChildData>("after-nap")
+                .Then("mark", (_, _, _) => { ran = System.Diagnostics.Stopwatch.GetTimestamp(); return Task.CompletedTask; })
+                .Build();
+            var workflow = Workflow.For<OrderData>("nap-then-run")
+                .Then("nap", (_, _, _) =>
+                {
+                    napped = System.Diagnostics.Stopwatch.GetTimestamp();
+                    return Task.FromResult(ActionResult.Sleep(TimeSpan.FromMilliseconds(300)));
+                })
+                .Run("sub", child, _ => new ChildData(), (data, result) => data.Note = result.Status.ToString())
+                .Build();
+            var ending = Workflow.For<OrderData>("nap-then-end")
+                .Then("last", (data, _, _) =>
+                {
+                    data.Count = 1;
+                    return Task.FromResult(ActionResult.Sleep(TimeSpan.FromMilliseconds(300)));
+                })
+                .Build();
+            await using var host = await TestHost.OpenAsync(catalog => catalog.Add(workflow).Add(ending));
+            Equal("Completed", (await host.Runner.RunAsync(workflow, new OrderData())).EnsureCompleted().Note, "the sub-workflow ran");
+            var waited = System.Diagnostics.Stopwatch.GetElapsedTime(napped, ran);
+            Check(waited >= TimeSpan.FromMilliseconds(250), $"the composite step waited for the sleep ({waited.TotalMilliseconds} ms)");
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
+            var ended = await host.Runner.RunAsync(ending, new OrderData());
+            Equal(1, ended.EnsureCompleted().Count, "data kept");
+            Check(System.Diagnostics.Stopwatch.GetElapsedTime(started) >= TimeSpan.FromMilliseconds(250), "the end waited for the sleep");
+            Equal("last", ended.StoppedAt, "stopped at the action that slept");
+        });
+
         yield return Case("run.data-error", async () =>
         {
             var workflow = Workflow.For<OrderData>("precision").Then("big", data => data.Big = long.MaxValue).Build();

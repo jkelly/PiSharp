@@ -1,7 +1,9 @@
 // Decision 0012: tool sources. A source is a named, changing set of tools installed as one durable extension, "tools.<id>"; agents select
 // it by name, so a change reaches every agent that selects it at its next model request without reconfiguring them. A change installs the
 // whole extension again (Registry.Install replaces by name). When a tool is removed mid-run, the next request no longer offers it, a call
-// that has not started gets a tool_unavailable error, and a call already executing finishes on the code it started with.
+// that has not started gets a tool_unavailable error, and a call already executing finishes on the code it started with. A change and a
+// catalog check each hold ChangeGate first: a change validates against catalogs (their lock inside its own) while a catalog reads sources'
+// tools (their locks inside its own), so without one lock taken first the two orders could deadlock.
 using System.Collections.Immutable;
 using PiSharp.Durable;
 
@@ -19,6 +21,9 @@ internal delegate void ToolSourceValidator(ToolSource source, IReadOnlyList<Tool
 /// </summary>
 public abstract class ToolSource
 {
+    /// <summary>Held around every tool change and every catalog check of tools, before the source's or the catalog's own lock.</summary>
+    internal static readonly Lock ChangeGate = new();
+
     private readonly Lock gate = new();
     private readonly List<IRegistry> registries = [];
     private readonly List<ToolSourceValidator> validators = [];
@@ -48,6 +53,7 @@ public abstract class ToolSource
     protected void Publish(Func<ImmutableArray<ToolRegistration>, ImmutableArray<ToolRegistration>> next)
     {
         ArgumentNullException.ThrowIfNull(next);
+        lock (ChangeGate)
         lock (gate)
         {
             var proposed = next(tools);

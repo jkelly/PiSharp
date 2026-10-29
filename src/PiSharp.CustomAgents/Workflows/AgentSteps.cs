@@ -1,6 +1,8 @@
 // Decision 0012: agent steps. Agent runs a team agent (by definition name, resolved through WorkflowCatalog.Agents) on an input built from
 // the Data, in a child conversation of the run configured with that agent's whole AgentChange: its model, instructions and tools, nothing
-// inherited from the run. Like a prompt, a rerun within one attempt returns the recorded answer instead of asking again.
+// inherited from the run. Like a prompt, a rerun within one attempt returns the recorded answer instead of asking again. In a team, the
+// conversation is listed in the agent directory (<definition>#<n>, kind Workflow) while the call runs, so the agent's messaging and
+// orchestration tools know it; the entry closes when the call ends.
 using PiSharp.CustomAgents.Workflows.Engine;
 
 namespace PiSharp.CustomAgents.Workflows;
@@ -19,7 +21,8 @@ public sealed partial class ActionContext
     private int agents;
 
     /// <summary>Runs the team agent <paramref name="agent"/> on <paramref name="input"/> and returns its answer. Needs an agent provider
-    /// (an agent team sets <see cref="Hosting.WorkflowCatalog.Agents"/>).</summary>
+    /// (an agent team sets <see cref="Hosting.WorkflowCatalog.Agents"/>). In a team, the agent is in the directory while it runs, so it can
+    /// message other agents and, when its definition names subagents, delegate to them.</summary>
     public Task<ModelAnswer> RunAgentAsync(string agent, string input, AgentRunOptions? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(agent);
@@ -30,7 +33,8 @@ public sealed partial class ActionContext
         var change = provider.Resolve(agent) ?? throw new ModelCallException($"No agent '{agent}' is defined.", "unknown_agent");
         if (options.Key is null) agents++;
         var key = options.Key ?? (agents == 1 ? "agent" : "agent" + agents);
-        return ModelCalls.CallAsync(this, key, change, input, options.Timeout, null, cancellationToken);
+        var listed = Scope.Catalog.Team is { } team && team.Catalog.Find(agent) is not null ? agent : null;
+        return ModelCalls.CallAsync(this, key, change, input, options.Timeout, null, cancellationToken, listed);
     }
 }
 

@@ -79,6 +79,7 @@ public sealed class AgentCatalog : IAgentProvider
     {
         ArgumentNullException.ThrowIfNull(definition);
         definition.Validate();
+        lock (ToolSource.ChangeGate)
         lock (gate)
         {
             if (definitions.ContainsKey(definition.Name))
@@ -97,6 +98,7 @@ public sealed class AgentCatalog : IAgentProvider
     {
         ArgumentNullException.ThrowIfNull(definition);
         definition.Validate();
+        lock (ToolSource.ChangeGate)
         lock (gate)
         {
             if (!definitions.ContainsKey(definition.Name)) throw new InvalidOperationException($"Agent '{definition.Name}' is not registered.");
@@ -129,6 +131,7 @@ public sealed class AgentCatalog : IAgentProvider
     public AgentCatalog AddSource(ToolSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
+        lock (ToolSource.ChangeGate)
         lock (gate)
         {
             if (sources.ContainsKey(source.Id)) throw new InvalidOperationException($"A tool source '{source.Id}' is already added.");
@@ -144,6 +147,7 @@ public sealed class AgentCatalog : IAgentProvider
     /// <summary>Removes the source with <paramref name="id"/> and uninstalls its tools.</summary>
     public bool RemoveSource(string id)
     {
+        lock (ToolSource.ChangeGate)
         lock (gate)
         {
             if (!sources.Remove(id, out var source)) return false;

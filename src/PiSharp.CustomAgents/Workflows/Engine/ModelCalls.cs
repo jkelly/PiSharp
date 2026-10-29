@@ -2,7 +2,8 @@
 // call key and recorded in the run document, in two commits: the child and its agent first, then the submission. The request ID
 // wf:<task>:<step>:<key>:<attempt>[:r<repair>] is deterministic, and durable returns the existing submission for a known request ID, so
 // a rerun after a crash waits for the same answer instead of asking again. A typed call selects a per-type extension whose submit_result
-// tool terminates the run; the answer entry then carries the validated arguments.
+// tool terminates the run; the answer entry then carries the validated arguments. A team agent's call is listed in the agent directory
+// from the commit that creates (or reuses) its conversation until the call ends.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -76,9 +77,10 @@ internal sealed partial class ResultTool
 
 internal static partial class ModelCalls
 {
-    /// <summary>Runs one model call keyed <paramref name="key"/> in this visit, with the agent <paramref name="agent"/>.</summary>
+    /// <summary>Runs one model call keyed <paramref name="key"/> in this visit, with the agent <paramref name="agent"/>; with
+    /// <paramref name="teamAgent"/>, the call's conversation is that team definition's agent in the directory while the call runs.</summary>
     public static async Task<ModelAnswer> CallAsync(ActionContext context, string key, AgentChange agent, string text, TimeSpan? timeout,
-        string? requestSuffix, CancellationToken cancellationToken)
+        string? requestSuffix, CancellationToken cancellationToken, string? teamAgent = null)
     {
         var runtime = context.Runtime;
         var task = context.Task;
@@ -91,16 +93,38 @@ internal static partial class ModelCalls
             if (!doc.ContainsKey("calls") || doc.Get("calls") is not JsonObjectValue) doc.Set("calls", JsonObjectValue.Empty);
             var calls = doc.GetObject("calls");
             if (calls.Get(callKey) is JsonObjectValue known && known.TryGetValue("conversationId", out var id) && id is JsonNumberValue number)
-            {
                 child = new ConversationId((long)number.Value);
-                return;
+            else
+            {
+                var created = await tx.CreateConversationAsync(ConversationOwnership.Task(task.Id)).ConfigureAwait(false);
+                await Agents.ConfigureAsync(tx, created.Id, agent).ConfigureAwait(false);
+                child = created.Id;
+                calls.Set(callKey, RunDocs.Object(("conversationId", created.Id.Value), ("action", context.Action), ("at", runtime.Now())));
+                while (calls.Count > 200) calls.Delete(calls.Keys[0]);
             }
-            var created = await tx.CreateConversationAsync(ConversationOwnership.Task(task.Id)).ConfigureAwait(false);
-            await Agents.ConfigureAsync(tx, created.Id, agent).ConfigureAwait(false);
-            child = created.Id;
-            calls.Set(callKey, RunDocs.Object(("conversationId", created.Id.Value), ("action", context.Action), ("at", runtime.Now())));
-            while (calls.Count > 200) calls.Delete(calls.Keys[0]);
+            if (teamAgent is not null) await Teams.AgentDirectory.OpenWorkflowAgentAsync(tx, teamAgent, child).ConfigureAwait(false);
         }, durable).ConfigureAwait(false);
+        if (teamAgent is null) return await AnswerAsync(context, key, child, text, timeout, requestSuffix, durable).ConfigureAwait(false);
+        ModelAnswer result;
+        try { result = await AnswerAsync(context, key, child, text, timeout, requestSuffix, durable).ConfigureAwait(false); }
+        catch (Exception) when (!context.Durable.IsCancellationRequested)
+        {
+            await CloseAsync(context, child).ConfigureAwait(false);
+            throw;
+        }
+        await CloseAsync(context, child).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>Closes the directory entry of a team agent's call; a stopping runtime leaves it open, and the rerun closes it.</summary>
+    private static Task CloseAsync(ActionContext context, ConversationId child) =>
+        context.Runtime.CommitAsync((tx, _) => Teams.AgentDirectory.CloseConversationAsync(tx, child), context.Durable);
+
+    /// <summary>Submits the call's input to <paramref name="child"/> (idempotent by request ID) and reads the answer.</summary>
+    private static async Task<ModelAnswer> AnswerAsync(ActionContext context, string key, ConversationId child, string text, TimeSpan? timeout,
+        string? requestSuffix, DurableContext durable)
+    {
+        var runtime = context.Runtime;
         var handle = await runtime.ConversationAsync(child, durable).ConfigureAwait(false)
             ?? throw new ModelCallException($"The model call conversation {child.Value} is missing.");
         var requestId = context.IdempotencyKey(key) + ":" + context.Attempt.ToString(CultureInfo.InvariantCulture) + (requestSuffix ?? "");

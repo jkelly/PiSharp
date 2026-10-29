@@ -191,6 +191,36 @@ internal static partial class Program
             Throws<ArgumentException>(() => source.Add(AgentTool.Create("lookup", "again", _ => Task.FromResult<AgentToolResult>(""))), "within a source");
         });
 
+        yield return Case("agents.tools.change-during-check-no-deadlock", async () =>
+        {
+            var team = Team(new FauxAgentModels());
+            var source = new DynamicToolSource("busy");
+            team.Catalog.AddSource(source);
+            using var start = new Barrier(2);
+            // A source change validates against the catalog while a registration reads the source's tools: opposite lock orders.
+            var changes = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                for (var i = 0; i < 400; i++)
+                    source.Replace(AgentTool.Create("shared" + (i % 5), "x", _ => Task.FromResult<AgentToolResult>("")));
+            });
+            var checks = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                for (var i = 0; i < 400; i++)
+                    team.Catalog.Register(new AgentDefinition
+                    {
+                        Name = "agent" + i,
+                        Description = "x",
+                        Tools = [AgentTool.Create("own" + i, "x", _ => Task.FromResult<AgentToolResult>(""))],
+                        ToolSources = ["busy"],
+                    });
+            });
+            await Task.WhenAll(changes, checks).WaitAsync(TimeSpan.FromSeconds(60));
+            Equal(5, source.Tools.Count, "every change applied");
+            Equal(400, team.Catalog.Definitions.Count, "every registration applied");
+        });
+
         yield return Case("agents.team.child-does-not-inherit-parent-tools", async () =>
         {
             var models = new FauxAgentModels();
@@ -230,6 +260,32 @@ internal static partial class Program
             var failed = await session.Workflows.RunAsync(missing, new OrderData());
             Equal(WorkflowRunStatus.Failed, failed.Status, "unknown agent fails the step");
             Check(failed.Error!.Contains("nobody"), "names the agent: " + failed.Error);
+        });
+
+        yield return Case("agents.team.workflow-agent-in-directory", async () =>
+        {
+            var models = new FauxAgentModels();
+            var team = Team(models);
+            team.Catalog.Register(new AgentDefinition { Name = "coordinator", Description = "Coordinates", Subagents = ["worker"] });
+            team.Catalog.Register(new AgentDefinition { Name = "worker", Description = "Computes" });
+            models.On(request => Is(request, "coordinator") && !request.AfterTools,
+                _ => FauxReply.ToolCall("delegate", Json(new { agent = "worker", task = "compute 6*7" })));
+            models.On(request => Is(request, "coordinator") && request.LastToolName == "delegate", request => "coordinator: " + request.LastToolResult);
+            models.On(request => Is(request, "worker"), _ => "42");
+            var workflow = Workflow.For<OrderData>("coordinated")
+                .Agent("ask", "coordinator", _ => "what is 6*7?", (data, answer) => data.Note = answer.Text)
+                .Build();
+            team.Workflows.Add(workflow);
+            await using var session = await team.OpenAsync(new MemoryStorage());
+            var data = (await session.Workflows.RunAsync(workflow, new OrderData()).WaitAsync(TimeSpan.FromSeconds(30))).EnsureCompleted();
+            Equal("coordinator: worker#1 answered:\n42", data.Note, "the workflow's agent delegated");
+            var coordinator = (await session.FindAgentAsync("coordinator#1"))!;
+            Equal(AgentKind.Workflow, coordinator.Kind, "listed as a workflow agent");
+            Equal(0, coordinator.Depth, "a root agent");
+            Check(coordinator.Closed, "closed when its call ended");
+            var worker = (await session.FindAgentAsync("worker#1"))!;
+            Equal("coordinator#1", worker.Parent, "the subagent's parent");
+            Equal(1, worker.Depth, "one level down");
         });
 
         yield return Case("agents.team.definition-update-propagates", async () =>

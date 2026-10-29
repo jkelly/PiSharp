@@ -1,6 +1,7 @@
 // Decision 0012: compiles a workflow onto one durable task definition, pisharp.workflow.<name>. Phases: "#start", one per action named
-// after it, and "<step>#join" for composite steps. Every phase commits exactly one state change; the Data and the next step move together
-// in that commit, so they are exactly once, while the action body that produced them is at least once.
+// after it, "<step>#join" for composite steps, and "#end" for a Sleep before the end. Every phase commits exactly one state change; the
+// Data and the next step move together in that commit, so they are exactly once, while the action body that produced them is at least
+// once. Every phase but "#start" first waits for the checkpoint's wake time, so a Sleep holds whatever step comes next.
 using System.Collections.Immutable;
 using PiSharp.CustomAgents.Workflows.Hosting;
 using PiSharp.Durable;
@@ -53,6 +54,8 @@ internal sealed partial class WorkflowEngine<TData> : IWorkflowEngine, IStepScop
         Codec = new DataCodec(workflow.JsonOptions, workflow.Limits.MaxDataBytes);
         var phases = new Dictionary<string, TaskPhaseHandler>(StringComparer.Ordinal) { ["#start"] = StartAsync };
         foreach (var step in workflow.Nodes) step.AddPhases(phases, this);
+        phases[WorkflowEnd] = EndAsync;
+        foreach (var name in phases.Keys.Where(name => name != "#start").ToList()) phases[name] = Waking(phases[name]);
         Extensions = [.. workflow.Nodes.SelectMany(step => step.Extensions), .. workflow.Results.Values.Select(result => result.Extension)];
         ChildTasks = [.. workflow.Nodes.SelectMany(step => step.ChildTasks(this))];
         SubWorkflows = [.. workflow.Nodes.SelectMany(step => step.SubWorkflows)];
@@ -106,11 +109,25 @@ internal sealed partial class WorkflowEngine<TData> : IWorkflowEngine, IStepScop
         await TransitionAsync(task, runtime, checkpoint, "#start", "start", data, first, null, context).ConfigureAwait(false);
     }
 
+    /// <summary>Runs <paramref name="phase"/> once the checkpoint's wake time (a Sleep, a Repeat or a retry delay) has passed.</summary>
+    private static TaskPhaseHandler Waking(TaskPhaseHandler phase) => async (task, runtime, context) =>
+    {
+        if (Checkpoint.Parse(task.Checkpoint).WakeAt is { } wake && wake > runtime.Now()) await runtime.SleepAsync(wake, context).ConfigureAwait(false);
+        await phase(task, runtime, context).ConfigureAwait(false);
+    };
+
+    /// <summary>The end after a Sleep: completes the run, stopped at the action that slept.</summary>
+    private Task EndAsync(RunningTask task, ITaskRuntime runtime, DurableContext context)
+    {
+        var checkpoint = Checkpoint.Parse(task.Checkpoint);
+        var from = checkpoint.State is { } state && state.TryGetValue("from", out var value) && value is JsonStringValue text ? text.Value : WorkflowEnd;
+        return CompleteJsonAsync(task, runtime, checkpoint, from, checkpoint.Data, "end", context);
+    }
+
     /// <summary>Runs one attempt of an action and commits its outcome.</summary>
     internal async Task RunActionAsync(ActionStep<TData> step, RunningTask task, ITaskRuntime runtime, DurableContext context)
     {
         var checkpoint = Checkpoint.Parse(task.Checkpoint);
-        if (checkpoint.WakeAt is { } wake && wake > runtime.Now()) await runtime.SleepAsync(wake, context).ConfigureAwait(false);
         var replay = await MarkStartedAsync(task, runtime, checkpoint, step.Name, context).ConfigureAwait(false);
         TData data;
         try { data = Codec.Deserialize<TData>(checkpoint.Data); }
@@ -213,24 +230,34 @@ internal sealed partial class WorkflowEngine<TData> : IWorkflowEngine, IStepScop
             await FailAsync(task, runtime, checkpoint, from, error.Message, "routing", json, context).ConfigureAwait(false);
             return;
         }
+        var visits = checkpoint.Visits;
+        var steps = checkpoint.Steps;
         if (resolved == WorkflowEnd)
         {
-            await CompleteJsonAsync(task, runtime, checkpoint, from, json, outcome == "next" ? "end" : outcome, context).ConfigureAwait(false);
-            return;
+            if (wakeAt is null)
+            {
+                await CompleteJsonAsync(task, runtime, checkpoint, from, json, outcome == "next" ? "end" : outcome, context).ConfigureAwait(false);
+                return;
+            }
+            // A Sleep before the end: the "#end" phase completes the run once it wakes.
+            state = RunDocs.Object(("from", from));
         }
-        var visits = checkpoint.Visits.SetItem(resolved, checkpoint.Visits.GetValueOrDefault(resolved) + 1);
-        var steps = checkpoint.Steps + 1;
-        if (steps > workflow.Limits.MaxSteps)
+        else
         {
-            await FailAsync(task, runtime, checkpoint, from, $"The run entered {workflow.Limits.MaxSteps} actions without ending (MaxSteps).",
-                "limit", json, context).ConfigureAwait(false);
-            return;
-        }
-        if (workflow.ByName[resolved].MaxVisits is { } most && visits[resolved] > most)
-        {
-            await FailAsync(task, runtime, checkpoint, from, $"Action '{resolved}' was entered more than {most} times (MaxVisits).", "limit", json,
-                context).ConfigureAwait(false);
-            return;
+            visits = visits.SetItem(resolved, visits.GetValueOrDefault(resolved) + 1);
+            steps++;
+            if (steps > workflow.Limits.MaxSteps)
+            {
+                await FailAsync(task, runtime, checkpoint, from, $"The run entered {workflow.Limits.MaxSteps} actions without ending (MaxSteps).",
+                    "limit", json, context).ConfigureAwait(false);
+                return;
+            }
+            if (workflow.ByName[resolved].MaxVisits is { } most && visits[resolved] > most)
+            {
+                await FailAsync(task, runtime, checkpoint, from, $"Action '{resolved}' was entered more than {most} times (MaxVisits).", "limit", json,
+                    context).ConfigureAwait(false);
+                return;
+            }
         }
         var next = new Checkpoint(resolved, checkpoint.Seq + 1, checkpoint.Seq + 1, 1, steps, json, visits, wakeAt, state);
         await runtime.CommitAsync(async (tx, _) =>

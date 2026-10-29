@@ -203,6 +203,39 @@ internal static partial class Program
             Check(failed.Error!.Contains("no threes"), "reason: " + failed.Error);
         });
 
+        yield return Case("foreach.failfast-stops-early", async () =>
+        {
+            var slowStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var slowCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var merged = 0;
+            var body = Workflow.For<ChildData>("maybe-slow")
+                .Then("work", async (data, _, token) =>
+                {
+                    if (data.Input == "bad")
+                    {
+                        await slowStarted.Task.WaitAsync(token);
+                        return ActionResult.Fail("bad item");
+                    }
+                    slowStarted.TrySetResult();
+                    try { await Task.Delay(Timeout.Infinite, token); }
+                    catch (OperationCanceledException) { slowCancelled.TrySetResult(); throw; }
+                    return ActionResult.Next();
+                })
+                .Build();
+            var workflow = Workflow.For<OrderData>("each-failfast")
+                .ForEach("each", data => data.Trail, body, (_, item, _) => new ChildData { Input = item }, (_, _) => Interlocked.Increment(ref merged),
+                    new ForEachOptions { Concurrency = 3 })
+                .Build();
+            await using var host = await TestHost.OpenAsync(catalog => catalog.Add(workflow));
+            // The slow items never end on their own: the step fails at the first failed item instead of waiting for the batch.
+            var result = await host.Runner.RunAsync(workflow, new OrderData { Trail = ["bad", "slow", "slow"] }).WaitAsync(TimeSpan.FromSeconds(30));
+            Equal(WorkflowRunStatus.Failed, result.Status, "status");
+            Equal("child_failed", result.ErrorKind, "kind");
+            Check(result.Error!.Contains("bad item"), "reason: " + result.Error);
+            await slowCancelled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Equal(0, merged, "no merge on fail-fast");
+        });
+
         yield return Case("signal.early-late-timeout-reopen", async () =>
         {
             var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -38,6 +38,8 @@ The owner chose (2026-10-27):
      - composition: `Run` (a sub-workflow), `Parallel`, `ForEach` and `WaitForSignal`;
      - from the satellite projects: `Script` (JavaScript) and `CSharp` (a C# script).
    - An action returns `ActionResult.Next`, `GoTo`, `Stop`, `Fail`, `Repeat` or `Sleep`.
+     - A `Sleep` holds whatever comes next until it wakes: an action, a composite step, or the end of the run.
+   - `ForEach` runs its items in batches of `Concurrency`. With `JoinPolicy.FailFast` (the default), the first failed item ends the step and aborts the items still running, as `Parallel` does.
    - A workflow compiles to one durable task kind, `pisharp.workflow.<name>`, with one phase per action.
    - The Data and the next action are committed in one transaction. That gives these replay rules, which are documented for users:
      - The Data and the choice of next action are committed exactly once.
@@ -54,6 +56,7 @@ The owner chose (2026-10-27):
    - `AgentTool.Create<TArgs>` builds a typed tool whose schema comes from `TArgs`.
    - A `DynamicToolSource` adds, removes and replaces tools while agents run.
    - Duplicate tool names across selected sources are refused, because the Harness would otherwise silently keep the last one.
+     - A source change and a catalog check both take one shared lock first. A change checks the catalog while a registration reads the sources, so without it the two could deadlock.
    - `WebSearchTool.Create(provider)` builds a replay-safe `web_search` tool, with the arguments `query` and optional `count`:
      - The Harness offers the model only tools that the host runs, so a provider's hosted search (OpenAI's `web_search`, Anthropic's web search, Gemini's `googleSearch`) cannot be switched on for an agent's model. This tool calls a search backend instead.
      - The tool is independent of the agent's own model: an agent on any provider can use any backend.
@@ -75,6 +78,7 @@ The owner chose (2026-10-27):
    - The extension `agents.messaging` adds `list_agents`, `send_message`, `ask_agent` and `reply`.
    - The extension `agents.orchestration` adds `delegate`, `spawn`, `wait_agent` and `stop_agent`. It is withheld when the definition allows no subagents, or when the depth limit is reached.
    - The tools are replay-safe and idempotent per tool task.
+   - An agent that a workflow runs (an `Agent` step or `RunAgentAsync`) is in the directory while its call runs, as `<definition>#<n>` of kind `Workflow`, at depth 0. Its messaging tools work, and so do its `delegate` and `spawn` when its definition names subagents. The entry closes when the call ends.
    - The directory (`pisharp.agents.directory`) records every agent, its parent and the wait-for edges of blocking calls. A call that would close a cycle is refused with guidance. A question from a child to a parent that is waiting on it goes to the waiting call, which returns early.
    - `ask_agent("host")` reaches the program through `session.Host`. A definition must opt in with `CanAskHost`.
    - Two background tasks keep this durable:

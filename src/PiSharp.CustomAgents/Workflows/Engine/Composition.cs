@@ -211,7 +211,7 @@ internal sealed class ForEachStep<TData, TItem, TChild>(string name, Func<TData,
         var next = list.Skip(started.Count).Take(options.Concurrency)
             .Select((item, offset) => (bodyEngine, bodyEngine.Input(input(data, item, started.Count + offset)))).ToList();
         var state = RunDocs.Object(("batch", next.Count), ("total", list.Count));
-        return engine.StartChildrenAsync(task, runtime, checkpoint, Name, next, JoinPolicy.AllSettled, state, context, started);
+        return engine.StartChildrenAsync(task, runtime, checkpoint, Name, next, options.JoinPolicy, state, context, started);
     }
 }
 

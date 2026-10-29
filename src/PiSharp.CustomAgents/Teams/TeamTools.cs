@@ -178,7 +178,8 @@ internal static class TeamTools
         agent.Address == caller.Parent ? "your parent" :
         agent.Parent == caller.Address ? "your subagent" :
         agent.Parent is not null && agent.Parent == caller.Parent ? "a sibling subagent" :
-        agent.Kind == AgentKind.Orchestrator ? "the orchestrator" : "a peer";
+        agent.Kind == AgentKind.Orchestrator ? "the orchestrator" :
+        agent.Kind == AgentKind.Workflow ? "an agent of a workflow run" : "a peer";
 
     private static string Roster(AgentTeam team, AgentDefinition definition) =>
         "You can give work to these subagents with delegate (wait for the answer) or spawn (run in the background):\n" +

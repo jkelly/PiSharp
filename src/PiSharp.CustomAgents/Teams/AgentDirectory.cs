@@ -1,6 +1,7 @@
 // Decision 0012: the agent directory, a session document listing every agent conversation of a team by address: the orchestrator (named
-// after its definition), peers started by the host, and subagents (<definition>#<n>). Messaging resolves addresses through it, and a
-// definition update is reapplied to every conversation it lists for that definition.
+// after its definition), peers started by the host, subagents (<definition>#<n>), and the agents workflow runs start (<definition>#<n>,
+// listed while their call runs). Messaging resolves addresses through it, and a definition update is reapplied to every conversation it
+// lists for that definition.
 using System.Globalization;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -17,6 +18,8 @@ public enum AgentKind
     Peer,
     /// <summary>A subagent another agent delegated to or spawned.</summary>
     Child,
+    /// <summary>An agent a workflow run started (an Agent step or <c>ActionContext.RunAgentAsync</c>); closed when its call ends.</summary>
+    Workflow,
 }
 
 /// <summary>One agent conversation of a team.</summary>
@@ -66,6 +69,24 @@ internal static partial class AgentDirectory
         return definition + "#" + next.ToString(CultureInfo.InvariantCulture);
     }
 
+    /// <summary>Lists <paramref name="conversation"/>, which a workflow run configured as <paramref name="definition"/>, as an open root
+    /// agent: at the address it had (a rerun or a retry of the call), else at the next free one.</summary>
+    public static async Task OpenWorkflowAgentAsync(ITx tx, string definition, ConversationId conversation)
+    {
+        var doc = await tx.DocAsync(Doc).ConfigureAwait(false);
+        var address = doc.GetObject("byConversation").Get(Key(conversation)) is JsonStringValue known
+            ? known.Value
+            : await NextAddressAsync(tx, definition).ConfigureAwait(false);
+        await AddAsync(tx, new AgentEntry(address, conversation, definition, AgentKind.Workflow, null, 0, false)).ConfigureAwait(false);
+    }
+
+    /// <summary>Closes the agent of <paramref name="conversation"/>, when the directory lists one.</summary>
+    public static async Task CloseConversationAsync(ITx tx, ConversationId conversation)
+    {
+        var doc = await tx.DocAsync(Doc).ConfigureAwait(false);
+        if (doc.GetObject("byConversation").Get(Key(conversation)) is JsonStringValue address) await CloseAsync(tx, address.Value).ConfigureAwait(false);
+    }
+
     public static async Task CloseAsync(ITx tx, string address)
     {
         var doc = await tx.DocAsync(Doc).ConfigureAwait(false);
@@ -100,7 +121,13 @@ internal static partial class AgentDirectory
     {
         string? Text(string key) => value.TryGetValue(key, out var item) && item is JsonStringValue text ? text.Value : null;
         double Number(string key) => value.TryGetValue(key, out var item) && item is JsonNumberValue number ? number.Value : 0;
-        var kind = Text("kind") switch { "orchestrator" => AgentKind.Orchestrator, "child" => AgentKind.Child, _ => AgentKind.Peer };
+        var kind = Text("kind") switch
+        {
+            "orchestrator" => AgentKind.Orchestrator,
+            "child" => AgentKind.Child,
+            "workflow" => AgentKind.Workflow,
+            _ => AgentKind.Peer,
+        };
         return new AgentEntry(address, new ConversationId((long)Number("conversationId")), Text("definition") ?? "", kind, Text("parent"),
             (int)Number("depth"), value.TryGetValue("closed", out var closed) && closed is JsonBooleanValue { Value: true });
     }
