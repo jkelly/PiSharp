@@ -24,7 +24,7 @@ Reference the extension contracts without copying them into your output, and ena
 </Project>
 ```
 
-PiSharp supplies `PiSharp.Contracts`, `PiSharp.Extensions.Abstractions` and .NET itself. Your other dependencies are loaded from your build output, through its `.deps.json`.
+PiSharp supplies `PiSharp.Contracts`, `PiSharp.Extensions.Abstractions` and .NET itself. In fact any assembly the host can load comes from the host: a library that PiSharp also uses runs at PiSharp's version, not the one you built against. Your other dependencies are loaded from your build output, through its `.deps.json`.
 
 ## The extension class
 
@@ -57,7 +57,7 @@ public sealed class HelloExtension : IPiSharpExtension
 }
 ```
 
-The registry also takes handlers for `input`, `before_agent_start`, `context`, `tool_call` and `tool_result`. If it implements `IExtensionEventBusRegistry`, its `Events` property is the event bus Pi extensions use with `pi.events`.
+The registry also takes handlers for `input`, `before_agent_start`, `context`, `tool_call` and `tool_result`. If it implements `IExtensionEventBusRegistry`, its `Events` property is the event bus Pi extensions use with `pi.events`. [C# extension API](/docs/extensions/api/) lists everything the registry offers, and [Extension events](/docs/extensions/events/) lists every event.
 
 Tool parameters are declared as JSON Schema. The host validates arguments against the schema before your tool runs.
 
@@ -115,5 +115,5 @@ Don't keep mutable state in fields. Rebuild it from the current branch's session
 Each sample ships a `pisharp-extension.json`, so its build output loads straight from an extension folder or with `-e`. The older `session …` loader still accepts them too.
 
 :::note[The older package loader]
-The `pisharp session …` commands keep an older, Windows-only loader with a signed manifest, defined in [`schemas/pisharp-extension.schema.json`](https://github.com/jkelly/PiSharp/blob/main/schemas/pisharp-extension.schema.json), and an approval file. Plain `pisharp` doesn't use it.
+The `pisharp session …` commands keep an older, Windows-only loader with a manifest that pins the SHA-256 hash of each file, defined in [`schemas/pisharp-extension.schema.json`](https://github.com/jkelly/PiSharp/blob/main/schemas/pisharp-extension.schema.json), and an approval file. Plain `pisharp` doesn't use it.
 :::
