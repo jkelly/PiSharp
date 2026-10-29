@@ -186,7 +186,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         body["tool_choice"] = _options.ToolChoice ?? "auto";
         body["parallel_tool_calls"] = true;
         if (_options.Temperature is { } temperature) body["temperature"] = temperature;
-        if (_options.ServiceTier is { } tier) body["service_tier"] = tier;
+        // PiSharp-only: a request's own tier (ChatRequest.ServiceTier) wins over the configured one.
+        if ((request.ServiceTier is { } requested ? ServiceTiers.Codex(requested) : _options.ServiceTier) is { } tier) body["service_tier"] = tier;
         if (tools is { Count: > 0 }) body["tools"] = tools;
         var (offPresent, off) = ProviderTranscript.MappedLevel(_metadata, "off");
         if (effort is not null)
@@ -267,6 +268,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         internal JsonObject? FullBody;
         internal string? CacheSessionId, ConfiguredTransport;
         internal int RequestBytes;
+        /// <summary>PiSharp-only: the tier this request asked for (ChatRequest.ServiceTier), which prices it.</summary>
+        internal string? RequestedTier;
     }
 
     private async IAsyncEnumerable<StreamEvent> StreamCore(ChatRequest request, [EnumeratorCancellation] CancellationToken token)
@@ -347,6 +350,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var cacheSessionId = _options.CacheRetention == "none" ? null : _options.SessionId ?? request.SessionId;
         invocation.CacheSessionId = cacheSessionId; invocation.ConfiguredTransport = transport;
         invocation.RequestBytes = Encoding.UTF8.GetByteCount(bodyJson);
+        invocation.RequestedTier = request.ServiceTier is { } requestedTier ? ServiceTiers.Codex(requestedTier) : null;
         if (transport != "sse")
         {
             if (OpenAICodexWebSockets.IsFallbackActive(cacheSessionId)) OpenAICodexWebSockets.RecordSseFallback(cacheSessionId);
@@ -562,7 +566,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             response["status"] = status == "incomplete" ? "incomplete" : "completed";
             // resolveCodexServiceTier and Codex pricing: "default" defers to a requested flex/priority tier; "fast" is unpriced.
             var responseTier = response["service_tier"] is JsonValue tierValue && tierValue.TryGetValue<string>(out var tier) ? tier : null;
-            var resolvedTier = responseTier == "default" && _options.ServiceTier is "flex" or "priority" ? _options.ServiceTier : responseTier ?? _options.ServiceTier;
+            var requested = invocation.RequestedTier ?? _options.ServiceTier;
+            var resolvedTier = responseTier == "default" && requested is "flex" or "priority" ? requested : responseTier ?? requested;
             response["service_tier"] = resolvedTier is "flex" or "priority" ? resolvedTier : "default";
             return (JsonData.Parse(JsonUtf16.ToJsonString(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = JsonUtf16.MutableNode(JsonUtf16.ToJsonString(response)) })), true);
         }

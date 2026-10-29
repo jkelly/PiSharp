@@ -237,6 +237,31 @@ internal sealed partial class InteractiveMode
         }
     }
 
+    /// <summary>PiSharp-only /tier (decision 0007): without an argument, the current tier and the choices; with a tier, it applies from
+    /// the next request; a trailing <c>default</c> also saves it as the global <c>serviceTier</c> setting.</summary>
+    private void HandleTierCommand(string? argument)
+    {
+        if (string.IsNullOrEmpty(argument))
+        {
+            var current = PiSharp.Cli.Pi.PiServiceTierSetting.Current() ?? "none (provider default)";
+            ShowStatus($"Service tier: {current}. Choices: " +
+                string.Join("; ", PiSharp.AI.ServiceTiers.All.Select(tier => $"{tier} ({PiSharp.AI.ServiceTiers.Describe(tier)})")) +
+                ". Use /tier <tier>, or /tier <tier> default to save it.");
+            return;
+        }
+        var parts = argument.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var save = parts.Length > 1 && parts[^1].Equals("default", StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            var name = parts[0].Equals("none", StringComparison.OrdinalIgnoreCase) || parts[0].Equals("clear", StringComparison.OrdinalIgnoreCase) ? null : parts[0];
+            var tier = PiSharp.Cli.Pi.PiServiceTierSetting.Set(name);
+            if (save) settings.SetServiceTier(tier);
+            footer.Invalidate();
+            ShowStatus((save ? "Default service tier: " : "Service tier: ") + (tier ?? "none (provider default)"));
+        }
+        catch (ArgumentException error) { ShowError(error.Message); }
+    }
+
     private async Task HandleThinkingCommandAsync(string? searchTerm)
     {
         await RefreshThinkingLevelsAsync();

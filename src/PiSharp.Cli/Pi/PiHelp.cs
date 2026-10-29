@@ -62,6 +62,7 @@ internal static class PiHelp
                                  Applies to all tools, MCP tools included
   --tool-policy <policy>         Tool gate: pi (default; any path and command) or explicit (exact grants only)
   --thinking <level>             Set thinking level: off, minimal, low, medium, high, xhigh, max
+  --tier <tier>                  Set service tier: auto, normal, economy, priority, fast, ultrafast
   --extension, -e <path>         Load an extension file or builtin:<name> (can be used multiple times)
   --no-extensions, -ne           Disable extension discovery and built-in extensions (explicit -e paths still work)
   --no-mcp                       Disable built-in MCP support: no servers connect and no MCP tools

@@ -13,7 +13,7 @@ internal static class DurableSubagent
 {
     /// <summary>TypeBox <c>Type.Object({ task: Type.String({ description }) })</c>, in TypeBox's key order.</summary>
     private static readonly JsonObjectValue Parameters = (JsonObjectValue)JsonValue.Parse(
-        """{"type":"object","required":["task"],"properties":{"task":{"type":"string","description":"What the subagent should do"}}}""");
+        """{"type":"object","required":["task"],"properties":{"task":{"type":"string","description":"What the subagent should do"},"tier":{"type":"string","description":"PiSharp: service tier for the subagent's requests: auto, normal, economy, priority, fast or ultrafast. Omit to use this conversation's."}}}""");
 
     // Declared after Parameters: static initializers run in order.
     /// <summary>The <c>subagent</c> extension.</summary>
@@ -38,6 +38,11 @@ internal static class DurableSubagent
                     Execute = async (arguments, api, context) =>
                     {
                         var task = ((JsonStringValue)((JsonObjectValue)arguments)["task"]).Value;
+                        // PiSharp-only (decision 0007): a tier for the child; it otherwise inherits this conversation's.
+                        var tier = ((JsonObjectValue)arguments).TryGetValue("tier", out var tierValue) && tierValue is JsonStringValue tierText
+                            ? PiSharp.AI.ServiceTiers.Normalize(tierText.Value) ?? throw new InvalidOperationException(
+                                $"Unknown service tier \"{tierText.Value}\". Valid tiers: {string.Join(", ", PiSharp.AI.ServiceTiers.All)}")
+                            : null;
                         var child = await api.CommitAsync(async tx =>
                         {
                             var existing = (await tx.ScanConversationsAsync(new ConversationQuery { OwnerTaskId = api.TaskId }, 1).ConfigureAwait(false))
@@ -45,7 +50,11 @@ internal static class DurableSubagent
                             if (existing is not null) return existing.Id;
                             // Starts as a copy of this conversation's agent; without this extension it cannot delegate further.
                             var created = await tx.CreateConversationAsync(ConversationOwnership.Task(api.TaskId)).ConfigureAwait(false);
-                            await Agents.ConfigureAsync(tx, created.Id, new AgentChange { Extensions = ExtensionSelection.Edit(remove: [subagent]) })
+                            await Agents.ConfigureAsync(tx, created.Id, new AgentChange
+                                {
+                                    Extensions = ExtensionSelection.Edit(remove: [subagent]),
+                                    ServiceTier = tier is not null ? tier : (Patch<string>?)null,
+                                })
                                 .ConfigureAwait(false);
                             return created.Id;
                         }, context).ConfigureAwait(false);

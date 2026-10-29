@@ -55,6 +55,10 @@ internal static class DurableTuiState
     public static string JsNumber(double value) =>
         double.IsInteger(value) && Math.Abs(value) < 1e21 ? value.ToString("0", CultureInfo.InvariantCulture) : value.ToString("R", CultureInfo.InvariantCulture);
 
+    /// <summary>PiSharp-only (decision 0007): the <c>pi.agent</c> document's service tier, or null.</summary>
+    public static string? ServiceTierOf(ConversationView view) =>
+        view.Doc("pi.agent") is { } agent && agent.TryGetValue("serviceTier", out var tier) && tier is PiSharp.Durable.Chord.JsonStringValue text ? text.Value : null;
+
     /// <summary>The <c>pi.agent</c> document's model and thinking level (upstream <c>agentOf</c>).</summary>
     public static (ModelRef? Model, string? ThinkingLevel) AgentOf(ConversationView view)
     {

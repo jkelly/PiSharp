@@ -129,6 +129,9 @@ internal static partial class DurableRuntime
             var registry = DurableHarnessSetup.CreateCodingRegistry(settings, location.Cwd,
                 new DurablePromptResources(host.AgentDir, host.Home, PiSystemPrompt.Documentation(host.ApplicationDirectory)));
             registry.Install(DurableSubagent.Extension);
+            // PiSharp-only: image and video generation and embeddings, when a provider with media models is configured.
+            if (await DurableMedia.CreateAsync(settings, models, cancellationToken).ConfigureAwait(false) is { } media)
+                registry.Install(PiSharp.Durable.Tools.MediaTools.CreateExtension(media));
             var harnessSettings = DurableHarnessSetup.CreateHarnessSettings(settings, registry);
 
             var reports = new DurableReports();
@@ -149,11 +152,14 @@ internal static partial class DurableRuntime
             }, Context).ConfigureAwait(false);
             location.OnLockLost(((Session)harness).Fail);
             var initial = location.Created ? DurableHarnessSetup.FindInitialAgentModel(settings, models) : null;
+            // PiSharp-only (decision 0007): --tier for this run, else the serviceTier setting for a new session.
+            var tier = options.ServiceTier ?? (location.Created ? PiSharp.AI.ServiceTiers.Normalize(settings.String("serviceTier")) : null);
             var root = await harness.RootAsync(Context, new AgentChange
             {
                 Cwd = location.Cwd,
                 Model = initial?.Model is { } model ? model : (Patch<ModelRef>?)null,
                 ThinkingLevel = initial?.ThinkingLevel is { } level ? level : (Patch<string>?)null,
+                ServiceTier = tier is not null ? tier : (Patch<string>?)null,
             }).ConfigureAwait(false);
             var summaries = new List<DurableConversationSummary>();
             JsonObjectValue? cursor = null;
@@ -571,6 +577,24 @@ internal sealed class DurableSession : IOpenDurable, IDurableViewSource, IDurabl
         await current.ConfigureAsync(new AgentChange { Model = model, ThinkingLevel = DurableModels.ClampThinkingLevel(found, thinking) }, Context)
             .ConfigureAwait(false);
     });
+
+    /// <inheritdoc/>
+    public Task SetServiceTierAsync(string? tier) => Command(async () =>
+    {
+        var normalized = tier is null ? null : PiSharp.AI.ServiceTiers.Normalize(tier)
+            ?? throw new InvalidOperationException($"Unknown service tier \"{tier}\". Valid tiers: {string.Join(", ", PiSharp.AI.ServiceTiers.All)}");
+        await current.ConfigureAsync(new AgentChange { ServiceTier = normalized is null ? Patch<string>.Clear : normalized }, Context).ConfigureAwait(false);
+    });
+
+    /// <inheritdoc/>
+    public Task ShowServiceTierAsync()
+    {
+        var tier = DurableTuiState.ServiceTierOf(Current.Conversation) ?? "none (provider default)";
+        Notice(DurableNoticeLevel.Info, $"Service tier: {tier}. Choices: " +
+            string.Join("; ", PiSharp.AI.ServiceTiers.All.Select(name => $"{name} ({PiSharp.AI.ServiceTiers.Describe(name)})")) +
+            ". Use /tier <tier>, or /tier none to clear it.");
+        return Task.CompletedTask;
+    }
 
     /// <inheritdoc/>
     public Task ToggleTasksAsync() => Command(async () =>

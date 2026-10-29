@@ -18,6 +18,10 @@ public sealed class TurnRunner
 
     private readonly string? sessionId;
 
+    /// <summary>PiSharp-only: the service tier stamped on every request that has none, read per request.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
+    public Func<string?>? ServiceTier { get; init; }
+
     /// <param name="sessionId">Source agent.sessionId: stamped on every request that has none (prompt-cache keys, session headers).</param>
     public TurnRunner(ChatClient client, ToolBatchScheduler scheduler, string? thinkingLevel = null, string? sessionId = null)
         : this(client, scheduler, thinkingLevel) => this.sessionId = sessionId;
@@ -49,6 +53,7 @@ public sealed class TurnRunner
         // High-level configuration owns this control, including cancellation fallback requests.
         if (thinkingLevel is not null) request = request with { ThinkingLevel = thinkingLevel };
         if (sessionId is not null && request.SessionId is null) request = request with { SessionId = sessionId };
+        if (request.ServiceTier is null && ServiceTier?.Invoke() is { } tier) request = request with { ServiceTier = tier };
         ChatResult chat;
         var deliveryToken = settleAbort ? CancellationToken.None : cancellationToken;
         var assistantStarted = false;
