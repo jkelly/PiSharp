@@ -1,8 +1,9 @@
 // PiSharp-only (no upstream Pi source): durable tools over PiSharp.AI's MediaRegistry. Generated files (images, videos, speech, music)
 // are written in the execution environment and their paths returned. The paid calls are memoized in the tool task: a rerun after a
-// crash returns the saved files or keeps polling the submitted job, and one that finds a request sent but neither its result nor its
-// job id saved fails rather than paying again. Each kind has defaults (a model and default arguments) that a call's own arguments
-// override; set_media_defaults changes and saves them.
+// crash returns the saved files or transcript or keeps polling the submitted job, and one that finds a generation or transcription
+// sent but neither its result nor its job id saved fails rather than paying again. embed, rerank and decide save their result too, but
+// one interrupted before that simply runs again: they are cheap and read-only (decision 0007). Each kind has defaults (a model and
+// default arguments) that a call's own arguments override; set_media_defaults changes and saves them.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -272,7 +273,8 @@ public static partial class MediaTools
         """);
 
     /// <summary><c>embed</c>: embeds texts; with <c>query</c>, ranks them by similarity to it. Programs get the vectors as structured
-    /// output; <c>output_path</c> writes them to a JSON file.</summary>
+    /// output; <c>output_path</c> writes them to a JSON file. The result is memoized before the file is written, so a rerun after a crash
+    /// writes the file from it; one interrupted before the result was saved embeds again (cheap, and the same texts give the same vectors).</summary>
     public static ToolRegistration CreateEmbedTool(MediaToolsOptions options) => Define.Tool(new ToolRegistration
     {
         Name = EmbedToolName,
@@ -284,45 +286,56 @@ public static partial class MediaTools
         PrepareArguments = arguments => WrapString(arguments, "input"),
         Execute = async (arguments, api, context) =>
         {
-            var (args, model) = await PrepareAsync(options, MediaKind.Embedding, arguments, context).ConfigureAwait(false);
+            var args = Arguments(options, MediaKind.Embedding, arguments);
             var texts = Texts(args, "input");
             if (texts.Count == 0) throw new InvalidOperationException("input must list at least one text");
             var query = Text(args, "query");
-            var request = new EmbeddingRequest(query is null ? [.. texts] : [query, .. texts])
+            if (await api.MemoAsync(ResultMemo, context).ConfigureAwait(false) is not JsonObjectValue embedded)
             {
-                Dimensions = Integer(args, "dimensions"), TaskType = Text(args, "task_type"), Options = Options(args),
-            };
-            var result = await options.Media.EmbedAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
-            if (result.StopReason != ModelOperationStopReason.Stop) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "embedding failed"}");
-            var vectors = query is null ? result.Vectors : result.Vectors.RemoveAt(0);
-            var dimensions = vectors.Length == 0 ? 0 : vectors[0].Length;
-            var structured = new List<KeyValuePair<string, JsonValue>>
-            {
-                new("model", model.Spec), new("dimensions", dimensions), new("vectors", JsonValue.Array(vectors.Select(Vector))),
-            };
-            var text = new StringBuilder($"Embedded {texts.Count} text(s) with {model.Spec} ({dimensions} dimensions");
-            if (result.InputTokens is { } tokens) { text.Append($", {tokens} tokens"); structured.Add(new("inputTokens", tokens)); }
-            text.Append(").");
-            if (query is not null)
-            {
-                var ranking = vectors.Select((vector, index) => (Index: index, Score: Cosine(result.Vectors[0], vector)))
-                    .OrderByDescending(item => item.Score).ToList();
-                structured.Add(new("ranking", JsonValue.Array(ranking.Select(item => (JsonValue)JsonValue.Object([new("index", item.Index), new("score", Round(item.Score))])))));
-                text.Append("\nRanked by similarity to the query:");
-                foreach (var (index, score) in ranking)
-                    text.Append(CultureInfo.InvariantCulture, $"\n{score:0.0000}  [{index}] {Preview(texts[index])}");
+                var model = await ModelAsync(options, MediaKind.Embedding, args, context).ConfigureAwait(false);
+                var request = new EmbeddingRequest(query is null ? [.. texts] : [query, .. texts])
+                {
+                    Dimensions = Integer(args, "dimensions"), TaskType = Text(args, "task_type"), Options = Options(args),
+                };
+                var result = await options.Media.EmbedAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
+                if (result.StopReason != ModelOperationStopReason.Stop) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "embedding failed"}");
+                var vectors = query is null ? result.Vectors : result.Vectors.RemoveAt(0);
+                var fields = new List<KeyValuePair<string, JsonValue>>
+                {
+                    new("model", model.Spec), new("dimensions", vectors.Length == 0 ? 0 : vectors[0].Length), new("vectors", JsonValue.Array(vectors.Select(Vector))),
+                };
+                if (result.InputTokens is { } tokens) fields.Add(new("inputTokens", tokens));
+                if (query is not null)
+                    fields.Add(new("ranking", JsonValue.Array(vectors.Select((vector, index) => (Index: index, Score: Cosine(result.Vectors[0], vector)))
+                        .OrderByDescending(item => item.Score)
+                        .Select(item => (JsonValue)JsonValue.Object([new("index", item.Index), new("score", Round(item.Score))])))));
+                if (Text(args, "output_path") is { } path) fields.Add(new("path", path));
+                embedded = (JsonObjectValue)await api.MemoAsync(ResultMemo, JsonValue.Object(fields), context).ConfigureAwait(false);
             }
-            if (Text(args, "output_path") is { } outputPath)
+            var spec = ((JsonStringValue)embedded["model"]).Value;
+            var dimensions = (int)((JsonNumberValue)embedded["dimensions"]).Value;
+            var saved = (JsonArrayValue)embedded["vectors"];
+            var text = new StringBuilder($"Embedded {texts.Count} text(s) with {spec} ({dimensions} dimensions");
+            if (embedded.TryGetValue("inputTokens", out var inputTokens) && inputTokens is JsonNumberValue tokenCount) text.Append($", {(long)tokenCount.Value} tokens");
+            text.Append(").");
+            if (embedded.TryGetValue("ranking", out var ranking) && ranking is JsonArrayValue ranked)
             {
-                var document = JsonValue.Object([new("model", model.Spec), new("dimensions", dimensions),
-                    new("items", JsonValue.Array(texts.Select((input, index) => (JsonValue)JsonValue.Object([new("text", input), new("embedding", Vector(vectors[index]))]))))]);
+                text.Append("\nRanked by similarity to the query:");
+                foreach (var hit in ranked.OfType<JsonObjectValue>())
+                {
+                    var index = (int)((JsonNumberValue)hit["index"]).Value;
+                    text.Append(CultureInfo.InvariantCulture, $"\n{((JsonNumberValue)hit["score"]).Value:0.0000}  [{index}] {Preview(texts[index])}");
+                }
+            }
+            if (embedded.TryGetValue("path", out var pathValue) && pathValue is JsonStringValue { Value: var outputPath })
+            {
+                var document = JsonValue.Object([new("model", spec), new("dimensions", dimensions),
+                    new("items", JsonValue.Array(texts.Zip(saved, (input, vector) => (JsonValue)JsonValue.Object([new("text", input), new("embedding", vector)]))))]);
                 await SaveAsync(ToolEnv.Require(api), outputPath, Encoding.UTF8.GetBytes(document.ToString()), context).ConfigureAwait(false);
-                structured.Add(new("path", outputPath));
                 text.Append($"\nWrote the vectors to {outputPath}.");
             }
-            if (Flag(args, "include_vectors") == true)
-                text.Append('\n').Append(JsonValue.Array(vectors.Select(Vector)).ToString());
-            return new ToolExecutionResult { Output = JsonValue.Array(TextBlock(text.ToString())), StructuredOutput = JsonValue.Object(structured) };
+            if (Flag(args, "include_vectors") == true) text.Append('\n').Append(saved.ToString());
+            return new ToolExecutionResult { Output = JsonValue.Array(TextBlock(text.ToString())), StructuredOutput = embedded };
         },
     });
 
@@ -433,22 +446,34 @@ public static partial class MediaTools
 
     // ----- shared -----
 
-    /// <summary>The call's arguments over the kind's default arguments, and the model: the call's <c>model</c>, else the default model,
-    /// else the first available model of the kind.</summary>
+    /// <summary>The call's arguments over the kind's default arguments, and the model (<see cref="ModelAsync"/>).</summary>
     private static async Task<(JsonObjectValue Args, MediaModel Model)> PrepareAsync(MediaToolsOptions options, MediaKind kind, JsonValue arguments,
         DurableContext context)
     {
-        var defaults = options.Defaults.Get(kind);
-        var args = defaults.Options;
+        var args = Arguments(options, kind, arguments);
+        return (args, await ModelAsync(options, kind, args, context).ConfigureAwait(false));
+    }
+
+    /// <summary>The call's arguments over the kind's default arguments.</summary>
+    private static JsonObjectValue Arguments(MediaToolsOptions options, MediaKind kind, JsonValue arguments)
+    {
+        var args = options.Defaults.Get(kind).Options;
         foreach (var (name, value) in (JsonObjectValue)arguments) args = args.SetItem(name, value);
-        var spec = Text(args, "model") ?? defaults.Model;
+        return args;
+    }
+
+    /// <summary>The model of a call: its <c>model</c>, else the kind's default model, else the first available model of the kind. A rerun
+    /// that replays a saved result does not resolve it, so a model that is gone by then does not fail the replay.</summary>
+    private static async Task<MediaModel> ModelAsync(MediaToolsOptions options, MediaKind kind, JsonObjectValue args, DurableContext context)
+    {
+        var spec = Text(args, "model") ?? options.Defaults.Get(kind).Model;
         if (spec is null)
         {
             var available = await options.Media.GetAvailableAsync(kind, context.CancellationToken).ConfigureAwait(false);
-            return (args, available.FirstOrDefault() ?? throw new InvalidOperationException(
-                $"No {MediaCatalog.Name(kind)} model is configured: set an API key for a provider that has one (OpenRouter has every kind), or name a model as provider/model."));
+            return available.FirstOrDefault() ?? throw new InvalidOperationException(
+                $"No {MediaCatalog.Name(kind)} model is configured: set an API key for a provider that has one (OpenRouter has every kind), or name a model as provider/model.");
         }
-        return options.Media.TryResolve(kind, spec, out var model, out var error) ? (args, model) : throw new InvalidOperationException(error);
+        return options.Media.TryResolve(kind, spec, out var model, out var error) ? model : throw new InvalidOperationException(error);
     }
 
     /// <summary>
@@ -626,20 +651,23 @@ public static partial class MediaTools
     /// <summary>
     /// The saved summary of a finished call, which a rerun after a crash returns, or null when no paid request was sent yet. A rerun that
     /// finds the request sent but no result saved fails instead of sending it again: the first request may have been charged.
+    /// <paramref name="retry"/> says what the model can do instead.
     /// </summary>
-    private static async Task<JsonObjectValue?> SavedAsync(IToolExecutionApi api, string kind, DurableContext context)
+    private static async Task<JsonObjectValue?> SavedAsync(IToolExecutionApi api, string kind, DurableContext context, string retry = RetryGeneration)
     {
         if (await api.MemoAsync(ResultMemo, context).ConfigureAwait(false) is JsonObjectValue saved) return saved;
-        if (await api.MemoAsync(SentMemo, context).ConfigureAwait(false) is not null) throw Interrupted(kind);
+        if (await api.MemoAsync(SentMemo, context).ConfigureAwait(false) is not null) throw Interrupted(kind, retry);
         return null;
     }
 
     /// <summary>Records in the tool task that the paid request is going out, before it does.</summary>
     private static Task MarkSentAsync(IToolExecutionApi api, DurableContext context) => api.MemoAsync(SentMemo, true, context);
 
-    private static InvalidOperationException Interrupted(string kind) => new(
+    private const string RetryGeneration = "check the media output directory for partly saved files, or call the tool again to generate anew";
+
+    private static InvalidOperationException Interrupted(string kind, string retry = RetryGeneration) => new(
         $"The {kind} request was sent before the process stopped, and its result was not saved. It may have been charged, so it was not " +
-        "sent again; check the media output directory for partly saved files, or call the tool again to generate anew.");
+        $"sent again; {retry}.");
 
     private static string Size(double bytes) => bytes >= 1024 * 1024 ? $"{bytes / (1024 * 1024):0.0} MB" : $"{bytes / 1024:0} KB";
 

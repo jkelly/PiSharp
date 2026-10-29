@@ -19,7 +19,7 @@ public interface IMediaDefaults
     /// <summary>The kind's defaults now; <see cref="MediaDefault.None"/> when none are set.</summary>
     MediaDefault Get(MediaKind kind);
     /// <summary>Replaces the kind's defaults (null clears them) and saves them in <paramref name="scope"/> (<c>global</c> or
-    /// <c>project</c>). Throws when they cannot be saved.</summary>
+    /// <c>project</c>). Throws when they cannot be saved; the replacement still applies to this session.</summary>
     Task SetAsync(MediaKind kind, MediaDefault? value, string scope, CancellationToken cancellationToken);
 }
 
@@ -45,11 +45,13 @@ public sealed class MediaDefaults : IMediaDefaults
 
     public async Task SetAsync(MediaKind kind, MediaDefault? value, string scope, CancellationToken cancellationToken)
     {
-        if (Persist is { } persist) await persist(kind, value is { IsEmpty: false } ? value : null, scope, cancellationToken).ConfigureAwait(false);
+        var next = value is { IsEmpty: false } ? value : null;
+        // Applied before the save, as settings changes are: a settings file that cannot be written leaves the session on the new defaults.
         lock (gate)
         {
-            if (value is null || value.IsEmpty) values.Remove(kind);
-            else values[kind] = value;
+            if (next is null) values.Remove(kind);
+            else values[kind] = next;
         }
+        if (Persist is { } persist) await persist(kind, next, scope, cancellationToken).ConfigureAwait(false);
     }
 }

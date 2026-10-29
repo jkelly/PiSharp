@@ -453,6 +453,96 @@ internal static class MediaTests
             Equal(1, http.Requests.Count, "nothing sent again");
         });
 
+        yield return Case(prefix + "tools.a-sent-transcription-without-a-saved-transcript-is-not-sent-again", async () =>
+        {
+            var cwd = Temp("media-transcribe-sent");
+            await File.WriteAllBytesAsync(Path.Combine(cwd, "talk.mp3"), [0x49, 0x44, 0x33, 0]);
+            var api = new MediaToolApi(new LocalExecutionEnv(cwd));
+            var http = new MediaFakeHttp((_, _) =>
+            {
+                Check(api.Memos.ContainsKey("request-sent"), "marked as sent before it goes out");
+                return MediaFakeHttp.Response("""{"text":"hi there","segments":[{"start":0,"end":1.2,"text":"hi there"}]}""");
+            });
+            var tool = MediaTools.CreateTranscribeTool(new MediaToolsOptions { Media = Registry(http) });
+            var args = JsonValue.Parse("""{"path":"talk.mp3","model":"openai/whisper-1","timestamps":true,"output_path":"notes/talk.json"}""");
+            var first = await tool.Execute(args, api, Context);
+            Equal(1, http.Requests.Count, "sent once");
+            var file = Path.Combine(cwd, "notes", "talk.json");
+            var written = await File.ReadAllTextAsync(file);
+            var saved = Json(written);
+            Check(saved.GetProperty("details").TryGetProperty("segments", out _) && !saved.TryGetProperty("path", out _), written);
+            // The process stopped after the transcript was saved and before its file was written: the rerun writes it from the saved transcript.
+            File.Delete(file);
+            var replay = await tool.Execute(args, api, Context);
+            Equal(1, http.Requests.Count, "replayed without a request");
+            Equal(Text(first), Text(replay), "replayed text");
+            Equal(first.StructuredOutput!.ToString(), replay.StructuredOutput!.ToString(), "replayed structured output");
+            Equal(written, await File.ReadAllTextAsync(file), "file written again from the saved transcript");
+            // The process stopped after the request went out and before its transcript was saved: the rerun reports that instead of paying again.
+            api.Memos.Remove("result");
+            var error = await ThrowsAsync<InvalidOperationException>(() => tool.Execute(args, api, Context), "interrupted transcription");
+            Check(error.Message.StartsWith("The transcription request was sent before the process stopped", StringComparison.Ordinal), error.Message);
+            Check(error.Message.EndsWith("call the tool again to transcribe the audio anew.", StringComparison.Ordinal), error.Message);
+            Equal(1, http.Requests.Count, "nothing sent again");
+        });
+
+        yield return Case(prefix + "tools.embed-rerank-and-decide-reuse-a-saved-result-and-resend-an-unsaved-one", async () =>
+        {
+            var cwd = Temp("media-lookups");
+            var http = new MediaFakeHttp((request, _) => new Uri(request.Url).AbsolutePath switch
+            {
+                "/v1/embeddings" => MediaFakeHttp.Response("""{"data":[{"embedding":[1,0]},{"embedding":[0.6,0.8]}],"usage":{"prompt_tokens":3}}"""),
+                "/api/v1/rerank" => MediaFakeHttp.Response("""{"results":[{"index":1,"relevance_score":0.7}],"usage":{"cost":0.002}}"""),
+                _ => MediaFakeHttp.Response("""{"answers":{"ok":{"type":"noul","noul":0.2}},"usage":{"cost":0.00001}}"""),
+            });
+            var options = new MediaToolsOptions { Media = Registry(http) };
+            var vectors = Path.Combine(cwd, "vectors.json");
+            var calls = new (ToolRegistration Tool, string Arguments, string Expected)[]
+            {
+                (MediaTools.CreateEmbedTool(options),
+                    """{"input":["cats"],"query":"kittens","model":"openai/text-embedding-3-small","output_path":"vectors.json"}""", "0.6000  [0] cats"),
+                (MediaTools.CreateRerankTool(options), """{"query":"q","documents":["a","b"],"model":"openrouter/cohere/rerank-4-fast"}""", "0.7000  [1] b"),
+                (MediaTools.CreateDecideTool(options),
+                    """{"state":"x","questions":{"ok":{"type":"noul","instructions":"ok?"}},"model":"openrouter/typesafe/jev-1.14"}""", "\"noul\":0.2"),
+            };
+            foreach (var (tool, json, expected) in calls)
+            {
+                var api = new MediaToolApi(new LocalExecutionEnv(cwd));
+                var args = JsonValue.Parse(json);
+                var sent = http.Requests.Count;
+                var first = await tool.Execute(args, api, Context);
+                Equal(sent + 1, http.Requests.Count, tool.Name + " sent once");
+                Check(Text(first).Contains(expected, StringComparison.Ordinal), Text(first));
+                Check(api.Memos.ContainsKey("result") && !api.Memos.ContainsKey("request-sent"), tool.Name + ": result saved, request not guarded");
+                // The process stopped after the result was saved: the rerun reuses it (and writes embed's output file from it).
+                File.Delete(vectors);
+                var replay = await tool.Execute(args, api, Context);
+                Equal(sent + 1, http.Requests.Count, tool.Name + " replayed without a request");
+                Equal(Text(first), Text(replay), tool.Name + " replayed text");
+                Equal(first.StructuredOutput!.ToString(), replay.StructuredOutput!.ToString(), tool.Name + " replayed structured output");
+                if (tool.Name == MediaTools.EmbedToolName) Check(File.Exists(vectors), "vectors written again from the saved result");
+                // The process stopped after the request went out and before its result was saved: a cheap, read-only call simply runs again.
+                api.Memos.Remove("result");
+                var rerun = await tool.Execute(args, api, Context);
+                Equal(sent + 2, http.Requests.Count, tool.Name + " sent again");
+                Equal(Text(first), Text(rerun), tool.Name + " rerun text");
+            }
+        });
+
+        yield return Case(prefix + "tools.defaults-that-cannot-be-saved-still-apply-to-the-session", async () =>
+        {
+            var defaults = new MediaDefaults { Persist = (_, _, _, _) => throw new InvalidOperationException("The defaults apply to this session but were not saved: disk full") };
+            var http = MediaFakeHttp.Json($$$"""{"data":[{"b64_json":"{{{Png}}}"}]}""");
+            var options = new MediaToolsOptions { Media = Registry(http), Defaults = defaults };
+            var api = new MediaToolApi(new LocalExecutionEnv(Temp("media-defaults-unsaved")));
+            var error = await ThrowsAsync<InvalidOperationException>(() => MediaTools.CreateDefaultsTool(options).Execute(
+                JsonValue.Parse("""{"kind":"image","model":"openai/gpt-image-1-mini"}"""), api, Context), "unsaved");
+            Check(error.Message.Contains("disk full", StringComparison.Ordinal), error.Message);
+            Equal("openai/gpt-image-1-mini", defaults.Get(MediaKind.Image).Model, "applied before the save");
+            await MediaTools.CreateImageTool(options).Execute(JsonValue.Parse("""{"prompt":"x"}"""), api, Context);
+            Equal("gpt-image-1-mini", Json(http.Requests.Single().Body).GetProperty("model").GetString(), "the session uses it");
+        });
+
         yield return Case(prefix + "tools.generate-image-saves-files-and-replays-from-the-memo", async () =>
         {
             var cwd = Temp("media-image");
@@ -793,14 +883,15 @@ internal static class MediaTests
             SeqEqual([MediaTools.DecideToolName, MediaTools.MusicToolName, MediaTools.SpeechToolName, MediaTools.RerankToolName, MediaTools.TranscribeToolName], deferred, "deferred");
             var cwd = Temp("media-specialized");
             await File.WriteAllBytesAsync(Path.Combine(cwd, "talk.mp3"), [0x49, 0x44, 0x33, 0]);
-            var api = new MediaToolApi(new LocalExecutionEnv(cwd));
-            Check(Text(await MediaTools.CreateRerankTool(options).Execute(JsonValue.Parse("""{"query":"q","documents":["a","b"]}"""), api, Context))
+            // Each call is a tool task of its own, with its own memos.
+            MediaToolApi Api() => new(new LocalExecutionEnv(cwd));
+            Check(Text(await MediaTools.CreateRerankTool(options).Execute(JsonValue.Parse("""{"query":"q","documents":["a","b"]}"""), Api(), Context))
                 .Contains("0.7000  [1] b", StringComparison.Ordinal), "rerank");
-            Check(Text(await MediaTools.CreateDecideTool(options).Execute(JsonValue.Parse("""{"state":{"x":1},"questions":{"ok":{"type":"noul","instructions":"ok?"}}}"""), api, Context))
+            Check(Text(await MediaTools.CreateDecideTool(options).Execute(JsonValue.Parse("""{"state":{"x":1},"questions":{"ok":{"type":"noul","instructions":"ok?"}}}"""), Api(), Context))
                 .Contains("\"noul\":0.2", StringComparison.Ordinal), "decide");
-            var speech = await MediaTools.CreateSpeechTool(options).Execute(JsonValue.Parse("""{"text":"Hello there","output_path":"voice/hello.mp3"}"""), api, Context);
+            var speech = await MediaTools.CreateSpeechTool(options).Execute(JsonValue.Parse("""{"text":"Hello there","output_path":"voice/hello.mp3"}"""), Api(), Context);
             Check(File.Exists(Path.Combine(cwd, "voice", "hello.mp3")), "speech saved: " + Text(speech));
-            var transcript = await MediaTools.CreateTranscribeTool(options).Execute(JsonValue.Parse("""{"path":"talk.mp3","output_path":"talk.txt"}"""), api, Context);
+            var transcript = await MediaTools.CreateTranscribeTool(options).Execute(JsonValue.Parse("""{"path":"talk.mp3","output_path":"talk.txt"}"""), Api(), Context);
             Equal("hi there", await File.ReadAllTextAsync(Path.Combine(cwd, "talk.txt")), "transcript file");
             Check(Text(transcript).Contains("hi there", StringComparison.Ordinal), "transcript text");
             var music = await MediaTools.CreateMusicTool(new MediaToolsOptions { Media = options.Media }).Execute(

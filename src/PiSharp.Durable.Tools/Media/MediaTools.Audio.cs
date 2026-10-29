@@ -85,7 +85,10 @@ public static partial class MediaTools
         {"type":"object","required":["model","text"],"properties":{"model":{"type":"string"},"text":{"type":"string"},"details":{"type":"object"},"path":{"type":"string"},"cost":{"type":"number"}}}
         """);
 
-    /// <summary><c>transcribe_audio</c>: speech to text.</summary>
+    /// <summary><c>transcribe_audio</c>: speech to text. Billed by the audio's length, so it is guarded like the generations: the request is
+    /// recorded as sent before it goes out, and the transcript is memoized as soon as it arrives, before <c>output_path</c> is written. A
+    /// rerun after a crash writes the file from the saved transcript, and one that finds the request sent but no transcript saved fails
+    /// rather than paying again.</summary>
     public static ToolRegistration CreateTranscribeTool(MediaToolsOptions options) => Define.Tool(new ToolRegistration
     {
         Name = TranscribeToolName,
@@ -96,30 +99,37 @@ public static partial class MediaTools
         PrepareArguments = arguments => WrapString(arguments, "keyterms"),
         Execute = async (arguments, api, context) =>
         {
-            var (args, model) = await PrepareAsync(options, MediaKind.Transcription, arguments, context).ConfigureAwait(false);
+            var args = Arguments(options, MediaKind.Transcription, arguments);
             var env = ToolEnv.Require(api);
             var path = RequiredText(args, "path");
-            var diarize = Flag(args, "diarize") == true;
-            var request = new TranscriptionRequest(await ReadFileAsync(env, path, context).ConfigureAwait(false), Path.GetFileName(path))
+            if (await SavedAsync(api, "transcription", context, "call the tool again to transcribe the audio anew").ConfigureAwait(false) is not { } transcribed)
             {
-                Language = Text(args, "language"), Prompt = Text(args, "prompt"), Temperature = Number(args, "temperature"),
-                Timestamps = diarize || Flag(args, "timestamps") == true, Diarize = diarize, KeyTerms = [.. Strings(args, "keyterms")], Options = Options(args),
-            };
-            var result = await options.Media.TranscribeAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
-            if (result.Text is not { } transcript) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "transcription failed"}");
-            var structured = new List<KeyValuePair<string, JsonValue>> { new("model", model.Spec), new("text", transcript) };
-            if (result.Data is { } data) structured.Add(new("details", JsonValue.FromData(data)));
-            if (result.Cost is { } cost) structured.Add(new("cost", cost));
-            var text = new StringBuilder($"Transcript of {path} ({model.Spec}):\n{transcript}");
-            if (Text(args, "output_path") is { } outputPath)
+                var model = await ModelAsync(options, MediaKind.Transcription, args, context).ConfigureAwait(false);
+                var diarize = Flag(args, "diarize") == true;
+                var request = new TranscriptionRequest(await ReadFileAsync(env, path, context).ConfigureAwait(false), Path.GetFileName(path))
+                {
+                    Language = Text(args, "language"), Prompt = Text(args, "prompt"), Temperature = Number(args, "temperature"),
+                    Timestamps = diarize || Flag(args, "timestamps") == true, Diarize = diarize, KeyTerms = [.. Strings(args, "keyterms")], Options = Options(args),
+                };
+                await MarkSentAsync(api, context).ConfigureAwait(false);
+                var result = await options.Media.TranscribeAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
+                if (result.Text is not { } transcript) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "transcription failed"}");
+                var fields = new List<KeyValuePair<string, JsonValue>> { new("model", model.Spec), new("text", transcript) };
+                if (result.Data is { } data) fields.Add(new("details", JsonValue.FromData(data)));
+                if (result.Cost is { } cost) fields.Add(new("cost", cost));
+                if (Text(args, "output_path") is { } requested) fields.Add(new("path", requested));
+                transcribed = (JsonObjectValue)await api.MemoAsync(ResultMemo, JsonValue.Object(fields), context).ConfigureAwait(false);
+            }
+            var words = ((JsonStringValue)transcribed["text"]).Value;
+            var text = new StringBuilder($"Transcript of {path} ({((JsonStringValue)transcribed["model"]).Value}):\n{words}");
+            if (transcribed.TryGetValue("path", out var pathValue) && pathValue is JsonStringValue { Value: var outputPath })
             {
-                var full = JsonValue.Object(structured);
-                var content = outputPath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? full.ToString() : transcript;
+                // A .json file gets the full result (timestamps and speakers included), without the path that names it.
+                var content = outputPath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? transcribed.Remove("path").ToString() : words;
                 await SaveAsync(env, outputPath, Encoding.UTF8.GetBytes(content), context).ConfigureAwait(false);
-                structured.Add(new("path", outputPath));
                 text.Append($"\n\nWrote the transcript to {outputPath}.");
             }
-            return new ToolExecutionResult { Output = JsonValue.Array(TextBlock(text.ToString())), StructuredOutput = JsonValue.Object(structured) };
+            return new ToolExecutionResult { Output = JsonValue.Array(TextBlock(text.ToString())), StructuredOutput = transcribed };
         },
     });
 
@@ -179,7 +189,8 @@ public static partial class MediaTools
         {"type":"object","required":["model","ranking"],"properties":{"model":{"type":"string"},"ranking":{"type":"array","items":{"type":"object","required":["index","score"],"properties":{"index":{"type":"number"},"score":{"type":"number"}}}},"cost":{"type":"number"}}}
         """);
 
-    /// <summary><c>rerank</c>: orders documents by relevance to a query with a rerank model.</summary>
+    /// <summary><c>rerank</c>: orders documents by relevance to a query with a rerank model. The ranking is memoized; a call interrupted
+    /// before it was saved ranks again (cheap, and read-only at the provider).</summary>
     public static ToolRegistration CreateRerankTool(MediaToolsOptions options) => Define.Tool(new ToolRegistration
     {
         Name = RerankToolName,
@@ -190,21 +201,31 @@ public static partial class MediaTools
         PrepareArguments = arguments => WrapString(arguments, "documents"),
         Execute = async (arguments, api, context) =>
         {
-            var (args, model) = await PrepareAsync(options, MediaKind.Rerank, arguments, context).ConfigureAwait(false);
+            var args = Arguments(options, MediaKind.Rerank, arguments);
             var documents = Texts(args, "documents");
-            var request = new RerankRequest(RequiredText(args, "query"), [.. documents]) { TopN = Integer(args, "top_n"), Options = Options(args) };
-            var result = await options.Media.RerankAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
-            if (result.StopReason != ModelOperationStopReason.Stop) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "rerank failed"}");
-            var text = new StringBuilder($"Ranked {documents.Count} document(s) with {model.Spec}:");
-            foreach (var hit in result.Ranking)
-                text.Append(CultureInfo.InvariantCulture, $"\n{hit.Score:0.0000}  [{hit.Index}] {(hit.Index < documents.Count ? Preview(documents[hit.Index]) : "")}");
-            var structured = new List<KeyValuePair<string, JsonValue>>
+            var query = RequiredText(args, "query");
+            if (await api.MemoAsync(ResultMemo, context).ConfigureAwait(false) is not JsonObjectValue ranked)
             {
-                new("model", model.Spec),
-                new("ranking", JsonValue.Array(result.Ranking.Select(hit => (JsonValue)JsonValue.Object([new("index", hit.Index), new("score", Round(hit.Score))])))),
-            };
-            if (result.Cost is { } cost) structured.Add(new("cost", cost));
-            return new ToolExecutionResult { Output = JsonValue.Array(TextBlock(text.ToString())), StructuredOutput = JsonValue.Object(structured) };
+                var model = await ModelAsync(options, MediaKind.Rerank, args, context).ConfigureAwait(false);
+                var request = new RerankRequest(query, [.. documents]) { TopN = Integer(args, "top_n"), Options = Options(args) };
+                var result = await options.Media.RerankAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
+                if (result.StopReason != ModelOperationStopReason.Stop) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "rerank failed"}");
+                var fields = new List<KeyValuePair<string, JsonValue>>
+                {
+                    new("model", model.Spec),
+                    new("ranking", JsonValue.Array(result.Ranking.Select(hit => (JsonValue)JsonValue.Object([new("index", hit.Index), new("score", Round(hit.Score))])))),
+                };
+                if (result.Cost is { } cost) fields.Add(new("cost", cost));
+                ranked = (JsonObjectValue)await api.MemoAsync(ResultMemo, JsonValue.Object(fields), context).ConfigureAwait(false);
+            }
+            var text = new StringBuilder($"Ranked {documents.Count} document(s) with {((JsonStringValue)ranked["model"]).Value}:");
+            foreach (var hit in ((JsonArrayValue)ranked["ranking"]).OfType<JsonObjectValue>())
+            {
+                var index = (int)((JsonNumberValue)hit["index"]).Value;
+                text.Append(CultureInfo.InvariantCulture,
+                    $"\n{((JsonNumberValue)hit["score"]).Value:0.0000}  [{index}] {(index >= 0 && index < documents.Count ? Preview(documents[index]) : "")}");
+            }
+            return new ToolExecutionResult { Output = JsonValue.Array(TextBlock(text.ToString())), StructuredOutput = ranked };
         },
     });
 
@@ -222,7 +243,8 @@ public static partial class MediaTools
         {"type":"object","required":["model","answers"],"properties":{"model":{"type":"string"},"answers":{"type":"object"},"cost":{"type":"number"}}}
         """);
 
-    /// <summary><c>decide</c>: fast, calibrated judgments (yes/no, choice, score, bounding box) from a decision model.</summary>
+    /// <summary><c>decide</c>: fast, calibrated judgments (yes/no, choice, score, bounding box) from a decision model. The answers are
+    /// memoized; a call interrupted before they were saved asks again (cheap, and read-only at the provider).</summary>
     public static ToolRegistration CreateDecideTool(MediaToolsOptions options) => Define.Tool(new ToolRegistration
     {
         Name = DecideToolName,
@@ -233,17 +255,22 @@ public static partial class MediaTools
         Replay = ToolReplay.Safe,
         Execute = async (arguments, api, context) =>
         {
-            var (args, model) = await PrepareAsync(options, MediaKind.Decision, arguments, context).ConfigureAwait(false);
+            var args = Arguments(options, MediaKind.Decision, arguments);
             if (!args.TryGetValue("state", out var state)) throw new InvalidOperationException("state is required");
             if (!args.TryGetValue("questions", out var questions) || questions is not JsonObjectValue) throw new InvalidOperationException("questions must be an object");
-            var request = new DecisionRequest(state.ToData(), questions.ToData()) { Options = Options(args) };
-            var result = await options.Media.DecideAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
-            if (result.Data is not { } answers) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "decision failed"}");
-            var structured = new List<KeyValuePair<string, JsonValue>> { new("model", model.Spec), new("answers", JsonValue.FromData(answers)) };
-            if (result.Cost is { } cost) structured.Add(new("cost", cost));
+            if (await api.MemoAsync(ResultMemo, context).ConfigureAwait(false) is not JsonObjectValue decided)
+            {
+                var model = await ModelAsync(options, MediaKind.Decision, args, context).ConfigureAwait(false);
+                var request = new DecisionRequest(state.ToData(), questions.ToData()) { Options = Options(args) };
+                var result = await options.Media.DecideAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
+                if (result.Data is not { } answers) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "decision failed"}");
+                var fields = new List<KeyValuePair<string, JsonValue>> { new("model", model.Spec), new("answers", JsonValue.FromData(answers)) };
+                if (result.Cost is { } cost) fields.Add(new("cost", cost));
+                decided = (JsonObjectValue)await api.MemoAsync(ResultMemo, JsonValue.Object(fields), context).ConfigureAwait(false);
+            }
             return new ToolExecutionResult
             {
-                Output = JsonValue.Array(TextBlock($"Answers from {model.Spec}:\n{answers}")), StructuredOutput = JsonValue.Object(structured),
+                Output = JsonValue.Array(TextBlock($"Answers from {((JsonStringValue)decided["model"]).Value}:\n{decided["answers"]}")), StructuredOutput = decided,
             };
         },
     });
