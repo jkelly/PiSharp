@@ -3,10 +3,12 @@
 // `pisharp durable` runtime and its TUI (decision 0005, phase P12): the TUI renders a DurableView and asks the controller for changes; no
 // Harness object crosses it. Upstream's unsubscribe function is an IDisposable and its close() is DisposeAsync.
 // PiSharp-only since pi-durable 1.2.0 (durable work list area l): the view also carries the session's failure and the nested tool calls.
+// PiSharp-only (decision 0005, "PiSharp-only additions"): the controller answers ask_user_question, reviews plans and switches plan mode.
 using System.Collections.Immutable;
 using PiSharp.Cli.Pi;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
+using PiSharp.Durable.Tools;
 
 namespace PiSharp.Cli.Durable;
 
@@ -136,6 +138,39 @@ internal interface IDurableController
 
     /// <summary>Show and talk to another conversation.</summary>
     Task SwitchConversationAsync(ConversationId id);
+
+    /// <summary>Answers or declines (<see cref="QuestionResponse.Declined"/>) the questions of the shown conversation's
+    /// <c>ask_user_question</c> call <paramref name="toolTask"/> (PiSharp-only, decision 0005). A call that no longer waits is an info notice;
+    /// answers that do not fit its questions are an error notice and fault the returned task.</summary>
+    Task AnswerQuestionAsync(TaskId toolTask, QuestionResponse response);
+
+    /// <summary>Enters (<paramref name="on"/>) or leaves plan mode for the shown conversation; entering then submits <paramref name="prompt"/>
+    /// when it is given (PiSharp-only, decision 0005).</summary>
+    Task SetPlanModeAsync(bool on, string? prompt);
+
+    /// <summary>Approves, approves without starting, or rejects with optional feedback the plan the shown conversation's
+    /// <c>exit_plan_mode</c> call <paramref name="exitCall"/> submitted (PiSharp-only, decision 0005). Failures are as
+    /// <see cref="AnswerQuestionAsync"/>'s.</summary>
+    Task ReviewPlanAsync(TaskId exitCall, DurablePlanDecision decision);
+}
+
+/// <summary>What the user decided about a submitted plan (PiSharp-only, decision 0005).</summary>
+internal enum DurablePlanVerdict
+{
+    /// <summary>"Yes, implement it": plan mode ends and the agent implements the plan.</summary>
+    Approve,
+    /// <summary>"Yes, but don't start yet": plan mode ends and the run stops until the user says to start.</summary>
+    ApproveAndStop,
+    /// <summary>"No, keep planning": the agent stays in plan mode and revises the plan.</summary>
+    Reject,
+}
+
+/// <summary>A plan review: the verdict and, for <see cref="DurablePlanVerdict.Reject"/>, optional feedback.</summary>
+internal sealed record DurablePlanDecision(DurablePlanVerdict Verdict, string? Feedback = null)
+{
+    public static DurablePlanDecision Approve { get; } = new(DurablePlanVerdict.Approve);
+    public static DurablePlanDecision ApproveAndStop { get; } = new(DurablePlanVerdict.ApproveAndStop);
+    public static DurablePlanDecision Reject(string? feedback = null) => new(DurablePlanVerdict.Reject, feedback);
 }
 
 /// <summary>How to open a durable session (upstream <c>OpenDurableOptions</c>).</summary>

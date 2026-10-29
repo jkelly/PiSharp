@@ -58,7 +58,7 @@ Skills, prompt templates, themes and context files have their own `--skill`, `--
 
 - `--tool-policy pi|explicit` sets how far the built-in tools reach. See [Tool policy](/docs/reference/configuration/#tool-policy).
 - `pisharp session <verb>` keeps PiSharp's earlier explicit-path commands (`create`, `prompt`, `resume`, `rpc`, `terminal`, `copy`, `migrate` and more). They use the `explicit` tool policy and their `--allow-*` grants. New scripts should use the Pi options above.
-- `pisharp durable [--continue]` runs the experimental durable agent, whose sessions survive a crash. See [Pi Durable](/docs/guides/durable/).
+- `pisharp durable [--continue]` runs the experimental durable agent, whose sessions survive a crash. Inside it, `/plan` turns [plan mode](/docs/guides/durable/#plan-mode) on or off, and `/plan <message>` turns it on and sends the message. See [Pi Durable](/docs/guides/durable/).
 
 `pisharp --help` lists these three additions with Pi's commands and options; Pi's help has none of them.
 

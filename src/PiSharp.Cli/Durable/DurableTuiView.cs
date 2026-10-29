@@ -4,13 +4,16 @@
 // ToolExecutionComponent with the built-in tool renderers, CustomEditor, WorkingStatusIndicator) over PiSharp.Tui's TuiAltScreen.
 // Everything here runs on the TUI's UiLoop, as upstream runs on Node's event loop. PiSharp-only since pi-durable 1.2.0 (durable work list
 // area l): the nested calls of a tool call as rows under its card, a tool result's diagnostics as plain lines, tool cards with pi's image
-// settings, and alerts above the notices for a failed session and for pi.live.compactionFailure.
+// settings, and alerts above the notices for a failed session and for pi.live.compactionFailure. PiSharp-only (decision 0005,
+// "PiSharp-only additions"): a pending ask_user_question or plan review replaces the editor with its form (the editor keeps its draft),
+// the status says what the run waits for, the footer shows plan mode, and both tools have their own cards.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Interactive.Mode;
 using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Durable;
+using PiSharp.Durable.Tools;
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Durable.DurableTuiState;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
@@ -20,19 +23,23 @@ using TuiKeybindingsManager = PiSharp.Tui.Pi.KeybindingsManager;
 
 namespace PiSharp.Cli.Durable;
 
-/// <summary>What the view's editor asks for (upstream <c>Handlers</c>).</summary>
+/// <summary>What the view's editor asks for (upstream <c>Handlers</c>). PiSharp-only (decision 0005): what the question form and the plan
+/// review ask for; the returned task faults when the runtime did not take the answer, and the form then takes input again.</summary>
 internal sealed record DurableTuiHandlers(
     Action<string> Submit,
     Action<string> FollowUp,
     Action Abort,
     Action Exit,
     Action SelectModel,
-    Action CycleThinking);
+    Action CycleThinking,
+    Func<TaskId, QuestionResponse, Task>? AnswerQuestion = null,
+    Func<TaskId, DurablePlanDecision, Task>? ReviewPlan = null);
 
 /// <summary>Upstream's <c>DurableTui</c> class: renders <see cref="DurableView"/> revisions.</summary>
 internal sealed class DurableTuiView
 {
-    private static readonly IReadOnlyDictionary<string, ToolRenderers> Renderers = BuiltInToolRenderers.CreateAllToolRenderers();
+    private static readonly IReadOnlyDictionary<string, ToolRenderers> Renderers = BuiltInToolRenderers.CreateAllToolRenderers()
+        .Concat(DurableInteractionRenderers.Create()).ToDictionary(StringComparer.Ordinal);
 
     private readonly TuiAltScreen ui;
     private readonly Container chat = new();
@@ -40,6 +47,8 @@ internal sealed class DurableTuiView
     private readonly Container queue = new();
     private readonly Container alerts = new();
     private readonly Container notices = new();
+    /// <summary>The status while something else than the editor (which shows it in its border) is mounted.</summary>
+    private readonly Container statusLine = new();
     private readonly Container footer = new();
     private readonly Text footerStats = new("", 1, 0);
     private readonly Text footerHints = new("", 1, 0);
@@ -70,6 +79,13 @@ internal sealed class DurableTuiView
     /// <summary>Set when the transcript was rebuilt: the next render repaints the screen and shows the end.</summary>
     private bool rebuilt;
     private readonly ScrollView transcript;
+    private readonly UiLoop loop;
+    private readonly DurableTuiHandlers handlers;
+    private readonly TuiKeybindingsManager appKeybindings;
+    /// <summary>What the editor container shows: the editor, a selector, or an interaction's form.</summary>
+    private IComponent mounted;
+    /// <summary>The interaction whose form is mounted, and the form.</summary>
+    private (PendingInteraction Pending, IComponent Form)? interaction;
 
     /// <param name="toolOptions">pi's settings for tool cards (<c>terminal.showImages</c>, <c>terminal.imageWidthCells</c>, <c>outputPad</c>), as
     /// interactive mode passes them; null is the cards' defaults.</param>
@@ -78,8 +94,11 @@ internal sealed class DurableTuiView
     {
         this.cwd = cwd;
         this.toolOptions = toolOptions ?? new();
+        this.loop = loop;
+        this.handlers = handlers;
         ui = new TuiAltScreen(terminal, loop, false, agentDir);
         var keybindings = AppKeybindings.Create(agentDir);
+        appKeybindings = keybindings.Manager;
         TuiKeybindingsManager.SetGlobal(keybindings.Manager);
         editor = new CustomEditor(ui, Themes.GetEditorTheme(), keybindings.Manager, new CustomEditorOptions(PaddingX: 1, EmbedWorkingStatus: true))
         {
@@ -122,15 +141,17 @@ internal sealed class DurableTuiView
             new StackEntry(queue, Shrink: 1, MinSize: 0),
             new StackEntry(alerts, Shrink: 1, MinSize: 0),
             new StackEntry(notices, Shrink: 1, MinSize: 0),
+            new StackEntry(statusLine, Shrink: 1, MinSize: 0),
             new StackEntry(editorContainer, Shrink: 1, MinSize: 3),
             new StackEntry(footer, Shrink: 1, MinSize: 0),
         ]);
-        foreach (var component in new IComponent[] { chat, tasks, queue, alerts, notices, editorContainer, footer }) ui.AddChild(component);
+        foreach (var component in new IComponent[] { chat, tasks, queue, alerts, notices, statusLine, editorContainer, footer }) ui.AddChild(component);
         ui.SetLayoutRoot(new VStack([
             new StackEntry(transcript, Basis: 0, Grow: 1, Shrink: 1, MinSize: 1),
             new StackEntry(dock, Basis: null, Grow: 0, Shrink: 1, MinSize: 1),
         ]));
         ui.SetFocus(editor);
+        mounted = editor;
     }
 
     public TuiAltScreen Ui => ui;
@@ -162,7 +183,9 @@ internal sealed class DurableTuiView
     {
         editorContainer.Clear();
         editorContainer.AddChild(component);
+        mounted = component;
         ui.SetFocus(component);
+        SyncStatusLine();
         ui.RequestRender();
     }
 
@@ -195,6 +218,8 @@ internal sealed class DurableTuiView
                 component.UpdateResult(ToolOutput(text, details), true);
             }
             else if (output is not null) component.UpdateResult(ToolOutput(output, details), true);
+            // A question or plan review waiting for the user: its card shows the pending state (PiSharp-only, decision 0005).
+            else if (Str(details, "kind") is UserQuestions.DetailsKind or PlanMode.DetailsKind) component.UpdateResult(ToolOutput("", details), true);
         }
         SyncNested(view.NestedCalls);
         SyncTasks(view.Tasks);
@@ -203,7 +228,9 @@ internal sealed class DurableTuiView
         SyncNotices(view);
         editor.BorderColor = theme.GetThinkingBorderColor(AgentOf(view.Conversation).ThinkingLevel ?? "off");
         // A failed session runs nothing any more: what pi.live last said is not happening.
-        SyncStatus(view.Failure is null ? live : new JsonObject());
+        var pending = view.Failure is null ? PendingInteraction(view.Conversation) : null;
+        SyncInteraction(pending);
+        SyncStatus(view.Failure is null ? live : new JsonObject(), pending);
         SyncFooter(view);
         if (rebuilt) transcript.ScrollToEnd();
         ui.RequestRender(rebuilt);
@@ -306,7 +333,70 @@ internal sealed class DurableTuiView
         }
     }
 
-    private void SyncStatus(JsonObject live)
+    /// <summary>
+    /// Mounts the form of the interaction the conversation waits for in place of the editor, or puts the editor back with its draft once
+    /// none waits (PiSharp-only, decision 0005). The form of the same call stays mounted, with what the user chose so far.
+    /// </summary>
+    private void SyncInteraction(PendingInteraction? pending)
+    {
+        if (pending is null)
+        {
+            if (interaction is not null)
+            {
+                interaction = null;
+                RestoreEditor();
+            }
+            return;
+        }
+        if (interaction is { } shown && shown.Pending.TaskId == pending.TaskId && shown.Pending.ConversationId == pending.ConversationId) return;
+        IComponent form = pending.Kind == UserQuestions.DetailsKind ? QuestionForm(pending) : PlanReview(pending);
+        interaction = (pending, form);
+        Mount(form);
+    }
+
+    private DurableQuestionForm QuestionForm(PendingInteraction pending)
+    {
+        DurableQuestionForm form = null!;
+        form = new DurableQuestionForm(UserQuestions.QuestionsOf(pending.Details),
+            response => Send(handlers.AnswerQuestion?.Invoke(pending.TaskId, response), form.Retry),
+            handlers.Abort, handlers.Exit);
+        return form;
+    }
+
+    private DurablePlanReview PlanReview(PendingInteraction pending)
+    {
+        static string? Field(PiSharp.Durable.Chord.JsonObjectValue details, string key) =>
+            details.TryGetValue(key, out var value) && value is DurableString text ? text.Value : null;
+        DurablePlanReview review = null!;
+        review = new DurablePlanReview(ui, appKeybindings, Field(pending.Details, "plan") ?? "", Field(pending.Details, "planFile"),
+            decision => Send(handlers.ReviewPlan?.Invoke(pending.TaskId, decision), review.Retry),
+            handlers.Abort, handlers.Exit);
+        return review;
+    }
+
+    /// <summary>Calls <paramref name="retry"/> on the loop when <paramref name="request"/> faults: the runtime did not take the answer.</summary>
+    private void Send(Task? request, Action retry)
+    {
+        if (request is null) return;
+        _ = request.ContinueWith(completed =>
+        {
+            _ = completed.Exception;
+            loop.Post(() =>
+            {
+                retry();
+                ui.RequestRender();
+            });
+        }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+    }
+
+    /// <summary>The status above whatever replaces the editor; the editor shows it in its border.</summary>
+    private void SyncStatusLine()
+    {
+        statusLine.Clear();
+        if (indicator is not null && !ReferenceEquals(mounted, editor)) statusLine.AddChild(indicator);
+    }
+
+    private void SyncStatus(JsonObject live, PendingInteraction? pending)
     {
         var generation = Obj(live, "generation");
         var compaction = Arr(live, "compactions").FirstOrDefault();
@@ -322,6 +412,8 @@ internal sealed class DurableTuiView
                 ? $"Retrying {reason} compaction (attempt {JsNumber((Num(compaction, "attempt") ?? double.NaN) + 1)})..."
                 : $"Compacting ({reason})...";
         }
+        else if (pending is not null)
+            text = pending.Kind == UserQuestions.DetailsKind ? "Waiting for your answer... (esc to abort)" : "Waiting for plan approval... (esc to abort)";
         else if (runningTool is not null) text = $"Running {Str(runningTool, "name") ?? "undefined"}... (esc to abort)";
         else if (live["run"] is not null) text = "Working... (esc to abort)";
         if (text == statusText) return;
@@ -329,6 +421,7 @@ internal sealed class DurableTuiView
         indicator?.Dispose();
         indicator = text.Length > 0 ? new WorkingStatusIndicator(ui, text, null, part => (editor.BorderColor ?? (value => value))(part)) : null;
         editor.SetWorkingStatusIndicator(indicator);
+        SyncStatusLine();
     }
 
     private void SyncFooter(DurableView view)
@@ -354,10 +447,12 @@ internal sealed class DurableTuiView
         var model = agent.Model is null ? "no model" : $"{agent.Model.Provider}/{agent.Model.ModelId}";
         var shown = view.Conversations.FirstOrDefault(candidate => candidate.Id == view.Conversation.Conversation.Id);
         var label = shown?.Label ?? $"conversation {view.Conversation.Conversation.Id.Value.ToString(CultureInfo.InvariantCulture)}";
+        // Plan mode is a badge after the label (PiSharp-only, decision 0005).
+        var plan = IsPlanMode(view.Conversation) ? theme.Fg("dim", " · ") + theme.Fg("warning", "plan mode") : "";
         footerHints.SetText(
-            theme.Fg(label == "main" ? "dim" : "accent", label) + theme.Fg("dim",
+            theme.Fg(label == "main" ? "dim" : "accent", label) + plan + theme.Fg("dim",
                 $" · {model} · thinking:{agent.ThinkingLevel ?? "off"} ({KeybindingHints.KeyText("app.thinking.cycle")}) · " +
-                $"{KeybindingHints.KeyText("app.model.select")} or /model · /agents · /compact · /tasks · " +
+                $"{KeybindingHints.KeyText("app.model.select")} or /model · /agents · /compact · /tasks · /plan · " +
                 $"{KeybindingHints.KeyText("app.message.followUp")} follow-up · {KeybindingHints.KeyText("app.clear")} exit"));
     }
 

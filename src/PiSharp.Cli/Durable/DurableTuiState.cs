@@ -3,11 +3,12 @@
 // 0005, phase P12, risk 7): the components take pi-ai wire messages as System.Text.Json objects, as they do in interactive mode, so an entry's
 // `model[0]` and the built-in documents (pi.agent, pi.live, pi.inbox, pi.usage) are read as JsonNode copies of the durable JSON values.
 // Upstream reads the same plain JSON through TypeScript casts; a missing field reads as absent here as it does there. PiSharp-only since
-// pi-durable 1.2.0 (durable work list area l): DisplayResult and NestedRow.
+// pi-durable 1.2.0 (durable work list area l): DisplayResult and NestedRow. PiSharp-only (decision 0005): PendingInteraction and IsPlanMode.
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Durable;
+using PiSharp.Durable.Tools;
 using DurableArray = PiSharp.Durable.Chord.JsonArrayValue;
 using DurableJson = PiSharp.Durable.Chord.JsonValue;
 using DurableObject = PiSharp.Durable.Chord.JsonObjectValue;
@@ -68,6 +69,14 @@ internal static class DurableTuiState
             ? text.Value : null;
         return (model, thinking);
     }
+
+    /// <summary>The interaction the conversation waits for, shown in place of the editor (PiSharp-only, decision 0005): the first running
+    /// <c>pi.live.tools</c> slot, by task ID, whose details are a pending question (<c>pisharp.questions</c>) or plan review
+    /// (<c>pisharp.plan-approval</c>); null when there is none.</summary>
+    public static PendingInteraction? PendingInteraction(ConversationView view) => UserInteraction.PendingIn(view).FirstOrDefault();
+
+    /// <summary>Whether the conversation is in plan mode: its <c>pi.agent</c> selects <c>plan-mode</c> (PiSharp-only, decision 0005).</summary>
+    public static bool IsPlanMode(ConversationView view) => PlanMode.IsActive(view.Doc("pi.agent"));
 
     /// <summary>Upstream <c>userText</c>: a string content, or its text blocks joined.</summary>
     public static string UserText(JsonNode? content)

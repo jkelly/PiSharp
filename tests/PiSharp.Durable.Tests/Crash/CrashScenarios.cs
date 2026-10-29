@@ -170,6 +170,7 @@ internal static class CrashScenarios
     /// <summary>The commit trigger of a checkpoint; null for checkpoints the scenario code reaches itself.</summary>
     internal static CommitTrigger? Trigger(string scenario, string checkpoint) => (scenario, checkpoint) switch
     {
+        var (interaction, at) when InteractionCrash.Uses(interaction) => InteractionCrash.Trigger(interaction, at),
         ("chat", "answer-before") => new(StopAnswer, false),
         ("chat", "answer-failed") => new(StopAnswer, false, Fail: true),
         ("tool-unsafe", "intent-failed") => new(ToolIntent, false, Fail: true),
@@ -187,6 +188,10 @@ internal static class CrashScenarios
         _ => null,
     };
 
+    /// <summary>The execution environment of a scenario's Harness, in the child and in the parent; null for scenarios without files.</summary>
+    internal static Func<EnvTarget, DurableContext, Task<PiSharp.Durable.Env.IExecutionEnv?>>? EnvFor(string scenario, string workDir) =>
+        InteractionCrash.Env(scenario, workDir);
+
     internal static bool UsesTool(string scenario) => scenario is "tool-unsafe" or "tool-safe" or "abort";
 
     // ─── Setup ──────────────────────────────────────────────────────────────
@@ -195,6 +200,8 @@ internal static class CrashScenarios
     /// slow <c>chat.stream</c> model.</summary>
     internal static ChatSetup BuildSetup(string scenario, string checkpoint, CrashGate gate, string workDir)
     {
+        // The ask-user and plan-approval scenarios (InteractionCrashScenarios.cs).
+        if (InteractionCrash.Uses(scenario)) return InteractionCrash.BuildSetup(scenario, workDir);
         var slow = gate.Child && scenario == "chat" && checkpoint == "stream";
         var setup = new ChatSetup(new FauxModels(new FauxOptions
         {
@@ -313,12 +320,13 @@ internal static class CrashScenarios
             var storage = await OpenStorage(backend, path);
             if (Trigger(scenario, checkpoint) is { } trigger) storage = new CrashStorage(storage, trigger.Matches, trigger.After, checkpoint, trigger.Fail);
             var setup = BuildSetup(scenario, checkpoint, gate, workDir);
-            var opened = await OpenChat(storage, setup);
+            var opened = await OpenChat(storage, setup, EnvFor(scenario, workDir));
             var (harness, root) = (opened.Harness, opened.Root);
             harness.Resume();
             try
             {
-                await RunScenarioAsync(scenario, checkpoint, gate, harness, root);
+                if (InteractionCrash.Uses(scenario)) await InteractionCrash.RunAsync(scenario, checkpoint, gate, setup, root, workDir);
+                else await RunScenarioAsync(scenario, checkpoint, gate, harness, root);
                 await harness.WaitForIdleAsync(Ctx);
             }
             catch (Exception error) when (Fails(checkpoint) && error is SessionFailedException or IOException)
