@@ -41,8 +41,6 @@ The libraries are separate NuGet packages. See the [SDK](/sdk/).
 
 You need **.NET SDK 10.0.401** exactly: `global.json` pins it with roll-forward disabled.
 
-The committed `NuGet.Config` clears all package feeds. The CLI build needs its third-party packages (YamlDotNet, SkiaSharp and Jint) from a local cache, or from nuget.org added as a source.
-
 ```powershell
 git clone https://github.com/jkelly/PiSharp.git
 cd PiSharp
@@ -50,20 +48,12 @@ dotnet build src/PiSharp.Cli/PiSharp.Cli.csproj -c Release -p:RestoreSources=htt
 dotnet src/PiSharp.Cli/bin/Release/net10.0/PiSharp.Cli.dll --help
 ```
 
-The committed lock files still record the sibling projects at their pre-0.99.1 version, so the build above restores without lock-file checking. This matches what the release pipeline does.
-
-## Run the offline tests
-
-These test projects use fake HTTP handlers and make no live provider requests:
-
-```powershell
-dotnet run --project tests/PiSharp.AzureResponses.Tests -c Release -p:RestoreLockedMode=false
-dotnet run --project tests/PiSharp.MistralConversations.Tests -c Release -p:RestoreLockedMode=false
-```
+[Build from source](/docs/contribute/build/) covers the prerequisites, the restore settings, the samples and how to reference the projects from your own app. [Tests](/docs/contribute/testing/) lists the test suites and how to run them.
 
 ## Next steps
 
 - [Coming from Pi](/docs/coming-from-pi/)
-- [Command line](/docs/reference/cli/)
+- [Command line](/docs/reference/cli/) and [Settings](/docs/reference/settings/)
 - [Providers and models](/docs/guides/providers/)
 - [Interactive mode](/docs/guides/interactive/)
+- [Use the SDK](/docs/embed/sdk/) to embed PiSharp in your own app

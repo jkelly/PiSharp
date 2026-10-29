@@ -32,9 +32,25 @@ pisharp durable                        # start a new durable session
 pisharp durable --continue             # reopen the newest durable session for this folder
 ```
 
-`pisharp durable` takes one option. `--continue` (or `-c`) reopens the newest session for the current folder, and without it each run starts a new session. Any other argument fails with `Unknown argument`. The command is listed in `pisharp --help` as experimental and prints a one-line experimental notice when it starts.
+| Option | What it does |
+| --- | --- |
+| `--continue`, `-c` | Reopens the newest session for the current folder. Without it, each run starts a new session. |
+| `--tier <tier>`, `--service-tier <tier>` | (experimental, unreleased) Sets the main conversation's [service tier](/docs/guides/service-tiers/): `auto`, `normal`, `economy`, `priority`, `fast` or `ultrafast`. It applies when the run creates the session; a session that `--continue` reopens keeps its stored tier, which you change with `/tier`. |
 
-It reads the same settings, credentials and models as `pisharp`, so providers you have signed in to work here too. The model gets the `read`, `write`, `edit` and `bash` tools, with images from `read`, and a `subagent` tool.
+Any other argument fails with `Unknown argument: <argument>`, a tier name it doesn't know fails with `Invalid service tier`, and `--tier` without a value fails with `--tier needs a tier`. Each exits with 1. The command is listed in `pisharp --help` as experimental, though its help line shows only `[--continue]`, and it prints a one-line experimental notice when it starts.
+
+`--tier`, `/tier`, the `subagent` tool's `tier` argument and the media tools are on PiSharp's `main` branch but not in any release yet. To try them, run a CLI built from source (see [Run the CLI from source](/docs/contribute/build/#run-the-cli-from-source)).
+
+It reads the same settings, credentials and models as `pisharp`, so providers you have signed in to work here too. A new session starts on your `defaultProvider`, `defaultModel` and `defaultThinkingLevel`.
+
+### Tools
+
+| Tool | What it does |
+| --- | --- |
+| `read`, `write`, `edit`, `bash` | The coding tools. `read` returns images too. A call that a crash interrupts is not run again: the model gets an "interrupted" result. |
+| `subagent` | Hands a self-contained task to a child conversation with the same tools, except `subagent`, and returns its answer. Arguments: `task` (required) and `tier` (experimental, unreleased), the child's service tier; without it the child uses this conversation's. Replay-safe: after a crash, the rerun finds the child and the message it already sent. |
+| Media tools | (experimental, unreleased) `generate_image`, `generate_video`, `embed`, `list_media_models` and `set_media_defaults`, plus `generate_speech`, `transcribe_audio`, `generate_music`, `rerank` and `decide`, which are deferred. Installed only when the `media.enabled` setting isn't `false` and a provider with a media model is configured. See [Media tools](/docs/guides/media/). |
+| `tool_search` | Finds deferred tools and loads them. Offered only while an installed tool is deferred, which today means the media tools. |
 
 ### In a session
 
@@ -43,13 +59,28 @@ It reads the same settings, credentials and models as `pisharp`, so providers yo
 | A message | Sends it. While the agent is working, it steers the current turn. |
 | The follow-up key | Queues the message until the agent finishes. |
 | `/model` | Picks the model. |
+| `/tier [tier]` | (experimental, unreleased) Without a tier, shows the shown conversation's service tier and the choices. With one, sets it for that conversation from its next request; `/tier none` (or `clear`) removes it. The tier is saved in the session. See [Service tiers](/docs/guides/service-tiers/#in-pisharp-durable). |
 | `/tasks` | Shows or hides running tasks. |
 | `/agents` | Switches between the main conversation and its subagents. |
 | `/compact [instructions]` | Compacts the conversation. |
 | Escape | Aborts the turn. |
 | Ctrl+D | Exits. |
 
-Your [key bindings](/docs/guides/interactive/#key-bindings) apply, including the keys for the model selector and the thinking level.
+Your [key bindings](/docs/guides/interactive/#key-bindings) apply, including the keys for the model selector and the thinking level. The footer shows `tier:<tier> (/tier)` while the shown conversation has a tier.
+
+### Settings it reads
+
+| Setting | Used for |
+| --- | --- |
+| `defaultProvider`, `defaultModel`, `defaultThinkingLevel` | The model of a new session. |
+| `retry.enabled`, `retry.maxRetries`, `retry.baseDelayMs`, `retry.maxAgentDelayMs` | Retries of a failed model turn. Defaults: on, 3, 2000, 60000. |
+| `retry.provider.timeoutMs`, `retry.provider.maxRetries`, `retry.provider.maxRetryDelayMs`, `httpIdleTimeoutMs` | Request timeouts and retries inside one request. The timeout falls back to `httpIdleTimeoutMs`. |
+| `compaction.enabled`, `compaction.reserveTokens`, `compaction.keepRecentTokens` | Automatic compaction. Defaults: on, 16384, 20000. |
+| `steeringMode`, `followUpMode` | `all` places every queued message at once; anything else, one at a time. |
+| `serviceTier` | (experimental, unreleased) The tier of a new session when you don't pass `--tier`. |
+| `media` | (experimental, unreleased) The media tools. See [Media tools](/docs/guides/media/#settings). |
+
+See [Settings](/docs/reference/settings/) for where settings files live.
 
 ### Where sessions are stored
 
@@ -80,7 +111,7 @@ Three NuGet packages, versioned with the rest of PiSharp:
 | --- | --- |
 | `PiSharp.Durable` | The harness, sessions, conversations, tasks, and in-memory and JSONL storage |
 | `PiSharp.Durable.Sqlite` | SQLite storage, through `Microsoft.Data.Sqlite` and SQLitePCLRaw's e_sqlite3 native library |
-| `PiSharp.Durable.Tools` | The local execution environment, the coding tools, `tool_search` and durable code mode |
+| `PiSharp.Durable.Tools` | The local execution environment, the coding tools, `tool_search`, durable code mode, and on `main` the media tools (experimental, unreleased) |
 
 Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compiler reports an error until you opt in by suppressing that diagnostic:
 
@@ -95,7 +126,7 @@ Every public type is marked `[Experimental("PISHARP_DURABLE001")]`, so the compi
 </ItemGroup>
 ```
 
-`PiSharp.Durable.Sqlite` brings the e_sqlite3 build for each platform, and the packages carry their license notices under `licenses/`. [`samples/Durable.Chat`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Chat) is a small chat app that runs on a real model, and [`samples/Durable.Examples`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Examples) ports upstream's examples.
+`PiSharp.Durable.Sqlite` brings the e_sqlite3 build for each platform, and the packages carry their license notices under `licenses/`. [Durable library](/docs/embed/durable/) shows how to build an agent on them. [`samples/Durable.Chat`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Chat) is a small chat app that runs on a real model, and [`samples/Durable.Examples`](https://github.com/jkelly/PiSharp/tree/main/samples/Durable.Examples) ports upstream's examples.
 
 ## Known issues
 
