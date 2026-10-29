@@ -21,7 +21,7 @@
     "versionSpecificPackageConsumptionQualified": false,
     "fullProviderParity": false,
     "completeNativeGateReady": false,
-    "status": "Release candidate on release/1.2.0.1: a C#-only release on the Pi v1.2.0 baseline that adds the experimental durable port (decision 0005) as pisharp durable and three [Experimental] packages. Nothing is tagged or published. Fresh versioned lock, build, package and consumer evidence is required at release, with the owner's go-ahead."
+    "status": "Released 2026-10-17: a C#-only release on the Pi v1.2.0 baseline that adds the experimental durable port (decision 0005) as pisharp durable and three [Experimental] packages."
   },
   "releaseCandidate": {
     "branch": "release/1.2.0.1",
@@ -31,9 +31,12 @@
     "changelog": "website/src/content/changelog/1.2.0.1.md"
   },
   "publication": {
-    "tagCreated": false,
-    "binaryReleasePublished": false,
-    "nugetPackagesPublished": false
+    "tagCreated": true,
+    "binaryReleasePublished": true,
+    "nugetPackagesPublished": true,
+    "publishedOn": "2026-10-17",
+    "tagCommit": "b2a558a5e3f2480a7443789d08af88f76197df00",
+    "releaseRun": "38993151457"
   },
   "previousReleases": [
     {

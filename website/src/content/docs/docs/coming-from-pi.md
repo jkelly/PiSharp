@@ -24,7 +24,7 @@ These docs describe PiSharp's current baseline, Pi v1.2.0. Features Pi added lat
 | TypeScript extensions and packages | Run through the [Node bridge](/docs/extensions/node-bridge/), with Pi's own npm packages. `pisharp install` installs Pi packages. |
 | RPC clients | The same protocol over stdin and stdout. |
 
-See [Files and settings](/docs/reference/configuration/) for the full list of paths.
+See [Files and locations](/docs/reference/configuration/) for the full list of paths.
 
 ## Older session files
 

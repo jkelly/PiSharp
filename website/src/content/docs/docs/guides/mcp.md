@@ -56,6 +56,12 @@ The script API, the `store()` and `models` globals and the limits are Pi's. The 
 - Running out of memory or recursion depth ends the script. In Pi, a script can catch those errors.
 - Error messages from the engine itself, such as a `JSON.stringify` failure, have different text.
 
+[Code mode](/docs/guides/codemode/) covers its settings and limits, and [`pisharp mcp`](/docs/reference/cli/#mcp) lists every option of the MCP commands.
+
 ## Manage servers in a session
 
 `/mcp` lists servers with their state, tool count and exposure. Select one to see its tools, reconnect, sign in or out, change its exposure, or turn it off. `--no-mcp` turns MCP off for one run.
+
+## From an extension
+
+An extension can add MCP servers of its own, as `pi.registerMcpServer` does in Pi. A server in `mcp.json` with the same name wins. C# extensions use `IExtensionMcpServerRegistry`; see [Optional registries](/docs/extensions/api/#optional-registries). To run MCP clients in your own app, see [MCP servers](/docs/embed/extension-host/#mcp-servers) in the hosting guide.
