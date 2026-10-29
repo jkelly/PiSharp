@@ -555,7 +555,11 @@ public static class CodemodeExecutor
         }
         static string? Field(JsonData model, string name) =>
             model.Value.ValueKind == JsonValueKind.Object && model.Value.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
-        static JsonData List(ImmutableArray<JsonData> entries) => JsonData.Parse("[" + string.Join(",", entries.Select(entry => entry.ToString())) + "]");
+        static JsonData List(ImmutableArray<JsonData> entries) => JsonData.Parse("[" + string.Join(",", entries.Select(entry => ToModelInfo(entry).ToString())) + "]");
+        // execute.ts toModelInfo: a script sees the catalog entry without headers, which can carry credentials (models.json headers).
+        // classify() and generateImages() still run the registry's own entry, resolved by provider and id.
+        static JsonData ToModelInfo(JsonData model) =>
+            JsonNode.Parse(model.ToString()) is JsonObject info && info.Remove("headers") ? JsonData.Parse(info.ToJsonString(Relaxed)) : model;
 
         yield return new("models.getModelsOfType", (arguments, _) =>
         {
@@ -573,7 +577,7 @@ public static class CodemodeExecutor
             var provider = At(args, 1); var id = At(args, 2);
             if (provider.ValueKind != JsonValueKind.String || id.ValueKind != JsonValueKind.String)
                 throw new InvalidOperationException($"models.getModelOfType(type, provider, id) expects three strings, got ({string.Join(", ", args.Select(DescribeValue))}). The provider and the id are separate arguments, for example models.getModelOfType(\"classifier\", \"typesafe\", \"jev-latest\").");
-            return ValueTask.FromResult(models.GetModelOfType(ToModelType(At(args, 0)), provider.GetString()!, id.GetString()!));
+            return ValueTask.FromResult(models.GetModelOfType(ToModelType(At(args, 0)), provider.GetString()!, id.GetString()!) is { } model ? ToModelInfo(model) : null);
         }) { Spread = true };
         yield return new("models.classify", async (arguments, token) => await RunModelCall("models.classify", ModelType.Classifier, Spread(arguments),
             CheckClassifierContext, async (resolved, context) =>

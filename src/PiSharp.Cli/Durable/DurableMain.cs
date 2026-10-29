@@ -13,6 +13,20 @@ internal static class DurableMain
     internal const string ExperimentalNotice =
         "pisharp durable is experimental (a port of pi's experimental durable agent): its sessions, commands and behavior may change.";
 
+    /// <summary><c>pisharp durable --help</c> (PiSharp-only: upstream ran main.ts from source and had no help).</summary>
+    internal static string Help => string.Join('\n',
+        "Usage:",
+        $"  {PiConfig.DisplayName} durable [options]",
+        "",
+        "EXPERIMENTAL: PiSharp's crash-safe durable agent (a port of pi's experimental durable agent), whose sessions survive",
+        "a crash. Its sessions, commands and behavior may change.",
+        "",
+        "Options:",
+        "  --continue, -c                 Continue the newest durable session",
+        "  --tier, --service-tier <tier>  Service tier for a new session: " + string.Join(", ", PiSharp.AI.ServiceTiers.All),
+        "  --help, -h                     Show this help",
+        "");
+
     /// <summary>Upstream <c>parseArgs</c>: <c>--continue</c> and <c>-c</c>; PiSharp-only <c>--tier &lt;tier&gt;</c> (decision 0007).</summary>
     /// <exception cref="ArgumentException">"Unknown argument: X".</exception>
     internal static OpenDurableOptions ParseArgs(IEnumerable<string> argv)
@@ -38,6 +52,12 @@ internal static class DurableMain
     /// <summary>Runs <c>pisharp durable</c> with the arguments after <c>durable</c>; returns the exit code.</summary>
     internal static async Task<int> RunAsync(string[] args, PiHost host, CancellationToken cancellationToken)
     {
+        if (args.Contains("--help") || args.Contains("-h"))
+        {
+            await host.Stdout.WriteAsync(Help.AsMemory(), cancellationToken).ConfigureAwait(false);
+            await host.Stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+            return 0;
+        }
         OpenDurableOptions options;
         try { options = ParseArgs(args); }
         catch (ArgumentException error)

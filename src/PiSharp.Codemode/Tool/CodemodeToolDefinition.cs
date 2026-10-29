@@ -44,6 +44,8 @@ public static class CodemodeToolDefinition
     /// <summary>The reference for scripts. PiSharp resolves it next to the application; see docs/compatibility/codemode-engine.md.</summary>
     public static string DocsPath { get; set; } = Path.Combine(AppContext.BaseDirectory, "docs", "codemode.md");
 
+    // tool.ts DESCRIPTION_INTRO, word for word: the model reads Pi's description (the declaration goldens and session-format scenarios pin
+    // it), so it still says QuickJS although scripts run in Jint, whose runner keeps QuickJS's script-visible behaviour (decision 0003).
     private const string DescriptionIntro = "Run JavaScript that calls other tools. The input is raw JavaScript (not JSON, no code fence), run as an async function body in a QuickJS sandbox: top-level `await` and `return` work. No Node, file system, network, or timers.\n" +
         "- `await tools.<name>({ ...args })` resolves to a string, or an object if the tool's declaration says so, and rejects with an Error on failure. A tool whose declaration returns an object resolves on failure too when it returned that object; check its fields. Calls still running when the script ends are cancelled.\n" +
         "- Optional first line: `// @options: {\"max_output_tokens\": 10000, \"timeout_ms\": 60000}`";

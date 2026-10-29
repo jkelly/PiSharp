@@ -52,7 +52,10 @@ internal static partial class Program
     private sealed class FakeModels : ICodemodeModelRuntime
     {
         public int Active, MaxActive, Classified;
-        private static readonly JsonData Classifier = Parse("""{"id":"jev-latest","name":"Jev","api":"typesafe-system-one","provider":"typesafe","type":"classifier","input":["text"],"cost":{"input":1,"output":0,"cacheRead":0,"cacheWrite":0}}""");
+        /// <summary>Whether every classify() call received the registry's entry with its headers.</summary>
+        public bool ClassifiedWithHeaders = true;
+        // models.json headers can carry credentials: scripts must never see them, but the model call still sends them.
+        private static readonly JsonData Classifier = Parse("""{"id":"jev-latest","name":"Jev","api":"typesafe-system-one","provider":"typesafe","type":"classifier","input":["text"],"cost":{"input":1,"output":0,"cacheRead":0,"cacheWrite":0},"headers":{"X-Api-Key":"secret"}}""");
         private static readonly JsonData Image = Parse("""{"id":"flux","name":"Flux","api":"openrouter-images","provider":"openrouter","type":"image","input":["text"]}""");
         public ImmutableArray<JsonData> GetModelsOfType(ModelType type, string? provider) => type == ModelType.Classifier ? [Classifier] : type == ModelType.Image ? [Image] : [];
         public Task<ImmutableArray<JsonData>> GetAvailableOfTypeAsync(ModelType type, string? provider, CancellationToken cancellationToken) => Task.FromResult(GetModelsOfType(type, provider));
@@ -60,6 +63,7 @@ internal static partial class Program
             type == ModelType.Classifier && provider == "typesafe" && id == "jev-latest" ? Classifier : type == ModelType.Image && provider == "openrouter" && id == "flux" ? Image : null;
         public async Task<ClassifierResult> ClassifyAsync(JsonData model, ClassifierContext context, CancellationToken cancellationToken)
         {
+            if (!model.Value.TryGetProperty("headers", out _)) ClassifiedWithHeaders = false;
             var now = Interlocked.Increment(ref Active);
             lock (this) MaxActive = Math.Max(MaxActive, now);
             await Task.Delay(30, cancellationToken);
@@ -197,6 +201,10 @@ internal static partial class Program
                 var result = await Execute("const model = (await models.getAvailableOfType(\"classifier\"))[0];\nconst context = { state: { text: \"hi\" }, questions: { ok: { type: \"bool\", instructions: \"Is it ok?\", criteria: { true: \"yes\", false: \"no\" } } } };\nconst results = await Promise.all(Array.from({ length: 10 }, () => models.classify(model, context)));\nreturn [results.length, results[0].answers.ok.probability, results[0].stopReason, Object.keys(model).includes(\"headers\")];",
                     host, models: true);
                 Equal("[10,0.75,\"stop\",false]", ResultText(result), "classified");
+                Check(models.ClassifiedWithHeaders, "classify() ran the registry's entry, headers included");
+                // execute.ts toModelInfo: no listing hands a script the headers.
+                Equal("[false,false,false,\"Jev\"]", ResultText(await Execute("const all = await models.getModelsOfType(\"classifier\");\nconst available = await models.getAvailableOfType(\"classifier\", \"typesafe\");\nconst one = await models.getModelOfType(\"classifier\", \"typesafe\", \"jev-latest\");\nreturn [\"headers\" in all[0], \"headers\" in available[0], \"headers\" in one, one.name];",
+                    host, models: true)), "headers dropped from every listing");
                 Equal(10, models.Classified, "calls"); Check(models.MaxActive <= CodemodeExecutor.MaxConcurrentModelCalls && models.MaxActive > 1, "at most 4 at once: " + models.MaxActive);
                 Names(Enumerable.Repeat("models.classify:ok", 10), CallRows(result), "model rows");
                 var row = result.Value.GetProperty("details").GetProperty("calls")[0];

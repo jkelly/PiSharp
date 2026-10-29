@@ -52,8 +52,10 @@ Creates or replaces a file, and creates missing parent folders.
 | `path` | string | yes | File to write. |
 | `content` | string | yes | The whole new content. |
 
-:::caution[64 KiB limit]
-In the CLI, `write` refuses content larger than 65,536 UTF-8 bytes with `File content exceeds the supported input limit.`, and the call's arguments are limited to 65,536 characters. Pi has no such limit. Use `edit` or `bash` for larger files.
+Pi has no size limit. In the CLI, one `write` call's arguments can hold up to 8 MiB (8,388,608 characters) of JSON, so one call writes a little under 8 MiB of plain text. Characters that JSON escapes, such as `<`, `&` or accented letters, count up to six characters each. Write a larger file in parts, for example with `bash`.
+
+:::caution[64 KiB in released builds]
+PiSharp 1.2.0.1 and earlier limit `write` to 65,536 UTF-8 bytes of content and 65,536 characters of arguments; larger content fails with `File content exceeds the supported input limit.` The larger limit is not in any release yet and needs a CLI built from source.
 :::
 
 ## edit
@@ -179,7 +181,7 @@ Turn it on with `--tools +codemode` or `"defaultTools": ["+codemode"]`. MCP serv
 
 ## powershell
 
-There is no `powershell` tool in the PiSharp CLI. Pi v1.2.0 has one for Windows; PiSharp hasn't ported it to the CLI yet, and the [Parity](/parity/) page lists it as deferred. `pisharp --help` still lists `powershell` under **Built-in Tool Names**. The name is reserved, and the terminal UI can show a `powershell` call from an extension. On Windows, `bash` runs through Git Bash.
+There is no `powershell` tool in the PiSharp CLI. Pi v1.2.0 has one for Windows; PiSharp hasn't ported it to the CLI yet, and the [Parity](/parity/) page lists it as deferred. The name is reserved, and the terminal UI can show a `powershell` call from an extension. On Windows, `bash` runs through Git Bash.
 
 ## Selecting tools
 

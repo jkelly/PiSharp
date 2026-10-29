@@ -140,6 +140,21 @@ internal static partial class Program
             Equal(calls, results.Count, "every call has its result");
             Check(results.All(result => !result.TryGetProperty("is_error", out var error) || !error.GetBoolean()), "no call failed");
         }),
+        // write.ts writes content of any size: 1.15 MB of HTML with accented letters (formerly 65,536 UTF-8 bytes and argument characters),
+        // whose JSON arguments escape every '<', '>', '&' and accented letter, reaches the file whole.
+        ("caps.write-has-no-64-kib-limit", async () =>
+        {
+            using var sandbox = new Sandbox("caps-write");
+            var content = string.Concat(Enumerable.Repeat("<p>héllo & wörld</p>\n", 50_000));
+            sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("write", new { path = "big.html", content }) : AnthropicText("done");
+            var (code, stdout, stderr) = await sandbox.Run(["-p", "--tools", "write", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "write it"]);
+            Equal(0, code, "exit; " + stderr);
+            Equal("done\n", stdout, "final text");
+            var result = sandbox.Requests[1].Json.GetProperty("messages").EnumerateArray().Last().GetProperty("content").EnumerateArray()
+                .Single(item => item.GetProperty("type").GetString() == "tool_result");
+            Check(!result.GetProperty("is_error").GetBoolean(), "the write succeeded: " + result);
+            Equal(content, File.ReadAllText(Path.Combine(sandbox.Cwd, "big.html")), "the whole content");
+        }),
         // mcp/index.ts and runtime.ts: 130 servers (formerly 128), one listing 201 tools over two pages (formerly 128 per binding and
         // per registry owner) with a 300 KB schema (formerly 256 KiB per schema and 64 KiB per registered schema), and a 2,000,000-
         // character result (formerly 1 MiB per response) cut to 20 KiB for the model with the whole text saved.
