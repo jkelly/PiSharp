@@ -1,7 +1,8 @@
 // PiSharp-only (no upstream Pi source): durable tools over PiSharp.AI's MediaRegistry. Generated files (images, videos, speech, music)
-// are written in the execution environment and their paths returned. The paid calls are memoized in the tool task, so a rerun after a
-// crash returns the saved files or keeps polling the submitted job instead of paying again. Each kind has defaults (a model and default
-// arguments) that a call's own arguments override; set_media_defaults changes and saves them.
+// are written in the execution environment and their paths returned. The paid calls are memoized in the tool task: a rerun after a
+// crash returns the saved files or keeps polling the submitted job, and one that finds a request sent but neither its result nor its
+// job id saved fails rather than paying again. Each kind has defaults (a model and default arguments) that a call's own arguments
+// override; set_media_defaults changes and saves them.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -55,6 +56,7 @@ public static partial class MediaTools
 
     private const string ResultMemo = "result";
     private const string JobMemo = "video-job";
+    private const string SentMemo = "request-sent";
 
     /// <summary>The extension with every media tool.</summary>
     public static Extension CreateExtension(MediaToolsOptions options)
@@ -118,7 +120,7 @@ public static partial class MediaTools
         PrepareArguments = arguments => WrapString(arguments, "reference_images"),
         Execute = async (arguments, api, context) =>
         {
-            if (await api.MemoAsync(ResultMemo, context).ConfigureAwait(false) is JsonObjectValue saved) return Replayed(saved, "image");
+            if (await SavedAsync(api, "image", context).ConfigureAwait(false) is { } saved) return Replayed(saved, "image");
             var (args, model) = await PrepareAsync(options, MediaKind.Image, arguments, context).ConfigureAwait(false);
             var env = ToolEnv.Require(api);
             var prompt = RequiredText(args, "prompt");
@@ -135,6 +137,7 @@ public static partial class MediaTools
                 Mask = Text(args, "mask") is { } maskPath ? await ReadImageAsync(env, maskPath, context).ConfigureAwait(false) : null,
                 Options = await TierRoutingAsync(api, model, Options(args), context).ConfigureAwait(false),
             };
+            await MarkSentAsync(api, context).ConfigureAwait(false);
             var result = await options.Media.GenerateImagesAsync(model, new ImagesContext(input.ToImmutable()), parameters, null, context.CancellationToken)
                 .ConfigureAwait(false);
             if (result.StopReason != ModelOperationStopReason.Stop) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "image generation failed"}");
@@ -214,6 +217,8 @@ public static partial class MediaTools
                 GenerateAudio = Flag(args, "generate_audio"), PreviousJobId = Text(args, "previous_job_id"), Options = Options(args),
             };
             var resume = await api.MemoAsync(JobMemo, context).ConfigureAwait(false) is JsonStringValue job ? job.Value : null;
+            // A submission that went out without its job id saved may have started a paid job: report it rather than submit another.
+            if (resume is null && await api.MemoAsync(SentMemo, context).ConfigureAwait(false) is not null) throw Interrupted("video");
             string? lastReport = null;
             var hooks = new VideoJobHooks
             {
@@ -230,6 +235,7 @@ public static partial class MediaTools
                 },
             };
             var media = new MediaOptions { PollIntervalMs = options.VideoPollIntervalMs, MaxWaitMs = options.VideoMaxWaitMs };
+            if (resume is null) await MarkSentAsync(api, context).ConfigureAwait(false);
             var result = await options.Media.GenerateVideoAsync(model, request, media, hooks, context.CancellationToken).ConfigureAwait(false);
             if (result.Video is not { } video)
                 throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "video generation failed"}" + (result.JobId is { } id ? $" (job {id})" : ""));
@@ -279,7 +285,7 @@ public static partial class MediaTools
         Execute = async (arguments, api, context) =>
         {
             var (args, model) = await PrepareAsync(options, MediaKind.Embedding, arguments, context).ConfigureAwait(false);
-            var texts = Strings(args, "input");
+            var texts = Texts(args, "input");
             if (texts.Count == 0) throw new InvalidOperationException("input must list at least one text");
             var query = Text(args, "query");
             var request = new EmbeddingRequest(query is null ? [.. texts] : [query, .. texts])
@@ -555,14 +561,15 @@ public static partial class MediaTools
         return paths;
     }
 
-    /// <summary><c>image-20261017-142530-a-red-fox</c>: the kind, the UTC time and the prompt's first words.</summary>
+    /// <summary><c>image-20261017-142530-3f9a2c-a-red-fox</c>: the kind, the UTC time, a random id and the prompt's first words. The id
+    /// keeps parallel calls with the same prompt (variants, subagents) from overwriting each other's files.</summary>
     internal static string Stem(string kind, string prompt)
     {
         var words = new string(prompt.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : ' ').ToArray())
             .Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(5);
         var slug = string.Join('-', words);
         if (slug.Length > 40) slug = slug[..40].TrimEnd('-');
-        return $"{kind}-{DateTime.UtcNow:yyyyMMdd-HHmmss}" + (slug.Length > 0 ? "-" + slug : "");
+        return $"{kind}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}" + (slug.Length > 0 ? "-" + slug : "");
     }
 
     private static string Extension(string mime) => mime switch
@@ -615,6 +622,24 @@ public static partial class MediaTools
     {
         Output = JsonValue.Array(TextBlock(Describe(kind, summary))), StructuredOutput = summary, Details = summary,
     };
+
+    /// <summary>
+    /// The saved summary of a finished call, which a rerun after a crash returns, or null when no paid request was sent yet. A rerun that
+    /// finds the request sent but no result saved fails instead of sending it again: the first request may have been charged.
+    /// </summary>
+    private static async Task<JsonObjectValue?> SavedAsync(IToolExecutionApi api, string kind, DurableContext context)
+    {
+        if (await api.MemoAsync(ResultMemo, context).ConfigureAwait(false) is JsonObjectValue saved) return saved;
+        if (await api.MemoAsync(SentMemo, context).ConfigureAwait(false) is not null) throw Interrupted(kind);
+        return null;
+    }
+
+    /// <summary>Records in the tool task that the paid request is going out, before it does.</summary>
+    private static Task MarkSentAsync(IToolExecutionApi api, DurableContext context) => api.MemoAsync(SentMemo, true, context);
+
+    private static InvalidOperationException Interrupted(string kind) => new(
+        $"The {kind} request was sent before the process stopped, and its result was not saved. It may have been charged, so it was not " +
+        "sent again; check the media output directory for partly saved files, or call the tool again to generate anew.");
 
     private static string Size(double bytes) => bytes >= 1024 * 1024 ? $"{bytes / (1024 * 1024):0.0} MB" : $"{bytes / 1024:0} KB";
 
@@ -680,8 +705,24 @@ public static partial class MediaTools
     private static PiSharp.Contracts.JsonData? Options(JsonObjectValue args) =>
         args.TryGetValue("options", out var value) && value is JsonObjectValue options ? options.ToData() : null;
 
+    /// <summary>A list whose entries stand alone (paths, terms): entries that are not strings, or are blank, are skipped.</summary>
     private static IReadOnlyList<string> Strings(JsonObjectValue args, string name) =>
         args.TryGetValue(name, out var value) && value is JsonArrayValue items
             ? [.. items.OfType<JsonStringValue>().Select(item => item.Value).Where(item => item.Trim().Length > 0)]
             : [];
+
+    /// <summary>Texts that the result refers to by position (embed vectors, rerank indices): every entry must be a non-blank string, so
+    /// none is dropped and the positions stay those of the call's list.</summary>
+    private static IReadOnlyList<string> Texts(JsonObjectValue args, string name)
+    {
+        if (!args.TryGetValue(name, out var value) || value is not JsonArrayValue items) return [];
+        var texts = new List<string>();
+        foreach (var item in items)
+        {
+            if (item is not JsonStringValue text || text.Value.Trim().Length == 0)
+                throw new InvalidOperationException($"{name}[{texts.Count}] must be a non-empty string");
+            texts.Add(text.Value);
+        }
+        return texts;
+    }
 }

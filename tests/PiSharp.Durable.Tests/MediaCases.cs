@@ -6,6 +6,7 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using PiSharp.AI.Media;
 using PiSharp.AI.ModelOperations;
 using PiSharp.Contracts.ModelOperations;
@@ -413,8 +414,43 @@ internal static class MediaTests
             SeqEqual(["out/s-1.png", "out/s-2.jpg"], MediaTools.OutputPaths("out/", ".pi/media", "s", [".png", ".jpg"]), "directory");
             SeqEqual(["art/logo.png", "art/logo-2.png"], MediaTools.OutputPaths("art/logo.png", ".pi/media", "s", [".png", ".png"]), "file");
             var stem = MediaTools.Stem("image", "A red fox, jumping over the lazy dog!");
-            Check(stem.StartsWith("image-", StringComparison.Ordinal) && stem.EndsWith("-a-red-fox-jumping-over", StringComparison.Ordinal), stem);
+            Check(Regex.IsMatch(stem, "^image-[0-9]{8}-[0-9]{6}-[0-9a-f]{6}-a-red-fox-jumping-over$"), stem);
+            // Calls in the same second with the same prompt (variants, subagents) still get files of their own.
+            Check(stem != MediaTools.Stem("image", "A red fox, jumping over the lazy dog!"), "a random id per call");
             return Task.CompletedTask;
+        });
+
+        yield return Case(prefix + "tools.a-sent-request-without-a-saved-result-is-not-sent-again", async () =>
+        {
+            var cwd = Temp("media-sent");
+            var api = new MediaToolApi(new LocalExecutionEnv(cwd));
+            var http = new MediaFakeHttp((_, _) =>
+            {
+                Check(api.Memos.ContainsKey("request-sent"), "marked as sent before it goes out");
+                return MediaFakeHttp.Response($$$"""{"data":[{"b64_json":"{{{Png}}}"}]}""");
+            });
+            var options = new MediaToolsOptions { Media = Registry(http) };
+            var image = MediaTools.CreateImageTool(options);
+            var args = JsonValue.Parse("""{"prompt":"a fox","model":"openai/gpt-image-1"}""");
+            await image.Execute(args, api, Context);
+            Equal(1, http.Requests.Count, "sent once");
+            // The process stopped after the request went out and before its result was saved: the rerun reports that instead of paying again.
+            api.Memos.Remove("result");
+            var error = await ThrowsAsync<InvalidOperationException>(() => image.Execute(args, api, Context), "interrupted image");
+            Check(error.Message.StartsWith("The image request was sent before the process stopped", StringComparison.Ordinal), error.Message);
+            foreach (var tool in new[] { MediaTools.CreateSpeechTool(options), MediaTools.CreateMusicTool(options) })
+            {
+                var stopped = new MediaToolApi(new LocalExecutionEnv(cwd));
+                stopped.Memos["request-sent"] = true;
+                await ThrowsAsync<InvalidOperationException>(() => tool.Execute(JsonValue.Parse("""{"text":"hi","prompt":"piano"}"""), stopped, Context), tool.Name);
+            }
+            // A video submission whose job id was not saved is not submitted again (one whose job id was saved resumes the job).
+            var video = new MediaToolApi(new LocalExecutionEnv(cwd));
+            video.Memos["request-sent"] = true;
+            var videoError = await ThrowsAsync<InvalidOperationException>(() => MediaTools.CreateVideoTool(options).Execute(
+                JsonValue.Parse("""{"prompt":"waves","model":"google/veo-3.0-generate-001"}"""), video, Context), "interrupted video");
+            Check(videoError.Message.StartsWith("The video request was sent", StringComparison.Ordinal), videoError.Message);
+            Equal(1, http.Requests.Count, "nothing sent again");
         });
 
         yield return Case(prefix + "tools.generate-image-saves-files-and-replays-from-the-memo", async () =>
@@ -491,6 +527,20 @@ internal static class MediaTests
             var file = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(cwd, "vectors.json"))).RootElement;
             Equal("cats", file.GetProperty("items")[1].GetProperty("text").GetString(), "file items");
             Equal(0.9, file.GetProperty("items")[1].GetProperty("embedding")[0].GetDouble(), "float written as its shortest decimal");
+        });
+
+        yield return Case(prefix + "tools.embed-and-rerank-reject-blank-entries-instead-of-shifting-positions", async () =>
+        {
+            var http = MediaFakeHttp.Json("{}");
+            var options = new MediaToolsOptions { Media = Registry(http) };
+            var api = new MediaToolApi(null);
+            var embed = await ThrowsAsync<InvalidOperationException>(() => MediaTools.CreateEmbedTool(options).Execute(
+                JsonValue.Parse("""{"input":["alpha","  ","beta"],"model":"openai/text-embedding-3-small"}"""), api, Context), "blank input");
+            Equal("input[1] must be a non-empty string", embed.Message, "embed");
+            var rerank = await ThrowsAsync<InvalidOperationException>(() => MediaTools.CreateRerankTool(options).Execute(
+                JsonValue.Parse("""{"query":"q","documents":["alpha","beta",3],"model":"openrouter/cohere/rerank-4-fast"}"""), api, Context), "non-string document");
+            Equal("documents[2] must be a non-empty string", rerank.Message, "rerank");
+            Equal(0, http.Requests.Count, "nothing sent");
         });
 
         yield return Case(prefix + "tools.list-models-and-defaults", async () =>

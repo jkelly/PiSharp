@@ -45,7 +45,9 @@ It offers no 3D generation.
    - `generate_image`, `generate_video` and `embed`.
    - `generate_speech`, `transcribe_audio`, `generate_music`, `rerank` and `decide`. These are deferred by default, so `tool_search` finds them and they do not grow every prompt.
    - `list_media_models` (with `all` for OpenRouter's full list) and `set_media_defaults`.
-   - Generated files are saved, by default under `.pi/media`, and the tools return their paths. Paid generations are memoized: image, speech and music results, and a video's job id as soon as the job is submitted. A rerun after a crash therefore never pays twice.
+   - Generated files are saved, by default under `.pi/media`, and the tools return their paths. Default file names carry a random id, so parallel calls with the same prompt never overwrite each other's files.
+   - Paid generations are memoized: image, speech and music results, and a video's job id as soon as the job is submitted. Each tool also records that its paid request is going out before it sends it. A rerun after a crash returns the saved result or resumes the job; one that finds the request sent but nothing saved fails instead of sending it again. A rerun therefore never pays twice.
+   - `embed` and `rerank` reject blank or non-string entries instead of dropping them, so vectors and ranking indices keep the positions of the call's list.
    - Every tool declares structured output, so programs and nested tool calls (workflow steps) get paths, vectors, rankings and answers.
 4. **Defaults.**
    - Each kind's defaults are a model and default tool arguments, merged under a call's own arguments; the call wins.
@@ -108,7 +110,7 @@ The owner also wants to switch priority tiers for chat requests: normal, priorit
 The `media.*` cases in `tests/PiSharp.Durable.Tests/MediaCases.cs` use fake HTTP handlers. They pin:
 
 - Each API's request shape, retries, errors and redirect credential stripping.
-- The tools' files, memo replay and job resume.
+- The tools' files and default names, memo replay, job resume, and the refusal to resend a request that went out without a saved result.
 - The defaults merge and persistence, and tool deferral.
 - One run through the Harness that includes a nested `embed` call.
 

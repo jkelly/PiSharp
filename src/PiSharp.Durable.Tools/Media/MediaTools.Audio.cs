@@ -38,7 +38,7 @@ public static partial class MediaTools
         PrepareArguments = arguments => WrapString(arguments, "voice_samples"),
         Execute = async (arguments, api, context) =>
         {
-            if (await api.MemoAsync(ResultMemo, context).ConfigureAwait(false) is JsonObjectValue saved) return Replayed(saved, "audio file");
+            if (await SavedAsync(api, "speech", context).ConfigureAwait(false) is { } saved) return Replayed(saved, "audio file");
             var (args, model) = await PrepareAsync(options, MediaKind.Speech, arguments, context).ConfigureAwait(false);
             var env = ToolEnv.Require(api);
             var turns = args.TryGetValue("turns", out var turnValue) && turnValue is JsonArrayValue list
@@ -53,6 +53,7 @@ public static partial class MediaTools
                 Turns = turns, Voice = Text(args, "voice"), Instructions = Text(args, "instructions"), Format = Text(args, "format"),
                 Speed = Number(args, "speed"), References = samples.ToImmutable(), Options = Options(args),
             };
+            await MarkSentAsync(api, context).ConfigureAwait(false);
             var result = await options.Media.SpeakAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
             if (result.Audio is not { } audio) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "speech failed"}");
             var stem = Stem("speech", text.Length > 0 ? text : turns[0].Text);
@@ -145,13 +146,14 @@ public static partial class MediaTools
         PrepareArguments = arguments => WrapString(arguments, "images"),
         Execute = async (arguments, api, context) =>
         {
-            if (await api.MemoAsync(ResultMemo, context).ConfigureAwait(false) is JsonObjectValue saved) return Replayed(saved, "audio file");
+            if (await SavedAsync(api, "music", context).ConfigureAwait(false) is { } saved) return Replayed(saved, "audio file");
             var (args, model) = await PrepareAsync(options, MediaKind.Music, arguments, context).ConfigureAwait(false);
             var env = ToolEnv.Require(api);
             var prompt = RequiredText(args, "prompt");
             var images = ImmutableArray.CreateBuilder<ImageContent>();
             foreach (var imagePath in Strings(args, "images")) images.Add(await ReadImageAsync(env, imagePath, context).ConfigureAwait(false));
             var request = new MusicRequest(prompt) { Images = images.ToImmutable(), Seed = Seed(args), Options = Options(args) };
+            await MarkSentAsync(api, context).ConfigureAwait(false);
             var result = await options.Media.ComposeAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
             if (result.Audio is not { } audio) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "music generation failed"}");
             var path = OutputPaths(Text(args, "output_path"), options.OutputDirectory, Stem("music", prompt), [Extension(audio.MimeType)])[0];
@@ -189,7 +191,7 @@ public static partial class MediaTools
         Execute = async (arguments, api, context) =>
         {
             var (args, model) = await PrepareAsync(options, MediaKind.Rerank, arguments, context).ConfigureAwait(false);
-            var documents = Strings(args, "documents");
+            var documents = Texts(args, "documents");
             var request = new RerankRequest(RequiredText(args, "query"), [.. documents]) { TopN = Integer(args, "top_n"), Options = Options(args) };
             var result = await options.Media.RerankAsync(model, request, null, context.CancellationToken).ConfigureAwait(false);
             if (result.StopReason != ModelOperationStopReason.Stop) throw new InvalidOperationException($"{model.Spec}: {result.ErrorMessage ?? "rerank failed"}");
