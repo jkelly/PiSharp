@@ -36,6 +36,7 @@ public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int 
     int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, ToolInvokerOptions? ToolInvokerOptions = null)
 {
     /// <summary>PiSharp-only: the live service tier every configuration's requests carry (<see cref="AgentConfiguration.ServiceTier"/>).</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public Func<string?>? ServiceTier { get; init; }
     /// <summary>Borrowed prepared hooks for all active native and extension adapters in the single final-action invoker.</summary>
     public IPreparedToolHooks? PreparedToolHooks { get; init; }

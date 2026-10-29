@@ -13,6 +13,7 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
     public GoogleThinkingOptions? Thinking { get; init; }
     public JsonData? Headers { get; init; }
     /// <summary>PiSharp-only: <c>serviceTier</c> (standard, flex or priority); a request's own tier wins. Null omits it.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? ServiceTier { get; init; }
     public int MaxRetries { get; init; }
     public int MaxRetryDelayMilliseconds { get; init; } = 60_000;

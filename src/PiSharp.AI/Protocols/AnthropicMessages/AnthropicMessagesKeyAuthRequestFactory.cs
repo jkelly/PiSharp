@@ -18,10 +18,13 @@ public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = 
     /// <c>Authorization: Bearer</c> (the SDK's authToken) instead of x-api-key.</summary>
     public bool BearerAuthorization { get; init; }
     /// <summary>PiSharp-only: <c>service_tier</c> (<c>auto</c> or <c>standard_only</c>); null omits it.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? ServiceTier { get; init; }
     /// <summary>PiSharp-only: <c>speed</c> (<c>fast</c> for fast mode, with the <c>fast-mode-2026-02-01</c> beta); null omits it.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? Speed { get; init; }
     /// <summary>PiSharp-only: the canonical PiSharp tier these fields came from.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public string? PiSharpTier { get; init; }
 }
 

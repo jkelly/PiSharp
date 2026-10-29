@@ -26,6 +26,7 @@ public sealed record AgentConfiguration(ModelDescriptor Model, IChatTransport Tr
     public string? SessionId { get; init; }
     /// <summary>PiSharp-only: the service tier of each request (<see cref="ChatRequest.ServiceTier"/>), read when the request is sent, so
     /// a session can switch tiers between requests. Null sends none.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public Func<string?>? ServiceTier { get; init; }
 }
 public enum AgentCancellationBehavior { Propagate, SettleAborted }

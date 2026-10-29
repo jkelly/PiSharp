@@ -89,6 +89,19 @@ The owner also wants to switch priority tiers for chat requests: normal, priorit
 6. **Media:**
    - OpenRouter's media endpoints have no tiers. For OpenRouter images the conversation's tier picks `provider.sort` instead: economy → `price`, priority → `throughput`, fast and ultrafast → `latency`.
    - A call's own `provider` options win.
+7. **Experimental.** On the owner's choice (2026-10-28), the tier API is experimental like the media API:
+   - `[Experimental("PISHARP_TIERS001")]` marks `ServiceTiers`, `ChatRequest.ServiceTier`, `AgentConfiguration.ServiceTier`, `TurnRunner.ServiceTier` and `SessionRuntimeRegistryOptions.ServiceTier`.
+   - It also marks the new request-factory options: `ServiceTier`, `Speed` and `PiSharpTier` for Anthropic Messages, and `ServiceTier` for Google and Chat Completions.
+   - `PISHARP_DURABLE001` already covers the durable members.
+   - The `ServiceTier` options that the Responses and Codex transports had before this change stay as they were.
+   - The projects in this repository that pass tiers along suppress the diagnostic in their project files.
+8. **Intentional differences from Pi.** Pi has no service tiers, so these exist only in PiSharp:
+   - `--tier` (listed in `pisharp --help`).
+   - The `/tier` command.
+   - The tier in the footer.
+   - The `serviceTier` setting.
+
+   Without a tier, requests and the footer are unchanged: no tier field is sent and nothing is added to the footer. The website's parity list (`website/src/data/parity.json`) gets the entry when the feature is released, because merging website data publishes the site at once.
 
 ## Verification
 

@@ -19,6 +19,7 @@ public sealed class TurnRunner
     private readonly string? sessionId;
 
     /// <summary>PiSharp-only: the service tier stamped on every request that has none, read per request.</summary>
+    [System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
     public Func<string?>? ServiceTier { get; init; }
 
     /// <param name="sessionId">Source agent.sessionId: stamped on every request that has none (prompt-cache keys, session headers).</param>

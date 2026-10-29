@@ -4,7 +4,7 @@
        (work list area d) runs scripts on PiSharp.Codemode's deterministic CodemodeSandbox.Start() and renders tool declarations with its
        CodemodeDeclarations; that brings Jint, Acornima and PiSharp.Extensions.Abstractions in transitively (decision 0005, Codemode Start()). -->
   <PropertyGroup>
-    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_MEDIA001</NoWarn>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_MEDIA001;PISHARP_TIERS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.Durable.Tests" />

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_MEDIA001</NoWarn>
+    <NoWarn>$(NoWarn);PISHARP_DURABLE001;PISHARP_MEDIA001;PISHARP_TIERS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Durable/PiSharp.Durable.csproj" />

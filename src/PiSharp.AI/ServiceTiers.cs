@@ -7,6 +7,7 @@ using System.Collections.Immutable;
 namespace PiSharp.AI;
 
 /// <summary>The service tiers PiSharp offers and their wire values per API.</summary>
+[System.Diagnostics.CodeAnalysis.Experimental("PISHARP_TIERS001")]
 public static class ServiceTiers
 {
     public const string Auto = "auto";
