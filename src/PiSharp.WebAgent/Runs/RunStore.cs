@@ -3,8 +3,9 @@
 // (BeginCall): a durable request recovered after a restart carries the same op, so it updates its row (back to running, its earlier events
 // dropped) instead of adding a second one. Each store instance has a runner id; the first use in a process marks every row still running
 // under another runner interrupted (the app stopped while it ran: it is never retried by itself; a recovered chat call sets it running
-// again). Cleanup deletes unpinned runs older than the retention (never a running one, the parent of a pinned run or a run whose parent is
-// pinned) and raw payloads older than RawRetentionDays, whatever the run's own retention. Every method is synchronous (SQLite on the
+// again). Cleanup deletes unpinned runs older than the retention (never a running one, nor an ancestor or a descendant of a pinned run, at
+// any depth: an agent compare run is three levels) and raw payloads older than RawRetentionDays, whatever the run's own retention. Delete
+// takes a run's whole tree. Every method is synchronous (SQLite on the
 // caller's thread) and safe from many threads.
 using System.Globalization;
 using System.Text;
@@ -85,6 +86,21 @@ public sealed class RunStore
         "billing, spend_op, ttft_ms, duration_ms, tokens_per_second, pinned, raw_state, created, started, finished, updated";
 
     private const string FullColumns = ListColumns + ", options, messages, output";
+
+    // The runs a pin keeps, at any depth (an agent compare run is three levels: run, model, call): `up` holds the pinned runs and every
+    // ancestor, `down` the pinned runs and every descendant. UNION (not UNION ALL) also ends a cycle.
+    private const string PinTrees = """
+        WITH RECURSIVE
+            up(id) AS (SELECT id FROM runs WHERE pinned = 1
+                       UNION SELECT runs.parent_id FROM runs JOIN up ON runs.id = up.id WHERE runs.parent_id IS NOT NULL),
+            down(id) AS (SELECT id FROM runs WHERE pinned = 1
+                         UNION SELECT runs.id FROM runs JOIN down ON runs.parent_id = down.id)
+        """;
+
+    private const string NotPinTree = "id NOT IN (SELECT id FROM up) AND id NOT IN (SELECT id FROM down)";
+
+    // What a retention with cutoff $cutoff deletes (after PinTrees).
+    private const string PastRetentionWhere = "pinned = 0 AND created < $cutoff AND status <> 'running' AND " + NotPinTree;
 
     private readonly Lock gate = new();
     private readonly ILogger log;
@@ -283,8 +299,8 @@ public sealed class RunStore
         return found;
     }
 
-    /// <summary>Deletes the runs <paramref name="ids"/> and their children (with their events and raw payloads). A running run is deleted
-    /// too: its end then finds no row.</summary>
+    /// <summary>Deletes the runs <paramref name="ids"/> and their children at any depth (with their events and raw payloads). A running run
+    /// is deleted too: its end then finds no row.</summary>
     /// <returns>How many rows were deleted.</returns>
     /// <exception cref="ArgumentException">More than <see cref="MaxDelete"/> ids.</exception>
     public int Delete(IEnumerable<string> ids)
@@ -296,24 +312,36 @@ public sealed class RunStore
         EnsureReady();
         var names = list.Select((_, index) => "$p" + index.ToString(CultureInfo.InvariantCulture)).ToList();
         var set = string.Join(", ", names);
-        var deleted = Db.Db.Execute($"DELETE FROM runs WHERE id IN ({set}) OR parent_id IN ({set});",
-            [.. names.Zip(list, (name, id) => (name, (object?)id))]);
+        var deleted = Db.Db.Execute($"""
+            WITH RECURSIVE tree(id) AS (SELECT id FROM runs WHERE id IN ({set}) OR parent_id IN ({set})
+                                        UNION SELECT runs.id FROM runs JOIN tree ON runs.parent_id = tree.id)
+            DELETE FROM runs WHERE id IN (SELECT id FROM tree);
+            """, [.. names.Zip(list, (name, id) => (name, (object?)id))]);
         if (deleted > 0) Raise("deleted", list);
         return deleted;
     }
 
-    /// <summary>Deletes every run (or every unpinned one), with its events and raw payloads.</summary>
+    /// <summary>Deletes every run (or every one no pin keeps: a pinned run keeps its ancestors and descendants), with its events and raw
+    /// payloads.</summary>
     public int Clear(bool keepPinned)
     {
         EnsureReady();
-        var deleted = Db.Db.Execute(keepPinned ? "DELETE FROM runs WHERE pinned = 0 AND id NOT IN (SELECT parent_id FROM runs WHERE pinned = 1 AND parent_id IS NOT NULL);"
-            : "DELETE FROM runs;");
+        var deleted = Db.Db.Execute(keepPinned ? PinTrees + " DELETE FROM runs WHERE " + NotPinTree + ";" : "DELETE FROM runs;");
         if (deleted > 0) Raise("deleted", []);
         return deleted;
     }
 
+    /// <summary>How many runs a retention of <paramref name="retention"/> would delete at <paramref name="now"/> (<see cref="Cleanup"/>'s
+    /// rule).</summary>
+    public long CountPastRetention(TimeSpan retention, DateTimeOffset now)
+    {
+        EnsureReady();
+        return Db.Db.Scalar(PinTrees + " SELECT COUNT(*) FROM runs WHERE " + PastRetentionWhere + ";", ("$cutoff", Ms(now - retention))) is { } value
+            and not DBNull ? Convert.ToInt64(value, CultureInfo.InvariantCulture) : 0;
+    }
+
     /// <summary>Applies <paramref name="settings"/>' retention at <paramref name="now"/>: deletes unpinned runs older than the retention (never
-    /// a running one, a parent with a pinned run, or a run whose parent is pinned) and raw payloads older than
+    /// a running one, nor an ancestor or a descendant of a pinned run) and raw payloads older than
     /// <see cref="RunHistorySettings.RawRetentionDays"/> (their runs' raw state becomes expired).</summary>
     public RunCleanup Cleanup(RunHistorySettings settings, DateTimeOffset now)
     {
@@ -323,11 +351,8 @@ public sealed class RunStore
         {
             var runs = 0;
             if (settings.Retention is { } retention)
-                runs = WebAgentDb.Execute(connection, transaction, """
-                    DELETE FROM runs WHERE pinned = 0 AND created < $cutoff AND status <> 'running'
-                        AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM runs WHERE pinned = 1))
-                        AND id NOT IN (SELECT parent_id FROM runs WHERE pinned = 1 AND parent_id IS NOT NULL);
-                    """, ("$cutoff", Ms(now - retention)));
+                runs = WebAgentDb.Execute(connection, transaction, PinTrees + " DELETE FROM runs WHERE " + PastRetentionWhere + ";",
+                    ("$cutoff", Ms(now - retention)));
             WebAgentDb.Execute(connection, transaction, "DELETE FROM run_raw WHERE created < $cutoff;",
                 ("$cutoff", Ms(now - TimeSpan.FromDays(RunHistorySettings.RawRetentionDays))));
             var raw = WebAgentDb.Execute(connection, transaction,

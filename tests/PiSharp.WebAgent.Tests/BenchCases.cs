@@ -271,7 +271,8 @@ internal static partial class Program
                 && empty.Contains("Create your first tool", StringComparison.Ordinal), "its texts");
             Check(Regex.IsMatch(empty, "title=\"Define a tool first\" disabled=\"disabled\" data-bench-run"), "Run is disabled with its reason");
             Check(empty.Contains("No tool calls yet", StringComparison.Ordinal), "the empty call log");
-            Check(Regex.IsMatch(empty, "data-preset-save disabled") && empty.Contains("data-preset-load", StringComparison.Ordinal), "the preset hooks for Presets");
+            Check(Regex.IsMatch(empty, "data-preset-save>") && empty.Contains("data-preset-load", StringComparison.Ordinal) && !empty.Contains("Presets are not available yet", StringComparison.Ordinal),
+                "the preset hooks for Presets");
             Check(Regex.IsMatch(empty, "id=\"ruleBuiltin\" disabled"), "built-ins never run");
             foreach (var modal in new[] { "modal-model-picker", "modal-tool-editor", "modal-spend-confirm", "modal-shortcuts", "modal-confirm" })
                 Check(empty.Contains($"id=\"{modal}\"", StringComparison.Ordinal), "the page hosts #" + modal);

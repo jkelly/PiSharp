@@ -210,12 +210,8 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
         return new DataRunFacts(true, display, count, pinned, store.SizeBytes(), raw.Item1, raw.Item2, events, history, older);
     }
 
-    // Runs a retention of `days` would delete now: RunStore.Cleanup's own rule (unpinned, not running, not a pinned run's parent or child).
-    private static long PastRetention(RunStore store, DateTimeOffset now, int days) => Long(store.Db.Db.Scalar("""
-        SELECT COUNT(*) FROM runs WHERE pinned = 0 AND created < $cutoff AND status <> 'running'
-            AND (parent_id IS NULL OR parent_id NOT IN (SELECT id FROM runs WHERE pinned = 1))
-            AND id NOT IN (SELECT parent_id FROM runs WHERE pinned = 1 AND parent_id IS NOT NULL);
-        """, ("$cutoff", (now - TimeSpan.FromDays(days)).ToUnixTimeMilliseconds())));
+    // Runs a retention of `days` would delete now: RunStore.Cleanup's own rule (unpinned, not running, not in a pinned run's tree).
+    private static long PastRetention(RunStore store, DateTimeOffset now, int days) => store.CountPastRetention(TimeSpan.FromDays(days), now);
 
     private static long Long(object? value) => value is null or DBNull ? 0 : Convert.ToInt64(value, CultureInfo.InvariantCulture);
 

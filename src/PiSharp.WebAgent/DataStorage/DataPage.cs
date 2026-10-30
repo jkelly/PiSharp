@@ -126,7 +126,7 @@ public sealed record DataWorkspaceRow(string Run, string Slot, string Model, str
     public string Name => Run + " · " + Slot;
 
     /// <summary>The View run link.</summary>
-    public string RunHref => "/compare?run=" + Uri.EscapeDataString(Run);
+    public string RunHref => "/compare?mode=agent&run=" + Uri.EscapeDataString(Run);
 
     /// <summary>"Oct 28 UTC".</summary>
     public string Until => ExpiresAt.UtcDateTime.ToString("MMM d", System.Globalization.CultureInfo.InvariantCulture) + " UTC";

@@ -45,7 +45,8 @@ internal static partial class Program
             Check(Regex.IsMatch(html, "id=\"pg-th-max\" value=\"max\" disabled=\"disabled\""), "max is listed, not sent");
             Check(Regex.IsMatch(html, "data-provider-pane=\"azure\"") && Regex.IsMatch(html, "data-unsent=\"azureApiVersion\"") && html.Contains("data-provider-pane=\"bedrock\"", StringComparison.Ordinal),
                 "the Azure and Bedrock panes");
-            Check(Regex.IsMatch(html, "data-preset-save disabled") && Regex.IsMatch(html, "data-preset-load disabled"), "Save and Load preset: markup only, for Presets to wire");
+            Check(Regex.IsMatch(html, "data-preset-save>") && Regex.IsMatch(html, "data-preset-load>") && !html.Contains("Presets are not available yet", StringComparison.Ordinal),
+                "Save and Load preset: enabled, for presets-host.js to wire");
             Check(!html.Contains("Pin as test", StringComparison.Ordinal), "no Pin as test (W5)");
             Check(html.Contains("data-msg-prompt=\"true\"", StringComparison.Ordinal) && html.Contains("<template data-msg-template>", StringComparison.Ordinal), "the system prompt editor and the template");
             Check(html.Contains("data-provider-model=\"pg\"", StringComparison.Ordinal) && html.Contains("data-provider-model=\"mp\"", StringComparison.Ordinal), "Provider → Model in the config and the picker");

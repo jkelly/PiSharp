@@ -365,7 +365,8 @@ internal static partial class Program
             Check(html.Contains("No metrics <em>yet</em>", StringComparison.Ordinal), "no figures before a run");
             Check(html.Contains("id=\"cmpModeRequest\"", StringComparison.Ordinal) && html.Contains("id=\"cmpModeAgent\"", StringComparison.Ordinal), "the Request · Agent switch");
             Check(!Regex.IsMatch(html, ">\\s*Blind\\s*<") && !html.Contains("data-blind", StringComparison.Ordinal), "no Blind switch (W5)");
-            Check(Regex.IsMatch(html, "data-preset-load disabled") && Regex.IsMatch(html, "data-preset-save disabled"), "presets: markup only");
+            Check(Regex.IsMatch(html, "data-preset-load>") && Regex.IsMatch(html, "data-preset-save>") && !html.Contains("Presets are not available yet", StringComparison.Ordinal),
+                "presets: enabled, for presets-host.js to wire");
             Check(html.Contains("data-compare-add", StringComparison.Ordinal) && html.Contains("2 slots left", StringComparison.Ordinal), "Add model, with the slots left");
             foreach (var modal in new[] { "modal-model-picker", "modal-spend-confirm", "modal-shortcuts" })
                 Check(html.Contains($"id=\"{modal}\"", StringComparison.Ordinal), "the page hosts #" + modal);

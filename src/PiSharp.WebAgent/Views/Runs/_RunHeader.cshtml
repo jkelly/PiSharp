@@ -43,6 +43,10 @@
       {
         <a class="btn btn-sm btn-outline-secondary" href="@Model.SessionHref"><i class="bi bi-chat-square-text me-1" aria-hidden="true"></i>Open chat</a>
       }
+      @if (Model.CompareHref is not null)
+      {
+        <a class="btn btn-sm btn-outline-secondary" href="@Model.CompareHref" data-run-compare><i class="bi bi-layout-three-columns me-1" aria-hidden="true"></i>Open in Compare</a>
+      }
       @if (Model.ParentHref is not null)
       {
         <a class="btn btn-sm btn-outline-secondary" href="@Model.ParentHref"><i class="bi bi-diagram-2 me-1" aria-hidden="true"></i>Open parent run</a>

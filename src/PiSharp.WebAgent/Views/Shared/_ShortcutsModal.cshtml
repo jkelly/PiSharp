@@ -1,5 +1,6 @@
 @* Decision 0011 (run W2, WU4): the mockups' _ShortcutsModal (#modal-shortcuts), opened from the top bar or with "?". Global keys are wired
-   by shell.js; the Chat keys by the chat page's script (W2 WU8). The Playground section comes with the Playground (W4). *@
+   by shell.js; the Chat keys by the chat page's script (W2 WU8). The Playground keys (W4): Run by playground.js (also Compare's Run all and
+   the Tool Bench's Run), Save preset by presets-host.js on the Playground, Compare and the Tool Bench. *@
 <div class="modal fade" id="modal-shortcuts" tabindex="-1" aria-labelledby="modal-shortcuts-title" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -20,6 +21,9 @@
         <div class="kv"><span class="k">Stop</span><span class="v"><kbd class="ps-kbd">Esc</kbd></span></div>
         <div class="kv"><span class="k">Cycle thinking level</span><span class="v"><kbd class="ps-kbd">Shift</kbd> <kbd class="ps-kbd">Tab</kbd></span></div>
         <div class="kv"><span class="k">Session tree</span><span class="v"><kbd class="ps-kbd">Esc</kbd> <kbd class="ps-kbd">Esc</kbd></span></div>
+        <div class="ps-label mt-3 mb-2">Playground</div>
+        <div class="kv"><span class="k">Run</span><span class="v"><kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">Enter</kbd></span></div>
+        <div class="kv"><span class="k">Save preset</span><span class="v"><kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">S</kbd></span></div>
       </div>
     </div>
   </div>

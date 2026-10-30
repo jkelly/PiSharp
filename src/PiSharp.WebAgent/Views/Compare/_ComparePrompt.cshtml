@@ -1,5 +1,5 @@
 @* Decision 0011 (run W4, R2): the mockups' _ComparePrompt (request mode): "Shared prompt", the collapsible shared system prompt, Load preset
-   and Save as preset (markup only: [data-preset-load] and [data-preset-save] stay disabled until the Presets unit, R8, wires them), the
+   and Save as preset ([data-preset-load] and [data-preset-save], which the Presets unit's presets-host.js wires), the
    prompt, the Request · Agent switch (_CompareModeSwitch), the shared options (thinking, maxTokens, temperature: inline from sm up, a
    Settings dropdown below; each column clamps or leaves out what its model does not take, and says so), View options (Sync scroll), Stop
    all (Esc), Run all (Ctrl+Enter) and the estimate by Run all (_RunEstimate: the Spend Guard's preflight of every column; the over-cap chip
@@ -18,8 +18,8 @@
       <i class="bi bi-chevron-right"></i><span>System prompt</span><span class="text-ps-faint text-truncate d-none d-md-inline cmp-system-preview" data-system-preview>@preview</span>
     </button>
     <div class="ms-auto d-flex gap-1">
-      <button class="btn btn-sm btn-outline-secondary" type="button" title="Load preset · Presets are not available yet" aria-label="Load preset" data-preset-load disabled><i class="bi bi-folder2-open"></i><span class="d-none d-sm-inline ms-1">Load preset</span></button>
-      <button class="btn btn-sm btn-outline-secondary" type="button" title="Save as preset · Presets are not available yet" aria-label="Save as preset" data-preset-save disabled><i class="bi bi-bookmark-plus"></i><span class="d-none d-sm-inline ms-1">Save as preset</span></button>
+      <button class="btn btn-sm btn-outline-secondary" type="button" title="Load preset" aria-label="Load preset" data-preset-load><i class="bi bi-folder2-open"></i><span class="d-none d-sm-inline ms-1">Load preset</span></button>
+      <button class="btn btn-sm btn-outline-secondary" type="button" title="Save as preset (Ctrl+S)" aria-label="Save as preset" data-preset-save><i class="bi bi-bookmark-plus"></i><span class="d-none d-sm-inline ms-1">Save as preset</span></button>
     </div>
   </div>
   <div class="collapse@(draft.SystemPrompt is null ? "" : " show")" id="cmpSystem">

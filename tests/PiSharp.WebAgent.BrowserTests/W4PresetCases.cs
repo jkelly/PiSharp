@@ -16,7 +16,7 @@ internal static partial class Program
             await page.Locator("[data-msg][data-msg-prompt='true'] [data-msg-text]").FillAsync("Answer in one line.");
             await page.Locator("[data-msg][data-role='user'] [data-msg-text]").First.FillAsync("Describe a lighthouse.");
             var save = page.Locator("[data-preset-save]");
-            await Expect(save).ToBeEnabledAsync();
+            await Expect(save).ToHaveAttributeAsync("data-preset-ready", "true"); // presets-host.js wired it
             var dialog = await page.OpenModalAsync(save, "modal-save-preset");
             await dialog.Locator("#sp-name").FillAsync("One-line answers");
             await dialog.Locator("#sp-tags").FillAsync("short, test");
@@ -37,7 +37,7 @@ internal static partial class Program
 
             // Load it into Compare: a fresh comparison with the preset's prompts.
             await page.GotoAsync("/compare");
-            var load = page.Locator("[data-preset-load]:not([disabled]) >> visible=true").First;
+            var load = page.Locator("[data-preset-load][data-preset-ready] >> visible=true").First;
             var loader = await page.OpenModalAsync(load, "modal-load-preset");
             await loader.Locator($"[data-lp-item='{id}']").ClickAsync();
             await loader.Locator("[data-lp-load]").ClickAsync();

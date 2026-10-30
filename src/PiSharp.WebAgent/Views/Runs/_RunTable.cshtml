@@ -76,6 +76,10 @@
                 {
                   <li><a class="dropdown-item" href="@row.ChatHref"><i class="bi bi-chat-square-text me-2" aria-hidden="true"></i>Open chat</a></li>
                 }
+                @if (row.CompareHref is not null)
+                {
+                  <li><a class="dropdown-item" href="@row.CompareHref" data-run-compare><i class="bi bi-layout-three-columns me-2" aria-hidden="true"></i>Open in Compare</a></li>
+                }
                 @if (row.IsGroup)
                 {
                   <li><a class="dropdown-item" href="/settings/data#compare-workspaces"><i class="bi bi-folder2-open me-2" aria-hidden="true"></i>Workspaces</a></li>

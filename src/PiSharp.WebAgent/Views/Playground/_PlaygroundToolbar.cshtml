@@ -1,7 +1,7 @@
 @* Decision 0011 (run W4, R1): the mockups' _PlaygroundToolbar: the model chip (opens #modal-model-picker, Ctrl+K), Run (Ctrl+Enter) and the
    disabled "Running" spinner while a run streams, the estimate by Run (_RunEstimate), Stop (Esc; cancels the run through
-   POST /api/runs/{id}/cancel), Save preset and Load preset (markup only: [data-preset-save] and [data-preset-load] stay disabled until the
-   Presets unit wires them), View code, Open in inspector (the last run), the Reset menu and the status line. Its state follows the output
+   POST /api/runs/{id}/cancel), Save preset and Load preset ([data-preset-save] and [data-preset-load], which the Presets unit's presets-host.js
+   wires), View code, Open in inspector (the last run), the Reset menu and the status line. Its state follows the output
    pane's (data-state: empty, streaming, completed, stopped, error). Model: PlaygroundPage. *@
 @model PlaygroundPage
 @{
@@ -22,8 +22,8 @@
   <span class="d-inline-flex align-items-center gap-1" data-estimate-host><partial name="_RunEstimate" model="Model.Estimate" /></span>
   <button class="btn btn-sm @(streaming ? "btn-outline-danger" : "btn-outline-secondary")" type="button" title="Stop (Esc)" data-stop disabled="@(!streaming)"><i class="bi bi-stop-fill me-1"></i>Stop</button>
   <span class="vr d-none d-md-block mx-1"></span>
-  <button class="btn btn-sm btn-outline-secondary" type="button" title="Save preset (Ctrl+S) · Presets are not available yet" aria-label="Save preset" data-preset-save disabled><i class="bi bi-bookmark-plus"></i><span class="d-none d-lg-inline ms-1">Save preset</span></button>
-  <button class="btn btn-sm btn-outline-secondary" type="button" title="Load preset · Presets are not available yet" aria-label="Load preset" data-preset-load disabled><i class="bi bi-folder2-open"></i><span class="d-none d-lg-inline ms-1">Load preset</span></button>
+  <button class="btn btn-sm btn-outline-secondary" type="button" title="Save preset (Ctrl+S)" aria-label="Save preset" data-preset-save><i class="bi bi-bookmark-plus"></i><span class="d-none d-lg-inline ms-1">Save preset</span></button>
+  <button class="btn btn-sm btn-outline-secondary" type="button" title="Load preset" aria-label="Load preset" data-preset-load><i class="bi bi-folder2-open"></i><span class="d-none d-lg-inline ms-1">Load preset</span></button>
   <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modal-view-code" title="View code (C#, cURL, JSON)" aria-label="View code" data-view-code><i class="bi bi-code-slash"></i><span class="d-none d-lg-inline ms-1">View code</span></button>
   <a class="btn btn-sm btn-outline-secondary@(output.InspectorUrl is null ? " disabled" : "")" href="@(output.InspectorUrl ?? "#")" aria-disabled="@(output.InspectorUrl is null ? "true" : null)" title="Open the last run in the inspector" aria-label="Open in inspector" data-open-inspector><i class="bi bi-braces"></i><span class="d-none d-lg-inline ms-1">Open in inspector</span></a>
   <div class="dropdown">

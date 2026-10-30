@@ -138,6 +138,9 @@ public sealed record RunInspectorView
     /// <summary>The Playground with this run's request.</summary>
     public string PlaygroundHref => "/playground?run=" + Uri.EscapeDataString(Run.Id);
 
+    /// <summary>An agent compare run's page, or null.</summary>
+    public string? CompareHref => RunHistoryText.AgentCompareHref(Run);
+
     /// <summary>Whether a HAR can be made (raw payloads were stored).</summary>
     public bool HasHar => Requests.Count > 0;
 }

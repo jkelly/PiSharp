@@ -171,6 +171,9 @@ public sealed record RunHistoryRow
     /// <summary>The chat a chat's call belongs to, or null.</summary>
     public string? ChatHref => Run.Source == "chat" && !string.IsNullOrEmpty(Run.Session) ? "/chat/" + Uri.EscapeDataString(Run.Session) : null;
 
+    /// <summary>An agent compare run's page, or null.</summary>
+    public string? CompareHref => RunHistoryText.AgentCompareHref(Run);
+
     /// <summary>The id of the collapse row of <see cref="Models"/>.</summary>
     public string ModelsId => "run-" + Run.Id + "-models";
 }
@@ -204,6 +207,15 @@ public static class RunHistoryText
         if (row.Source == Spend.SpendSource.Chat) return null;
         if (row.Op.StartsWith("run-", StringComparison.Ordinal) && row.Op.Length > 4) return "/runs/" + Uri.EscapeDataString(row.Op[4..].Split('~')[0]);
         return "/runs/" + Uri.EscapeDataString(row.Op);
+    }
+
+    /// <summary>The agent compare page of an agent compare run's top row (<c>/compare?mode=agent&amp;run={id}</c>: runs.db's parent row has the
+    /// agent compare run's id), or null for any other run.</summary>
+    public static string? AgentCompareHref(RunRecord run)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        return run.Kind == RunKind.Parent && run.ParentId is null && run.Source == Spend.SpendSources.Wire(Spend.SpendSource.AgentCompare)
+            ? "/compare?mode=agent&run=" + Uri.EscapeDataString(run.Id) : null;
     }
 
     /// <summary>Micro-USD as dollars (four places under a cent).</summary>

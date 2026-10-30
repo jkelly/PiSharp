@@ -240,12 +240,12 @@ internal static partial class Program
             Check(Regex.IsMatch(playground, "<a class=\"nav-link active\" aria-current=\"page\" href=\"/playground\" data-nav=\"playground\">"), "Playground is the active item");
             Check(playground.Contains("data-bs-target=\"#modal-shortcuts\"", StringComparison.Ordinal), "the shortcuts button on a main page");
             Check(playground.Contains("<h1 class=\"app-title\">Playground</h1>", StringComparison.Ordinal), "the top bar title");
-            Check(!playground.Contains("aria-label=\"History views\"", StringComparison.Ordinal), "only History's later page has the History tabs");
+            Check(!playground.Contains("aria-label=\"History views\"", StringComparison.Ordinal), "only History has the History tabs");
 
-            // W3 integration: History's later page shows S4's History tabs, so the sidebar's History reaches History › Spend.
+            // History › Runs (W4, R3) shows S4's History tabs, so the sidebar's History reaches History › Spend.
             var history = (await app.Get("/history")).Text;
             Check(history.Contains("<a class=\"nav-link active\" aria-current=\"page\" href=\"/history\">Runs</a>", StringComparison.Ordinal) &&
-                history.Contains("<a class=\"nav-link\" href=\"/history/spend\">Spend</a>", StringComparison.Ordinal), "History's later page has the tabs Runs · Spend");
+                history.Contains("<a class=\"nav-link\" href=\"/history/spend\">Spend</a>", StringComparison.Ordinal), "History › Runs has the tabs Runs · Spend");
 
             var spend = (await app.Get("/settings/spend")).Text;
             Check(spend.Contains("<nav class=\"app-breadcrumb\" aria-label=\"Breadcrumb\"><a href=\"/settings/providers\">Settings</a>", StringComparison.Ordinal) &&

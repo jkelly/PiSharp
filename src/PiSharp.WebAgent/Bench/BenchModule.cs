@@ -140,46 +140,9 @@ public static class BenchModule
         return routes;
     }
 
-    /// <summary>The confirm modal's answer for a refused turn (the same shape as <c>/api/runs</c>' and <c>/api/spend/confirm</c>'s).</summary>
-    public static async Task<JsonObject> SpendAsync(RunRefusal refusal, IServiceProvider services)
-    {
-        ArgumentNullException.ThrowIfNull(refusal);
-        ArgumentNullException.ThrowIfNull(services);
-        var decision = refusal.Decision;
-        var estimate = decision.Estimate;
-        var answer = new JsonObject
-        {
-            ["verdict"] = JsonSerializer.SerializeToNode(decision.Verdict, SettingsStore.JsonOptions),
-            ["code"] = refusal.Code,
-            ["message"] = refusal.Message,
-            ["pane"] = null,
-            ["canProceed"] = decision.Verdict == SpendVerdict.Ask,
-            ["capOutputTokens"] = null,
-            ["estimate"] = new JsonObject
-            {
-                ["worstMicros"] = estimate.WorstMicros,
-                ["typicalMicros"] = estimate.TypicalMicros,
-                ["billing"] = JsonSerializer.SerializeToNode(estimate.Billing, SettingsStore.JsonOptions),
-                ["chip"] = SpendEstimateText.Chip(estimate),
-            },
-            ["html"] = null,
-        };
-        if (services.GetService<SpendPages>() is not { } pages || decision.Causes.Count == 0) return answer;
-        try
-        {
-            var view = pages.ConfirmView(refusal.Call, decision);
-            answer["pane"] = view.Pane;
-            answer["canProceed"] = view.CanProceed;
-            answer["capOutputTokens"] = view.CapOutputTokens;
-            if (services.GetService<FragmentRenderer>() is { } renderer)
-                answer["html"] = await renderer.RenderAsync(SpendEndpoints.ConfirmPartial, view).ConfigureAwait(false);
-        }
-        catch (Exception error) when (error is not OperationCanceledException)
-        {
-            services.GetService<ILoggerFactory>()?.CreateLogger(typeof(BenchModule)).LogWarning(error, "The spend confirm modal of a refused bench turn could not be made.");
-        }
-        return answer;
-    }
+    /// <summary>The confirm modal's answer for a refused turn (<see cref="RunEndpoints.SpendAsync"/>: the same shape as <c>/api/runs</c>' and
+    /// <c>/api/spend/confirm</c>'s).</summary>
+    public static Task<JsonObject> SpendAsync(RunRefusal refusal, IServiceProvider services) => RunEndpoints.SpendAsync(refusal, services);
 
     private static async Task<IResult> ActionAsync(BenchAction action, BenchPages pages, IServiceProvider services)
     {

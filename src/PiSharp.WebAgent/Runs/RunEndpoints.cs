@@ -182,9 +182,12 @@ public static class RunEndpoints
         return Json(new { posted = false, code = refusal.Code, message = refusal.Message, groupId = start.GroupId, spend = await SpendAsync(refusal, services).ConfigureAwait(false) });
     }
 
-    /// <summary>The confirm modal's answer for a refused run (the same shape as <c>/api/spend/confirm</c>).</summary>
-    private static async Task<JsonObject> SpendAsync(RunRefusal refusal, IServiceProvider services)
+    /// <summary>The confirm modal's answer for a refused run (the same shape as <c>/api/spend/confirm</c>): the <c>spend</c> of a
+    /// <c>{posted:false}</c> answer. Compare's and the Tool Bench's run endpoints answer with it too.</summary>
+    public static async Task<JsonObject> SpendAsync(RunRefusal refusal, IServiceProvider services)
     {
+        ArgumentNullException.ThrowIfNull(refusal);
+        ArgumentNullException.ThrowIfNull(services);
         var decision = refusal.Decision;
         var estimate = decision.Estimate;
         var answer = new JsonObject

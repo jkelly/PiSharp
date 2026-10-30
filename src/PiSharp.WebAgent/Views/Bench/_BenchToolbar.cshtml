@@ -31,7 +31,7 @@
 
   <span class="d-inline-flex align-items-center gap-2" data-bench-part="controls"><partial name="~/Views/Bench/_BenchRunControls.cshtml" model="Model" /></span>
   <button class="btn btn-sm btn-outline-secondary" type="button" title="Clear assistant turns and tool results; keep the user messages" data-bench-reset disabled="@(Model.State == BenchStates.Running)"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset conversation</button>
-  <button class="btn btn-sm btn-outline-secondary" type="button" title="Save preset · Presets are not available yet" aria-label="Save preset" data-preset-save disabled><i class="bi bi-bookmark-plus"></i><span class="d-none d-lg-inline ms-1">Save preset</span></button>
+  <button class="btn btn-sm btn-outline-secondary" type="button" title="Save preset (Ctrl+S)" aria-label="Save preset" data-preset-save><i class="bi bi-bookmark-plus"></i><span class="d-none d-lg-inline ms-1">Save preset</span></button>
 
   <div class="ms-auto d-flex align-items-center gap-1 bench-rules">
     <div class="form-check form-switch mb-0">
