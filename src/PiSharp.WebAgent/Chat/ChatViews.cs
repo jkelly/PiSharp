@@ -52,6 +52,14 @@ public sealed class ChatRenderContext
     /// <summary>The answers' cost marks from the spend ledger, and the running answer's reservation (empty without the Spend area).</summary>
     public ChatSpendFacts Spend { get; init; } = ChatSpendFacts.Empty;
 
+    /// <summary>The call the Spend Guard stopped that ended the branch's run, with the messages queued behind it
+    /// (<see cref="ChatSpendStopView.Newest"/>); null otherwise.</summary>
+    public ChatSpendStopView? Stop { get; init; }
+
+    /// <summary>The messages queued behind answer <paramref name="entryId"/> when it is the stop that ended the run (its stop card says
+    /// they wait); 0 otherwise.</summary>
+    public int QueuedBehind(long? entryId) => Stop is { Queued: > 0 } stop && entryId is not null && stop.EntryId == entryId ? stop.Queued : 0;
+
     /// <summary>The pending approval of tool call <paramref name="callId"/>, or null.</summary>
     public PendingApproval? Approval(string callId) => Approvals.TryGetValue(callId, out var approval) ? approval : null;
 
@@ -178,7 +186,7 @@ public sealed record ChatBannersView(bool NoProviders, string? ExpiredProvider =
     /// <summary>No banner.</summary>
     public static ChatBannersView None { get; } = new(false);
 
-    /// <summary>The newest answer is a call the Spend Guard stopped (over a cap, or no price), or null.</summary>
+    /// <summary>The newest answer is a call the Spend Guard stopped (over a cap, or no price), with the messages queued behind it, or null.</summary>
     public ChatSpendStopView? Spend { get; init; }
 }
 

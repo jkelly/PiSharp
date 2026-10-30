@@ -19,6 +19,7 @@
 // compaction, not another send. Every check here ignores approvals that wait (PreflightAsync withApprovals: false), so a send the user has
 // not answered is always asked about. A send key's check, approval and send run one at a time (EnterAsync), so two copies of one POST
 // store one approval; a send that fails after its approval was stored withdraws it (WithdrawAsync) and is checked again when retried.
+// W3 fix 2: what Posted notes after a send's message is posted can never fail that send; a failure to read the sends table is logged.
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -338,12 +339,22 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
     }
 
     /// <summary>Notes that the send <paramref name="key"/> was posted as <paramref name="submissionId"/> of the chat, when it stored an
-    /// approval, so withdrawing that queued message (<see cref="WithdrawPostedAsync"/>) also withdraws its approval.</summary>
+    /// approval, so withdrawing that queued message (<see cref="WithdrawPostedAsync"/>) also withdraws its approval. The message is already
+    /// posted, so this never throws for want of the sends table or the database (W3 fix 2): it logs, and the approval then answers only its
+    /// own message until it expires.</summary>
     public void Posted(string chatId, long submissionId, string key)
     {
         ArgumentException.ThrowIfNullOrEmpty(chatId);
         ArgumentException.ThrowIfNullOrEmpty(key);
-        if (Sends.ApprovalOf(key) is null) return;
+        try
+        {
+            if (Sends.ApprovalOf(key) is null) return;
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            logger.LogWarning(error, "The spend approval of chat send {Key} could not be read after it was posted.", key);
+            return;
+        }
         if (posted.Count > 2000) posted.Clear();
         posted[(chatId, submissionId)] = key;
     }

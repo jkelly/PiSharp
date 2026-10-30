@@ -14,7 +14,9 @@
    act on an entry id (data-entry). W3 (S5): footers mark costs from the spend ledger (ChatSpendText): metered "$x", list price "≈ $x list",
    settled at an estimate "≈ $x · est.", uncertain (the chip, "$x reserved" and Resolve… on History › Spend), "price unknown"; the running
    answer's live footer "≈ $x · est." from the tokens received so far; and a call the Spend Guard stopped before it was sent shows the
-   cap's stop (data-failure="spend") with Review…, which opens modal-spend-confirm and continues after the user's choice. *@
+   cap's stop (data-failure="spend") with Review…, which opens modal-spend-confirm and continues after the user's choice. W3 fix 2: when
+   that stop ended the run and messages wait in the queue behind it, the stop card says they are sent when the user continues or sends
+   another message (data-queued; the durable engine starts queued messages only after an answer). *@
 @model ChatItemView
 @{
     var item = Model.Item;
@@ -62,7 +64,8 @@
             var lastText = texts.LastOrDefault();
             var failureName = failure switch { ChatFailureKind.Error => "error", ChatFailureKind.Expired => "expired", ChatFailureKind.Aborted => "aborted", ChatFailureKind.Spend => "spend", _ => null };
             var spendMark = live ? context.Spend.LiveFor(assistant) : context.Spend.For(assistant.Id);
-            var spendStop = failure == ChatFailureKind.Spend ? ChatSpendStopView.From(meta?.ErrorMessage ?? assistant.Error, assistant.Id) : null;
+            var spendStop = failure == ChatFailureKind.Spend && ChatSpendStopView.From(meta?.ErrorMessage ?? assistant.Error, assistant.Id) is { } stopped
+                ? stopped with { Queued = context.QueuedBehind(assistant.Id) } : null;
             var errorText = ChatFailures.Display(meta?.ErrorMessage ?? assistant.Error);
             <article class="msg msg-assistant" data-key="@assistant.Key" data-entry="@assistant.Id" data-stop="@meta?.StopReason" data-failure="@failureName" data-tail="@(facts.Tail ? "true" : null)">
               <div class="msg-body">
@@ -116,12 +119,16 @@
                 @switch (failure)
                 {
                     case ChatFailureKind.Spend when spendStop is not null:
-                      <div class="msg-error msg-spend mt-2" role="alert" data-spend-stop data-op="@spendStop.Op" data-code="@spendStop.Code">
+                      <div class="msg-error msg-spend mt-2" role="alert" data-spend-stop data-op="@spendStop.Op" data-code="@spendStop.Code" data-queued="@spendStop.Queued">
                         <div class="d-flex align-items-start gap-2">
                           <i class="bi bi-shield-exclamation mt-1" aria-hidden="true"></i>
                           <div class="flex-grow-1 min-w-0">
                             <div class="fw-semibold">@spendStop.Title</div>
                             <div class="small text-break">@ChatDisplay.Cut(spendStop.Text, 600) Nothing was sent or reserved.</div>
+                            @if (spendStop.QueuedText is { } waiting)
+                            {
+                              <div class="small mt-1" data-spend-queued><i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>@waiting</div>
+                            }
                             <div class="d-flex flex-wrap gap-2 mt-2">
                               @if (spendStop.Op is { Length: > 0 } stopOp)
                               {

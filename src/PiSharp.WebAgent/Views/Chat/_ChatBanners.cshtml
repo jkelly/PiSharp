@@ -3,13 +3,14 @@
    again goes to that provider's settings, and Retry on the failed answer sends again with the same account. The page renders it; the
    stream re-renders it (panel "banners"). W3 (S5): the over-cap state of a run: when the branch's newest answer is a call the Spend Guard
    stopped (over a cap, or no price), the banner says why and offers Review… (modal-spend-confirm with the stop's cause; the run continues
-   after the user's choice) and Settings › Spend. *@
+   after the user's choice) and Settings › Spend. W3 fix 2: when messages wait in the queue behind that stop (the durable engine starts
+   queued messages only after an answer), the banner says they are sent when the user continues or sends another message. *@
 @model ChatBannersView
 @if (Model.Spend is { } stop)
 {
-  <div class="app-banner warn" role="alert" data-banner="spend" data-code="@stop.Code">
+  <div class="app-banner warn" role="alert" data-banner="spend" data-code="@stop.Code" data-queued="@stop.Queued">
     <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
-    <span><strong>@stop.Title.</strong> @stop.Text Nothing was sent or reserved.</span>
+    <span><strong>@stop.Title.</strong> @stop.Text Nothing was sent or reserved.@if (stop.QueuedText is { } waiting) {<span data-spend-queued> @waiting</span>}</span>
     <span class="ms-auto d-flex flex-wrap gap-2">
       @if (stop.Op is { Length: > 0 } op)
       {

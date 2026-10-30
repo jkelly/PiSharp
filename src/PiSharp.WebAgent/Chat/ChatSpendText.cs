@@ -8,7 +8,8 @@
 // id) and the reported usage, else by provider, model and time (an answer without usage: dropped, stopped or failed after output); the
 // stored entries carry no op. A call the guard stopped inside the run has no row: its entry's error names the op (ChatSpendStopView).
 // The session panel's chat spend (ChatSpendSummary) is the ledger's total of the run and its per-run caps. Text set here is plain; the
-// tooltip's markup is built from encoded parts only.
+// tooltip's markup is built from encoded parts only. W3 fix (chat spend): the stop that ended a branch's run says when messages queued
+// behind it wait for the user (ChatSpendStopView.Queued), because the durable engine starts queued messages only after an answer.
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -156,9 +157,42 @@ public sealed record ChatSpendStopView(string Code, string Text, string? Op, lon
     /// <summary>Settings › Spend, at the part that changes this.</summary>
     public string SettingsUrl => Code == SpendErrors.UnknownPrice ? "/settings/spend#unknown-prices" : "/settings/spend#caps";
 
+    /// <summary>The messages queued behind this stop (follow-ups and steers sent while the run went on), when it ended the branch's run; 0
+    /// otherwise. W3 fix (chat spend): the durable engine starts queued messages only after an answer, and a stopped call ends its run with
+    /// an error, so they wait until the user continues or sends another message (a send to an idle branch with queued messages places them
+    /// first). The stop card and the banner say so.</summary>
+    public int Queued { get; init; }
+
+    /// <summary>What the stop card and the banner say about <see cref="Queued"/>, or null when nothing waits.</summary>
+    public string? QueuedText => Queued switch
+    {
+        <= 0 => null,
+        1 => "The run stopped here, so your queued message waits: it is sent when you continue or send another message.",
+        _ => $"The run stopped here, so your {Queued.ToString(CultureInfo.InvariantCulture)} queued messages wait: they are sent when you continue or send another message.",
+    };
+
     /// <summary>The stop in <paramref name="errorMessage"/>, or null when it is not a spend error.</summary>
     public static ChatSpendStopView? From(string? errorMessage, long? entryId) =>
         SpendErrors.Parse(errorMessage) is { } info ? new ChatSpendStopView(info.Code, info.Text, info.Op, entryId) : null;
+
+    /// <summary>The stop that ended a branch's run: its newest message (yours or an answer) is an answer the Spend Guard stopped. Null
+    /// otherwise, also when a message came after the stop (the stop no longer holds anything back).</summary>
+    /// <param name="entries">The branch's active entries.</param>
+    /// <param name="queued">The branch's queued messages (<see cref="Waiting"/>), which wait behind the stop.</param>
+    public static ChatSpendStopView? Newest(IEnumerable<JsonObject> entries, int queued = 0)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        var newest = entries.Where(entry => ChatDisplay.Str(entry, "kind") is "pi.user" or "pi.assistant").MaxBy(entry => ChatDisplay.Long(entry, "id") ?? 0);
+        if (ChatDisplay.Str(newest, "kind") != "pi.assistant") return null;
+        return From(ChatEntryMeta.Of(newest)?.ErrorMessage, ChatDisplay.Long(newest, "id")) is { } stop ? stop with { Queued = Math.Max(0, queued) } : null;
+    }
+
+    /// <summary>The messages of a branch's queue that wait to be sent: follow-ups and steers (a queued context update is not a message).</summary>
+    public static int Waiting(IEnumerable<InboxItem> inbox)
+    {
+        ArgumentNullException.ThrowIfNull(inbox);
+        return inbox.Count(item => item.Mode != "write");
+    }
 }
 
 /// <summary>The chat's spend in the session panel: the ledger's total of the run (the chat id) and its per-run caps.</summary>
