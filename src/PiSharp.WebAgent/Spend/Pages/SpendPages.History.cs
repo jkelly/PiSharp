@@ -1,7 +1,8 @@
 // Decision 0011 (run W3, S4): History › Spend's read side: the filters (search, UTC date range, provider → model, source, account, status),
 // one page of the ledger as the table shows it, the summary (today and this month against the everything-metered day and month caps, the
 // other caps above their warning threshold, the prompt-cache meter, what is not counted), the uncertain banner, and the Resolve modal's
-// figures (what settling or releasing would leave in each cap the row counts toward). Every figure is the ledger's.
+// figures (what settling or releasing would leave in each cap the row counts toward). Every figure is the ledger's. The filter chips and
+// the saved filters are SpendPages.SavedFilters.cs (W3 fix, spend-ui).
 using System.Globalization;
 using PiSharp.WebAgent.Contracts;
 
@@ -28,6 +29,7 @@ public sealed partial class SpendPages
         ResolveReservationView? resolve = null;
         if (filter.Resolve is { } op && await ledger.GetAsync(op, cancellationToken).ConfigureAwait(false) is { State: ReservationState.Uncertain } row)
             resolve = await ResolveViewAsync(row, cancellationToken).ConfigureAwait(false);
+        var options = FilterOptions(filter);
         return new SpendHistoryPage
         {
             Filter = filter,
@@ -37,9 +39,12 @@ public sealed partial class SpendPages
             Uncertain = [.. uncertain.Items.Select(item => LedgerRow(item, now))],
             UncertainCount = uncertain.Total,
             UncertainMicros = uncertainTotal.CountedMicros,
-            Options = FilterOptions(filter),
+            Options = options,
             DatabasePath = DatabasePath,
             Resolve = resolve,
+            Chips = FilterChips(filter, options),
+            Saved = SavedFilters(filter, options),
+            SaveName = SuggestedFilterName(filter, options),
         };
     }
 
@@ -453,6 +458,15 @@ public sealed record SpendHistoryPage
 
     /// <summary>The Resolve modal to open when the page loads (<c>?resolve=</c>), or null.</summary>
     public ResolveReservationView? Resolve { get; init; }
+
+    /// <summary>The active filters as chips, each with the address without it.</summary>
+    public IReadOnlyList<SpendFilterChip> Chips { get; init; } = [];
+
+    /// <summary>The saved filters (the Saved filters menu and the Manage modal).</summary>
+    public IReadOnlyList<SpendSavedFilterView> Saved { get; init; } = [];
+
+    /// <summary>The name the Save current filters modal suggests for the active filters.</summary>
+    public string SaveName { get; init; } = "";
 
     /// <summary>Whether the ledger holds no row at all.</summary>
     public bool Empty => Ledger.TotalAll == 0;

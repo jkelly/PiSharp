@@ -1,0 +1,46 @@
+@* Decision 0011 (run W3, fix spend-ui): Manage saved filters of History › Spend's Saved filters menu (the mockups name the menu item and
+   draw no modal for it): each saved filter's name, editable, what it filters, Open, and Remove (which marks the row and offers Undo).
+   Nothing changes until Save changes: spend-history.js then posts the remaining filters, in order, to /api/spend/filters/manage, and
+   reloads with the toast; closing the modal puts the rows back as they were. Model: SpendHistoryPage. *@
+@model SpendHistoryPage
+<div class="modal fade" id="modal-manage-spend-filters" tabindex="-1" aria-labelledby="modal-manage-spend-filters-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <form class="modal-content" novalidate autocomplete="off" data-manage-filters>
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="modal-manage-spend-filters-title">Manage saved filters</h2>
+          <div class="modal-subtitle">Rename or remove them. Nothing changes until you save.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="list-unstyled d-grid gap-2 mb-0" data-mf-list>
+          @for (var i = 0; i < Model.Saved.Count; i++)
+          {
+            var saved = Model.Saved[i];
+            <li class="ps-panel px-3 py-2" data-mf-row data-query="@saved.Query" data-name="@saved.Name">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi @saved.Icon text-ps-faint" aria-hidden="true"></i>
+                <label class="visually-hidden" for="@("mfName" + i)">Name of saved filter @(i + 1)</label>
+                <input class="form-control form-control-sm" id="@("mfName" + i)" maxlength="@SpendSavedFilters.MaxNameLength" value="@saved.Name" required data-mf-name>
+                <a class="btn btn-icon" href="@saved.Href" title="Open" aria-label="Open @saved.Name"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                <button class="btn btn-icon" type="button" title="Remove" aria-label="Remove @saved.Name" aria-pressed="false" data-mf-remove><i class="bi bi-trash3" aria-hidden="true"></i></button>
+              </div>
+              <div class="fs-8 ps-mono text-ps-faint text-break mt-1" data-mf-description>@saved.Description</div>
+              <div class="fs-8 text-ps-warn mt-1" data-mf-removed hidden>Removed when you save. <button class="btn btn-link btn-sm p-0 align-baseline fs-8" type="button" data-mf-undo>Undo</button></div>
+            </li>
+          }
+        </ul>
+        @if (Model.Saved.Count == 0)
+        {
+          <p class="fs-7 text-ps-faint mb-0">No saved filters. Choose filters, then Save current filters….</p>
+        }
+        <div class="text-ps-danger fs-7 mt-3" role="alert" data-mf-error hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-mf-submit>Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>

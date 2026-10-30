@@ -2,7 +2,8 @@
 // process with --faux-metered (the faux models at a test list price; no provider code path, no network) on a temporary data folder; ledger
 // rows are seeded through a SpendLedger on the same webagent.db before the app starts. A planted OPENAI_API_KEY (an environment account)
 // must never appear in any page, answer or CSV. The unit cases check the CSV's cells and the filters' query string. The subscription card's
-// case signs in to ChatGPT through the fake OAuth endpoints and runs the app without --faux (pages and /api/spend only, nothing sent).
+// case signs in to ChatGPT through the fake OAuth endpoints and runs the app without --faux (pages and /api/spend only, nothing sent). The
+// saved filters' cases (W3 fix, spend-ui) check the spend-filters section and its round trip through /api/spend/filters and History › Spend.
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -557,7 +558,211 @@ internal static partial class Program
                 DeleteTemp(root);
             }
         }),
+
+        // W3 fix (spend-ui): History › Spend's saved filters (the mockups' Saved filters menu, which S4 had replaced with fixed quick
+        // filters). The section keeps a name and the filters' query string: paging, the page size and ?resolve= are never saved, a filter
+        // needs at least one value, and a later filter with the same name (ignoring case) replaces the earlier one in its place.
+        Case("spend.pages.saved-filters-normalise", () =>
+        {
+            var defaults = SpendSavedFilters.CreateDefault().Normalize();
+            Equal("Uncertain only=status=uncertain|Settled at an estimate=status=estimate|Chats only=source=chat",
+                string.Join("|", defaults.Filters!.Select(filter => filter.Name + "=" + filter.Query)), "a new data folder starts with the filters that need no date");
+            Equal("spend-filters", SpendSavedFilters.SectionName, "its own section, not the guard's");
+            Equal("provider=anthropic&status=uncertain", SpendSavedFilters.NormalizeQuery("?status=uncertain&page=3&size=50&resolve=op-1&provider=anthropic&bogus=1"),
+                "the filters only, in their fixed order");
+            Equal("q=a%20b&from=2026-10-01&to=2026-10-31", SpendSavedFilters.NormalizeQuery("to=2026-10-31&from=2026-10-01&q=a+b"), "a search and a date range");
+            foreach (var empty in new[] { null, "", "?page=2&size=50", "status=bogus&model=m" })
+                Check(Throws<ArgumentException>(() => SpendSavedFilters.NormalizeQuery(empty), "no filter: " + empty).Message.Contains("at least one filter", StringComparison.Ordinal),
+                    "says so: " + empty);
+            Equal("Anthropic this month", SpendSavedFilters.NormalizeName("  Anthropic \t this   month "), "trimmed, runs of space as one");
+            Throws<ArgumentException>(() => SpendSavedFilters.NormalizeName(" "), "an empty name");
+            Equal(80, SpendSavedFilters.NormalizeName(new string('n', 80)).Length, "80 characters is allowed");
+            Throws<ArgumentException>(() => SpendSavedFilters.NormalizeName(new string('n', 81)), "81 is not");
+            var merged = new SpendSavedFilters([new("Mine", "status=uncertain"), new("Chats", "source=chat"), new(" mine ", "?status=estimate&page=4")]).Normalize();
+            Equal("mine=status=estimate|Chats=source=chat", string.Join("|", merged.Filters!.Select(filter => filter.Name + "=" + filter.Query)),
+                "the later filter called mine replaces the earlier one in its place");
+            Equal("/history/spend?status=estimate", merged.Find("MINE")!.Href, "found ignoring case");
+            Throws<ArgumentException>(() => new SpendSavedFilters([.. Enumerable.Range(0, SpendSavedFilters.MaxFilters + 1).Select(i => new SpendSavedFilter("f" + i, "source=chat"))]).Normalize(),
+                "at most 50");
+
+            var root = Temp("spend-pages-saved-filters-unit");
+            try
+            {
+                var pages = Sp4Pages(root, new EstCatalog().Add(EstProvider("anthropic", BillingKind.Metered), EstModel("anthropic", "claude-opus-5-5", new CatalogCost(2, 10))));
+                var filter = new SpendHistoryFilter { Provider = "anthropic", Model = "claude-opus-5-5", Source = SpendSource.Chat, Account = "acc-1", Status = LedgerStatus.Uncertain, Search = "x", Page = 3 };
+                Equal("search: x|date|provider: anthropic|model: claude-opus-5-5|source: Chat|account: account acc-1|status: uncertain",
+                    string.Join("|", pages.FilterChips(filter with { From = new DateOnly(2026, 10, 1) }).Select(chip => chip.Name == "date" ? "date" : chip.Text)), "the chips");
+                Equal("/history/spend?q=x&provider=anthropic&source=chat&account=acc-1&status=uncertain",
+                    pages.FilterChips(filter).Single(chip => chip.Name == "model").Href, "a chip's link leaves out that filter and the page");
+                Equal("anthropic/claude-opus-5-5 · Chat · account acc-1 · uncertain · “x”", pages.SuggestedFilterName(filter), "the suggested name");
+                Equal("anthropic · 2026-10-21", pages.SuggestedFilterName(new SpendHistoryFilter { Provider = "anthropic", From = new DateOnly(2026, 10, 21), To = new DateOnly(2026, 10, 21) }),
+                    "one day");
+                Equal("", pages.SuggestedFilterName(new SpendHistoryFilter()), "nothing to name");
+                Equal(SpendSavedFilters.MaxNameLength, pages.SuggestedFilterName(new SpendHistoryFilter { Search = new string('s', 200) }).Length, "a long suggestion is cut");
+                var saved = pages.SavedFilters(new SpendHistoryFilter { Status = LedgerStatus.Uncertain, Page = 2, Size = 50 });
+                Equal("Uncertain only:bi-question-circle:True|Settled at an estimate:bi-calculator:False|Chats only:bi-chat-square-text:False",
+                    string.Join("|", saved.Select(view => $"{view.Name}:{view.Icon}:{view.Current}")), "the menu marks the filter the page shows, whatever its page");
+                Equal(("status: uncertain", "/history/spend?status=uncertain"), (saved[0].Description, saved[0].Href), "described by its chips");
+                Check(pages.SavedFilters(new SpendHistoryFilter()).All(view => !view.Current), "nothing is marked on the unfiltered page");
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
+
+        // W3 fix (spend-ui): the saved filters round trip through /api/spend/filters and the page: the menu lists them (the one the page
+        // shows marked), Save current filters… is offered only when a filter is set and suggests a name, a save again is the same filter,
+        // the same name replaces, Manage saved filters renames and removes, and what the page shows is what webagent.db holds. A
+        // cross-origin write is refused, and no page or answer carries the planted environment key.
+        Case("spend.pages.saved-filters-round-trip", async () =>
+        {
+            var envKey = Planted("sk-proj-");
+            var root = Temp("spend-pages-saved-filters");
+            try
+            {
+                var data = Path.Join(root, "data");
+                Directory.CreateDirectory(data);
+                var path = Path.Join(data, "webagent.db");
+                var db = new WebAgentDb(path, [CoreMigrations.AppInfo, SettingsStore.Migration, .. SpendLedgerMigrations.All]);
+                db.Migrate();
+                var ledger = new SpendLedger(db, new SettingsStore(db));
+                await Sp4Seed(ledger, "op-chat", Sp4Estimate("anthropic", 120_000), SpendSource.Chat, "chat-1", async op => await ledger.SettleAsync(op, new SpendUsage(1_000, 100) { CostMicros = 3_000 }));
+                await Sp4Seed(ledger, "op-play", Sp4Estimate("openai", 50_000), SpendSource.Playground, "pg-1", async op => await ledger.ReleaseAsync(op, "failed before any output"));
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+                await using var app = await WebAgentApp.StartAsync(root, new AppStart
+                {
+                    DataDirectory = data,
+                    Faux = false,
+                    Arguments = ["--faux-metered"],
+                    Environment = new Dictionary<string, string> { ["OPENAI_API_KEY"] = envKey },
+                });
+                var seen = new StringBuilder();
+                async Task<(int Status, JsonNode? Body, string Text)> Call(HttpMethod method, string path, JsonNode? body = null)
+                {
+                    var response = await app.SendAsync(method, path, body, origin: method == HttpMethod.Get ? null : app.Origin);
+                    seen.AppendLine(response.Text);
+                    if (path.StartsWith(SpendEndpoints.Prefix, StringComparison.Ordinal))
+                        Check(response.Response.Headers.CacheControl?.NoStore == true, path + " is no-store");
+                    return (response.Status, response.Body, response.Text);
+                }
+                async Task<string> Page(string path)
+                {
+                    var (status, _, text) = await Call(HttpMethod.Get, path);
+                    Equal(200, status, path + ": " + Cut(text));
+                    Sp4CheckPage(path, text);
+                    return WebUtility.HtmlDecode(text);
+                }
+                static string Menu(string page) => Sp4Between(page, "data-saved-filters>", "</ul>");
+                static string Names(JsonNode? body) =>
+                    string.Join("|", body!["filters"]!.AsArray().Select(filter => filter!["name"]!.GetValue<string>() + "=" + filter["query"]!.GetValue<string>()));
+                Task<(int Status, JsonNode? Body, string Text)> Save(string name, string query) =>
+                    Call(HttpMethod.Post, "/api/spend/filters", new JsonObject { ["name"] = name, ["query"] = query });
+                Task<(int Status, JsonNode? Body, string Text)> Manage(params (string Name, string Query)[] filters) =>
+                    Call(HttpMethod.Post, "/api/spend/filters/manage",
+                        new JsonObject { ["filters"] = new JsonArray([.. filters.Select(filter => (JsonNode)new JsonObject { ["name"] = filter.Name, ["query"] = filter.Query })]) });
+
+                // The unfiltered page: the menu as the mockup draws it, with the starting filters; nothing to save yet.
+                var page = await Page("/history/spend");
+                var menu = Menu(page);
+                Check(page.Contains("<i class=\"bi bi-bookmark me-1\" aria-hidden=\"true\"></i>Saved filters</button>", StringComparison.Ordinal)
+                    && !page.Contains("Quick filters", StringComparison.Ordinal), "a Saved filters menu, not quick filters");
+                foreach (var (name, href) in new[] { ("Uncertain only", "/history/spend?status=uncertain"), ("Settled at an estimate", "/history/spend?status=estimate"), ("Chats only", "/history/spend?source=chat") })
+                    Check(Regex.IsMatch(menu, $"<a class=\"dropdown-item text-truncate\" href=\"{Regex.Escape(href)}\" title=\"[^\"]+\" data-saved-filter=\"{name}\">"), $"the menu has {name}: {menu}");
+                Check(menu.Contains("data-bs-target=\"#modal-save-spend-filter\" disabled=\"disabled\" data-save-filter-open>", StringComparison.Ordinal), "nothing to save without a filter: " + menu);
+                Check(menu.Contains("data-bs-target=\"#modal-manage-spend-filters\" data-manage-filters-open>", StringComparison.Ordinal), "Manage saved filters is offered");
+                foreach (var part in new[] { "id=\"modal-save-spend-filter\"", "id=\"modal-manage-spend-filters\"", "data-mf-row data-query=\"status=uncertain\" data-name=\"Uncertain only\"" })
+                    Check(page.Contains(part, StringComparison.Ordinal), "the page has " + part);
+                var listed = await Call(HttpMethod.Get, "/api/spend/filters");
+                Equal((200, "Uncertain only=status=uncertain|Settled at an estimate=status=estimate|Chats only=source=chat"), (listed.Status, Names(listed.Body)), "the list");
+
+                // Save current filters…: added (paging, size and resolve left out), the same again, then the same name ignoring case replaces it.
+                var added = await Save("Anthropic chats", "?provider=anthropic&source=chat&page=2&size=50&resolve=op-chat");
+                Equal(200, added.Status, "saved: " + added.Text);
+                Equal(("added", "provider=anthropic&source=chat", "/history/spend?provider=anthropic&source=chat", "provider: anthropic · source: Chat", "bi-chat-square-text"),
+                    (added.Body!["outcome"]!.GetValue<string>(), added.Body["filter"]!["query"]!.GetValue<string>(), added.Body["filter"]!["href"]!.GetValue<string>(),
+                        added.Body["filter"]!["description"]!.GetValue<string>(), added.Body["filter"]!["icon"]!.GetValue<string>()), "the saved filter");
+                Equal(("Filter saved", "Anthropic chats is under Saved filters: provider: anthropic · source: Chat."),
+                    (added.Body!["toast"]!["title"]!.GetValue<string>(), added.Body["toast"]!["body"]!.GetValue<string>()), "the toast");
+                var again = await Save("Anthropic chats", "provider=anthropic&source=chat");
+                Equal((200, "existing", 4), (again.Status, again.Body!["outcome"]!.GetValue<string>(), again.Body["filters"]!.AsArray().Count), "the same filter again is the same filter");
+                var replaced = await Save("  anthropic   CHATS ", "status=settled&provider=anthropic");
+                Equal((200, "replaced", "Saved filter replaced"), (replaced.Status, replaced.Body!["outcome"]!.GetValue<string>(), replaced.Body["toast"]!["title"]!.GetValue<string>()), "replaced");
+                Equal("Uncertain only=status=uncertain|Settled at an estimate=status=estimate|Chats only=source=chat|anthropic CHATS=provider=anthropic&status=settled",
+                    Names(replaced.Body), "in its place, under the new spelling");
+                foreach (var (name, query, why) in new[] { ("", "status=settled", "a name"), ("Paged", "page=2&size=50", "at least one filter"), (new string('n', 81), "status=settled", "at most 80") })
+                {
+                    var bad = await Save(name, query);
+                    Equal((400, "invalid"), (bad.Status, bad.Body!["code"]!.GetValue<string>()), "refused without " + why + ": " + bad.Text);
+                }
+                Equal(400, (await Call(HttpMethod.Post, "/api/spend/filters", new JsonObject { ["name"] = 5, ["query"] = "status=settled" })).Status, "a name is text");
+                Equal(403, (await app.SendAsync(HttpMethod.Post, "/api/spend/filters", new JsonObject { ["name"] = "Evil", ["query"] = "status=settled" }, origin: "http://evil.example")).Status,
+                    "a cross-origin save is refused");
+
+                // The page with those filters: the saved one is marked, Save current filters… is offered with a name suggested from the values.
+                var filtered = await Page("/history/spend?provider=anthropic&status=settled");
+                menu = Menu(filtered);
+                Check(menu.Contains("<a class=\"dropdown-item text-truncate active\" href=\"/history/spend?provider=anthropic&status=settled\" title=\"provider: anthropic · status: settled\" aria-current=\"true\" data-saved-filter=\"anthropic CHATS\">",
+                    StringComparison.Ordinal), "the filter the page shows is marked: " + menu);
+                Check(menu.Contains("data-bs-target=\"#modal-save-spend-filter\" data-save-filter-open>", StringComparison.Ordinal), "Save current filters… is offered");
+                var modal = Sp4Between(filtered, "id=\"modal-save-spend-filter\"", "</form>");
+                Check(modal.Contains("data-save-filter data-query=\"?provider=anthropic&status=settled\"", StringComparison.Ordinal), "the modal saves the page's filters: " + modal);
+                Check(modal.Contains("value=\"anthropic · settled\"", StringComparison.Ordinal), "a suggested name: " + modal);
+                Check(modal.Contains("<span class=\"ps-chip\" data-tone=\"accent\">provider: anthropic</span>", StringComparison.Ordinal)
+                    && modal.Contains("<span class=\"ps-chip\" data-tone=\"accent\">status: settled</span>", StringComparison.Ordinal), "the filters it saves");
+                Check(!modal.Contains("doesn't move with the calendar", StringComparison.Ordinal), "no date note without dates");
+                Check((await Page("/history/spend?from=2026-10-01")).Contains("doesn't move with the calendar", StringComparison.Ordinal), "the date note with dates");
+
+                // Manage saved filters: rename and remove in one save; two with one name are refused and change nothing.
+                var managed = await Manage(("Uncertain spend", "status=uncertain"), ("anthropic CHATS", "provider=anthropic&status=settled"));
+                Equal(200, managed.Status, "managed: " + managed.Text);
+                Equal(("Uncertain spend=status=uncertain|anthropic CHATS=provider=anthropic&status=settled", 2, "2 saved filters. Removed 2."),
+                    (Names(managed.Body), managed.Body!["removed"]!.GetValue<int>(), managed.Body["toast"]!["body"]!.GetValue<string>()), "renamed and removed");
+                var twice = await Manage(("Same", "status=uncertain"), ("same", "source=chat"));
+                Equal((400, "invalid"), (twice.Status, twice.Body!["code"]!.GetValue<string>()), "two called same");
+                Check(twice.Body!["error"]!.GetValue<string>().Contains("Two saved filters are called same", StringComparison.Ordinal), "says so: " + twice.Text);
+                Equal(400, (await Call(HttpMethod.Post, "/api/spend/filters/manage", new JsonObject())).Status, "the list is required, so a missing one never clears it");
+                Equal(400, (await Manage(("Nothing", "page=3"))).Status, "a filter without a value");
+                Equal("Uncertain spend=status=uncertain|anthropic CHATS=provider=anthropic&status=settled", Names((await Call(HttpMethod.Get, "/api/spend/filters")).Body),
+                    "unchanged by the refusals");
+                menu = Menu(await Page("/history/spend"));
+                Check(menu.Contains("data-saved-filter=\"Uncertain spend\"", StringComparison.Ordinal) && !menu.Contains("Chats only", StringComparison.Ordinal)
+                    && menu.IndexOf("Uncertain spend", StringComparison.Ordinal) < menu.IndexOf("anthropic CHATS", StringComparison.Ordinal), "the page shows the managed list in order: " + menu);
+
+                // Everything removed: the menu says so and Manage is not offered; a new save starts the list again.
+                var cleared = await Manage();
+                Equal((200, "", "No saved filters left. Removed 2."), (cleared.Status, Names(cleared.Body), cleared.Body!["toast"]!["body"]!.GetValue<string>()), "all removed");
+                menu = Menu(await Page("/history/spend"));
+                Check(menu.Contains("None saved yet.", StringComparison.Ordinal) && menu.Contains("data-bs-target=\"#modal-manage-spend-filters\" disabled=\"disabled\"", StringComparison.Ordinal),
+                    "the empty menu: " + menu);
+                Equal("added", (await Save("Playground", "source=playground")).Body!["outcome"]!.GetValue<string>(), "saved after clearing");
+
+                NoSecret(seen.ToString(), "a page or answer", envKey);
+                await app.StopAsync();
+                Check(!app.Log.Contains("Exception", StringComparison.Ordinal), "no exception in the log: " + app.Log);
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                var stored = new SettingsStore(new WebAgentDb(path, [CoreMigrations.AppInfo, SettingsStore.Migration])).Get<SpendSavedFilters>();
+                Equal("Playground=source=playground", string.Join("|", stored.Filters!.Select(filter => filter.Name + "=" + filter.Query)), "webagent.db holds what the page showed");
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
     ];
+
+    /// <summary>The text of <paramref name="html"/> from <paramref name="start"/> to the next <paramref name="end"/>.</summary>
+    private static string Sp4Between(string html, string start, string end)
+    {
+        var from = html.IndexOf(start, StringComparison.Ordinal);
+        Check(from >= 0, "the page has " + start);
+        var to = html.IndexOf(end, from, StringComparison.Ordinal);
+        Check(to > from, start + " ends with " + end);
+        return html[from..to];
+    }
 
     /// <summary>The account card of <paramref name="accountId"/> on a provider page: from its <c>data-account-card</c> to its test result.</summary>
     private static string Sp4AccountCard(string html, string accountId)
