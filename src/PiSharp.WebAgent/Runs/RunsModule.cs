@@ -6,8 +6,8 @@
 //   - with real providers (not --faux), RoutingOptions.ProviderHandler is wrapped by the capture hook (RunCaptureHandler) so a run's options
 //     reach the provider and, when the user turned raw payloads on, its redacted request and response are kept. A handler a test or host
 //     registered stays theirs (the hook never disposes it); otherwise the hook owns one shared handler (redirects off, no cookies);
-//   - RunRetention cleans runs.db when the app starts and every day after (history.retentionDays, pinned runs kept; raw payloads after
-//     RunHistorySettings.RawRetentionDays).
+//   - RunRetention cleans runs.db when the app starts and every hour after (history.retentionDays, pinned runs kept; raw payloads after
+//     RunHistorySettings.RawRetentionDays, which RunStore never reads past anyway), on the app's TimeProvider when it registers one.
 // MapRunsArea maps /api/runs (RunEndpoints).
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PiSharp.Durable;
@@ -26,7 +26,8 @@ public static class RunsModule
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
         services.TryAddSingleton(provider => new RunsDb(options, provider.GetService<ILogger<RunsDb>>()));
-        services.TryAddSingleton(provider => new RunStore(provider.GetRequiredService<RunsDb>(), provider.GetService<ILogger<RunStore>>()));
+        services.TryAddSingleton(provider => new RunStore(provider.GetRequiredService<RunsDb>(), provider.GetService<ILogger<RunStore>>(),
+            provider.GetService<TimeProvider>()));
         services.TryAddSingleton<RunLive>();
         services.TryAddSingleton(provider => new RunEngine(provider.GetRequiredService<RunStore>(), provider.GetRequiredService<RunLive>(), provider,
             provider.GetService<ILogger<RunEngine>>(), provider.GetService<IHostApplicationLifetime>()));
@@ -137,24 +138,28 @@ public sealed class RunCaptureHook : IDisposable
 
 /// <summary>Cleans runs.db when the app starts and every <see cref="Interval"/> after: runs older than the retention (unpinned, not
 /// running), and raw payloads older than <see cref="RunHistorySettings.RawRetentionDays"/>. Its first cleanup opens the store, which marks
-/// the runs a stopped process left running as interrupted (never retried).</summary>
+/// the runs a stopped process left running as interrupted (never retried). Each pass reads the saved settings and the app's clock (its
+/// TimeProvider, or the system's); a pass that fails is logged and the next one runs on time.</summary>
 public sealed class RunRetention(RunStore store, IServiceProvider services, ILogger<RunRetention>? log = null) : BackgroundService
 {
-    /// <summary>How often the cleanup runs.</summary>
-    public static TimeSpan Interval { get; } = TimeSpan.FromHours(24);
+    /// <summary>How often the cleanup runs: hourly, so stored payloads go within the hour after their seven days (they are not read after
+    /// them in any case) and expired runs well within the day.</summary>
+    public static TimeSpan Interval { get; } = TimeSpan.FromHours(1);
 
-    /// <summary>One cleanup now.</summary>
+    private TimeProvider Time => services.GetService<TimeProvider>() ?? TimeProvider.System;
+
+    /// <summary>One cleanup now, with the saved <see cref="RunHistorySettings"/>.</summary>
     public RunCleanup CleanNow()
     {
         var settings = services.GetService<ISettingsStore>()?.Get<RunHistorySettings>() ?? RunHistorySettings.CreateDefault();
-        var time = services.GetService<TimeProvider>() ?? TimeProvider.System;
-        return store.Cleanup(settings, time.GetUtcNow());
+        return store.Cleanup(settings, Time.GetUtcNow());
     }
 
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Yield();
+        var time = Time;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -169,7 +174,7 @@ public sealed class RunRetention(RunStore store, IServiceProvider services, ILog
             }
             try
             {
-                await Task.Delay(Interval, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(Interval, time, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

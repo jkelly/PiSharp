@@ -1,12 +1,21 @@
 // Decision 0011 (run W4, R0): runs.db. In process over a temporary file: its own migration (id 1, once, never in webagent.db), retention
 // (30 days by default; pinned runs, their parents and a pinned parent's runs kept; running runs never removed; null keeps everything), raw
-// payloads removed after seven days whatever the run's retention (the run's raw state becomes expired), a store opened after a stop marks
-// another process's running runs interrupted, the history query (filters, search, paging, totals), pins, deletes, and the redaction of
-// captured requests (headers, query parameters, the planted key wherever it appears).
+// payloads removed after seven days whatever the run's retention (the run's raw state becomes expired) and never read after them even
+// before a cleanup (a fixed clock), a store opened after a stop marks another process's running runs interrupted, the history query
+// (filters, search, paging, totals), pins, deletes, and the redaction of captured requests (headers, query parameters, the planted key
+// wherever it appears). RunRetention, the hosted service: it cleans at start and every interval on the app's clock with the saved
+// settings, a failed pass is logged and the next one runs; and the built app cleans a seeded runs.db when it starts.
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Hosting;
 using PiSharp.WebAgent.Runs;
+using PiSharp.WebAgent.Spend;
 
 internal static partial class Program
 {
@@ -91,25 +100,120 @@ internal static partial class Program
             var root = Temp("runs-store-raw");
             try
             {
-                var store = new RunStore(new RunsDb(Path.Join(root, RunsDb.FileName)));
-                var now = DateTimeOffset.UtcNow;
-                foreach (var (id, age) in new[] { ("raw-old", 8), ("raw-new", 2) })
-                {
-                    store.Insert(RunsRow(id, now.AddDays(-age), RunStatus.Running));
-                    store.Finish(id, new RunOutcome
-                    {
-                        Status = RunStatus.Completed,
-                        Finished = now.AddDays(-age),
-                        Events = [new RunEventRecord(1, 5, new JsonObject { ["type"] = "start" })],
-                        Raw = [new RunRawItem(1, "request", 0, "{}"), new RunRawItem(2, "sse", 4, "data: {}")],
-                    });
-                }
-                Equal((RunRawState.Stored, 2), (store.Get("raw-old")!.RawState, store.Raw("raw-old").Count), "stored");
+                var path = Path.Join(root, RunsDb.FileName);
+                var now = new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero);
+                var clock = new RunsClock(now);
+                var store = new RunStore(new RunsDb(path), time: clock);
+                var week = TimeSpan.FromDays(RunHistorySettings.RawRetentionDays);
+                foreach (var (id, age) in new[] { ("raw-old", TimeSpan.FromDays(8)), ("raw-past", week + TimeSpan.FromHours(1)), ("raw-new", week - TimeSpan.FromHours(1)) })
+                    RunsWithRaw(store, id, now - age);
+                int OnDisk(string id) => ReadDb(path, $"SELECT COUNT(*) FROM run_raw WHERE run_id = '{id}'", reader => reader.GetInt32(0)).Single();
+
+                // Never read past seven days, though a cleanup has not removed them yet.
+                Equal((RunRawState.Expired, 0), (store.Get("raw-past")!.RawState, store.Raw("raw-past").Count), "a payload 7 days and 1 hour old is not returned");
+                Equal(RunRawState.Expired, store.List(new RunQuery()).Items.Single(item => item.Id == "raw-past").RawState, "History reads it as expired too");
+                Equal(2, OnDisk("raw-past"), "until the next cleanup removes it");
+                Equal((RunRawState.Stored, 2), (store.Get("raw-new")!.RawState, store.Raw("raw-new").Count), "one an hour short of seven days is");
+
                 var cleanup = store.Cleanup(RunHistorySettings.CreateDefault(), now);
-                Equal((0, 1), (cleanup.Runs, cleanup.RawRuns), "the run stays; its raw payloads go");
+                Equal((0, 2), (cleanup.Runs, cleanup.RawRuns), "the runs stay; their raw payloads go");
+                Equal((0, 0), (OnDisk("raw-old"), OnDisk("raw-past")), "removed from runs.db");
                 Equal((RunRawState.Expired, 0), (store.Get("raw-old")!.RawState, store.Raw("raw-old").Count), "expired");
                 Equal(1, store.Events("raw-old").Count, "its events stay");
                 Equal((RunRawState.Stored, 2), (store.Get("raw-new")!.RawState, store.Raw("raw-new").Count), "a newer run keeps them");
+
+                clock.Advance(TimeSpan.FromHours(2));
+                Equal((RunRawState.Expired, 0), (store.Get("raw-new")!.RawState, store.Raw("raw-new").Count), "and stops showing them once they are seven days old");
+            }
+            finally
+            {
+                SqliteClearPools();
+                DeleteTemp(root);
+            }
+        }),
+
+        Case("runs.retention.cleans-at-start-and-every-interval-with-the-saved-settings", async () =>
+        {
+            var root = Temp("runs-retention-service");
+            var now = new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero);
+            var clock = new RunsClock(now);
+            var logs = new ConcurrentQueue<string>();
+            ServiceProvider? provider = null;
+            try
+            {
+                var options = new WebAgentOptions { DataDirectory = Path.Join(root, "data"), Faux = true };
+                options.EnsureDirectories();
+                var services = new ServiceCollection();
+                services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Debug).AddProvider(new ListLoggerProvider(logs)));
+                services.AddSingleton<TimeProvider>(clock);
+                services.AddWebAgentCore(options);
+                services.AddWebAgentFallbacks(options);
+                services.AddSpendArea(options);
+                services.AddRunsArea(options);
+                services.AddSingleton<ISettingsStore>(registered => new RunsFlakySettings(new SettingsStore(registered.GetRequiredService<WebAgentDb>())));
+                provider = services.BuildServiceProvider();
+                provider.GetRequiredService<WebAgentDb>().Migrate();
+                var settings = (RunsFlakySettings)provider.GetRequiredService<ISettingsStore>();
+                var store = provider.GetRequiredService<RunStore>();
+                store.Insert(RunsRow("old", now.AddDays(-40)));
+                store.Insert(RunsRow("old-pinned", now.AddDays(-40)) with { Pinned = true });
+                store.Insert(RunsRow("two-days", now.AddDays(-2)));
+                RunsWithRaw(store, "raw-old", now.AddDays(-8));
+                RunsWithRaw(store, "raw-new", now.AddHours(-1));
+                int OnDisk(string id) => ReadDb(store.Db.Path, $"SELECT COUNT(*) FROM run_raw WHERE run_id = '{id}'", reader => reader.GetInt32(0)).Single();
+
+                var retention = provider.GetServices<IHostedService>().OfType<RunRetention>().Single();
+                settings.FailOnce();
+                await retention.StartAsync(CancellationToken.None);
+                await WaitUntilAsync(() => Task.FromResult(logs.Any(line => line.Contains("Run history cleanup failed", StringComparison.Ordinal)) && clock.Waiting > 0),
+                    "the first pass fails, is logged, and the next one is due");
+                Check(store.Get("old") is not null && OnDisk("raw-old") == 2, "the failed pass removed nothing");
+
+                clock.Advance(RunRetention.Interval);
+                await WaitUntilAsync(() => Task.FromResult(store.Get("old") is null), "the next pass runs on time and removes the expired run");
+                Equal("old-pinned,raw-new,raw-old,two-days", Ids(store), "pinned and recent runs stay");
+                Equal((0, RunRawState.Expired), (OnDisk("raw-old"), store.Get("raw-old")!.RawState), "raw payloads past seven days are removed");
+                Equal((2, RunRawState.Stored), (OnDisk("raw-new"), store.Get("raw-new")!.RawState), "newer ones stay");
+                Check(retention.ExecuteTask is { IsCompleted: false }, "the service keeps going after a failed pass");
+
+                await settings.SaveAsync(new RunHistorySettings(RetentionDays: 1));
+                Equal(2, retention.CleanNow().Runs, "a cleanup reads the saved retention (one day)");
+                Equal("old-pinned,raw-new", Ids(store), "the two-day and eight-day runs went; the pinned run stays");
+                await retention.StopAsync(CancellationToken.None);
+                Check(retention.ExecuteTask?.IsCompleted == true && clock.Waiting == 0, "it stops with the app");
+            }
+            finally
+            {
+                if (provider is not null) await provider.DisposeAsync();
+                SqliteClearPools();
+                DeleteTemp(root);
+            }
+        }),
+
+        Case("runs.app.cleans-runs-db-when-it-starts", async () =>
+        {
+            var root = Temp("runs-app-retention");
+            try
+            {
+                var data = Path.Join(root, "data");
+                Directory.CreateDirectory(data);
+                var now = DateTimeOffset.UtcNow;
+                var seed = new RunStore(new RunsDb(Path.Join(data, RunsDb.FileName)));
+                seed.Insert(RunsRow("old", now.AddDays(-40)));
+                seed.Insert(RunsRow("old-pinned", now.AddDays(-40)) with { Pinned = true });
+                seed.Insert(RunsRow("recent", now.AddDays(-2)));
+                RunsWithRaw(seed, "raw-old", now.AddDays(-8));
+                RunsWithRaw(seed, "raw-new", now.AddDays(-1));
+                SqliteClearPools();
+                await using var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = data, Arguments = ["--faux"] });
+                await WaitUntilAsync(async () => (await app.Get("/api/runs/old")).Status == 404, "the expired run is removed at start");
+                Equal((200, 200), ((await app.Get("/api/runs/old-pinned")).Status, (await app.Get("/api/runs/recent")).Status), "pinned and recent runs stay");
+                await WaitUntilAsync(() => Task.FromResult(ReadDb(Path.Join(data, RunsDb.FileName), "SELECT COUNT(*) FROM run_raw WHERE run_id = 'raw-old'",
+                    reader => reader.GetInt32(0)).Single() == 0), "raw payloads past seven days are removed at start");
+                var expired = await app.Get("/api/runs/raw-old/raw");
+                Equal(("expired", 0), (expired.Body!["rawState"]!.GetValue<string>(), expired.Body["items"]!.AsArray().Count), "and read as expired: " + expired.Text);
+                var kept = await app.Get("/api/runs/raw-new/raw");
+                Equal(("stored", 2), (kept.Body!["rawState"]!.GetValue<string>(), kept.Body["items"]!.AsArray().Count), "a newer run keeps its payloads: " + kept.Text);
             }
             finally
             {
@@ -224,6 +328,119 @@ internal static partial class Program
         Started = created,
         Updated = created,
     };
+
+    /// <summary>Inserts the finished run <paramref name="id"/> with two raw payload items stored at <paramref name="at"/>.</summary>
+    private static void RunsWithRaw(RunStore store, string id, DateTimeOffset at)
+    {
+        store.Insert(RunsRow(id, at, RunStatus.Running));
+        store.Finish(id, new RunOutcome
+        {
+            Status = RunStatus.Completed,
+            Finished = at,
+            Events = [new RunEventRecord(1, 5, new JsonObject { ["type"] = "start" })],
+            Raw = [new RunRawItem(1, "request", 0, "{}"), new RunRawItem(2, "sse", 4, "data: {}")],
+        });
+    }
+
+    /// <summary>A clock that moves only when told to, with timers that fire when it passes their time (Task.Delay on it waits for that).</summary>
+    internal sealed class RunsClock(DateTimeOffset start) : TimeProvider
+    {
+        private readonly Lock gate = new();
+        private readonly List<Timer> timers = [];
+        private DateTimeOffset now = start;
+
+        /// <summary>How many timers wait to fire.</summary>
+        public int Waiting
+        {
+            get
+            {
+                lock (gate) return timers.Count(timer => timer.Due is not null);
+            }
+        }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            lock (gate) return now;
+        }
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = new Timer(this, callback, state);
+            lock (gate) timers.Add(timer);
+            timer.Change(dueTime, period);
+            return timer;
+        }
+
+        /// <summary>Moves the clock on by <paramref name="by"/> and fires every timer that is then due.</summary>
+        public void Advance(TimeSpan by)
+        {
+            List<Timer> due;
+            lock (gate)
+            {
+                now += by;
+                due = [.. timers.Where(timer => timer.Due is { } at && at <= now)];
+                foreach (var timer in due) timer.Due = timer.Period is { } period ? now + period : null;
+            }
+            foreach (var timer in due) timer.Fire();
+        }
+
+        private sealed class Timer(RunsClock clock, TimerCallback callback, object? state) : ITimer
+        {
+            public DateTimeOffset? Due { get; set; }
+
+            public TimeSpan? Period { get; private set; }
+
+            public bool Change(TimeSpan dueTime, TimeSpan period)
+            {
+                lock (clock.gate)
+                {
+                    if (!clock.timers.Contains(this)) return false;
+                    Due = dueTime == Timeout.InfiniteTimeSpan ? null : clock.now + dueTime;
+                    Period = period == Timeout.InfiniteTimeSpan || period == TimeSpan.Zero ? null : period;
+                }
+                return true;
+            }
+
+            public void Fire() => callback(state);
+
+            public void Dispose()
+            {
+                lock (clock.gate) clock.timers.Remove(this);
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
+    }
+
+    /// <summary>The settings store, with run history's section failing once when told to (a cleanup pass that fails).</summary>
+    private sealed class RunsFlakySettings(ISettingsStore inner) : ISettingsStore
+    {
+        private int fail;
+
+        public void FailOnce() => Volatile.Write(ref fail, 1);
+
+        public T Get<T>() where T : class, ISettingsSection<T> =>
+            typeof(T) == typeof(RunHistorySettings) && Interlocked.Exchange(ref fail, 0) == 1
+                ? throw new IOException("webagent.db could not be read (test).") : inner.Get<T>();
+
+        public Task<T> SaveAsync<T>(T value, CancellationToken cancellationToken = default) where T : class, ISettingsSection<T> =>
+            inner.SaveAsync(value, cancellationToken);
+
+        public Task<T> UpdateAsync<T>(Func<T, T> change, CancellationToken cancellationToken = default) where T : class, ISettingsSection<T> =>
+            inner.UpdateAsync(change, cancellationToken);
+
+        public Task<T> ResetAsync<T>(CancellationToken cancellationToken = default) where T : class, ISettingsSection<T> => inner.ResetAsync<T>(cancellationToken);
+
+        public event EventHandler<SettingsChangedEventArgs>? Changed
+        {
+            add => inner.Changed += value;
+            remove => inner.Changed -= value;
+        }
+    }
 
     private static string Ids(RunStore store) =>
         string.Join(",", store.List(new RunQuery { Limit = RunQuery.MaxLimit }).Items.Select(item => item.Id).Order(StringComparer.Ordinal));

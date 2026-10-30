@@ -9,8 +9,8 @@ using PiSharp.WebAgent.Contracts;
 namespace PiSharp.WebAgent.Runs;
 
 /// <summary>Run history's settings (section <c>history</c>, Settings › Data).</summary>
-/// <param name="RetentionDays">Runs older than this many days are deleted at start and once a day (pinned ones are kept); null keeps them
-/// forever. 1 to 3,650; default 30.</param>
+/// <param name="RetentionDays">Runs older than this many days are deleted at start and every hour after (pinned ones are kept); null keeps
+/// them forever. 1 to 3,650; default 30.</param>
 /// <param name="StoreRawPayloads">Whether raw payloads are stored (opt-in; default off). They are kept at most
 /// <see cref="RawRetentionDays"/> days.</param>
 /// <param name="StoreSseEvents">Whether each run's normalized stream events are stored with their arrival times (default on).</param>

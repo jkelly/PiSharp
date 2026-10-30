@@ -6,10 +6,12 @@
 // it is reserved again). A reserved call gets its runs.db row (running) and runs in the background, tied to the app's life rather than to
 // the request, so it keeps going when the tab closes: through AccountRouter (WebDurableModels' host transport) with the run's account, or,
 // with --faux, through the faux models offline (--faux-metered prices them). The guard's output cap ("cap the output") is sent as max
-// tokens. Every normalized event is published to the run's live log (RunLive, for /api/runs/{id}/events) with its time, and stored with the
-// row when event storage is on; raw payloads are captured (redacted) by the routing hook only when the user turned them on. When the call
-// ends the row records the output, usage, cost (the ledger row it settled: actual, estimate, uncertain or released, with its billing
-// mode), time to first token, duration, tokens per second, stop reason and error. A cancelled run ends aborted; a run the app stops during
+// tokens, and like the user's own it is the whole output (RunModelOptions.SendPatch); a cap the run cannot hold is refused before anything
+// is reserved or sent, and the confirm modal of a refused run does not offer it. Every normalized event is published to the run's live
+// log (RunLive, for /api/runs/{id}/events) with its time, and stored with the row when event storage is on; raw payloads are captured
+// (redacted) by the routing hook only when the user turned them on. When the call ends the row records the output, usage, cost (the
+// ledger row it settled: actual, estimate, uncertain or released, with its billing mode), time to first token, duration, tokens per
+// second, stop reason and error. A cancelled run ends aborted; a run the app stops during
 // ends interrupted, and one the app was killed during is marked interrupted at the next start (RunStore): neither is retried by itself.
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -55,7 +57,13 @@ public sealed record RunSpendAnswer(SpendChoice Choice, int? MaxOutputTokens = n
 /// <param name="Message">Why, in a sentence.</param>
 /// <param name="Call">The call as checked (for the confirm modal).</param>
 /// <param name="Decision">The guard's decision.</param>
-public sealed record RunRefusal(string Code, string Message, SpendCall Call, SpendDecision Decision);
+public sealed record RunRefusal(string Code, string Message, SpendCall Call, SpendDecision Decision)
+{
+    /// <summary>Why capping the run's output at a given number of tokens would not hold (its model takes no output cap, or its thinking needs
+    /// more), or null when it would; the confirm modal does not offer "cap the output" then. Null: always offered.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<int, string?>? CapOutputRefusal { get; init; }
+}
 
 /// <summary>What a run request started.</summary>
 /// <param name="Posted">Whether anything started.</param>
@@ -136,6 +144,7 @@ public sealed class RunEngine : IAsyncDisposable
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
         var plan = Plan(spec);
         if (!plan.Allowed) throw new RunOptionException(plan);
+        CheckCap(plan, spend);
         var id = NewId();
         var account = await AccountAsync(plan, cancellationToken).ConfigureAwait(false);
         var call = Call(plan, id, account, plan.Spec.GroupId ?? id);
@@ -147,7 +156,13 @@ public sealed class RunEngine : IAsyncDisposable
         if (!lease.Reserved)
         {
             await lease.DisposeAsync().ConfigureAwait(false);
-            return new RunStart(false, [], null, Refusal(call, lease.Decision));
+            return new RunStart(false, [], null, Refusal(call, lease.Decision) with { CapOutputRefusal = tokens => CapRefusal(plan, tokens) });
+        }
+        if (CapRefusal(plan, lease.Reservation.MaxTokens) is { } why)
+        {
+            // An approval stored for the run earlier capped the output below what the run can hold: release it, send nothing.
+            await lease.DisposeAsync().ConfigureAwait(false);
+            throw new ArgumentException(CapMessage(plan, lease.Reservation.MaxTokens!.Value, why));
         }
         Begin(id, plan, account, call, lease, plan.Spec.GroupId);
         return new RunStart(true, [id], plan.Spec.GroupId, null);
@@ -178,6 +193,14 @@ public sealed class RunEngine : IAsyncDisposable
                 throw new ArgumentException($"Column {index + 1}: {error.Message}", error);
             }
             if (!plan.Allowed) throw new RunOptionException(plan);
+            try
+            {
+                CheckCap(plan, spend);
+            }
+            catch (ArgumentException error)
+            {
+                throw new ArgumentException($"Column {index + 1}: {error.Message}", error);
+            }
             plans.Add(plan);
         }
         var ids = plans.Select(_ => NewId()).ToList();
@@ -194,8 +217,19 @@ public sealed class RunEngine : IAsyncDisposable
             await leases.DisposeAsync().ConfigureAwait(false);
             var refusing = leases.Reservation.Items.FirstOrDefault(item => !item.Reserved);
             var decision = leases.Reservation.Refused ?? refusing?.GroupDecision ?? refusing?.Decision ?? leases.Leases[0].Decision;
-            return new RunStart(false, [], group, Refusal(refusing?.Call ?? calls[0], decision));
+            return new RunStart(false, [], group, Refusal(refusing?.Call ?? calls[0], decision) with
+            {
+                // The answer caps every column: it is offered only when every column holds it.
+                CapOutputRefusal = tokens => plans.Select(plan => CapRefusal(plan, tokens) is { } why ? $"{plan.Model.Provider}/{plan.Model.Id}: {why}" : null)
+                    .FirstOrDefault(why => why is not null),
+            });
         }
+        for (var index = 0; index < plans.Count; index++)
+            if (CapRefusal(plans[index], leases.Leases[index].Reservation.MaxTokens) is { } why)
+            {
+                await leases.DisposeAsync().ConfigureAwait(false);
+                throw new ArgumentException($"Column {index + 1}: {CapMessage(plans[index], leases.Leases[index].Reservation.MaxTokens!.Value, why)}");
+            }
         try
         {
             for (var index = 0; index < plans.Count; index++) Begin(ids[index], plans[index], accounts[index], calls[index], leases.Leases[index], group);
@@ -271,6 +305,24 @@ public sealed class RunEngine : IAsyncDisposable
     private static RunRefusal Refusal(SpendCall call, SpendDecision decision) =>
         new(decision.ErrorCode ?? SpendErrors.Ask, SpendErrors.Describe(decision), call, decision);
 
+    /// <summary>Why the output cap <paramref name="maxTokens"/> the Spend Guard would send cannot be <paramref name="plan"/>'s whole output,
+    /// or null (no cap, the plan's own cap, which the plan checked, or one the run holds).</summary>
+    private static string? CapRefusal(RunRequestPlan plan, int? maxTokens) =>
+        maxTokens is { } cap && cap != plan.Spec.MaxTokens ? RunModelOptions.OutputCapRefusal(plan.Model, plan.Thinking, cap) : null;
+
+    private static string CapMessage(RunRequestPlan plan, int maxTokens, string why) =>
+        $"Capping the output of {plan.Model.Provider}/{plan.Model.Id} at {maxTokens.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} tokens " +
+        $"would not hold: {why}. Nothing was sent.";
+
+    /// <summary>Refuses a "cap the output" answer that the run cannot hold, before anything is reserved (only when it lowers the run's cap,
+    /// as the Spend Guard applies it).</summary>
+    private static void CheckCap(RunRequestPlan plan, RunSpendAnswer? spend)
+    {
+        if (spend is { Choice: SpendChoice.CapOutput, MaxOutputTokens: { } cap } && (plan.Spec.MaxTokens is not { } own || cap < own) &&
+            CapRefusal(plan, cap) is { } why)
+            throw new ArgumentException(CapMessage(plan, cap, why));
+    }
+
     private void Begin(string id, RunRequestPlan plan, string? account, SpendCall call, GuardedLease lease, string? group)
     {
         var now = DateTimeOffset.UtcNow;
@@ -337,8 +389,12 @@ public sealed class RunEngine : IAsyncDisposable
         try
         {
             RunHttpScope.Current = http;
-            await foreach (var item in work.Lease.StreamAsync(model.Descriptor,
-                (send, token) => Models.StreamSimple(model, plan.Messages, Options(work, send), token), work.Cancel.Token).ConfigureAwait(false))
+            await foreach (var item in work.Lease.StreamAsync(model.Descriptor, (send, token) =>
+                {
+                    // The output cap sent is the whole output (RunModelOptions.SendPatch): the guard's own cap gets its patch too.
+                    (http.Patch, http.PatchPath) = RunModelOptions.SendPatch(plan, send.MaxTokens);
+                    return Models.StreamSimple(model, plan.Messages, Options(work, send), token);
+                }, work.Cancel.Token).ConfigureAwait(false))
             {
                 var at = work.Clock.ElapsedMilliseconds;
                 if (ttft is null && IsContent(item)) ttft = at;
@@ -414,7 +470,7 @@ public sealed class RunEngine : IAsyncDisposable
         var (cost, costKind, billing) = Cost(work.Lease.Settled, message);
         double? rate = usage.Output > 0 && ttft is { } first && duration > first ? usage.Output / ((duration - first) / 1000.0) : null;
         var notes = new List<string>(work.Plan.Notes);
-        if (work.Plan.Patch is not null && http.Requests > 0 && http.Patched == 0)
+        if (http.Patch is not null && http.Requests > 0 && http.Patched == 0)
             notes.Add("PiSharp did not find the model request to apply this run's options to, so it was sent without them.");
         if (capture?.Truncated == true) notes.Add($"Raw payloads were cut at {RunCapture.MaxBytes / (1024 * 1024)} MB.");
         if (work.Lease.Reservation.OutputCapped) notes.Add($"The output was capped at {work.Lease.Reservation.MaxTokens:N0} tokens (your spend choice).");
