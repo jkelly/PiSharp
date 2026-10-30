@@ -5,8 +5,10 @@
 // only when the run would send it. An option the user set that the model does not take stays set (its draft value is kept) and the row
 // says the run will be refused until it is cleared: nothing is dropped silently (brief rule 4). Every option RunSpec takes has a live
 // control (W4 fix: text verbosity, the reasoning summary, the session id, the timeout, parallel tool calls and a tool's strict flag joined
-// the rest). Options PiSharp's run engine has no field for yet (baseUrl, thinking budgets, cache retention, retries, Azure and Bedrock)
-// are shown disabled with the reason, never sent; an API key is never taken from the page (W2 rule 3: secrets stay on the server).
+// the rest; W5 L4: cache retention, retries, the retry delay, thinking budgets and the Azure API version). Options a run refuses by design
+// (a base URL, the Azure base URL, resource name and deployment, the Bedrock options) are shown disabled with why and where they are set
+// instead, never sent; an API key is never taken from the page (W2 rule 3: secrets stay on the server). Sampling's read-only samplingParams
+// row shows the model's catalog sampling values (RequestSamplingView) and whether its API applies them.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -129,10 +131,60 @@ public static class RequestAccounts
 /// <param name="Sent">Whether the run engine sends it (<see cref="RunSpec.ServiceTiers"/>).</param>
 public sealed record RequestTier(string Value, string Label, bool Sent);
 
-/// <summary>An option shown for completeness that the run engine has no field for yet: always disabled, never sent.</summary>
+/// <summary>An option shown for completeness that a run never takes, by design (it would send the account's credential elsewhere, change
+/// which model answers, or alter a signed request): always disabled, never sent. Its reason says why, and where it is set instead.</summary>
 /// <param name="Name">The option's name (Pi's spelling).</param>
-/// <param name="Reason">Why it is not sent.</param>
+/// <param name="Reason">Why a run refuses it, and where it is set.</param>
 public sealed record RequestUnsentOption(string Name, string Reason);
+
+/// <summary>The model's catalog sampling values (pi-ai <c>samplingParams</c> and <c>samplingParamsByThinkingLevel</c>), as Sampling's
+/// read-only samplingParams row shows them. The OpenAI Chat Completions, OpenAI Responses and Azure OpenAI Responses request factories merge
+/// them into the request body (the model's values, then the thinking level's, then the request's own options, per key); other APIs never
+/// send them. Nothing here is editable: they come from the catalog or a models.json override.</summary>
+/// <param name="Model">The model id, or empty when the draft names no model PiSharp knows.</param>
+/// <param name="Api">The model's API, or empty.</param>
+/// <param name="Values">The model's <c>samplingParams</c>, or null.</param>
+/// <param name="ByLevel">The model's <c>samplingParamsByThinkingLevel</c>, or null.</param>
+public sealed record RequestSamplingView(string Model, string Api, JsonObject? Values, JsonObject? ByLevel)
+{
+    /// <summary>The APIs whose request factories merge a model's sampling values into the body.</summary>
+    public static IReadOnlyList<string> ApplyingApis { get; } = ["openai-completions", "openai-responses", "azure-openai-responses"];
+
+    /// <summary>No model: the row says to choose one.</summary>
+    public static RequestSamplingView None { get; } = new("", "", null, null);
+
+    /// <summary>The sampling values of <paramref name="model"/>'s catalog entry (its pi-ai wire JSON), or <see cref="None"/>.</summary>
+    public static RequestSamplingView Of(PiSharp.Durable.DurableModel? model) =>
+        model is null ? None : new RequestSamplingView(model.Id, model.Api, Field(model, "samplingParams"), Field(model, "samplingParamsByThinkingLevel"));
+
+    private static JsonObject? Field(PiSharp.Durable.DurableModel model, string name) =>
+        model.Wire is { } wire && wire.TryGetValue(name, out var value) && value is PiSharp.Durable.Chord.JsonObjectValue
+            && JsonNode.Parse(value.ToJson()) is JsonObject json && json.Count > 0 ? json : null;
+
+    /// <summary>Whether the draft names a model PiSharp knows.</summary>
+    public bool Known => Model.Length > 0;
+
+    /// <summary>Whether the model's API merges catalog sampling values into the request body.</summary>
+    public bool Applied => ApplyingApis.Contains(Api);
+
+    /// <summary>Whether the catalog sets any.</summary>
+    public bool Any => Values is not null || ByLevel is not null;
+
+    /// <summary>The row's chip.</summary>
+    public string Chip => Applied ? "applied by this api" : "not applied by this api";
+
+    /// <summary>The model's values on one line, or empty.</summary>
+    public string ValuesText => Values is null ? "" : RequestJson.Compact(Values);
+
+    /// <summary>The values by thinking level on one line, or empty.</summary>
+    public string ByLevelText => ByLevel is null ? "" : RequestJson.Compact(ByLevel);
+
+    /// <summary>What the row says under the values.</summary>
+    public string Note => !Known ? "Choose a model PiSharp knows."
+        : !Any ? $"{Model} has none."
+        : Applied ? $"{Api} merges them into the request body (the model's values, then the thinking level's); an option set here replaces the same key."
+        : $"{Api} does not apply them, so they are never sent.";
+}
 
 /// <summary>The model of <c>Views/Shared/_RequestConfig.cshtml</c>: the request options of one draft, for one model.</summary>
 public sealed record RequestConfigView
@@ -181,7 +233,8 @@ public sealed record RequestConfigView
         RunModelOptions.Thinking, RunModelOptions.MaxTokens, RunModelOptions.Temperature, RunModelOptions.TopP, RunModelOptions.TopK, RunModelOptions.Stop,
         RunModelOptions.Seed, RunModelOptions.PresencePenalty, RunModelOptions.FrequencyPenalty, RunModelOptions.ResponseFormat, RunModelOptions.ToolChoice,
         RunModelOptions.ServiceTier, RunModelOptions.Headers, RunModelOptions.ProviderOptions, RunModelOptions.ParallelToolCalls, RunModelOptions.TextVerbosity,
-        RunModelOptions.ReasoningSummary, RunModelOptions.SessionId, RunModelOptions.TimeoutMs,
+        RunModelOptions.ReasoningSummary, RunModelOptions.SessionId, RunModelOptions.TimeoutMs, RunModelOptions.CacheRetention, RunModelOptions.MaxRetries,
+        RunModelOptions.MaxRetryDelayMs, RunModelOptions.ThinkingBudgets, RunModelOptions.AzureApiVersion,
     ];
 
     /// <summary>The element id of <paramref name="name"/>.</summary>
@@ -243,6 +296,11 @@ public sealed record RequestConfigView
         RunModelOptions.ReasoningSummary => !string.IsNullOrWhiteSpace(Draft.ReasoningSummary),
         RunModelOptions.SessionId => !string.IsNullOrWhiteSpace(Draft.SessionId),
         RunModelOptions.TimeoutMs => Draft.TimeoutMs is not null,
+        RunModelOptions.CacheRetention => !string.IsNullOrWhiteSpace(Draft.CacheRetention),
+        RunModelOptions.MaxRetries => Draft.MaxRetries is not null,
+        RunModelOptions.MaxRetryDelayMs => Draft.MaxRetryDelayMs is not null,
+        RunModelOptions.ThinkingBudgets => Draft.ThinkingBudgets is { Count: > 0 },
+        RunModelOptions.AzureApiVersion => !string.IsNullOrWhiteSpace(Draft.AzureApiVersion),
         _ => false,
     };
 
@@ -310,17 +368,42 @@ public sealed record RequestConfigView
     /// <summary>The tool a <c>tool</c> choice names.</summary>
     public string? ChoiceTool => ChoiceKind == "tool" ? Draft.ToolChoice : null;
 
-    /// <summary>The options this page does not send, by section: options the run engine has no field for yet (every option RunSpec takes
-    /// has a live control).</summary>
+    /// <summary>The options this page shows and never sends, by RunModelOptions' name, because a run refuses them by design (RunModelOptions
+    /// refuses the same): a base URL, the Azure base URL, resource name and deployment, and the Bedrock options (the Bedrock pane, whose rows
+    /// are <see cref="RunSpec.BedrockOptionNames"/>); and the API key, which is never taken from the page. Each reason says why, and where
+    /// the value is set instead. Every option a run can take has a live control.</summary>
     public static IReadOnlyDictionary<string, RequestUnsentOption> Unsent { get; } = new Dictionary<string, RequestUnsentOption>(StringComparer.Ordinal)
     {
-        ["baseUrl"] = new("baseUrl", "Runs use the provider's base URL from Settings › Providers; a per-run override is refused, because it would send the account's credential to a host typed here."),
+        [RunModelOptions.BaseUrl] = new(RunModelOptions.BaseUrl, "Refused per run by design: PiSharp sends an account's credential only to the account's own host. Set the base URL on the provider in Settings › Providers."),
         ["apiKey"] = new("apiKey", "The Playground never takes a key from the page: runs use the account below, whose credential stays on the server."),
-        ["thinkingBudgets"] = new("thinkingBudgets", "The Playground sends the thinking level only; per-level token budgets are not sent from this page yet."),
-        ["cacheRetention"] = new("cacheRetention", "Runs use PiSharp's prompt-cache defaults; a per-run value is not sent yet."),
-        ["maxRetries"] = new("maxRetries", "Runs use PiSharp's transport defaults; per-run retries are not sent yet."),
-        ["maxRetryDelayMs"] = new("maxRetryDelayMs", "Runs use PiSharp's transport defaults; a per-run retry delay is not sent yet."),
+        [RunModelOptions.AzureBaseUrl] = new(RunModelOptions.AzureBaseUrl, AzureHost),
+        [RunModelOptions.AzureResourceName] = new(RunModelOptions.AzureResourceName, AzureHost),
+        [RunModelOptions.AzureDeploymentName] = new(RunModelOptions.AzureDeploymentName, "Refused per run by design: it decides which model answers, while the Spend Guard prices the model you chose. Map deployments on the provider in Settings › Providers."),
+        [RunModelOptions.Bedrock] = new(RunModelOptions.Bedrock, "Bedrock requests are signed, so these options are refused per run by design: they come from the provider's AWS profile, set in Settings › Providers."),
     };
+
+    private const string AzureHost = "Refused per run by design: it names the host the account's key goes to. Set it on the provider in Settings › Providers.";
+
+    /// <summary>The prompt cache retentions the cacheRetention row offers (<see cref="RunSpec.CacheRetentions"/>).</summary>
+    public static IReadOnlyList<string> CacheRetentions => RunSpec.CacheRetentions;
+
+    /// <summary>The levels the thinkingBudgets row has a budget for (<see cref="RunSpec.BudgetLevels"/>; xhigh and max use high's).</summary>
+    public static IReadOnlyList<string> BudgetLevels => RunSpec.BudgetLevels;
+
+    /// <summary>The draft's budget for thinking level <paramref name="level"/>, as the control's value, or empty.</summary>
+    public string Budget(string level) =>
+        Draft.ThinkingBudgets is { } budgets && budgets.TryGetValue(level, out var budget) ? budget.ToString(CultureInfo.InvariantCulture) : "";
+
+    /// <summary>The model's catalog sampling values (Sampling's read-only samplingParams row), or null to leave the row out (the Playground
+    /// always sets it).</summary>
+    public RequestSamplingView? Sampling { get; init; }
+
+    /// <summary>The longest Azure API version a run takes (RunSpec's limit).</summary>
+    public const int MaxAzureApiVersion = 40;
+
+    /// <summary>The retry delay's range as the Transport row says it (0 to 3,600,000 ms).</summary>
+    public static string RetryDelayRange { get; } =
+        string.Create(CultureInfo.InvariantCulture, $"0 to {RunSpec.MaxRetryDelayLimitMs:N0} ms");
 
     /// <summary>The timeout's range as the Transport row says it (1,000 to 3,600,000 ms).</summary>
     public static string TimeoutRange { get; } =
@@ -349,12 +432,12 @@ public sealed record RequestConfigView
         return json.ToJsonString();
     }
 
-    /// <summary>The Azure OpenAI Responses options (set on the provider; not sent per run yet).</summary>
+    /// <summary>The Azure OpenAI Responses options a run refuses by design (set on the provider; <see cref="Unsent"/> says why). The API
+    /// version is not one of them: it has a live row.</summary>
     public static IReadOnlyList<(string Name, string Placeholder, string Help)> AzureOptions { get; } =
     [
         ("azureBaseUrl", "https://{resource}.openai.azure.com/openai/v1", "Full endpoint base. Takes precedence over azureResourceName."),
         ("azureResourceName", "AZURE_OPENAI_RESOURCE_NAME", "Falls back to AZURE_OPENAI_RESOURCE_NAME."),
-        ("azureApiVersion", "v1", "Sent as ?api-version=. Falls back to AZURE_OPENAI_API_VERSION, then v1."),
         ("azureDeploymentName", "model id", "Falls back to AZURE_OPENAI_DEPLOYMENT_NAME_MAP, then the model id."),
     ];
 
@@ -367,8 +450,10 @@ public sealed record RequestConfigView
     /// <summary>Whether the model's API is one the run engine patches (providerOptions can reach its body).</summary>
     public bool Patched => RunModelOptions.PatchedApis.Contains(Api);
 
-    /// <summary>The Provider-specific pane shown first.</summary>
-    public string ProviderPane => OnAzure ? "azure" : OnBedrock ? "bedrock" : "current";
+    /// <summary>The Provider-specific pane shown first: the model's API's, or Azure's when the draft sets an Azure API version the model does
+    /// not take (so the marked row is in view), unless it sets providerOptions too.</summary>
+    public string ProviderPane => OnAzure ? "azure" : OnBedrock ? "bedrock"
+        : Conflict(RunModelOptions.AzureApiVersion) && !IsSet(RunModelOptions.ProviderOptions) ? "azure" : "current";
 
     /// <summary>A number as a control's value (invariant culture), or empty.</summary>
     public static string Number(double? value) => value is { } number ? number.ToString("0.###", CultureInfo.InvariantCulture) : "";

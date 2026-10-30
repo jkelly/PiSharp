@@ -7,7 +7,8 @@
 // the Playground selects it in Model & auth's account choice, a Compare column in its overrides, the Tool Bench in its setup; an account
 // this machine does not have was already dropped with a note (PresetService), so the provider's active account is used and the page says so.
 //   playground  {spec: {provider, model, account, systemPrompt, messages, options..., headers, toolChoice}, tools: [{name, description,
-//                parameters, enabled, mock?, mockError?}], parallel}
+//                parameters, enabled, strict?, mock?, mockError?}], parallel}  (W5 L4: every PresetOptions field, so every option the
+//                Playground sends; Compare's and the Tool Bench's notes name each option they leave out, from PresetOptions.Entries)
 //   compare     {draft: {systemPrompt, prompt, thinking, maxTokens, temperature, columns: [{provider, model, account, thinking, temperature}]}}
 //   bench       {setup: {provider, model, account, thinking, systemPrompt, tools, toolChoice, parallel, rules}, messages: [texts]}
 using System.Text.Json;
@@ -105,6 +106,7 @@ public static class PresetLoad
             foreach (var tool in preset.Tools ?? [])
             {
                 var item = new JsonObject { ["name"] = tool.Name, ["description"] = tool.Description ?? "", ["parameters"] = tool.Parameters?.DeepClone(), ["enabled"] = tool.Enabled };
+                if (tool.Strict) item["strict"] = true;
                 var mock = tool.Mocks.FirstOrDefault(candidate => candidate.Fallback) ?? tool.Mocks.FirstOrDefault();
                 if (mock is not null)
                 {

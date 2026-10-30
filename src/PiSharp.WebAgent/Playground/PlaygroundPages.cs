@@ -103,7 +103,7 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         var output = Output(run, draft);
         return new PlaygroundPage
         {
-            Config = new RequestConfigView { Draft = draft, Capabilities = capabilities, Auth = auth },
+            Config = new RequestConfigView { Draft = draft, Capabilities = capabilities, Auth = auth, Sampling = Sampling(draft.Provider, draft.Model) },
             Messages = new MessageListView
             {
                 SystemPrompt = draft.SystemPrompt,
@@ -185,6 +185,15 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         if (Engine.Capabilities(provider, model) is not { } capabilities) return null;
         var auth = await AuthAsync(Empty(provider, model) with { Account = account }, capabilities, cancellationToken).ConfigureAwait(false);
         return (capabilities, auth);
+    }
+
+    /// <summary>The catalog sampling values of <paramref name="provider"/>/<paramref name="model"/> (Sampling's read-only samplingParams row,
+    /// W5 L4), or <see cref="RequestSamplingView.None"/> when it is not a model PiSharp knows.</summary>
+    public RequestSamplingView Sampling(string provider, string model)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentNullException.ThrowIfNull(model);
+        return RequestSamplingView.Of(Engine.Models.GetModel(provider.Trim(), model.Trim()));
     }
 
     /// <summary>The run's request as the Playground edits it (its options and messages as runs.db stored them; the group, parent, source and

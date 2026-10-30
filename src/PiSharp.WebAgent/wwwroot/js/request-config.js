@@ -9,21 +9,27 @@
 // A tool's strict flag lives in the tool list (request-tools.js): the tools row is marked when a
 // strict tool meets a model that takes no strict tools (RunModelOptions' "strict"), and "Clear them" turns strict off rather than
 // removing the tools.
+// W5 L4: cache retention, retries, the retry delay, thinking budgets (four inputs, one per budget level: the row is set while any is
+// filled in) and the Azure API version are rows like the rest. A newly chosen model shows its API's Provider-specific pane (Azure's when
+// an Azure API version it does not take is set, as options a preset applies do too), and markRefused shows the pane of a refused row. Sampling's read-only samplingParams row
+// ([data-sampling-params]) follows the model (samplingParams of GET /api/playground/model).
 
 // Every option with its own row (RequestConfigView.Counted on the server).
 const COUNTED = ['thinking', 'maxTokens', 'temperature', 'topP', 'topK', 'stop', 'seed', 'presencePenalty', 'frequencyPenalty',
   'responseFormat', 'toolChoice', 'serviceTier', 'headers', 'providerOptions', 'parallelToolCalls', 'textVerbosity', 'reasoningSummary',
-  'sessionId', 'timeoutMs'];
+  'sessionId', 'timeoutMs', 'cacheRetention', 'maxRetries', 'maxRetryDelayMs', 'thinkingBudgets', 'azureApiVersion'];
 const SECTIONS = {
   sampling: ['temperature', 'topP', 'topK', 'presencePenalty', 'frequencyPenalty', 'stop', 'seed'],
   output: ['maxTokens', 'responseFormat', 'textVerbosity'],
-  reasoning: ['thinking', 'reasoningSummary'],
-  cache: ['sessionId'],
+  reasoning: ['thinking', 'thinkingBudgets', 'reasoningSummary'],
+  cache: ['cacheRetention', 'sessionId'],
   tier: ['serviceTier'],
-  transport: ['timeoutMs'],
+  transport: ['timeoutMs', 'maxRetries', 'maxRetryDelayMs'],
   headers: ['headers'],
-  provider: ['providerOptions'],
+  provider: ['providerOptions', 'azureApiVersion'],
 };
+// The Provider-specific pane of an API (RequestConfigView.ProviderPane on the server).
+const PANES = { 'azure-openai-responses': 'azure', 'bedrock-converse-stream': 'bedrock' };
 // The thinking levels a run sends (RunSpec.ThinkingLevels, max last).
 const SEND_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 const REFUSED = 'Set: the run will be refused until you clear it.';
@@ -117,6 +123,29 @@ function resetRow(row) {
   }
   if (option === 'toolChoice') row.querySelectorAll('[data-choice-note]').forEach((note) => { note.hidden = note.dataset.choiceNote !== 'auto'; });
   markSet(row, false);
+}
+
+/** Shows Provider-specific pane `name` (current, azure or bedrock) and selects it in the pane list. */
+function showPane(config, name) {
+  const select = config.querySelector('[data-provider-pane-select]');
+  if (!select || ![...select.options].some((option) => option.value === name)) return;
+  select.value = name;
+  config.querySelectorAll('[data-provider-pane]').forEach((pane) => { pane.hidden = pane.dataset.providerPane !== name; });
+}
+
+// Sampling's read-only samplingParams row ({ values, byLevel, chip, note, applied } of GET /api/playground/model, or null).
+function showSampling(config, sampling) {
+  const row = config.querySelector('[data-sampling-params]');
+  if (!row) return;
+  row.dataset.applied = sampling?.applied ? 'true' : 'false';
+  row.querySelector('[data-sampling-chip]').textContent = sampling?.chip ?? 'not applied by this api';
+  const values = row.querySelector('[data-sampling-values]');
+  values.textContent = sampling?.values ? JSON.stringify(sampling.values) : '';
+  values.hidden = !sampling?.values;
+  const byLevel = row.querySelector('[data-sampling-by-level]');
+  byLevel.querySelector('[data-sampling-by-level-text]').textContent = sampling?.byLevel ? JSON.stringify(sampling.byLevel) : '';
+  byLevel.hidden = !sampling?.byLevel;
+  row.querySelector('[data-sampling-note]').textContent = sampling?.note ?? 'Choose a model PiSharp knows.';
 }
 
 /** Clears every option back to its default (Reset parameters). */
@@ -352,7 +381,22 @@ export function applyModel(config, answer) {
   if (manage && caps) manage.href = '/settings/providers/' + encodeURIComponent(caps.provider);
   const paneApi = config.querySelector('[data-pane-api]');
   if (paneApi) paneApi.textContent = `${caps?.api || 'This model'} (active)`;
+  showSampling(config, answer?.samplingParams ?? null);
   refresh(config);
+  // The new model's Provider-specific pane, or Azure's while an Azure API version it does not take is set (so the marked row shows).
+  const active = PANES[caps?.api ?? ''] ?? 'current';
+  const select = config.querySelector('[data-provider-pane-select]');
+  select?.querySelectorAll('option:not([data-pane-api])').forEach((option) => {
+    option.textContent = option.textContent.replace(/ \(active\)$/, '') + (option.value === active ? ' (active)' : '');
+  });
+  showPane(config, active === 'current' && azureConflict(config) ? 'azure' : active);
+}
+
+// An Azure API version set for a model that does not take it, while the current pane's providerOptions is not set: Azure's pane is the
+// one to show, so the marked row can be seen.
+function azureConflict(config) {
+  return config.querySelector('[data-option="azureApiVersion"]')?.dataset.conflict === 'true'
+    && config.querySelector('[data-option="providerOptions"]')?.dataset.set !== 'true';
 }
 
 function onInput(config, event) {
@@ -372,9 +416,12 @@ function onInput(config, event) {
     row.querySelectorAll('[data-choice-note]').forEach((note) => { note.hidden = note.dataset.choiceNote !== (target.value || 'auto'); });
   }
   if (target.matches('[data-tool-on]')) return;
+  // Headers and thinking budgets have several inputs: the row is set while any is filled in.
   const empty = row.dataset.option === 'headers'
     ? ![...row.querySelectorAll('[data-header-name]')].some((input) => input.value.trim() !== '')
-    : target.matches('[data-opt]') && target.dataset.kind !== 'range' && target.value.trim() === '';
+    : target.dataset.kind === 'budgets'
+      ? ![...row.querySelectorAll('[data-opt]')].some((input) => input.value.trim() !== '')
+      : target.matches('[data-opt]') && target.dataset.kind !== 'range' && target.value.trim() === '';
   markSet(row, !empty);
   refresh(config);
   changed(config);
@@ -439,7 +486,11 @@ export function initConfig(config) {
       changed(config);
     }
   });
-  config.addEventListener('request-options-applied', () => refresh(config));
+  // Options a preset or a run set (request-spec.js applyOptions): an Azure API version the model does not take shows Azure's pane.
+  config.addEventListener('request-options-applied', () => {
+    refresh(config);
+    if (config.querySelector('[data-provider-pane-select]')?.value === 'current' && azureConflict(config)) showPane(config, 'azure');
+  });
   if (config.dataset.account === undefined) config.dataset.account = accountParts(config).select?.value ?? '';
   // A tool added, edited, removed or switched (request-tools.js): its strict flag may meet the model differently.
   config.addEventListener('request-tools-changed', () => refresh(config));
@@ -453,6 +504,9 @@ export function markRefused(config, refused) {
     const row = config.querySelector(`[data-option="${entry.option === 'strict' ? 'tools' : entry.option}"]`);
     if (!row) continue;
     row.dataset.conflict = 'true';
+    // A row in a Provider-specific pane not shown (the Azure API version): show its pane.
+    const pane = row.closest('[data-provider-pane]');
+    if (pane?.hidden) showPane(config, pane.dataset.providerPane);
     const note = row.querySelector('[data-option-note]');
     if (note) {
       note.textContent = `${entry.reason ? entry.reason + '. ' : ''}The run was refused: clear it or choose another model.`;

@@ -7,7 +7,8 @@
 //                                   ?run= the run the page shows adds inspectorUrl ("Open last run in inspector") when runs.db has it.
 //   GET  /api/playground/model      ?provider=&model=&account= -> {capabilities, auth: {providerName, accountLabel, billing, source, tone,
 //                                   offline, activeLabel, chosen, accounts: [{id, label, active, usable, status}]}} for Model & auth (accounts
-//                                   by id and label only; the list fills its account choice, W4 fix 2).
+//                                   by id and label only; the list fills its account choice, W4 fix 2), and samplingParams: {values,
+//                                   byLevel, applied, chip, note} (the model's catalog sampling values: Sampling's read-only row, W5 L4).
 // Writes are JSON POSTs (HostGuard: same origin, JSON only); every answer is no-store; errors are {error: {code, message}} as /api/runs's.
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -58,9 +59,11 @@ public static class PlaygroundModule
             var found = await pages.ModelAsync(provider.Trim(), model.Trim(), string.IsNullOrWhiteSpace(account) ? null : account.Trim(), token).ConfigureAwait(false);
             if (found is not { } info) return Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, $"There is no model {provider}/{model}.");
             var auth = info.Auth;
+            var sampling = pages.Sampling(provider, model);
             return Json(new
             {
                 capabilities = info.Capabilities,
+                samplingParams = new { values = sampling.Values, byLevel = sampling.ByLevel, applied = sampling.Applied, chip = sampling.Chip, note = sampling.Note },
                 auth = auth is null ? null : new
                 {
                     auth.ProviderName, auth.AccountLabel, billing = auth.BillingText, auth.Source, auth.Tone, auth.Offline,

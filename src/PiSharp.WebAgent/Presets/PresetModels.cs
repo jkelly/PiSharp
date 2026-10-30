@@ -76,7 +76,8 @@ public static class PresetParts
     };
 }
 
-/// <summary>A preset's request options (any of them; an unset one is not saved).</summary>
+/// <summary>A preset's request options (any of them; an unset one is not saved): every option the Playground sends but the tool choice and
+/// the headers, which are parts of their own (W5 L4 added the newer ones, from text verbosity to the Azure API version).</summary>
 public sealed record PresetOptions
 {
     /// <summary>The thinking level, or null for off.</summary>
@@ -115,10 +116,43 @@ public sealed record PresetOptions
     /// <summary>Provider options (never one that names a credential).</summary>
     public JsonObject? ProviderOptions { get; init; }
 
+    /// <summary>The text verbosity (W5 L4: every option the Playground sends is kept).</summary>
+    public string? TextVerbosity { get; init; }
+
+    /// <summary>The reasoning summary.</summary>
+    public string? ReasoningSummary { get; init; }
+
+    /// <summary>The session id (the provider's prompt cache key).</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>The timeout for the response headers, in milliseconds.</summary>
+    public int? TimeoutMs { get; init; }
+
+    /// <summary>Whether the model may call several tools in one turn (the request's switch; <see cref="Preset.Parallel"/> is how the Tool
+    /// Bench answers calls).</summary>
+    public bool? ParallelToolCalls { get; init; }
+
+    /// <summary>The prompt cache retention.</summary>
+    public string? CacheRetention { get; init; }
+
+    /// <summary>How many times a failed model request is sent again.</summary>
+    public int? MaxRetries { get; init; }
+
+    /// <summary>The longest server-requested retry delay a retry waits for, in milliseconds.</summary>
+    public int? MaxRetryDelayMs { get; init; }
+
+    /// <summary>Token budgets per thinking level.</summary>
+    public IReadOnlyDictionary<string, int>? ThinkingBudgets { get; init; }
+
+    /// <summary>The Azure OpenAI API version.</summary>
+    public string? AzureApiVersion { get; init; }
+
     /// <summary>Whether no option is set.</summary>
     [JsonIgnore]
     public bool Empty => Thinking is null && MaxTokens is null && Temperature is null && TopP is null && TopK is null && Stop is not { Count: > 0 }
-        && Seed is null && PresencePenalty is null && FrequencyPenalty is null && ResponseFormat is null && ServiceTier is null && ProviderOptions is not { Count: > 0 };
+        && Seed is null && PresencePenalty is null && FrequencyPenalty is null && ResponseFormat is null && ServiceTier is null && ProviderOptions is not { Count: > 0 }
+        && TextVerbosity is null && ReasoningSummary is null && SessionId is null && TimeoutMs is null && ParallelToolCalls is null && CacheRetention is null
+        && MaxRetries is null && MaxRetryDelayMs is null && ThinkingBudgets is not { Count: > 0 } && AzureApiVersion is null;
 
     /// <summary>The options set, as (name, text) pairs for the cards and the modals, in the Playground's order.</summary>
     public IReadOnlyList<(string Name, string Text)> Entries()
@@ -136,6 +170,17 @@ public sealed record PresetOptions
         if (ResponseFormat is { } format) entries.Add(("responseFormat", format["type"] is JsonValue type && type.TryGetValue<string>(out var kind) ? kind : "set"));
         if (ServiceTier is { } tier) entries.Add(("serviceTier", tier));
         if (ProviderOptions is { Count: > 0 } extra) entries.Add(("providerOptions", string.Join(", ", extra.Select(pair => pair.Key))));
+        if (TextVerbosity is { } verbosity) entries.Add(("textVerbosity", verbosity));
+        if (ReasoningSummary is { } summary) entries.Add(("reasoningSummary", summary));
+        if (SessionId is { } session) entries.Add(("sessionId", session));
+        if (TimeoutMs is { } timeout) entries.Add(("timeoutMs", timeout.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)));
+        if (ParallelToolCalls is { } parallel) entries.Add(("parallelToolCalls", parallel ? "true" : "false"));
+        if (CacheRetention is { } retention) entries.Add(("cacheRetention", retention));
+        if (MaxRetries is { } retries) entries.Add(("maxRetries", retries.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        if (MaxRetryDelayMs is { } delay) entries.Add(("maxRetryDelayMs", delay.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)));
+        if (ThinkingBudgets is { Count: > 0 } budgets)
+            entries.Add(("thinkingBudgets", string.Join(", ", budgets.Select(pair => $"{pair.Key} {pair.Value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)}"))));
+        if (AzureApiVersion is { } version) entries.Add(("azureApiVersion", version));
         return entries;
     }
 

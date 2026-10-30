@@ -6,8 +6,9 @@
 // the run engine has no field for ([data-unsent]) are never read. W4 fix 2: Model & auth's account choice ([data-account-select]) is the
 // RunSpec's account (an id; none for the provider's active account), and applySpec sets it (config.dataset.account is the account wanted,
 // which request-config.js selects again once a newly chosen provider's accounts are listed).
-// Every option RunSpec takes is read (SENT_OPTIONS, and a tool's strict flag with its definition); options the run engine has no field for
-// ([data-unsent]) are never read.
+// Every option RunSpec takes is read (SENT_OPTIONS, and a tool's strict flag with its definition; W5 L4 added cache retention, retries, the
+// retry delay, thinking budgets as { level: tokens } and the Azure API version); options a run refuses by design ([data-unsent]: a base
+// URL, the Azure host and deployment, Bedrock's) are never read.
 
 import { editorMessage, setMessages } from './request-messages.js';
 import { setTools } from './request-tools.js';
@@ -18,7 +19,7 @@ export { editorMessage };
 /** The options collectSpec sends when their row is set, by RunSpec's names (tools and their strict flags go with the tool list). */
 export const SENT_OPTIONS = ['thinking', 'maxTokens', 'temperature', 'topP', 'topK', 'stop', 'seed', 'presencePenalty', 'frequencyPenalty',
   'responseFormat', 'toolChoice', 'serviceTier', 'headers', 'providerOptions', 'parallelToolCalls', 'textVerbosity', 'reasoningSummary',
-  'sessionId', 'timeoutMs'];
+  'sessionId', 'timeoutMs', 'cacheRetention', 'maxRetries', 'maxRetryDelayMs', 'thinkingBudgets', 'azureApiVersion'];
 
 const KINDS = {
   range: (input) => (input.value === '' ? null : Number(input.value)),
@@ -34,6 +35,14 @@ const KINDS = {
   text: (input) => input.value.trim() || null,
   // A switch the user touched sends its state, on or off (parallel tool calls).
   bool: (input) => input.checked,
+  // One number input per level (thinking budgets, [data-level]): { level: tokens } for the levels filled in, or null when none is.
+  budgets: (input) => {
+    const budgets = {};
+    input.closest('[data-option]')?.querySelectorAll('[data-opt]').forEach((level) => {
+      if (level.value.trim() !== '') budgets[level.dataset.level] = Number(level.value);
+    });
+    return Object.keys(budgets).length > 0 ? budgets : null;
+  },
 };
 
 /** The config pane and the message list under `root` (a page, a Compare column...). */
@@ -182,13 +191,18 @@ export function applyOptions(config, spec) {
     const input = element?.querySelector('[data-opt]');
     if (input) input.value = value(option) ?? input.dataset.default ?? '';
   }
-  for (const option of ['maxTokens', 'topK', 'seed', 'timeoutMs', 'sessionId', 'reasoningSummary']) {
+  for (const option of ['maxTokens', 'topK', 'seed', 'timeoutMs', 'sessionId', 'reasoningSummary', 'maxRetries', 'maxRetryDelayMs', 'azureApiVersion']) {
     const element = setRow(config, option, value(option) !== null);
     const input = element?.querySelector('[data-opt]');
     if (input) input.value = value(option) ?? '';
   }
-  const verbosity = setRow(config, 'textVerbosity', value('textVerbosity') !== null);
-  verbosity?.querySelectorAll('[data-opt="textVerbosity"]').forEach((radio) => { radio.checked = radio.value === value('textVerbosity'); });
+  for (const option of ['textVerbosity', 'cacheRetention']) {
+    const element = setRow(config, option, value(option) !== null);
+    element?.querySelectorAll(`[data-opt="${option}"]`).forEach((radio) => { radio.checked = radio.value === value(option); });
+  }
+  const budgets = value('thinkingBudgets');
+  const budgetRow = setRow(config, 'thinkingBudgets', budgets !== null && Object.keys(budgets).length > 0);
+  budgetRow?.querySelectorAll('[data-opt="thinkingBudgets"]').forEach((input) => { input.value = budgets?.[input.dataset.level] ?? ''; });
   const parallel = setRow(config, 'parallelToolCalls', typeof spec?.parallelToolCalls === 'boolean');
   const parallelSwitch = parallel?.querySelector('[data-opt="parallelToolCalls"]');
   if (parallelSwitch) parallelSwitch.checked = typeof spec?.parallelToolCalls === 'boolean' ? spec.parallelToolCalls : parallelSwitch.dataset.default === 'true';

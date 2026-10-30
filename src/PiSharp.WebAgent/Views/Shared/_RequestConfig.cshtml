@@ -6,8 +6,11 @@
    refused until it is cleared: nothing is dropped silently (brief rule 4). Every option RunSpec takes has a live row: text verbosity
    (Output) and the reasoning summary (Reasoning) where the OpenAI Responses, Azure and Codex APIs take them (the summary while the model
    thinks), parallel tool calls (Tools) where the API has the switch, and the session id and timeout in _RequestConfigAdvanced; a tool's
-   strict flag comes from _ToolEditorModal, and the tools row is marked when a strict tool meets a model that takes none. Options the run
-   engine has no field for yet are [data-unsent]: shown disabled with the reason, never sent; an API key is never taken from the page.
+   strict flag comes from _ToolEditorModal, and the tools row is marked when a strict tool meets a model that takes none. W5 L4: thinking
+   budgets (Reasoning: four token inputs, one per budget level, [data-kind="budgets"]) are live where the model thinks by budget, and
+   _RequestConfigAdvanced has cache retention, retries, the retry delay and the Azure API version; Sampling's samplingParams row
+   ([data-sampling-params], read-only) shows the model's catalog sampling values and whether its API applies them. Options a run refuses
+   by design are [data-unsent]: shown disabled with why and where they are set, never sent; an API key is never taken from the page.
    Sections: _RequestConfigModel and _RequestConfigAdvanced. Model: RequestConfigView. *@
 @using PiSharp.WebAgent.Playground
 @using PiSharp.WebAgent.Runs
@@ -21,7 +24,7 @@
     int Dot(params string[] options) => Model.ModifiedOf(options);
     var sampling = Dot(RunModelOptions.Temperature, RunModelOptions.TopP, RunModelOptions.TopK, RunModelOptions.PresencePenalty, RunModelOptions.FrequencyPenalty, RunModelOptions.Stop, RunModelOptions.Seed);
     var output = Dot(RunModelOptions.MaxTokens, RunModelOptions.ResponseFormat, RunModelOptions.TextVerbosity);
-    var reasoning = Dot(RunModelOptions.Thinking, RunModelOptions.ReasoningSummary);
+    var reasoning = Dot(RunModelOptions.Thinking, RunModelOptions.ThinkingBudgets, RunModelOptions.ReasoningSummary);
     var tools = Model.Draft.Tools ?? [];
 }
 <section class="pane pg-config pane-alt" aria-label="Request configuration" data-request-config data-id-prefix="@p" data-provider="@Model.Draft.Provider" data-model="@Model.Draft.Model" data-api="@Model.Api" data-capabilities="@Model.CapabilitiesJson" data-thinking-on="@(Model.Thinking ? "true" : "false")">
@@ -58,6 +61,20 @@
               </div>
               <div class="alert alert-info py-2 px-2 fs-8 mb-2 mt-1" data-option-alert hidden="@(Model.Takes(RunModelOptions.Temperature))"><i class="bi bi-info-circle me-1"></i><span class="ps-mono" data-model-ref>@Model.ModelRef</span> <span data-option-reason>@(Model.Takes(RunModelOptions.Temperature) ? "" : "doesn't take temperature: " + Model.Why(RunModelOptions.Temperature) + ".")</span></div>
             </div>
+
+            @if (Model.Sampling is { } samplingParams)
+            {
+              <div class="param-row" data-sampling-params data-applied="@(samplingParams.Applied ? "true" : "false")">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="param-name">samplingParams</span>
+                  <i class="bi bi-question-circle param-help text-ps-faint" tabindex="0" data-bs-toggle="tooltip" title="Model-level sampling values from the catalog (or a models.json override), merged into the body by openai-completions, openai-responses and azure-openai-responses. Read-only: set an option here to replace one."></i>
+                  <span class="ps-chip ms-auto" data-sampling-chip>@samplingParams.Chip</span>
+                </div>
+                <div class="ps-mono fs-8 text-break mt-1" data-sampling-values hidden="@(samplingParams.Values is null)">@samplingParams.ValuesText</div>
+                <div class="fs-8 text-break mt-1" data-sampling-by-level hidden="@(samplingParams.ByLevel is null)">By thinking level: <span class="ps-mono" data-sampling-by-level-text>@samplingParams.ByLevelText</span></div>
+                <div class="form-text mt-1 mb-1" data-sampling-note>@samplingParams.Note</div>
+              </div>
+            }
 
             <div class="@Row(RunModelOptions.TopP)" data-option="topP" data-set="@Set(RunModelOptions.TopP)" data-conflict="@Conflict(RunModelOptions.TopP)">
               <div class="param-head"><label class="param-name" for="@(p)-top-p">top_p <span class="status-dot info ms-1" data-option-dot title="Modified"></span></label><span class="param-value" data-option-value>@(Model.Draft.TopP is { } topP ? RequestConfigView.Number(topP) : "default")</span></div>
@@ -167,18 +184,18 @@
               </div>
               <div class="form-text mt-1" data-option-note>@(Model.Capabilities is { ThinkingLevels.Count: > 1 } caps ? $"This model thinks at {string.Join(", ", caps.ThinkingLevels.Skip(1))}. Default: off." : "This model does not think.")</div>
             </div>
-            <div class="param-row param-disabled" data-unsent="thinkingBudgets">
+            <div class="@Row(RunModelOptions.ThinkingBudgets)" data-option="thinkingBudgets" data-set="@Set(RunModelOptions.ThinkingBudgets)" data-conflict="@Conflict(RunModelOptions.ThinkingBudgets)">
               <div class="param-head">
-                <span class="param-name">thinkingBudgets <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Token budget per level for budget-based providers (Anthropic manual thinking, Gemini, Bedrock)."></i></span>
+                <span class="param-name" id="@(p)-lbl-budgets">thinkingBudgets <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Token budget per thinking level, for models that think by budget (Anthropic budget thinking, Gemini 2.5) while they think. The run's level uses its own (xhigh and max use high's); an empty level keeps the model's. APIs that take a reasoning effort take no budget."></i></span>
                 <span class="ps-chip">tokens</span>
               </div>
-              <div class="row g-1">
-                @foreach (var level in new[] { "minimal", "low", "medium", "high" })
+              <div class="row g-1" role="group" aria-labelledby="@(p)-lbl-budgets">
+                @foreach (var level in RequestConfigView.BudgetLevels)
                 {
-                  <div class="col-6"><div class="input-group input-group-sm"><label class="input-group-text ps-mono fs-8" for="@(p)-budget-@level">@level</label><input class="form-control ps-mono" id="@(p)-budget-@level" type="number" placeholder="—" disabled></div></div>
+                  <div class="col-6"><div class="input-group input-group-sm"><label class="input-group-text ps-mono fs-8" for="@(p)-budget-@level">@level</label><input class="form-control ps-mono" id="@(p)-budget-@level" type="number" min="1" max="10000000" step="1024" placeholder="—" value="@Model.Budget(level)" data-opt="thinkingBudgets" data-kind="budgets" data-level="@level" disabled="@Model.Off(RunModelOptions.ThinkingBudgets)"></div></div>
                 }
               </div>
-              <div class="form-text mt-1">@RequestConfigView.Unsent["thinkingBudgets"].Reason</div>
+              <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note data-default-note="Empty, each level keeps the model's own budget.">@(Model.Why(RunModelOptions.ThinkingBudgets) ?? "Empty, each level keeps the model's own budget.")</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ThinkingBudgets))">Clear</button></div>
             </div>
             <div class="@Row(RunModelOptions.ReasoningSummary)" data-option="reasoningSummary" data-set="@Set(RunModelOptions.ReasoningSummary)" data-conflict="@Conflict(RunModelOptions.ReasoningSummary)">
               <div class="param-head"><label class="param-name" for="@(p)-summary">reasoningSummary <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Responses, Azure and Codex, while the model thinks: reasoning.summary. The summary appears as the thinking block."></i></label></div>
