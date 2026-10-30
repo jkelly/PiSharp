@@ -37,6 +37,18 @@ public sealed partial class ReplaceableAgentSession
         finally { inMutation.Value = prior; mutations.Release(); }
     }
 
+    /// <summary>The attachment's catalog registry, captured between owner mutations. A resource close, reload or switch holds the
+    /// session's replacement reservation only inside one, and the session refuses a capture meanwhile ("Session replacement is in
+    /// progress"); this joins them instead, so binding a resource is not refused because another one is closing.</summary>
+    public async Task<SessionRuntimeRegistry> CaptureToolCatalogRegistryAsync(AgentSessionAttachment attachment, CancellationToken token = default)
+    {
+        RejectTransitionReentrancy(); ValidateAttachment(attachment);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, closing.Token, attachment.LifetimeToken);
+        await mutations.WaitAsync(linked.Token).ConfigureAwait(false);
+        try { ValidateAttachment(attachment); return attachment.Session.CaptureToolCatalogRegistry(); }
+        finally { mutations.Release(); }
+    }
+
     /// <summary>The captured attachment remains reserved through durable publication; close and
     /// replacement join this actual mutation rather than a caller-cancelled waiting wrapper.</summary>
     public async Task<SessionToolCatalogReceipt> PublishToolCatalogAsync(AgentSessionAttachment attachment,

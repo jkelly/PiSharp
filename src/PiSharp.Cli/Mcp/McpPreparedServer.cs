@@ -45,9 +45,13 @@ public sealed class McpPreparedServer : IAsyncDisposable
     private long publishedRevision;
     private Exception? publicationFailure;
 
+    /// <param name="catalog">The attachment's registry, when the host captured it between owner mutations
+    /// (<see cref="ReplaceableAgentSession.CaptureToolCatalogRegistryAsync"/>); otherwise it is captured here, which the session refuses
+    /// while another resource closes.</param>
     public McpPreparedServer(McpServerEntry entry, ExtensionRegistry registry, RegistrationScope scope,
         ReplaceableAgentSession owner, IToolActionPolicy policy, ExtensionToolArgumentValidator validator,
-        McpAdmittedChannelFactory channelFactory, McpRuntimeOptions options, McpPreparedHookComposer composeHooks)
+        McpAdmittedChannelFactory channelFactory, McpRuntimeOptions options, McpPreparedHookComposer composeHooks,
+        SessionRuntimeRegistry? catalog = null)
     {
         ArgumentNullException.ThrowIfNull(entry); ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(scope); ArgumentNullException.ThrowIfNull(owner);
@@ -55,7 +59,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(channelFactory); ArgumentNullException.ThrowIfNull(options); ArgumentNullException.ThrowIfNull(composeHooks);
         this.registry = registry; this.scope = scope; this.owner = owner; this.policy = policy; this.validator = validator; this.composeHooks = composeHooks;
         attachment = owner.Current;
-        var captured = attachment.Session.CaptureToolCatalogRegistry();
+        var captured = catalog ?? attachment.Session.CaptureToolCatalogRegistry();
         if (options.Generation != attachment.Generation || captured.InvocationOwnerGeneration != attachment.Generation ||
             !captured.UsesFinalActionPolicy(policy))
             throw new ArgumentException("MCP binding requires the captured attachment generation and native final-action policy.");

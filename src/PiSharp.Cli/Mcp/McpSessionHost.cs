@@ -219,9 +219,13 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     grants.AdmitServer(scope);
                     McpPreparedServer? prepared = null;
                     var notifications = Notifications(actual.Name, serverLog, () => Volatile.Read(ref prepared), (name, error) => manager?.RefreshFailed(name, error));
+                    var channels = Channels(actual, notifications);
+                    // Another server closing meanwhile (unregistered, disabled) holds the session until its close ended: wait for it
+                    // rather than fail this server.
+                    var catalog = await owner.CaptureToolCatalogRegistryAsync(attachment, cancellation).ConfigureAwait(false);
                     // The original records nothing at session_shutdown, so a resumed session declares the tools again once the server connects.
-                    var server = new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual, notifications),
-                        new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks)
+                    var server = new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, channels,
+                        new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks, catalog)
                     {
                         DurableWithdrawalOnShutdown = false, ConvertResults = true,
                         // runtime.ts withClient: a call the server rejects for authentication marks the server as needing a sign-in.
