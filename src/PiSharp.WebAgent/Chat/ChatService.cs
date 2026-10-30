@@ -10,6 +10,9 @@
 // `spend` is checked before anything is posted (409 with the confirm modal when the guard would ask or block; the user's choice comes back
 // on the same request id), a call stopped inside a run continues after the user's choice, the composer's estimate, the answers' cost marks,
 // the chat's spend in the details panel and the banner of a stopped call. Billing comes from the Spend area's billing modes when present.
+// W3 fix (chat spend): a checked create, send or continue holds its send key (ChatSpend.EnterAsync) from the check to the send, so two
+// copies of one POST store one approval, which answers only the message it was given for; a send that fails after it was admitted
+// withdraws its approval, and its retry is checked again.
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using PiSharp.Durable;
@@ -136,35 +139,59 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
     {
         ArgumentNullException.ThrowIfNull(request);
         CheckRequest(request.RequestId, request.Text);
-        var binding = bindings.FindByRequest(request.RequestId);
-        if (binding is null)
+        var spend = request.Spend is null ? null : Spending;
+        var key = "new/" + request.RequestId;
+        // One copy of a checked create at a time: a parallel copy waits, then finds the chat and the admission the first one made.
+        using var hold = spend is null ? null : await spend.EnterAsync(key, cancellationToken).ConfigureAwait(false);
+        var admitting = false;
+        PiSharp.Durable.Hosting.SendResult result;
+        ChatBinding? binding;
+        try
         {
-            var (provider, model) = ResolveModel(request.Provider, request.Model);
-            var defaults = settings.Get<DefaultsSettings>();
-            var thinking = Clamp(model, request.Thinking ?? defaults.Thinking ?? (model.Reasoning ? "medium" : "off"));
-            var tier = CheckTier(request.Tier);
-            var cwd = request.Cwd is { Length: > 0 } chosen ? CheckDirectory(chosen) : settings.Get<ToolsSettings>().EffectiveWorkingDirectory;
-            var title = string.IsNullOrWhiteSpace(request.Title) ? ChatDisplay.TitleFrom(request.Text) : ChatDisplay.Cut(request.Title.Trim(), 100);
-            var account = await Accounts.BindAsync(provider.Id, cancellationToken).ConfigureAwait(false);
-            var spend = request.Spend is null ? null : Spending;
-            var approval = spend is null ? null : await spend.AdmitAsync(ChatSpend.NewChatCall(provider.Id, model.Id, account?.Id, request.Text, request.RequestId),
-                "new/" + request.RequestId, request.Spend!, null, cancellationToken).ConfigureAwait(false);
-            var session = await device.Host.CreateSessionAsync(new SessionCreateRequest
+            binding = bindings.FindByRequest(request.RequestId);
+            if (binding is null)
             {
-                Cwd = cwd,
-                Name = title,
-                Model = new ModelRef(provider.Id, model.Id),
-                ThinkingLevel = thinking,
-                SpawnKey = "chat:" + request.RequestId,
-            }, cancellationToken).ConfigureAwait(false);
-            var now = bindings.Now();
-            binding = bindings.Add(new ChatBinding(session.Id, session.Name, provider.Id, model.Id, account?.Id, thinking, tier, 1, now, now, null,
-                request.RequestId));
-            if (approval is not null) await spend!.ApproveAsync(approval with { Run = session.Id }, "new/" + request.RequestId, cancellationToken).ConfigureAwait(false);
-            logger.LogInformation("Chat {Chat} created with {Provider}/{Model}.", session.Id, provider.Id, model.Id);
+                var (provider, model) = ResolveModel(request.Provider, request.Model);
+                var defaults = settings.Get<DefaultsSettings>();
+                var thinking = Clamp(model, request.Thinking ?? defaults.Thinking ?? (model.Reasoning ? "medium" : "off"));
+                var tier = CheckTier(request.Tier);
+                var cwd = request.Cwd is { Length: > 0 } chosen ? CheckDirectory(chosen) : settings.Get<ToolsSettings>().EffectiveWorkingDirectory;
+                var title = string.IsNullOrWhiteSpace(request.Title) ? ChatDisplay.TitleFrom(request.Text) : ChatDisplay.Cut(request.Title.Trim(), 100);
+                var account = await Accounts.BindAsync(provider.Id, cancellationToken).ConfigureAwait(false);
+                admitting = spend is not null && !spend.WasAdmitted(key);
+                var approval = spend is null ? null : await spend.AdmitAsync(ChatSpend.NewChatCall(provider.Id, model.Id, account?.Id, request.Text, request.RequestId),
+                    key, request.Spend!, null, request.Text, cancellationToken).ConfigureAwait(false);
+                var session = await device.Host.CreateSessionAsync(new SessionCreateRequest
+                {
+                    Cwd = cwd,
+                    Name = title,
+                    Model = new ModelRef(provider.Id, model.Id),
+                    ThinkingLevel = thinking,
+                    SpawnKey = "chat:" + request.RequestId,
+                }, cancellationToken).ConfigureAwait(false);
+                var now = bindings.Now();
+                binding = bindings.Add(new ChatBinding(session.Id, session.Name, provider.Id, model.Id, account?.Id, thinking, tier, 1, now, now, null,
+                    request.RequestId));
+                if (approval is not null) await spend!.ApproveAsync(approval with { Run = session.Id }, key, cancellationToken).ConfigureAwait(false);
+                logger.LogInformation("Chat {Chat} created with {Provider}/{Model}.", session.Id, provider.Id, model.Id);
+            }
+            else if (spend is not null && spend.WasWithdrawn(key) && !binding.IsArchived)
+            {
+                // The first copy made the chat but its message failed: this retry is checked again, as a send to the chat.
+                admitting = true;
+                var call = await spend.CallAsync(binding, 1, request.Text, cancellationToken).ConfigureAwait(false);
+                var approval = await spend.AdmitAsync(call, key, request.Spend!, binding.SessionId, request.Text, cancellationToken).ConfigureAwait(false);
+                if (approval is not null) await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false);
+            }
+            if (binding.IsArchived) return new ChatCreated(binding, 0, "Deleted");
+            result = await Session(binding.SessionId).SendAsync(1, new SendRequest(request.Text, request.RequestId), cancellationToken).ConfigureAwait(false);
         }
-        if (binding.IsArchived) return new ChatCreated(binding, 0, "Deleted");
-        var result = await Session(binding.SessionId).SendAsync(1, new SendRequest(request.Text, request.RequestId), cancellationToken).ConfigureAwait(false);
+        catch when (admitting)
+        {
+            // Nothing may wait to answer a message that was not posted; a retry is checked again.
+            await spend!.WithdrawAsync(key).ConfigureAwait(false);
+            throw;
+        }
         _ = device.RefreshAsync(binding.SessionId);
         return new ChatCreated(binding, result.SubmissionId.Value, result.Status.ToString());
     }
@@ -180,15 +207,33 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         var agentId = request.AgentId ?? binding.AgentId;
         var agent = (await session.AgentsAsync(cancellationToken).ConfigureAwait(false)).FirstOrDefault(item => item.Id == agentId)
             ?? throw ChatException.NotFound($"No agent {agentId} in this chat.");
-        if (request.Spend is { } answer && Spending is { } spend && !spend.WasAdmitted(chatId + "/" + request.RequestId))
+        var spend = request.Spend is null ? null : Spending;
+        var key = chatId + "/" + request.RequestId;
+        // One copy of a checked send at a time, so two copies of one POST store one approval.
+        using var hold = spend is null ? null : await spend.EnterAsync(key, cancellationToken).ConfigureAwait(false);
+        var admitting = false;
+        PiSharp.Durable.Hosting.SendResult result;
+        try
         {
-            var call = await spend.CallAsync(binding, agentId, request.Text, cancellationToken).ConfigureAwait(false);
-            var approval = await spend.AdmitAsync(call, chatId + "/" + request.RequestId, answer, chatId, cancellationToken).ConfigureAwait(false);
-            if (approval is not null) await spend.ApproveAsync(approval, chatId + "/" + request.RequestId, cancellationToken).ConfigureAwait(false);
+            if (spend is not null && !spend.WasAdmitted(key))
+            {
+                admitting = true;
+                var call = await spend.CallAsync(binding, agentId, request.Text, cancellationToken).ConfigureAwait(false);
+                var approval = await spend.AdmitAsync(call, key, request.Spend!, chatId, request.Text, cancellationToken).ConfigureAwait(false);
+                if (approval is not null) await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false);
+            }
+            if (!agent.Busy && agent.Kind != AgentKind.Subagent) await AlignAsync(session, agentId, binding, cancellationToken).ConfigureAwait(false);
+            result = await session.SendAsync(agentId, new SendRequest(request.Text, request.RequestId) { WhenBusy = request.Steer ? WhenBusy.Steer : null },
+                cancellationToken).ConfigureAwait(false);
         }
-        if (!agent.Busy && agent.Kind != AgentKind.Subagent) await AlignAsync(session, agentId, binding, cancellationToken).ConfigureAwait(false);
-        var result = await session.SendAsync(agentId, new SendRequest(request.Text, request.RequestId) { WhenBusy = request.Steer ? WhenBusy.Steer : null },
-            cancellationToken).ConfigureAwait(false);
+        catch when (admitting)
+        {
+            // Nothing may wait to answer a message that was not posted; a retry is checked again.
+            await spend!.WithdrawAsync(key).ConfigureAwait(false);
+            throw;
+        }
+        // A queued message the user withdraws takes its approval with it.
+        Spending?.Posted(chatId, result.SubmissionId.Value, key);
         bindings.Update(chatId, current => current with
         {
             AgentId = agent.Kind == AgentKind.Subagent ? current.AgentId : agentId,
@@ -211,15 +256,27 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         var binding = Require(chatId);
         var spend = Spending ?? throw ChatException.NotFound("The Spend Guard isn't running, so no request of this chat was stopped.");
         var key = chatId + "/" + requestId;
-        if (!spend.WasAdmitted(key))
+        using var hold = await spend.EnterAsync(key, cancellationToken).ConfigureAwait(false);
+        var admitting = false;
+        try
         {
-            var stop = await spend.StopAsync(chatId, op, cancellationToken).ConfigureAwait(false)
-                ?? throw ChatException.NotFound($"No request of this chat was stopped as {op}.");
-            var call = ChatSpend.ContinueCall(stop) with { Provider = binding.Provider, Model = binding.Model, Account = binding.AccountId };
-            var approval = await spend.AdmitAsync(call, key, answer, chatId, cancellationToken).ConfigureAwait(false);
-            if (approval is not null) await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false);
+            if (!spend.WasAdmitted(key))
+            {
+                admitting = true;
+                var stop = await spend.StopAsync(chatId, op, cancellationToken).ConfigureAwait(false)
+                    ?? throw ChatException.NotFound($"No request of this chat was stopped as {op}.");
+                var call = ChatSpend.ContinueCall(stop) with { Provider = binding.Provider, Model = binding.Model, Account = binding.AccountId };
+                var approval = await spend.AdmitAsync(call, key, answer, chatId, ChatSpend.ContinueText, cancellationToken).ConfigureAwait(false);
+                if (approval is not null) await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false);
+            }
+            // Not checked again inside (no spend answer), so the held key is not entered twice.
+            return await SendAsync(chatId, new ChatSendRequest(requestId, ChatSpend.ContinueText) { AgentId = agentId }, cancellationToken).ConfigureAwait(false);
         }
-        return await SendAsync(chatId, new ChatSendRequest(requestId, ChatSpend.ContinueText) { AgentId = agentId }, cancellationToken).ConfigureAwait(false);
+        catch when (admitting)
+        {
+            await spend.WithdrawAsync(key).ConfigureAwait(false);
+            throw;
+        }
     }
 
     /// <summary>The composer's estimate of <paramref name="draft"/> on a branch of the chat; null without the Spend Guard.</summary>
@@ -265,7 +322,9 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
     {
         var binding = Require(chatId);
         var result = await Session(chatId).WithdrawAsync(agentId ?? binding.AgentId, submissionId, cancellationToken).ConfigureAwait(false);
-        return result == SubmissionAbortResult.Aborted;
+        if (result != SubmissionAbortResult.Aborted) return false;
+        if (Spending is { } spend) await spend.WithdrawPostedAsync(chatId, submissionId).ConfigureAwait(false);
+        return true;
     }
 
     // ─── Chat management ────────────────────────────────────────────────────

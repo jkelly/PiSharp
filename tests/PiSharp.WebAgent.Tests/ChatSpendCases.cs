@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -11,7 +12,9 @@ using PiSharp.Web.Common;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Faux;
 using PiSharp.WebAgent.Spend;
+using ChordJson = PiSharp.Durable.Chord.JsonValue;
 
 // Decision 0011 (run W3, S5): spend in chat. The render cases build the guard's decisions and the ledger's rows as S3 writes them and check
 // the server-rendered states of the chat pages: the composer's estimate by Send (metered, list price, nothing for free, price unknown, the
@@ -21,6 +24,13 @@ using PiSharp.WebAgent.Spend;
 // spend. The app cases run the built app with --faux-metered (offline, priced faux models): a blocked send posts nothing and reserves
 // nothing, "proceed once" posts once for a retried request id, "cap the output" sends at the chosen cap, a refused new chat creates no chat,
 // and a call stopped inside a run is reviewed and continued after the user's choice.
+//
+// W3 fix (chat spend): the approval a send gets answers only the call that sends its message. In process (the guard's scripted world, and
+// the Chat area over guarded faux models with its tools asking first): the running turn's next call, a compaction, the same text placed
+// earlier and another message never use it, the message's own call does once; a message queued behind a running turn keeps its approval
+// while that turn's next call is stopped, and withdrawn takes it along; an approval its call did not need is retired, and a send nobody answered is asked about even with
+// an approval waiting for the chat; a send that fails after its approval withdraws it and its retry is checked again. In the built app,
+// parallel copies of one proceed-once POST store one approval and post once.
 internal static partial class Program
 {
     private static readonly SpendPrice SpendTestPrice = new(3, 15, 0.3);
@@ -615,7 +625,230 @@ internal static partial class Program
                 DeleteTemp(root);
             }
         }),
+
+        Case("chat.spend.approval-answers-only-its-message", async () =>
+        {
+            await using var world = GuardWorld.Create("chat-spend-submission");
+            await world.CapAsync(CapPeriod.Request, 50_000, CapAction.Ask);
+            var script = new GuardScript((call, token) => GuardAnswer(call.Model, "answered", GuardUsage(10, 5)));
+            var models = world.Over(script);
+            var model = GuardModel("metered", "m");
+            var given = world.Clock.Now.ToUnixTimeMilliseconds();
+            async Task<bool> SendAsync(string op, string text, long placed, double? maxTokens = null) =>
+                (await GuardCollect(models.StreamSimple(model, SpendTurn(text, placed), GuardOptions(op, "chat-1", maxTokens: maxTokens), CancellationToken.None)))[^1]
+                    is PiSharp.Contracts.StreamDone;
+
+            var key = GuardedDurableModels.SubmissionKey("queued please");
+            Equal((key, (long?)(given + 5)), GuardedDurableModels.Submission(SpendTurn("queued please", given + 5)), "a request answers its newest user message");
+            Check(key.Length == 32 && !key.Contains("queued", StringComparison.Ordinal), "a key, never the text");
+            Equal(((string?)null, (long?)null), GuardedDurableModels.Submission([]), "no user message, no submission");
+            var stored = await world.Guard.ApproveStoredAsync(new SpendApproval("chat-1", SpendChoice.ProceedOnce) { Submission = key });
+            Equal(key, stored.Approval.Submission, "the approval belongs to the message");
+
+            Check(!await SendAsync("op-running", "an earlier message", given - 5_000), "the running turn's next call does not use it");
+            var compaction = await models.CompleteSimpleAsync(model, SpendTurn("queued please", given + 1_000), GuardOptions("op-compact", "chat-1"), CancellationToken.None);
+            Equal(PiSharp.Contracts.StopReason.Error, compaction.StopReason, "nor a compaction summary, even one whose newest user message is it");
+            Check(!await SendAsync("op-early", "queued please", given - 1), "nor the same text placed before the approval was given");
+            Check(!await SendAsync("op-other", "another message", given + 1_000), "nor another message");
+            Equal(SpendVerdict.Ask, (await world.Guard.PreflightAsync(GuardCall("", "chat-1"))).Verdict, "nor a preflight that answers no message");
+            Equal(0, script.Calls.Count, "nothing was sent");
+            Equal(1, (await world.Approvals.WaitingAsync("chat-1")).Count, "it still waits");
+
+            Check(await SendAsync("op-queued", "queued please", given + 2_000), "the call that sends the message uses it");
+            Equal("asked · sent once", (await world.Ledger.GetAsync("op-queued"))!.Note, "sent once");
+            Equal(key, (await world.Approvals.UsedByAsync("op-queued"))?.Approval.Submission, "used by that call");
+            Check(!await SendAsync("op-queued-2", "queued please", given + 2_000), "its turn's next call asks again");
+            Equal(1, script.Calls.Count, "one send in all");
+
+            // A run-wide approval answers a preflight, but never the chat's check of a send the user has not answered.
+            await world.Guard.ApproveAsync(new SpendApproval("chat-1", SpendChoice.ProceedOnce));
+            Equal(SpendVerdict.Allow, (await world.Guard.PreflightAsync(GuardCall("", "chat-1"))).Verdict, "a run-wide approval answers a preflight");
+            Equal(SpendVerdict.Ask, (await world.Guard.PreflightAsync(GuardCall("", "chat-1"), withApprovals: false)).Verdict, "not the chat's check");
+
+            // A message's own approval comes before a run-wide one.
+            var both = await world.Guard.ApproveStoredAsync(new SpendApproval("chat-1", SpendChoice.ProceedOnce) { Submission = GuardedDurableModels.SubmissionKey("mine please") });
+            Check(await SendAsync("op-mine", "mine please", given + 3_000), "sent");
+            Equal(both.Id, (await world.Approvals.UsedByAsync("op-mine"))?.Id, "with its own approval");
+            Check((await world.Approvals.WaitingAsync("chat-1")) is [{ Approval.Submission: null }], "the run-wide one still waits");
+
+            // A message whose call fits as it is retires its approval: it answers nothing else.
+            var small = await world.Guard.ApproveStoredAsync(new SpendApproval("chat-1", SpendChoice.ProceedOnce) { Submission = GuardedDurableModels.SubmissionKey("small please") });
+            Check(await SendAsync("op-small", "small please", given + 4_000, maxTokens: 100), "a small call fits the cap");
+            Check((await world.Ledger.GetAsync("op-small"))!.Note is null, "without the approval");
+            Equal(SpendApprovalStore.Unneeded, SpendApprovalUsedBy(world.Path, small.Id), "which is retired, unneeded");
+            Check((await world.Approvals.WaitingAsync("chat-1")) is [{ Approval.Submission: null }], "only the run-wide one waits");
+        }),
+
+        Case("chat.spend.queued-send-keeps-its-approval-from-the-running-turn", async () =>
+        {
+            await using var world = GuardWorld.Create("chat-spend-queued-world");
+            await using var chat = await SpendChatHarnessAsync("chat-spend-queued", world);
+            var chatId = (await chat.CreateAsync("hello", "r1")).SessionId;
+            await chat.Chats.SendAsync(chatId, new ChatSendRequest("m1", "!echo hi"));
+            var tool = await chat.PendingAsync(chatId, "bash");
+            await world.CapAsync(CapPeriod.Request, 50_000, CapAction.Ask);
+
+            var asked = await ThrowsAsync<ChatSpendException>(() => chat.Chats.SendAsync(chatId, new ChatSendRequest("m2", "queued please") { Spend = ChatSpendAnswer.Check }),
+                "a send while the chat runs is checked");
+            Equal(SpendErrors.Ask, asked.Code, "and asked about");
+            var queued = await chat.Chats.SendAsync(chatId, new ChatSendRequest("m2", "queued please") { Spend = new ChatSpendAnswer(SpendChoice.ProceedOnce) });
+            Equal("Queued", queued.Status, "proceed once queues it behind the running turn");
+            Check((await world.Approvals.WaitingAsync(chatId)) is [{ Approval.Submission: var submission }] && submission == GuardedDurableModels.SubmissionKey("queued please"),
+                "one approval, for that message");
+
+            Equal(ApprovalOutcomeStatus.Decided, (await chat.Chats.DecideApprovalAsync(chatId, tool.Request.TaskId, new ApprovalDecision(ApprovalChoice.AllowOnce))).Status,
+                "the running turn goes on");
+            await WaitUntilAsync(async () => (await world.Approvals.StopsAsync(chatId)).Count > 0, "the running turn's next call is checked", TimeSpan.FromSeconds(30));
+            await chat.IdleAsync(chatId);
+            var stops = await world.Approvals.StopsAsync(chatId);
+            Check(stops is [{ Code: SpendErrors.Ask }], "the running turn's next call was stopped: the user approved the queued message, not it");
+            Lacks(await chat.TextAsync(chatId), "Tool finished", "so it sent nothing");
+            Check(world.Rows().All(row => SpendChatNote(world.Path, row.Op) is null), "no call went out on the user's OK");
+            var still = (await world.Approvals.WaitingAsync(chatId)).Single();
+            Equal(GuardedDurableModels.SubmissionKey("queued please"), still.Approval.Submission, "the approval still waits for the queued message");
+
+            // The run ended on the stop, so the follow-up stays queued (the engine starts queued items only after an answer). Withdrawn,
+            // it takes its approval with it: a later copy of the same text is not let through on it.
+            Check(await chat.Chats.WithdrawAsync(chatId, null, queued.SubmissionId), "the queued message is withdrawn");
+            Equal(SpendApprovalStore.Withdrawn, SpendApprovalUsedBy(world.Path, still.Id), "its approval is withdrawn");
+            Equal(0, (await world.Approvals.WaitingAsync(chatId)).Count, "nothing waits");
+            var again = await ThrowsAsync<ChatSpendException>(() => chat.Chats.SendAsync(chatId, new ChatSendRequest("m3", "queued please") { Spend = ChatSpendAnswer.Check }),
+                "the same text sent again");
+            Equal(SpendErrors.Ask, again.Code, "is asked about again");
+        }),
+
+        Case("chat.spend.unused-approval-never-answers-another-send", async () =>
+        {
+            await using var world = GuardWorld.Create("chat-spend-unused-world");
+            await using var chat = await SpendChatHarnessAsync("chat-spend-unused", world);
+            var chatId = (await chat.CreateAsync("hello", "r1")).SessionId;
+            await chat.Chats.SendAsync(chatId, new ChatSendRequest("m1", "!echo hi"));
+            var tool = await chat.PendingAsync(chatId, "bash");
+            var cap = await world.CapAsync(CapPeriod.Request, 50_000, CapAction.Ask);
+            await chat.Chats.SendAsync(chatId, new ChatSendRequest("m2", "small please") { Spend = new ChatSpendAnswer(SpendChoice.ProceedOnce) });
+            var given = (await world.Approvals.WaitingAsync(chatId)).Single();
+
+            // The cap goes before the message is sent: its call fits as it is, so the user's OK was not needed.
+            await world.Ledger.SaveCapAsync(cap with { Enabled = false });
+            await chat.Chats.DecideApprovalAsync(chatId, tool.Request.TaskId, new ApprovalDecision(ApprovalChoice.AllowOnce));
+            await WaitUntilAsync(async () => (await chat.TextAsync(chatId)).Contains("Echo: small please", StringComparison.Ordinal), "the message is answered",
+                TimeSpan.FromSeconds(30));
+            await chat.IdleAsync(chatId);
+            Equal(SpendApprovalStore.Unneeded, SpendApprovalUsedBy(world.Path, given.Id), "its approval is retired, unneeded");
+            Equal(0, (await world.Approvals.WaitingAsync(chatId)).Count, "nothing waits");
+            Check(world.Rows().All(row => SpendChatNote(world.Path, row.Op) is null), "no call went out on an approval");
+
+            // Over the cap again, with a run-wide approval left waiting: a send the user has not answered is still asked about.
+            await world.Ledger.SaveCapAsync(cap with { Enabled = true });
+            await world.Guard.ApproveAsync(new SpendApproval(chatId, SpendChoice.ProceedOnce));
+            var later = await ThrowsAsync<ChatSpendException>(() => chat.Chats.SendAsync(chatId, new ChatSendRequest("m3", "later please") { Spend = ChatSpendAnswer.Check }),
+                "a check-only send");
+            Equal((SpendErrors.Ask, true), (later.Code, later.Result.CanProceed), "is asked about (409), not let through by an approval it was never given");
+            Equal("ask", (await chat.Chats.EstimateAsync(chatId, null, "later please"))?.Verdict, "the composer says so too");
+            Lacks(await chat.TextAsync(chatId), "later please", "nothing was posted");
+        }),
+
+        Case("chat.spend.failed-send-withdraws-its-approval", async () =>
+        {
+            await using var world = GuardWorld.Create("chat-spend-failed-world");
+            await using var chat = await SpendChatHarnessAsync("chat-spend-failed", world);
+            var binding = await chat.CreateAsync("hello", "r1");
+            var chatId = binding.SessionId;
+            await world.CapAsync(CapPeriod.Request, 50_000, CapAction.Ask);
+            var once = new ChatSendRequest("m1", "doomed please") { Spend = new ChatSpendAnswer(SpendChoice.ProceedOnce) };
+
+            // The chat's model is gone from the device: the send is admitted and approved, then fails before its message is posted.
+            chat.Bindings.Update(chatId, current => current with { Model = "gone" });
+            await ThrowsAsync<HostInvalidException>(() => chat.Chats.SendAsync(chatId, once), "the send fails after its approval");
+            Equal(0, (await world.Approvals.WaitingAsync(chatId)).Count, "no approval waits for a message that was not posted");
+            Equal(SpendApprovalStore.Withdrawn, ReadDb(world.Path, "SELECT used_by FROM spend_approvals", reader => reader.GetString(0)).Single(), "it was withdrawn");
+            Check(!chat.Chats.Spending!.WasAdmitted(chatId + "/m1"), "the send is no longer admitted");
+            Lacks(await chat.TextAsync(chatId), "doomed please", "nothing was posted");
+
+            // Its retry is checked again, and posts once with an approval of its own.
+            chat.Bindings.Update(chatId, current => current with { Model = binding.Model });
+            Equal(SpendErrors.Ask, (await ThrowsAsync<ChatSpendException>(() => chat.Chats.SendAsync(chatId, once with { Spend = ChatSpendAnswer.Check }),
+                "a check-only retry")).Code, "is asked about again");
+            await chat.Chats.SendAsync(chatId, once);
+            await WaitUntilAsync(async () => (await chat.TextAsync(chatId)).Contains("Echo: doomed please", StringComparison.Ordinal), "the retry is answered",
+                TimeSpan.FromSeconds(30));
+            await chat.IdleAsync(chatId);
+            Equal(1, Regex.Matches(await chat.TextAsync(chatId), "Echo: doomed please").Count, "posted once");
+            Check(world.Rows().Count(row => SpendChatNote(world.Path, row.Op) == "asked · sent once") == 1, "sent once on the new approval");
+            Equal(0, (await world.Approvals.WaitingAsync(chatId)).Count, "nothing waits");
+        }),
+
+        Case("chat.spend.parallel-copies-of-a-send-store-one-approval", async () =>
+        {
+            await using var world = GuardWorld.Create("chat-spend-copies-world");
+            await using var chat = await SpendChatHarnessAsync("chat-spend-copies", world);
+            var chatId = (await chat.CreateAsync("hello", "r1")).SessionId;
+            await world.CapAsync(CapPeriod.Request, 50_000, CapAction.Ask);
+            var sends = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => Task.Run(() =>
+                chat.Chats.SendAsync(chatId, new ChatSendRequest("m1", "copies please") { Spend = new ChatSpendAnswer(SpendChoice.ProceedOnce) }))));
+            Equal(1, sends.Select(sent => sent.SubmissionId).Distinct().Count(), "one submission");
+            await WaitUntilAsync(async () => (await chat.TextAsync(chatId)).Contains("Echo: copies please", StringComparison.Ordinal), "answered", TimeSpan.FromSeconds(30));
+            await chat.IdleAsync(chatId);
+            Equal(1L, ReadDb(world.Path, "SELECT COUNT(*) FROM spend_approvals", reader => reader.GetInt64(0)).Single(), "six copies stored one approval");
+            Equal(0, (await world.Approvals.WaitingAsync(chatId)).Count, "and none is left unused");
+            Equal(1, Regex.Matches(await chat.TextAsync(chatId), "Echo: copies please").Count, "posted once");
+        }),
+
+        Case("chat.spend.app.parallel-proceed-once-stores-one-approval", async () =>
+        {
+            var root = Temp("chat-spend-parallel-app");
+            try
+            {
+                var (app, path) = await SpendChatStartAsync(root);
+                await using var _ = app;
+                var created = await app.SendAsync(HttpMethod.Post, "/api/chats", new JsonObject { ["requestId"] = "r1", ["text"] = "hello" });
+                Equal(200, created.Status, "created: " + created.Text);
+                var chatId = created.Body!["id"]!.GetValue<string>();
+                await GuardIdleAsync(app, chatId, "Echo: hello");
+                SpendChatCap(path, SpendChatInputMicros(path) + 30_000, "ask");
+                Equal(409, (await app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/messages",
+                    new JsonObject { ["requestId"] = "m1", ["text"] = "twice please", ["spend"] = new JsonObject { ["check"] = true } })).Status, "asked first");
+
+                var posts = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/messages",
+                    new JsonObject { ["requestId"] = "m1", ["text"] = "twice please", ["spend"] = new JsonObject { ["choice"] = "proceed-once" } })));
+                Check(posts.All(post => post.Status == 200), "both copies answer 200: " + string.Join(" | ", posts.Select(post => post.Text)));
+                Equal(posts[0].Body!["submissionId"]!.GetValue<long>(), posts[1].Body!["submissionId"]!.GetValue<long>(), "one submission");
+                await GuardIdleAsync(app, chatId, "Echo: twice please");
+                Equal(1L, ReadDb(path, $"SELECT COUNT(*) FROM spend_approvals WHERE run = '{chatId.Replace("'", "''", StringComparison.Ordinal)}'", reader => reader.GetInt64(0)).Single(),
+                    "two parallel copies stored one approval");
+                Equal(0, (await app.Get("/api/spend/approvals?run=" + chatId)).Body?["approvals"]?.AsArray().Count, "and none is left unused");
+                Equal("asked · sent once", string.Join(" | ", SpendChatNotes(path, chatId)), "one request sent once");
+                Equal(1, Regex.Matches((await app.Get($"/chat/{chatId}/export.md")).Text, "Echo: twice please").Count, "posted and answered once");
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
     ];
+
+    /// <summary>The Chat area in process with <paramref name="world"/>'s Spend Guard on its chat pages and over its faux models ($3 / $15
+    /// per million tokens; no cap until the case adds one). Its tools ask first.</summary>
+    private static Task<ChatHarness> SpendChatHarnessAsync(string name, GuardWorld world) =>
+        ChatHarness.StartAsync(name, world.Over(FauxModelCatalog.CreateModels()), configure: services => services.AddSingleton(world.Guard));
+
+    /// <summary>A running turn's request: <paramref name="text"/> as its newest user message, placed at <paramref name="placed"/>, then an
+    /// answer (about 3,000 bytes in all).</summary>
+    private static ImmutableArray<ChordJson> SpendTurn(string text, long placed) =>
+    [
+        ChordJson.Object([new("role", "user"), new("content", text), new("timestamp", (ChordJson)(double)placed)]),
+        ChordJson.Object([new("role", "assistant"), new("content", new string('x', 2_900))]),
+    ];
+
+    /// <summary>What used up the approval <paramref name="id"/>, or null while it waits.</summary>
+    private static string? SpendApprovalUsedBy(string path, long id) =>
+        ReadDb(path, $"SELECT used_by FROM spend_approvals WHERE id = {id.ToString(CultureInfo.InvariantCulture)}", reader => reader.IsDBNull(0) ? null : reader.GetString(0)).Single();
+
+    /// <summary>The ledger note of the reservation <paramref name="op"/>, or null.</summary>
+    private static string? SpendChatNote(string path, string op) =>
+        ReadDb(path, $"SELECT note FROM spend_reservations WHERE op = '{op.Replace("'", "''", StringComparison.Ordinal)}'", reader => reader.IsDBNull(0) ? null : reader.GetString(0))
+            .SingleOrDefault();
 
     /// <summary>Starts the built app with --faux-metered over a fresh data folder whose tools ask first; returns it and its webagent.db.</summary>
     private static async Task<(WebAgentApp App, string Db)> SpendChatStartAsync(string root)

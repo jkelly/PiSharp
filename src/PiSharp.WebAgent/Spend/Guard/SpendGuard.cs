@@ -9,6 +9,11 @@
 // check:" (the durable engine never retries a message that says "billing", and SpendErrors.Parse finds the code after words before it).
 // The guard never changes the model, the account or the messages; it only lowers maxTokens when the user chose that.
 //
+// W3 fix (chat spend): an approval the chat gives for a send belongs to that send's submission (SpendApproval.Submission), and only a call
+// that carries it (SpendCall.Submission: its newest user message is that message, placed after the approval) uses it; a call that carries
+// it and fits the caps as it is retires it as unneeded. PreflightAsync(call, withApprovals: false) answers whether a call needs the user's
+// answer itself, without counting an approval that waits for another send.
+//
 // Ops and recovery: a durable request keeps its op when it is recovered, and the ledger returns an op's row unchanged whatever its state.
 // So the guard walks the op's ledger keys (op, op~2, op~3, ...): a key still reserved or uncertain is that request's own reservation and is
 // reused (a recovered request never reserves twice; its uncertain row stays uncertain until the user resolves it), while a key that already
@@ -127,14 +132,21 @@ public sealed class SpendGuard : ISpendGuard
     }
 
     /// <inheritdoc/>
-    public async Task<SpendDecision> PreflightAsync(SpendCall call, CancellationToken cancellationToken = default)
+    public Task<SpendDecision> PreflightAsync(SpendCall call, CancellationToken cancellationToken = default) =>
+        PreflightAsync(call, withApprovals: true, cancellationToken);
+
+    /// <summary><see cref="PreflightAsync(SpendCall, CancellationToken)"/>; with <paramref name="withApprovals"/> false, an approval that
+    /// waits for the run is not counted: the answer is whether the call needs the user's answer itself (the chat's check of a send the user
+    /// has not answered, which an approval given for another send never answers).</summary>
+    public async Task<SpendDecision> PreflightAsync(SpendCall call, bool withApprovals, CancellationToken cancellationToken = default)
     {
         var checkedCall = Check(call, requireOp: false);
         var estimate = await estimator.EstimateAsync(checkedCall.EstimateInput, cancellationToken).ConfigureAwait(false);
         var key = checkedCall.Op.Length == 0 ? "preflight-" + Guid.NewGuid().ToString("N") : (await LedgerKeyAsync(checkedCall.Op, cancellationToken).ConfigureAwait(false)).Key;
         var first = await ledger.CheckAsync(Request(checkedCall, key, estimate, checkedCall.Approved, null), cancellationToken).ConfigureAwait(false);
-        if (first.Allowed) return first;
-        if (await approvals.PeekAsync(checkedCall.Run, Blank(checkedCall.Op), cancellationToken).ConfigureAwait(false) is not { } approval) return first;
+        if (first.Allowed || !withApprovals) return first;
+        if (await approvals.PeekAsync(checkedCall.Run, Blank(checkedCall.Op), checkedCall.Submission, checkedCall.SubmittedAt, cancellationToken).ConfigureAwait(false)
+            is not { } approval) return first;
         var (answered, _) = Apply(estimate, approval.Approval);
         return await ledger.CheckAsync(Request(checkedCall, key, answered, approved: true, null), cancellationToken).ConfigureAwait(false);
     }
@@ -153,9 +165,13 @@ public sealed class SpendGuard : ISpendGuard
         if (existing is not null) return await ReusedAsync(checkedCall, estimate, existing, cancellationToken).ConfigureAwait(false);
         var first = await ledger.ReserveAsync(Request(checkedCall, key, estimate, checkedCall.Approved, null), cancellationToken).ConfigureAwait(false);
         if (first.Reserved)
+        {
+            if (!first.Existing) await RetireUnneededAsync(checkedCall, cancellationToken).ConfigureAwait(false);
             return first.Existing ? await ReusedAsync(checkedCall, estimate, first.Reservation!, cancellationToken).ConfigureAwait(false)
                 : new GuardedReservation(checkedCall, first) { MaxTokens = checkedCall.MaxTokens };
-        if (await approvals.TakeAsync(checkedCall.Run, Blank(checkedCall.Op), key, cancellationToken).ConfigureAwait(false) is not { } approval)
+        }
+        if (await approvals.TakeAsync(checkedCall.Run, Blank(checkedCall.Op), checkedCall.Submission, checkedCall.SubmittedAt, key, cancellationToken).ConfigureAwait(false)
+            is not { } approval)
         {
             await StopAsync(checkedCall, first.Decision, cancellationToken).ConfigureAwait(false);
             return new GuardedReservation(checkedCall, first);
@@ -341,6 +357,23 @@ public sealed class SpendGuard : ISpendGuard
         },
     };
 
+    /// <summary>Retires the approvals given for the submission <paramref name="call"/> answers (it was reserved without one, so they are not
+    /// needed and must not answer a later call); best effort.</summary>
+    private async Task RetireUnneededAsync(SpendCall call, CancellationToken cancellationToken)
+    {
+        if (call.Submission is null) return;
+        try
+        {
+            if (await approvals.RetireSubmissionAsync(call.Run, call.Submission, call.SubmittedAt, cancellationToken).ConfigureAwait(false) > 0)
+                log.LogInformation("Spend Guard: {Op} fitted the caps as it was; the user's approval of its message was not needed.", call.Op);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            // The call holds its reservation either way; the approval then waits until it expires, and answers only its own message.
+            log.LogWarning(error, "Spend Guard: the unneeded approval of {Op}'s message could not be retired.", call.Op);
+        }
+    }
+
     private async Task StopAsync(SpendCall call, SpendDecision decision, CancellationToken cancellationToken)
     {
         try
@@ -379,7 +412,13 @@ public sealed class SpendGuard : ISpendGuard
         if (op.Length > MaxOpLength) throw new ArgumentException($"An op is at most {MaxOpLength} characters.");
         var run = Blank(call.Run);
         if (run?.Length > SpendRequest.MaxKeyLength) throw new ArgumentException($"A run key is at most {SpendRequest.MaxKeyLength} characters.");
-        return call with { Provider = call.Provider.Trim(), Model = call.Model.Trim(), Account = Blank(call.Account), Run = run, Op = op, Note = Blank(call.Note) };
+        var submission = Blank(call.Submission);
+        if (submission?.Length > SpendRequest.MaxKeyLength) throw new ArgumentException($"A submission key is at most {SpendRequest.MaxKeyLength} characters.");
+        return call with
+        {
+            Provider = call.Provider.Trim(), Model = call.Model.Trim(), Account = Blank(call.Account), Run = run, Op = op, Note = Blank(call.Note),
+            Submission = submission, SubmittedAt = submission is null ? null : call.SubmittedAt,
+        };
     }
 
     private DateTimeOffset Now() => DateTimeOffset.FromUnixTimeMilliseconds(clock.GetUtcNow().ToUnixTimeMilliseconds());

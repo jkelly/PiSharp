@@ -30,7 +30,7 @@ internal static partial class Program
     [
         Case("spend.guard.registration-decorates-the-final-models-once", async () =>
         {
-            Equal("1100:spend: approvals,1101:spend: stops", string.Join(",", SpendGuardMigrations.All.Select(migration => $"{migration.Id}:{migration.Name}")), "the migrations");
+            Equal("1100:spend: approvals,1101:spend: stops,1102:spend: approval submissions", string.Join(",", SpendGuardMigrations.All.Select(migration => $"{migration.Id}:{migration.Name}")), "the migrations");
             Check(SpendGuardMigrations.All.All(migration => MigrationArea.Of(migration.Id) == MigrationArea.Spend), "inside the spend range");
 
             var root = Temp("spend-guard-registration");

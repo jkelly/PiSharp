@@ -43,6 +43,17 @@ public sealed record SpendCall
     /// <summary>A short note for the ledger, or null.</summary>
     public string? Note { get; init; }
 
+    /// <summary>The submission the request answers: the key of the newest user message it sends (a durable generation request's; see
+    /// <c>GuardedDurableModels.SubmissionKey</c>), or null (a compaction summary, a non-durable call, a preflight). A one-time approval of a
+    /// chat send (<see cref="SpendApproval.Submission"/>) answers only a call that carries that send's key.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Submission { get; init; }
+
+    /// <summary>When the newest user message the request sends was placed (UTC Unix milliseconds), with <see cref="Submission"/>; null
+    /// otherwise. An approval of a send answers only a message placed at or after the approval was given.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? SubmittedAt { get; init; }
+
     /// <summary>What the estimator prices.</summary>
     [JsonIgnore]
     public SpendEstimateInput EstimateInput => new(Provider, Model, Account, InputBytes, MaxTokens);
@@ -106,7 +117,7 @@ public enum SpendChoice
 }
 
 /// <summary>A one-time approval the user gave in the confirm modal. It applies to the next call of <see cref="Run"/> (of
-/// <see cref="Op"/> only, when set) that needs an Ask answer, once; a Block cap still blocks.</summary>
+/// <see cref="Op"/> only, or of <see cref="Submission"/> only, when set) that needs an Ask answer, once; a Block cap still blocks.</summary>
 /// <param name="Run">The run key the approval is for (the chat id).</param>
 /// <param name="Choice">Proceed once, or cap the output.</param>
 public sealed record SpendApproval(string Run, SpendChoice Choice)
@@ -117,6 +128,10 @@ public sealed record SpendApproval(string Run, SpendChoice Choice)
     /// <summary>Only this op (a call stopped inside a run), or null for the run's next call.</summary>
     public string? Op { get; init; }
 
+    /// <summary>Only a call that answers this submission (<see cref="SpendCall.Submission"/>: the chat message the user approved the send
+    /// of, placed at or after the approval), or null for any call of the run.</summary>
+    public string? Submission { get; init; }
+
     /// <summary>The same approval, trimmed and checked.</summary>
     /// <exception cref="ArgumentException">A value is not allowed.</exception>
     public SpendApproval Normalize()
@@ -125,7 +140,12 @@ public sealed record SpendApproval(string Run, SpendChoice Choice)
         if (!Enum.IsDefined(Choice)) throw new ArgumentException($"Unknown choice {(int)Choice}.");
         if (Choice == SpendChoice.CapOutput && MaxOutputTokens is not >= 1) throw new ArgumentException("Capping the output needs a token count of 1 or more.");
         if (Choice == SpendChoice.ProceedOnce && MaxOutputTokens is not null) throw new ArgumentException("Proceed once takes no output cap.");
-        return this with { Run = Run.Trim(), Op = string.IsNullOrWhiteSpace(Op) ? null : Op.Trim() };
+        return this with
+        {
+            Run = Run.Trim(),
+            Op = string.IsNullOrWhiteSpace(Op) ? null : Op.Trim(),
+            Submission = string.IsNullOrWhiteSpace(Submission) ? null : Submission.Trim(),
+        };
     }
 }
 

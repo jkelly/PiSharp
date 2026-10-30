@@ -4,13 +4,20 @@
 // sends, failed and stopped answers left out, as its context does) plus the draft; the browser never says how big a request is. A send that
 // carries `spend` is checked: when the guard would ask or block, nothing is posted and the answer is 409 with the cause's confirm modal
 // (S4's _SpendConfirmModal from SpendPages.ConfirmView). The user's choice comes back on the same request id: "proceed once" or "cap the
-// output" is checked as the guard would apply it, then stored as the run's one-time approval (SpendGuard.ApproveStoredAsync), which the
-// guard uses on the run's next stopped call; a Block still blocks. A request id that was admitted is never checked again, so a retried
-// POST reaches the engine's de-duplication and posts once. A call the guard stopped inside a run (its error names the op) is reviewed
+// output" is checked as the guard would apply it, then stored as the one-time approval of that message (SpendGuard.ApproveStoredAsync),
+// which the guard uses when the call that sends the message is stopped; a Block still blocks. A request id that was admitted is never
+// checked again, so a retried POST reaches the engine's de-duplication and posts once. A call the guard stopped inside a run (its error
+// names the op) is reviewed
 // with that stop's own decision, and continues with a "Continue." message on the same branch after the user's choice (the stopped call's
 // size, plus the message, is what is checked). Nothing switches a model or an account: cheaper models are suggestions in the modal. The
 // ledger side (footers, the session panel) is read at most every LedgerLifetime per chat, and again whenever the branch's entries or
 // running state change.
+//
+// W3 fix (chat spend): the one-time approval belongs to the message the user approved (SpendApproval.Submission, the key of its text), so
+// only the call that sends that message uses it: not the running turn's next call while the message waits as a follow-up, not a
+// compaction, not another send. Every check here ignores approvals that wait (PreflightAsync withApprovals: false), so a send the user has
+// not answered is always asked about. A send key's check, approval and send run one at a time (EnterAsync), so two copies of one POST
+// store one approval; a send that fails after its approval was stored withdraws it (WithdrawAsync) and is checked again when retried.
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -102,6 +109,9 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
 
     private readonly ConcurrentDictionary<string, byte> admitted = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> approved = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> withdrawn = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<(string Chat, long Submission), string> posted = new();
+    private readonly Dictionary<string, SendGate> gates = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (string Stamp, DateTimeOffset At, IReadOnlyList<Reservation> Rows)> reads = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (DateTimeOffset At, ChatSpendSummary Summary)> summaries = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<(string Session, long Agent), (DateTimeOffset At, long Bytes)> contexts = new();
@@ -192,13 +202,14 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
 
     // ─── Checks ─────────────────────────────────────────────────────────────
 
-    /// <summary>What the guard says about <paramref name="call"/> now (nothing reserved), with the composer's estimate and, when it is not
-    /// allowed and <paramref name="modal"/>, the confirm modal; null without a Spend Guard.</summary>
+    /// <summary>What the guard says about <paramref name="call"/> now (nothing reserved; an approval that waits for another send is not
+    /// counted), with the composer's estimate and, when it is not allowed and <paramref name="modal"/>, the confirm modal; null without a
+    /// Spend Guard.</summary>
     public async Task<ChatSpendResult?> CheckAsync(SpendCall call, bool modal, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(call);
         if (Guard is not { } guard) return null;
-        var decision = await guard.PreflightAsync(call, cancellationToken).ConfigureAwait(false);
+        var decision = await guard.PreflightAsync(call, withApprovals: false, cancellationToken).ConfigureAwait(false);
         return await ResultAsync(call, decision, modal, cancellationToken).ConfigureAwait(false);
     }
 
@@ -211,7 +222,7 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
         try
         {
             var call = await CallAsync(binding, agentId, draft, cancellationToken).ConfigureAwait(false);
-            return await ViewAsync(call, await guard.PreflightAsync(call, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+            return await ViewAsync(call, await guard.PreflightAsync(call, withApprovals: false, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
         }
         catch (Exception error) when (error is not OperationCanceledException && ChatErrors.From(error) is null)
         {
@@ -228,7 +239,7 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
         {
             var account = (await Accounts.BindAsync(provider, cancellationToken).ConfigureAwait(false))?.Id;
             var call = NewChatCall(provider, model, account, draft);
-            return await ViewAsync(call, await guard.PreflightAsync(call, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+            return await ViewAsync(call, await guard.PreflightAsync(call, withApprovals: false, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
         }
         catch (Exception error) when (error is not OperationCanceledException && ChatErrors.From(error) is null)
         {
@@ -246,21 +257,24 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
     }
 
     /// <summary>Lets a send through, or refuses it (409, nothing posted): a request id admitted before passes at once; else the guard's
-    /// preflight decides, and the user's choice, when given, is checked as the guard would apply it. Returns the one-time approval to store
-    /// for the run before the send goes out (<see cref="ApproveAsync"/>), or null when none is needed.</summary>
+    /// preflight decides (an approval that waits for another send is not counted), and the user's choice, when given, is checked as the
+    /// guard would apply it. Returns the one-time approval to store before the send goes out (<see cref="ApproveAsync"/>), scoped to the
+    /// message the send posts, or null when none is needed. Call it inside the send key's <see cref="EnterAsync"/>.</summary>
     /// <param name="call">The request the send makes.</param>
     /// <param name="key">The send's de-duplication key (chat and request id).</param>
     /// <param name="answer">The check, or the user's choice.</param>
     /// <param name="run">The run the approval is for (the chat id; a new chat's once it exists).</param>
+    /// <param name="text">The message the send posts: the approval answers only the call that sends it.</param>
     /// <param name="cancellationToken">Cancels the check.</param>
     /// <exception cref="ChatSpendException">The guard would ask or block.</exception>
-    public async Task<SpendApproval?> AdmitAsync(SpendCall call, string key, ChatSpendAnswer answer, string? run, CancellationToken cancellationToken = default)
+    public async Task<SpendApproval?> AdmitAsync(SpendCall call, string key, ChatSpendAnswer answer, string? run, string text, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(answer);
+        ArgumentNullException.ThrowIfNull(text);
         if (admitted.ContainsKey(key) || Guard is not { } guard) return null;
-        var decision = await guard.PreflightAsync(call, cancellationToken).ConfigureAwait(false);
+        var decision = await guard.PreflightAsync(call, withApprovals: false, cancellationToken).ConfigureAwait(false);
         if (decision.Allowed)
         {
             Admit(key);
@@ -270,35 +284,146 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
         if (answer.Choice is { } choice)
         {
             var answered = call with { Approved = true, MaxTokens = choice == SpendChoice.CapOutput ? answer.MaxOutputTokens : call.MaxTokens };
-            var second = await guard.PreflightAsync(answered, cancellationToken).ConfigureAwait(false);
+            var second = await guard.PreflightAsync(answered, withApprovals: false, cancellationToken).ConfigureAwait(false);
             if (second.Allowed)
             {
                 Admit(key);
                 logger.LogInformation("Chat send {Key} admitted after the user's answer ({Choice}).", key, SpendApprovalStore.Wire(choice));
-                return new SpendApproval(run ?? call.Run ?? "", choice) { MaxOutputTokens = choice == SpendChoice.CapOutput ? answer.MaxOutputTokens : null };
+                return new SpendApproval(run ?? call.Run ?? "", choice)
+                {
+                    MaxOutputTokens = choice == SpendChoice.CapOutput ? answer.MaxOutputTokens : null,
+                    Submission = GuardedDurableModels.SubmissionKey(text),
+                };
             }
             (refused, decision) = (answered, second);
         }
         throw new ChatSpendException(await ResultAsync(refused, decision, modal: true, cancellationToken).ConfigureAwait(false));
     }
 
-    /// <summary>Stores <paramref name="approval"/> as the run's one-time approval, once per send key.</summary>
-    public async Task ApproveAsync(SpendApproval approval, string key, CancellationToken cancellationToken = default)
+    /// <summary>Stores <paramref name="approval"/> as the one-time approval of the send <paramref name="key"/>, once per send key (call it
+    /// inside the key's <see cref="EnterAsync"/>). Returns the stored approval, or null when none was stored now.</summary>
+    public async Task<StoredApproval?> ApproveAsync(SpendApproval approval, string key, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(approval);
-        if (Guard is not { } guard || approved.ContainsKey(key)) return;
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        if (Guard is not { } guard || approved.ContainsKey(key)) return null;
         var stored = await guard.ApproveStoredAsync(approval, cancellationToken).ConfigureAwait(false);
         if (approved.Count > 2000) approved.Clear();
         approved[key] = stored.Id;
+        return stored;
+    }
+
+    /// <summary>Undoes the admission of the send <paramref name="key"/> after its send failed: its approval, when one was stored, is retired
+    /// (<see cref="SpendApprovalStore.Withdrawn"/>) so it answers nothing else, and a retry of the key is checked again. A failure to retire
+    /// it is logged, not thrown (the send's own failure is what the caller reports).</summary>
+    public async Task WithdrawAsync(string key)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        if (admitted.TryRemove(key, out _))
+        {
+            if (withdrawn.Count > 2000) withdrawn.Clear();
+            withdrawn[key] = 0;
+        }
+        await RetireAsync(key, "failed").ConfigureAwait(false);
+    }
+
+    /// <summary>Notes that the send <paramref name="key"/> was posted as <paramref name="submissionId"/> of the chat, when it stored an
+    /// approval, so withdrawing that queued message (<see cref="WithdrawPostedAsync"/>) also withdraws its approval.</summary>
+    public void Posted(string chatId, long submissionId, string key)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(chatId);
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        if (!approved.ContainsKey(key)) return;
+        if (posted.Count > 2000) posted.Clear();
+        posted[(chatId, submissionId)] = key;
+    }
+
+    /// <summary>After the user withdrew the queued message <paramref name="submissionId"/> of the chat: the approval its send stored, when
+    /// one still waits, is retired (<see cref="SpendApprovalStore.Withdrawn"/>), so it never answers a later copy of the same text.</summary>
+    public async Task WithdrawPostedAsync(string chatId, long submissionId)
+    {
+        if (posted.TryRemove((chatId, submissionId), out var key)) await RetireAsync(key, "was withdrawn").ConfigureAwait(false);
+    }
+
+    private async Task RetireAsync(string key, string why)
+    {
+        if (!approved.TryRemove(key, out var id) || Guard is not { } guard) return;
+        try
+        {
+            if (await guard.Approvals.RetireAsync(id, SpendApprovalStore.Withdrawn).ConfigureAwait(false))
+                logger.LogInformation("Chat send {Key} {Why}; its spend approval was withdrawn.", key, why);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            // The send's own outcome is what the caller reports; the approval then answers only its own message until it expires.
+            logger.LogWarning(error, "The spend approval of chat send {Key} could not be withdrawn.", key);
+        }
     }
 
     /// <summary>Whether a send key was admitted (a retry of it is not checked again).</summary>
     public bool WasAdmitted(string key) => admitted.ContainsKey(key);
 
+    /// <summary>Whether a send key was admitted and then withdrawn because its send failed, and not admitted again since (a retry of it is
+    /// checked again even where the first copy already made something, such as a new chat).</summary>
+    public bool WasWithdrawn(string key) => withdrawn.ContainsKey(key);
+
+    /// <summary>Waits until no other request holds the send <paramref name="key"/>, then holds it until the result is disposed: one copy of a
+    /// send at a time is checked, approved and sent, so two copies of one POST never store two approvals.</summary>
+    public async Task<IDisposable> EnterAsync(string key, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(key);
+        SendGate? gate;
+        lock (gates)
+        {
+            if (!gates.TryGetValue(key, out gate)) gates[key] = gate = new SendGate();
+            gate.Users++;
+        }
+        try
+        {
+            await gate.Lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            Leave(key, gate);
+            throw;
+        }
+        return new SendHold(this, key, gate);
+    }
+
+    private void Leave(string key, SendGate gate)
+    {
+        lock (gates)
+        {
+            if (--gate.Users == 0) gates.Remove(key);
+        }
+    }
+
     private void Admit(string key)
     {
         if (admitted.Count > 2000) admitted.Clear();
         admitted[key] = 0;
+        withdrawn.TryRemove(key, out _);
+    }
+
+    /// <summary>One send key's lock and how many requests hold or wait for it.</summary>
+    private sealed class SendGate
+    {
+        public SemaphoreSlim Lock { get; } = new(1, 1);
+
+        public int Users { get; set; }
+    }
+
+    /// <summary>A held send key; disposing releases it once.</summary>
+    private sealed class SendHold(ChatSpend owner, string key, SendGate gate) : IDisposable
+    {
+        private int released;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref released, 1) != 0) return;
+            gate.Lock.Release();
+            owner.Leave(key, gate);
+        }
     }
 
     /// <summary>A stopped call of the chat: the guard's own record of it (op, size, decision), or null when there is none (or it belongs to

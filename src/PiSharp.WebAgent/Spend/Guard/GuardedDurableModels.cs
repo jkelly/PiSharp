@@ -12,9 +12,16 @@
 // process (the handle id maps to the ledger op in memory); a cancelled one becomes uncertain; after a restart, startup recovery has
 // already made it uncertain. Model lookups, catalog listings, classification and image generation pass through unguarded (W3 prices chat
 // requests only).
+//
+// W3 fix (chat spend): a generation request carries the submission it answers (SpendCall.Submission: the key of its newest user message,
+// with that message's timestamp), so a one-time approval the chat gave for a send is used only by the call that sends that message. The
+// durable host's metadata hook is per session, not per turn, so the request itself is where the guard finds which message it answers.
+// A compaction summary carries none.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -47,12 +54,18 @@ public sealed class GuardedDurableModels : IDurableModels
     /// <summary>The executor, resolved on first use.</summary>
     public GuardedRunExecutor Executor => executor.Value;
 
-    /// <summary>The call the guard reserves for one request: the model, <c>metadata.pisharp</c>'s fields (source <c>chat</c> and a fresh op
-    /// <c>call-…</c> when missing), the messages' size and <c>maxTokens</c>.</summary>
-    public static SpendCall Call(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options)
+    /// <summary>The call the guard reserves for one generation request: the model, <c>metadata.pisharp</c>'s fields (source <c>chat</c> and a
+    /// fresh op <c>call-…</c> when missing), the messages' size, <c>maxTokens</c> and the submission it answers (<see cref="Submission"/>).</summary>
+    public static SpendCall Call(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options) =>
+        Call(model, messages, options, answersSubmission: true);
+
+    /// <summary><see cref="Call(DurableModel, ImmutableArray{JsonValue}, DurableStreamOptions?)"/>; with <paramref name="answersSubmission"/>
+    /// false (a compaction summary) the call carries no submission, so no approval of a chat send answers it.</summary>
+    public static SpendCall Call(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options, bool answersSubmission)
     {
         ArgumentNullException.ThrowIfNull(model);
         var fields = SpendMetadata.Read(options);
+        var (submission, submittedAt) = answersSubmission ? Submission(messages) : (null, null);
         return new SpendCall
         {
             Provider = model.Provider,
@@ -63,7 +76,33 @@ public sealed class GuardedDurableModels : IDurableModels
             Op = fields.Op ?? "call-" + Guid.NewGuid().ToString("N"),
             InputBytes = CostEstimator.InputBytes(messages.IsDefault ? [] : messages),
             MaxTokens = MaxTokens(options?.MaxTokens),
+            Submission = submission,
+            SubmittedAt = submittedAt,
         };
+    }
+
+    /// <summary>The key of a submitted message's text (<see cref="SpendApproval.Submission"/>, <see cref="SpendCall.Submission"/>): the first
+    /// 32 hex digits of its UTF-8 SHA-256, so the text itself is never stored with an approval.</summary>
+    public static string SubmissionKey(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..32];
+    }
+
+    /// <summary>The submission a request answers: the key of its newest user message's text (<see cref="SubmissionKey"/>; a content that is not
+    /// a string is keyed by its JSON) and when that message was placed (its <c>timestamp</c>, UTC Unix milliseconds); nulls when it has no user
+    /// message.</summary>
+    public static (string? Key, long? At) Submission(ImmutableArray<JsonValue> messages)
+    {
+        if (messages.IsDefaultOrEmpty) return (null, null);
+        for (var index = messages.Length - 1; index >= 0; index--)
+        {
+            if (messages[index] is not JsonObjectValue message || !message.TryGetValue("role", out var role) || role is not JsonStringValue { Value: "user" }) continue;
+            var text = !message.TryGetValue("content", out var content) ? "" : content is JsonStringValue plain ? plain.Value : content.ToJson();
+            long? at = message.TryGetValue("timestamp", out var time) && time is JsonNumberValue { Value: >= 0 and < 1e15 } stamp ? (long)Math.Floor(stamp.Value) : null;
+            return (SubmissionKey(text), at);
+        }
+        return (null, null);
     }
 
     /// <summary><paramref name="options"/> as sent for <paramref name="send"/>: unchanged, except <c>maxTokens</c> lowered to the user's chosen
@@ -91,7 +130,8 @@ public sealed class GuardedDurableModels : IDurableModels
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
-        var (lease, refusal) = await ReserveAsync(model, messages, options, cancellationToken).ConfigureAwait(false);
+        // A compaction summary (the durable engine's only CompleteSimpleAsync call of a chat) answers no message the user approved.
+        var (lease, refusal) = await ReserveAsync(model, messages, options, answersSubmission: false, cancellationToken).ConfigureAwait(false);
         if (lease is null) return GuardedRunExecutor.StoppedMessage(model.Descriptor, refusal!, Now());
         await using (lease.ConfigureAwait(false))
         {
@@ -157,7 +197,7 @@ public sealed class GuardedDurableModels : IDurableModels
     private async IAsyncEnumerable<StreamEvent> Stream(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var (lease, refusal) = await ReserveAsync(model, messages, options, cancellationToken).ConfigureAwait(false);
+        var (lease, refusal) = await ReserveAsync(model, messages, options, answersSubmission: true, cancellationToken).ConfigureAwait(false);
         if (lease is null)
         {
             yield return new StreamError(StopReason.Error, GuardedRunExecutor.StoppedMessage(model.Descriptor, refusal!, Now()));
@@ -188,11 +228,11 @@ public sealed class GuardedDurableModels : IDurableModels
 
     /// <summary>The lease of one request, or null and the message of a guard that could not check it (nothing is sent).</summary>
     private async Task<(GuardedLease? Lease, string? Unchecked)> ReserveAsync(DurableModel model, ImmutableArray<JsonValue> messages,
-        DurableStreamOptions? options, CancellationToken cancellationToken)
+        DurableStreamOptions? options, bool answersSubmission, CancellationToken cancellationToken)
     {
         try
         {
-            return (await Executor.ReserveAsync(Call(model, messages, options), cancellationToken).ConfigureAwait(false), null);
+            return (await Executor.ReserveAsync(Call(model, messages, options, answersSubmission), cancellationToken).ConfigureAwait(false), null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
