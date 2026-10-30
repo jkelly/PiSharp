@@ -1,0 +1,45 @@
+@* Decision 0011 (run W3, unit AP): one setting row of Settings › Appearance (Display, Messages), after the mockup's rows: the name, what it
+   does, where it is kept, and its control (a button group, a dropdown or a switch) named by the preference's key. The server renders the
+   defaults; appearance.js sets the browser's stored values when the page loads and marks the row (.is-modified, "modified · was …") while
+   it differs from what is saved. Model: AppearancePref. *@
+@using PiSharp.WebAgent.Appearance
+@model AppearancePref
+@{
+    var pref = Model;
+    var id = "ap-" + pref.Key;
+}
+<div class="setting-row" data-pref-row="@pref.Key" data-pref-label="@pref.Label">
+  <div>
+    <div class="setting-label d-flex align-items-center gap-2 flex-wrap">@pref.Label <span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
+    <div class="setting-desc">@pref.Description</div>
+    <div class="setting-key">@pref.KeyNote</div>
+  </div>
+  <div class="setting-control">
+    @switch (pref.Control)
+    {
+      case AppearanceControl.Buttons:
+        <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="@pref.Label">
+          @foreach (var choice in pref.Choices)
+          {
+            <input type="radio" class="btn-check" name="@pref.Key" id="@id-@choice.Value" value="@choice.Value" checked="@(choice.Value == pref.Default)" data-pref="@pref.Key"><label class="btn btn-outline-secondary" for="@id-@choice.Value">@choice.Label</label>
+          }
+        </div>
+        break;
+      case AppearanceControl.Select:
+        <label class="visually-hidden" for="@id">@pref.Label</label>
+        <select class="form-select form-select-sm ap-select" id="@id" name="@pref.Key" data-pref="@pref.Key">
+          @foreach (var choice in pref.Choices)
+          {
+            <option value="@choice.Value" selected="@(choice.Value == pref.Default)">@choice.Label</option>
+          }
+        </select>
+        break;
+      default:
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="@id" name="@pref.Key" checked="@(pref.Default == "on")" data-pref="@pref.Key" data-follows-system="@(pref.Default == "system" ? "true" : null)">
+          <label class="form-check-label visually-hidden" for="@id">@pref.Label</label>
+        </div>
+        break;
+    }
+  </div>
+</div>

@@ -1,0 +1,122 @@
+@* Decision 0011 (run W3, unit AP): the mockups' settings-appearance page (route GET /settings/appearance), mapped 1:1. Theme: three cards
+   (Dark, the default; Light; System, which follows the system and switches when it changes) that apply at once and are remembered by this
+   browser, like the top bar's moon. Display (UI font size, message density, code theme, code ligatures) and Messages (thinking and tool
+   cards expanded, the usage footer, reduce motion) are a form: the live preview (_AppearancePreview) shows a change before it is saved,
+   the rows mark what changed, and _SettingsSaveBar saves it to this browser (or discards it); each section can be reset to its defaults.
+   Nothing here is stored by the server or sent to a model. wwwroot/js/appearance.js (loaded in every page's <head>) wires the page.
+   "Render markdown in user messages" is left out: the chat shows a user's text as typed. Model: AppearancePage. *@
+@using PiSharp.WebAgent.Appearance
+@model AppearancePage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Appearance";
+    ViewData[ShellViewData.SettingsSection] = "appearance";
+    ViewData[ShellViewData.ContentClass] = "ap-wide";
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+<header class="settings-header">
+  <div class="ps-eyebrow">App</div>
+  <h2>Appearance</h2>
+  <p>How the web agent looks in this browser. None of these settings change what is sent to a model.</p>
+</header>
+
+<div class="alert alert-warning d-flex gap-2 align-items-start fs-7" role="status" data-appearance-storage-off hidden>
+  <i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i>
+  <div><strong>This browser keeps no site data for the app</strong> (a private window, or site data turned off), so these settings last only until the page is closed.</div>
+</div>
+
+<section class="settings-section" id="theme">
+  <h3>Theme</h3>
+  <p class="section-desc">Applies right away and is remembered by this browser. The moon icon in the top bar switches between dark and light.</p>
+  <div class="row g-2" role="radiogroup" aria-label="Theme" data-appearance-themes>
+    @foreach (var theme in AppearancePrefs.Themes)
+    {
+      <div class="col-sm-4">
+        <input type="radio" class="btn-check" name="theme" id="theme-@theme.Value" value="@theme.Value" checked="@(theme.Value == AppearancePrefs.DefaultTheme)" data-theme-set="@theme.Value">
+        <label class="choice-card h-100" for="theme-@theme.Value">
+          <span class="theme-swatch" aria-hidden="true">
+            @switch (theme.Value)
+            {
+              case "dark":
+                <span class="sw sw-dark"><span class="sw-side"></span><span class="sw-main"><span class="sw-line" style="width:40%"></span><span class="sw-bubble"></span><span class="sw-line sw-accent" style="width:55%"></span><span class="sw-line" style="width:80%"></span></span></span>
+                break;
+              case "light":
+                <span class="sw sw-light"><span class="sw-side"></span><span class="sw-main"><span class="sw-line" style="width:40%"></span><span class="sw-bubble"></span><span class="sw-line sw-accent" style="width:55%"></span><span class="sw-line" style="width:80%"></span></span></span>
+                break;
+              default:
+                <span class="sw sw-dark"><span class="sw-side"></span><span class="sw-main"><span class="sw-line" style="width:60%"></span><span class="sw-bubble"></span><span class="sw-line sw-accent" style="width:70%"></span></span></span>
+                <span class="sw sw-light"><span class="sw-main"><span class="sw-line" style="width:60%"></span><span class="sw-bubble"></span><span class="sw-line sw-accent" style="width:70%"></span></span></span>
+                break;
+            }
+          </span>
+          @switch (theme.Value)
+          {
+            case "dark":
+              <span class="choice-title d-flex align-items-center gap-2"><i class="bi bi-moon-stars text-ps-blue" aria-hidden="true"></i>Dark <span class="ps-chip" data-tone="outline">default</span></span>
+              <span class="choice-desc d-block">Near-black surfaces with grey text.</span>
+              break;
+            case "light":
+              <span class="choice-title d-flex align-items-center gap-2"><i class="bi bi-sun text-ps-blue" aria-hidden="true"></i>Light</span>
+              <span class="choice-desc d-block">White surfaces with light grey panels.</span>
+              break;
+            default:
+              <span class="choice-title d-flex align-items-center gap-2"><i class="bi bi-circle-half text-ps-blue" aria-hidden="true"></i>System <span class="ps-chip" data-tone="outline" data-system-now hidden></span></span>
+              <span class="choice-desc d-block">Follows the system's light or dark mode (in Windows, the app mode), and switches when it changes.</span>
+              break;
+          }
+        </label>
+      </div>
+    }
+  </div>
+  <div class="setting-key ps-mono fs-8 text-ps-faint mt-2">@AppearancePrefs.ThemeKey · this browser</div>
+</section>
+
+<form novalidate autocomplete="off" data-appearance-form>
+  <div class="row g-4">
+    <div class="col-xxl-5 order-xxl-2">
+      <section class="settings-section ap-preview-sticky" aria-labelledby="preview-title">
+        <h3 id="preview-title">Live preview</h3>
+        <p class="section-desc">Updates as you change the settings below, before you save them. Uses the chat's message markup.</p>
+        <partial name="/Views/Settings/_AppearancePreview.cshtml" model="Model" />
+      </section>
+    </div>
+
+    <div class="col-xxl-7 order-xxl-1">
+      <section class="settings-section" id="display">
+        <h3 class="d-flex align-items-baseline gap-2">Display <button type="button" class="btn btn-link btn-sm p-0 ms-auto fs-8 fw-normal text-decoration-none" data-appearance-reset="display"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset to defaults</button></h3>
+        <p class="section-desc">Type, spacing and code blocks.</p>
+        <div class="ps-card">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Accent color</div>
+              <div class="setting-desc">The interface is monochrome. Colour is only used for status (connected, warning, error).</div>
+              <div class="setting-key">--ps-accent · #ECECEC dark · #0D0D0D light</div>
+            </div>
+            <div class="setting-control">
+              <span class="ap-accent-dot flex-shrink-0" role="img" aria-label="Monochrome"></span>
+              <span class="fs-7">Monochrome</span>
+              <span class="ps-chip" data-tone="accent"><i class="bi bi-lock" aria-hidden="true"></i>brand</span>
+            </div>
+          </div>
+          @foreach (var pref in AppearancePrefs.InSection("display"))
+          {
+            <partial name="/Views/Settings/_AppearanceRow.cshtml" model="pref" />
+          }
+        </div>
+      </section>
+
+      <section class="settings-section" id="messages">
+        <h3 class="d-flex align-items-baseline gap-2">Messages <button type="button" class="btn btn-link btn-sm p-0 ms-auto fs-8 fw-normal text-decoration-none" data-appearance-reset="messages"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset to defaults</button></h3>
+        <p class="section-desc">What each message shows before you open it.</p>
+        <div class="ps-card">
+          @foreach (var pref in AppearancePrefs.InSection("messages"))
+          {
+            <partial name="/Views/Settings/_AppearanceRow.cshtml" model="pref" />
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <partial name="/Views/Settings/_SettingsSaveBar.cshtml" model="null" />
+</form>

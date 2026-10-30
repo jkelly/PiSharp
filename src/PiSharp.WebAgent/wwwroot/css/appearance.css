@@ -1,0 +1,134 @@
+/* =====================================================================
+   PiSharp Web Agent: Settings › Appearance on every page, and the
+   styles of the App settings pages Appearance and About (decision
+   0011, run W3, unit AP). Loaded in every page's <head> (_Layout),
+   after Web.Common's theme and shell styles and before site.css.
+   wwwroot/js/appearance.js sets this browser's preferences on <html>
+   before the first paint; the rules below read those attributes:
+     data-bs-theme        dark | light (from dark, light or system)
+     data-font-size       small | default | large   (body 14, 15, 17 px)
+     data-density         comfortable | compact
+     data-code-theme      default | github | solarized
+     data-code-ligatures  on | off
+     data-usage-footer    on | off
+     data-reduce-motion   on | off (its "system" follows the system)
+   Density, code theme and ligatures are custom properties set where
+   the attribute is, so the nearest one wins: the Appearance page's
+   live preview ([data-appearance-preview]) carries its own attributes
+   and shows unsaved values inside a page that shows the saved ones.
+   Each default matches the look before W3 (shell.css, the theme).
+   ===================================================================== */
+
+/* ---------- UI font size: every size is in rem, so the root's size scales the whole interface. ---------- */
+:root[data-font-size="small"] { font-size: 93.3333%; }
+:root[data-font-size="large"] { font-size: 113.3333%; }
+
+/* ---------- Message density (chats; Compare and History use the same message markup) ---------- */
+[data-density="compact"] {
+  --ap-msg-gap: .75rem;
+  --ap-msg-inner-gap: .6rem;
+  --ap-msg-line: 1.55;
+  --ap-thinking-gap: .4rem;
+  --ap-tool-margin: .2rem 0 .4rem;
+}
+[data-density="comfortable"] {
+  --ap-msg-gap: initial;
+  --ap-msg-inner-gap: initial;
+  --ap-msg-line: initial;
+  --ap-thinking-gap: initial;
+  --ap-tool-margin: initial;
+}
+.msg { margin-bottom: var(--ap-msg-gap, 1.75rem); gap: var(--ap-msg-inner-gap, .85rem); }
+.msg-content { line-height: var(--ap-msg-line, 1.7); }
+.thinking { margin-bottom: var(--ap-thinking-gap, .75rem); }
+.tool-card { margin: var(--ap-tool-margin, .4rem 0 .7rem); }
+
+/* ---------- Code theme: code blocks, tool output and JSON. Default is the theme's own (GitHub dark or light). ---------- */
+[data-code-theme="default"] { --ct-bg: initial; --ct-bar: initial; --ct-border: initial; --ct-text: initial; --ct-muted: initial; }
+[data-code-theme="github"] { --ct-bg: #f6f8fa; --ct-bar: #eaeef2; --ct-border: #d0d7de; --ct-text: #1f2328; --ct-muted: #57606a; }
+[data-code-theme="solarized"] { --ct-bg: #002b36; --ct-bar: #073642; --ct-border: #0b4a59; --ct-text: #93a1a1; --ct-muted: #839496; }
+.ps-term {
+  background: var(--ct-bg, var(--ps-code-bg));
+  border-color: var(--ct-border, var(--ps-code-border));
+  color: var(--ct-text, var(--ps-code-text));
+}
+.ps-term-bar { background: var(--ct-bar, var(--ps-code-bar)); color: var(--ct-muted, var(--ps-muted)); }
+.ps-term-bar .btn-icon { --bs-btn-color: var(--ct-muted, var(--ps-muted)); --bs-btn-hover-color: var(--ct-text, var(--ps-text)); }
+.ps-term pre { color: var(--ct-text, var(--ps-code-text)); }
+/* A model's fenced code (Markdown renders a bare <pre>) is a code block like the rest. */
+.msg-content > pre {
+  margin: .75rem 0 .9rem; padding: .85rem 1rem;
+  background: var(--ct-bg, var(--ps-code-bg));
+  border: 1px solid var(--ct-border, var(--ps-code-border));
+  border-radius: 12px;
+  color: var(--ct-text, var(--ps-code-text));
+  font-size: .8125rem; line-height: 1.6;
+  overflow: auto;
+}
+.msg-content > pre code { color: inherit; background: transparent; padding: 0; font-size: inherit; }
+
+/* ---------- Code font ligatures (off by default) ---------- */
+[data-code-ligatures="on"] { --ap-code-ligatures: normal; }
+[data-code-ligatures="off"] { --ap-code-ligatures: none; }
+pre, code, kbd, samp, .font-monospace { font-variant-ligatures: var(--ap-code-ligatures, none); }
+
+/* ---------- Usage footer: the numbers under a reply go; its buttons and the live status stay. ---------- */
+:root[data-usage-footer="off"] .msg-footer:not(.pv-usage) > :not(.msg-actions):not([data-live-status]) { display: none !important; }
+[data-appearance-preview][data-usage-footer="off"] .pv-usage { display: none !important; }
+
+/* ---------- Reduce motion: no animation or transition (spinners keep turning: they say the app is busy). ---------- */
+:root[data-reduce-motion="on"] { scroll-behavior: auto !important; }
+:root[data-reduce-motion="on"] *:not(.spinner-border):not(.spinner-grow),
+:root[data-reduce-motion="on"] *::before,
+:root[data-reduce-motion="on"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+[data-appearance-preview][data-reduce-motion="on"] .stream-cursor::after { animation: none; }
+
+/* =====================================================================
+   Settings › Appearance (Views/Settings/Appearance.cshtml)
+   ===================================================================== */
+.settings-content.ap-wide { max-width: 1320px; }
+@media (min-width: 1400px) { .ap-preview-sticky { position: sticky; top: 1rem; } }
+.btn-check:focus-visible + .choice-card { box-shadow: 0 0 0 .2rem var(--ps-focus); }
+.ap-select { width: 12rem; max-width: 100%; }
+.ap-accent-dot { display: inline-block; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--ps-accent); box-shadow: 0 0 0 3px var(--ps-accent-low); }
+
+/* Theme cards: a small picture of each theme (its own fixed colours, whatever the page's theme). */
+.theme-swatch { height: 86px; border-radius: 8px; overflow: hidden; display: flex; border: 1px solid var(--ps-border); margin-bottom: .75rem; }
+.theme-swatch .sw { flex: 1; display: flex; min-width: 0; }
+.theme-swatch .sw-side { width: 28%; }
+.theme-swatch .sw-main { flex: 1; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.theme-swatch .sw-line { display: block; height: 6px; border-radius: 3px; }
+.sw-dark { background: #212121; }
+.sw-dark .sw-side { background: #171717; }
+.sw-dark .sw-line { background: #3a3a3a; }
+.sw-dark .sw-accent { background: #ececec; }
+.sw-dark .sw-bubble { background: #303030; }
+.sw-light { background: #ffffff; }
+.sw-light .sw-side { background: #f9f9f9; border-right: 1px solid #e5e5e5; }
+.sw-light .sw-line { background: #e5e5e5; }
+.sw-light .sw-accent { background: #0d0d0d; }
+.sw-light .sw-bubble { background: #f4f4f4; }
+.sw-bubble { display: block; height: 18px; border-radius: 10px; width: 55%; align-self: flex-end; }
+
+/* The live preview: a sample in the chat's markup; its font size is a zoom set by appearance.js. */
+.ap-preview .msg-user .msg-body { max-width: 88%; }
+.ap-preview-scale { overflow: hidden; }
+
+/* =====================================================================
+   Settings › About (Views/Settings/About.cshtml)
+   ===================================================================== */
+.about-brand .about-logo { width: 88px; height: 88px; flex: none; }
+.about-brand .about-intro { flex: 1 1 16rem; min-width: 0; }
+.metric-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 0; background: transparent; }
+.metric { background: transparent; padding: .55rem .8rem; min-width: 0; }
+.metric .metric-label { font-size: .72rem; color: var(--ps-faint); }
+.metric .metric-value { font-size: .95rem; font-weight: 500; color: var(--ps-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.metric .metric-value small { font-size: .72rem; color: var(--ps-faint); font-weight: 400; }
+.about-report { max-height: 22rem; }
+.about-kv .v { min-width: 0; overflow-wrap: anywhere; }
+.connectivity-row .connectivity-detail { min-width: 0; }
+.connectivity-row .connectivity-time { flex: none; }

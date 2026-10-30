@@ -1,0 +1,46 @@
+@* Decision 0011 (run W3, unit AP): the results pane of the provider connectivity check (_AboutConnectivityCheck): one row per provider
+   (its active account) with how it went (ok, slow, failed, not tested), the request and what it answered or the tester's scrubbed message,
+   and the latency the tester measured; then when the check ran and how many answered. With --faux it says that nothing was sent. Rendered
+   with the page and again by POST /api/about/connectivity (FragmentRenderer), so it uses no URL helper. Empty before the first check.
+   Model: AboutConnectivityView. *@
+@using System.Globalization
+@using PiSharp.WebAgent.About
+@model AboutConnectivityView
+@if (Model.Last is { } run)
+{
+  @if (run.Offline || run.Results.Count == 0)
+  {
+    <div class="provider-row" data-connectivity-result="none">
+      <span class="status-dot info" aria-hidden="true"></span>
+      <div class="flex-grow-1 connectivity-detail"><div class="fs-7">@(run.Message ?? "Nothing to check.")</div></div>
+    </div>
+  }
+  @foreach (var result in run.Results)
+  {
+    var outcome = DiagnosticsReport.Outcome(result.Outcome);
+    var dot = result.Outcome switch { ConnectivityOutcome.Ok => "ok", ConnectivityOutcome.Slow => "warn", ConnectivityOutcome.Failed => "danger", _ => "info" };
+    var tone = result.Outcome switch { ConnectivityOutcome.Slow => "text-ps-warn", ConnectivityOutcome.Failed => "text-ps-danger", _ => "text-ps-faint" };
+    var label = result.Outcome switch { ConnectivityOutcome.Ok => "reachable", ConnectivityOutcome.Slow => "slow", ConnectivityOutcome.Failed => "failed", _ => "not tested" };
+    <div class="provider-row connectivity-row" data-connectivity-result="@result.Provider" data-outcome="@outcome">
+      <span class="status-dot @dot" role="img" aria-label="@label"></span>
+      <div class="flex-grow-1 connectivity-detail">
+        <div class="fs-7"><span class="ps-mono">@result.Provider</span>
+          @if (result.Name != result.Provider)
+          {
+            <span class="text-ps-faint">· @result.Name</span>
+          }
+        </div>
+        <div class="fs-8 @tone text-break">@result.Detail</div>
+      </div>
+      @if (result.Outcome == ConnectivityOutcome.Failed)
+      {
+        <a class="btn btn-sm btn-outline-secondary" href="/settings/providers/@Uri.EscapeDataString(result.Provider)">Open</a>
+      }
+      @if (result.LatencyMs is { } latency)
+      {
+        <span class="ps-mono fs-8 connectivity-time @(result.Outcome == ConnectivityOutcome.Slow ? "text-ps-warn" : "")">@latency.ToString("N0", CultureInfo.InvariantCulture) ms</span>
+      }
+    </div>
+  }
+  <div class="px-3 py-2 border-top fs-8 text-ps-faint" data-connectivity-summary>Checked @Model.Local(run.CheckedAt).ToString("HH:mm:ss", CultureInfo.InvariantCulture)@(run.Offline || run.Results.Count == 0 ? "" : " · " + run.Summary)</div>
+}
