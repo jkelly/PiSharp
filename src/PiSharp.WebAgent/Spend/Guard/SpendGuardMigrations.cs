@@ -4,7 +4,9 @@
 // run the guard stops (used_at and used_by, the first ledger op it let through). spend_approval_uses records every reservation an approval
 // let through (one row per ledger op: one for a single call, one per column of a Compare group), so each recovered request finds the output
 // cap it was sent with. spend_stops keeps what the guard decided about each call it stopped (keyed by the call's op), so the confirm modal
-// can open the cause's pane for a call stopped inside a run. Times are UTC Unix milliseconds. Nothing here is a secret.
+// can open the cause's pane for a call stopped inside a run. Times are UTC Unix milliseconds. Nothing here is a secret. 1103 (W3 fix, chat
+// spend) adds spend_approvals.submission: an approval of a chat send answers only the call that sends that message (a hash of its text,
+// never the text), so a running turn's next call, a compaction or another send can't use it.
 using PiSharp.WebAgent.Data;
 
 namespace PiSharp.WebAgent.Spend;
@@ -63,6 +65,11 @@ public static class SpendGuardMigrations
           ORDER BY id DESC;
         """);
 
+    /// <summary>1103: <c>spend_approvals.submission</c>, the chat message (its key, never its text) a one-time approval of a send answers.</summary>
+    public static SqlMigration ApprovalSubmissions { get; } = new(1103, "spend: approval submissions", """
+        ALTER TABLE spend_approvals ADD COLUMN submission TEXT;
+        """);
+
     /// <summary>Every Guard migration, lowest id first.</summary>
-    public static IReadOnlyList<IWebAgentMigration> All { get; } = [Approvals, Stops, ApprovalUses];
+    public static IReadOnlyList<IWebAgentMigration> All { get; } = [Approvals, Stops, ApprovalUses, ApprovalSubmissions];
 }

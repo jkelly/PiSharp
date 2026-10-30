@@ -30,8 +30,8 @@ internal static partial class Program
     [
         Case("spend.guard.registration-decorates-the-final-models-once", async () =>
         {
-            Equal("1100:spend: approvals,1101:spend: stops,1102:spend: approval uses", string.Join(",", SpendGuardMigrations.All.Select(migration => $"{migration.Id}:{migration.Name}")),
-                "the migrations");
+            Equal("1100:spend: approvals,1101:spend: stops,1102:spend: approval uses,1103:spend: approval submissions",
+                string.Join(",", SpendGuardMigrations.All.Select(migration => $"{migration.Id}:{migration.Name}")), "the migrations");
             Check(SpendGuardMigrations.All.All(migration => MigrationArea.Of(migration.Id) == MigrationArea.Spend), "inside the spend range");
 
             var root = Temp("spend-guard-registration");
@@ -539,7 +539,7 @@ internal static partial class Program
                     """);
                 Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 var after = new WebAgentDb(path, [CoreMigrations.AppInfo, SettingsStore.Migration, .. SpendGuardMigrations.All]);
-                Equal("1102", string.Join(",", after.Migrate()), "the upgrade applies the uses table");
+                Equal("1102,1103", string.Join(",", after.Migrate()), "the upgrade applies the uses table and the submission column");
                 var store = new SpendApprovalStore(after);
                 Equal(300, (await store.UsedByAsync("op-old"))?.Approval.MaxOutputTokens ?? -1, "the old approval is found by its reservation");
                 Check(await store.UsedByAsync(SpendApprovalStore.Refused) is null, "a refused one is not carried over");
