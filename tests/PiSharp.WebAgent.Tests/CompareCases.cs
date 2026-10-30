@@ -4,9 +4,10 @@
 // rows of one group id, each reserved under the group's run, and Compare's own record), a re-run sends one column again into the group, and
 // the group's reservation is all or nothing (a run cap that two columns fit and three do not refuses all three; an Ask cap asks once for the
 // group, and the user's choice lets every column through). Over real routing with a fake provider (no request leaves the process), one
-// failing column (an Anthropic 401) ends in error while the others complete. The columns and the Metrics tab render each state with model
-// text through the sanitizing MarkdownRenderer; end to end, the built app serves GET /compare (and the agent stub) with nothing the CSP
-// would block, and a Run all goes round trip through /api/compare, the runs' SSE and the fragments the page swaps in.
+// failing column (an Anthropic 401) ends in error while the others complete, each concurrent column's request carries only its own
+// provider's key (never the other's), and neither key reaches runs.db, its WAL, the log or the data folder. The columns and the Metrics tab
+// render each state with model text through the sanitizing MarkdownRenderer; end to end, the built app serves GET /compare (and the agent
+// stub) with nothing the CSP would block, and a Run all goes round trip through /api/compare, the runs' SSE and the fragments the page swaps in.
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -208,8 +209,8 @@ internal static partial class Program
             await using var host = CompareHost.Routing("cmp-failing");
             var openaiKey = Planted("sk-proj-");
             var anthropicKey = Planted("sk-ant-");
-            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("openai", openaiKey));
-            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", anthropicKey));
+            var openaiAccount = (await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("openai", openaiKey))).Account.Id;
+            var anthropicAccount = (await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", anthropicKey))).Account.Id;
             var catalog = host.Services.GetRequiredService<IModelCatalog>();
             var gpt = ModelOf(catalog, "openai", "openai-responses", "gpt-4.1");
             var claude = ModelOf(catalog, "anthropic", "anthropic-messages", "claude-sonnet-4-5");
@@ -248,7 +249,25 @@ internal static partial class Program
                 && html.Contains("data-col-retry", StringComparison.Ordinal), "the error card: Fix and Retry: " + Cut(html));
             Check(html.Contains("not retried (PiSharp never retries a run by itself)", StringComparison.Ordinal), "never retried by itself");
             NoSecret(html, "the column", anthropicKey);
-            NoSecret(host.Provider.Text, "nothing reaches the fake provider but each its own key", "sk-none");
+
+            // The three columns ran at once over real routing: each request carries its own provider's key and never the other one (a
+            // credential crossed between concurrent columns fails here), and neither key is stored or logged.
+            Equal($"{openaiAccount}|{anthropicAccount}|{openaiAccount}", string.Join("|", runs.Select(run => run.Account)), "each column ran on its provider's account");
+            var requests = host.Provider.Requests.ToList();
+            Equal(3, requests.Count, "one request per column: " + string.Join(", ", requests.Select(request => request.Key)));
+            foreach (var request in requests)
+            {
+                var anthropic = request.Url.Host == "api.anthropic.com";
+                var (own, other) = anthropic ? (anthropicKey, openaiKey) : (openaiKey, anthropicKey);
+                var sent = string.Join("\n", request.Headers.Select(pair => pair.Key + ": " + pair.Value)) + "\n" + request.Body;
+                var where = $"the {(anthropic ? "Anthropic" : "OpenAI")} request to {request.Url.Host}";
+                Check(sent.Contains(own, StringComparison.Ordinal), where + " carries its own key");
+                NoSecret(request.Url + "\n" + sent, where, other);
+            }
+            NoSecret(RunsFileText(host.Runs.Path), "runs.db", openaiKey, anthropicKey);
+            NoSecret(host.LogText, "the log", openaiKey, anthropicKey);
+            foreach (var key in new[] { openaiKey, anthropicKey })
+                Check(FilesHolding(host.Options.DataDirectory, key).Count == 0, "a planted key is on disk in plain text: " + string.Join(", ", FilesHolding(host.Options.DataDirectory, key)));
         }),
 
         Case("compare.columns.render-each-state", async () =>
@@ -534,12 +553,13 @@ internal static partial class Program
         private readonly ServiceProvider provider;
         private readonly string root;
 
-        private CompareHost(ServiceProvider provider, string root, WebAgentOptions options, ProviderFake fake)
+        private CompareHost(ServiceProvider provider, string root, WebAgentOptions options, ProviderFake fake, ConcurrentQueue<string> logs)
         {
             this.provider = provider;
             this.root = root;
             Options = options;
             Provider = fake;
+            Logs = logs;
         }
 
         public WebAgentOptions Options { get; }
@@ -558,6 +578,13 @@ internal static partial class Program
 
         public ProviderFake Provider { get; }
 
+        public RunsDb Runs => provider.GetRequiredService<RunsDb>();
+
+        /// <summary>What the app logged (only <see cref="Routing"/> records it).</summary>
+        public ConcurrentQueue<string> Logs { get; }
+
+        public string LogText => string.Join("\n", Logs);
+
         public string Database => Path.Join(Options.DataDirectory, "webagent.db");
 
         /// <summary>Over the priced faux models (--faux --faux-metered).</summary>
@@ -572,7 +599,7 @@ internal static partial class Program
             services.AddSpendArea(options);
             services.AddRunsArea(options);
             CompareModule.AddCompareArea(services, options);
-            return Build(services, root, options, new ProviderFake());
+            return Build(services, root, options, new ProviderFake(), new ConcurrentQueue<string>());
         }
 
         /// <summary>Over real routing with a fake provider as every provider request's handler (no request leaves the process).</summary>
@@ -582,8 +609,9 @@ internal static partial class Program
             var options = new WebAgentOptions { DataDirectory = Path.Join(root, "data") };
             options.EnsureDirectories();
             var fake = new ProviderFake();
+            var logs = new ConcurrentQueue<string>();
             var services = new ServiceCollection();
-            services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Debug).AddProvider(new ListLoggerProvider(new ConcurrentQueue<string>())));
+            services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Debug).AddProvider(new ListLoggerProvider(logs)));
             services.AddSingleton(RoutingCredentials(new Dictionary<string, string>(), new FakeOAuth(), root));
             services.AddSingleton(new RoutingOptions { ProviderHandler = fake, CodexTransport = "sse" });
             services.AddWebAgentCore(options);
@@ -593,14 +621,14 @@ internal static partial class Program
             services.AddSpendArea(options);
             services.AddRunsArea(options);
             CompareModule.AddCompareArea(services, options);
-            return Build(services, root, options, fake);
+            return Build(services, root, options, fake, logs);
         }
 
-        private static CompareHost Build(IServiceCollection services, string root, WebAgentOptions options, ProviderFake fake)
+        private static CompareHost Build(IServiceCollection services, string root, WebAgentOptions options, ProviderFake fake, ConcurrentQueue<string> logs)
         {
             var provider = services.BuildServiceProvider();
             provider.GetRequiredService<WebAgentDb>().Migrate();
-            return new CompareHost(provider, root, options, fake);
+            return new CompareHost(provider, root, options, fake, logs);
         }
 
         public async ValueTask DisposeAsync()
