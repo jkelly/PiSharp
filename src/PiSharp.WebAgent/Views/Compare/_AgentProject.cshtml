@@ -17,7 +17,7 @@
     @if (inspection is not null)
     {
       <button class="ps-chip ac-iso" type="button" data-tone="@Model.Tone" data-bs-toggle="modal" data-bs-target="#modal-agent-workspace" title="@Model.ChipTitle" data-ac-iso>
-        <i class="bi @(inspection.Kind == WorkspaceKind.Worktree ? "bi-git" : "bi-files")" aria-hidden="true"></i><span class="text-truncate">@inspection.Label</span>
+        <i class="bi @(inspection.Kind == WorkspaceKind.Worktree ? "bi-git" : "bi-files")" aria-hidden="true"></i><span class="text-truncate">@Model.ChipLabel</span>
       </button>
     }
     else

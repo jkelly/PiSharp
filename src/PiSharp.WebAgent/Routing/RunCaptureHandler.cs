@@ -33,9 +33,18 @@ public sealed class RunCaptureHandler : DelegatingHandler
         this.ownsInner = ownsInner;
     }
 
-    /// <summary>A handler as the routes make their own (redirects off), shared by every route, without cookies (one account's cookies never
-    /// reach another's requests).</summary>
-    public static HttpMessageHandler CreateDefaultInner() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
+    /// <summary>How long the shared handler keeps a pooled connection before it opens a new one (so a provider's DNS change is picked up).</summary>
+    public static TimeSpan ConnectionLifetime { get; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>The handler every route shares when none is registered (decision 0011, W4 integration fixes, confirming R0's choice): redirects
+    /// off, as the routes made their own; no cookies, as upstream Pi's fetch keeps none, so one account's cookies never reach another's
+    /// requests; one connection pool for the app's life, as .NET advises for a long-lived client, renewed every <see cref="ConnectionLifetime"/>.</summary>
+    public static HttpMessageHandler CreateDefaultInner() => new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        UseCookies = false,
+        PooledConnectionLifetime = ConnectionLifetime,
+    };
 
     /// <inheritdoc/>
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

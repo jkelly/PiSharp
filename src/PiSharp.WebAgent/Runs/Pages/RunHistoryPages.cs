@@ -55,7 +55,9 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
         store.Count(); // Opens the store first: migrations, and runs a stopped app left running marked interrupted.
         var db = store.Db.Db;
         var now = Now;
-        var totalAll = Convert.ToInt64(db.Scalar("SELECT COUNT(*) FROM runs WHERE parent_id IS NULL;") ?? 0L, CultureInfo.InvariantCulture);
+        // The plain counts are the store's (RunQuery.TopLevelOnly); the filtered rows below stay this page's own query, since a provider or
+        // model filter also matches a run through its children and a row carries its options and tool names, which RunStore.List leaves out.
+        var totalAll = store.Totals(new RunQuery { TopLevelOnly = true }).Count;
         var (where, parameters) = RootWhere(filter, since: null);
         var total = Convert.ToInt64(db.Scalar($"SELECT COUNT(*) FROM runs r{where};", [.. parameters]) ?? 0L, CultureInfo.InvariantCulture);
         var pages = total == 0 ? 1 : (int)Math.Ceiling(total / (double)filter.Size);
@@ -72,7 +74,7 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
             Rows = RowsOf(db, records, now),
             Total = total,
             TotalAll = totalAll,
-            Totals = Totals(db, filter, now),
+            Totals = Totals(db, filter, now, totalAll),
             Providers = Options(db, "SELECT DISTINCT provider FROM runs WHERE provider <> '' ORDER BY provider;", [], filter.Provider),
             Models = filter.Provider is null ? []
                 : Options(db, "SELECT DISTINCT model FROM runs WHERE provider = $provider AND model <> '' ORDER BY model;", [("$provider", filter.Provider)], filter.Model),
@@ -81,7 +83,7 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
             DbPath = store.Db.Path,
             SizeBytes = store.SizeBytes(),
             RetentionText = history.RetentionDays is { } days ? "retention " + days.ToString(CultureInfo.InvariantCulture) + (days == 1 ? " day" : " days") : "kept forever",
-            PinnedCount = Convert.ToInt64(db.Scalar("SELECT COUNT(*) FROM runs WHERE parent_id IS NULL AND pinned = 1;") ?? 0L, CultureInfo.InvariantCulture),
+            PinnedCount = store.Totals(new RunQuery { TopLevelOnly = true, Pinned = true }).Count,
         };
     }
 

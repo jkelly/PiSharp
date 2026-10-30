@@ -107,7 +107,8 @@ public sealed class RunCaptureHook : IDisposable
     private readonly Lock gate = new();
     private RunCaptureHandler? handler;
 
-    /// <summary>The hook over <paramref name="inner"/> (null: a shared handler as the routes make their own). Made once.</summary>
+    /// <summary>The hook over <paramref name="inner"/> (null: <see cref="RunCaptureHandler.CreateDefaultInner"/>, which every route then
+    /// shares, owned and disposed by this hook). Made once.</summary>
     public RunCaptureHandler Wrap(HttpMessageHandler? inner)
     {
         lock (gate)

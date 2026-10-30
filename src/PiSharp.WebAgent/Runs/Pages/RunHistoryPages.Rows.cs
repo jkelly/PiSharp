@@ -148,7 +148,7 @@ public sealed partial class RunHistoryPages
         };
     }
 
-    private static RunTotalsView Totals(WebAgentDb db, RunHistoryFilter filter, DateTimeOffset now)
+    private static RunTotalsView Totals(WebAgentDb db, RunHistoryFilter filter, DateTimeOffset now, long totalAll)
     {
         var filtered = filter.Active;
         var (where, parameters) = RootWhere(filter, filtered ? null : now.AddDays(-30));
@@ -185,7 +185,7 @@ public sealed partial class RunHistoryPages
         var rate = roots.Count == 0 ? (double?)null : roots.Errors * 100.0 / roots.Count;
         var metrics = new List<RunTotalMetric>
         {
-            new("Runs", RunHistoryText.Tokens(roots.Count), null, Dash(filtered ? "of " + RunHistoryText.Tokens(TotalRoots(db)) : "+" + RunHistoryText.Tokens(roots.Week) + " this week")),
+            new("Runs", RunHistoryText.Tokens(roots.Count), null, Dash(filtered ? "of " + RunHistoryText.Tokens(totalAll) : "+" + RunHistoryText.Tokens(roots.Week) + " this week")),
             new("Tokens in", RunHistoryText.Compact(sums.Input), null, Dash(RunHistoryText.Compact(sums.Cache) + " from cache")),
             new("Tokens out", RunHistoryText.Compact(sums.Output), null,
                 Dash(sums.Output == 0 ? "no output" : sums.Rate is { } speed ? "avg " + speed.ToString("0", CultureInfo.InvariantCulture) + " tok/s" : RunHistoryText.Tokens(sums.Calls) + " calls")),
@@ -207,8 +207,6 @@ public sealed partial class RunHistoryPages
             }));
         return new RunTotalsView(filtered, shareText, metrics);
     }
-
-    private static long TotalRoots(WebAgentDb db) => Convert.ToInt64(db.Scalar("SELECT COUNT(*) FROM runs WHERE parent_id IS NULL;") ?? 0L, CultureInfo.InvariantCulture);
 
     private static (string Label, string Icon) Source(string wire) =>
         SpendSources.TryParse(wire, out var source) ? (source.Label(), SpendPages.SourceIcon(source)) : (wire, "bi-question-circle");
