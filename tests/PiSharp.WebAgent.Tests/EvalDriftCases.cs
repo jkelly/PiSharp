@@ -1,12 +1,15 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
 using PiSharp.WebAgent.Evals;
 using PiSharp.WebAgent.Evals.Drift;
+using PiSharp.WebAgent.Evals.Suites;
 using PiSharp.WebAgent.Faux;
 using PiSharp.WebAgent.Hosting;
 using PiSharp.WebAgent.Routing;
@@ -24,6 +27,8 @@ using static System.FormattableString;
 // replaced each run, and a new baseline clears everything. Price Watch saves a snapshot when, and only when, a provider's catalog hash
 // changes (a built-in provider's is its shard's ProviderJsonSha256), lists the rates that moved, prices a suite run as the Spend Guard does,
 // and says which schedules to pause and what each change does to each suite. Everything is offline: fake catalogs, the faux app.
+// Fixes W5 drift 1 and 2: answers that never reached the target and judges that could not decide are missing answers, never drift (by
+// hand and through a suite run whose later calls the Spend Guard refuses), and the Drift page offers no action on an info-only target.
 internal static partial class Program
 {
     private static readonly SuiteTarget DwTarget = new("dwp", "dw-model");
@@ -639,6 +644,164 @@ internal static partial class Program
             }
             finally { DeleteTemp(root); }
         }),
+        // Fix W5 drift 1: an answer that never reached the target (the Spend Guard refused it, the call did not start, its record is
+        // missing; SuiteResult.Sent false) and an answer whose judge could not decide (refused, failed, or unsure: review) say nothing about
+        // the model. Counted as failures they raised a broken case and a pass-rate suspect, confirmed as drift by the next run; they are
+        // missing answers instead, while a call that was sent and failed (a provider error) still fails.
+        Case("evals.drift.answers-never-sent-and-undecided-judges-raise-nothing", () =>
+        {
+            var suite = EvalIds.New(EvalIds.Suite);
+            var cases = DwIds(8);
+            var baselineRun = DwRunOf(suite, 1, cases, 3);
+            var history = new DwHistory(baselineRun, DwAnswers(baselineRun, cases, [3, 3, 3, 3, 3, 3, 3, 3]));
+            // c01 refused on every repeat; c02 to c06 lose one repeat each (a lost hold race); c07's judge was refused; c08's judge was unsure.
+            List<SuiteResult> Missing(SuiteRun run) =>
+            [
+                .. Enumerable.Range(1, 3).Select(repetition => DwNotSent(run, cases[0], repetition)),
+                .. cases.Skip(1).Take(5).SelectMany(id => Enumerable.Range(1, 3).Select(repetition =>
+                    repetition == 3 ? DwNotSent(run, id, repetition) : DwAnswer(run, id, repetition, true))),
+                .. Enumerable.Range(1, 3).Select(repetition => DwUndecided(run, cases[6], repetition, CheckVerdict.Error)),
+                .. Enumerable.Range(1, 3).Select(repetition => DwUndecided(run, cases[7], repetition, CheckVerdict.Review)),
+            ];
+            Check(DriftAnalyzer.Decisive(DwAnswer(baselineRun, cases[0], 1, false)) && !DriftAnalyzer.Decisive(DwNotSent(baselineRun, cases[0], 1)) &&
+                !DriftAnalyzer.Decisive(DwUndecided(baselineRun, cases[0], 1, CheckVerdict.Review)) &&
+                DriftAnalyzer.Decisive(DwNotSent(baselineRun, cases[0], 1) with { Sent = true }), "what counts");
+
+            var runA = DwRunOf(suite, 2, cases, 3);
+            var a = history.Analyze(runA, Missing(runA));
+            Check(a.Raised.Count == 0 && a.Level == DriftLevel.Ok, "nothing raised: " + string.Join(" | ", a.Raised.Select(signal => signal.Message)));
+            Equal(14, a.Comparison.LeftOutAfter, "3 refused, 5 lost races, 3 refused judges and 3 unsure ones are missing answers");
+            Equal(0, a.Comparison.LeftOutBefore, "the baseline lost none");
+            Equal(5, a.Comparison.PairedCases, "c01 has no counted answer and c07 and c08 none decided, so five cases are compared");
+            Check(a.Comparison.BrokenCases.Count == 0 && a.Comparison.CasesWorse == 0, "no case broken or worse");
+            Equal("No changes against the baseline. Pass rate 1.00 → 1.00.", a.Comparison.OkText, "the pass rate of the answers that count");
+            var runB = DwRunOf(suite, 3, cases, 3);
+            var b = history.Analyze(runB, Missing(runB));
+            Check(b.Raised.Count == 0 && b.Level == DriftLevel.Ok && history.Open.Count == 0, "the next run confirms nothing either");
+
+            // The same answers sent to the target and failed (provider errors) still fail: c01 is broken.
+            var sent = new DwHistory(baselineRun, DwAnswers(baselineRun, cases, [3, 3, 3, 3, 3, 3, 3, 3]));
+            var runC = DwRunOf(suite, 4, cases, 3);
+            var failed = sent.Analyze(runC, [.. Missing(runC).Select(result => result.Status == ResultStatus.Error ? result with { Sent = true } : result)]);
+            Check(failed.Raised.Any(signal => signal.Rule == DriftRule.BrokenCase && signal.Detail!["cases"]!.AsArray().Single()!.GetValue<string>() == cases[0]),
+                "a provider error on every repeat is a broken case: " + string.Join(" | ", failed.Raised.Select(signal => signal.Message)));
+            Check(failed.Raised.Any(signal => signal.Rule == DriftRule.PassRate), "and six cases worse is a pass-rate suspect");
+
+            // A judge that decided counts; one that was unsure does not, so its low scores are no judge-score signal.
+            var judgedRun = DwRunOf(suite, 1, cases, 3);
+            var judged = new DwHistory(judgedRun, DwJudged(judgedRun, cases, 5));
+            var runD = DwRunOf(suite, 2, cases, 3);
+            var unsure = judged.Analyze(runD, [.. DwJudged(runD, cases, 1).Select(result => result with
+            {
+                Checks = [result.Checks[0], result.Checks[1] with { Verdict = CheckVerdict.Review }], Verdict = CheckVerdict.Review,
+            })]);
+            Check(unsure.Raised.Count == 0 && unsure.Comparison.JudgeCases == 0, "unsure judges' low scores are not a fall: " +
+                string.Join(" | ", unsure.Raised.Select(signal => signal.Message)));
+            var runE = DwRunOf(suite, 3, cases, 3);
+            Equal(DriftRule.JudgeScore, judged.Analyze(runE, DwJudged(runE, cases, 1)).Raised.Single().Rule, "the same scores from judges that decided are a fall");
+        }),
+
+        Case("evals.drift.calls-the-spend-guard-refused-mid-run-are-not-drift", async () =>
+        {
+            // A suite run on the in-process host: the first SuiteRunner.Concurrency calls are held in flight, a Block cap is saved, and every
+            // later call is refused by the Spend Guard when the run engine reserves it, so a whole case is never sent. Before fix W5 drift 1
+            // that case was a broken case (suspect, then drift on the next run).
+            await using var host = SuHost.Create("dw-refused");
+            var (suite, cases) = SuSeed(host, "Refused halfway", k: 3, cases: 3);
+            var first = await SuRunNow(host, suite.Id);
+            Check(host.Store.Results(first.Id).All(result => result is { Status: ResultStatus.Done, Sent: true }), "every baseline answer was sent");
+            Check(host.Suites.AcceptBaseline(suite.Id, first.Id, null, replaceReferences: false).Accepted.Count == 1, "run #1 is the baseline");
+
+            var asked = host.Script.Asked.Count;
+            host.Script.Hold();
+            var start = await host.Runner.StartAsync(suite.Id, new SuiteRunRequest());
+            Check(start is { Posted: true, Run: not null }, "run #2 started: " + start.Refused?.Message + start.Spend?.Message);
+            await WaitUntilAsync(() => Task.FromResult(host.Script.Asked.Count >= asked + SuiteRunner.Concurrency), "the first calls are in flight");
+            await host.Ledger.SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Request, 1, CapAction.Block));
+            host.Script.Release();
+            var run = await SuFinished(host, start.Run!.Id);
+            Equal(SuiteRunStatus.Complete, run.Status, "the run completes: " + run.Problem);
+
+            var results = host.Store.Results(run.Id);
+            var refused = results.Where(result => result.Status == ResultStatus.Error).ToList();
+            Equal(9 - SuiteRunner.Concurrency, refused.Count, "every call after the cap was refused");
+            Check(refused.All(result => !result.Sent && result.CallRunId is null && result.Error!.EndsWith("Nothing was sent.", StringComparison.Ordinal)),
+                "refused calls are marked not sent: " + string.Join("; ", refused.Select(result => result.Error)));
+            Check(results.Where(result => result.Status == ResultStatus.Done).All(result => result.Sent), "answered calls are marked sent");
+            Check(cases.Any(testCase => results.Where(result => result.CaseId == testCase.Id).All(result => !result.Sent)),
+                "a whole case was never sent (all its repeats refused)");
+
+            var signals = host.Store.Signals(suite.Id);
+            Check(signals.All(signal => signal.Level == DriftLevel.Info), "no suspect or drift signal (the held calls' latency may be info): " +
+                string.Join(" | ", signals.Select(signal => EvalJson.Wire(signal.Level) + " " + signal.Message)));
+            var analysis = host.Runner.AnalyzeDrift(run.Id).Single();
+            Equal(9 - SuiteRunner.Concurrency, analysis.Comparison.LeftOutAfter, "the refused calls are left out as missing answers");
+            Check(analysis.Findings.All(finding => DriftRules.InitialLevel(finding.Rule) == DriftLevel.Info), "no quality rule finds anything");
+        }),
+
+        Case("evals.drift.page-offers-no-baseline-for-an-info-only-target", async () =>
+        {
+            // Fix W5 drift 2: a target whose only open signals are info (latency, tokens/s) has no actions on the Drift page, as the
+            // mockup's info row has none; Accept as baseline is for drift, Run now to confirm for suspect. The info signals come from a real
+            // run: both cases answer through faux's slow: prompt after the baseline (k 2, so no fingerprint spread; plain faux, so no cost).
+            var root = Temp("dw-info-page");
+            try
+            {
+                await using var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = Path.Join(root, "data") });
+                var suiteId = EvalIds.New(EvalIds.Suite);
+                await EvPostAsync(app, EvalRoutes.ApiSuites, new JsonObject
+                {
+                    ["id"] = suiteId, ["name"] = "Slower", ["k"] = 2,
+                    ["targets"] = new JsonArray(new JsonObject { ["provider"] = "faux", ["model"] = "echo" }, new JsonObject { ["provider"] = "faux", ["model"] = "echo-small" }),
+                });
+                static JsonObject Spec(string prompt) => new()
+                {
+                    ["provider"] = "faux", ["model"] = "echo", ["maxTokens"] = 256,
+                    ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["text"] = prompt }),
+                };
+                var caseIds = new List<string>();
+                foreach (var name in new[] { "SemVer one", "SemVer two" })
+                {
+                    var caseId = EvalIds.New(EvalIds.Case);
+                    await EvPostAsync(app, EvalRoutes.ApiCases, new JsonObject
+                    {
+                        ["id"] = caseId, ["suiteId"] = suiteId, ["name"] = name, ["spec"] = Spec("Is 1.0.0-rc.1 valid " + name + "?"),
+                        ["checks"] = new JsonArray(new JsonObject { ["kind"] = "contains", ["text"] = "SemVer" }),
+                    });
+                    caseIds.Add(caseId);
+                }
+                var first = await EvRunAsync(app, suiteId);
+                await EvPostAsync(app, EvalRoutes.ApiSuites + "/" + suiteId + "/baseline", new JsonObject { ["runId"] = first });
+                var slow = "slow: SemVer " + string.Join(' ', Enumerable.Range(1, 30).Select(item => "word" + item.ToString(CultureInfo.InvariantCulture)));
+                foreach (var caseId in caseIds)
+                    await EvPostAsync(app, EvalRoutes.ApiCases + "/" + caseId, new JsonObject { ["spec"] = Spec(slow) });
+                var second = await EvRunAsync(app, suiteId);
+                await EvSignalsAsync(app, second, "info");
+
+                var page = await EvPageAsync(app, EvalRoutes.Drift, "Drift");
+                // A row runs to the next row or to the end of the suite's list (its "Other signals" list has its own </li> and </ul>).
+                var rows = Regex.Matches(page,
+                    "<li class=\"drift-row\" data-drift-target=\"t[0-9a-f]{12}\" data-level=\"([a-z]+)\">.*?</li>\\s*(?=<li class=\"drift-row\"|</ul>\\s*</section>)",
+                    RegexOptions.Singleline).ToList();
+                Equal("info,info", string.Join(",", rows.Select(row => row.Groups[1].Value)), "both targets show info only: " +
+                    string.Join(" | ", Regex.Matches(page, "data-drift-target=[^>]*>").Select(match => match.Value)));
+                foreach (var row in rows.Select(match => match.Value))
+                {
+                    Check(!row.Contains("data-open-baseline", StringComparison.Ordinal) && !row.Contains("Accept as baseline", StringComparison.Ordinal),
+                        "no Accept as baseline on an info row: " + Cut(row));
+                    Check(!row.Contains("data-run-suite", StringComparison.Ordinal) && !row.Contains("Compare answers", StringComparison.Ordinal),
+                        "no action row at all, as the mockup's info row");
+                    Check(row.Contains("Information only.", StringComparison.Ordinal) && WebUtility.HtmlDecode(row).Contains("Latency +", StringComparison.Ordinal),
+                        "the latency message and the information-only note: " + Cut(row));
+                }
+                Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
+            }
+            finally
+            {
+                SqliteClearPools();
+                DeleteTemp(root);
+            }
+        }),
     ];
 
     // ---- simulation ----
@@ -745,6 +908,22 @@ internal static partial class Program
         Checks = [new CheckResult("k1", CheckKind.Contains, passed ? CheckVerdict.Passed : CheckVerdict.Failed)],
         Verdict = passed ? CheckVerdict.Passed : CheckVerdict.Failed, Score = passed ? 1 : 0, ResponseModel = responseModel, Finished = run.Finished,
     };
+
+    /// <summary>An answer whose call never reached the target, as the suite runner stores one the Spend Guard refused: an error, not sent,
+    /// failed by WithChecks.</summary>
+    private static SuiteResult DwNotSent(SuiteRun run, string caseId, int repetition) => new SuiteResult
+    {
+        RunId = run.Id, CaseId = caseId, TargetId = DwTarget.Id, Repetition = repetition, Status = ResultStatus.Error,
+        Error = SpendGuard.ErrorPrefix + "this request is above a cap. Nothing was sent.", Finished = run.Finished,
+    }.WithChecks([]);
+
+    /// <summary>An answer that passed its contains check while its judge could not decide: <paramref name="judge"/> is
+    /// <see cref="CheckVerdict.Error"/> (refused or failed, no score) or <see cref="CheckVerdict.Review"/> (unsure, a low score).</summary>
+    private static SuiteResult DwUndecided(SuiteRun run, string caseId, int repetition, CheckVerdict judge)
+    {
+        List<CheckResult> checks = [new("k1", CheckKind.Contains, CheckVerdict.Passed), new("k2", CheckKind.Judge, judge, Score: judge == CheckVerdict.Review ? 2 : null)];
+        return DwAnswer(run, caseId, repetition, true) with { Checks = checks, Verdict = CheckResult.Combine(checks), Score = SuiteResult.ScoreOf(checks) };
+    }
 
     /// <summary>Each case's answers: the first <c>passes[i]</c> of its k repeats pass, the rest fail.</summary>
     private static List<SuiteResult> DwAnswers(SuiteRun run, IReadOnlyList<string> cases, IReadOnlyList<int> passes, string? responseModel = null) =>

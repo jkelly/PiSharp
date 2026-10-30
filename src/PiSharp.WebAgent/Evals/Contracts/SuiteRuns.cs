@@ -5,7 +5,9 @@
 // Counting, as the run page shows it: an answer passes when every check passed (CheckResult.Combine is Passed); a result's score is the
 // share of its checks that passed, and a cell's score (case × target) is the mean over its k repeats ("0.83" for 5 of 6 checks); a target's
 // pass rate is passed answers over answers ("35/36 passed"). An answer the call could not give (an error) fails. Judge "review" verdicts
-// do not pass. A case with no checks passes when it got an answer, and has no score.
+// do not pass. A case with no checks passes when it got an answer, and has no score. Drift Watch counts more strictly (DriftAnalyzer.Decisive):
+// an error whose call was never sent (SuiteResult.Sent false) and an answer whose checks could not decide (a judge refused, failed or sent
+// to review) are missing answers there, not failures, since neither says anything about the model.
 //
 // Each run is numbered within its suite (#1, #2, ...); a scheduled run also records its slot (unique per suite: one run per slot, decision
 // 0009). Slots the scheduler skipped (the previous run still going, the worst case over the cap, an unknown price) are recorded as
@@ -214,6 +216,12 @@ public sealed record SuiteResult
 
     /// <summary>The run-engine run id of its call (open it in the inspector), or null before it starts.</summary>
     public string? CallRunId { get; init; }
+
+    /// <summary>Whether the target call was sent: the run engine started it and its record was read back (an answer, a provider error or a
+    /// stop). False until then, and for an error that never reached the target: the Spend Guard refused the call (or it was stopped as never
+    /// sent), the call did not start, or its record is missing. Such an error says nothing about the model, so Drift Watch leaves it out as a
+    /// missing answer (fix W5 drift 1).</summary>
+    public bool Sent { get; init; }
 
     /// <summary>The checks' results, in the case's check order (empty until it is checked).</summary>
     public IReadOnlyList<CheckResult> Checks { get; init; } = [];
