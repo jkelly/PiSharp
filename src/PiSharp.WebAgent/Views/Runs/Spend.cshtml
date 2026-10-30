@@ -2,8 +2,9 @@
    uncertain-resolved (the resolved toast after a reload), filtered and empty: the header with Export CSV (the rows matching the filters),
    _HistoryTabs, the uncertain banner, _SpendSummary, _SpendFilters with the active filter chips, _SpendLedger with its pagination, and
    _SpendEmpty when the ledger holds nothing. Resolve… opens _ResolveReservationModal, whose content GET /history/spend/resolve?op= renders
-   (?resolve=op opens it when the page loads). spend-history.js runs the filters, the page size, the export toast and Resolve. Model:
-   SpendHistoryPage. *@
+   (?resolve=op opens it when the page loads). Saved filters' Save current filters… and Manage saved filters open _SaveSpendFilterModal
+   and _ManageSpendFiltersModal (W3 fix, spend-ui). spend-history.js runs the filters, the saved filters, the page size, the export toast
+   and Resolve. Model: SpendHistoryPage. *@
 @model SpendHistoryPage
 @{
     ViewData["Title"] = "Spend · History";
@@ -13,7 +14,15 @@
 }
 @section Styles { <link href="~/css/spend.css" rel="stylesheet" asp-append-version="true" /> }
 @section TopbarStart { <h1 class="app-title">History</h1> }
-@section Modals { <partial name="/Views/Runs/_ResolveReservationModal.cshtml" model="Model.Resolve" /> }
+@section Modals
+{
+  <partial name="/Views/Runs/_ResolveReservationModal.cshtml" model="Model.Resolve" />
+  @if (!Model.Empty)
+  {
+    <partial name="/Views/Runs/_SaveSpendFilterModal.cshtml" model="Model" />
+    <partial name="/Views/Runs/_ManageSpendFiltersModal.cshtml" model="Model" />
+  }
+}
 @section Scripts { <script type="module" src="~/js/spend-history.js" asp-append-version="true"></script> }
 <div class="page" data-spend-history>
   <div class="page-header">

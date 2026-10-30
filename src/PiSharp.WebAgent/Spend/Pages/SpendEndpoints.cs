@@ -1,10 +1,11 @@
 // Decision 0011 (run W3, S4): the Spend pages' JSON API under /api/spend: caps (list, add or edit, remove), the spend settings (warning
 // threshold, reservation output cap, unknown-price behaviour per provider, billing overrides per account), entered prices, resolving an
-// uncertain reservation, the ledger as JSON and as CSV, and the confirm modal (a preflight that reserves nothing). Writes are POSTs with
-// JSON bodies, so HostGuard's same-origin and JSON-only rules cover them; every answer is no-store. Writes are idempotent: adding a cap that
-// already exists with the same values answers that cap, removing one that is gone answers removed: false, and resolving a row again the same
-// way answers the row. Errors are {error, code}: 400 invalid, 404 not_found, 409 conflict. No answer carries a secret: accounts are ids,
-// labels and masked hints.
+// uncertain reservation, the ledger as JSON and as CSV, History › Spend's saved filters (W3 fix, spend-ui: list, save one, replace the list
+// from Manage saved filters), and the confirm modal (a preflight that reserves nothing). Writes are POSTs with JSON bodies, so HostGuard's
+// same-origin and JSON-only rules cover them; every answer is no-store. Writes are idempotent: adding a cap that already exists with the
+// same values answers that cap, removing one that is gone answers removed: false, resolving a row again the same way answers the row, and
+// saving a filter again under the same name with the same filters answers outcome: existing. Errors are {error, code}: 400 invalid, 404
+// not_found, 409 conflict. No answer carries a secret: accounts are ids, labels and masked hints.
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -61,6 +62,12 @@ public static class SpendEndpoints
             }, token).ConfigureAwait(false);
             return Json(new { removed });
         }));
+
+        api.MapGet("/filters", (SpendPages pages) => Run(() => Json(new { filters = pages.SavedFilters() })));
+        api.MapPost("/filters", (JsonObject? body, SpendPages pages, ISettingsStore store, CancellationToken token) =>
+            RunAsync(() => SaveFilterAsync(Required(body), pages, store, token)));
+        api.MapPost("/filters/manage", (JsonObject? body, SpendPages pages, ISettingsStore store, CancellationToken token) =>
+            RunAsync(() => ManageFiltersAsync(Required(body), pages, store, token)));
 
         api.MapPost("/resolve", (JsonObject? body, SpendPages pages, CancellationToken token) => RunAsync(() => ResolveAsync(Required(body), pages, token)));
         api.MapGet("/ledger", (HttpRequest request, SpendPages pages, CancellationToken token) => RunAsync(async () =>
@@ -222,6 +229,59 @@ public static class SpendEndpoints
         {
             price = new { provider, model, inputMicrosPerMillion = input, outputMicrosPerMillion = output, input = SpendMoney.Format(input), output = SpendMoney.Format(output) },
         });
+    }
+
+    /// <summary>Saves the filters of <c>query</c> as <c>name</c>: a new name is added at the end of the list, a name already used (ignoring
+    /// case) is replaced in its place, and the same name with the same filters again is the same filter (<c>outcome: existing</c>).</summary>
+    private static async Task<IResult> SaveFilterAsync(JsonObject body, SpendPages pages, ISettingsStore store, CancellationToken token)
+    {
+        var name = SpendSavedFilters.NormalizeName(Text(body, "name"));
+        var query = SpendSavedFilters.NormalizeQuery(Text(body, "query"));
+        var outcome = "added";
+        await store.UpdateAsync<SpendSavedFilters>(current =>
+        {
+            var filters = (current.Filters ?? []).ToList();
+            var at = filters.FindIndex(saved => string.Equals(saved.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (at >= 0)
+            {
+                outcome = filters[at].Name == name && filters[at].Query == query ? "existing" : "replaced";
+                filters[at] = new SpendSavedFilter(name, query);
+            }
+            else
+            {
+                if (filters.Count >= SpendSavedFilters.MaxFilters)
+                    throw new ArgumentException($"You already have {SpendSavedFilters.MaxFilters} saved filters; remove one under Manage saved filters first.");
+                outcome = "added";
+                filters.Add(new SpendSavedFilter(name, query));
+            }
+            return new SpendSavedFilters(filters);
+        }, token).ConfigureAwait(false);
+        var views = pages.SavedFilters();
+        var saved = views.First(view => string.Equals(view.Name, name, StringComparison.OrdinalIgnoreCase));
+        var title = outcome == "replaced" ? "Saved filter replaced" : "Filter saved";
+        return Json(new { filter = saved, outcome, filters = views, toast = new { title, body = $"{name} is under Saved filters: {saved.Description}." } });
+    }
+
+    /// <summary>Replaces the saved filters with <c>filters</c>, in the order sent (Manage saved filters: the kept ones, renamed or not). Two
+    /// with the same name (ignoring case) are refused rather than merged, so a rename never loses a filter.</summary>
+    private static async Task<IResult> ManageFiltersAsync(JsonObject body, SpendPages pages, ISettingsStore store, CancellationToken token)
+    {
+        if (body["filters"] is not JsonArray) throw new ArgumentException("Send the saved filters as a list.");
+        var filters = new List<SpendSavedFilter>();
+        foreach (var item in Array(body, "filters"))
+        {
+            var name = SpendSavedFilters.NormalizeName(Text(item, "name"));
+            if (filters.Any(saved => string.Equals(saved.Name, name, StringComparison.OrdinalIgnoreCase)))
+                throw new ArgumentException($"Two saved filters are called {name}; give each its own name.");
+            filters.Add(new SpendSavedFilter(name, SpendSavedFilters.NormalizeQuery(Text(item, "query"))));
+        }
+        var before = store.Get<SpendSavedFilters>().Filters?.Count ?? 0;
+        var saved = await store.SaveAsync(new SpendSavedFilters(filters), token).ConfigureAwait(false);
+        var count = saved.Filters?.Count ?? 0;
+        var removed = Math.Max(0, before - count);
+        var text = (count switch { 0 => "No saved filters left.", 1 => "1 saved filter.", _ => $"{count.ToString(Invariant)} saved filters." })
+            + (removed == 0 ? "" : $" Removed {removed.ToString(Invariant)}.");
+        return Json(new { filters = pages.SavedFilters(), removed, toast = new { title = "Saved filters updated", body = text } });
     }
 
     private static async Task<IResult> ResolveAsync(JsonObject body, SpendPages pages, CancellationToken token)

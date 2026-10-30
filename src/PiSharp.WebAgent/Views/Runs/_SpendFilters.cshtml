@@ -1,27 +1,17 @@
 @* Decision 0011 (run W3, S4): the mockups' _SpendFilters (the History filters plus Account): search, a UTC date range, Provider → Model
    (the model list is the chosen provider's), and under More filters the source, the account (grouped by billing mode) and the status, plus
-   quick filters; then the active filter chips with "N of M requests". A plain GET form (the filters live in the query string, so every
-   view is a link); spend-history.js applies a change at once. Left out: saving filters of your own (quick filters only). Model:
-   SpendHistoryPage. *@
+   Saved filters; then the active filter chips with "N of M requests". A plain GET form (the filters live in the query string, so every
+   view is a link); spend-history.js applies a change at once. Saved filters (W3 fix, spend-ui) lists the user's named filters (the
+   spend-filters section; the one the page shows is marked), then Save current filters… (only when a filter is set) and Manage saved
+   filters, which open _SaveSpendFilterModal and _ManageSpendFiltersModal. Model: SpendHistoryPage. *@
 @using System.Globalization
 @model SpendHistoryPage
 @{
     var filter = Model.Filter;
     var options = Model.Options;
     var more = filter.Source is not null || filter.Account is not null || filter.Status is not null;
-    var today = DateOnly.FromDateTime(DateTime.UtcNow);
-    var month = new DateOnly(today.Year, today.Month, 1);
     static string Day(DateOnly? day) => day?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
     var statuses = new[] { LedgerStatus.Settled, LedgerStatus.Estimate, LedgerStatus.Uncertain, LedgerStatus.Released, LedgerStatus.Reserved };
-    var chips = new List<(string Text, string Href, string Name)>();
-    var reset = filter with { Page = 1 };
-    if (filter.Search is { } search) chips.Add(("search: " + search, (reset with { Search = null }).Href, "search"));
-    if (filter.From is not null || filter.To is not null) chips.Add(("date: " + (Day(filter.From) is { Length: > 0 } f ? f : "…") + " → " + (Day(filter.To) is { Length: > 0 } t ? t : "…"), (reset with { From = null, To = null }).Href, "date"));
-    if (filter.Provider is { } provider) chips.Add(("provider: " + provider, (reset with { Provider = null, Model = null }).Href, "provider"));
-    if (filter.Model is { } model) chips.Add(("model: " + model, (reset with { Model = null }).Href, "model"));
-    if (filter.Source is { } source) chips.Add(("source: " + source.Label(), (reset with { Source = null }).Href, "source"));
-    if (filter.Account is { } account) chips.Add(("account: " + (options.Accounts.SelectMany(group => group.Options).FirstOrDefault(option => option.Value == account)?.Text ?? account), (reset with { Account = null }).Href, "account"));
-    if (filter.Status is { } status) chips.Add(("status: " + SpendHistoryFilter.StatusWire(status), (reset with { Status = null }).Href, "status"));
 }
 <section class="ps-card p-3 mb-3" aria-label="Filters">
   <form id="spendFilters" method="get" action="/history/spend" data-spend-filters>
@@ -111,14 +101,20 @@
         </div>
         <div class="col-6 col-lg-3">
           <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-bookmark me-1" aria-hidden="true"></i>Quick filters</button>
-            <ul class="dropdown-menu dropdown-menu-end">
-              <li><h6 class="dropdown-header">Quick filters</h6></li>
-              <li><a class="dropdown-item" href="/history/spend?status=uncertain"><i class="bi bi-question-circle me-2" aria-hidden="true"></i>Uncertain only</a></li>
-              <li><a class="dropdown-item" href="/history/spend?status=estimate"><i class="bi bi-calculator me-2" aria-hidden="true"></i>Settled at an estimate</a></li>
-              <li><a class="dropdown-item" href="@("/history/spend?from=" + Day(today) + "&to=" + Day(today))"><i class="bi bi-calendar-day me-2" aria-hidden="true"></i>Today</a></li>
-              <li><a class="dropdown-item" href="@("/history/spend?from=" + Day(month))"><i class="bi bi-calendar-month me-2" aria-hidden="true"></i>This month</a></li>
-              <li><a class="dropdown-item" href="/history/spend?source=chat"><i class="bi bi-chat-square-text me-2" aria-hidden="true"></i>Chats only</a></li>
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-bookmark me-1" aria-hidden="true"></i>Saved filters</button>
+            <ul class="dropdown-menu dropdown-menu-end spend-saved-menu" data-saved-filters>
+              <li><h6 class="dropdown-header">Saved filters</h6></li>
+              @foreach (var saved in Model.Saved)
+              {
+                <li><a class="@("dropdown-item text-truncate" + (saved.Current ? " active" : ""))" href="@saved.Href" title="@saved.Description" aria-current="@(saved.Current ? "true" : null)" data-saved-filter="@saved.Name"><i class="bi @saved.Icon me-2" aria-hidden="true"></i>@saved.Name</a></li>
+              }
+              @if (Model.Saved.Count == 0)
+              {
+                <li><span class="dropdown-item-text fs-8 text-ps-faint" data-saved-filters-empty>None saved yet.</span></li>
+              }
+              <li><hr class="dropdown-divider"></li>
+              <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-save-spend-filter" disabled="@(!filter.Active)" data-save-filter-open><i class="bi bi-plus-lg me-2" aria-hidden="true"></i>Save current filters…</button></li>
+              <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-manage-spend-filters" disabled="@(Model.Saved.Count == 0)" data-manage-filters-open><i class="bi bi-pencil me-2" aria-hidden="true"></i>Manage saved filters</button></li>
             </ul>
           </div>
         </div>
@@ -132,11 +128,11 @@
   </form>
 </section>
 
-@if (chips.Count > 0)
+@if (Model.Chips.Count > 0)
 {
   <div class="d-flex flex-wrap align-items-center gap-2 mb-3" data-spend-chips>
     <span class="ps-label">Active filters</span>
-    @foreach (var chip in chips)
+    @foreach (var chip in Model.Chips)
     {
       <span class="ps-chip" data-tone="accent">@chip.Text <a class="text-reset" href="@chip.Href" aria-label="Remove @chip.Name filter"><i class="bi bi-x-lg" aria-hidden="true"></i></a></span>
     }

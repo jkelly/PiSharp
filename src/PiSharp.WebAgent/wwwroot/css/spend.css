@@ -41,3 +41,6 @@
 @media (max-width: 575.98px) { .ps-table-wrap .ledger-table > :not(caption) > * > * { padding: .55rem .5rem; } }
 .resolve-formula { white-space: pre-line; }
 .pagination { --bs-pagination-active-bg: var(--ps-accent); --bs-pagination-active-border-color: var(--ps-accent); --bs-pagination-focus-box-shadow: 0 0 0 .2rem var(--bs-focus-ring-color); }
+/* History › Spend's saved filters (W3 fix, spend-ui): a long name ends in an ellipsis in the menu; a Manage row's name field shrinks first. */
+.spend-saved-menu { max-width: min(20rem, calc(100vw - 2rem)); }
+[data-mf-row] .form-control { flex: 1 1 auto; min-width: 0; }
