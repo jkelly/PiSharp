@@ -310,10 +310,14 @@ public static class SessionCommands
                         await session.WaitForIdleAsync().ConfigureAwait(false);
                         output.ThrowIfFailed();
                     }
-                    catch
+                    catch (Exception error)
                     {
                         // Propagated sink failures can pass through tool/Agent wrappers. Preserve the original fixed output classification.
                         if (!token.IsCancellationRequested || output.Failure != SessionJsonEventOutputFailure.Canceled) output.ThrowIfFailed();
+                        // The canceled output also refuses the run's agent_settled; the session joins that refusal to its own
+                        // cancellation. Nothing else failed, so the command is still canceled.
+                        else if (error is AggregateException joined && joined.InnerExceptions.All(inner => inner is OperationCanceledException or
+                            SessionJsonEventOutputException { Failure: SessionJsonEventOutputFailure.Canceled })) token.ThrowIfCancellationRequested();
                         throw;
                     }
                 }
