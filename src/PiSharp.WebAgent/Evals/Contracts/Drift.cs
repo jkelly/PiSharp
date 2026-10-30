@@ -202,7 +202,11 @@ public sealed record DriftSignal
     /// <summary>When it was raised.</summary>
     public DateTimeOffset Created { get; init; }
 
-    /// <summary>When a new baseline cleared it, or null while it is open.</summary>
+    /// <summary>
+    /// When the signal closed, or null while it is open. Every way a signal closes sets it;
+    /// <c>Detail["closedAs"]</c> gives the reason (confirmed, seen-again, not-confirmed,
+    /// superseded or baseline) and <c>Detail["closedBy"]</c> the run or baseline that closed it.
+    /// </summary>
     public DateTimeOffset? Cleared { get; init; }
 
     /// <summary>Whether it is a suspect signal waiting for the next run.</summary>
