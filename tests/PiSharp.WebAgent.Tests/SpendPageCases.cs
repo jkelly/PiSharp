@@ -65,6 +65,100 @@ internal static partial class Program
             Check(!odd.Active, "nothing filters");
         }),
 
+        // W3 fix (spend-ui): the confirm modal's parts add up. 41,300 input tokens × $2/M are 82,600 micro-USD and 12,290 output tokens ×
+        // $10/M are 122,900, a worst case of 205,500 ($0.2055); rounded to cents on their own they read $0.08 + $0.12 against $0.21. Under a
+        // dollar the modal shows four decimals (as the composer's tooltip and the spend errors do), and at any size the input and output are
+        // rounded so that they add up to the worst case shown: 1,005,000 + 1,005,000 micro-USD read $1.00 + $1.01 = $2.01, not $1.01 + $1.01.
+        Case("spend.pages.confirm-parts-add-up-to-the-worst-case", () =>
+        {
+            var root = Temp("spend-pages-confirm-parts");
+            try
+            {
+                var catalog = new EstCatalog().Add(EstProvider("anthropic", BillingKind.Metered), EstModel("anthropic", "claude-opus-5-5", new CatalogCost(2, 10)));
+                var pages = Sp4Pages(root, catalog);
+                foreach (var (input, output, worst, cap, shown) in new (int, int, long, long, string)[]
+                {
+                    (41_300, 12_290, 205_500, 100_000, "$0.0826 + $0.1229 = $0.2055"),
+                    (502_500, 100_500, 2_010_000, 1_000_000, "$1.00 + $1.01 = $2.01"),
+                    (1_025, 205, 4_100, 1_000, "$0.0020 + $0.0021 = $0.0041"),
+                })
+                {
+                    var view = pages.ConfirmView(Sp4Call("anthropic", "claude-opus-5-5", input, output), Sp4Over(Sp4Priced("anthropic", "claude-opus-5-5", input, output, worst), cap));
+                    var parts = Sp4Parts(view);
+                    Equal(shown, $"{view.Parts[0].Value} + {view.Parts[1].Value} = {view.Parts[2].Value}", "the parts as shown");
+                    Equal(parts["Worst case"], parts["Input"] + parts["Output"], $"Input + Output is the worst case ({shown})");
+                    Equal(SpendMoney.Format(worst, worst < SpendMoney.MicrosPerDollar ? 4 : 2), view.Parts[2].Value, "the worst case is the estimate's, rounded once");
+                    Equal(view.Parts[2].Value, view.Lead.Mark, "the lead names the same worst case");
+                    Check(Math.Abs(parts["Input"] - (long)input * 2) <= 10_000 && Math.Abs(parts["Output"] - (long)output * 10) <= 10_000, "each part within a cent of its own cost: " + shown);
+                }
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
+
+        // W3 fix (spend-ui): "The models above change nothing until you pick one yourself" only when the modal lists models; otherwise the
+        // footnote is the promise alone. A cheaper model that fits is a suggestion; a catalog with no other model, or an unknown price with
+        // no priced model, lists none.
+        Case("spend.pages.confirm-footnote-names-models-only-when-it-lists-some", () =>
+        {
+            var root = Temp("spend-pages-confirm-footnote");
+            try
+            {
+                var two = new EstCatalog().Add(EstProvider("anthropic", BillingKind.Metered),
+                    EstModel("anthropic", "claude-opus-5-5", new CatalogCost(2, 10)), EstModel("anthropic", "claude-haiku-5", new CatalogCost(0.5, 2)));
+                var call = Sp4Call("anthropic", "claude-opus-5-5", 41_300, 12_290);
+                var over = Sp4Over(Sp4Priced("anthropic", "claude-opus-5-5", 41_300, 12_290, 205_500), 100_000);
+                var listed = Sp4Pages(Path.Join(root, "two"), two).ConfirmView(call, over);
+                Equal("anthropic/claude-haiku-5", string.Join(",", listed.Suggestions.Select(suggestion => suggestion.Provider + "/" + suggestion.Model)), "the cheaper model is suggested");
+                Equal(SpendPages.NeverSwitches + " The models above change nothing until you pick one yourself.", listed.Footnote, "with models listed");
+
+                var one = new EstCatalog().Add(EstProvider("anthropic", BillingKind.Metered), EstModel("anthropic", "claude-opus-5-5", new CatalogCost(2, 10)));
+                var alone = Sp4Pages(Path.Join(root, "one"), one).ConfirmView(call, over);
+                Equal(0, alone.Suggestions.Count, "no other model to suggest");
+                Equal("PiSharp never switches your model or account.", alone.Footnote, "no models listed, so none is \"above\"");
+
+                var unpriced = new EstCatalog().Add(EstProvider("gateway", BillingKind.Unknown), EstModel("gateway", "large", null));
+                var unknownEstimate = new SpendEstimate { Provider = "gateway", Model = "large", Billing = BillingKind.Unknown, InputTokens = 1_000, OutputTokens = 8_192 };
+                var unknown = Sp4Pages(Path.Join(root, "unpriced"), unpriced).ConfirmView(Sp4Call("gateway", "large", 1_000, 8_192),
+                    SpendDecision.From(unknownEstimate, [new SpendCause { Kind = SpendCauseKind.UnknownPrice, Action = CapAction.Block }]));
+                Equal(("sc-unknown", 0), (unknown.Pane, unknown.Suggestions.Count), "an unknown price with no priced model");
+                Equal("PiSharp never switches your model or account.", unknown.Footnote, "the promise alone");
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
+
+        // W3 fix (spend-ui): offline (--faux, --faux-metered) the catalog is the faux one and no other provider is ever called, so Settings ›
+        // Spend lists only the faux provider: a machine's environment key for OpenAI is not an Unknown-price account with an Unknown-prices
+        // rule. Online, an account of a provider the catalog does not list is still shown (Unknown price, "Not in the model catalog").
+        Case("spend.pages.offline-accounts-are-the-faux-catalogs-only", () =>
+        {
+            var accounts = new EstAccounts(EstAccount("env-openai-openai_api_key", "openai", PiSharp.WebAgent.Credentials.AccountKind.Environment, source: "OPENAI_API_KEY"));
+            foreach (var price in new[] { null, PiSharp.WebAgent.Faux.FauxPricing.Price })
+            {
+                var catalog = new PiSharp.WebAgent.Faux.FauxModelCatalog(PiSharp.WebAgent.Faux.FauxModelCatalog.CreateModels(), price);
+                var settings = new EstSettings();
+                var prices = new ModelPrices(catalog, settings);
+                var what = price is null ? "--faux" : "--faux-metered";
+                var offline = new BillingModes(catalog, settings, prices, accounts) { Offline = true };
+                var rows = offline.Accounts();
+                Equal("faux:-", string.Join(",", rows.Select(row => row.Provider + ":" + (row.Account?.Id ?? "-"))), what + ": only the faux provider");
+                Equal(price is null ? BillingKind.Free : BillingKind.Metered, rows[0].Billing.Mode, what + ": billed as the faux catalog says");
+                Check(rows.All(row => row.Billing.Mode != BillingKind.Unknown), what + ": no Unknown-price account");
+
+                var online = new BillingModes(catalog, settings, prices, accounts).Accounts();
+                Equal("faux:-,openai:env-openai-openai_api_key", string.Join(",", online.Select(row => row.Provider + ":" + (row.Account?.Id ?? "-"))), what + ": not offline, it is listed");
+                Equal(new BillingResolution(BillingKind.Unknown, BillingKind.Unknown, false, "Not in the model catalog"), online[1].Billing, what + ": as an unlisted provider");
+                Equal(online[1].Billing, offline.Resolve("openai", "env-openai-openai_api_key"), what + ": Resolve is unchanged offline");
+            }
+        }),
+
         Case("spend.pages.settings-caps-and-confirm-round-trip", async () =>
         {
             var envKey = Planted("sk-proj-");
@@ -102,14 +196,19 @@ internal static partial class Program
                 foreach (var part in new[] { "id=\"caps\"", "id=\"accounts\"", "id=\"unknown-prices\"", "id=\"reservations\"", "id=\"modal-spend-cap\"", "data-savebar hidden",
                              "spend.reservationOutputTokens · default 8192", "spend.warnPercent · default 80", "/js/spend-settings.js", "/css/spend.css" })
                     Check(settings.Contains(part, StringComparison.Ordinal), "settings has " + part);
-                // --faux-metered: the faux provider is Metered at its test price; the environment key's provider has no model in the faux
-                // catalog, so it is Unknown price and listed under Unknown prices.
+                // --faux-metered: the faux provider is Metered at its test price. W3 fix (spend-ui): the environment key's provider has no
+                // model in the faux catalog and is never called offline, so it is neither an Accounts row (as "Not in the model catalog ·
+                // Unknown price") nor a row under Unknown prices.
                 Check(Regex.IsMatch(settings, "data-spend-field=\"billing:faux\\|\" data-provider=\"faux\"[^>]*data-initial=\"metered\">\\s*<option value=\"metered\" selected=\"selected\">Metered \\(detected\\)</option>"),
                     "the faux provider is metered, detected: " + Sp4Around(settings, "billing:faux|"));
-                var envRow = Regex.Match(settings, "data-spend-field=\"billing:openai\\|(?<id>[^\"]+)\" data-provider=\"openai\"");
-                Check(envRow.Success, "the environment account is listed: " + Sp4Around(settings, ">openai<"));
-                Check(Regex.IsMatch(settings, "<option value=\"unknown\" selected=\"selected\">Unknown price \\(detected\\)</option>"), "with no price, detected");
-                Check(settings.Contains("data-spend-field=\"unknown:openai\"", StringComparison.Ordinal), "and a row under Unknown prices");
+                Equal(1, Regex.Matches(settings, "data-spend-field=\"billing:").Count, "offline, the faux provider is the only account: " + Sp4Around(settings, "id=\"accounts\""));
+                Check(!settings.Contains("billing:openai|", StringComparison.Ordinal) && !settings.Contains("Not in the model catalog", StringComparison.Ordinal),
+                    "the environment account is not listed offline: " + Sp4Around(settings, "id=\"accounts\""));
+                Check(!settings.Contains("data-spend-field=\"unknown:openai\"", StringComparison.Ordinal) && !settings.Contains("Unknown price (detected)", StringComparison.Ordinal),
+                    "and has no row under Unknown prices: " + Sp4Around(settings, "id=\"unknown-prices\""));
+                var envAccounts = await Call(HttpMethod.Get, "/api/credentials/accounts?provider=openai");
+                Equal((200, 1), (envAccounts.Status, envAccounts.Body!["accounts"]!.AsArray().Count), "the environment account still exists: " + envAccounts.Text);
+                var envId = envAccounts.Body!["accounts"]![0]!["id"]!.GetValue<string>();
                 Check(settings.Contains("Example · <span class=\"ps-mono\">", StringComparison.Ordinal) && settings.Contains("data-worst-case-example", StringComparison.Ordinal),
                     "a worked example from a connected metered model");
                 Check(!settings.Contains("allowanceGate", StringComparison.Ordinal) && !settings.Contains("Sample data", StringComparison.Ordinal), "no allowance gate without allowance data");
@@ -176,6 +275,14 @@ internal static partial class Program
                 Check(!Regex.IsMatch(rawHtml, "\\son[a-z]+\\s*=", RegexOptions.IgnoreCase) && !rawHtml.Contains("<script", StringComparison.Ordinal), "no script in the fragment");
                 var tokens = confirm.Body!["capOutputTokens"]?.GetValue<int>();
                 Check(tokens is > 0 and < 8192 && html.Contains($"data-max-output-tokens=\"{tokens}\"", StringComparison.Ordinal), "a shorter output that fits is offered: " + tokens);
+                // W3 fix (spend-ui): the rendered parts add up to the worst case, and with no model listed the footnote speaks of none.
+                var shownParts = Regex.Matches(html, "<span class=\"k\">(?<key>Input|Output|Worst case)[^<]*</span><span class=\"v[^\"]*\">(?<value>[^<]+)</span>")
+                    .ToDictionary(match => match.Groups["key"].Value, match => SpendMoney.TryParseUsd(match.Groups["value"].Value, out var micros) ? micros : -1);
+                Equal(3, shownParts.Count, "the input, output and worst-case lines: " + Sp4Around(html, "ps-panel"));
+                Equal(shownParts["Worst case"], shownParts["Input"] + shownParts["Output"], "the modal's input and output add up to its worst case: " + Sp4Around(html, "ps-panel"));
+                Check(!html.Contains("data-spend-suggestion", StringComparison.Ordinal), "no cheaper faux model to suggest");
+                Check(html.Contains("data-spend-footnote>PiSharp never switches your model or account.</span>", StringComparison.Ordinal) && !html.Contains("models above", StringComparison.Ordinal),
+                    "no models listed, so no \"models above\": " + Sp4Around(html, "data-spend-footnote"));
 
                 var fits = await Call(HttpMethod.Post, "/api/spend/confirm", new JsonObject { ["provider"] = "faux", ["model"] = "echo", ["inputBytes"] = 30, ["maxTokens"] = 16 });
                 Equal(("allow", null), (fits.Body!["verdict"]!.GetValue<string>(), fits.Body["html"]?.GetValue<string>()), "a request that fits is allowed with no modal");
@@ -201,7 +308,6 @@ internal static partial class Program
                     saved.Body["unknownPrice"]!.GetValue<string>()), "saved: " + saved.Text);
                 Equal(400, (await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["warnPercent"] = 0 })).Status, "a threshold of 0%");
                 Equal(400, (await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["unknownPrice"] = "maybe" })).Status, "an unknown behaviour");
-                var envId = envRow.Groups["id"].Value;
 
                 // The provider page's account card before any override: the key's provider has no price.
                 var provider = await Page("/settings/providers/openai");
@@ -210,14 +316,17 @@ internal static partial class Program
 
                 var overridden = await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject
                 {
-                    ["billing"] = new JsonArray(new JsonObject { ["provider"] = "openai", ["account"] = envId, ["mode"] = "metered" }),
+                    ["billing"] = new JsonArray(new JsonObject { ["provider"] = "openai", ["account"] = envId, ["mode"] = "metered" },
+                        new JsonObject { ["provider"] = "faux", ["mode"] = "free" }),
                     ["unknownPriceRules"] = new JsonArray(new JsonObject { ["provider"] = "openai", ["behavior"] = "allow" }),
                 });
                 Equal(200, overridden.Status, "an override: " + overridden.Text);
-                Equal("openai|" + envId + "|metered", string.Join(",", overridden.Body!["billingOverrides"]!.AsArray().Select(item =>
-                    $"{item!["provider"]!.GetValue<string>()}|{item["account"]!.GetValue<string>()}|{item["mode"]!.GetValue<string>()}")), "kept");
+                Equal("openai|" + envId + "|metered,faux||free", string.Join(",", overridden.Body!["billingOverrides"]!.AsArray().Select(item =>
+                    $"{item!["provider"]!.GetValue<string>()}|{item["account"]?.GetValue<string>()}|{item["mode"]!.GetValue<string>()}")), "kept");
                 settings = await Page("/settings/spend");
-                Check(settings.Contains("override · detected Unknown price", StringComparison.Ordinal), "the page says it is an override");
+                Check(Regex.IsMatch(settings, "data-spend-field=\"billing:faux\\|\" data-provider=\"faux\"[^>]*data-initial=\"free\">") &&
+                    settings.Contains("override · detected Metered", StringComparison.Ordinal), "the page says it is an override: " + Sp4Around(settings, "id=\"accounts\""));
+                Check(!settings.Contains("billing:openai|", StringComparison.Ordinal), "an override does not list an account that is not used offline");
                 Check(Regex.IsMatch(settings, "value=\"70\"\\s+data-spend-field=\"warnPercent\" data-initial=\"70\""), "the saved threshold is the field's value and baseline");
 
                 // The provider page's account card of a metered account: today's spend and the daily cap line (none is left).
@@ -230,7 +339,10 @@ internal static partial class Program
                 Check(Regex.IsMatch(provider, "data-account-spend=\"metered\">Today \\$0\\.00 · <a href=\"/settings/spend#caps\">shared daily cap</a> \\$0\\.00 / \\$2\\.50</div>"),
                     "the shared daily cap's line: " + Sp4Around(provider, "data-account-spend"));
 
-                var back = await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["billing"] = new JsonArray(new JsonObject { ["provider"] = "openai", ["account"] = envId, ["mode"] = "unknown" }) });
+                var back = await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject
+                {
+                    ["billing"] = new JsonArray(new JsonObject { ["provider"] = "openai", ["account"] = envId, ["mode"] = "unknown" }, new JsonObject { ["provider"] = "faux", ["mode"] = "metered" }),
+                });
                 Equal(0, back.Body!["billingOverrides"]!.AsArray().Count, "choosing the detected mode removes the override");
                 Equal(404, (await Call(HttpMethod.Post, "/api/spend/prices", new JsonObject { ["provider"] = "faux", ["model"] = "nope", ["input"] = "1", ["output"] = "2" })).Status,
                     "a price for a model that does not exist");
@@ -401,6 +513,45 @@ internal static partial class Program
         var at = text.IndexOf(marker, StringComparison.Ordinal);
         return at < 0 ? "(" + marker + " not found)" : text.Substring(at, Math.Min(600, text.Length - at));
     }
+
+    /// <summary>SpendPages over <paramref name="catalog"/>, settings in memory, a ledger on a webagent.db under <paramref name="root"/> and no
+    /// guard (the confirm view needs none).</summary>
+    private static SpendPages Sp4Pages(string root, IModelCatalog catalog)
+    {
+        Directory.CreateDirectory(root);
+        var settings = new EstSettings();
+        var db = new WebAgentDb(Path.Join(root, "webagent.db"), [CoreMigrations.AppInfo, SettingsStore.Migration, .. SpendLedgerMigrations.All]);
+        db.Migrate();
+        var prices = new ModelPrices(catalog, settings);
+        var billing = new BillingModes(catalog, settings, prices);
+        return new SpendPages(new SpendLedger(db, settings), settings, catalog, billing, prices, new CostEstimator(catalog, settings, billing, prices),
+            new PiSharp.WebAgent.Hosting.WebAgentOptions { DataDirectory = root },
+            Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(new Microsoft.Extensions.DependencyInjection.ServiceCollection()));
+    }
+
+    /// <summary>A chat call of exactly <paramref name="inputTokens"/> input tokens with <c>maxTokens</c> <paramref name="maxTokens"/>.</summary>
+    private static SpendCall Sp4Call(string provider, string model, int inputTokens, int maxTokens) => new()
+    {
+        Provider = provider, Model = model, Source = SpendSource.Chat, Run = "chat-1", InputBytes = EstBytes(inputTokens), MaxTokens = maxTokens,
+    };
+
+    /// <summary>A metered estimate at $2 input and $10 output per million tokens with this worst case.</summary>
+    private static SpendEstimate Sp4Priced(string provider, string model, int inputTokens, int outputTokens, long worst) => new()
+    {
+        Provider = provider, Model = model, Billing = BillingKind.Metered, Price = new SpendPrice(2, 10), InputTokens = inputTokens, OutputTokens = outputTokens,
+        WorstMicros = worst,
+    };
+
+    /// <summary>Ask: <paramref name="estimate"/> is over a per-request cap of <paramref name="limit"/> micro-USD for everything metered.</summary>
+    private static SpendDecision Sp4Over(SpendEstimate estimate, long limit) => SpendDecision.From(estimate,
+    [
+        new SpendCause { Kind = SpendCauseKind.Cap, Action = CapAction.Ask, Cap = new SpendCap(1, CapScope.Everything, null, CapPeriod.Request, limit, CapAction.Ask), LeftMicros = limit },
+    ]);
+
+    /// <summary>The confirm view's money parts by name (Input, Output, Worst case, ...), read back as micro-USD.</summary>
+    private static Dictionary<string, long> Sp4Parts(SpendConfirmView view) => view.Parts.ToDictionary(
+        part => part.Key.Split(' ')[0] == "Worst" ? "Worst case" : part.Key.Split(' ')[0],
+        part => SpendMoney.TryParseUsd(part.Value.TrimStart('≈', ' '), out var micros) ? micros : throw new InvalidOperationException("not an amount: " + part.Value));
 
     /// <summary>A metered (or <paramref name="billing"/>) estimate of <paramref name="provider"/>'s model through account acc-1: 12,000 input
     /// and 8,192 output tokens at $2/$10 per million, with this worst case.</summary>

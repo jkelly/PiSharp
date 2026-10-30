@@ -22,7 +22,10 @@ public static partial class SpendModule
         services.TryAddSingleton(provider => new ModelPrices(provider.GetRequiredService<IModelCatalog>(), provider.GetRequiredService<ISettingsStore>(),
             () => provider.GetService<IDurableModels>()));
         services.TryAddSingleton(provider => new BillingModes(provider.GetRequiredService<IModelCatalog>(), provider.GetRequiredService<ISettingsStore>(),
-            provider.GetRequiredService<ModelPrices>(), provider.GetService<IAccountStore>(), () => provider.GetService<IDurableModels>()));
+            provider.GetRequiredService<ModelPrices>(), provider.GetService<IAccountStore>(), () => provider.GetService<IDurableModels>())
+        {
+            Offline = provider.GetService<WebAgentOptions>()?.Faux == true,
+        });
         services.TryAddSingleton<IBillingModes>(provider => provider.GetRequiredService<BillingModes>());
         services.TryAddSingleton(provider => new CostEstimator(provider.GetRequiredService<IModelCatalog>(), provider.GetRequiredService<ISettingsStore>(),
             provider.GetRequiredService<IBillingModes>(), provider.GetRequiredService<ModelPrices>(), provider.GetService<IAccountStore>(),
