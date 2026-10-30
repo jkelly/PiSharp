@@ -380,7 +380,10 @@ public sealed class RunEngine : IAsyncDisposable
         var http = new RunHttpContext
         {
             RunId = work.Id, Api = model.Api, Patch = plan.Patch, PatchPath = plan.PatchPath, Headers = plan.Headers, StrictTools = plan.StrictTools,
-            TimeoutMs = offline ? null : plan.Spec.TimeoutMs, Capture = capture,
+            Cache = plan.Cache, TimeoutMs = offline ? null : plan.Spec.TimeoutMs, Capture = capture,
+            ApiVersion = offline ? null : plan.Spec.AzureApiVersion,
+            MaxRetries = offline ? null : plan.Spec.MaxRetries,
+            MaxRetryDelayMs = offline ? null : plan.Spec.MaxRetryDelayMs,
         };
         var events = new List<RunEventRecord>();
         var partial = new StringBuilder();
@@ -392,8 +395,9 @@ public sealed class RunEngine : IAsyncDisposable
             RunHttpScope.Current = http;
             await foreach (var item in work.Lease.StreamAsync(model.Descriptor, (send, token) =>
                 {
-                    // The output cap sent is the whole output (RunModelOptions.SendPatch): the guard's own cap gets its patch too.
-                    (http.Patch, http.PatchPath) = RunModelOptions.SendPatch(plan, send.MaxTokens);
+                    // The output cap sent is the whole output (RunModelOptions.SendPatch): the guard's own cap gets its patch too. A capped send
+                    // goes through the router's summary route, which sends no cache breakpoints: the cache edit puts them back (W4 fix 2).
+                    (http.Patch, http.PatchPath, http.Cache) = RunModelOptions.Send(plan, send.MaxTokens);
                     return Models.StreamSimple(model, plan.Messages, Options(work, send), token);
                 }, work.Cancel.Token).ConfigureAwait(false))
             {
@@ -471,8 +475,13 @@ public sealed class RunEngine : IAsyncDisposable
         var (cost, costKind, billing) = Cost(work.Lease.Settled, message);
         double? rate = usage.Output > 0 && ttft is { } first && duration > first ? usage.Output / ((duration - first) / 1000.0) : null;
         var notes = new List<string>(work.Plan.Notes);
-        if ((http.Patch is not null || work.Plan.StrictTools is not null) && http.Requests > 0 && http.Patched == 0)
+        if ((http.Patch is not null || work.Plan.StrictTools is not null || http.Cache is not null || http.ApiVersion is not null) && http.Requests > 0 &&
+            http.Patched == 0)
             notes.Add("PiSharp did not find the model request to apply this run's options to, so it was sent without them.");
+        if (http.Retries > 0)
+            notes.Add($"PiSharp sent the model request again {http.Retries} {(http.Retries == 1 ? "time" : "times")} after a retryable answer or a network error.");
+        if (capture is not null && http.Requests == 0 && terminal is not null)
+            notes.Add("Raw payloads were on, but the model request did not pass through PiSharp's HTTP hook, so it was not captured.");
         if (capture?.Truncated == true) notes.Add($"Raw payloads were cut at {RunCapture.MaxBytes / (1024 * 1024)} MB.");
         if (work.Lease.Reservation.OutputCapped) notes.Add($"The output was capped at {work.Lease.Reservation.MaxTokens:N0} tokens (your spend choice).");
         return new RunOutcome

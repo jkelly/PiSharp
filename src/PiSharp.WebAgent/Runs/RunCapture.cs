@@ -1,8 +1,9 @@
 // Decision 0011 (run W4, R0; brief rule 6): what the routing path's capture hook (Routing/RunCaptureHandler) knows about the call it sees.
 // A run (RunEngine) or a recorded chat call (RecordingDurableModels) sets RunHttpScope.Current around the provider call; the hook reads it
 // on each HTTP request: the run's id, the JSON patch, strict tools and headers to apply to the model request, the run's timeout, and, only
-// when the user turned raw payloads on, a RunCapture to record into. A run that needs the HTTP request (a patch, strict tools or a
-// timeout) makes the account router choose Codex's SSE transport, whose request the hook sees, over its WebSocket one. An AsyncLocal set inside an async iterator is lost after its yield, so the iterators set it again before
+// when the user turned raw payloads on, a RunCapture to record into; W4 fix 2 adds the prompt cache edit, the Azure API version and the
+// retries. A call that needs the HTTP request (a patch, strict tools, a cache edit, an API version, retries, a timeout, or raw payloads to
+// record) makes the account router choose Codex's SSE transport, whose request the hook sees, over its WebSocket one. An AsyncLocal set inside an async iterator is lost after its yield, so the iterators set it again before
 // every step they take of the inner stream.
 //
 // RunCapture keeps a run's raw items in memory until the run ends (the engine stores them with its row): the request (method, URL, headers,
@@ -23,6 +24,7 @@ public sealed class RunHttpContext
 {
     private int patched;
     private int requests;
+    private int retries;
 
     /// <summary>The run (or chat call) id.</summary>
     public required string RunId { get; init; }
@@ -46,9 +48,25 @@ public sealed class RunHttpContext
     /// <summary>How long each request of the call waits for the provider's response headers, in milliseconds, or null for no limit.</summary>
     public int? TimeoutMs { get; init; }
 
-    /// <summary>Whether the call needs its model request to go over HTTP through the hook (a patch, strict tools or a timeout): the account
-    /// router then sends a Codex request over SSE rather than a WebSocket, which the hook cannot change.</summary>
-    public bool NeedsHttp => Patch is not null || StrictTools is { Count: > 0 } || TimeoutMs is not null;
+    /// <summary>The prompt cache edit of the model request's body (<see cref="RunModelOptions.ApplyCache"/>), or null. The engine sets it with
+    /// the patch.</summary>
+    public RunCacheEdit? Cache { get; set; }
+
+    /// <summary>The Azure OpenAI API version the model request's <c>api-version</c> query is set to, or null.</summary>
+    public string? ApiVersion { get; init; }
+
+    /// <summary>How many times the model request is sent again after a retryable answer (408, 409, 429, 5xx, <c>x-should-retry</c>) or a
+    /// network error, or null for none.</summary>
+    public int? MaxRetries { get; init; }
+
+    /// <summary>The longest server-requested retry delay waited for, in milliseconds (0: as long as asked, up to an hour; null: 60,000).</summary>
+    public int? MaxRetryDelayMs { get; init; }
+
+    /// <summary>Whether the call needs its model request to go over HTTP through the hook (a patch, strict tools, a cache edit, an API version,
+    /// retries, a timeout, or raw payloads to record): the account router then sends a Codex request over SSE rather than a WebSocket, which
+    /// the hook can neither change nor record.</summary>
+    public bool NeedsHttp => Patch is not null || StrictTools is { Count: > 0 } || Cache is not null || ApiVersion is not null || MaxRetries is > 0 ||
+        TimeoutMs is not null || Capture is not null;
 
     /// <summary>Where raw payloads go, or null when they are off.</summary>
     public RunCapture? Capture { get; init; }
@@ -59,7 +77,12 @@ public sealed class RunHttpContext
     /// <summary>How many HTTP requests the call made.</summary>
     public int Requests => Volatile.Read(ref requests);
 
+    /// <summary>How many times the model request was sent again.</summary>
+    public int Retries => Volatile.Read(ref retries);
+
     internal void CountPatched() => Interlocked.Increment(ref patched);
+
+    internal void CountRetry() => Interlocked.Increment(ref retries);
 
     internal void CountRequest() => Interlocked.Increment(ref requests);
 }

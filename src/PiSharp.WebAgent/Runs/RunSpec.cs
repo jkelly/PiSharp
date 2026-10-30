@@ -3,7 +3,9 @@
 // its signed thinking blocks and each call's thought signature, so a tool loop replays them as the provider sent them), the tools (a tool
 // may be strict), and every request option the Playground offers (thinking, max tokens, temperature, top P, top K, stop sequences, seed,
 // presence and frequency penalties, response format, tool choice, parallel tool calls, service tier, text verbosity, reasoning summary,
-// session id, timeout, extra headers and provider options). A spec is checked here for what
+// session id, timeout, extra headers and provider options; W4 fix 2: prompt cache retention, retries and the retry delay, per-level
+// thinking budgets, the Azure API version, and, so a page that posts them is answered rather than ignored, a base URL, the other Azure
+// options and the Bedrock options, which RunModelOptions refuses with the reason). A spec is checked here for what
 // is never allowed whatever the model (sizes, ranges, names, credential headers, provider options that would replace the request's own
 // structure); whether the chosen model and its API take each option is RunModelOptions' check. The account is an id: a spec never carries
 // a key, and a header that could carry one is refused.
@@ -113,6 +115,21 @@ public sealed partial record RunSpec
     /// <summary>The longest session id (OpenAI's prompt cache key).</summary>
     public const int MaxSessionId = 64;
 
+    /// <summary>The prompt cache retentions a spec may name (Pi's <c>CacheRetention</c>; the model's API decides which it takes).</summary>
+    public static IReadOnlyList<string> CacheRetentions { get; } = ["none", "short", "long"];
+
+    /// <summary>The most retries a run asks for.</summary>
+    public const int MaxRetryCount = 10;
+
+    /// <summary>The longest server-requested retry delay a run may wait for, in milliseconds (one hour; 0 is "no cap" up to this).</summary>
+    public const int MaxRetryDelayLimitMs = 3_600_000;
+
+    /// <summary>The levels a thinking budget names (Pi's <c>ThinkingBudgets</c>: xhigh and max use high's).</summary>
+    public static IReadOnlyList<string> BudgetLevels { get; } = ["minimal", "low", "medium", "high"];
+
+    /// <summary>The Bedrock options a spec may name (Pi's <c>BedrockOptions</c> the Playground lists).</summary>
+    public static IReadOnlyList<string> BedrockOptionNames { get; } = ["region", "profile", "thinkingDisplay", "interleavedThinking"];
+
     /// <summary>Provider option keys that would replace the request's own structure, never accepted.</summary>
     public static IReadOnlyList<string> StructuralKeys { get; } =
         ["model", "messages", "input", "contents", "system", "systemInstruction", "system_instruction", "instructions", "tools", "stream", "stream_options"];
@@ -205,6 +222,39 @@ public sealed partial record RunSpec
 
     /// <summary>Fields merged into the provider's request body (objects merge, anything else replaces); never the request's structure.</summary>
     public JsonObject? ProviderOptions { get; init; }
+
+    /// <summary><see cref="CacheRetentions"/>: how long the provider keeps the prompt cache (null for the route's default, short).</summary>
+    public string? CacheRetention { get; init; }
+
+    /// <summary>How many times the model request is sent again after a 408, 409, 429 or 5xx answer or a network error, before any output
+    /// (0 to <see cref="MaxRetryCount"/>; null for none).</summary>
+    public int? MaxRetries { get; init; }
+
+    /// <summary>The longest server-requested retry delay (retry-after) a retry waits for, in milliseconds: a longer one ends the run with the
+    /// provider's answer. 0 waits as long as the server asks, up to an hour; null for 60,000.</summary>
+    public int? MaxRetryDelayMs { get; init; }
+
+    /// <summary>Token budgets per thinking level (<see cref="BudgetLevels"/>) for models that think by budget; the run's level uses its own
+    /// (xhigh and max use high's).</summary>
+    public IReadOnlyDictionary<string, int>? ThinkingBudgets { get; init; }
+
+    /// <summary>A base URL for this run only: never taken (the account's credential goes only where the account says).</summary>
+    public string? BaseUrl { get; init; }
+
+    /// <summary>Azure OpenAI: the endpoint's base URL (never taken per run: the account decides where its key goes).</summary>
+    public string? AzureBaseUrl { get; init; }
+
+    /// <summary>Azure OpenAI: the resource name (never taken per run: it names the host the key goes to).</summary>
+    public string? AzureResourceName { get; init; }
+
+    /// <summary>Azure OpenAI: the API version, sent as the request's <c>api-version</c>.</summary>
+    public string? AzureApiVersion { get; init; }
+
+    /// <summary>Azure OpenAI: the deployment (never taken per run: it decides which model answers, and the Spend Guard prices the chosen one).</summary>
+    public string? AzureDeploymentName { get; init; }
+
+    /// <summary>Amazon Bedrock options (<see cref="BedrockOptionNames"/>; never taken per run: Bedrock requests are signed).</summary>
+    public JsonObject? Bedrock { get; init; }
 
     /// <summary>The spend source (<see cref="Source"/>, <c>playground</c> when null).</summary>
     public SpendSource SpendSource => Source is null ? SpendSource.Playground : SpendSources.TryParse(Source, out var parsed) ? parsed : SpendSource.Playground;
@@ -331,6 +381,19 @@ public sealed partial record RunSpec
         if (TimeoutMs is { } timeout && (timeout < MinTimeoutMs || timeout > MaxTimeoutMs))
             throw new ArgumentException($"The timeout is {MinTimeoutMs:N0} to {MaxTimeoutMs:N0} ms.");
         if (ParallelToolCalls is not null && tools.Count == 0) throw new ArgumentException("Parallel tool calls need at least one tool.");
+        var retention = string.IsNullOrWhiteSpace(CacheRetention) ? null : CacheRetention.Trim();
+        if (retention is not null && !CacheRetentions.Contains(retention))
+            throw new ArgumentException($"Cache retention is {string.Join(", ", CacheRetentions)}, not \"{retention}\".");
+        if (MaxRetries is { } retries && (retries < 0 || retries > MaxRetryCount)) throw new ArgumentException($"Max retries is 0 to {MaxRetryCount}.");
+        if (MaxRetryDelayMs is { } delay && (delay < 0 || delay > MaxRetryDelayLimitMs))
+            throw new ArgumentException($"The longest retry delay is 0 to {MaxRetryDelayLimitMs:N0} ms.");
+        var budgets = ThinkingBudgets is null ? null : CheckBudgets(ThinkingBudgets);
+        var apiVersion = Optional(AzureApiVersion, "The Azure API version", 40);
+        if (apiVersion is not null && !AzureNamePattern().IsMatch(apiVersion)) throw new ArgumentException("The Azure API version is letters, digits, '.', '_' and '-'.");
+        if (Bedrock is { } bedrock)
+            foreach (var key in bedrock.Select(pair => pair.Key))
+                if (!BedrockOptionNames.Contains(key, StringComparer.Ordinal))
+                    throw new ArgumentException($"\"{key}\" is not a Bedrock option: {string.Join(", ", BedrockOptionNames)}.");
         var headers = Headers is null ? null : CheckHeaders(Headers);
         if (ProviderOptions is { } extra)
             foreach (var key in extra.Select(pair => pair.Key))
@@ -358,6 +421,14 @@ public sealed partial record RunSpec
             SessionId = session,
             Headers = headers is { Count: > 0 } ? headers : null,
             ProviderOptions = ProviderOptions is { Count: > 0 } ? ProviderOptions : null,
+            CacheRetention = retention,
+            ThinkingBudgets = budgets is { Count: > 0 } ? budgets : null,
+            BaseUrl = Optional(BaseUrl, "The base URL", 2048),
+            AzureBaseUrl = Optional(AzureBaseUrl, "The Azure base URL", 2048),
+            AzureResourceName = Optional(AzureResourceName, "The Azure resource name", 200),
+            AzureApiVersion = apiVersion,
+            AzureDeploymentName = Optional(AzureDeploymentName, "The Azure deployment", 200),
+            Bedrock = Bedrock is { Count: > 0 } ? Bedrock : null,
         };
         foreach (var id in new[] { normalized.GroupId, normalized.ParentId })
             if (id is not null && (id.Length > 100 || !IdPattern().IsMatch(id))) throw new ArgumentException("A group or parent id is letters, digits, '-' and '_' (at most 100).");
@@ -422,6 +493,26 @@ public sealed partial record RunSpec
         return result;
     }
 
+    private static Dictionary<string, int> CheckBudgets(IReadOnlyDictionary<string, int> budgets)
+    {
+        var result = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var (level, tokens) in budgets)
+        {
+            if (!BudgetLevels.Contains(level, StringComparer.Ordinal))
+                throw new ArgumentException($"A thinking budget names a level ({string.Join(", ", BudgetLevels)}), not \"{level}\".");
+            if (tokens < 1 || tokens > 10_000_000) throw new ArgumentException($"The {level} thinking budget is 1 or more tokens.");
+            result[level] = tokens;
+        }
+        return result;
+    }
+
+    private static string? Optional(string? value, string what, int maxLength)
+    {
+        var text = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        if (text is not null && (text.Length > maxLength || text.Any(char.IsControl))) throw new ArgumentException($"{what} is not allowed.");
+        return text;
+    }
+
     private static void CheckFormat(JsonObject format)
     {
         var type = format["type"] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
@@ -467,4 +558,7 @@ public sealed partial record RunSpec
 
     [GeneratedRegex("^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,100}$")]
     private static partial Regex HeaderName();
+
+    [GeneratedRegex("^[A-Za-z0-9._-]+$")]
+    private static partial Regex AzureNamePattern();
 }
