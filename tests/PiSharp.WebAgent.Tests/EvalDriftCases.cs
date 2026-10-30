@@ -654,7 +654,8 @@ internal static partial class Program
             var cases = DwIds(8);
             var baselineRun = DwRunOf(suite, 1, cases, 3);
             var history = new DwHistory(baselineRun, DwAnswers(baselineRun, cases, [3, 3, 3, 3, 3, 3, 3, 3]));
-            // c01 refused on every repeat; c02 to c06 lose one repeat each (a lost hold race); c07's judge was refused; c08's judge was unsure.
+            // c01 refused on every repeat; c02 to c06 lose one repeat each (refused when reserved anew); c07's judge was refused; c08's judge
+            // was unsure.
             List<SuiteResult> Missing(SuiteRun run) =>
             [
                 .. Enumerable.Range(1, 3).Select(repetition => DwNotSent(run, cases[0], repetition)),
@@ -701,13 +702,17 @@ internal static partial class Program
             Equal(DriftRule.JudgeScore, judged.Analyze(runE, DwJudged(runE, cases, 1)).Raised.Single().Rule, "the same scores from judges that decided are a fall");
         }),
 
-        Case("evals.drift.calls-the-spend-guard-refused-mid-run-are-not-drift", async () =>
+        Case("evals.drift.a-cap-saved-mid-run-refuses-no-held-call-and-raises-no-drift", async () =>
         {
-            // A suite run on the in-process host: the first SuiteRunner.Concurrency calls are held in flight, a Block cap is saved, and every
-            // later call is refused by the Spend Guard when the run engine reserves it, so a whole case is never sent. Before fix W5 drift 1
-            // that case was a broken case (suspect, then drift on the next run).
+            // A suite run on the in-process host: the first SuiteRunner.Concurrency calls are held in flight and a Block cap is saved. Fix W5
+            // drift 1 wrote this case when each later call was reserved again by the run engine, so the cap refused it and a whole case was
+            // never sent (a broken case before that fix; a missing answer after it). W5 integration fix 1 sends every call on its own hold of
+            // the run's group reservation (RunEngine.StartReservedAsync), so a cap saved after the run was reserved refuses none of them (W5
+            // retest 1): every answer is sent and counted, the ledger has only the run's holds, and nothing is suspect or drift. Answers that
+            // were never sent (a call reserved anew because its hold no longer fits, refused) are still left out of drift, which
+            // evals.drift.answers-never-sent-and-undecided-judges-raise-nothing covers.
             await using var host = SuHost.Create("dw-refused");
-            var (suite, cases) = SuSeed(host, "Refused halfway", k: 3, cases: 3);
+            var (suite, _) = SuSeed(host, "Capped halfway", k: 3, cases: 3);
             var first = await SuRunNow(host, suite.Id);
             Check(host.Store.Results(first.Id).All(result => result is { Status: ResultStatus.Done, Sent: true }), "every baseline answer was sent");
             Check(host.Suites.AcceptBaseline(suite.Id, first.Id, null, replaceReferences: false).Accepted.Count == 1, "run #1 is the baseline");
@@ -723,19 +728,21 @@ internal static partial class Program
             Equal(SuiteRunStatus.Complete, run.Status, "the run completes: " + run.Problem);
 
             var results = host.Store.Results(run.Id);
-            var refused = results.Where(result => result.Status == ResultStatus.Error).ToList();
-            Equal(9 - SuiteRunner.Concurrency, refused.Count, "every call after the cap was refused");
-            Check(refused.All(result => !result.Sent && result.CallRunId is null && result.Error!.EndsWith("Nothing was sent.", StringComparison.Ordinal)),
-                "refused calls are marked not sent: " + string.Join("; ", refused.Select(result => result.Error)));
-            Check(results.Where(result => result.Status == ResultStatus.Done).All(result => result.Sent), "answered calls are marked sent");
-            Check(cases.Any(testCase => results.Where(result => result.CaseId == testCase.Id).All(result => !result.Sent)),
-                "a whole case was never sent (all its repeats refused)");
+            Equal(9, results.Count, "3 cases × k 3");
+            Check(results.All(result => result is { Status: ResultStatus.Done, Sent: true, CallRunId: not null }),
+                "every call went out on its hold, the new cap notwithstanding: " +
+                string.Join("; ", results.Select(result => EvalJson.Wire(result.Status) + " " + result.Error)));
+            var rows = (await host.Ledger.QueryAsync(new SpendLedgerQuery { Run = run.Id, Limit = SpendLedgerQuery.MaxLimit })).Items;
+            Check(rows.Count > 0 && rows.All(row => row.Op.StartsWith(SuiteRunner.HoldPrefix + run.Id + "-", StringComparison.Ordinal)),
+                "the ledger has only the run's holds (no call reserved again): " + string.Join(", ", rows.Select(row => row.Op)));
+            Equal(9, rows.Count(row => row.State == ReservationState.Settled), "each answer settled its hold");
+            Check(rows.All(row => row.State != ReservationState.Reserved), "nothing is left reserved");
 
             var signals = host.Store.Signals(suite.Id);
             Check(signals.All(signal => signal.Level == DriftLevel.Info), "no suspect or drift signal (the held calls' latency may be info): " +
                 string.Join(" | ", signals.Select(signal => EvalJson.Wire(signal.Level) + " " + signal.Message)));
             var analysis = host.Runner.AnalyzeDrift(run.Id).Single();
-            Equal(9 - SuiteRunner.Concurrency, analysis.Comparison.LeftOutAfter, "the refused calls are left out as missing answers");
+            Equal(0, analysis.Comparison.LeftOutAfter, "no answer is missing");
             Check(analysis.Findings.All(finding => DriftRules.InitialLevel(finding.Rule) == DriftLevel.Info), "no quality rule finds anything");
         }),
 
