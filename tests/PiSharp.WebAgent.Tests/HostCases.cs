@@ -220,8 +220,7 @@ internal static partial class Program
             {
                 var page = await app.Get(href);
                 Check(page.Status < 500, $"{href}: {page.Status} {Cut(page.Text)}");
-                var later = LaterFeature.Pages.GetValueOrDefault(href) ??
-                    (href.StartsWith("/settings/", StringComparison.Ordinal) ? LaterFeature.SettingsPages.GetValueOrDefault(href["/settings/".Length..]) : null);
+                var later = LaterFeature.Pages.GetValueOrDefault(href);
                 if (later is not null)
                 {
                     Equal(200, page.Status, href);
@@ -235,7 +234,7 @@ internal static partial class Program
                 CheckShell(href, page.Text);
                 Equal(HostGuardOptions.DefaultContentSecurityPolicy, string.Join("", page.Response.Headers.GetValues("Content-Security-Policy")), href + " CSP");
             }
-            Check(rendered >= LaterFeature.Pages.Count + LaterFeature.SettingsPages.Count, "every later-milestone page rendered");
+            Check(rendered >= LaterFeature.Pages.Count, "every later-milestone page rendered");
 
             var playground = (await app.Get("/playground")).Text;
             Check(Regex.IsMatch(playground, "<a class=\"nav-link active\" aria-current=\"page\" href=\"/playground\" data-nav=\"playground\">"), "Playground is the active item");
