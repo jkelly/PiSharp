@@ -10,7 +10,9 @@
 // gets the refusal (and the confirm modal); in the background, the session is "blocked" and Run asks again. One gate per session orders the
 // user's actions and the loop. A turn's signed parts (its thinking blocks with their signatures, each call's thought signature) are kept
 // with the turn and sent back with its calls, so a thinking model's tool loop continues on Anthropic and Google; Parallel tool calls off
-// is the run's first-class switch, which the run engine sends where the API has one and refuses where it has none.
+// is the run's first-class switch, which the run engine sends where the API has one and refuses where it has none. A strict tool is sent as
+// RunTool.Strict (strict: true on the OpenAI APIs); on an API without strict tools the turn is refused by name before anything is sent
+// (BenchStrict).
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -452,7 +454,9 @@ public sealed class BenchRunner : IAsyncDisposable
         if (setup.Tools.Count == 0) throw new ArgumentException("Define a tool first: the bench sends your tools with every request.");
         var enabled = setup.Enabled;
         if (enabled.Count == 0) throw new ArgumentException("Switch on at least one tool: the bench sends only the tools that are on.");
-        _ = engine.Capabilities(setup.Provider, setup.Model) ?? throw new ArgumentException($"There is no model {setup.Provider}/{setup.Model}; choose another.");
+        var capabilities = engine.Capabilities(setup.Provider, setup.Model) ?? throw new ArgumentException($"There is no model {setup.Provider}/{setup.Model}; choose another.");
+        // A strict tool on an API without strict tools refuses the turn by name (the run engine would refuse it too, less plainly).
+        if (BenchStrict.Refusal(setup, capabilities) is { } strictRefusal) throw new ArgumentException(strictRefusal);
         var choice = setup.ToolChoice == "any" ? "required" : setup.ToolChoice;
         return new RunSpec
         {
@@ -463,7 +467,7 @@ public sealed class BenchRunner : IAsyncDisposable
             GroupId = group ?? session.Group,
             SystemPrompt = setup.SystemPrompt,
             Messages = Messages(session),
-            Tools = [.. enabled.Select(tool => new RunTool(tool.Name, tool.Description, (JsonObject?)tool.Parameters?.DeepClone()))],
+            Tools = [.. enabled.Select(tool => new RunTool(tool.Name, tool.Description, (JsonObject?)tool.Parameters?.DeepClone(), tool.Strict ? true : null))],
             ToolChoice = choice,
             Thinking = setup.Thinking,
             // Off is sent where the API has a switch (parallel_tool_calls, or Anthropic's disable_parallel_tool_use); the run engine refuses it

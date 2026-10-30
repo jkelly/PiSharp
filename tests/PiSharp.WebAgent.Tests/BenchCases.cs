@@ -6,13 +6,20 @@
 // stopped. Tool definitions are validated as JSON Schema (names, types, enums, patterns, required) and built-ins keep PiSharp's own
 // declarations. End to end, the built app renders /bench in its empty, awaiting and default states with nothing the CSP would block, and
 // /api/bench goes round trip: a session, a run followed over SSE, the view, the call log export, Stop, and the 400/404/409 answers.
+// Strict (W4 fix 2): a strict bench tool reaches the OpenAI Responses body as strict: true (and only that tool), is accepted offline by the
+// faux model, and is refused by name, before anything is sent, on Anthropic and Gemini; the tool list and editor say what the model does
+// with it, and the tool check lists what OpenAI's strict mode would also ask of a schema.
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using PiSharp.WebAgent.Bench;
+using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Data;
 using PiSharp.WebAgent.Hosting;
+using PiSharp.WebAgent.Routing;
 using PiSharp.WebAgent.Runs;
 using PiSharp.WebAgent.Spend;
 
@@ -276,7 +283,7 @@ internal static partial class Program
             Check(Regex.IsMatch(empty, "id=\"ruleBuiltin\" disabled"), "built-ins never run");
             foreach (var modal in new[] { "modal-model-picker", "modal-tool-editor", "modal-spend-confirm", "modal-shortcuts", "modal-confirm" })
                 Check(empty.Contains($"id=\"{modal}\"", StringComparison.Ordinal), "the page hosts #" + modal);
-            foreach (var template in new[] { "bench-mock-section", "bench-mock-row", "bench-builtin-note", "bench-tool-delete" })
+            foreach (var template in new[] { "bench-mock-section", "bench-mock-row", "bench-builtin-note", "bench-strict-note", "bench-tool-delete" })
                 Check(empty.Contains($"<template id=\"{template}\">", StringComparison.Ordinal), "the editor's " + template);
             Check(Regex.IsMatch(empty, "<script type=\"module\" src=\"/js/bench\\.js\\?v=") && Regex.IsMatch(empty, "<link href=\"/css/bench\\.css\\?v="),
                 "its module and stylesheet: " + string.Join(" ", Regex.Matches(empty, "<(script|link)[^>]*bench[^>]*>").Select(match => match.Value)));
@@ -396,7 +403,158 @@ internal static partial class Program
             Check(reset.Status == 200 && reset.Body?["state"]?.GetValue<string>() == BenchStates.Idle && reset.Body["messages"]?.AsArray().Count == 2, "reset: " + Cut(reset.Text));
             Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
         }),
+
+        Case("bench.strict.sent-on-openai-and-refused-on-anthropic-and-google", async () =>
+        {
+            await using var host = BenchHost.Routing("bench-strict");
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("openai", Planted("sk-proj-")));
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", Planted("sk-ant-")));
+            var catalog = host.Services.GetRequiredService<IModelCatalog>();
+            var runner = host.Runner;
+            var gpt = ModelOf(catalog, "openai", "openai-responses", "gpt-4.1");
+            var lookup = BenchLookup() with { Strict = true };
+            var weather = BenchWeather();
+            var setup = new BenchSetup { Provider = "openai", Model = gpt, Tools = [lookup, weather] };
+
+            // The setup keeps the flag (left out of the JSON when off), and the turn's spec carries it for that tool only.
+            var json = JsonSerializer.Serialize(setup.Normalize(), SettingsStore.JsonOptions);
+            var back = JsonSerializer.Deserialize<BenchSetup>(json, SettingsStore.JsonOptions)!;
+            Check(back.Tools[0].Strict && !back.Tools[1].Strict, "the strict flag round-trips: " + json);
+            Equal(1, Regex.Matches(json, "\"strict\":").Count, "it is written only when on: " + json);
+            var session = runner.Create(setup, ["bench strict run"]);
+            Check(session.Setup.Tools[0].Strict, "the session keeps it");
+            var spec = runner.Spec(session);
+            Check(spec.Tools is [{ Name: "lookup", Strict: true }, { Name: "get_weather", Strict: null }],
+                "RunTool.Strict for the strict tool only: " + string.Join(", ", spec.Tools!.Select(tool => tool.Name + "=" + tool.Strict)));
+            var openai = host.Pages.View(session);
+            Check(openai.StrictTaken && openai.StrictNote is ({ } sentNote, "faint") && sentNote.Contains("lookup: sent as strict: true on the Responses API", StringComparison.Ordinal),
+                "the tool list says how it is sent: " + openai.StrictNote);
+            Check(openai.StrictEditorNote.Contains("as strict: true on the Responses API", StringComparison.Ordinal), "and so does the editor: " + openai.StrictEditorNote);
+
+            // On the Responses API the strict tool goes out with strict: true, the other one without, and the turn finishes.
+            var started = await runner.RunAsync(session.Id);
+            Check(started is { Refusal: null, Session.State: BenchStates.Running }, "the turn runs: " + started.Session.Note);
+            var done = await runner.WhenSettledAsync(session.Id, TimeSpan.FromSeconds(30));
+            Equal(BenchStates.Finished, done.State, "finished: " + done.Note + " " + done.Turns.LastOrDefault()?.Error);
+            var body = JsonNode.Parse(host.Provider.Requests.Single(request => request.Body?.Contains("bench strict run", StringComparison.Ordinal) == true).Body!)!;
+            var tools = body["tools"]!.AsArray().OfType<JsonObject>().ToDictionary(tool => tool["name"]!.GetValue<string>());
+            Equal(true, tools["lookup"]["strict"]?.GetValue<bool>(), "the strict tool is sent strict");
+            Check(tools["get_weather"]["strict"] is not JsonValue other || !other.GetValue<bool>(), "and only that one: " + tools["get_weather"].ToJsonString());
+            var row = host.Runs.Get(done.Turns.Single().RunId)!;
+            Check(row is { Source: "bench" } && row.Options?["applied"]?.AsArray().Any(item => item?.GetValue<string>() == RunModelOptions.StrictTools) == true,
+                "recorded as applied: " + row.Options?.ToJsonString());
+
+            // Anthropic and Gemini take no strict tools: Run refuses by name, before anything is sent or recorded, and the page says so first.
+            var sent = host.Provider.Requests.Count;
+            var recorded = host.Runs.Count();
+            async Task RefusedOn(string provider, string model, string api)
+            {
+                await runner.SaveSetupAsync(session.Id, setup with { Provider = provider, Model = model });
+                var error = await ThrowsAsync<ArgumentException>(() => runner.RunAsync(session.Id), "strict on " + provider);
+                Check(error.Message.StartsWith($"Strict is on for lookup, and {provider}/{model} cannot take it: ", StringComparison.Ordinal)
+                    && error.Message.Contains(api, StringComparison.Ordinal) && error.Message.Contains("Switch Strict off for it in the tool's editor", StringComparison.Ordinal)
+                    && error.Message.EndsWith("nothing was sent.", StringComparison.Ordinal), $"a clear refusal on {provider}: {error.Message}");
+                var view = host.Pages.View(runner.Get(session.Id));
+                Check(!view.StrictTaken && view.StrictNote is ({ } note, "danger") && note.Contains("Run refuses until you switch Strict off", StringComparison.Ordinal)
+                    && note.Contains(api, StringComparison.Ordinal), $"the tool list says so before Run on {provider}: {view.StrictNote}");
+                Check(view.StrictEditorNote.Contains("cannot take Strict", StringComparison.Ordinal), $"and so does the editor on {provider}: {view.StrictEditorNote}");
+                Equal(sent, host.Provider.Requests.Count, "nothing was sent to " + provider);
+                Equal(recorded, host.Runs.Count(), "nothing was recorded for " + provider);
+            }
+            var claude = ModelOf(catalog, "anthropic", "anthropic-messages");
+            await RefusedOn("anthropic", claude, "Anthropic Messages API");
+            await RefusedOn("google", ModelOf(catalog, "google", "google-generative-ai"), "Gemini API");
+
+            // A strict tool that is switched off is not sent, so it refuses nothing.
+            Check(BenchStrict.Refusal(setup with { Provider = "anthropic", Model = claude, Tools = [lookup with { Enabled = false }, weather] },
+                host.Engine.Capabilities("anthropic", claude)!) is null, "a strict tool that is off is not sent, so it is not refused");
+
+            // Strict off: the same model runs the turn, and nothing strict is sent.
+            await runner.SaveSetupAsync(session.Id, setup with { Provider = "anthropic", Model = claude, Tools = [lookup with { Strict = false }, weather] });
+            var plain = await runner.RunAsync(session.Id);
+            Check(plain is { Refusal: null, Session.State: BenchStates.Running }, "Strict off runs: " + plain.Session.Note);
+            var anthropic = await runner.WhenSettledAsync(session.Id, TimeSpan.FromSeconds(30));
+            Equal(BenchStates.Finished, anthropic.State, "finished on Anthropic: " + anthropic.Note + " " + anthropic.Turns.LastOrDefault()?.Error);
+            var messages = host.Provider.Requests.Last(request => request.Url.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal)).Body!;
+            Check(messages.Contains("\"lookup\"", StringComparison.Ordinal) && !Regex.IsMatch(messages, "\"strict\"\\s*:\\s*true"), "no strict tool on Anthropic: " + messages);
+        }),
+
+        Case("bench.strict.lists-what-openai-strict-mode-asks-of-a-schema", () =>
+        {
+            Equal(0, BenchStrict.Problems(BenchLookup().Parameters).Count, "a schema that fits strict mode");
+            var weather = BenchStrict.Problems(BenchWeather().Parameters);
+            Check(weather is [var extra, var optional] && extra == "parameters: set \"additionalProperties\": false"
+                && optional.StartsWith("parameters: list every property in \"required\" (unit is not)", StringComparison.Ordinal), "the root's two rules: " + string.Join(" | ", weather));
+            var nested = BenchStrict.Problems(JsonNode.Parse("""
+                {"type":"object","additionalProperties":false,"required":["to","tags","any"],"properties":{
+                  "to":{"type":"object","properties":{"city":{"type":"string"},"zip":{"type":"string"}},"required":["city"]},
+                  "tags":{"type":"array","items":{"type":"object","properties":{"k":{"type":"string"}},"required":["k"],"additionalProperties":false}},
+                  "any":{"anyOf":[{"type":"string"},{"type":["object","null"],"properties":{"x":{"type":"number"}},"required":["x"]}]}}}
+                """)!.AsObject());
+            Check(nested is [var to, var zip, var anyOf] && to == "parameters/properties/to: set \"additionalProperties\": false"
+                && zip.StartsWith("parameters/properties/to: list every property in \"required\" (zip is not)", StringComparison.Ordinal)
+                && anyOf == "parameters/properties/any/anyOf/1: set \"additionalProperties\": false", "nested objects, array items and unions: " + string.Join(" | ", nested));
+            Check(BenchStrict.Problems(null) is [var empty] && empty.Contains("additionalProperties", StringComparison.Ordinal), "the empty schema needs additionalProperties false too");
+            Check(BenchStrict.Problems(BenchTemplates.Builtin("read")!.Parameters).Count > 0, "PiSharp's own read declaration does not fit strict mode (optional offset and limit)");
+            Check(BenchSchema.NormalizeTool(new BenchTool { Name = "read", Builtin = true, Strict = true }) is { Strict: true, Builtin: true }, "a built-in may still be sent strict");
+        }),
+
+        Case("bench.strict.page-says-what-the-model-does-and-faux-accepts-it", async () =>
+        {
+            await using var app = await WebAgentApp.StartAsync("bench-strict-page");
+            var setup = BenchSetupJson(autoRespond: true);
+            setup["tools"]![0]!["strict"] = true;
+            var created = await app.SendAsync(HttpMethod.Post, "/api/bench/sessions", new JsonObject
+            {
+                ["setup"] = setup,
+                ["messages"] = new JsonArray("""tool: get_weather {"location":"Oslo"}"""),
+            }, origin: app.Origin);
+            Equal(200, created.Status, "a session: " + created.Text);
+            var id = created.Body!["id"]!.GetValue<string>();
+            Equal(true, created.Body["session"]?["setup"]?["tools"]?[0]?["strict"]?.GetValue<bool>(), "the session keeps Strict");
+
+            var page = (await app.Get("/bench?session=" + id)).Text;
+            CheckShell("/bench strict", page);
+            Check(page.Contains("data-bench-strict=\"get_weather\"", StringComparison.Ordinal) && page.Contains("data-strict-taken=\"true\"", StringComparison.Ordinal), "the strict chip");
+            Check(page.Contains("data-strict-note=\"The faux model accepts Strict offline and does not apply it", StringComparison.Ordinal), "the editor's line for this model");
+            Check(page.Contains("data-bench-strict-note=\"faint\"", StringComparison.Ordinal)
+                && page.Contains("Strict is on for get_weather: the faux model accepts it offline and does not apply it.", StringComparison.Ordinal), "the tool list's line");
+            Check(page.Contains("&quot;strict&quot;: true", StringComparison.Ordinal), "the schema preview shows it");
+            Check(!page.Contains("are not sent yet", StringComparison.Ordinal), "Strict is no longer 'not sent yet' on the bench");
+            Check(page.Contains("<template id=\"bench-strict-note\">", StringComparison.Ordinal) && page.Contains("id=\"tool-strict\"", StringComparison.Ordinal),
+                "the editor's Strict switch and the bench's line for it");
+
+            // The faux model accepts Strict offline: the loop runs, and the turn records Strict as applied.
+            Equal(200, (await app.SendAsync(HttpMethod.Post, $"/api/bench/sessions/{id}/run", new JsonObject(), origin: app.Origin)).Status, "Run");
+            await BenchStateAsync(app, id, BenchStates.Finished);
+            var session = (await app.Get($"/api/bench/sessions/{id}")).Body!["session"]!;
+            var first = session["entries"]!.AsArray().First(entry => entry?["turn"] is not null)!["turn"]!["runId"]!.GetValue<string>();
+            var run = (await app.Get($"/api/runs/{first}")).Body?["run"];
+            Check(run?["options"]?["applied"]?.AsArray().Any(item => item?.GetValue<string>() == RunModelOptions.StrictTools) == true, "Strict applied: " + run?["options"]?.ToJsonString());
+
+            // The tool check: with Strict on, what OpenAI's strict mode would also ask of a valid schema.
+            async Task<JsonNode> CheckTool(JsonNode parameters, bool strict) => (await app.SendAsync(HttpMethod.Post, "/api/bench/tools/check",
+                new JsonObject { ["tool"] = new JsonObject { ["name"] = "t", ["parameters"] = parameters.DeepClone(), ["strict"] = strict } }, origin: app.Origin)).Body!;
+            var loose = await CheckTool(BenchWeather().Parameters!, strict: true);
+            Check(loose["valid"]?.GetValue<bool>() == true && loose["strictProblems"]?.AsArray().Count == 2, "two strict-mode problems: " + loose.ToJsonString());
+            Equal(0, (await CheckTool(BenchWeather().Parameters!, strict: false))["strictProblems"]?.AsArray().Count, "none asked without Strict");
+            Equal(0, (await CheckTool(BenchLookup().Parameters!, strict: true))["strictProblems"]?.AsArray().Count, "none for a schema that fits");
+
+            // The editor's script drives the shared #tool-strict: it sends the flag, shows the problems and puts the bench's line under it.
+            var script = (await app.Get("/js/bench-tools.js")).Text;
+            Check(script.Contains("#tool-strict", StringComparison.Ordinal) && script.Contains("strict: strictOn()", StringComparison.Ordinal)
+                && script.Contains("strictProblems", StringComparison.Ordinal) && script.Contains("bench-strict-note", StringComparison.Ordinal), "bench-tools.js wires Strict");
+            Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
+        }),
     ];
+
+    /// <summary>A lookup tool whose schema fits OpenAI's strict mode (every property required, additionalProperties false).</summary>
+    private static BenchTool BenchLookup() => new()
+    {
+        Name = "lookup",
+        Description = "Look a word up.",
+        Parameters = JsonNode.Parse("""{"type":"object","properties":{"word":{"type":"string"}},"required":["word"],"additionalProperties":false}""")!.AsObject(),
+    };
 
     /// <summary>A get_weather tool: location (required) and unit (c or f).</summary>
     private static BenchTool BenchWeather(params BenchMock[] mocks) => new()
@@ -457,19 +615,51 @@ internal static partial class Program
         private readonly ServiceProvider provider;
         private readonly string? root;
 
-        private BenchHost(ServiceProvider provider, string? root)
+        private BenchHost(ServiceProvider provider, string? root, ProviderFake? fake = null)
         {
             this.provider = provider;
             this.root = root;
+            Provider = fake ?? new ProviderFake();
         }
 
         public IServiceProvider Services => provider;
 
         public BenchRunner Runner => provider.GetRequiredService<BenchRunner>();
 
+        public BenchPages Pages => provider.GetRequiredService<BenchPages>();
+
         public BenchStore Store => provider.GetRequiredService<BenchStore>();
 
         public RunStore Runs => provider.GetRequiredService<RunStore>();
+
+        public RunEngine Engine => provider.GetRequiredService<RunEngine>();
+
+        public IAccountStore Accounts => provider.GetRequiredService<IAccountStore>();
+
+        /// <summary>The fake provider every request goes to (only used by <see cref="Routing"/>).</summary>
+        public ProviderFake Provider { get; }
+
+        /// <summary>Over real routing (not --faux) with <see cref="Provider"/> as every provider request's handler, in a new temporary folder.</summary>
+        public static BenchHost Routing(string name)
+        {
+            var root = Temp(name);
+            var options = new WebAgentOptions { DataDirectory = Path.Join(root, "data") };
+            options.EnsureDirectories();
+            var fake = new ProviderFake();
+            var services = new ServiceCollection().AddLogging();
+            services.AddSingleton(RoutingCredentials(new Dictionary<string, string>(), new FakeOAuth(), root));
+            services.AddSingleton(new RoutingOptions { ProviderHandler = fake, CodexTransport = "sse" });
+            services.AddWebAgentCore(options);
+            services.AddCredentialsArea(options);
+            services.AddRoutingArea(options);
+            services.AddWebAgentFallbacks(options);
+            services.AddSpendArea(options);
+            services.AddRunsArea(options);
+            services.AddBenchArea(options);
+            var provider = services.BuildServiceProvider();
+            provider.GetRequiredService<WebAgentDb>().Migrate();
+            return new BenchHost(provider, root, fake);
+        }
 
         public static BenchHost Faux(string name)
         {

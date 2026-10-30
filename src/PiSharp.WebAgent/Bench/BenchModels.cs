@@ -1,9 +1,10 @@
 // Decision 0011 (run W4, R7): what the Tool Bench keeps. A bench session is one conversation with its setup: the model, thinking, the
-// system prompt, the tools (JSON Schema definitions, each switched on or off, each with saved mock results), the tool choice, the parallel
-// switch and the auto-respond rules. The conversation is the user's messages and the model's turns, in order; each turn is one guarded,
-// recorded run of the run engine (runs.db, source "bench", one group per conversation), and the tool calls it made are kept with their
-// schema check and their result: a mock (auto-respond), a result the user typed, or nothing yet (the bench paused on it). The bench never
-// runs a tool: every result is a mock or the user's text. Sessions are stored as JSON (BenchStore) with SettingsStore.JsonOptions.
+// system prompt, the tools (JSON Schema definitions, each switched on or off, strict or not, each with saved mock results), the tool
+// choice, the parallel switch and the auto-respond rules. The conversation is the user's messages and the model's turns, in order; each
+// turn is one guarded, recorded run of the run engine (runs.db, source "bench", one group per conversation), and the tool calls it made are
+// kept with their schema check and their result: a mock (auto-respond), a result the user typed, or nothing yet (the bench paused on it).
+// The bench never runs a tool: every result is a mock or the user's text. Sessions are stored as JSON (BenchStore) with
+// SettingsStore.JsonOptions.
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
@@ -139,6 +140,12 @@ public sealed record BenchTool
     /// <summary>Whether it is PiSharp's own declaration (read, grep, find, ls, bash, edit, write): read-only, and never run here.</summary>
     public bool Builtin { get; init; }
 
+    /// <summary>Whether the provider must keep the call's arguments to the schema (Strict, <c>constrainedSampling</c>): sent as
+    /// <see cref="Runs.RunTool.Strict"/>, which the run engine sends as <c>strict: true</c> on the OpenAI APIs; a model whose API takes no
+    /// strict tools refuses the turn (<see cref="BenchStrict"/>). Left out of the JSON when off.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Strict { get; init; }
+
     /// <summary>Saved mock results, in match order.</summary>
     public IReadOnlyList<BenchMock> Mocks { get; init; } = [];
 }
@@ -195,6 +202,10 @@ public sealed record BenchSetup
     /// <summary>The enabled tools.</summary>
     [JsonIgnore]
     public IReadOnlyList<BenchTool> Enabled => [.. Tools.Where(tool => tool.Enabled)];
+
+    /// <summary>The enabled tools that are strict.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<BenchTool> EnabledStrict => [.. Tools.Where(tool => tool.Enabled && tool.Strict)];
 
     /// <summary>The tool choice as the select shows it: auto, none, required, any or tool.</summary>
     [JsonIgnore]

@@ -14,7 +14,9 @@
 //   POST /api/bench/sessions/{id}/calls/{call}/result {text, isError?, mock?, continue?, spend?} -> as run.
 //   POST /api/bench/sessions/{id}/stop | /reset       the view.
 //   GET  /api/bench/sessions/{id}/log.json            the call log (attachment).
-//   POST /api/bench/tools/check                       {name, description, parameters} -> {valid, errors, summary, properties, required}.
+//   POST /api/bench/tools/check                       {tool: {name, description, parameters, strict?}} -> {valid, errors, summary, properties,
+//                                                     required, strictProblems} (strictProblems: with strict, what OpenAI's strict mode would
+//                                                     also ask of a valid schema; a warning).
 // Writes are JSON POSTs (HostGuard: same origin, JSON only). Every answer is no-store; errors are {error: {code, message, refused?}} with 400
 // (invalid; an option the model does not take), 404 (no such session or call) or 409 (the state does not allow it: code "conflict").
 using System.Globalization;
@@ -135,7 +137,12 @@ public static class BenchModule
         {
             var tool = Required(body)["tool"] as JsonObject ?? body!;
             var check = BenchSchema.CheckTool(Text(tool, "name"), Text(tool, "description"), tool["parameters"]);
-            return Task.FromResult(Json(new { valid = check.Valid, errors = check.Errors, summary = check.Summary, properties = check.Properties, required = check.Required }));
+            // With Strict on, what OpenAI's strict mode would also ask of a valid schema (a warning: the provider has the last word).
+            IReadOnlyList<string> strict = check.Valid && Flag(tool, "strict") ? BenchStrict.Problems(tool["parameters"] as JsonObject) : [];
+            return Task.FromResult(Json(new
+            {
+                valid = check.Valid, errors = check.Errors, summary = check.Summary, properties = check.Properties, required = check.Required, strictProblems = strict,
+            }));
         }));
         return routes;
     }
