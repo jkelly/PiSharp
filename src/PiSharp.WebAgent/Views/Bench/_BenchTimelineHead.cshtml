@@ -1,0 +1,16 @@
+@* Decision 0011 (run W4, R7): the conversation pane's header: the state chip (finished · stop, paused on a call, running, stopped, error,
+   Spend Guard), "N turns · N tool calls · N s" and Inspect (the last turn's run in the inspector). Model: BenchView. *@
+@model BenchView
+<h2 class="pane-title">Conversation</h2>
+@if (Model.StateChip is { } chip)
+{
+  <span class="ps-chip" data-tone="@chip.Tone">@if (Model.State is BenchStates.Awaiting or BenchStates.Running){<span class="status-dot @(Model.State == BenchStates.Running ? "live" : "warn")"></span>}@chip.Text</span>
+}
+@if (Model.Session.Turns.Count > 0)
+{
+  <span class="fs-8 ps-mono text-ps-faint text-nowrap d-none d-xl-inline">@Model.Summary</span>
+}
+@if (Model.InspectUrl is { } inspect)
+{
+  <a class="btn btn-sm btn-ghost ms-auto text-nowrap" href="@inspect" title="Open the last request in the inspector"><i class="bi bi-braces me-1"></i><span class="d-none d-sm-inline">Inspect</span></a>
+}

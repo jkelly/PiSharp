@@ -1,0 +1,137 @@
+@* Decision 0011 (run W4, R7): the mockups' _BenchToolList: New tool and Templates (examples, and PiSharp's built-ins with their real
+   declarations), one card per tool (its name, description, parameters with * for required, its mocks or "built-in"; the pencil edits it in
+   _ToolEditorModal, the eye shows a built-in read-only; the switch sends it or not), then the tool choice (auto, none, required, any, a
+   specific tool), the parallel switch (what is sent depends on the model's API) and the schema preview of the selected tool. Every change
+   saves the setup. Model: BenchView. *@
+@model BenchView
+@{
+    var setup = Model.Setup;
+    var preview = Model.PreviewTool;
+    var kind = setup.ChoiceKind;
+    var enabled = setup.Enabled;
+}
+<section class="pane pane-alt" aria-label="Tool definitions" data-bench-part="tools">
+  <div class="pane-header">
+    <h2 class="pane-title">Tools</h2>
+    @if (Model.NoTools)
+    {
+      <span class="ps-chip ms-auto">0 tools</span>
+    }
+    else
+    {
+      <span class="ps-chip ms-auto">@Model.EnabledCount of @setup.Tools.Count on</span>
+    }
+  </div>
+  <div class="pane-body p-3 position-relative">
+    <div class="d-flex gap-2 mb-3">
+      <button class="btn btn-sm btn-primary flex-grow-1" type="button" data-bench-new-tool><i class="bi bi-plus-lg me-1"></i>New tool</button>
+      <div class="dropdown flex-grow-1">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-grid me-1"></i>Templates</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><h6 class="dropdown-header">Examples</h6></li>
+          @foreach (var template in BenchTemplates.Examples)
+          {
+            <li><button class="dropdown-item" type="button" data-bench-template="@template.Json"><i class="bi @template.Icon me-2"></i>@template.Label</button></li>
+          }
+          <li><h6 class="dropdown-header">PiSharp built-ins</h6></li>
+          @foreach (var template in BenchTemplates.Builtins)
+          {
+            <li><button class="dropdown-item ps-mono fs-7" type="button" data-bench-template="@template.Json">@template.Label</button></li>
+          }
+        </ul>
+      </div>
+    </div>
+
+    @if (Model.NoTools)
+    {
+      <div class="text-center py-4 px-2">
+        <div class="empty-state p-0">
+          <div class="empty-icon"><i class="bi bi-tools"></i></div>
+        </div>
+        <div class="fw-semibold fs-7 mb-1">No tools defined</div>
+        <p class="fs-8 text-secondary mb-0">Tools you define here are sent with every bench request. Built-ins like <span class="ps-mono">read</span> and <span class="ps-mono">grep</span> are under Templates.</p>
+      </div>
+    }
+    else
+    {
+      var index = 0;
+      foreach (var tool in setup.Tools)
+      {
+        index++;
+        var active = ReferenceEquals(tool, preview);
+        <div class="tool-def@(active ? " active" : "")" aria-current="@(active ? "true" : null)" data-tool-def="@tool.Name" data-tool="@BenchView.ToolJson(tool)" data-definition="@BenchView.Definition(tool)">
+          <div class="d-flex align-items-center gap-1">
+            <span class="tool-def-name text-truncate min-w-0">@tool.Name</span>
+            <button class="btn btn-icon ms-auto p-1" type="button" title="@(tool.Builtin ? "View" : "Edit") @tool.Name" aria-label="@(tool.Builtin ? "View" : "Edit") @tool.Name" data-bench-edit="@tool.Name"><i class="bi @(tool.Builtin ? "bi-eye" : "bi-pencil") fs-8"></i></button>
+            <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="td-@index" checked="@tool.Enabled" data-bench-enable="@tool.Name"><label class="visually-hidden" for="td-@index">Enable @tool.Name</label></div>
+          </div>
+          <div class="tool-def-desc">@tool.Description</div>
+          <div class="d-flex align-items-center gap-2 mt-1">
+            <span class="fs-8 ps-mono text-ps-faint text-truncate min-w-0">@BenchSchema.ParametersLine(tool.Parameters)</span>
+            <span class="ms-auto d-inline-flex gap-1">
+              @if (tool.Builtin)
+              {
+                <span class="ps-chip" data-tone="accent">built-in</span>
+              }
+              @if (tool.Mocks.Count > 0)
+              {
+                <span class="ps-chip" data-tone="info">@tool.Mocks.Count @(tool.Mocks.Count == 1 ? "mock" : "mocks")</span>
+              }
+              else if (!tool.Builtin)
+              {
+                <span class="ps-chip" data-tone="outline">no mocks</span>
+              }
+            </span>
+          </div>
+        </div>
+      }
+
+      <hr class="my-3">
+
+      <div data-bench-choice>
+        <label class="ps-label mb-1" for="toolChoice">toolChoice</label>
+        <select class="form-select form-select-sm ps-mono" id="toolChoice" data-bench-choice-kind>
+          <option value="auto" selected="@(kind == "auto")">auto</option>
+          <option value="none" selected="@(kind == "none")">none</option>
+          <option value="required" selected="@(kind == "required")">required</option>
+          <option value="any" selected="@(kind == "any")">any</option>
+          <option value="tool" selected="@(kind == "tool")" disabled="@(enabled.Count == 0)">specific tool…</option>
+        </select>
+        <div class="fs-8 text-ps-faint mt-1" data-choice-pane="auto" hidden="@(kind != "auto")">The model decides whether to call a tool.</div>
+        <div class="fs-8 text-ps-faint mt-1" data-choice-pane="none" hidden="@(kind != "none")">Tools are sent but the model must answer in text.</div>
+        <div class="fs-8 text-ps-faint mt-1" data-choice-pane="required" hidden="@(kind != "required")">The model must call at least one tool (OpenAI <span class="ps-mono">required</span>).</div>
+        <div class="fs-8 text-ps-faint mt-1" data-choice-pane="any" hidden="@(kind != "any")">The model must call a tool (Anthropic <span class="ps-mono">any</span>; sent as <span class="ps-mono">required</span>, which every API maps to its own).</div>
+        <div class="mt-2" data-choice-pane="tool" hidden="@(kind != "tool")">
+          <label class="form-label fs-8 mb-1" for="toolChoiceName">Tool name <span class="text-ps-faint ps-mono">{type:"tool", name}</span></label>
+          <select class="form-select form-select-sm ps-mono" id="toolChoiceName" data-bench-choice-tool>
+            @foreach (var tool in enabled)
+            {
+              <option value="@tool.Name" selected="@(setup.ToolChoice == tool.Name)">@tool.Name</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="form-check form-switch mt-3 mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="parallelCalls" checked="@setup.Parallel" disabled="@(!Model.ParallelSwitchable && setup.Parallel)" data-bench-parallel>
+        <label class="form-check-label fs-7" for="parallelCalls">Parallel tool calls</label>
+      </div>
+      <div class="fs-8 text-ps-faint">@Model.ParallelNote</div>
+
+      <hr class="my-3">
+
+      @if (preview is not null)
+      {
+        <div class="d-flex align-items-center mb-1">
+          <span class="ps-label">Schema · <span data-bench-schema-name>@preview.Name</span></span>
+          <span class="ps-chip ms-auto" data-tone="outline">read-only</span>
+        </div>
+        <div class="ps-term">
+          <div class="ps-term-bar"><span class="dot"></span><span data-bench-schema-file>@(preview.Name).json</span><button class="btn btn-icon ms-auto" type="button" data-bench-copy="#benchSchemaPreview" title="Copy schema" aria-label="Copy schema"><i class="bi bi-copy"></i></button></div>
+          <pre class="wrap" id="benchSchemaPreview"><code class="language-json" data-bench-schema>@BenchView.Definition(preview)</code></pre>
+        </div>
+        <div class="fs-8 text-ps-faint mt-1"><i class="bi bi-info-circle me-1"></i>Strict arguments (<span class="ps-mono">constrainedSampling</span>) are not sent yet, so arguments can break the schema. The bench checks every call with Pi's argument check.</div>
+      }
+    }
+  </div>
+</section>

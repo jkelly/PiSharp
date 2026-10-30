@@ -1,0 +1,20 @@
+@* Decision 0011 (run W4, R7): the run controls of _BenchToolbar, swapped in on every change: Run (Ctrl+Enter; disabled with the reason,
+   such as "Define a tool first"), or the disabled Running button and Stop (Esc) while a turn runs, or the "Paused · N results pending"
+   chip and Stop while the bench waits for results. Model: BenchView. *@
+@model BenchView
+@switch (Model.State)
+{
+  case BenchStates.Running:
+    <button class="btn btn-sm btn-primary btn-ps" type="button" disabled data-running><span class="spinner-border spinner-border-sm me-1 pg-spinner" aria-hidden="true"></span>Running</button>
+    <button class="btn btn-sm btn-outline-danger" type="button" title="Stop the run (Esc)" data-bench-stop><i class="bi bi-stop-fill me-1"></i>Stop</button>
+    break;
+  case BenchStates.Awaiting:
+    var pending = Model.Pending.Count;
+    <span class="ps-chip" data-tone="warn"><span class="status-dot warn"></span>Paused · @pending @(pending == 1 ? "result" : "results") pending</span>
+    <button class="btn btn-sm btn-outline-danger" type="button" title="Abort the run (Esc)" data-bench-stop><i class="bi bi-stop-fill me-1"></i>Stop</button>
+    break;
+  default:
+    var blocked = Model.RunBlocked;
+    <button class="btn btn-sm btn-primary btn-ps" type="button" title="@(blocked ?? Model.RunTitle)" disabled="@(blocked is not null)" data-bench-run><i class="bi bi-play-fill me-1"></i>Run</button>
+    break;
+}

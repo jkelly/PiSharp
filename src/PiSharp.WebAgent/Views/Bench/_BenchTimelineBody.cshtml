@@ -1,0 +1,193 @@
+@* Decision 0011 (run W4, R7): the conversation pane's body. Empty: "Give the model something to call." with New tool, the templates and a
+   bench preset (Presets wire [data-preset-load]). Otherwise the timeline: user messages (removable while nothing runs), each model turn
+   (turn number, time, duration, stop reason, parallel calls, thinking, its text through the sanitizing MarkdownRenderer, or its error;
+   a running turn streams into [data-bench-stream] by textContent), each tool call (_BenchTimeline's tool card: arguments, Pi's schema
+   check and its violations), then each call's result (auto · mock, manual, auto · no mock matched, isError, its wait) or, while the bench
+   is paused, _AwaitingResultCard. The last turn of a finished conversation carries the totals of every turn. Model: BenchView. *@
+@model BenchView
+@inject MarkdownRenderer Markdown
+@{
+    var session = Model.Session;
+    var removable = Model.State is not (BenchStates.Running or BenchStates.Awaiting);
+    var lastIndex = Model.LastTurn?.Index ?? 0;
+    var waiting = 0;
+    var starters = BenchTemplates.All.Where(template => template.Id is "weather" or "calc" or "read" or "grep").ToList();
+}
+@if (session.Entries.Count == 0)
+{
+  <div class="empty-state py-5">
+    <div class="empty-icon"><i class="bi bi-diagram-3"></i></div>
+    <h3 class="ps-heading fs-2 text-body mb-2">Give the model something to call.</h3>
+    <p class="fs-7 mx-auto mb-4 bench-empty-text">Define a tool with a JSON Schema, write a prompt, and run it. You answer each tool call by hand or let saved mock results answer for you.</p>
+    <div class="d-flex flex-wrap justify-content-center gap-2">
+      <button class="btn btn-primary btn-ps" type="button" data-bench-new-tool><i class="bi bi-plus-lg me-1"></i>@(Model.NoTools ? "Create your first tool" : "New tool")</button>
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-grid me-1"></i>Use a template</button>
+        <ul class="dropdown-menu">
+          @foreach (var template in starters)
+          {
+            <li><button class="dropdown-item" type="button" data-bench-template="@template.Json"><i class="bi @template.Icon me-2"></i>@(template.Builtin ? "PiSharp " + template.Label : template.Label)</button></li>
+          }
+        </ul>
+      </div>
+    </div>
+    <div class="fs-8 ps-mono text-ps-faint mt-4">or <a href="/presets?type=bench" data-preset-load>load a bench preset</a></div>
+  </div>
+}
+else
+{
+  <div class="timeline py-3 pe-3 pe-md-4">
+    @for (var position = 0; position < session.Entries.Count; position++)
+    {
+      var entry = session.Entries[position];
+      if (entry.Kind == "user")
+      {
+        <div class="tl-item tl-user">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <span class="ps-label">user</span><span class="ps-mono fs-8 text-ps-faint">@BenchView.Time(entry.At)</span>
+            @if (removable)
+            {
+              <button class="btn btn-icon p-1 ms-auto" type="button" title="Remove this message and everything after it" aria-label="Remove this message and everything after it" data-bench-remove="@position"><i class="bi bi-x-lg fs-8"></i></button>
+            }
+          </div>
+          <div class="ps-panel px-3 py-2 fs-7 bench-text">@entry.Text</div>
+        </div>
+        continue;
+      }
+      var turn = entry.Turn!;
+      var calls = session.CallsOf(turn.Index);
+      var latest = turn.Index == lastIndex;
+      var tone = turn.Status switch
+      {
+        RunStatus.Completed => turn.StopReason switch { "toolUse" => "info", "stop" or null => "outline", _ => "warn" },
+        RunStatus.Error => "danger",
+        _ => "warn",
+      };
+      <div class="tl-item tl-assistant" data-turn="@turn.Index" data-turn-run="@turn.RunId">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+          <span class="ps-label">assistant</span><span class="ps-mono fs-8 text-ps-faint">turn @turn.Index · @BenchView.Time(turn.Started)@(turn.DurationMs is { } ms ? " · " + BenchView.Number(ms) + " ms" : "")</span>
+          @if (turn.Status == RunStatus.Running)
+          {
+            <span class="ps-chip" data-tone="info"><span class="status-dot live"></span>running</span>
+          }
+          else
+          {
+            <span class="ps-chip" data-tone="@tone">@(turn.Completed ? turn.StopReason ?? "stop" : turn.Status)</span>
+          }
+          @if (calls.Count > 1)
+          {
+            <span class="ps-chip" data-tone="outline"><i class="bi bi-distribute-vertical"></i>@calls.Count parallel calls</span>
+          }
+        </div>
+        @if (!string.IsNullOrEmpty(turn.Thinking))
+        {
+          <details class="thinking mb-0" open="@(latest && calls.Count > 0)">
+            <summary><i class="bi bi-chevron-right"></i><i class="bi bi-lightbulb"></i> Thinking</summary>
+            <div class="thinking-body bench-text">@turn.Thinking</div>
+          </details>
+        }
+        @if (turn.Status == RunStatus.Running)
+        {
+          <div class="d-flex align-items-center gap-2 fs-8 text-ps-faint" data-bench-waiting-model><span class="spinner-border spinner-border-sm pg-spinner" aria-hidden="true"></span>Waiting for the model…</div>
+          <div class="msg-content fs-7 bench-text" data-bench-stream hidden></div>
+        }
+        else if (!string.IsNullOrEmpty(turn.Text))
+        {
+          <div class="msg-content fs-7">@Html.Raw(Markdown.Render(turn.Text))</div>
+        }
+        @if (!turn.Completed && turn.Status != RunStatus.Running && turn.Error is { } error)
+        {
+          <div class="ps-panel p-2 fs-8 mt-1 text-break"><i class="bi bi-exclamation-octagon text-ps-danger me-1"></i>@error</div>
+        }
+        @if (latest && turn.Completed && calls.Count == 0)
+        {
+          <div class="msg-footer">
+            <span title="Input tokens, all turns"><i class="bi bi-arrow-up"></i>@BenchView.Number(Model.Input)</span>
+            <span title="Output tokens, all turns"><i class="bi bi-arrow-down"></i>@BenchView.Number(Model.Output)</span>
+            @if (Model.Cached > 0)
+            {
+              <span title="Cache read tokens"><i class="bi bi-lightning-charge"></i>@BenchView.Number(Model.Cached) cached</span>
+            }
+            @if (Model.CostMicros is { } cost)
+            {
+              <span title="Cost, all turns">@BenchView.Money(cost)</span>
+            }
+            @if (Model.WallMs is { } wall)
+            {
+              <span title="Run duration"><i class="bi bi-stopwatch"></i>@BenchView.Seconds(wall)</span>
+            }
+            <a class="text-ps-faint" href="@Model.InspectUrl"><i class="bi bi-braces"></i>inspect</a>
+          </div>
+        }
+      </div>
+      foreach (var call in calls)
+      {
+        var schema = BenchView.SchemaChip(call);
+        <div class="tl-item tl-call" data-call="@call.Id">
+          <details class="tool-card my-0" open="@latest">
+            <summary class="flex-wrap">
+              <span class="tool-icon@(call.Violations.Count > 0 ? " is-warn" : "")"><i class="bi @BenchTemplates.Icon(call.Tool)"></i></span>
+              <span class="tool-name">@call.Tool</span>
+              <span class="tool-args-summary">@BenchSchema.ArgumentsLine(call.Arguments, call.RawArguments)</span>
+              <span class="ps-chip" data-tone="@schema.Tone"><i class="bi @schema.Icon"></i>@schema.Text</span>
+            </summary>
+            <div class="tool-body">
+              <div class="d-flex flex-wrap gap-3 fs-8 ps-mono text-ps-faint mb-2"><span class="text-break">id @call.Id</span>@if (call.Count > 1){<span>parallel @call.Index of @call.Count</span>}</div>
+              <div class="ps-term"><pre class="wrap"><code class="language-json">@(call.Arguments is null ? call.RawArguments ?? "" : BenchSchema.Indented(call.Arguments))</code></pre></div>
+              @if (call.Violations.Count > 0)
+              {
+                <div class="ps-panel p-2 mt-2 fs-8 bench-violations">
+                  <div class="text-ps-warn fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>@call.Violations.Count schema @(call.Violations.Count == 1 ? "violation" : "violations")</div>
+                  @foreach (var violation in call.Violations)
+                  {
+                    <div class="ps-mono text-break"><span class="text-ps-faint">@violation.Path</span> @violation.Message</div>
+                  }
+                </div>
+              }
+            </div>
+          </details>
+        </div>
+      }
+      foreach (var call in calls)
+      {
+        if (call.Result is { } result)
+        {
+          var chip = BenchView.ResultChip(result);
+          <div class="tl-item tl-result" data-result="@call.Id">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <span class="ps-label">tool result</span><span class="ps-mono fs-8 text-ps-faint text-break">@call.Tool · @call.Id</span>
+              @if (result.IsError)
+              {
+                <span class="ps-chip" data-tone="danger">isError</span>
+              }
+              <span class="ps-chip" data-tone="@chip.Tone">@if (chip.Icon is { } icon){<i class="bi @icon"></i>}@chip.Text</span>
+              <span class="ps-mono fs-8 text-ps-faint">@BenchView.Number(result.Ms) ms</span>
+            </div>
+            <div class="ps-term"><pre class="wrap"><code class="language-json">@BenchSchema.Pretty(result.Text)</code></pre></div>
+          </div>
+        }
+        else if (call.Skipped)
+        {
+          <div class="tl-item tl-result is-skipped" data-result="@call.Id">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="ps-label">tool result</span><span class="ps-mono fs-8 text-ps-faint text-break">@call.Tool · @call.Id</span>
+              <span class="ps-chip" data-tone="outline">none · the run was stopped</span>
+            </div>
+          </div>
+        }
+        else if (Model.State == BenchStates.Awaiting)
+        {
+          waiting++;
+          <partial name="~/Views/Bench/_AwaitingResultCard.cshtml" model="new BenchCallView(Model, call, waiting)" />
+        }
+      }
+    }
+  </div>
+  @if (session.Note is { } note)
+  {
+    var noteIcon = Model.State switch { BenchStates.Error => "bi-exclamation-octagon text-ps-danger", BenchStates.Blocked => "bi-shield-exclamation text-ps-warn", BenchStates.Stopped => "bi-stop-circle text-ps-warn", _ => "bi-info-circle" };
+    <div class="px-3 pb-3 ps-md-4 pe-md-4">
+      <div class="ps-panel p-2 fs-8 text-secondary text-break" role="status" data-bench-note><i class="bi @noteIcon me-1"></i>@note</div>
+    </div>
+  }
+}

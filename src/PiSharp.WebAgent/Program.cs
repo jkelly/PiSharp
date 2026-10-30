@@ -46,6 +46,8 @@ builder.Services.AddRunsArea(options);
 PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.AddAgentCompareRunner(builder.Services, options);
 // Playground (run W4, R1): GET /playground and /api/playground (the estimate by Run, View code, a model's options and account).
 PiSharp.WebAgent.Playground.PlaygroundModule.AddPlaygroundArea(builder.Services, options);
+// Tool Bench (run W4, R7): GET /bench and /api/bench (tool calls paused for manual or mock results; a turn is a guarded run; never runs a tool).
+PiSharp.WebAgent.Bench.BenchModule.AddBenchArea(builder.Services, options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -60,6 +62,7 @@ app.MapCustomProvidersArea();
 app.MapRunsArea();
 PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.MapAgentCompareRunner(app);
 PiSharp.WebAgent.Playground.PlaygroundModule.MapPlaygroundArea(app);
+PiSharp.WebAgent.Bench.BenchModule.MapBenchArea(app);
 app.MapWebAgentCore();
 app.Run();
 return 0;
