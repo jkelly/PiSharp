@@ -5,7 +5,8 @@
 // engine as one group (RunEngine.StartGroupAsync: the Spend Guard reserves the columns all or none; a refusal answers {posted: false} with
 // the confirm modal's content, and the user's choice comes back as a one-time approval of the group), and stores the group. A re-run sends
 // one column again into its group (its own reservation, recorded under the group's run). The estimate is the Spend Guard's preflight of
-// each column (CompareEstimate). Accounts are resolved as the run engine resolves them and named by their labels only.
+// each column (CompareEstimate). Accounts are resolved as the run engine resolves them and named by their labels only; a column may name one
+// of its provider's accounts (W4 fix 2: the overrides' account choice, and a preset's), else it runs on the provider's active account.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Web.Common;
@@ -274,6 +275,7 @@ public sealed class ComparePages(IServiceProvider services, ILogger<ComparePages
             {
                 Provider = row.Provider,
                 Model = row.Model,
+                Account = spec?.Account,
                 Thinking = spec?.ThinkingLevel != shared.Thinking ? spec?.Thinking ?? "off" : null,
                 Temperature = spec?.Temperature != shared.Temperature ? spec?.Temperature : null,
             };
@@ -315,8 +317,12 @@ public sealed class ComparePages(IServiceProvider services, ILogger<ComparePages
     {
         var catalogModel = Catalog?.FindModel(column.Provider, column.Model);
         var provider = Catalog?.FindProvider(column.Provider);
+        // W4 fix 2: the provider's accounts for the overrides' account choice (none offline); a preset or the user may name one.
+        var accounts = RequestAccounts.List(services, column.Provider, capabilities?.Offline == true, log);
         return new CompareColumnView
         {
+            Accounts = accounts,
+            ActiveLabel = accounts.FirstOrDefault(account => account.Active)?.Label,
             Key = key,
             Column = column,
             Shared = shared.Shared,

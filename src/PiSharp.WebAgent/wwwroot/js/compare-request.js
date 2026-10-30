@@ -7,7 +7,10 @@
 // (Provider → Model); a new model resets the column and keeps its overrides (one the model does not take stays in the form, not sent).
 // Re-run sends one column again into its group (POST /api/compare/groups/{id}/rerun), Stop this column cancels its run, Stop all (Esc)
 // cancels the group's. The estimate by Run all and the columns' chips follow the draft (POST /api/compare/plan, debounced). Sync scroll
-// keeps the columns' scroll positions in step. Tooltips start lazily on hover or focus.
+// keeps the columns' scroll positions in step. Tooltips start lazily on hover or focus. W4 fix 2: a column may name one of its provider's
+// accounts (the overrides' account choice; none: the provider's active account), kept when its new model has the same provider; and
+// applyDraft loads a draft in place (Presets), with no page load: the shared request's parts and, with the model part, fresh columns (the
+// comparison shown so far leaves the page and stays in History; the next Run all starts a new group).
 import { showToast, providerModelValue } from './shell.js';
 import { showSpendConfirm } from './spend-confirm.js';
 import { postRequest, getFragment, copyText, RequestError } from './request-api.js';
@@ -55,19 +58,45 @@ function shared() {
   };
 }
 
+// The column's account: its choice when the overrides offer one, else the account it was rendered with (none: the active account).
+function columnAccount(column) {
+  const select = $('[data-override="account"]', column);
+  return (select ? select.value : column.dataset.account) || null;
+}
+
 function columnDraft(column) {
   const thinking = $('[data-override="thinking"]', column)?.value || null;
   const temperature = $('[data-override="temperature"]', column);
-  return {
+  const draft = {
     provider: column.dataset.provider,
     model: column.dataset.model,
     thinking,
     temperature: temperature && !temperature.disabled ? number(temperature, false) : null,
   };
+  const account = columnAccount(column);
+  if (account) draft.account = account;
+  return draft;
+}
+
+// The chip and data-account follow the column's account choice.
+function accountChanged(column, select) {
+  if (!column) return;
+  const account = select.value;
+  if (account) column.dataset.account = account; else delete column.dataset.account;
+  const chip = $('[data-col-account]', column);
+  if (!chip) return;
+  $('[data-col-account-label]', chip).textContent = account ? select.selectedOptions[0]?.dataset.label || account : '';
+  chip.hidden = !account;
 }
 
 function draft() {
   return { ...shared(), columns: columns().map(columnDraft) };
+}
+
+/** The page's draft as Run all sends it (Presets saves it). Throws an Error for a number that does not parse. */
+export function compareDraft() {
+  if (!host || !prompt || !grid) throw new Error('Compare is not ready yet.');
+  return draft();
 }
 
 // ---- layout -------------------------------------------------------------------------------------------------------------------
@@ -501,15 +530,17 @@ function nextKey() {
   for (let index = 1; ; index++) if (!used.has(`c${index}`)) return `c${index}`;
 }
 
-async function columnFragment({ provider, model, key, thinking, temperature, count }) {
+// A column that has not run, from the server. `inGroup` false: under the page's shared options, outside the group shown (a fresh comparison).
+async function columnFragment({ provider, model, key, thinking, temperature, account, count }, { inGroup = true } = {}) {
   const values = (() => { try { return shared(); } catch { return {}; } })();
   const query = new URLSearchParams({ provider, model, key, count: String(count) });
+  if (account) query.set('account', account);
   if (thinking) query.set('thinking', thinking);
   if (temperature !== null && temperature !== undefined && temperature !== '') query.set('temperature', String(temperature));
   if (values.thinking) query.set('sharedThinking', values.thinking);
   if (values.temperature !== null && values.temperature !== undefined) query.set('sharedTemperature', String(values.temperature));
   if (values.maxTokens) query.set('sharedMaxTokens', String(values.maxTokens));
-  if (group) query.set('group', group);
+  if (group && inGroup) query.set('group', group);
   return getFragment('/compare/column?' + query.toString());
 }
 
@@ -523,7 +554,9 @@ async function chooseModel(provider, model) {
       // A new model resets the column (its answer was another model's) and keeps the overrides; one it does not take is kept, not sent.
       const thinking = $('[data-override="thinking"]', column)?.value || column.dataset.keptThinking || null;
       const temperature = $('[data-override="temperature"]', column)?.value ?? '';
-      const fresh = await columnFragment({ provider, model, key: column.dataset.key, thinking, temperature, count: columns().length });
+      // An account belongs to its provider: kept for another model of the same provider, else the new provider's active account.
+      const account = provider === column.dataset.provider ? columnAccount(column) : null;
+      const fresh = await columnFragment({ provider, model, key: column.dataset.key, thinking, temperature, account, count: columns().length });
       if (!fresh) return;
       const replaces = column.dataset.runId || column.dataset.replaces;
       if (replaces) fresh.dataset.replaces = replaces;
@@ -584,6 +617,82 @@ async function copyTable(button) {
   else toast('Not copied', 'The browser did not allow the clipboard.', 'warn');
 }
 
+// ---- a draft loaded in place (Presets) ------------------------------------------------------------------------------------------
+
+// The comparison shown so far leaves the page (it stays in History): no group, an empty Metrics tab, nothing waiting on the Spend Guard.
+async function leaveGroup() {
+  for (const stream of streams.values()) stream.close();
+  streams.clear();
+  group = null;
+  delete host.dataset.group;
+  hideOvercap();
+  try {
+    const metrics = await getFragment('/compare/metrics');
+    if (metrics) metricsHost.replaceChildren(metrics);
+  } catch { /* the Metrics tab refreshes on the next Run all */ }
+  setStatus('Not run yet');
+}
+
+/**
+ * Loads `next` (a Compare draft: {systemPrompt, prompt, thinking, maxTokens, temperature, columns: [{provider, model, account, thinking,
+ * temperature}]}) into the page in place, with no page load. Only `parts` change: 'systemPrompt', 'messages' (the prompt), 'parameters'
+ * (the shared thinking, max tokens and temperature) and 'model' (the columns, each with its account and overrides; fewer than two replace
+ * the first column and keep the others). With the model part every column is a fresh one that has not run, so the comparison shown so far
+ * leaves the page (it stays in History) and the next Run all starts a new group. Refused while Run all starts or a column streams.
+ * Returns { notes: what could not be set, fresh: whether the page now shows a new comparison }.
+ */
+export async function applyDraft(next, parts = []) {
+  if (!host || !prompt || !grid) throw new Error('Compare is not ready yet.');
+  if (busy || streaming()) throw new Error('A comparison is running: stop it (Esc) before loading a preset.');
+  const has = (part) => parts.includes(part);
+  const source = next ?? {};
+  const notes = [];
+  // The columns first: nothing on the page changes until every new column has come back.
+  let built = null;
+  if (has('model') && Array.isArray(source.columns) && source.columns.length > 0) {
+    const kept = source.columns.length >= minColumns() ? [] : columns().slice(1).map(columnDraft);
+    const wanted = [...source.columns, ...kept].slice(0, maxColumns());
+    if (source.columns.length > maxColumns()) notes.push(`Compare runs at most ${maxColumns()} models: the first ${maxColumns()} columns are loaded.`);
+    built = [];
+    for (const [index, column] of wanted.entries()) {
+      const element = await columnFragment({ ...column, key: `c${index + 1}`, count: wanted.length }, { inGroup: false });
+      if (!element) throw new Error(`The ${column.provider}/${column.model} column could not be loaded.`);
+      built.push(element);
+    }
+  }
+  if (has('systemPrompt')) {
+    const system = $('[data-compare-system]', prompt);
+    system.value = source.systemPrompt ?? '';
+    const collapse = document.getElementById('cmpSystem');
+    if (system.value && collapse && window.bootstrap) window.bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false }).show();
+  }
+  if (has('messages')) $('[data-compare-text]', prompt).value = source.prompt ?? '';
+  if (has('parameters')) {
+    const thinking = $('[data-shared="thinking"]', prompt);
+    const level = source.thinking ?? 'off';
+    if (thinking && [...thinking.options].some((option) => option.value === level)) thinking.value = level;
+    else if (thinking) notes.push(`Compare's shared thinking has no "${level}" level, so it stays ${thinking.value}.`);
+    const max = $('[data-shared="maxTokens"]', prompt);
+    if (max) max.value = source.maxTokens ?? '';
+    const temperature = $('[data-shared="temperature"]', prompt);
+    if (temperature) temperature.value = source.temperature ?? '';
+  }
+  if (built) {
+    if (group) await leaveGroup();
+    for (const column of columns()) {
+      disposeTooltips(column);
+      column.remove();
+    }
+    const add = $('[data-compare-add]', grid);
+    for (const element of built) grid.insertBefore(element, add);
+    pickerTarget = null;
+  }
+  sharedChanged();
+  layout();
+  schedulePlan();
+  return { notes, fresh: !group };
+}
+
 // ---- wiring -------------------------------------------------------------------------------------------------------------------
 
 export function initCompareRequest(root) {
@@ -607,6 +716,7 @@ export function initCompareRequest(root) {
     }
   });
   grid.addEventListener('change', (event) => {
+    if (event.target.matches('[data-override="account"]')) accountChanged(event.target.closest('[data-compare-col]'), event.target);
     if (event.target.matches('[data-override]')) schedulePlan();
   });
   grid.addEventListener('input', (event) => {

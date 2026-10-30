@@ -5,7 +5,10 @@
    (ComparePlanner: "temperature n/a", "thinking xhigh → high"), subscription, then the run's state (its stop reason, streaming, stopped,
    error). Body: nothing yet, the text so far (plain text with the cursor; compare.js appends the live deltas with textContent), the answer
    as Markdown through the sanitizing MarkdownRenderer, or the error card (Fix for an account error, Retry, the stored response body). Foot:
-   the run row's own figures. Element ids carry the column's key. Model: CompareColumnView. *@
+   the run row's own figures. Element ids carry the column's key. W4 fix 2: the overrides offer the column's account (the provider's active
+   account, or one of its accounts by id and label; shown when the provider has two accounts or more, or the column names one), the section
+   carries it (data-account) and a chip names a chosen one, so a preset's account loads here instead of being ignored. Model:
+   CompareColumnView. *@
 @model CompareColumnView
 @inject MarkdownRenderer Markdown
 @{
@@ -23,7 +26,7 @@
     var kind = Model.AccountError ? "Account" : Model.Error?.Kind is "Error" or null ? "Provider" : Model.Error.Kind;
     var aria = label + (Model.Best ? ", marked best" : "") + (streaming ? ", streaming" : "");
 }
-<section class="compare-col@(Model.Best ? " is-best" : "")" aria-label="@aria" data-compare-col data-key="@k" data-provider="@column.Provider" data-model="@column.Model" data-name="@Model.Name" data-state="@state" data-run-id="@run?.Id" data-group="@Model.GroupId" data-last-seq="@Model.Output.LastSeq" data-started="@((run?.Started ?? run?.Created)?.ToUnixTimeMilliseconds())" data-kept-thinking="@Model.KeptThinking" data-best="@(Model.Best ? "true" : "false")">
+<section class="compare-col@(Model.Best ? " is-best" : "")" aria-label="@aria" data-compare-col data-key="@k" data-provider="@column.Provider" data-model="@column.Model" data-account="@column.Account" data-name="@Model.Name" data-state="@state" data-run-id="@run?.Id" data-group="@Model.GroupId" data-last-seq="@Model.Output.LastSeq" data-started="@((run?.Started ?? run?.Created)?.ToUnixTimeMilliseconds())" data-kept-thinking="@Model.KeptThinking" data-best="@(Model.Best ? "true" : "false")">
   <div class="compare-col-head">
     <button class="model-chip" type="button" title="Change model" aria-label="Change the model of @label" data-col-model disabled="@streaming">
       <span class="status-dot @dot"></span>
@@ -36,6 +39,16 @@
         <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Overrides for this column" aria-label="Overrides for @Model.Name" disabled="@(streaming || !Model.Known)"><i class="bi bi-sliders"></i></button>
         <div class="dropdown-menu dropdown-menu-end p-3 cmp-overrides">
           <div class="ps-label mb-2">Overrides · this column</div>
+          @if (Model.AccountChoice)
+          {
+            <label class="form-label fs-8 ps-mono mb-1" for="cmp-@(k)-account">account</label>
+            <select class="form-select form-select-sm mb-2" id="cmp-@(k)-account" data-override="account">
+              @foreach (var option in Model.AccountOptions)
+              {
+                <option value="@option.Value" selected="@option.Selected" disabled="@option.Disabled" data-label="@option.Label">@option.Text</option>
+              }
+            </select>
+          }
           <label class="form-label fs-8 ps-mono mb-1" for="cmp-@(k)-thinking">thinking</label>
           <select class="form-select form-select-sm ps-mono mb-2" id="cmp-@(k)-thinking" data-override="thinking">
             <option value="" selected="@(column.Thinking is null)" data-inherit>inherit (@Model.SharedThinking)</option>
@@ -69,6 +82,7 @@
       {
         <span class="ps-chip" data-tone="ok" data-chip="fastest" title="The shortest total time of the completed columns"><i class="bi bi-lightning-charge-fill"></i>fastest</span>
       }
+      <span class="ps-chip" data-tone="outline" data-chip="account" title="Runs on this account, not the provider's active one" data-col-account hidden="@(Model.AccountLabel is null)"><i class="bi bi-person"></i><span data-col-account-label>@Model.AccountLabel</span></span>
       <span class="cmp-chip-group" data-col-draft-chips>
         @foreach (var chip in Model.Chips)
         {
