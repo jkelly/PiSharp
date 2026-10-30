@@ -1,0 +1,11 @@
+@* Decision 0011 (run W5, E6): a model as the Evals tables show it (mockups _LeaderboardTable, _SuiteTargets, _DriftSuite): the provider's
+   logo, then "provider/" faint and the model in mono (a word break between them), and its settings line ("thinking medium", "default
+   settings"). Model: EvalModelView. *@
+@model EvalModelView
+<div class="d-flex align-items-center gap-2">
+  <partial name="/Views/Settings/_ProviderLogo.cshtml" model='new LogoModel(Model.ProviderName, Model.LogoUrl, "sm")' />
+  <div class="eval-model-text">
+    <div class="ps-mono fs-7"><span class="text-ps-faint text-nowrap">@Model.Prefix</span><wbr><span class="text-nowrap">@Model.Model</span></div>
+    <div class="fs-8 text-ps-faint">@Model.Settings</div>
+  </div>
+</div>

@@ -1,0 +1,61 @@
+/* Decision 0011 (run W5, E6): the Evals pages (Views/Evals), the mockups' page-specific styles (evals-leaderboard, evals-suites,
+   evals-suite, evals-run, evals-drift) folded in. Colours are the theme's tokens only, so both themes work; nothing here scrolls the page
+   sideways at 375px (tables scroll inside .ps-table-wrap, the tabs inside their own row). */
+
+/* The pages and modals hide parts with the hidden attribute (panes, the rename form, the try line); Bootstrap's display utilities
+   (d-flex) are !important, so hidden has to win over them here. */
+[data-evals] [hidden], [data-eval-modal] [hidden] { display: none !important; }
+
+/* _EvalsTabs */
+.section-tabs { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; margin-bottom: 1rem; }
+.section-tabs .nav-link { white-space: nowrap; }
+
+.provider-logo.xs { width: 22px; height: 22px; border-radius: 6px; font-size: .55rem; }
+
+.eval-min-0, .eval-model-text, .suite-target { min-width: 0; }
+.eval-prose { max-width: 68ch; }
+.eval-empty-text { max-width: 54ch; }
+.eval-notice-text { min-width: min(12rem, 100%); }
+.eval-menu-meta { color: var(--ps-faint); white-space: nowrap; }
+.dropdown-item.active .eval-menu-meta, .dropdown-item:active .eval-menu-meta { color: inherit; }
+.eval-rename-input { max-width: 20rem; }
+.eval-time-input { max-width: 10rem; }
+.eval-cap-input { max-width: 12rem; }
+.eval-kind-select { max-width: 20rem; }
+
+/* _LeaderboardTable */
+.lb-table td { vertical-align: middle; }
+.lb-rank-col { width: 4.5rem; }
+.lb-rank { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ci-track { position: relative; width: 6.5rem; height: 4px; margin: .4rem 0 0 auto; border-radius: 999px; background: var(--ps-surface-3); }
+.ci-track > span { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--ps-faint); }
+.ci-track > i { position: absolute; top: -3px; width: 2px; height: 10px; margin-left: -1px; border-radius: 1px; background: var(--ps-text); }
+
+/* _SuiteTargets, _SuiteCases */
+.case-table td, .target-table td { vertical-align: middle; }
+.case-name { max-width: 18rem; }
+.check-link {
+  border: 0; background: transparent; padding: 0; color: var(--ps-muted); font-size: .78rem;
+  text-decoration: underline dotted var(--ps-border-strong); text-underline-offset: 3px;
+}
+.check-link:hover, .check-link:focus-visible { color: var(--ps-text); }
+
+/* _RunGrid */
+.eval-grid > :not(caption) > * > :first-child { position: sticky; left: 0; z-index: 1; background-color: var(--ps-surface); }
+@media (max-width: 575.98px) { .eval-grid > :not(caption) > * > :first-child { max-width: 9rem; } }
+.eval-grid > :not(caption) > * > * { vertical-align: top; }
+.eval-grid tbody th { font-weight: 400; }
+.eval-grid tfoot th, .eval-grid tfoot td { font-size: .78rem; color: var(--ps-muted); font-weight: 400; }
+.eval-cell {
+  display: block; margin: -.3rem -.45rem; padding: .3rem .45rem; border-radius: 10px; color: inherit; text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+a.eval-cell:hover, a.eval-cell:focus-visible { background: var(--ps-hover); color: inherit; }
+.eval-dots { display: inline-flex; align-items: center; gap: .25rem; vertical-align: middle; }
+.eval-dots .status-dot { width: .55rem; height: .55rem; }
+.status-dot.pending { background: transparent; box-shadow: inset 0 0 0 1px var(--ps-border-strong); }
+
+/* _DriftSuite */
+.drift-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem 1rem; padding: .9rem 1rem; }
+.drift-row + .drift-row { border-top: 1px solid var(--ps-border); }
+.drift-text { flex: 1 1 16rem; min-width: 0; }

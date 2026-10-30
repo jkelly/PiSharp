@@ -1,0 +1,32 @@
+@* Decision 0011 (run W5, E6): Evals › Suites › suite › Run #n (GET /evals/runs/{id}), after the mockups' evals-run.html, states default (a
+   finished run) and running (cells fill in as answers finish: the page polls GET /evals/runs/{id}/live, which renders _RunLive, and
+   swaps it in until the run ends). _RunLive is _EvalRunHeader, a notice per drift signal the run raised (with the run that saw it first
+   when this run confirms it) and _RunGrid. Set as baseline opens _BaselineModal on this run. Model: RunPage. *@
+@model RunPage
+@{
+    ViewData["Title"] = Model.Title + " · " + Model.Suite.Name;
+    ViewData[ShellViewData.Nav] = ShellNav.Evals;
+    ViewData[ShellViewData.Page] = "evals-run";
+}
+@section Styles { <link href="~/css/evals.css" rel="stylesheet" asp-append-version="true" /> }
+@section TopbarStart
+{
+  <nav class="app-breadcrumb" aria-label="Breadcrumb">
+    <a class="d-none d-sm-inline" href="@EvalRoutes.Leaderboard">Evals</a>
+    <span class="d-none d-sm-inline" aria-hidden="true">›</span>
+    <a class="d-none d-sm-inline" href="@EvalRoutes.Suites">Suites</a>
+    <span class="d-none d-sm-inline" aria-hidden="true">›</span>
+    <a class="text-truncate" href="@EvalRoutes.Suite(Model.Suite.Id)">@Model.Suite.Name</a>
+    <span aria-hidden="true">›</span>
+    <h1 class="app-title current fs-7 mb-0 text-nowrap">@Model.Title</h1>
+  </nav>
+}
+@section Modals
+{
+  <partial name="_BaselineModal" model="null" />
+  <partial name="/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
+}
+@section Scripts { <script type="module" src="~/js/evals.js" asp-append-version="true"></script> }
+<div class="page" data-evals="run" data-run-id="@Model.Run.Id" data-suite-id="@Model.Suite.Id">
+  <partial name="_RunLive" model="Model" />
+</div>

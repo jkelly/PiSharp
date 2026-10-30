@@ -1,0 +1,98 @@
+@* Decision 0011 (run W5, E6): the mockups' _SuiteTargets: "3 of up to 6", Add target (a collapse with _ProviderModelSelect "st": Provider
+   then Model; the target runs on that provider's active account), and a row per target: the model and its settings, its account and how
+   it is billed, its worst case per run (list price for a subscription), its drift (the worst open signal, linking to Drift Watch) and
+   Remove. The judge line says what the suite's LLM judges add. A target is its provider, model, account and settings. The suite's targets
+   travel as data-targets JSON so the page can post the whole list back. Model: SuitePage. *@
+@model SuitePage
+@{
+    var suite = Model.Suite;
+    var perTarget = Model.Overview.Cases * suite.K;
+}
+<section class="mb-4" aria-labelledby="targetsTitle" data-suite-targets data-targets="@Model.TargetsJson">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <h3 class="fs-6 fw-semibold mb-0" id="targetsTitle">Targets</h3>
+    <span class="fs-8 text-ps-faint">@suite.Targets.Count.ToString(CultureInfo.InvariantCulture) of up to @Suite.MaxTargets.ToString(CultureInfo.InvariantCulture)</span>
+    @if (Model.CanAddTarget)
+    {
+      <button class="btn btn-sm btn-ghost ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#addTarget" aria-expanded="false" aria-controls="addTarget"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add target</button>
+    }
+  </div>
+  @if (Model.CanAddTarget)
+  {
+    <div class="collapse" id="addTarget">
+      <form class="ps-card p-3 mb-2" data-add-target>
+        <partial name="_ProviderModelSelect" model="Model.AddTarget" />
+        <div class="form-text">Runs on the provider's active account. Adds @EvalText.Plural(perTarget, "answer", "answers") per run (@EvalText.Plural(Model.Overview.Cases, "case", "cases") × k @suite.K.ToString(CultureInfo.InvariantCulture)); the new worst case shows on the page once it is added.</div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button class="btn btn-sm btn-primary" type="submit">Add target</button>
+          <button class="btn btn-sm btn-ghost" type="button" data-bs-toggle="collapse" data-bs-target="#addTarget">Cancel</button>
+        </div>
+      </form>
+    </div>
+  }
+  @if (Model.Targets.Count == 0)
+  {
+    <div class="ps-panel p-3 fs-7 text-secondary" data-no-targets>No target yet. Add the models this suite should run on: 2 to 6 make a useful comparison.</div>
+  }
+  else
+  {
+    <div class="ps-table-wrap">
+      <table class="table align-middle target-table">
+        <thead>
+          <tr>
+            <th scope="col">Target</th>
+            <th scope="col" class="d-none d-md-table-cell">Account</th>
+            <th scope="col" class="text-end" title="Expected worst case per run">Worst</th>
+            <th scope="col">Drift</th>
+            <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var target in Model.Targets)
+          {
+            <tr data-target-row="@target.Target.Id">
+              <td><partial name="_EvalModel" model="target.Model" /></td>
+              <td class="d-none d-md-table-cell"><div class="fs-7">@target.Account</div><div class="fs-8 text-ps-faint">@(target.Billing is { } billing ? EvalText.Billing(billing) : "—")</div></td>
+              <td class="text-end text-nowrap ps-mono fs-7">
+                @if (target.RunMicros is not { } micros)
+                {
+                  <span class="text-ps-faint" title="No case to estimate yet">—</span>
+                }
+                else if (target.Billing == BillingKind.Subscription)
+                {
+                  <text>@EvalText.ListMoney(micros) <span class="fs-8 text-ps-faint">list</span></text>
+                }
+                else if (target.Billing == BillingKind.Unknown)
+                {
+                  <span class="text-ps-faint" title="No known price: Spend Guard asks before each run until you enter one">unknown</span>
+                }
+                else
+                {
+                  <text>@EvalText.Money(micros)</text>
+                }
+              </td>
+              <td class="text-nowrap">
+                @if (target.Level == DriftLevel.Ok && !Model.Overview.Baselines.Any(baseline => baseline.TargetId == target.Target.Id))
+                {
+                  <span class="fs-8 text-ps-faint" title="Set a baseline to compare later runs with" data-no-baseline>no baseline</span>
+                }
+                else
+                {
+                  <a class="text-reset text-decoration-none" href="@EvalRoutes.Drift">
+                    <span class="ps-chip" data-tone="@EvalText.Tone(target.Level)" title="@EvalText.LevelTitle(target.Level)">@EvalText.Level(target.Level)</span>
+                    @if (target.Note is { } note)
+                    {
+                      <span class="d-block fs-8 text-ps-faint mt-1">@note</span>
+                    }
+                  </a>
+                }
+              </td>
+              <td class="text-end"><button class="btn btn-icon" type="button" data-remove-target="@target.Target.Id" data-target-name="@target.Model.Name" aria-label="Remove @target.Model.Name from the suite" title="Remove target"><i class="bi bi-x-lg fs-8" aria-hidden="true"></i></button></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+  <div class="fs-8 text-ps-faint mt-2">@(Model.JudgeText is { } judge ? judge + " " : "")A target is its provider, model, account and settings.</div>
+</section>
