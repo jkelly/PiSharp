@@ -58,8 +58,10 @@ public sealed partial class SpendPages
         var now = Now;
         var reserved = row.CountedMicros;
         var estimate = row.EstimateMicros ?? row.ReservedMicros ?? 0;
+        var reported = row.ReportedMicros;
         var counted = new List<string>();
         var afterEstimate = new List<string>();
+        var afterReported = new List<string>();
         var afterRelease = new List<string>();
         foreach (var status in await ledger.CapStatusAsync(row.Run, cancellationToken).ConfigureAwait(false))
         {
@@ -73,6 +75,7 @@ public sealed partial class SpendPages
             counted.Add(name);
             var limit = SpendMoney.Format(cap.LimitMicros);
             afterEstimate.Add($"{name} {SpendMoney.Format(Math.Max(0, spent - reserved + estimate))} of {limit}");
+            if (reported is { } cost) afterReported.Add($"{name} {SpendMoney.Format(Math.Max(0, spent - reserved + cost))} of {limit}");
             afterRelease.Add($"{name} {SpendMoney.Format(Math.Max(0, spent - reserved))} of {limit}");
         }
         var shown = LedgerRow(row, now);
@@ -96,6 +99,12 @@ public sealed partial class SpendPages
                 ? "No estimate was recorded for this request, so it settles at the reserved worst case."
                 : "The input and the output received before the stream dropped, at this model's price.",
             AfterEstimate = afterEstimate.Count == 0 ? null : "After settling: " + string.Join(" · ", afterEstimate) + ".",
+            ReportedMicros = reported,
+            ReportedText = row.Usage is { } usage
+                ? $"The request was sent again after a restart and that answer reported {SpendEstimateText.Tokens(usage.InputTokens)} input and " +
+                  $"{SpendEstimateText.Tokens(usage.OutputTokens)} output tokens."
+                : null,
+            AfterReported = afterReported.Count == 0 ? null : "After settling: " + string.Join(" · ", afterReported) + ".",
             AfterRelease = afterRelease.Count == 0 ? null : "After releasing: " + string.Join(" · ", afterRelease) + ".",
         };
     }
@@ -502,6 +511,16 @@ public sealed record ResolveReservationView
     public required string EstimateText { get; init; }
 
     public string? AfterEstimate { get; init; }
+
+    /// <summary>What the usage the provider reported for the row costs (a recovered request's resend), or null when nothing was reported:
+    /// the modal then offers no "settle at the reported cost".</summary>
+    public long? ReportedMicros { get; init; }
+
+    /// <summary>What was reported, in words, or null.</summary>
+    public string? ReportedText { get; init; }
+
+    /// <summary>What settling at the reported cost counts.</summary>
+    public string? AfterReported { get; init; }
 
     public string? AfterRelease { get; init; }
 }

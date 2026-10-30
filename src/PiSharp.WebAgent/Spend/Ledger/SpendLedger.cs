@@ -6,7 +6,8 @@
 // writes the row only when it fits every Block cap and every Ask cap was approved; reaching the limit exactly fits. A group reserves all
 // or nothing, each request checked with the group's earlier ones counted. An op already in the ledger is returned unchanged, whatever its
 // state, so nothing is reserved twice. Settle, settle-at-estimate, release and mark-uncertain change only a reserved row (the first ending
-// wins); an uncertain row keeps counting until the user resolves it. Subscription rows are recorded at list price, free rows at $0 and
+// wins); an uncertain row keeps counting until the user resolves it (W3 fix: a recovered request's resend may attach the usage it reported,
+// which leaves it uncertain and lets Resolve settle it at that cost). Subscription rows are recorded at list price, free rows at $0 and
 // unknown-price rows without a cost; none of them counts toward a money cap, and a request whose price is unknown gets the provider's
 // unknown-price behaviour instead (Ask by default). Caps at the warning threshold (SpendSettings.WarnPercent) come back as warnings.
 //
@@ -62,6 +63,11 @@ public sealed partial class SpendLedger : ISpendLedger
 
     /// <summary>Whether startup recovery has run in this ledger.</summary>
     public bool Started => started;
+
+    /// <summary>Raised after a row's ending changed (settled, released, made uncertain, resolved, or given the usage a resend reported), with
+    /// the row as it is now, outside the lock (W3 fix: the chat pages refresh that run's message footers, so a Resolve on History › Spend
+    /// shows in an open chat). Startup recovery raises nothing (no page is open yet). A handler must not throw.</summary>
+    public event Action<Reservation>? Changed;
 
     /// <summary>Runs startup recovery if it has not run yet (<see cref="SpendRecovery"/> calls it at start; any other call runs it first
     /// too) and returns how many rows it made uncertain. Calling it again changes nothing and returns the same count.</summary>
@@ -275,10 +281,22 @@ public sealed partial class SpendLedger : ISpendLedger
                     Settlement = SettlementKind.Estimate,
                 },
                 ResolveChoice.Amount => row with { State = ReservationState.Settled, ActualMicros = choice.AmountMicros, Settlement = SettlementKind.Entered },
+                ResolveChoice.Reported => row.Usage is { } usage
+                    ? row with { State = ReservationState.Settled, ActualMicros = row.CostOf(usage), Settlement = SettlementKind.Actual }
+                    : throw new ArgumentException($"Nothing was reported for reservation {row.Op}: settle it at the estimate or an amount instead."),
                 _ => row with { State = ReservationState.Released },
             };
             return resolved with { ResolvedByUser = true, Ended = now };
         }, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    /// <exception cref="ArgumentException">A token count or cost is negative or not a finite number.</exception>
+    public Task<Reservation> ReportUsageAsync(string op, SpendUsage usage, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(usage);
+        CheckUsage(usage);
+        return ChangeAsync(op, (row, _) => row.State != ReservationState.Uncertain ? null : row with { Usage = usage }, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -454,13 +472,7 @@ public sealed partial class SpendLedger : ISpendLedger
 
     /// <summary>What <paramref name="usage"/> cost on <paramref name="row"/>: $0 when free; none when the price is unknown; at the entered
     /// price for an entered one; else the cost the provider layer reported, or the row's rates x its tokens when it reported none.</summary>
-    private static long? ActualCost(Reservation row, SpendUsage usage)
-    {
-        if (row.Billing == BillingKind.Free) return 0;
-        if (row.Price is not { } price || row.ReservedMicros is null) return null;
-        if (price.Source == SpendPriceSource.Entered) return price.CostMicros(usage);
-        return usage.CostMicros is > 0 ? usage.CostMicros : price.CostMicros(usage);
-    }
+    private static long? ActualCost(Reservation row, SpendUsage usage) => row.CostOf(usage);
 
     /// <summary><paramref name="micros"/>, $0 for a free row, or none for a row without a price.</summary>
     private static long? CostOrNone(Reservation row, long micros) =>
@@ -574,16 +586,31 @@ public sealed partial class SpendLedger : ISpendLedger
 
     /// <summary>Changes the row of <paramref name="op"/> as <paramref name="change"/> says (null: leave it as it is) and returns it; a row
     /// that settles with usage gets its share of the cache meter.</summary>
-    private Task<Reservation> ChangeAsync(string op, Func<Reservation, DateTimeOffset, Reservation?> change, CancellationToken cancellationToken)
+    private async Task<Reservation> ChangeAsync(string op, Func<Reservation, DateTimeOffset, Reservation?> change, CancellationToken cancellationToken)
     {
         var key = Key(op);
-        return WriteAsync((connection, transaction, now) =>
+        var changed = false;
+        var result = await WriteAsync((connection, transaction, now) =>
         {
+            changed = false;
             var row = Find(connection, transaction, key) ?? throw SpendException.NotFound($"There is no reservation {key}.");
             if (change(row, now) is not { } next) return row;
             var (saved, missed) = CacheNumbers(connection, transaction, next);
             Update(connection, transaction, next, saved, missed);
+            changed = true;
             return next;
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
+        if (changed && Changed is { } handlers)
+        {
+            try
+            {
+                handlers(result);
+            }
+            catch (Exception error)
+            {
+                log.LogWarning(error, "A handler of the ledger's change of {Op} failed.", key);
+            }
+        }
+        return result;
     }
 }

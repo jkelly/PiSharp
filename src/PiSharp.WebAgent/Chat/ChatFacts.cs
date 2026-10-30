@@ -48,6 +48,10 @@ public sealed record ChatEntryMeta
     /// <summary>How long the message took, when the provider layer recorded it.</summary>
     public double? DurationMs { get; init; }
 
+    /// <summary>The op of the Spend Guard ledger row the answer settled (W3 fix: the guard stores it on the message as <c>pisharp.spendOp</c>),
+    /// or null for an answer the guard did not reserve (or one stored before it named its row).</summary>
+    public string? SpendOp { get; init; }
+
     /// <summary>Whether the provider reported any usage.</summary>
     public bool HasUsage => Input + Output + CacheRead + CacheWrite > 0;
 
@@ -73,6 +77,7 @@ public sealed record ChatEntryMeta
             CacheWrite = Number(usage, "cacheWrite") ?? 0,
             Cost = Number(usage?["cost"] as JsonObject, "total") ?? 0,
             DurationMs = Number(message, "durationMs"),
+            SpendOp = Spend.GuardedDurableModels.LedgerOpOf(message),
         };
     }
 

@@ -41,9 +41,14 @@ public sealed class SettingsController(ProviderDirectory directory, ISettingsSto
     [HttpGet("/settings/accounts")]
     public IActionResult Accounts()
     {
-        var providers = directory.List().Where(entry => entry.SignsIn).ToList();
+        var all = directory.List();
+        var providers = all.Where(entry => entry.SignsIn).ToList();
         var modals = Modals();
-        return View("Accounts", new AccountsPage(providers, options.DataDirectory, CallbackHost(), modals.CallbackPort, directory.Offline) { Modals = modals });
+        return View("Accounts", new AccountsPage(providers, options.DataDirectory, CallbackHost(), modals.CallbackPort, directory.Offline)
+        {
+            Modals = modals,
+            CustomKeys = [.. all.Where(entry => entry.Custom is { KeySource: CustomProviders.CustomKeySource.Stored } && entry.StoredAccounts.Any())],
+        });
     }
 
     /// <summary>Settings › Models, filtered and paged by its query string (<see cref="ModelsQuery"/>).</summary>

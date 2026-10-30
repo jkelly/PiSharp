@@ -8,6 +8,12 @@
 // the spend error, and CompleteSimpleAsync returns that message, so the durable run fails with the code in its error (S5 shows the
 // confirm modal from it). If the guard itself fails (the ledger cannot be read), the call is refused the same way: never sent unchecked.
 //
+// The answer names its ledger row (W3 fix): the final message of a reserved call (StreamDone or StreamError, CompleteSimpleAsync's message,
+// a deferred answer's) carries `pisharp: {spendOp}`, the op of the ledger row it settles (op, or op~n for a later send), which the durable
+// engine stores with the entry, so the chat's message footers link to their row exactly. It is PiSharp's own field: every request's messages
+// lose it again before anything else reads them (the size the guard counts, and what the inner models and the provider see), so the
+// provider gets the conversation exactly as it would without the guard.
+//
 // Deferred responses keep their reservation until the deferred answer arrives through StreamDeferred or FetchDeferredAsync of the same
 // process (the handle id maps to the ledger op in memory); a cancelled one becomes uncertain; after a restart, startup recovery has
 // already made it uncertain. Model lookups, catalog listings, classification and image generation pass through unguarded (W3 prices chat
@@ -47,6 +53,34 @@ public sealed class GuardedDurableModels : IDurableModels
     /// <summary>The executor, resolved on first use.</summary>
     public GuardedRunExecutor Executor => executor.Value;
 
+    /// <summary>The field of a guarded answer that names its ledger row: <c>pisharp</c>, an object whose <c>spendOp</c> is the row's op.</summary>
+    public const string AnswerField = "pisharp";
+
+    /// <summary>The name of the ledger op inside <see cref="AnswerField"/>: <c>spendOp</c>.</summary>
+    public const string AnswerOpField = "spendOp";
+
+    /// <summary><paramref name="message"/> naming its ledger row <paramref name="ledgerOp"/> (<see cref="AnswerField"/>); unchanged when the op
+    /// is null.</summary>
+    public static AssistantMessage Tag(AssistantMessage message, string? ledgerOp)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        if (string.IsNullOrEmpty(ledgerOp)) return message;
+        var field = JsonData.Parse(new System.Text.Json.Nodes.JsonObject { [AnswerOpField] = ledgerOp }.ToJsonString());
+        return message with { ExtraProperties = (message.ExtraProperties ?? JsonFields.Empty).Set(AnswerField, field) };
+    }
+
+    /// <summary><paramref name="messages"/> without <see cref="AnswerField"/> on any message (the same array when none has it).</summary>
+    public static ImmutableArray<JsonValue> Untag(ImmutableArray<JsonValue> messages)
+    {
+        if (messages.IsDefaultOrEmpty || !messages.Any(message => message is JsonObjectValue item && item.ContainsKey(AnswerField))) return messages;
+        return [.. messages.Select(message => message is JsonObjectValue item && item.ContainsKey(AnswerField) ? item.Remove(AnswerField) : message)];
+    }
+
+    /// <summary>The ledger op a stored answer names (<see cref="AnswerField"/>), or null.</summary>
+    public static string? LedgerOpOf(System.Text.Json.Nodes.JsonObject? message) =>
+        message?[AnswerField] is System.Text.Json.Nodes.JsonObject field && field[AnswerOpField] is System.Text.Json.Nodes.JsonValue value &&
+        value.TryGetValue<string>(out var op) && op.Length > 0 ? op : null;
+
     /// <summary>The call the guard reserves for one request: the model, <c>metadata.pisharp</c>'s fields (source <c>chat</c> and a fresh op
     /// <c>call-…</c> when missing), the messages' size and <c>maxTokens</c>.</summary>
     public static SpendCall Call(DurableModel model, ImmutableArray<JsonValue> messages, DurableStreamOptions? options)
@@ -83,7 +117,7 @@ public sealed class GuardedDurableModels : IDurableModels
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
-        return Stream(model, messages, options, cancellationToken);
+        return Stream(model, Untag(messages), options, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -91,6 +125,7 @@ public sealed class GuardedDurableModels : IDurableModels
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
+        messages = Untag(messages);
         var (lease, refusal) = await ReserveAsync(model, messages, options, cancellationToken).ConfigureAwait(false);
         if (lease is null) return GuardedRunExecutor.StoppedMessage(model.Descriptor, refusal!, Now());
         await using (lease.ConfigureAwait(false))
@@ -98,7 +133,7 @@ public sealed class GuardedDurableModels : IDurableModels
             var message = await lease.CompleteAsync(model.Descriptor,
                 (send, token) => Inner.CompleteSimpleAsync(model, messages, Options(options, send), token), cancellationToken).ConfigureAwait(false);
             Remember(lease);
-            return message;
+            return lease.Reserved ? Tag(message, lease.LedgerOp) : message;
         }
     }
 
@@ -116,7 +151,10 @@ public sealed class GuardedDurableModels : IDurableModels
         ArgumentNullException.ThrowIfNull(handle);
         var message = await Inner.FetchDeferredAsync(model, handle, cancellationToken).ConfigureAwait(false);
         if (message.StopReason != StopReason.Deferred && deferred.TryRemove(handle.Id, out var op))
+        {
             await Executor.SettleDeferredAsync(op, message).ConfigureAwait(false);
+            return Tag(message, op);
+        }
         return message;
     }
 
@@ -167,7 +205,7 @@ public sealed class GuardedDurableModels : IDurableModels
         {
             await foreach (var item in lease.StreamAsync(model.Descriptor,
                 (send, token) => Inner.StreamSimple(model, messages, Options(options, send), token), cancellationToken).ConfigureAwait(false))
-                yield return item;
+                yield return lease.Reserved ? Tagged(item, lease.LedgerOp) : item;
             Remember(lease);
         }
     }
@@ -179,7 +217,7 @@ public sealed class GuardedDurableModels : IDurableModels
         await foreach (var item in Inner.StreamDeferred(model, handle, cancellationToken).ConfigureAwait(false))
         {
             watch.Observe(item);
-            yield return item;
+            yield return item is StreamTerminalEvent { Message.StopReason: not StopReason.Deferred } ? Tagged(item, op) : item;
         }
         // Only a final answer settles; a stream that stopped early leaves the reservation for the next fetch (or recovery).
         if (watch.Terminal is { Message.StopReason: not StopReason.Deferred } terminal && deferred.TryRemove(handle.Id, out _))
@@ -203,6 +241,15 @@ public sealed class GuardedDurableModels : IDurableModels
             return (null, SpendGuard.UncheckedMessage(error));
         }
     }
+
+    /// <summary>A final event (<see cref="StreamDone"/> or <see cref="StreamError"/>) whose message names <paramref name="ledgerOp"/>; any
+    /// other event unchanged.</summary>
+    private static StreamEvent Tagged(StreamEvent item, string? ledgerOp) => item switch
+    {
+        StreamDone done => done with { Message = Tag(done.Message, ledgerOp) },
+        StreamError error => error with { Message = Tag(error.Message, ledgerOp) },
+        _ => item,
+    };
 
     private void Remember(GuardedLease lease)
     {

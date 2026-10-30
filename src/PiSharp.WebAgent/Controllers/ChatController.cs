@@ -6,9 +6,10 @@
 // {error: {code, message}}. No answer carries a credential: a chat names its account by label only. WU8 adds /chat/{id}/tree (the session
 // tree modal's body), /api/chats/{id}/retry (Retry and Regenerate fork and send again; a retry with the same requestId makes nothing new)
 // and /api/chats/{id}/compaction (the automatic compaction switch). W3 (S5) adds the Spend Guard: a create or send with `spend: {check: true}`
-// is checked first and answers 409 {error: {code: spend_blocked|spend_ask|spend_unknown_price, message}, spend: {verdict, code, pane,
-// canProceed, sentence, chip, html, modal, capOutputTokens}} with nothing posted when the guard would ask or block; the same request id
-// with `spend: {choice: proceed-once|cap-output, maxOutputTokens?}` sends after the user's choice (a Block still refuses). POST
+// is checked first and, when the guard would ask or block, answers 200 {posted: false, code: spend_blocked|spend_ask|spend_unknown_price,
+// message, spend: {verdict, code, pane, canProceed, sentence, chip, html, modal, capOutputTokens}} with nothing posted (W3 fix: not 409, so
+// the browser logs no failed request for a refusal the page expects); every answer of a create, send or continue says `posted`. The same
+// request id with `spend: {choice: proceed-once|cap-output, maxOutputTokens?}` sends after the user's choice (a Block still refuses). POST
 // /api/chats/{id}/spend and POST /api/chats/spend (a new chat) answer the composer's estimate of a draft; GET
 // /api/chats/{id}/spend/stops/{op} the confirm modal of a call the guard stopped inside the run, and POST /api/chats/{id}/spend/continue
 // continues the branch after the user's choice. No spend answer carries the draft: only its size is counted.
@@ -80,8 +81,8 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
     // ─── Chats ──────────────────────────────────────────────────────────────
 
     /// <summary><c>POST /api/chats {requestId, text, provider?, model?, thinking?, tier?, cwd?, title?, spend?}</c>: creates a chat and sends its
-    /// first message. Answers <c>{id, url, title, agentId, submissionId, status}</c>; with <c>spend</c>, 409 and no chat when the Spend Guard
-    /// would ask or block.</summary>
+    /// first message. Answers <c>{posted: true, id, url, title, agentId, submissionId, status}</c>; with <c>spend</c>, <c>{posted: false, code,
+    /// message, spend}</c> and no chat when the Spend Guard would ask or block.</summary>
     [HttpPost("/api/chats")]
     public Task<IActionResult> Create([FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
     {
@@ -97,6 +98,7 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
         }, cancellationToken).ConfigureAwait(false);
         return Ok(new
         {
+            posted = true,
             id = created.Binding.SessionId,
             url = ChatUrl(created.Binding.SessionId),
             title = created.Binding.Title,
@@ -123,8 +125,8 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
     });
 
     /// <summary><c>POST /api/chats/{id}/messages {requestId, text, agentId?, steer?, spend?}</c>: sends (queues as a follow-up, or steers, while
-    /// it runs). Answers <c>{agentId, submissionId, status}</c>; with <c>spend</c>, 409 and nothing posted when the Spend Guard would ask or
-    /// block.</summary>
+    /// it runs). Answers <c>{posted: true, agentId, submissionId, status}</c>; with <c>spend</c>, <c>{posted: false, code, message, spend}</c>
+    /// and nothing posted when the Spend Guard would ask or block.</summary>
     [HttpPost("/api/chats/{id}/messages")]
     public Task<IActionResult> Send(string id, [FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
     {
@@ -134,7 +136,7 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
             Steer = ChatDisplay.Bool(body, "steer"),
             Spend = ChatSpendAnswer.Read(body?["spend"]),
         }, cancellationToken).ConfigureAwait(false);
-        return Ok(new { agentId = sent.AgentId, submissionId = sent.SubmissionId, status = sent.Status });
+        return Ok(new { posted = true, agentId = sent.AgentId, submissionId = sent.SubmissionId, status = sent.Status });
     });
 
     // ─── Spend ──────────────────────────────────────────────────────────────
@@ -161,13 +163,14 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
         Spend(await chats.StopReviewAsync(id, op, cancellationToken).ConfigureAwait(false)));
 
     /// <summary><c>POST /api/chats/{id}/spend/continue {requestId, op, agentId?, spend?}</c>: continues the branch after a stopped call, with
-    /// the user's choice. Answers <c>{agentId, submissionId, status}</c>, or 409 when the guard still would not let it through.</summary>
+    /// the user's choice. Answers <c>{posted: true, agentId, submissionId, status}</c>, or <c>{posted: false, code, message, spend}</c> when the
+    /// guard still would not let it through.</summary>
     [HttpPost("/api/chats/{id}/spend/continue")]
     public Task<IActionResult> Continue(string id, [FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
     {
         var sent = await chats.ContinueAsync(id, ChatDisplay.Long(body, "agentId"), Text(body, "op"), Text(body, "requestId"),
             ChatSpendAnswer.Read(body?["spend"]) ?? ChatSpendAnswer.Check, cancellationToken).ConfigureAwait(false);
-        return Ok(new { agentId = sent.AgentId, submissionId = sent.SubmissionId, status = sent.Status });
+        return Ok(new { posted = true, agentId = sent.AgentId, submissionId = sent.SubmissionId, status = sent.Status });
     });
 
     /// <summary><c>POST /api/chats/{id}/abort {agentId?}</c>: stops the run.</summary>
@@ -390,7 +393,8 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
         }
         catch (ChatSpendException refused)
         {
-            return StatusCode(ChatSpendException.Status, new { error = new { code = refused.Code, message = refused.Message }, spend = refused.Result });
+            // Not an error: the page expects it and opens the confirm modal; nothing was posted.
+            return Ok(new { posted = false, code = refused.Code, message = refused.Message, spend = refused.Result });
         }
         catch (SpendException error)
         {

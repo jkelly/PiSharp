@@ -10,8 +10,9 @@
 // (Shift+Tab cycles the thinking level, Esc Esc opens the tree). Markup comes only from the server's partials; text set here goes through
 // textContent. W3 (S5) adds the Spend Guard: the send estimate by Send follows the draft (debounced; the server counts the request, the
 // draft only by its size) and the model; every send and new chat asks the guard first (spend: {check: true}), and when it would ask or
-// block nothing is posted and modal-spend-confirm (S4's spend-confirm.js) opens: Proceed once or Cap output sends again with the same
-// request id and the choice, Cancel or Choose a model… sends nothing and keeps the draft. A call the guard stopped inside a run shows
+// block nothing is posted (the answer is 200 {posted: false}, never a failed request) and modal-spend-confirm (S4's spend-confirm.js)
+// opens: Proceed once or Cap output sends again with the same request id and the choice, Cancel or Choose a model… sends nothing and keeps
+// the draft. A call the guard stopped inside a run shows
 // Review…, which opens the stop's modal and continues the run after the user's choice. Nothing here switches a model or an account.
 import { MuxStream } from '/_content/PiSharp.Web.Common/js/stream.js';
 import { applyItems, swapHtml, keepPinned } from '/_content/PiSharp.Web.Common/js/swap.js';
@@ -60,11 +61,11 @@ function report(result, what) {
   return false;
 }
 
-/** Opens modal-spend-confirm for the guard's answer to a send (`spend` of a 409, or a stopped call's review); resolves with what to send
- * again ({choice: 'proceed-once'} or {choice: 'cap-output', maxOutputTokens}), or null when nothing is to be sent. */
-async function askSpend(spend, error) {
+/** Opens modal-spend-confirm for the guard's answer to a send (`spend` of a {posted: false} answer, or a stopped call's review); resolves
+ * with what to send again ({choice: 'proceed-once'} or {choice: 'cap-output', maxOutputTokens}), or null when nothing is to be sent. */
+async function askSpend(spend, message) {
   if (!spend?.modal) {
-    showToast({ title: 'Not sent', body: error?.message || spend?.sentence || 'This request is over a spend cap.', tone: 'warn' });
+    showToast({ title: 'Not sent', body: message || spend?.sentence || 'This request is over a spend cap.', tone: 'warn' });
     return null;
   }
   const answer = await showSpendConfirm({ html: spend.modal, verdict: spend.verdict, code: spend.code, pane: spend.pane });
@@ -73,23 +74,23 @@ async function askSpend(spend, error) {
   return null;
 }
 
-/** POSTs a send the Spend Guard checks first: when it would ask or block, nothing was posted, the confirm modal opens and the user's choice
- * goes with the same body (the same request id), so the message posts once. Resolves with the last result; `refused` when the user chose
- * not to send (a failure is a toast). */
+/** POSTs a send the Spend Guard checks first: when it would ask or block, the answer is {posted: false} (nothing was posted), the confirm
+ * modal opens and the user's choice goes with the same body (the same request id), so the message posts once. Resolves with the last
+ * result, `ok` only when the message was posted; `refused` when the user chose not to send (a failure is a toast). */
 async function postWithSpend(path, body, what, spend = { check: true }) {
   let current = spend;
   for (let round = 0; round < 4; round++) {
     const result = await post(path, { ...body, spend: current });
-    if (result.status === 409 && result.data?.spend) {
-      const choice = await askSpend(result.data.spend, result.data.error);
-      if (!choice) return { ...result, refused: true };
+    if (result.ok && result.data?.posted === false) {
+      const choice = await askSpend(result.data.spend, result.data.message);
+      if (!choice) return { ...result, ok: false, refused: true };
       current = choice;
       continue;
     }
     report(result, what);
     return result;
   }
-  return { ok: false, status: 409, data: null, refused: true };
+  return { ok: false, status: 200, data: null, refused: true };
 }
 
 /** Keeps the send estimate by Send current: asks the server about the draft (debounced) and swaps in its rendered answer. */

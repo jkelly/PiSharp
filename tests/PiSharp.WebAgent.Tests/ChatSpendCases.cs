@@ -446,7 +446,7 @@ internal static partial class Program
                 var (app, path) = await SpendChatStartAsync(root);
                 await using var _ = app;
                 var created = await app.SendAsync(HttpMethod.Post, "/api/chats", new JsonObject { ["requestId"] = "r1", ["text"] = "hello", ["spend"] = new JsonObject { ["check"] = true } });
-                Equal(200, created.Status, "no cap: the check lets it through: " + created.Text);
+                Equal((200, true), (created.Status, created.Body?["posted"]?.GetValue<bool>()), "no cap: the check lets it through: " + created.Text);
                 var chatId = created.Body!["id"]!.GetValue<string>();
                 await GuardIdleAsync(app, chatId, "Echo: hello");
 
@@ -475,7 +475,7 @@ internal static partial class Program
                 var stopsBefore = (await app.Get("/api/spend/stops?run=" + chatId)).Body?["stops"]?.AsArray().Count;
                 var blocked = await app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/messages",
                     new JsonObject { ["requestId"] = "m1", ["text"] = "blocked please", ["spend"] = new JsonObject { ["check"] = true } });
-                Equal((409, "spend_blocked"), (blocked.Status, blocked.Body?["error"]?["code"]?.GetValue<string>()), "a blocked send: " + blocked.Text);
+                Equal((200, false, "spend_blocked"), (blocked.Status, blocked.Body?["posted"]?.GetValue<bool>(), blocked.Body?["code"]?.GetValue<string>()), "a blocked send: " + blocked.Text);
                 var spend = blocked.Body!["spend"]!;
                 Equal(("block", false, "sc-request"), (spend["verdict"]!.GetValue<string>(), spend["canProceed"]!.GetValue<bool>(), spend["pane"]!.GetValue<string>()), "no proceed");
                 Has(spend["modal"]!.GetValue<string>(), "id=\"modal-spend-confirm\"", "with the confirm modal");
@@ -483,7 +483,7 @@ internal static partial class Program
                 Check(spend["capOutputTokens"]?.GetValue<int>() > 0, "which offers an output cap that fits: " + spend.ToJsonString());
                 var again = await app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/messages",
                     new JsonObject { ["requestId"] = "m1", ["text"] = "blocked please", ["spend"] = new JsonObject { ["choice"] = "proceed-once" } });
-                Equal((409, "spend_blocked"), (again.Status, again.Body?["error"]?["code"]?.GetValue<string>()), "proceed once never passes a Block cap: " + again.Text);
+                Equal((200, false, "spend_blocked"), (again.Status, again.Body?["posted"]?.GetValue<bool>(), again.Body?["code"]?.GetValue<string>()), "proceed once never passes a Block cap: " + again.Text);
                 Equal(rowsBefore, SpendChatRows(path), "nothing was reserved");
                 Equal(stopsBefore, (await app.Get("/api/spend/stops?run=" + chatId)).Body?["stops"]?.AsArray().Count, "nothing was stopped: nothing was sent");
                 Equal(0, (await app.Get("/api/spend/approvals?run=" + chatId)).Body?["approvals"]?.AsArray().Count, "and no approval was stored");
@@ -498,12 +498,12 @@ internal static partial class Program
                 SpendChatCapAction(path, capId, "ask");
                 var ask = await app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/messages",
                     new JsonObject { ["requestId"] = "m2", ["text"] = "ask please", ["spend"] = new JsonObject { ["check"] = true } });
-                Equal((409, "spend_ask"), (ask.Status, ask.Body?["error"]?["code"]?.GetValue<string>()), "an Ask cap asks first: " + ask.Text);
+                Equal((200, false, "spend_ask"), (ask.Status, ask.Body?["posted"]?.GetValue<bool>(), ask.Body?["code"]?.GetValue<string>()), "an Ask cap asks first: " + ask.Text);
                 Check(ask.Body!["spend"]!["canProceed"]!.GetValue<bool>(), "and may proceed once");
                 Lacks((await app.Get($"/chat/{chatId}/export.md")).Text, "ask please", "nothing was posted before the choice");
                 var once = await app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/messages",
                     new JsonObject { ["requestId"] = "m2", ["text"] = "ask please", ["spend"] = new JsonObject { ["choice"] = "proceed-once" } });
-                Equal(200, once.Status, "proceed once: " + once.Text);
+                Equal((200, true), (once.Status, once.Body?["posted"]?.GetValue<bool>()), "proceed once: " + once.Text);
                 var retried = await app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/messages",
                     new JsonObject { ["requestId"] = "m2", ["text"] = "ask please", ["spend"] = new JsonObject { ["choice"] = "proceed-once" } });
                 Equal(200, retried.Status, "a retried POST: " + retried.Text);
@@ -518,12 +518,13 @@ internal static partial class Program
                 SpendChatCapAction(path, capId, "block");
                 var refused = await app.SendAsync(HttpMethod.Post, "/api/chats",
                     new JsonObject { ["requestId"] = "n1", ["text"] = "new blocked", ["spend"] = new JsonObject { ["check"] = true } });
-                Equal((409, "spend_blocked"), (refused.Status, refused.Body?["error"]?["code"]?.GetValue<string>()), "a refused new chat: " + refused.Text);
+                Equal((200, false, "spend_blocked"), (refused.Status, refused.Body?["posted"]?.GetValue<bool>(), refused.Body?["code"]?.GetValue<string>()), "a refused new chat: " + refused.Text);
                 Has(refused.Body!["spend"]!["modal"]!.GetValue<string>(), "id=\"modal-spend-confirm\"", "with the modal");
                 Equal(chats, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "creates no chat");
                 SpendChatCapAction(path, capId, "ask");
-                Equal(409, (await app.SendAsync(HttpMethod.Post, "/api/chats",
-                    new JsonObject { ["requestId"] = "n2", ["text"] = "new asked", ["spend"] = new JsonObject { ["check"] = true } })).Status, "asked first");
+                var asked = await app.SendAsync(HttpMethod.Post, "/api/chats",
+                    new JsonObject { ["requestId"] = "n2", ["text"] = "new asked", ["spend"] = new JsonObject { ["check"] = true } });
+                Equal((200, false, "spend_ask"), (asked.Status, asked.Body?["posted"]?.GetValue<bool>(), asked.Body?["code"]?.GetValue<string>()), "asked first: " + asked.Text);
                 Equal(chats, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "still no chat");
                 var made = await app.SendAsync(HttpMethod.Post, "/api/chats",
                     new JsonObject { ["requestId"] = "n2", ["text"] = "new asked", ["spend"] = new JsonObject { ["choice"] = "proceed-once" } });
@@ -596,7 +597,7 @@ internal static partial class Program
                     new JsonObject { ["requestId"] = "c0", ["op"] = "no-such-op", ["spend"] = new JsonObject { ["choice"] = "proceed-once" } })).Status, "nor continued");
 
                 var check = await app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/spend/continue", new JsonObject { ["requestId"] = "c1", ["op"] = op });
-                Equal((409, "spend_blocked"), (check.Status, check.Body?["error"]?["code"]?.GetValue<string>()), "continuing as it is is still over: " + check.Text);
+                Equal((200, false, "spend_blocked"), (check.Status, check.Body?["posted"]?.GetValue<bool>(), check.Body?["code"]?.GetValue<string>()), "continuing as it is is still over: " + check.Text);
                 Lacks((await app.Get($"/chat/{chatId}/export.md")).Text, ChatSpend.ContinueText, "nothing was posted");
                 var go = await app.SendAsync(HttpMethod.Post, $"/api/chats/{chatId}/spend/continue",
                     new JsonObject { ["requestId"] = "c1", ["op"] = op, ["spend"] = new JsonObject { ["choice"] = "cap-output", ["maxOutputTokens"] = 100 } });

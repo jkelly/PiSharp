@@ -2,11 +2,12 @@
 // guard's preflight (SpendGuard.PreflightAsync: nothing reserved) about the request the send would make: the chat's model and account, its
 // run (the chat id) and the request's size, which the server works out from the branch's active entries (the messages the durable engine
 // sends, failed and stopped answers left out, as its context does) plus the draft; the browser never says how big a request is. A send that
-// carries `spend` is checked: when the guard would ask or block, nothing is posted and the answer is 409 with the cause's confirm modal
-// (S4's _SpendConfirmModal from SpendPages.ConfirmView). The user's choice comes back on the same request id: "proceed once" or "cap the
+// carries `spend` is checked: when the guard would ask or block, nothing is posted and the answer is {posted: false} (200, so the browser
+// logs no failed request) with the cause's confirm modal (S4's _SpendConfirmModal from SpendPages.ConfirmView). The user's choice comes back on the same request id: "proceed once" or "cap the
 // output" is checked as the guard would apply it, then stored as the run's one-time approval (SpendGuard.ApproveStoredAsync), which the
 // guard uses on the run's next stopped call; a Block still blocks. A request id that was admitted is never checked again, so a retried
-// POST reaches the engine's de-duplication and posts once. A call the guard stopped inside a run (its error names the op) is reviewed
+// POST reaches the engine's de-duplication and posts once; the admitted ids and the approvals they stored are kept in webagent.db
+// (ChatSpendSends, W3 fix), so this holds across a restart too. A call the guard stopped inside a run (its error names the op) is reviewed
 // with that stop's own decision, and continues with a "Continue." message on the same branch after the user's choice (the stopped call's
 // size, plus the message, is what is checked). Nothing switches a model or an account: cheaper models are suggestions in the modal. The
 // ledger side (footers, the session panel) is read at most every LedgerLifetime per chat, and again whenever the branch's entries or
@@ -67,13 +68,11 @@ public sealed record ChatSpendAnswer(SpendChoice? Choice = null, int? MaxOutputT
 public sealed record ChatSpendResult(string Verdict, bool Allowed, string? Code, string? Pane, bool CanProceed, string? Sentence, string? Chip, string Html,
     string? Modal, int? CapOutputTokens);
 
-/// <summary>A send the Spend Guard would not let through as it is (409); nothing was posted.</summary>
+/// <summary>A send the Spend Guard would not let through as it is; nothing was posted. ChatController answers it 200
+/// <c>{posted: false, code, message, spend}</c>: a refusal the page expects and answers with the confirm modal, not a failed request.</summary>
 /// <param name="result">The guard's answer, with the confirm modal.</param>
 public sealed class ChatSpendException(ChatSpendResult result) : Exception(result.Sentence ?? "This request is over a spend cap.")
 {
-    /// <summary>The HTTP status.</summary>
-    public const int Status = 409;
-
     /// <summary>The guard's answer.</summary>
     public ChatSpendResult Result { get; } = result;
 
@@ -100,8 +99,6 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
     /// <summary>How long a branch's context size is kept while the draft changes.</summary>
     public static TimeSpan ContextLifetime { get; } = TimeSpan.FromSeconds(3);
 
-    private readonly ConcurrentDictionary<string, byte> admitted = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, long> approved = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (string Stamp, DateTimeOffset At, IReadOnlyList<Reservation> Rows)> reads = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (DateTimeOffset At, ChatSpendSummary Summary)> summaries = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<(string Session, long Agent), (DateTimeOffset At, long Bytes)> contexts = new();
@@ -114,6 +111,11 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
     private ISpendLedger? Ledger => services.GetService<ISpendLedger>();
 
     private IChatAccounts Accounts => services.GetService<IChatAccounts>() ?? NoChatAccounts.Instance;
+
+    /// <summary>The sends admitted so far and the approvals they stored (webagent.db; in memory when the chat area's store is missing).</summary>
+    public ChatSpendSends Sends => sends ??= services.GetService<ChatSpendSends>() ?? new ChatSpendSends(null);
+
+    private ChatSpendSends? sends;
 
     /// <summary>How <paramref name="provider"/> through <paramref name="account"/> is billed: the Spend area's billing modes (the user's
     /// override included), else the catalog's.</summary>
@@ -133,7 +135,8 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
     // ─── Request size ───────────────────────────────────────────────────────
 
     /// <summary>The UTF-8 size of the messages a branch's next request sends: every active entry's messages, without the answers the
-    /// durable context leaves out (stopped, failed or deferred).</summary>
+    /// durable context leaves out (stopped, failed or deferred) and without the field that names an answer's ledger row (the guard drops it
+    /// before a request is sent).</summary>
     public static long ContextBytes(IEnumerable<JsonObject> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
@@ -142,7 +145,13 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
             foreach (var message in (entry["model"] as JsonArray ?? []).OfType<JsonObject>())
             {
                 if (ChatDisplay.Str(message, "role") == "assistant" && ChatDisplay.Str(message, "stopReason") is "aborted" or "error" or "deferred") continue;
-                bytes += Encoding.UTF8.GetByteCount(message.ToJsonString());
+                var sent = message;
+                if (message.ContainsKey(GuardedDurableModels.AnswerField))
+                {
+                    sent = (JsonObject)message.DeepClone();
+                    sent.Remove(GuardedDurableModels.AnswerField);
+                }
+                bytes += Encoding.UTF8.GetByteCount(sent.ToJsonString());
             }
         return bytes;
     }
@@ -245,7 +254,7 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
         return new ChatSpendResult(view.Verdict, view.Verdict == "allow", view.Code, view.Pane, view.Verdict == "ask", null, view.Chip, html, null, null);
     }
 
-    /// <summary>Lets a send through, or refuses it (409, nothing posted): a request id admitted before passes at once; else the guard's
+    /// <summary>Lets a send through, or refuses it (nothing posted): a request id admitted before passes at once; else the guard's
     /// preflight decides, and the user's choice, when given, is checked as the guard would apply it. Returns the one-time approval to store
     /// for the run before the send goes out (<see cref="ApproveAsync"/>), or null when none is needed.</summary>
     /// <param name="call">The request the send makes.</param>
@@ -259,7 +268,7 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
         ArgumentNullException.ThrowIfNull(call);
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(answer);
-        if (admitted.ContainsKey(key) || Guard is not { } guard) return null;
+        if (Guard is not { } guard || Sends.IsAdmitted(key)) return null;
         var decision = await guard.PreflightAsync(call, cancellationToken).ConfigureAwait(false);
         if (decision.Allowed)
         {
@@ -286,20 +295,15 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
     public async Task ApproveAsync(SpendApproval approval, string key, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(approval);
-        if (Guard is not { } guard || approved.ContainsKey(key)) return;
+        if (Guard is not { } guard || Sends.ApprovalOf(key) is not null) return;
         var stored = await guard.ApproveStoredAsync(approval, cancellationToken).ConfigureAwait(false);
-        if (approved.Count > 2000) approved.Clear();
-        approved[key] = stored.Id;
+        Sends.Approved(key, stored.Id);
     }
 
-    /// <summary>Whether a send key was admitted (a retry of it is not checked again).</summary>
-    public bool WasAdmitted(string key) => admitted.ContainsKey(key);
+    /// <summary>Whether a send key was admitted (a retry of it is not checked again, also after a restart).</summary>
+    public bool WasAdmitted(string key) => Sends.IsAdmitted(key);
 
-    private void Admit(string key)
-    {
-        if (admitted.Count > 2000) admitted.Clear();
-        admitted[key] = 0;
-    }
+    private void Admit(string key) => Sends.Admit(key);
 
     /// <summary>A stopped call of the chat: the guard's own record of it (op, size, decision), or null when there is none (or it belongs to
     /// another run).</summary>
@@ -366,6 +370,53 @@ public sealed class ChatSpend(DeviceHostService device, IModelCatalog catalog, F
     }
 
     // ─── Ledger ─────────────────────────────────────────────────────────────
+
+    /// <summary>Raised with a chat id after one of its ledger rows changed (settled, released, made uncertain, resolved): that chat's cached
+    /// rows and summaries are dropped first, so its next render reads them again (W3 fix: a Resolve on History › Spend shows in the open
+    /// chat's footers without a reload). The first handler hooks the ledger's <see cref="SpendLedger.Changed"/>; without the Spend area it is
+    /// never raised.</summary>
+    public event Action<string>? RunChanged
+    {
+        add
+        {
+            HookLedger();
+            lock (hooks) runChanged += value;
+        }
+        remove
+        {
+            lock (hooks) runChanged -= value;
+        }
+    }
+
+    private readonly Lock hooks = new();
+    private Action<string>? runChanged;
+    private int hooked;
+
+    /// <summary>Drops chat <paramref name="run"/>'s cached ledger rows and spend summaries.</summary>
+    public void Forget(string run)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(run);
+        reads.TryRemove(run, out _);
+        foreach (var key in summaries.Keys)
+        {
+            if (key.StartsWith(run + "|", StringComparison.Ordinal)) summaries.TryRemove(key, out _);
+        }
+    }
+
+    private void HookLedger()
+    {
+        if (Interlocked.Exchange(ref hooked, 1) == 1) return;
+        if (services.GetService<SpendLedger>() is { } ledger) ledger.Changed += LedgerChanged;
+    }
+
+    private void LedgerChanged(Reservation row)
+    {
+        if (row.Run is not { Length: > 0 } run) return;
+        Forget(run);
+        Action<string>? handlers;
+        lock (hooks) handlers = runChanged;
+        handlers?.Invoke(run);
+    }
 
     /// <summary>The footer marks of a branch's answers and the running answer's reservation, from the chat's ledger rows.</summary>
     public async Task<ChatSpendFacts> FactsAsync(ChatBinding binding, IReadOnlyList<JsonObject> entries, bool running, string? accountLabel,

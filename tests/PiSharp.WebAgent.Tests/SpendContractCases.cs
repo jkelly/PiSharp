@@ -42,7 +42,8 @@ internal static partial class Program
                 Equal("[\"allow\",\"ask\",\"block\"]", JsonSerializer.Serialize(Enum.GetValues<SpendVerdict>(), options), "verdicts");
                 Equal("[\"ask\",\"block\",\"allow\"]", JsonSerializer.Serialize(Enum.GetValues<UnknownPriceBehavior>(), options), "unknown-price behaviours");
                 Equal("[\"proceed-once\",\"cap-output\"]", JsonSerializer.Serialize(Enum.GetValues<SpendChoice>(), options), "choices");
-                Equal("[\"estimate\",\"amount\",\"release\"]", JsonSerializer.Serialize(Enum.GetValues<ResolveChoice>(), options), "resolutions");
+                // W3 fix: "reported" settles a recovered request's uncertain row at the cost its resend reported.
+                Equal("[\"estimate\",\"amount\",\"release\",\"reported\"]", JsonSerializer.Serialize(Enum.GetValues<ResolveChoice>(), options), "resolutions");
             }
             var cap = new SpendCap(3, CapScope.Provider, "anthropic", CapPeriod.Month, 10_000_000, CapAction.Block);
             var json = JsonSerializer.Serialize(cap, SettingsStore.JsonOptions);

@@ -1,12 +1,15 @@
 @* Decision 0011 (run W2, WU9): the mockups' _ProviderHeader (settings-provider-openai, settings-provider-codex): logo, what kind of provider
    it is, its name and id, how it is connected (the active account's chip, "OAuth only", "not signed in", "sign-in expired"), its
-   description, and a panel of facts: APIs, base URL, model count and how it authenticates. Model: ProviderPage. *@
+   description, and a panel of facts: APIs, base URL, model count and how it authenticates. W3 fix: a custom provider of models.json is
+   "Custom provider", with its key source as the chip and the auth fact. Model: ProviderPage. *@
 @model ProviderPage
 @{
     var provider = Model.Provider;
     var active = provider.Active;
-    var eyebrow = provider.NoCredentials ? "Offline test provider" : provider.Builtin ? (provider.SignInOnly ? "Built-in provider · subscription" : "Built-in provider") : "Provider";
-    var auth = provider.NoCredentials ? "none needed"
+    var custom = provider.Custom;
+    var eyebrow = custom is not null ? "Custom provider · models.json" : provider.NoCredentials ? "Offline test provider" : provider.Builtin ? (provider.SignInOnly ? "Built-in provider · subscription" : "Built-in provider") : "Provider";
+    var auth = custom is not null ? custom.Auth
+        : provider.NoCredentials ? "none needed"
         : provider.SignInOnly ? "OAuth · " + string.Join(" or ", provider.SignIns.Select(method => method.Method == SignInMethod.Browser ? "PKCE" : "device code"))
         : provider.KeyForm switch
         {
@@ -27,7 +30,11 @@
         {
           <span class="ps-chip" data-tone="accent"><i class="bi bi-shield-lock" aria-hidden="true"></i>OAuth only</span>
         }
-        @if (provider.NoCredentials)
+        @if (custom is not null && Model.ExpiredAccount is null)
+        {
+          <span class="ps-chip" data-tone="@custom.Tone"><i class="bi @custom.Icon" aria-hidden="true"></i>@custom.Chip</span>
+        }
+        else if (provider.NoCredentials)
         {
           <span class="ps-chip" data-tone="ok">no key needed</span>
         }

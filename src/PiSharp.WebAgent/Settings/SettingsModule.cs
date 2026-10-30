@@ -1,5 +1,6 @@
 // Decision 0011 (run W2, WU9): the Settings area's entry points, which Program.cs calls. The area registers ProviderDirectory (the providers
-// the settings pages list, over IModelCatalog, IAccountStore and ISignInFlows) and maps /api/settings (SettingsEndpoints); its pages are
+// the settings pages list, over IModelCatalog, IAccountStore and ISignInFlows; W3 fix: and the custom providers area's models.json when it
+// is registered) and maps /api/settings (SettingsEndpoints); its pages are
 // SettingsController's (Views/Settings). The Defaults, Tools and Models sections themselves are the core's ISettingsStore (WU4); keys and
 // sign-ins are the credentials area's /api/credentials (WU5).
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -17,7 +18,7 @@ public static class SettingsModule
     {
         ArgumentNullException.ThrowIfNull(options);
         services.TryAddSingleton(provider => new ProviderDirectory(provider.GetRequiredService<IModelCatalog>(), provider.GetRequiredService<IAccountStore>(),
-            provider.GetRequiredService<ISignInFlows>(), provider.GetService<CredentialsOptions>()));
+            provider.GetRequiredService<ISignInFlows>(), provider.GetService<CredentialsOptions>(), provider.GetService<CustomProviders.CustomProviderService>()));
         return services;
     }
 

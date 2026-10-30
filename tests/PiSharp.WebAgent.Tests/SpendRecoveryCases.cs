@@ -11,11 +11,12 @@ using PiSharp.WebAgent.Spend;
 // each case kills its process tree (Process.Kill, no shutdown: a crash) and starts it again on the same data. Killed while a faux "slow:"
 // answer streams, the request's reservation was still reserved; after the restart startup recovery has made it uncertain ("stream dropped,
 // no usage reported"), the durable engine sends the interrupted request again under the same op, and the guard reuses that row: it is never
-// reserved a second time, never settled automatically (not even by the recovered answer's usage), and keeps counting toward the caps until
-// the user resolves it in History › Spend. The chat still ends with exactly one answer. A daily Block cap with room for one worst case but
-// not two proves both halves: the recovered request is not checked again (a second reservation would not fit), and the next message is
-// refused (409 spend_blocked, nothing posted) until the uncertain row is released, after which the same request id posts once and settles
-// at its actual cost; one more crash leaves those settled and released rows as they were. Nothing here calls a provider.
+// reserved a second time, never settled automatically (the recovered answer's usage is only attached to the row, so Resolve can offer the
+// reported cost), and keeps counting toward the caps until the user resolves it in History › Spend. The chat still ends with exactly one
+// answer. A daily Block cap with room for one worst case but not two proves both halves: the recovered request is not checked again (a
+// second reservation would not fit), and the next message is refused ({posted: false}, spend_blocked, nothing posted) until the uncertain
+// row is released, after which the same request id posts once and settles at its actual cost; one more crash leaves those settled and
+// released rows as they were. Nothing here calls a provider.
 internal static partial class Program
 {
     /// <summary>The app with <c>--faux-metered</c> as a child process over a case folder (<c>data</c> and <c>work</c>), whose Settings › Tools
@@ -195,12 +196,14 @@ internal static partial class Program
             Check(LedgerMicros(after, "actualMicros") is null && LedgerText(after, "settlement") is null, "no actual amount: " + after.ToJsonString());
             Check(after["reservation"]?["resolvedByUser"]?.GetValue<bool>() == false, "nobody resolved it");
             Equal(worst, after["countedMicros"]!.GetValue<long>(), "it keeps counting at the reserved amount");
+            Check(after["reservation"]?["usage"] is JsonObject reported && reported["outputTokens"]?.GetValue<double>() > 0,
+                "the usage the recovered answer reported is kept on the row, for Resolve: " + after.ToJsonString());
 
             // It still counts toward the daily cap: the next message does not fit, and nothing is posted.
             var send = new JsonObject { ["requestId"] = "m2", ["text"] = "after the crash", ["spend"] = new JsonObject { ["check"] = true } };
             var refused = await app.PostAsync($"/api/chats/{id}/messages", (JsonObject)send.DeepClone());
-            Equal(409, refused.Status, "over the daily cap with the uncertain spend counted: " + refused.Text);
-            Equal(SpendErrors.Blocked, refused.Body?["error"]?["code"]?.GetValue<string>(), "a Block cap");
+            Equal((200, false), (refused.Status, refused.Body?["posted"]?.GetValue<bool>()), "over the daily cap with the uncertain spend counted: " + refused.Text);
+            Equal(SpendErrors.Blocked, refused.Body?["code"]?.GetValue<string>(), "a Block cap");
             Equal(1, Count((await app.App.Get($"/chat/{id}/export.md")).Text, "### You"), "nothing was posted");
             Equal(1, (await app.LedgerAsync()).TotalAll, "and nothing reserved");
 
@@ -217,6 +220,10 @@ internal static partial class Program
             Has(history.Text, $"data-spend-row=\"{op}\" data-status=\"uncertain\"", "the uncertain row");
             Has(history.Text, $"data-resolve-op=\"{op}\"", "with Resolve…");
             Has(await app.PageAsync(id), "/history/spend?resolve=" + Uri.EscapeDataString(op), "the chat links the uncertain spend to its Resolve");
+            var resolve = await app.App.Get("/history/spend/resolve?op=" + Uri.EscapeDataString(op));
+            Equal(200, resolve.Status, "the Resolve dialog");
+            Check(System.Text.RegularExpressions.Regex.IsMatch(resolve.Text, "id=\"rrReported\" value=\"reported\" autocomplete=\"off\" checked"),
+                "it offers the reported cost first, chosen: " + resolve.Text);
 
             // Released by the user, it stops counting; the refused message (same request id) now fits and posts once.
             var released = await app.PostAsync("/api/spend/resolve", new JsonObject { ["op"] = op, ["choice"] = "release" });

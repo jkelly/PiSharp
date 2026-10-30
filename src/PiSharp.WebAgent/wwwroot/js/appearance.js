@@ -4,8 +4,9 @@
 // Web.Common's theme key (<html data-theme-key>, "pisharp-theme": dark, light or system); "system" follows prefers-color-scheme and
 // switches when it changes, and the top bar's moon (shell.js) sets dark or light through window.PiSharpAppearance. Every other preference
 // is one JSON object under "pisharp.appearance" (AppearancePrefs lists them) and becomes an attribute that appearance.css reads:
-// data-font-size, data-density, data-code-theme, data-code-ligatures, data-usage-footer, data-reduce-motion (its "system" follows
-// prefers-reduced-motion), data-expand-thinking and data-expand-tools; the last two open each chat's thinking blocks and tool cards the
+// data-font-size, data-density, data-code-theme, data-code-ligatures, data-usage-footer, data-user-markdown (W3 fix: which of the two
+// renderings of a user message the chat shows), data-reduce-motion (its "system" follows prefers-reduced-motion), data-expand-thinking
+// and data-expand-tools; the last two open each chat's thinking blocks and tool cards the
 // first time they appear (a MutationObserver, so streamed fragments too), and keep the user's own open or close for the page's life.
 // Another tab's change applies here at once (the storage event). After any change it dispatches "pisharp:appearance" on document. When the
 // browser keeps no site data, the preferences last for the page only. On the Appearance page it also wires the form: the theme cards
@@ -28,6 +29,7 @@
     expandThinking: { values: SWITCH, fallback: 'off', attribute: 'data-expand-thinking' },
     showUsage: { values: SWITCH, fallback: 'on', attribute: 'data-usage-footer' },
     expandToolCalls: { values: SWITCH, fallback: 'off', attribute: 'data-expand-tools' },
+    userMarkdown: { values: SWITCH, fallback: 'off', attribute: 'data-user-markdown' },
     reduceMotion: { values: [...SWITCH, 'system'], fallback: 'system', attribute: 'data-reduce-motion' },
   };
   // The body text size of each font size (rem-based sizes scale with the root): 14, 15 and 17 px.
@@ -251,7 +253,7 @@
 
     function showPreview(draft) {
       if (!preview) return;
-      for (const key of ['density', 'codeTheme', 'codeLigatures', 'showUsage', 'reduceMotion']) {
+      for (const key of ['density', 'codeTheme', 'codeLigatures', 'showUsage', 'userMarkdown', 'reduceMotion']) {
         preview.setAttribute(PREFS[key].attribute, effective(key, draft[key]));
       }
       // The page already shows the saved font size; the sample is zoomed by the ratio, so it shows the unsaved one.

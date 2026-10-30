@@ -1,9 +1,10 @@
 // Decision 0011 (run W3, SU): what the first-run wizard and its redirect decide on. "Connected" is the Settings area's word for a provider
 // (ProviderDirectory: a usable stored key or sign-in, an environment variable or ambient credentials, or a provider that needs no key such
-// as the faux one or a loopback custom provider), so the wizard, Settings › Providers and Settings › Defaults always agree on it. The
-// redirect applies only while nothing is connected and the wizard was never finished or skipped, and never with --faux (the faux provider
-// counts as connected anyway, and an offline app must not be forced through a wizard it cannot complete online). Finishing saves the
-// default model through ISettingsStore's Defaults section, exactly as Settings › Defaults does, and never changes an account or a chat.
+// as the faux one, or a routed custom provider whose key source is usable: none, a stored key or a set variable; W3 fix), so the wizard,
+// Settings › Providers and Settings › Defaults always agree on it. The redirect applies only while nothing is connected and the wizard was
+// never finished or skipped, and never with --faux (the faux provider counts as connected anyway, and an offline app must not be forced
+// through a wizard it cannot complete online). Finishing saves the default model through ISettingsStore's Defaults section, exactly as
+// Settings › Defaults does, and never changes an account or a chat.
 using PiSharp.AI;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Hosting;

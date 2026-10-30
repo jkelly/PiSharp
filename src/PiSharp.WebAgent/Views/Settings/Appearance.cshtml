@@ -1,10 +1,11 @@
 @* Decision 0011 (run W3, unit AP): the mockups' settings-appearance page (route GET /settings/appearance), mapped 1:1. Theme: three cards
    (Dark, the default; Light; System, which follows the system and switches when it changes) that apply at once and are remembered by this
    browser, like the top bar's moon. Display (UI font size, message density, code theme, code ligatures) and Messages (thinking and tool
-   cards expanded, the usage footer, reduce motion) are a form: the live preview (_AppearancePreview) shows a change before it is saved,
+   cards expanded, the usage footer, Markdown in user messages, reduce motion) are a form: the live preview (_AppearancePreview) shows a change before it is saved,
    the rows mark what changed, and _SettingsSaveBar saves it to this browser (or discards it); each section can be reset to its defaults.
    Nothing here is stored by the server or sent to a model. wwwroot/js/appearance.js (loaded in every page's <head>) wires the page.
-   "Render markdown in user messages" is left out: the chat shows a user's text as typed. Model: AppearancePage. *@
+   "Render markdown in user messages" (W3 fix) picks which of the two renderings of a user message the chat shows (_ChatItem). Model:
+   AppearancePage. *@
 @using PiSharp.WebAgent.Appearance
 @model AppearancePage
 @{

@@ -1,7 +1,8 @@
 @* Decision 0011 (run W3, S4): the mockups' modal-resolve-reservation (_ResolveReservationModal, History › Spend): an uncertain row (the
    stream dropped, no usage reported) and how to settle it: at the estimate (the reserved worst case when none was recorded), at the amount
    the user enters, or released. It shows what it reserved and why, which caps it counts toward and what each would show afterwards.
-   PiSharp never settles it on its own. With a null model it is the empty shell the page keeps; GET /history/spend/resolve?op= renders it
+   PiSharp never settles it on its own. When a recovered request's resend reported usage for the row (W3 fix), "Settle at the reported
+   cost" comes first and is chosen. With a null model it is the empty shell the page keeps; GET /history/spend/resolve?op= renders it
    with a row and spend-history.js swaps that content in and posts the choice to /api/spend/resolve. Model: ResolveReservationView? *@
 @model ResolveReservationView?
 <div class="modal fade" id="modal-resolve-reservation" tabindex="-1" aria-labelledby="modal-resolve-reservation-title" aria-hidden="true">
@@ -36,7 +37,15 @@
           <fieldset>
             <legend class="ps-label mb-2">Settle it how?</legend>
             <div class="d-grid gap-2">
-              <input type="radio" class="btn-check" name="rrChoice" id="rrEstimate" value="estimate" autocomplete="off" checked>
+              @if (view.ReportedMicros is { } reportedMicros)
+              {
+                <input type="radio" class="btn-check" name="rrChoice" id="rrReported" value="reported" autocomplete="off" checked>
+                <label class="choice-card" for="rrReported">
+                  <span class="d-flex justify-content-between gap-2"><span class="choice-title">Settle at the reported cost</span><span class="ps-mono fs-7">@SpendMoney.Format(reportedMicros)</span></span>
+                  <span class="choice-desc d-block">@view.ReportedText</span>
+                </label>
+              }
+              <input type="radio" class="btn-check" name="rrChoice" id="rrEstimate" value="estimate" autocomplete="off" checked="@(view.ReportedMicros is null)">
               <label class="choice-card" for="rrEstimate">
                 <span class="d-flex justify-content-between gap-2"><span class="choice-title">Settle at the estimate</span><span class="ps-mono fs-7">@estimate</span></span>
                 <span class="choice-desc d-block">@view.EstimateText</span>
@@ -53,7 +62,11 @@
               </label>
             </div>
           </fieldset>
-          <div class="fs-8 text-ps-faint mt-3" data-rr-pane="estimate">@(view.AfterEstimate ?? "It counts toward no cap.")</div>
+          @if (view.ReportedMicros is not null)
+          {
+            <div class="fs-8 text-ps-faint mt-3" data-rr-pane="reported">@(view.AfterReported ?? "It counts toward no cap.")</div>
+          }
+          <div class="fs-8 text-ps-faint mt-3" data-rr-pane="estimate" hidden="@(view.ReportedMicros is not null)">@(view.AfterEstimate ?? "It counts toward no cap.")</div>
           <div class="mt-3" data-rr-pane="amount" hidden>
             <label class="form-label" for="rrAmount">Actual amount</label>
             <div class="input-group input-group-sm" style="max-width:12rem">
@@ -67,7 +80,11 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary" data-rr-pane="estimate" data-rr-submit>Settle at @estimate</button>
+          @if (view.ReportedMicros is { } reportedCost)
+          {
+            <button type="submit" class="btn btn-primary" data-rr-pane="reported" data-rr-submit>Settle at @SpendMoney.Format(reportedCost)</button>
+          }
+          <button type="submit" class="btn btn-primary" data-rr-pane="estimate" data-rr-submit hidden="@(view.ReportedMicros is not null)">Settle at @estimate</button>
           <button type="submit" class="btn btn-primary" data-rr-pane="amount" data-rr-submit hidden>Save amount</button>
           <button type="submit" class="btn btn-primary" data-rr-pane="release" data-rr-submit hidden>Release @reserved</button>
         </div>

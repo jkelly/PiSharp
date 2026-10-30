@@ -3,10 +3,18 @@
 // (BuiltinProviders: metadata only, nothing calls a provider), then any provider that only has accounts; so a key can be stored for a
 // provider even offline. Accounts come from IAccountStore and sign-in methods from ISignInFlows (WU5): an entry holds metadata only, a masked
 // hint at most. Nothing here picks or changes an account: the active account is the one the user chose (IAccountStore.Active).
+// W3 fix: a custom provider of the data folder's models.json (whenever CustomProviderService knows the id) is listed after the built-in
+// providers, routed or not, with CustomProviderFacts: where its key comes from (none, a vault account named "<name> key", or a $VAR
+// reference that is set or not; never the key), and the page that edits it (Settings › Custom providers), which its rows link to instead
+// of a detail page. It takes no key through the generic API key modal (KeyForm None), it is not a no-credentials (faux) provider, and it
+// counts as connected only when it is routed (never with --faux) and its key source is usable: no key, a stored key that works, or a set
+// variable. So the first-run redirect (SetupState.HasConnection) no longer counts a custom provider whose variable is unset, or one that
+// is not routed.
 using PiSharp.AI.Catalogs;
 using PiSharp.Web.Common;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Credentials;
+using PiSharp.WebAgent.CustomProviders;
 using BuiltinAuth = PiSharp.AI.Catalogs.ProviderAuthKind;
 
 namespace PiSharp.WebAgent.Settings;
@@ -47,6 +55,59 @@ public enum ApiKeyForm
 
     /// <summary>Cloudflare: API token, account id and (for the AI Gateway) gateway id.</summary>
     Cloudflare,
+}
+
+/// <summary>A custom provider of the data folder's models.json as the settings pages show it (W3 fix): where its key comes from (never the
+/// key), whether it is routed, and the page that edits it.</summary>
+/// <param name="KeySource">Where its key comes from now (<see cref="CustomProviderService.KeySource"/>).</param>
+/// <param name="Variable">The environment variable of an environment key, or null.</param>
+/// <param name="VariableSet">Whether that variable is set on the web host (<see cref="CustomProviderService.IsSet"/>; never its value).</param>
+/// <param name="BaseUrl">Its base URL (empty when the file has none).</param>
+/// <param name="Api">Its API type (empty when the file has none).</param>
+/// <param name="Loopback">Whether the base URL is on this machine.</param>
+/// <param name="Routed">Whether it is routed: a key source the web app uses, models, and an API with a live route.</param>
+/// <param name="Problem">Why its key or a header is not used, or null.</param>
+public sealed record CustomProviderFacts(CustomKeySource KeySource, string? Variable, bool VariableSet, string BaseUrl, string Api, bool Loopback,
+    bool Routed, string? Problem)
+{
+    /// <summary>Settings › Custom providers, where a custom provider is edited (its key too).</summary>
+    public const string PageUrl = "/settings/custom-providers";
+
+    /// <summary>The chip of its key source: <c>no key</c>, <c>stored key</c>, <c>env · VARIABLE</c> (with <c>not set</c>), <c>key not used</c>.</summary>
+    public string Chip => KeySource switch
+    {
+        CustomKeySource.Stored => "stored key",
+        CustomKeySource.Environment => "env · " + Variable + (VariableSet ? "" : " · not set"),
+        CustomKeySource.Unsupported => "key not used",
+        _ => "no key",
+    };
+
+    /// <summary>The chip's tone.</summary>
+    public string Tone => KeySource switch
+    {
+        CustomKeySource.Stored => "ok",
+        CustomKeySource.Environment => VariableSet ? "info" : "warn",
+        CustomKeySource.Unsupported => "warn",
+        _ => "ok",
+    };
+
+    /// <summary>The chip's Bootstrap icon.</summary>
+    public string Icon => KeySource switch
+    {
+        CustomKeySource.Stored => "bi-key",
+        CustomKeySource.Environment => "bi-terminal",
+        CustomKeySource.Unsupported => "bi-exclamation-triangle",
+        _ => "bi-hdd-network",
+    };
+
+    /// <summary>How it authenticates, for the provider header.</summary>
+    public string Auth => KeySource switch
+    {
+        CustomKeySource.Stored => "API key (vault)",
+        CustomKeySource.Environment => "$" + Variable + (VariableSet ? "" : " (not set)"),
+        CustomKeySource.Unsupported => "a key the web app doesn't use",
+        _ => "none (a placeholder key is sent)",
+    };
 }
 
 /// <summary>One provider as the settings pages show it. Metadata only.</summary>
@@ -106,6 +167,12 @@ public sealed record ProviderEntry
     /// <summary>How it is connected now.</summary>
     public ProviderState State { get; init; }
 
+    /// <summary>The custom provider of models.json this is (W3 fix), or null for any other provider.</summary>
+    public CustomProviderFacts? Custom { get; init; }
+
+    /// <summary>Where it is managed: its detail page, or Settings › Custom providers for a custom provider.</summary>
+    public string Href => Custom is null ? "/settings/providers/" + Uri.EscapeDataString(Id) : CustomProviderFacts.PageUrl;
+
     /// <summary>Whether a key (or key settings) can be stored for it.</summary>
     public bool TakesApiKey => KeyForm != ApiKeyForm.None;
 
@@ -130,7 +197,7 @@ public sealed record ProviderEntry
     /// <summary>The auth-kind filter words (<c>apiKey</c>, <c>oauth</c>, <c>cloud</c>), space-separated.</summary>
     public string AuthTags => string.Join(' ', new[]
     {
-        KeyForm is ApiKeyForm.Single or ApiKeyForm.Azure ? "apiKey" : null,
+        KeyForm is ApiKeyForm.Single or ApiKeyForm.Azure || Custom is { KeySource: CustomKeySource.Stored or CustomKeySource.Environment } ? "apiKey" : null,
         SignsIn ? "oauth" : null,
         KeyForm is ApiKeyForm.Bedrock or ApiKeyForm.Vertex or ApiKeyForm.Cloudflare ? "cloud" : null,
     }.Where(tag => tag is not null));
@@ -144,7 +211,10 @@ public sealed record ProviderEntry
 /// <param name="accounts">The accounts.</param>
 /// <param name="signIn">The sign-in flows (only <see cref="ISignInFlows.Methods"/> is read).</param>
 /// <param name="options">The credentials options (offline in --faux mode), when registered.</param>
-public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accounts, ISignInFlows signIn, CredentialsOptions? options = null)
+/// <param name="customs">The custom providers area (models.json), when registered: its providers are listed with
+/// <see cref="ProviderEntry.Custom"/>.</param>
+public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accounts, ISignInFlows signIn, CredentialsOptions? options = null,
+    CustomProviderService? customs = null)
 {
     private static readonly Dictionary<string, string> Descriptions = new(StringComparer.Ordinal)
     {
@@ -168,7 +238,8 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
     /// <summary>The message the pages show while offline.</summary>
     public static string OfflineMessage => CredentialsOptions.OfflineMessage;
 
-    /// <summary>Every provider: the catalog's, then the built-in ones, then providers that only have accounts.</summary>
+    /// <summary>Every provider: the catalog's, then the built-in ones, then the custom ones of models.json (routed or not), then providers that
+    /// only have accounts.</summary>
     public IReadOnlyList<ProviderEntry> List()
     {
         var methods = signIn.Methods;
@@ -176,6 +247,7 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
         var ids = new List<string>();
         foreach (var provider in catalog.Providers) Add(provider.Id);
         foreach (var provider in BuiltinProviders.All) Add(provider.Id);
+        foreach (var provider in CustomProviders()) Add(provider.Id);
         foreach (var account in all.OrderBy(account => account.Provider, StringComparer.Ordinal)) Add(account.Provider);
         return [.. ids.Select(id => Build(id, [.. all.Where(account => account.Provider == id)], methods))];
 
@@ -185,11 +257,11 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
         }
     }
 
-    /// <summary>The provider <paramref name="id"/>, or null when no catalog, built-in provider or account knows it.</summary>
+    /// <summary>The provider <paramref name="id"/>, or null when no catalog, built-in provider, custom provider or account knows it.</summary>
     public ProviderEntry? Find(string? id)
     {
         if (string.IsNullOrWhiteSpace(id)) return null;
-        var known = catalog.FindProvider(id) is not null || BuiltinProviders.TryGet(id, out _);
+        var known = catalog.FindProvider(id) is not null || BuiltinProviders.TryGet(id, out _) || CustomOf(id) is not null;
         var own = accounts.List(id);
         return known || own.Count > 0 ? Build(id, own, signIn.Methods) : null;
     }
@@ -197,8 +269,13 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
     /// <summary>The ids of the providers that are connected (a usable account, or no credentials needed).</summary>
     public IReadOnlySet<string> ConnectedIds() => List().Where(entry => entry.IsConnected).Select(entry => entry.Id).ToHashSet(StringComparer.Ordinal);
 
+    private IReadOnlyList<CustomProviderInfo> CustomProviders() => customs?.Current.Providers ?? [];
+
+    private CustomProviderInfo? CustomOf(string id) => customs is null || CustomProviderJson.IsBuiltin(id) ? null : customs.Current.Find(id);
+
     private ProviderEntry Build(string id, IReadOnlyList<AccountInfo> own, IReadOnlyList<SignInMethodInfo> methods)
     {
+        if (customs is not null && CustomOf(id) is { } custom) return BuildCustom(custom, customs, own);
         var listed = catalog.FindProvider(id);
         BuiltinProviders.TryGet(id, out var builtin);
         var noCredentials = CredentialVault.NoCredentialProviders.Contains(id) || (listed is not null && listed.AuthKinds.All(kind => kind == Contracts.ProviderAuthKind.None));
@@ -227,6 +304,62 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
             KeyForm = noCredentials || signInOnly ? ApiKeyForm.None : FormOf(id, builtin),
             State = StateOf(noCredentials, active, own),
         };
+    }
+
+    /// <summary>A custom provider (W3 fix): its key source instead of an API key form, and connected only when it is routed and its key
+    /// source is usable.</summary>
+    private ProviderEntry BuildCustom(CustomProviderInfo custom, CustomProviderService service, IReadOnlyList<AccountInfo> own)
+    {
+        var listed = catalog.FindProvider(custom.Id);
+        var source = service.KeySource(custom);
+        var variable = source == CustomKeySource.Environment ? custom.KeyVariable : null;
+        var facts = new CustomProviderFacts(source, variable, service.IsSet(variable), custom.BaseUrl, custom.Api, custom.Loopback, custom.Routed,
+            custom.Problem);
+        var active = source == CustomKeySource.Stored ? own.FirstOrDefault(account => account.IsActive) : null;
+        var name = listed?.DisplayName ?? custom.Name;
+        return new ProviderEntry
+        {
+            Id = custom.Id,
+            Name = name,
+            LogoUrl = Logo(custom.Id, listed?.LogoKey),
+            Description = DescribeCustom(custom, facts, Offline),
+            BaseUrl = custom.BaseUrl.Length > 0 ? custom.BaseUrl : null,
+            SubscriptionName = name,
+            Apis = custom.Api.Length > 0 ? [custom.Api] : [],
+            Variables = variable is null ? [] : [variable],
+            Billing = listed?.Billing ?? (custom.Loopback ? BillingKind.Free : BillingKind.Unknown),
+            Models = listed is null ? [] : catalog.Models(custom.Id),
+            Accounts = own,
+            Active = active,
+            KeyForm = ApiKeyForm.None,
+            // With --faux no custom provider is routed (the faux catalog stands in), so none counts as connected.
+            State = !custom.Routed || Offline ? ProviderState.NotConfigured : source switch
+            {
+                CustomKeySource.None => ProviderState.Connected,
+                CustomKeySource.Environment => facts.VariableSet ? ProviderState.Environment : ProviderState.NotConfigured,
+                CustomKeySource.Stored => StateOf(false, active, own),
+                _ => ProviderState.NotConfigured,
+            },
+            Custom = facts,
+        };
+    }
+
+    private static string DescribeCustom(CustomProviderInfo custom, CustomProviderFacts facts, bool offline)
+    {
+        var at = custom.BaseUrl.Length > 0 ? " at " + custom.BaseUrl : "";
+        var api = custom.Api.Length > 0 ? " (" + custom.Api + ")" : "";
+        var key = facts.KeySource switch
+        {
+            CustomKeySource.Stored => "Its key is stored encrypted in the credential vault.",
+            CustomKeySource.Environment => $"Its key is read from {facts.Variable}" + (facts.VariableSet ? "." : ", which isn't set for the web host."),
+            CustomKeySource.Unsupported => "The key in models.json isn't one the web app uses, so it isn't routed until it is saved with another key source.",
+            _ => "It needs no key; requests carry a placeholder key.",
+        };
+        var routed = offline ? " With --faux it isn't routed."
+            : custom.Routed || facts.KeySource == CustomKeySource.Unsupported ? ""
+            : custom.Models.Count == 0 ? " It has no models yet, so it isn't in the model picker."
+            : " Its API has no live route here, so it isn't in the model picker.";
+        return $"A custom provider from models.json{at}{api}. {key}{routed} Edit it in Settings › Custom providers.";
     }
 
     private static ApiKeyForm FormOf(string id, BuiltinProviderDefinition? builtin) => builtin?.Auth switch

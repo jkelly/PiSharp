@@ -113,7 +113,8 @@ internal static partial class Program
                          "data-preview-detail=\"expandToolCalls\"", "data-savebar", "data-appearance-reset=\"display\"", "data-appearance-reset=\"messages\"",
                          "data-appearance-storage-off", "pisharp-theme · this browser" })
                 Check(html.Contains(part, StringComparison.Ordinal), "the page has " + part);
-            Check(!html.Contains("Render markdown in user messages", StringComparison.Ordinal), "no option the app cannot honour");
+            // W3 fix: the chat now honours it (_ChatItem renders a user message both ways; appearance.css shows one).
+            Check(html.Contains("Render markdown in user messages", StringComparison.Ordinal), "the user-Markdown option");
             var usage = Regex.Match(html, "<div class=\"msg-footer pv-usage\">(.*?)</div>", RegexOptions.Singleline);
             Check(usage.Success, "the preview's usage footer");
             Check(!Regex.IsMatch(usage.Groups[1].Value, "[0-9]"), "the sample shows no number nothing measured: " + usage.Groups[1].Value);

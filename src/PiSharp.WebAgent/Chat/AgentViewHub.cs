@@ -11,6 +11,8 @@
 // agent's frames, so every feed renders again when that flag changes (ActivityChanged); otherwise a page could keep showing busy after a run.
 // W3 (S5): the render context carries the answers' cost marks from the spend ledger (ChatSpend, read at most every second or when the
 // entries or the running state change), and an item's fingerprint includes its mark, so a footer changes when its request settles.
+// W3 fix: a chat's feeds also render again when one of its ledger rows changes (ChatSpend.RunChanged), so a reservation resolved on History
+// › Spend, or settled after the answer was committed, shows in an open chat at once.
 using System.Text.Json.Nodes;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Hosting;
@@ -29,6 +31,7 @@ public sealed class AgentViewHub : IAsyncDisposable
     private readonly ChatService chats;
     private readonly ChatBindings bindings;
     private readonly ApprovalBroker broker;
+    private readonly ChatSpend? spending;
     private readonly FragmentRenderer renderer;
     private readonly ILogger<AgentViewHub> logger;
     private readonly Lock gate = new();
@@ -48,6 +51,8 @@ public sealed class AgentViewHub : IAsyncDisposable
         broker.Changed += Refresh;
         bindings.Changed += Refresh;
         device.ActivityChanged += RefreshAll;
+        spending = chats.Spending;
+        if (spending is not null) spending.RunChanged += Refresh;
     }
 
     /// <summary>The feeds open now (one per watched agent, however many tabs watch it).</summary>
@@ -117,6 +122,7 @@ public sealed class AgentViewHub : IAsyncDisposable
         broker.Changed -= Refresh;
         bindings.Changed -= Refresh;
         device.ActivityChanged -= RefreshAll;
+        if (spending is not null) spending.RunChanged -= Refresh;
         List<Feed> all;
         lock (gate)
         {

@@ -14,7 +14,7 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> W3SettingsCases() =>
     [
-        BrowseW3("browser.w3.custom-providers.a-stored-key-never-reaches-the-page", W3Mode.Faux, async (app, window) =>
+        Browse("browser.w3.custom-providers.a-stored-key-never-reaches-the-page", AgentMode.Faux, async (app, window) =>
         {
             var secret = "sk-cp-PLANTED" + Guid.NewGuid().ToString("N") + "Zq9Lw2";
             var page = window.Page;
@@ -84,7 +84,7 @@ internal static partial class Program
             Check(!app.Log.Contains(secret, StringComparison.Ordinal), "the app's log leaves the key out");
         }),
 
-        BrowseW3("browser.w3.appearance.the-theme-switches-and-survives-a-reload", W3Mode.Faux, async (app, window) =>
+        Browse("browser.w3.appearance.the-theme-switches-and-survives-a-reload", AgentMode.Faux, async (app, window) =>
         {
             var page = window.Page;
             // Records the theme at the moment <body> appears, before any paint: it must already be the stored one.
@@ -134,7 +134,7 @@ internal static partial class Program
             Equal("system", await page.EvaluateAsync<string?>("() => localStorage.getItem('pisharp-theme')"), "System is stored");
         }),
 
-        BrowseW3("browser.w3.about.copies-the-diagnostics-report", W3Mode.Faux, async (app, window) =>
+        Browse("browser.w3.about.copies-the-diagnostics-report", AgentMode.Faux, async (app, window) =>
         {
             var secret = "sk-proj-PLANTED" + Guid.NewGuid().ToString("N") + "Ab3Cd4";
             var stored = await app.PostAsync("/api/credentials/accounts", new JsonObject { ["provider"] = "openai", ["apiKey"] = secret, ["label"] = "About key" });

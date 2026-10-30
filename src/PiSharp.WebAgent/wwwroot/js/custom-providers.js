@@ -3,6 +3,9 @@
 // connection test), the row actions (Test, Edit, Duplicate, Delete behind the confirm dialog), Re-check all, Import and Export, and model
 // overrides. Everything goes through /api/custom-providers. A key typed into the editor is sent only with a save or a test, and the field
 // is cleared when the editor closes; the preview never sends it. Text is always set with textContent or an input's value, never as HTML.
+// W3 fix: the setup wizard's "Add server" links here with ?add=<template> (lmstudio, ollama, vllm, openai-compatible); the page opens the
+// editor on that template once, when models.json is valid, and drops the parameter from the address so a reload or Back does not open it
+// again.
 import { showToast, confirmAction, providerModelValue } from './shell.js';
 import { postJson, getJson, flashAndReload, showFlash, showError, setText, setShown, plural, fillLogo, busy } from './settings-api.js';
 
@@ -648,3 +651,15 @@ form?.addEventListener('submit', async (event) => {
 
 if (offline) document.querySelectorAll('[data-cp-test], [data-cp-recheck]').forEach((button) => { button.disabled = true; button.title = 'Offline (--faux): nothing is tested'; });
 showFlash();
+openRequested();
+
+/** Opens the editor on the template the address asks for (?add=lmstudio, from the setup wizard), once. */
+function openRequested() {
+  const url = new URL(window.location.href);
+  const template = url.searchParams.get('add');
+  if (template === null) return;
+  url.searchParams.delete('add');
+  window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  if (!page || !modalEl || page.dataset.fileValid !== 'true' || !Object.hasOwn(TEMPLATES, template)) return;
+  openEditor(blankDraft(template)).catch((error) => showError('Could not open the editor', error));
+}

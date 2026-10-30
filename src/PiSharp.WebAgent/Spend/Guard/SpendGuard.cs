@@ -11,9 +11,10 @@
 //
 // Ops and recovery: a durable request keeps its op when it is recovered, and the ledger returns an op's row unchanged whatever its state.
 // So the guard walks the op's ledger keys (op, op~2, op~3, ...): a key still reserved or uncertain is that request's own reservation and is
-// reused (a recovered request never reserves twice; its uncertain row stays uncertain until the user resolves it), while a key that already
-// settled or was released means the request was sent again after it ended (a restart after the answer arrived but before the engine saved
-// it), which is a new provider call with a new key. A reused reservation is sent with the output cap its approval chose.
+// reused (a recovered request never reserves twice; its uncertain row stays uncertain until the user resolves it, and the usage its resend
+// reports is attached to the row (W3 fix), so Resolve can offer the reported cost), while a key that already settled or was released
+// means the request was sent again after it ended (a restart after the answer arrived but before the engine saved it), which is a new
+// provider call with a new key. A reused reservation is sent with the output cap its approval chose.
 //
 // Settling (SettleAsync, from how the call ended): StreamDone with usage -> the actual cost; an error or cancel before any output ->
 // released; a cancel after output -> settled at the estimate (the input estimate plus the output seen); a stream that ended without usage
@@ -224,7 +225,11 @@ public sealed class SpendGuard : ISpendGuard
         try
         {
             var row = await ledger.GetAsync(key, cancellationToken).ConfigureAwait(false);
-            // The first ending wins; an uncertain row (a recovered request's) changes only when the user resolves it.
+            // The first ending wins; an uncertain row (a recovered request's) is settled only when the user resolves it, but the usage its
+            // resend reported is kept on it for that choice.
+            if (row is { State: ReservationState.Uncertain } && outcome is { Kind: SpendOutcomeKind.Completed, Usage: { } reported } &&
+                (reported.HasTokens || reported.CostMicros is > 0))
+                return await ledger.ReportUsageAsync(key, reported, cancellationToken).ConfigureAwait(false);
             if (row is null || row.State != ReservationState.Reserved) return row;
             var estimate = EstimateMicros(row, outcome.OutputTokensSeen);
             switch (outcome.Kind)

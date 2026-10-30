@@ -221,6 +221,10 @@ public sealed record SetupPage
     {
         ArgumentNullException.ThrowIfNull(entry);
         var models = entry.Models.Count > 0 ? SettingsText.Plural(entry.Models.Count, "model") : null;
+        // W3 fix: a custom provider says where its key comes from (no key, stored key, env · VARIABLE) and leads with its base URL.
+        if (entry.Custom is { } custom)
+            return new SetupConnection(entry, entry.Active, custom.Chip, custom.Icon, custom.Tone, custom.BaseUrl.Length > 0 ? custom.BaseUrl : "custom provider",
+                custom.BaseUrl.Length > 0, models ?? "");
         if (entry.NoCredentials || entry.Active is not { } account)
             return new SetupConnection(entry, null, "no key needed", "bi-plug", "ok", "No key needed", false, models ?? "");
         var rest = new List<string?> { models };

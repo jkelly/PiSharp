@@ -1,0 +1,14 @@
+@* Decision 0011 (W3 fix): the <head> content both layouts share (_Layout and the setup wizard's _SetupLayout), kept in one place: the
+   charset and viewport, the title, Web.Common's _WebCommonHead (the favicon, theme-boot.js before the first paint, Bootstrap and the PiSharp
+   tokens), then Settings › Appearance (run W3, unit AP: appearance.js, a classic script after theme-boot.js, sets this browser's theme,
+   font size, density, code theme and chat display options on <html> before the first paint; appearance.css reads them) and site.css. A
+   layout renders its page's Styles section after it. No inline script (the Content-Security-Policy has script-src 'self'). Model: the
+   page's title (string). *@
+@model string
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@Model · PiSharp Web Agent</title>
+<partial name="_WebCommonHead" model='"pisharp-theme"' />
+<script src="~/js/appearance.js" asp-append-version="true"></script>
+<link href="~/css/appearance.css" rel="stylesheet" asp-append-version="true">
+<link href="~/css/site.css" rel="stylesheet" asp-append-version="true">
