@@ -6,7 +6,10 @@
 // questions and plan reviews answer the waiting tool calls. Markdown export renders the stored transcript with the Client's Transcript. The
 // sidebar's recent chats come from the bindings, with the device's running flags. WU8 adds Retry (fork before the message an answer replies
 // to and send it again, with the chat's own model and account), the session tree (every branch's entries merged by id), the session
-// details panel, the banners and the automatic compaction switch.
+// details panel, the banners and the automatic compaction switch. W3 (S5) adds the Spend Guard (ChatSpend): a create or send that carries
+// `spend` is checked before anything is posted (409 with the confirm modal when the guard would ask or block; the user's choice comes back
+// on the same request id), a call stopped inside a run continues after the user's choice, the composer's estimate, the answers' cost marks,
+// the chat's spend in the details panel and the banner of a stopped call. Billing comes from the Spend area's billing modes when present.
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using PiSharp.Durable;
@@ -41,6 +44,9 @@ public sealed record ChatCreateRequest(string RequestId, string Text)
 
     /// <summary>The title, else one from the first message.</summary>
     public string? Title { get; init; }
+
+    /// <summary>The Spend Guard check (or the user's answer to it) to make before the chat is created; null makes none here.</summary>
+    public ChatSpendAnswer? Spend { get; init; }
 }
 
 /// <summary>A created chat.</summary>
@@ -59,6 +65,10 @@ public sealed record ChatSendRequest(string RequestId, string Text)
 
     /// <summary>While the agent runs: steer the run (true) or queue a follow-up (false, the default).</summary>
     public bool Steer { get; init; }
+
+    /// <summary>The Spend Guard check (or the user's answer to it) to make before the message is posted; null makes none here (the guard
+    /// still checks the request when it is made, and stops it inside the run).</summary>
+    public ChatSpendAnswer? Spend { get; init; }
 }
 
 /// <summary>A sent message.</summary>
@@ -104,6 +114,9 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
 
     private IChatAccounts Accounts => services.GetService<IChatAccounts>() ?? NoChatAccounts.Instance;
 
+    /// <summary>The Spend Guard on the chat pages, or null when the Chat area runs without it.</summary>
+    public ChatSpend? Spending => services.GetService<ChatSpend>();
+
     /// <summary>The binding of a chat that exists and was not deleted.</summary>
     /// <exception cref="ChatException">404.</exception>
     public ChatBinding Require(string chatId) =>
@@ -133,6 +146,9 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             var cwd = request.Cwd is { Length: > 0 } chosen ? CheckDirectory(chosen) : settings.Get<ToolsSettings>().EffectiveWorkingDirectory;
             var title = string.IsNullOrWhiteSpace(request.Title) ? ChatDisplay.TitleFrom(request.Text) : ChatDisplay.Cut(request.Title.Trim(), 100);
             var account = await Accounts.BindAsync(provider.Id, cancellationToken).ConfigureAwait(false);
+            var spend = request.Spend is null ? null : Spending;
+            var approval = spend is null ? null : await spend.AdmitAsync(ChatSpend.NewChatCall(provider.Id, model.Id, account?.Id, request.Text, request.RequestId),
+                "new/" + request.RequestId, request.Spend!, null, cancellationToken).ConfigureAwait(false);
             var session = await device.Host.CreateSessionAsync(new SessionCreateRequest
             {
                 Cwd = cwd,
@@ -144,6 +160,7 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             var now = bindings.Now();
             binding = bindings.Add(new ChatBinding(session.Id, session.Name, provider.Id, model.Id, account?.Id, thinking, tier, 1, now, now, null,
                 request.RequestId));
+            if (approval is not null) await spend!.ApproveAsync(approval with { Run = session.Id }, "new/" + request.RequestId, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Chat {Chat} created with {Provider}/{Model}.", session.Id, provider.Id, model.Id);
         }
         if (binding.IsArchived) return new ChatCreated(binding, 0, "Deleted");
@@ -163,6 +180,12 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         var agentId = request.AgentId ?? binding.AgentId;
         var agent = (await session.AgentsAsync(cancellationToken).ConfigureAwait(false)).FirstOrDefault(item => item.Id == agentId)
             ?? throw ChatException.NotFound($"No agent {agentId} in this chat.");
+        if (request.Spend is { } answer && Spending is { } spend && !spend.WasAdmitted(chatId + "/" + request.RequestId))
+        {
+            var call = await spend.CallAsync(binding, agentId, request.Text, cancellationToken).ConfigureAwait(false);
+            var approval = await spend.AdmitAsync(call, chatId + "/" + request.RequestId, answer, chatId, cancellationToken).ConfigureAwait(false);
+            if (approval is not null) await spend.ApproveAsync(approval, chatId + "/" + request.RequestId, cancellationToken).ConfigureAwait(false);
+        }
         if (!agent.Busy && agent.Kind != AgentKind.Subagent) await AlignAsync(session, agentId, binding, cancellationToken).ConfigureAwait(false);
         var result = await session.SendAsync(agentId, new SendRequest(request.Text, request.RequestId) { WhenBusy = request.Steer ? WhenBusy.Steer : null },
             cancellationToken).ConfigureAwait(false);
@@ -173,6 +196,60 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         });
         _ = device.RefreshAsync(chatId);
         return new ChatSent(agentId, result.SubmissionId.Value, result.Status.ToString());
+    }
+
+    /// <summary>Continues a branch after a call the Spend Guard stopped inside its run (<paramref name="op"/>, named in the stopped answer's
+    /// error): the stopped request plus a "Continue." message is checked with the user's <paramref name="answer"/> (proceed once, or cap
+    /// the output, stored as the chat's one-time approval when it is needed), then the message is sent on the branch. Refused (409, nothing
+    /// sent) when the guard still would not let it through. A retry with the same request id sends nothing new.</summary>
+    /// <exception cref="ChatSpendException">The guard would still ask or block.</exception>
+    public async Task<ChatSent> ContinueAsync(string chatId, long? agentId, string op, string requestId, ChatSpendAnswer answer,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        CheckRequestId(requestId);
+        var binding = Require(chatId);
+        var spend = Spending ?? throw ChatException.NotFound("The Spend Guard isn't running, so no request of this chat was stopped.");
+        var key = chatId + "/" + requestId;
+        if (!spend.WasAdmitted(key))
+        {
+            var stop = await spend.StopAsync(chatId, op, cancellationToken).ConfigureAwait(false)
+                ?? throw ChatException.NotFound($"No request of this chat was stopped as {op}.");
+            var call = ChatSpend.ContinueCall(stop) with { Provider = binding.Provider, Model = binding.Model, Account = binding.AccountId };
+            var approval = await spend.AdmitAsync(call, key, answer, chatId, cancellationToken).ConfigureAwait(false);
+            if (approval is not null) await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false);
+        }
+        return await SendAsync(chatId, new ChatSendRequest(requestId, ChatSpend.ContinueText) { AgentId = agentId }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The composer's estimate of <paramref name="draft"/> on a branch of the chat; null without the Spend Guard.</summary>
+    public async Task<ChatSpendResult?> EstimateAsync(string chatId, long? agentId, string? draft, CancellationToken cancellationToken = default)
+    {
+        var binding = Require(chatId);
+        if (Spending is not { } spend) return null;
+        return await spend.RenderAsync(await spend.EstimateAsync(binding, agentId, draft, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
+    }
+
+    /// <summary>The composer's estimate of a new chat's first message with a model (else the defaults); null without the Spend Guard.</summary>
+    public async Task<ChatSpendResult?> EstimateNewAsync(string? providerId, string? modelId, string? draft, CancellationToken cancellationToken = default)
+    {
+        if (Spending is not { } spend) return null;
+        var (provider, model) = ResolveModel(providerId, modelId);
+        return await spend.RenderAsync(await spend.EstimateNewAsync(provider.Id, model.Id, draft, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
+    }
+
+    /// <summary>The confirm modal of a call the guard stopped in this chat: when continuing would now go through as it is, an allowed answer
+    /// (no modal); else the stop's own decision. Null without the Spend Guard.</summary>
+    public async Task<ChatSpendResult?> StopReviewAsync(string chatId, string op, CancellationToken cancellationToken = default)
+    {
+        var binding = Require(chatId);
+        if (Spending is not { } spend) return null;
+        var stop = await spend.StopAsync(chatId, op, cancellationToken).ConfigureAwait(false)
+            ?? throw ChatException.NotFound($"No request of this chat was stopped as {op}.");
+        var now = await spend.CheckAsync(ChatSpend.ContinueCall(stop) with { Provider = binding.Provider, Model = binding.Model, Account = binding.AccountId },
+            modal: false, cancellationToken).ConfigureAwait(false);
+        if (now is { Allowed: true }) return now;
+        return await spend.StopResultAsync(stop, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Stops the agent's run (its queued messages are withdrawn); resolves once it is idle.</summary>
@@ -412,13 +489,15 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         var model = catalog.FindModel(binding.Provider, binding.Model);
         var items = Transcript.Build(entries);
         var waiting = broker.Pending(chatId).Any(approval => approval.Request.AgentId == agent.Id);
+        var spend = Spending;
+        var facts = spend is null ? ChatSpendFacts.Empty : await spend.FactsAsync(binding, entries, agent.Busy, account?.Label, cancellationToken).ConfigureAwait(false);
         return new ChatPage
         {
             Binding = binding,
             Agent = agent,
             Agents = agents,
             Items = items,
-            Context = RenderContext(binding, agent.Id, account?.Label, entries, items, new ChatRunState(agent.Busy, false, waiting, false)),
+            Context = RenderContext(binding, agent.Id, account?.Label, entries, items, new ChatRunState(agent.Busy, false, waiting, false), facts),
             Cwd = session.Cwd,
             Provider = catalog.FindProvider(binding.Provider),
             Model = model,
@@ -428,6 +507,7 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             Busy = agents.Any(item => item.Busy),
             Info = await InfoAsync(binding, agent.Id, entries, ContextTokens(entries), null, account?.Label, cancellationToken).ConfigureAwait(false),
             Banners = Banners(binding, account?.Label, entries),
+            Estimate = spend is null ? null : await spend.EstimateAsync(binding, agent.Id, null, cancellationToken).ConfigureAwait(false),
         };
     }
 
@@ -466,6 +546,7 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             AssistantCount = entries.Count(entry => ChatDisplay.Str(entry, "kind") == "pi.assistant"),
             ToolCount = entries.Where(entry => ChatDisplay.Str(entry, "kind") == "pi.tool-result")
                 .Sum(entry => (entry["model"] as JsonArray ?? []).OfType<JsonObject>().Count(message => ChatDisplay.Str(message, "role") == "toolResult")),
+            Spend = Spending is { } spend ? await spend.SummaryAsync(binding, accountLabel, cancellationToken).ConfigureAwait(false) : null,
         };
     }
 
@@ -476,6 +557,9 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         ArgumentNullException.ThrowIfNull(binding);
         ArgumentNullException.ThrowIfNull(entries);
         var none = catalog.Providers.Count == 0;
+        var newest = entries.Where(entry => ChatDisplay.Str(entry, "kind") is "pi.user" or "pi.assistant").MaxBy(entry => ChatDisplay.Long(entry, "id") ?? 0);
+        if (ChatDisplay.Str(newest, "kind") == "pi.assistant" && ChatSpendStopView.From(ChatEntryMeta.Of(newest)?.ErrorMessage, ChatDisplay.Long(newest, "id")) is { } stop)
+            return new ChatBannersView(none) { Spend = stop };
         var (kind, meta) = ChatFacts.LastFailure(entries);
         if (kind != ChatFailureKind.Expired) return none ? new ChatBannersView(true) : ChatBannersView.None;
         var provider = meta?.Provider ?? binding.Provider;
@@ -615,6 +699,14 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
 
     private sealed record AgentDetails(string Name, IReadOnlyList<string> Tools, IReadOnlyList<string> AskTools, string? Instructions, DateTimeOffset Read);
 
+    /// <summary>The new chat page's defaults, with the send estimate of an empty first message.</summary>
+    public async Task<NewChatPage> NewChatAsync(CancellationToken cancellationToken = default)
+    {
+        var page = NewChat();
+        if (Spending is not { } spend || page.Provider is not { } provider || page.Model is not { } model) return page;
+        return page with { Estimate = await spend.EstimateNewAsync(provider, model, null, cancellationToken).ConfigureAwait(false) };
+    }
+
     /// <summary>The new chat page's defaults.</summary>
     public NewChatPage NewChat()
     {
@@ -630,7 +722,7 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
     /// <summary>The render context of an agent of the chat: its pending approvals by call id, the account label, the provider's billing
     /// kind and, with the branch's committed <paramref name="entries"/> and <paramref name="items"/>, the items' facts.</summary>
     public ChatRenderContext RenderContext(ChatBinding binding, long agentId, string? accountLabel, IReadOnlyList<JsonObject>? entries = null,
-        IReadOnlyList<TranscriptItem>? items = null, ChatRunState? run = null)
+        IReadOnlyList<TranscriptItem>? items = null, ChatRunState? run = null, ChatSpendFacts? spend = null)
     {
         ArgumentNullException.ThrowIfNull(binding);
         var approvals = new Dictionary<string, PendingApproval>(StringComparer.Ordinal);
@@ -646,12 +738,18 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             Approvals = approvals,
             AccountLabel = accountLabel,
             Provider = binding.Provider,
-            Billing = catalog.FindProvider(binding.Provider)?.Billing ?? BillingKind.Unknown,
+            Billing = Spending?.BillingOf(binding.Provider, binding.AccountId) ?? catalog.FindProvider(binding.Provider)?.Billing ?? BillingKind.Unknown,
             Catalog = catalog,
             Facts = items is null ? new Dictionary<string, ChatItemFacts>(StringComparer.Ordinal) : ChatFacts.Build(items, entries, run),
             Results = ChatFacts.ToolResults(entries),
+            Spend = spend ?? ChatSpendFacts.Empty,
         };
     }
+
+    /// <summary>The answers' cost marks of a branch from the spend ledger (empty without the Spend area).</summary>
+    public Task<ChatSpendFacts> SpendFactsAsync(ChatBinding binding, IReadOnlyList<JsonObject> entries, bool running, string? accountLabel,
+        CancellationToken cancellationToken = default) =>
+        Spending is { } spend ? spend.FactsAsync(binding, entries, running, accountLabel, cancellationToken) : Task.FromResult(ChatSpendFacts.Empty);
 
     /// <summary>The account label of a binding, or null.</summary>
     public async Task<string?> AccountLabelAsync(ChatBinding binding, CancellationToken cancellationToken = default) =>

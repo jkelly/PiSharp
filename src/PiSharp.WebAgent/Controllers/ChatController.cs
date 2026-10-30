@@ -5,12 +5,19 @@
 // change) answers 409 {error: {code: "busy"}} while it runs; a second decision on an approval answers 409 "already_decided". Errors are
 // {error: {code, message}}. No answer carries a credential: a chat names its account by label only. WU8 adds /chat/{id}/tree (the session
 // tree modal's body), /api/chats/{id}/retry (Retry and Regenerate fork and send again; a retry with the same requestId makes nothing new)
-// and /api/chats/{id}/compaction (the automatic compaction switch).
+// and /api/chats/{id}/compaction (the automatic compaction switch). W3 (S5) adds the Spend Guard: a create or send with `spend: {check: true}`
+// is checked first and answers 409 {error: {code: spend_blocked|spend_ask|spend_unknown_price, message}, spend: {verdict, code, pane,
+// canProceed, sentence, chip, html, modal, capOutputTokens}} with nothing posted when the guard would ask or block; the same request id
+// with `spend: {choice: proceed-once|cap-output, maxOutputTokens?}` sends after the user's choice (a Block still refuses). POST
+// /api/chats/{id}/spend and POST /api/chats/spend (a new chat) answer the composer's estimate of a draft; GET
+// /api/chats/{id}/spend/stops/{op} the confirm modal of a call the guard stopped inside the run, and POST /api/chats/{id}/spend/continue
+// continues the branch after the user's choice. No spend answer carries the draft: only its size is counted.
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Spend;
 
 namespace PiSharp.WebAgent.Controllers;
 
@@ -26,7 +33,7 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
     /// <summary>The new chat page.</summary>
     [HttpGet("/chat")]
     [HttpGet("/chat/new")]
-    public IActionResult New() => View("Index", chats.NewChat());
+    public async Task<IActionResult> New(CancellationToken cancellationToken) => View("Index", await chats.NewChatAsync(cancellationToken).ConfigureAwait(false));
 
     /// <summary>A chat page: the stored transcript of the chat's current branch (or <paramref name="agent"/>).</summary>
     [HttpGet("/chat/{id}")]
@@ -72,8 +79,9 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
 
     // ─── Chats ──────────────────────────────────────────────────────────────
 
-    /// <summary><c>POST /api/chats {requestId, text, provider?, model?, thinking?, tier?, cwd?, title?}</c>: creates a chat and sends its first
-    /// message. Answers <c>{id, url, title, agentId, submissionId, status}</c>.</summary>
+    /// <summary><c>POST /api/chats {requestId, text, provider?, model?, thinking?, tier?, cwd?, title?, spend?}</c>: creates a chat and sends its
+    /// first message. Answers <c>{id, url, title, agentId, submissionId, status}</c>; with <c>spend</c>, 409 and no chat when the Spend Guard
+    /// would ask or block.</summary>
     [HttpPost("/api/chats")]
     public Task<IActionResult> Create([FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
     {
@@ -85,6 +93,7 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
             Tier = ChatDisplay.Str(body, "tier"),
             Cwd = ChatDisplay.Str(body, "cwd"),
             Title = ChatDisplay.Str(body, "title"),
+            Spend = ChatSpendAnswer.Read(body?["spend"]),
         }, cancellationToken).ConfigureAwait(false);
         return Ok(new
         {
@@ -113,8 +122,9 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
         return Ok(await DescribeAsync(binding, cancellationToken).ConfigureAwait(false));
     });
 
-    /// <summary><c>POST /api/chats/{id}/messages {requestId, text, agentId?, steer?}</c>: sends (queues as a follow-up, or steers, while it
-    /// runs). Answers <c>{agentId, submissionId, status}</c>.</summary>
+    /// <summary><c>POST /api/chats/{id}/messages {requestId, text, agentId?, steer?, spend?}</c>: sends (queues as a follow-up, or steers, while
+    /// it runs). Answers <c>{agentId, submissionId, status}</c>; with <c>spend</c>, 409 and nothing posted when the Spend Guard would ask or
+    /// block.</summary>
     [HttpPost("/api/chats/{id}/messages")]
     public Task<IActionResult> Send(string id, [FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
     {
@@ -122,7 +132,41 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
         {
             AgentId = ChatDisplay.Long(body, "agentId"),
             Steer = ChatDisplay.Bool(body, "steer"),
+            Spend = ChatSpendAnswer.Read(body?["spend"]),
         }, cancellationToken).ConfigureAwait(false);
+        return Ok(new { agentId = sent.AgentId, submissionId = sent.SubmissionId, status = sent.Status });
+    });
+
+    // ─── Spend ──────────────────────────────────────────────────────────────
+
+    /// <summary><c>POST /api/chats/{id}/spend {text?, agentId?}</c>: the composer's estimate of a draft on a branch (the server counts the
+    /// branch's context; the draft only by its size): <c>{verdict, allowed, code, pane, chip, html}</c>. Nothing is reserved.</summary>
+    [HttpPost("/api/chats/{id}/spend")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<IActionResult> Estimate(string id, [FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
+        Spend(await chats.EstimateAsync(id, ChatDisplay.Long(body, "agentId"), ChatDisplay.Str(body, "text"), cancellationToken).ConfigureAwait(false)));
+
+    /// <summary><c>POST /api/chats/spend {provider?, model?, text?}</c>: the estimate of a new chat's first message.</summary>
+    [HttpPost("/api/chats/spend")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<IActionResult> EstimateNew([FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
+        Spend(await chats.EstimateNewAsync(ChatDisplay.Str(body, "provider"), ChatDisplay.Str(body, "model"), ChatDisplay.Str(body, "text"), cancellationToken)
+            .ConfigureAwait(false)));
+
+    /// <summary><c>GET /api/chats/{id}/spend/stops/{op}</c>: the confirm modal of a call the Spend Guard stopped inside the chat's run (or an
+    /// allowed answer when continuing would now go through as it is).</summary>
+    [HttpGet("/api/chats/{id}/spend/stops/{op}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public Task<IActionResult> Stop(string id, string op, CancellationToken cancellationToken) => Run(async () =>
+        Spend(await chats.StopReviewAsync(id, op, cancellationToken).ConfigureAwait(false)));
+
+    /// <summary><c>POST /api/chats/{id}/spend/continue {requestId, op, agentId?, spend?}</c>: continues the branch after a stopped call, with
+    /// the user's choice. Answers <c>{agentId, submissionId, status}</c>, or 409 when the guard still would not let it through.</summary>
+    [HttpPost("/api/chats/{id}/spend/continue")]
+    public Task<IActionResult> Continue(string id, [FromBody] JsonObject? body, CancellationToken cancellationToken) => Run(async () =>
+    {
+        var sent = await chats.ContinueAsync(id, ChatDisplay.Long(body, "agentId"), Text(body, "op"), Text(body, "requestId"),
+            ChatSpendAnswer.Read(body?["spend"]) ?? ChatSpendAnswer.Check, cancellationToken).ConfigureAwait(false);
         return Ok(new { agentId = sent.AgentId, submissionId = sent.SubmissionId, status = sent.Status });
     });
 
@@ -325,6 +369,10 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
         updated = binding.Updated,
     };
 
+    /// <summary>A spend answer; without the Spend Guard, an allowed one with nothing to show.</summary>
+    private OkObjectResult Spend(ChatSpendResult? result) =>
+        Ok(result ?? new ChatSpendResult("allow", true, null, null, false, null, null, "", null, null));
+
     private ObjectResult Error(int status, string code, string message, object? extra = null) =>
         StatusCode(status, extra is null
             ? new { error = new { code, message } }
@@ -337,6 +385,14 @@ public sealed class ChatController(ChatService chats, ApprovalBroker broker, Dev
             return await work().ConfigureAwait(false);
         }
         catch (ChatException error)
+        {
+            return Error(error.Status, error.Code, error.Message);
+        }
+        catch (ChatSpendException refused)
+        {
+            return StatusCode(ChatSpendException.Status, new { error = new { code = refused.Code, message = refused.Message }, spend = refused.Result });
+        }
+        catch (SpendException error)
         {
             return Error(error.Status, error.Code, error.Message);
         }

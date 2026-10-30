@@ -3,9 +3,11 @@
 // stopReason "aborted". The `expired` state (a sign-in that expired, or an account that was removed or revoked) has a stable marker:
 // "account_expired:" (AccountExpired builds it; the marker is for the page only and Display strips it), or the text routing (WU6's
 // AccountRouter) fails such a request with, which starts with AccountRouteErrors.Prefix ("Account expired (<reason>): ...", shown as it is).
-// OAuth refresh failures that mean the same (invalid_grant, refresh_token_reused) count too.
+// OAuth refresh failures that mean the same (invalid_grant, refresh_token_reused) count too. W3 (S5) adds `spend`: a call the Spend Guard
+// stopped before it was sent (its error carries a spend code: SpendErrors.Parse), shown as the cap's stop, never as a provider error.
 using System.Text.RegularExpressions;
 using PiSharp.WebAgent.Routing;
+using PiSharp.WebAgent.Spend;
 
 namespace PiSharp.WebAgent.Chat;
 
@@ -23,6 +25,9 @@ public enum ChatFailureKind
 
     /// <summary>The provider request failed.</summary>
     Error,
+
+    /// <summary>The Spend Guard stopped the call before it was sent (over a cap, or no price): nothing was sent or reserved.</summary>
+    Spend,
 }
 
 /// <summary>Classifies stored failures, and builds the expired marker that routing uses.</summary>
@@ -49,6 +54,7 @@ public static partial class ChatFailures
     {
         if (stopReason == "aborted") return ChatFailureKind.Aborted;
         if (stopReason != "error" && string.IsNullOrEmpty(errorMessage)) return ChatFailureKind.None;
+        if (SpendErrors.IsSpend(errorMessage)) return ChatFailureKind.Spend;
         return IsExpired(errorMessage) ? ChatFailureKind.Expired : ChatFailureKind.Error;
     }
 
@@ -58,11 +64,12 @@ public static partial class ChatFailures
         errorMessage is { Length: > 0 } text && (text.Contains(AccountExpiredPrefix, StringComparison.Ordinal)
             || text.Contains(AccountRouteErrors.Prefix, StringComparison.Ordinal) || RefusedRefresh().IsMatch(text));
 
-    /// <summary>A failure's message for display, trimmed: from after the marker when it has one, or the sentence of routing's account
-    /// error (<see cref="AccountRouteErrors.Detail"/>, capitalized).</summary>
+    /// <summary>A failure's message for display, trimmed: from after the marker when it has one, the sentence of routing's account
+    /// error (<see cref="AccountRouteErrors.Detail"/>, capitalized), or a spend error's sentence.</summary>
     public static string Display(string? errorMessage)
     {
         var text = (errorMessage ?? "").Trim();
+        if (SpendErrors.Parse(text) is { } spend) return spend.Text;
         var at = text.IndexOf(AccountExpiredPrefix, StringComparison.Ordinal);
         if (at >= 0) return text[(at + AccountExpiredPrefix.Length)..].Trim();
         at = text.IndexOf(AccountRouteErrors.Prefix, StringComparison.Ordinal);

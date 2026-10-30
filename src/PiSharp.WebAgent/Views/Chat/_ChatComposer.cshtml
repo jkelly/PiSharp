@@ -5,7 +5,9 @@
    while a run goes on the box offers Follow-up, Steer and Stop (data-running-controls); Enter sends (steers while running), Alt+Enter
    queues a follow-up, Esc stops, Shift+Tab cycles the thinking level and Esc Esc opens the session tree. A typed /compact, /tree, /new or
    /clone runs the command instead of sending it. chat.js posts the message as JSON with a request id, so a retry never sends twice. Prompt
-   templates, skills and attachments come in later milestones. *@
+   templates, skills and attachments come in later milestones. W3 (S5): the send estimate (_ChatSpendEstimate) sits left of Send in
+   data-spend-estimate-host, which chat.js refreshes as the draft changes; a send asks the Spend Guard first and opens modal-spend-confirm
+   when it would ask or block. *@
 @model ChatComposerView
 <form class="composer text-start" data-composer data-new-chat="@(Model.NewChat ? "true" : "false")" autocomplete="off">
   @if (!Model.NewChat)
@@ -45,6 +47,7 @@
       }
     </select>
     <span class="ms-auto d-flex align-items-center gap-2">
+      <span class="composer-spend" data-spend-estimate-host>@await Html.PartialAsync("~/Views/Chat/_ChatSpendEstimate.cshtml", Model.Estimate ?? ChatSpendEstimateView.None)</span>
       @if (!Model.NewChat)
       {
         <span class="d-flex gap-1" data-running-controls hidden>

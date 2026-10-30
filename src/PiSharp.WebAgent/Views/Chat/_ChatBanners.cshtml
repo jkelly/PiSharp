@@ -1,8 +1,24 @@
 @* Decision 0011 (run W2, WU8): the mockups' _GlobalBanners on a chat: "No providers configured", and the chat's sign-in expired when its
    newest answer failed because the chat's account could not be used (ChatFailures.AccountExpired). The chat keeps its account: Sign in
    again goes to that provider's settings, and Retry on the failed answer sends again with the same account. The page renders it; the
-   stream re-renders it (panel "banners"). *@
+   stream re-renders it (panel "banners"). W3 (S5): the over-cap state of a run: when the branch's newest answer is a call the Spend Guard
+   stopped (over a cap, or no price), the banner says why and offers Review… (modal-spend-confirm with the stop's cause; the run continues
+   after the user's choice) and Settings › Spend. *@
 @model ChatBannersView
+@if (Model.Spend is { } stop)
+{
+  <div class="app-banner warn" role="alert" data-banner="spend" data-code="@stop.Code">
+    <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
+    <span><strong>@stop.Title.</strong> @stop.Text Nothing was sent or reserved.</span>
+    <span class="ms-auto d-flex flex-wrap gap-2">
+      @if (stop.Op is { Length: > 0 } op)
+      {
+        <button class="btn btn-sm btn-warning" type="button" data-action="spend-review" data-op="@op" data-entry="@stop.EntryId">@(stop.CanProceed ? "Review and continue…" : "Review…")</button>
+      }
+      <a class="btn btn-sm btn-outline-secondary" href="@stop.SettingsUrl">Settings › Spend</a>
+    </span>
+  </div>
+}
 @if (Model.ExpiredProvider is { } provider)
 {
   <div class="app-banner warn" role="alert" data-banner="expired">

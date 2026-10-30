@@ -8,10 +8,15 @@
 // tab decides), the error details, Retry (a new branch from before the failed answer, with the chat's own model and account), the session
 // tree (fork before or at any entry, switch branch), compaction, the model switch without a reload, the slash commands and the keys
 // (Shift+Tab cycles the thinking level, Esc Esc opens the tree). Markup comes only from the server's partials; text set here goes through
-// textContent.
+// textContent. W3 (S5) adds the Spend Guard: the send estimate by Send follows the draft (debounced; the server counts the request, the
+// draft only by its size) and the model; every send and new chat asks the guard first (spend: {check: true}), and when it would ask or
+// block nothing is posted and modal-spend-confirm (S4's spend-confirm.js) opens: Proceed once or Cap output sends again with the same
+// request id and the choice, Cancel or Choose a model… sends nothing and keeps the draft. A call the guard stopped inside a run shows
+// Review…, which opens the stop's modal and continues the run after the user's choice. Nothing here switches a model or an account.
 import { MuxStream } from '/_content/PiSharp.Web.Common/js/stream.js';
 import { applyItems, swapHtml, keepPinned } from '/_content/PiSharp.Web.Common/js/swap.js';
 import { showToast, confirmAction, providerModelValue } from './shell.js';
+import { showSpendConfirm } from './spend-confirm.js';
 
 const HOST_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 const APPROVAL_KEY = 'pisharp.chat.approval-dialog';
@@ -53,6 +58,63 @@ function report(result, what) {
       : `${what} failed`;
   showToast({ title, body: error.message || `The app answered ${result.status}.`, tone });
   return false;
+}
+
+/** Opens modal-spend-confirm for the guard's answer to a send (`spend` of a 409, or a stopped call's review); resolves with what to send
+ * again ({choice: 'proceed-once'} or {choice: 'cap-output', maxOutputTokens}), or null when nothing is to be sent. */
+async function askSpend(spend, error) {
+  if (!spend?.modal) {
+    showToast({ title: 'Not sent', body: error?.message || spend?.sentence || 'This request is over a spend cap.', tone: 'warn' });
+    return null;
+  }
+  const answer = await showSpendConfirm({ html: spend.modal, verdict: spend.verdict, code: spend.code, pane: spend.pane });
+  if (answer?.choice === 'proceed-once') return { choice: 'proceed-once' };
+  if (answer?.choice === 'cap-output' && answer.maxOutputTokens) return { choice: 'cap-output', maxOutputTokens: answer.maxOutputTokens };
+  return null;
+}
+
+/** POSTs a send the Spend Guard checks first: when it would ask or block, nothing was posted, the confirm modal opens and the user's choice
+ * goes with the same body (the same request id), so the message posts once. Resolves with the last result; `refused` when the user chose
+ * not to send (a failure is a toast). */
+async function postWithSpend(path, body, what, spend = { check: true }) {
+  let current = spend;
+  for (let round = 0; round < 4; round++) {
+    const result = await post(path, { ...body, spend: current });
+    if (result.status === 409 && result.data?.spend) {
+      const choice = await askSpend(result.data.spend, result.data.error);
+      if (!choice) return { ...result, refused: true };
+      current = choice;
+      continue;
+    }
+    report(result, what);
+    return result;
+  }
+  return { ok: false, status: 409, data: null, refused: true };
+}
+
+/** Keeps the send estimate by Send current: asks the server about the draft (debounced) and swaps in its rendered answer. */
+function spendEstimate(form, url, body) {
+  const host = form.querySelector('[data-spend-estimate-host]');
+  let timer = null;
+  let asked = 0;
+  async function refresh() {
+    if (!host) return;
+    clearTimeout(timer);
+    timer = null;
+    const mine = ++asked;
+    const result = await post(url(), body(), { attempts: 1 });
+    if (mine !== asked || !result.ok || typeof result.data?.html !== 'string') return;
+    disposeTooltips(host);
+    swapHtml(host, result.data.html);
+  }
+  return {
+    refresh,
+    schedule(delay = 400) {
+      if (!host) return;
+      clearTimeout(timer);
+      timer = setTimeout(refresh, delay);
+    },
+  };
 }
 
 function modalOf(el) {
@@ -203,26 +265,32 @@ function initNewChat(root) {
   const thinking = form.querySelector('[data-thinking-select]');
   const tier = form.querySelector('[data-speed-select]');
   let requestId = null;
+  let requestText = null;
   let sending = false;
+  const estimate = spendEstimate(form, () => '/api/chats/spend',
+    () => ({ provider: root.dataset.provider || null, model: root.dataset.model || null, text: input.value }));
 
   async function send() {
     const text = input.value;
     if (!text.trim() || sending) return;
     sending = true;
-    requestId ??= newRequestId();
+    if (requestText !== text) {
+      requestText = text;
+      requestId = newRequestId();
+    }
     form.querySelector('[data-send]')?.setAttribute('disabled', '');
-    const result = await post('/api/chats', {
+    const result = await postWithSpend('/api/chats', {
       requestId,
       text,
       provider: root.dataset.provider || null,
       model: root.dataset.model || null,
       thinking: thinking?.value || null,
       tier: tier?.value || null,
-    });
+    }, 'Starting the chat');
     sending = false;
     form.querySelector('[data-send]')?.removeAttribute('disabled');
-    if (!report(result, 'Starting the chat')) {
-      if (result.status !== 0) requestId = null;
+    if (!result.ok) {
+      if (!result.refused && result.status !== 0) requestText = null;
       return;
     }
     window.location.assign(result.data.url);
@@ -230,6 +298,7 @@ function initNewChat(root) {
 
   form.addEventListener('submit', (event) => { event.preventDefault(); send(); });
   wireComposerKeys(input, { send, thinking });
+  input.addEventListener('input', () => estimate.schedule());
   input.focus();
 
   root.addEventListener('click', (event) => {
@@ -250,6 +319,7 @@ function initNewChat(root) {
     showModelName(picker, value);
     fillThinking(thinking, value.thinking);
     hideModal(picker.closest('.modal'));
+    estimate.refresh();
     input.focus();
   });
 }
@@ -286,6 +356,8 @@ function initChat(root) {
   const errorModal = document.getElementById('modal-error-details');
   const compactModal = document.getElementById('modal-compact');
   const retries = new Map();
+  const continues = new Map();
+  const estimate = spendEstimate(form, () => `${base}/spend`, () => ({ text: input.value, agentId }));
   let busy = root.dataset.busy === 'true';
   let pendingText = null;
   let pendingId = null;
@@ -322,6 +394,8 @@ function initChat(root) {
         swapHtml(panel, html);
       }
       const state = frame.state || {};
+      // A finished run changed the context the next request sends: the estimate follows.
+      if (busy && !state.busy) estimate.schedule(250);
       setBusy(Boolean(state.busy));
       setStream('connected');
       if (firstView) {
@@ -353,12 +427,45 @@ function initChat(root) {
       pendingText = text;
       pendingId = newRequestId();
     }
-    const result = await post(`${base}/messages`, { requestId: pendingId, text, agentId, steer });
-    if (!report(result, 'Sending')) return;
+    const result = await postWithSpend(`${base}/messages`, { requestId: pendingId, text, agentId, steer }, 'Sending');
+    if (!result.ok) return;
     pendingText = null;
     pendingId = null;
     input.value = '';
+    estimate.schedule(0);
     input.focus();
+  }
+
+  /** Review… on a call the Spend Guard stopped inside the run: its own modal (or none, when continuing now fits as it is), then the run
+   * continues with "Continue." after the user's choice, once per stop (the same request id on a retry). */
+  async function reviewStop(op, button) {
+    if (!op) return;
+    button?.setAttribute('disabled', '');
+    try {
+      let response = null;
+      try {
+        response = await fetch(`${base}/spend/stops/${encodeURIComponent(op)}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      } catch {
+        response = null;
+      }
+      let data = null;
+      try { data = response ? await response.json() : null; } catch { data = null; }
+      if (!response?.ok || !data) {
+        report({ ok: false, status: response?.status ?? 0, data }, 'Reviewing the stopped request');
+        return;
+      }
+      let spend = { check: true };
+      if (!data.allowed) {
+        const choice = await askSpend(data, null);
+        if (!choice) return;
+        spend = choice;
+      }
+      if (!continues.has(op)) continues.set(op, newRequestId());
+      const result = await postWithSpend(`${base}/spend/continue`, { requestId: continues.get(op), op, agentId }, 'Continuing', spend);
+      if (result.ok) showToast({ title: 'Continuing', body: 'The run goes on after your choice.', tone: 'info', delay: 3000 });
+    } finally {
+      button?.removeAttribute('disabled');
+    }
   }
 
   /** Runs a typed session command (/compact [focus], /tree, /new, /clone) instead of sending it; returns whether it was one. */
@@ -408,6 +515,7 @@ function initChat(root) {
   }
 
   form.addEventListener('submit', (event) => { event.preventDefault(); send({ steer: busy }); });
+  input.addEventListener('input', () => estimate.schedule());
   wireComposerKeys(input, {
     send: () => send({ steer: busy }),
     followUp: () => send({ steer: false }),
@@ -439,7 +547,10 @@ function initChat(root) {
     select.addEventListener('focus', () => { previous = select.value; });
     select.addEventListener('change', async () => {
       const body = select === thinking ? { thinking: select.value } : { tier: select.value };
-      if (await change(body, select, previous)) previous = select.value;
+      if (await change(body, select, previous)) {
+        previous = select.value;
+        estimate.refresh();
+      }
     });
   }
 
@@ -456,6 +567,7 @@ function initChat(root) {
     fillThinking(thinking, value.thinking);
     if (thinking && done.thinking) thinking.value = done.thinking;
     root.dataset.provider = done.provider;
+    estimate.refresh();
     const clamped = requested && done.thinking && requested !== done.thinking
       ? ` The thinking level was clamped from ${requested} to ${done.thinking}.` : '';
     showToast({ title: 'Model switched', body: `Now using ${done.provider}/${done.model}.${clamped}`, tone: 'info' });
@@ -643,6 +755,8 @@ function initChat(root) {
       target.removeAttribute('disabled');
     } else if (action === 'error-details') {
       openErrorDetails(target.closest('[data-error-detail]'));
+    } else if (action === 'spend-review') {
+      await reviewStop(target.dataset.op, target);
     } else if (action === 'copy-error') {
       const text = ['subtitle', 'stop', 'attempts', 'message']
         .map((name) => errorModal.querySelector(name === 'subtitle' ? '[data-error-subtitle]' : `[data-error-field="${name}"]`)?.textContent ?? '')

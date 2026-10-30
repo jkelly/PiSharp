@@ -1,0 +1,22 @@
+@* Decision 0011 (run W3, S5): the mockups' _SendEstimate, left of Send. The muted estimate ("≈ $0.03", "≈ $0.21 list" for a subscription,
+   "price unknown"; nothing for a free model) with its details on hover or focus (typical, the worst case worked out, the output and tier
+   notes, how the account is billed); the amber "81% of … cap" chips of caps near their limit; and, when the Spend Guard would ask or
+   block, the over-cap chip named after the cause instead of the estimate (Send then opens modal-spend-confirm). The page renders it for
+   an empty draft and chat.js swaps in the server's answer for the draft (POST /api/chats/{id}/spend, debounced). The tooltip is markup
+   built from encoded parts (ChatSpendText.Estimate); Bootstrap's sanitizer keeps only its strong and br. Model: ChatSpendEstimateView. *@
+@model ChatSpendEstimateView
+@if (Model.Shown)
+{
+  foreach (var warning in Model.Warnings)
+  {
+    <span class="ps-chip d-none d-sm-inline-flex" data-tone="warn" tabindex="0" data-bs-toggle="tooltip" title="@warning.Title" data-spend-warning>@warning.Text</span>
+  }
+  if (Model.Over is { } over)
+  {
+    <button class="ps-chip run-estimate" type="button" data-tone="warn" data-spend-over data-verdict="@Model.Verdict" data-pane="@Model.Pane" aria-label="@Model.Label" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="ps-tip-left" title="@Model.Tooltip">@over</button>
+  }
+  else if (Model.Chip is { } chip)
+  {
+    <button class="composer-estimate run-estimate" type="button" data-spend-chip data-verdict="@Model.Verdict" aria-label="@Model.Label" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="ps-tip-left" title="@Model.Tooltip">@chip</button>
+  }
+}

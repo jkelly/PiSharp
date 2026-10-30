@@ -4,7 +4,9 @@
    banners and info. Closing the tab never stops a run. The top bar holds the model switch, the stream's "Reconnecting…" chip, the session
    tree and the chat's actions (rename, branches & fork, clone, compact, export, delete); the banners say when the chat's sign-in expired or
    no provider is configured; the details panel (_ChatInfo) shows the context window, usage, model, tools, instructions and the durable
-   session. A page opened while the chat runs is the mockups' background state (data-busy, then data-background in chat.js). *@
+   session. A page opened while the chat runs is the mockups' background state (data-busy, then data-background in chat.js). W3 (S5): the
+   composer's send estimate, the answers' cost marks, the chat's spend in the details panel, the banner and card of a call stopped at a
+   spend cap, and S4's modal-spend-confirm (_SpendConfirmModal, an empty shell spend-confirm.js fills) for the over-cap state. *@
 @model ChatPage
 @{
     var binding = Model.Binding;
@@ -77,7 +79,7 @@
       }
       <div data-panel="notices"></div>
       <div data-panel="pending"></div>
-      <partial name="_ChatComposer" model="new ChatComposerView(false, binding.Thinking, Model.ThinkingLevels, binding.Tier)" />
+      <partial name="_ChatComposer" model="new ChatComposerView(false, binding.Thinking, Model.ThinkingLevels, binding.Tier) { Estimate = Model.Estimate }" />
     </div>
   </section>
   <aside class="pane chat-info" aria-label="Session details">
@@ -90,6 +92,7 @@
 @section Modals {
   <partial name="_ChatModelPicker" model="picker" />
   <partial name="_ChatModals" model="Model" />
+  <partial name="~/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
 }
 @section Scripts {
   <script type="module" src="~/js/chat.js" asp-append-version="true"></script>
