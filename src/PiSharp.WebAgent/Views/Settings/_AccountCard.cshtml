@@ -14,6 +14,10 @@
     var plan = account.Details.GetValueOrDefault("plan");
     var host = account.Details.GetValueOrDefault("host");
     var models = account.Details.GetValueOrDefault("models");
+    // Run W3, S4: the spend line (the mockups' "Today $0.52 · shared daily cap $1.84 / $5.00" for a metered key, "Subscription · list cost
+    // not counted" for a subscription), from the ledger. Left out where the Spend area is not registered (render tests).
+    var spendPages = Context.RequestServices.GetService(typeof(PiSharp.WebAgent.Spend.SpendPages)) as PiSharp.WebAgent.Spend.SpendPages;
+    var spendLine = spendPages is null ? null : await spendPages.AccountLineAsync(provider.Id, account);
 }
 <div class="ps-card account-card overflow-hidden" data-account-card="@account.Id" data-account-status="@SettingsText.Status(account)">
   <div class="p-3 d-flex flex-wrap gap-3 align-items-start">
@@ -77,6 +81,10 @@
       {
         <div class="fs-8 text-ps-warn mt-1">@reason</div>
       }
+      @if (spendLine is not null)
+      {
+        <div class="@("fs-8 mt-1 " + (spendLine.Tone == "danger" ? "text-ps-danger" : spendLine.Tone == "warn" ? "text-ps-warn" : "text-ps-faint"))" title="@spendLine.Title" data-account-spend="@spendLine.Mode.ToString().ToLowerInvariant()">@(spendLine.Text)@if (spendLine.LinkText is not null) {<a href="@spendLine.Href">@spendLine.LinkText</a>}@(spendLine.After)</div>
+      }
       <div class="fs-8 text-ps-faint mt-1" data-account-last-test>
         @if (account.LastTest is { } test)
         {
@@ -88,7 +96,7 @@
         }
         else if (plan is not null || models is not null)
         {
-          @(plan is not null ? (provider.Id == SignInFlows.CodexProvider ? "Subscription · list cost not counted" : SettingsText.Plan(plan)) : models + " models enabled by policy")
+          @(plan is not null ? (provider.Id == SignInFlows.CodexProvider && spendLine is null ? "Subscription · list cost not counted" : SettingsText.Plan(plan)) : models + " models enabled by policy")
         }
       </div>
     </div>

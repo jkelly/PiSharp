@@ -1,0 +1,129 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendLedger and _Pagination: one row per provider request, newest first: when (UTC), the
+   source, provider/model with the account (masked) and its billing, the worst case reserved, the actual cost (≈ list for a subscription,
+   free, or price unknown), the status (settled, estimate, uncertain with Resolve…, released, reserved while running) with its note, and
+   Open chat for a chat's rows. Titles explain each figure from the row's own tokens and prices. Then "Showing 1–25 of N", rows per page
+   (25, 50, 100) and the pages. Model: SpendHistoryPage. *@
+@using System.Globalization
+@model SpendHistoryPage
+@{
+    var filter = Model.Filter;
+    var total = Model.Ledger.Total;
+    var first = total == 0 ? 0 : (filter.Page - 1) * filter.Size + 1;
+    var last = Math.Min(total, filter.Page * filter.Size);
+    var pages = Model.Pages;
+    var shown = new SortedSet<int> { 1, pages };
+    for (var page = Math.Max(1, filter.Page - 1); page <= Math.Min(pages, filter.Page + 1); page++) shown.Add(page);
+    static string N(int value) => value.ToString("#,0", CultureInfo.InvariantCulture);
+}
+@if (Model.Rows.Count == 0)
+{
+  <div class="ps-card p-4 text-center" data-spend-no-match>
+    <div class="fw-medium">No requests match these filters</div>
+    <p class="fs-7 text-secondary mb-3">@N(Model.Ledger.TotalAll) @(Model.Ledger.TotalAll == 1 ? "request is" : "requests are") in the ledger.</p>
+    <a class="btn btn-sm btn-outline-secondary" href="/history/spend">Clear all filters</a>
+  </div>
+}
+else
+{
+  <div class="ps-table-wrap">
+    <table class="table table-hover align-middle ledger-table" data-spend-ledger>
+      <thead>
+        <tr>
+          <th scope="col">Time</th>
+          <th scope="col" class="d-none d-md-table-cell">Source</th>
+          <th scope="col">Provider / model</th>
+          <th scope="col" class="text-end d-none d-md-table-cell" title="Worst case reserved before the request: input tokens × input rate + max output tokens × output rate">Reserved</th>
+          <th scope="col" class="text-end" title="Cost from the usage the provider reported">Actual</th>
+          <th scope="col" class="d-none d-sm-table-cell" title="settled: reported usage · estimate: settled at an estimate · uncertain: no usage reported, still counted · released: nothing billed">Status</th>
+          <th scope="col" class="text-end d-none d-sm-table-cell"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var row in Model.Rows)
+        {
+          var faint = row.Reserved == "—";
+          <tr data-spend-row="@row.Op" data-status="@row.Status">
+            <td class="text-nowrap"><div class="ps-mono fs-8">@row.Time</div><div class="fs-8 text-ps-faint">@row.Day</div></td>
+            <td class="d-none d-md-table-cell"><span class="ps-chip" title="@row.SourceLabel"><i class="bi @row.SourceIcon" aria-hidden="true"></i><span class="visually-hidden">@row.SourceLabel</span></span></td>
+            <td><div class="ps-mono fs-8"><span class="text-ps-faint text-nowrap">@(row.Row.Provider)/</span><wbr><span class="text-nowrap">@row.Row.Model</span></div><div class="fs-8 text-ps-faint">@row.AccountText</div></td>
+            <td class="@("ps-mono fs-8 text-end d-none d-md-table-cell" + (faint ? " text-ps-faint" : ""))" title="@row.ReservedTitle">@row.Reserved</td>
+            <td class="ps-mono fs-8 text-end text-nowrap" title="@row.ActualTitle">
+              <div class="@(row.Actual == "—" ? "text-ps-faint" : null)">@row.Actual</div>
+              @if (row.ActualSub is not null)
+              {
+                <div class="text-ps-faint">@row.ActualSub</div>
+              }
+              @if (row.StatusTone is not null)
+              {
+                <div class="d-sm-none mt-1"><span class="ps-chip" data-tone="@row.StatusTone">@row.Status</span></div>
+              }
+              @if (row.CanResolve)
+              {
+                <div class="d-sm-none mt-1"><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-resolve-op="@row.Op">Resolve…</button></div>
+              }
+            </td>
+            <td class="d-none d-sm-table-cell">
+              @if (row.StatusTone is not null)
+              {
+                <span class="ps-chip" data-tone="@row.StatusTone">@row.Status</span>
+              }
+              else
+              {
+                <span class="fs-8 text-ps-faint">@row.Status</span>
+              }
+              @if (row.Note is not null || row.CanResolve)
+              {
+                <div class="ledger-note fs-8 text-ps-faint mt-1">@(row.Note)@if (row.CanResolve) {<text> · </text><button class="btn btn-link p-0 fs-8 align-baseline" type="button" data-resolve-op="@row.Op">Resolve…</button>}</div>
+              }
+            </td>
+            <td class="text-end text-nowrap d-none d-sm-table-cell">
+              @if (row.ChatHref is not null)
+              {
+                <a class="btn btn-icon" href="@row.ChatHref" title="Open chat" aria-label="Open chat"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mt-3" data-spend-pager>
+    <span class="fs-8 ps-mono text-ps-faint me-sm-auto">Showing @N(first)–@N(last) of @N(total) @(filter.Active ? "matching requests" : "requests")</span>
+    <div class="d-flex align-items-center gap-2">
+      <label class="fs-8 text-ps-faint text-nowrap" for="spendPageSize">Rows per page</label>
+      <select class="form-select form-select-sm w-auto" id="spendPageSize" data-spend-size>
+        @foreach (var size in SpendHistoryFilter.Sizes)
+        {
+          <option value="@size" selected="@(size == filter.Size)">@size</option>
+        }
+      </select>
+    </div>
+    @if (pages > 1)
+    {
+      <nav aria-label="Spend pages">
+        <ul class="pagination pagination-sm mb-0">
+          <li class="@("page-item" + (filter.Page <= 1 ? " disabled" : ""))"><a class="page-link" href="@((filter with { Page = Math.Max(1, filter.Page - 1) }).Href)" aria-label="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></a></li>
+          @{ var previous = 0; }
+          @foreach (var page in shown)
+          {
+            if (page - previous > 1)
+            {
+              <li class="page-item disabled"><span class="page-link">…</span></li>
+            }
+            previous = page;
+            if (page == filter.Page)
+            {
+              <li class="page-item active" aria-current="page"><a class="page-link" href="@((filter with { Page = page }).Href)">@N(page)</a></li>
+            }
+            else
+            {
+              <li class="page-item"><a class="page-link" href="@((filter with { Page = page }).Href)">@N(page)</a></li>
+            }
+          }
+          <li class="@("page-item" + (filter.Page >= pages ? " disabled" : ""))"><a class="page-link" href="@((filter with { Page = Math.Min(pages, filter.Page + 1) }).Href)" aria-label="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></a></li>
+        </ul>
+      </nav>
+    }
+  </div>
+}

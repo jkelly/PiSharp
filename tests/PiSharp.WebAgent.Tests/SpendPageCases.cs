@@ -1,0 +1,425 @@
+// Decision 0011 (run W3, S4): Settings › Spend, History › Spend, the spend modals and /api/spend. The page cases run the built app as a child
+// process with --faux-metered (the faux models at a test list price; no provider code path, no network) on a temporary data folder; ledger
+// rows are seeded through a SpendLedger on the same webagent.db before the app starts. A planted OPENAI_API_KEY (an environment account)
+// must never appear in any page, answer or CSV. The unit cases check the CSV's cells and the filters' query string.
+using System.Net;
+using System.Text;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
+using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Shell;
+using PiSharp.WebAgent.Spend;
+
+internal static partial class Program
+{
+    internal static IEnumerable<(string, Func<Task>)> SpendPageCases() =>
+    [
+        Case("spend.pages.placeholder-is-gone", () =>
+        {
+            Check(!LaterFeature.SettingsPages.ContainsKey("spend"), "Settings › Spend is no longer a later-milestone page");
+            var route = typeof(PiSharp.WebAgent.Controllers.ShellController).GetMethod("SettingsLater")!
+                .GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.HttpGetAttribute), false).Cast<Microsoft.AspNetCore.Mvc.HttpGetAttribute>().Single().Template!;
+            Check(!route.Contains("spend", StringComparison.Ordinal), "the placeholder route leaves spend out: " + route);
+            Check(typeof(PiSharp.WebAgent.Controllers.SpendController).GetMethod("Settings") is not null, "SpendController serves it");
+        }),
+
+        Case("spend.pages.csv-cells-are-quoted-and-never-formulas", () =>
+        {
+            Equal("", SpendEndpoints.Cell(null), "null");
+            Equal("plain", SpendEndpoints.Cell("plain"), "plain");
+            Equal("\"a,b\"", SpendEndpoints.Cell("a,b"), "a comma");
+            Equal("\"say \"\"hi\"\"\"", SpendEndpoints.Cell("say \"hi\""), "quotes doubled");
+            Equal("'=SUM(A1)", SpendEndpoints.Cell("=SUM(A1)"), "a formula is neutralised");
+            Equal("'+cmd", SpendEndpoints.Cell("+cmd"), "a plus");
+            Equal("'@x", SpendEndpoints.Cell("@x"), "an at sign");
+            Equal("\"'-1+2,3\"", SpendEndpoints.Cell("-1+2,3"), "a minus that is not a number, quoted for its comma");
+            Equal("-0.500000", SpendEndpoints.Cell("-0.500000"), "a negative number stays a number");
+            Equal("pisharp-spend-2026-10-21.csv", SpendEndpoints.CsvName(new DateTimeOffset(2026, 10, 21, 23, 0, 0, TimeSpan.Zero)), "the file name is the UTC day");
+        }),
+
+        Case("spend.pages.filters-round-trip-through-the-query-string", () =>
+        {
+            var values = new Dictionary<string, string>
+            {
+                ["q"] = " chat-1 ", ["from"] = "2026-10-21", ["to"] = "2026-10-01", ["provider"] = "anthropic", ["model"] = "claude-sonnet-5-5",
+                ["source"] = "agent-compare", ["account"] = "acc-1", ["status"] = "uncertain", ["page"] = "3", ["size"] = "50", ["resolve"] = "op-1",
+            };
+            var filter = SpendHistoryFilter.Parse(key => values.GetValueOrDefault(key));
+            Equal("chat-1", filter.Search, "trimmed");
+            Equal((new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 21)), (filter.From!.Value, filter.To!.Value), "a reversed range is put in order");
+            Equal((SpendSource.AgentCompare, LedgerStatus.Uncertain, 3, 50, "op-1"), (filter.Source!.Value, filter.Status!.Value, filter.Page, filter.Size, filter.Resolve), "the rest");
+            Check(filter.Active, "filtered");
+            var query = filter.Query();
+            Equal(new DateTimeOffset(2026, 10, 22, 0, 0, 0, TimeSpan.Zero), query.To!.Value, "the end date is inclusive (up to the next UTC midnight)");
+            Equal((100, 50), (query.Offset, query.Limit), "paging");
+            Equal("?q=chat-1&from=2026-10-01&to=2026-10-21&provider=anthropic&model=claude-sonnet-5-5&source=agent-compare&account=acc-1&status=uncertain&page=3&size=50",
+                filter.QueryString(), "the query string");
+            Equal("/history/spend?provider=anthropic", (new SpendHistoryFilter { Provider = "anthropic" }).Href, "defaults are left out");
+
+            var odd = SpendHistoryFilter.Parse(key => key switch
+            {
+                "model" => "m", "source" => "nope", "status" => "bogus", "size" => "33", "page" => "-2", "from" => "21/10/2026", _ => null,
+            });
+            Equal((null, null, null, 25, 1, null), (odd.Model, odd.Source, odd.Status, odd.Size, odd.Page, odd.From), "values that are not allowed are left out (a model needs a provider)");
+            Check(!odd.Active, "nothing filters");
+        }),
+
+        Case("spend.pages.settings-caps-and-confirm-round-trip", async () =>
+        {
+            var envKey = Planted("sk-proj-");
+            var root = Temp("spend-pages-settings");
+            try
+            {
+                await using var app = await WebAgentApp.StartAsync(root, new AppStart
+                {
+                    DataDirectory = Path.Join(root, "data"),
+                    Faux = false,
+                    Arguments = ["--faux-metered"],
+                    Environment = new Dictionary<string, string> { ["OPENAI_API_KEY"] = envKey },
+                });
+                var seen = new StringBuilder();
+                async Task<(int Status, JsonNode? Body, string Text)> Call(HttpMethod method, string path, JsonNode? body = null)
+                {
+                    var response = await app.SendAsync(method, path, body, origin: method == HttpMethod.Get ? null : app.Origin);
+                    seen.AppendLine(response.Text);
+                    if (path.StartsWith(SpendEndpoints.Prefix, StringComparison.Ordinal))
+                        Check(response.Response.Headers.CacheControl?.NoStore == true, path + " is no-store");
+                    return (response.Status, response.Body, response.Text);
+                }
+                async Task<string> Page(string path)
+                {
+                    var (status, _, text) = await Call(HttpMethod.Get, path);
+                    Equal(200, status, path);
+                    Sp4CheckPage(path, text);
+                    return WebUtility.HtmlDecode(text);
+                }
+
+                // Empty: no caps, no spend.
+                var settings = await Page("/settings/spend");
+                Check(settings.Contains("No caps yet", StringComparison.Ordinal) && settings.Contains("data-caps-empty", StringComparison.Ordinal), "the empty caps state");
+                Check(!settings.Contains("Coming in a later milestone", StringComparison.Ordinal), "not the placeholder");
+                foreach (var part in new[] { "id=\"caps\"", "id=\"accounts\"", "id=\"unknown-prices\"", "id=\"reservations\"", "id=\"modal-spend-cap\"", "data-savebar hidden",
+                             "spend.reservationOutputTokens · default 8192", "spend.warnPercent · default 80", "/js/spend-settings.js", "/css/spend.css" })
+                    Check(settings.Contains(part, StringComparison.Ordinal), "settings has " + part);
+                // --faux-metered: the faux provider is Metered at its test price; the environment key's provider has no model in the faux
+                // catalog, so it is Unknown price and listed under Unknown prices.
+                Check(Regex.IsMatch(settings, "data-spend-field=\"billing:faux\\|\" data-provider=\"faux\"[^>]*data-initial=\"metered\">\\s*<option value=\"metered\" selected=\"selected\">Metered \\(detected\\)</option>"),
+                    "the faux provider is metered, detected: " + Sp4Around(settings, "billing:faux|"));
+                var envRow = Regex.Match(settings, "data-spend-field=\"billing:openai\\|(?<id>[^\"]+)\" data-provider=\"openai\"");
+                Check(envRow.Success, "the environment account is listed: " + Sp4Around(settings, ">openai<"));
+                Check(Regex.IsMatch(settings, "<option value=\"unknown\" selected=\"selected\">Unknown price \\(detected\\)</option>"), "with no price, detected");
+                Check(settings.Contains("data-spend-field=\"unknown:openai\"", StringComparison.Ordinal), "and a row under Unknown prices");
+                Check(settings.Contains("Example · <span class=\"ps-mono\">", StringComparison.Ordinal) && settings.Contains("data-worst-case-example", StringComparison.Ordinal),
+                    "a worked example from a connected metered model");
+                Check(!settings.Contains("allowanceGate", StringComparison.Ordinal) && !settings.Contains("Sample data", StringComparison.Ordinal), "no allowance gate without allowance data");
+
+                var history = await Page("/history/spend");
+                Check(history.Contains("No spend <em>yet</em>", StringComparison.Ordinal) && history.Contains("webagent.db", StringComparison.Ordinal), "the empty ledger");
+                Check(history.Contains("<h1 class=\"app-title\">History</h1>", StringComparison.Ordinal), "History in the top bar");
+                Check(Regex.IsMatch(history, "class=\"nav-link active\" aria-current=\"page\" href=\"/history/spend\">Spend</a>"), "the Spend tab is active");
+                Check(Regex.IsMatch(history, "<button class=\"btn btn-outline-secondary\" type=\"button\" disabled><i class=\"bi bi-filetype-csv"), "Export CSV is disabled");
+                Check(history.Contains("id=\"modal-resolve-reservation\"", StringComparison.Ordinal), "the Resolve modal's shell");
+
+                // Caps: add, add again (idempotent), a different value for the same target (409), edit, invalid, remove twice.
+                var daily = new JsonObject { ["scope"] = "everything", ["period"] = "day", ["limit"] = "5.00", ["action"] = "block" };
+                var added = await Call(HttpMethod.Post, "/api/spend/caps", daily);
+                Equal(200, added.Status, "add: " + added.Text);
+                var dailyId = added.Body!["cap"]!["id"]!.GetValue<long>();
+                Equal((5_000_000L, "everything", "day", "block", false), (added.Body!["cap"]!["limitMicros"]!.GetValue<long>(), added.Body["cap"]!["scope"]!.GetValue<string>(),
+                    added.Body["cap"]!["period"]!.GetValue<string>(), added.Body["cap"]!["action"]!.GetValue<string>(), added.Body["existing"]!.GetValue<bool>()), "the cap");
+                var again = await Call(HttpMethod.Post, "/api/spend/caps", daily.DeepClone());
+                Equal((200, dailyId, true), (again.Status, again.Body!["cap"]!["id"]!.GetValue<long>(), again.Body["existing"]!.GetValue<bool>()), "the same cap again is the same cap");
+                var other = await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "day", ["limit"] = "7", ["action"] = "block" });
+                Equal((409, "conflict"), (other.Status, other.Body!["code"]!.GetValue<string>()), "another daily cap for everything metered");
+                Check(other.Body!["error"]!.GetValue<string>().Contains("already exists", StringComparison.Ordinal), "says so");
+                var bad = await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "day", ["limit"] = "lots", ["action"] = "block" });
+                Equal((400, "invalid"), (bad.Status, bad.Body!["code"]!.GetValue<string>()), "a limit that is not an amount");
+                Equal(400, (await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "provider", ["period"] = "day", ["limit"] = "1", ["action"] = "ask" })).Status,
+                    "a provider cap needs a provider");
+                Equal(404, (await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "account", ["key"] = "no-such-account", ["period"] = "day", ["limit"] = "1", ["action"] = "ask" })).Status,
+                    "an account cap needs an account that exists");
+                Equal(415, (await app.SendAsync(HttpMethod.Post, "/api/spend/caps", text: "scope=everything", contentType: "application/x-www-form-urlencoded", origin: app.Origin)).Status,
+                    "JSON writes only");
+                Equal(403, (await app.SendAsync(HttpMethod.Post, "/api/spend/caps", daily.DeepClone(), origin: "http://evil.example")).Status, "same origin only");
+
+                var edited = await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["id"] = dailyId, ["limit"] = "6", ["action"] = "ask" });
+                Equal((200, 6_000_000L, "ask", "day"), (edited.Status, edited.Body!["cap"]!["limitMicros"]!.GetValue<long>(), edited.Body["cap"]!["action"]!.GetValue<string>(),
+                    edited.Body["cap"]!["period"]!.GetValue<string>()), "edit changes the limit and the action, not the window");
+                Equal(404, (await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["id"] = 999_999, ["limit"] = "1" })).Status, "editing a cap that is gone");
+
+                var perRequest = await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "request", ["limit"] = "0.01", ["action"] = "ask" });
+                Equal(200, perRequest.Status, "a per-request cap");
+                var source = await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "source", ["key"] = "Chat", ["period"] = "month", ["limit"] = "40", ["action"] = "block" });
+                Equal((200, "chat"), (source.Status, source.Body!["cap"]!["key"]!.GetValue<string>()), "a source cap stores the source's wire name");
+
+                var listed = await Call(HttpMethod.Get, "/api/spend/caps");
+                Equal(3, listed.Body!["caps"]!.AsArray().Count, "three caps");
+                settings = await Page("/settings/spend");
+                Check(!settings.Contains("data-caps-empty", StringComparison.Ordinal), "not empty any more");
+                Check(settings.Contains("<div class=\"cap-num\">$0.00 / $6.00</div>", StringComparison.Ordinal), "the daily cap's spend and limit");
+                Check(settings.Contains("data-cap-edit data-cap-id=\"" + dailyId + "\"", StringComparison.Ordinal) && settings.Contains("data-cap-amount=\"6.00\"", StringComparison.Ordinal),
+                    "its edit button carries its values");
+                Check(settings.Contains("worst case per request", StringComparison.Ordinal), "the per-request cap is checked per request");
+                Check(Regex.IsMatch(settings, "Over the \\$0\\.01 per-request cap|Fits .*per-request cap"), "the example says which caps it fits");
+
+                // The confirm modal: over the per-request cap (Ask), then over a Block day cap.
+                var confirm = await Call(HttpMethod.Post, "/api/spend/confirm", new JsonObject { ["provider"] = "faux", ["model"] = "echo", ["inputBytes"] = 3000 });
+                Equal(200, confirm.Status, "confirm: " + confirm.Text);
+                Equal(("ask", "sc-request", "spend_ask", true), (confirm.Body!["verdict"]!.GetValue<string>(), confirm.Body["pane"]!.GetValue<string>(), confirm.Body["code"]!.GetValue<string>(),
+                    confirm.Body["canProceed"]!.GetValue<bool>()), "asks, for the per-request cap");
+                var rawHtml = confirm.Body!["html"]!.GetValue<string>();
+                var html = WebUtility.HtmlDecode(rawHtml);
+                foreach (var part in new[] { "id=\"modal-spend-confirm\"", "Over your per-request cap", "<span class=\"ps-mono\">faux/echo</span>", "data-spend-choice=\"proceed-once\"",
+                             "PiSharp never switches your model or account.", "Worst case", "data-spend-pane=\"sc-request\"" })
+                    Check(html.Contains(part, StringComparison.Ordinal), "the modal has " + part);
+                Check(!Regex.IsMatch(rawHtml, "\\son[a-z]+\\s*=", RegexOptions.IgnoreCase) && !rawHtml.Contains("<script", StringComparison.Ordinal), "no script in the fragment");
+                var tokens = confirm.Body!["capOutputTokens"]?.GetValue<int>();
+                Check(tokens is > 0 and < 8192 && html.Contains($"data-max-output-tokens=\"{tokens}\"", StringComparison.Ordinal), "a shorter output that fits is offered: " + tokens);
+
+                var fits = await Call(HttpMethod.Post, "/api/spend/confirm", new JsonObject { ["provider"] = "faux", ["model"] = "echo", ["inputBytes"] = 30, ["maxTokens"] = 16 });
+                Equal(("allow", null), (fits.Body!["verdict"]!.GetValue<string>(), fits.Body["html"]?.GetValue<string>()), "a request that fits is allowed with no modal");
+
+                var block = await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "provider", ["key"] = "faux", ["period"] = "month", ["limit"] = "0.01", ["action"] = "block" });
+                Equal(200, block.Status, "a blocking month cap for faux");
+                var blocked = await Call(HttpMethod.Post, "/api/spend/confirm", new JsonObject { ["provider"] = "faux", ["model"] = "echo", ["inputBytes"] = 3000 });
+                Equal(("block", "sc-period", "spend_blocked", false), (blocked.Body!["verdict"]!.GetValue<string>(), blocked.Body["pane"]!.GetValue<string>(), blocked.Body["code"]!.GetValue<string>(),
+                    blocked.Body["canProceed"]!.GetValue<bool>()), "blocks, for the month cap first");
+                var blockedHtml = WebUtility.HtmlDecode(blocked.Body!["html"]!.GetValue<string>());
+                Check(blockedHtml.Contains("disabled aria-describedby=\"spend-confirm-blocked\">Proceed once", StringComparison.Ordinal), "Proceed once is not offered");
+                Check(blockedHtml.Contains("It's also over your $0.01 per-request cap, which is set to Ask, but Block takes priority.", StringComparison.Ordinal), "the other cause");
+                Check(blockedHtml.Contains("href=\"/settings/spend#caps\"", StringComparison.Ordinal), "where to raise the cap");
+                Equal(400, (await Call(HttpMethod.Post, "/api/spend/confirm", new JsonObject { ["model"] = "echo" })).Status, "a call needs a provider");
+
+                // Remove (twice).
+                Equal(true, (await Call(HttpMethod.Post, $"/api/spend/caps/{dailyId}/remove")).Body!["removed"]!.GetValue<bool>(), "removed");
+                Equal((200, false), await Call(HttpMethod.Post, $"/api/spend/caps/{dailyId}/remove") is var gone ? (gone.Status, gone.Body!["removed"]!.GetValue<bool>()) : default, "removing it again");
+
+                // Settings: the reservation cap, the warning threshold, unknown prices, a billing override and back.
+                var saved = await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["warnPercent"] = 70, ["reservationOutputTokens"] = "4096", ["unknownPrice"] = "block" });
+                Equal((200, 70, 4096, "block"), (saved.Status, saved.Body!["warnPercent"]!.GetValue<int>(), saved.Body["reservationOutputTokens"]!.GetValue<int>(),
+                    saved.Body["unknownPrice"]!.GetValue<string>()), "saved: " + saved.Text);
+                Equal(400, (await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["warnPercent"] = 0 })).Status, "a threshold of 0%");
+                Equal(400, (await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["unknownPrice"] = "maybe" })).Status, "an unknown behaviour");
+                var envId = envRow.Groups["id"].Value;
+
+                // The provider page's account card before any override: the key's provider has no price.
+                var provider = await Page("/settings/providers/openai");
+                Check(Regex.IsMatch(provider, "data-account-spend=\"unknown\">Unknown price · <a href=\"/settings/spend#unknown-prices\">not checked against caps</a>"),
+                    "the unknown-price key's spend line: " + Sp4Around(provider, "data-account-spend"));
+
+                var overridden = await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject
+                {
+                    ["billing"] = new JsonArray(new JsonObject { ["provider"] = "openai", ["account"] = envId, ["mode"] = "metered" }),
+                    ["unknownPriceRules"] = new JsonArray(new JsonObject { ["provider"] = "openai", ["behavior"] = "allow" }),
+                });
+                Equal(200, overridden.Status, "an override: " + overridden.Text);
+                Equal("openai|" + envId + "|metered", string.Join(",", overridden.Body!["billingOverrides"]!.AsArray().Select(item =>
+                    $"{item!["provider"]!.GetValue<string>()}|{item["account"]!.GetValue<string>()}|{item["mode"]!.GetValue<string>()}")), "kept");
+                settings = await Page("/settings/spend");
+                Check(settings.Contains("override · detected Unknown price", StringComparison.Ordinal), "the page says it is an override");
+                Check(Regex.IsMatch(settings, "value=\"70\"\\s+data-spend-field=\"warnPercent\" data-initial=\"70\""), "the saved threshold is the field's value and baseline");
+
+                // The provider page's account card of a metered account: today's spend and the daily cap line (none is left).
+                provider = await Page("/settings/providers/openai");
+                Check(Regex.IsMatch(provider, "data-account-spend=\"metered\">Today \\$0\\.00 · <a href=\"/settings/spend#caps\">no daily cap</a>"),
+                    "the metered key's spend line: " + Sp4Around(provider, "data-account-spend"));
+                var shared = await Call(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "day", ["limit"] = "2.50", ["action"] = "ask" });
+                Equal(200, shared.Status, "a shared daily cap");
+                provider = await Page("/settings/providers/openai");
+                Check(Regex.IsMatch(provider, "data-account-spend=\"metered\">Today \\$0\\.00 · <a href=\"/settings/spend#caps\">shared daily cap</a> \\$0\\.00 / \\$2\\.50</div>"),
+                    "the shared daily cap's line: " + Sp4Around(provider, "data-account-spend"));
+
+                var back = await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["billing"] = new JsonArray(new JsonObject { ["provider"] = "openai", ["account"] = envId, ["mode"] = "unknown" }) });
+                Equal(0, back.Body!["billingOverrides"]!.AsArray().Count, "choosing the detected mode removes the override");
+                Equal(404, (await Call(HttpMethod.Post, "/api/spend/prices", new JsonObject { ["provider"] = "faux", ["model"] = "nope", ["input"] = "1", ["output"] = "2" })).Status,
+                    "a price for a model that does not exist");
+                Equal(409, (await Call(HttpMethod.Post, "/api/spend/prices", new JsonObject { ["provider"] = "faux", ["model"] = "echo", ["input"] = "1", ["output"] = "2" })).Status,
+                    "an entered price never replaces a catalog price");
+                Equal(false, (await Call(HttpMethod.Post, "/api/spend/prices/remove", new JsonObject { ["provider"] = "faux", ["model"] = "echo" })).Body!["removed"]!.GetValue<bool>(),
+                    "removing a price that was never entered");
+
+
+                var csv = await Call(HttpMethod.Get, "/api/spend/ledger.csv");
+                Equal(200, csv.Status, "an empty CSV");
+                Check(csv.Text.TrimStart('﻿').StartsWith("time_utc,op,source,provider,model,account_id,account,billing,status,", StringComparison.Ordinal), "its header");
+
+                Check(!seen.ToString().Contains(envKey, StringComparison.Ordinal), "the planted key never appears in any answer");
+                Check(!seen.ToString().Contains(envKey[^12..], StringComparison.Ordinal), "nor its tail");
+                Check(!app.Log.Contains(envKey, StringComparison.Ordinal), "nor in the log");
+                await app.StopAsync();
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
+
+        Case("spend.pages.history-ledger-resolve-and-csv", async () =>
+        {
+            var root = Temp("spend-pages-history");
+            try
+            {
+                var data = Path.Join(root, "data");
+                Directory.CreateDirectory(data);
+                var path = Path.Join(data, "webagent.db");
+                var db = new WebAgentDb(path, [CoreMigrations.AppInfo, SettingsStore.Migration, .. SpendLedgerMigrations.All]);
+                db.Migrate();
+                var ledger = new SpendLedger(db, new SettingsStore(db));
+                await ledger.SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Day, 5_000_000, CapAction.Block));
+                await ledger.SaveCapAsync(new SpendCap(0, CapScope.Provider, "anthropic", CapPeriod.Month, 450_000, CapAction.Block));
+                await Sp4Seed(ledger, "op-settled", Sp4Estimate("anthropic", 120_000), SpendSource.Chat, "chat-1", async op => await ledger.SettleAsync(op, new SpendUsage(1_000, 100) { CostMicros = 3_000 }));
+                await Sp4Seed(ledger, "op-uncertain", Sp4Estimate("anthropic", 380_000), SpendSource.Chat, "chat-2",
+                    async op => await ledger.MarkUncertainAsync(op, "stream dropped, no usage reported", 317_100));
+                await Sp4Seed(ledger, "op-sub", Sp4Estimate("openai-codex", 210_000, BillingKind.Subscription), SpendSource.AgentCompare, "cmp-1",
+                    async op => await ledger.SettleAsync(op, new SpendUsage(2_000, 200) { CostMicros = 21_000 }));
+                await Sp4Seed(ledger, "op-released", Sp4Estimate("openai", 50_000), SpendSource.Playground, "pg-1", async op => await ledger.ReleaseAsync(op, "failed before any output"));
+                await Sp4Seed(ledger, "op-formula", Sp4Estimate("google", 40_000), SpendSource.Bench, "bench-1",
+                    async op => await ledger.SettleAsync(op, new SpendUsage(500, 50) { CostMicros = 1_500 }), note: "=HYPERLINK(\"http://evil.example\")");
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+                await using var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = data, Faux = false, Arguments = ["--faux-metered"] });
+                async Task<string> Page(string path)
+                {
+                    var response = await app.Get(path);
+                    Equal(200, response.Status, path + ": " + Cut(response.Text));
+                    Sp4CheckPage(path, response.Text);
+                    return WebUtility.HtmlDecode(response.Text);
+                }
+
+                var page = await Page("/history/spend");
+                Equal(5, Regex.Matches(page, "<tr data-spend-row=").Count, "five rows");
+                Check(page.Contains("data-uncertain-banner", StringComparison.Ordinal) && page.Contains("1 uncertain", StringComparison.Ordinal), "the uncertain banner");
+                Check(page.Contains("data-resolve-op=\"op-uncertain\"", StringComparison.Ordinal), "Resolve… for the uncertain row");
+                Check(page.Contains("href=\"/chat/chat-1\" title=\"Open chat\"", StringComparison.Ordinal), "a chat row opens its chat");
+                Check(!page.Contains("href=\"/chat/pg-1\"", StringComparison.Ordinal), "a Playground row does not");
+                Check(page.Contains("≈ $0.0210", StringComparison.Ordinal) && page.Contains("<div class=\"text-ps-faint\">list</div>", StringComparison.Ordinal), "a subscription row at list price");
+                Check(page.Contains("$0.0030", StringComparison.Ordinal), "the settled row's actual cost");
+                Check(page.Contains("<span class=\"ps-chip\" data-tone=\"warn\">uncertain</span>", StringComparison.Ordinal), "the uncertain status");
+                Check(page.Contains("stream dropped, no usage reported", StringComparison.Ordinal), "with its reason");
+                Check(page.Contains("$0.38 <small>of $5.00</small>", StringComparison.Ordinal), "today against the daily cap, uncertain included: " + Sp4Around(page, "data-spend-meter=\"Today\""));
+                Check(page.Contains("includes $0.38 uncertain", StringComparison.Ordinal), "says the uncertain part");
+                Check(Regex.IsMatch(page, "data-tone=\"warn\" title=\"anthropic monthly cap: \\$0\\.38 of \\$0\\.45 · blocks at the cap · above the 80% warning threshold\">anthropic 85% of \\$0\\.45"),
+                    "the anthropic month cap above its warning threshold");
+                Check(page.Contains("Not counted toward money caps: subscription use ≈ $0.02 list this month.", StringComparison.Ordinal), "what is not counted");
+                Check(page.Contains("href=\"/api/spend/ledger.csv\"", StringComparison.Ordinal), "Export CSV");
+                Check(page.Contains("Showing 1–5 of 5 requests", StringComparison.Ordinal), "the pager");
+
+                var filtered = await Page("/history/spend?provider=openai&q=");
+                Equal(1, Regex.Matches(filtered, "<tr data-spend-row=").Count, "one openai row");
+                Check(filtered.Contains("Matching requests", StringComparison.Ordinal) && filtered.Contains("provider: openai", StringComparison.Ordinal), "the filtered state and its chip");
+                Check(filtered.Contains("1 of 5 requests", StringComparison.Ordinal), "how many match");
+                Check(filtered.Contains("href=\"/api/spend/ledger.csv?provider=openai\"", StringComparison.Ordinal), "the export keeps the filters");
+                var none = await Page("/history/spend?q=nothing-matches-this");
+                Check(none.Contains("No requests match these filters", StringComparison.Ordinal), "no match");
+
+                var deepLink = await Page("/history/spend?status=uncertain&resolve=op-uncertain");
+                Check(deepLink.Contains("data-op=\"op-uncertain\" data-open=\"true\"", StringComparison.Ordinal) && deepLink.Contains("Resolve uncertain spend", StringComparison.Ordinal),
+                    "?resolve= opens the modal on load");
+                var fragment = await app.Get("/history/spend/resolve?op=op-uncertain");
+                Equal(200, fragment.Status, "the modal's content");
+                Sp4CheckFragment(fragment.Text);
+                var resolveText = WebUtility.HtmlDecode(fragment.Text);
+                foreach (var part in new[] { "Settle at $0.32", "Release $0.38", "Save amount", "Counts toward</span><span class=\"v\">today and anthropic monthly</span>", "After settling: today $0.32 of $5.00",
+                             "After releasing: today $0.00 of $5.00", "account acc-1" })
+                    Check(resolveText.Contains(part, StringComparison.Ordinal), "the modal has " + part + ": " + Sp4Around(resolveText, "Counts toward"));
+                Equal(409, (await app.Get("/history/spend/resolve?op=op-settled")).Status, "a settled row has nothing to resolve");
+                Equal(404, (await app.Get("/history/spend/resolve?op=nope")).Status, "no such row");
+
+                async Task<(int Status, JsonNode? Body, string Text)> Resolve(JsonObject body)
+                {
+                    var response = await app.SendAsync(HttpMethod.Post, "/api/spend/resolve", body, origin: app.Origin);
+                    return (response.Status, response.Body, response.Text);
+                }
+                var resolved = await Resolve(new JsonObject { ["op"] = "op-uncertain", ["choice"] = "estimate" });
+                Equal(200, resolved.Status, "resolved: " + resolved.Text);
+                Equal(("settled", 317_100L, true, false), (resolved.Body!["reservation"]!["state"]!.GetValue<string>(), resolved.Body["reservation"]!["actualMicros"]!.GetValue<long>(),
+                    resolved.Body["reservation"]!["resolvedByUser"]!.GetValue<bool>(), resolved.Body["again"]!.GetValue<bool>()), "settled at the estimate");
+                Equal("Settled at the estimate, $0.3171. Today's metered spend is $0.32.", resolved.Body!["toast"]!["body"]!.GetValue<string>(), "the resolved toast");
+                var twice = await Resolve(new JsonObject { ["op"] = "op-uncertain", ["choice"] = "estimate" });
+                Equal((200, true), (twice.Status, twice.Body!["again"]!.GetValue<bool>()), "the same resolution again is fine");
+                Equal((409, "conflict"), await Resolve(new JsonObject { ["op"] = "op-uncertain", ["choice"] = "release" }) is var other ? (other.Status, other.Body!["code"]!.GetValue<string>()) : default,
+                    "a different one is a conflict");
+                Equal(404, (await Resolve(new JsonObject { ["op"] = "nope", ["choice"] = "release" })).Status, "no such row");
+                Equal(400, (await Resolve(new JsonObject { ["op"] = "op-settled", ["choice"] = "amount" })).Status, "an amount needs an amount");
+
+                page = await Page("/history/spend");
+                Check(!page.Contains("data-uncertain-banner", StringComparison.Ordinal), "no banner after resolving");
+                Check(page.Contains("<span class=\"ps-chip\" data-tone=\"outline\">estimate</span>", StringComparison.Ordinal) && page.Contains("resolved by you", StringComparison.Ordinal),
+                    "the row is settled at an estimate, by you");
+                var settings = await Page("/settings/spend");
+                Check(settings.Contains("data-tone=\"ok\" data-uncertain-count>None</span>", StringComparison.Ordinal), "Settings › Spend has no uncertain spend left");
+                Check(settings.Contains("<div class=\"cap-num\">$0.32 / $0.45</div>", StringComparison.Ordinal), "the anthropic cap counts the estimate");
+
+                var csv = await app.Get("/api/spend/ledger.csv");
+                Equal(200, csv.Status, "the CSV");
+                Equal("text/csv", csv.Response.Content.Headers.ContentType?.MediaType, "its type");
+                Equal(SpendEndpoints.CsvName(DateTimeOffset.UtcNow), csv.Response.Content.Headers.ContentDisposition?.FileNameStar ?? csv.Response.Content.Headers.ContentDisposition?.FileName?.Trim('"'),
+                    "its file name");
+                var lines = csv.Text.TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+                Equal(6, lines.Length, "a header and five rows");
+                Check(lines.Any(line => line.Contains(",op-uncertain,chat,anthropic,claude-sonnet-5-5,acc-1,account acc-1,metered,estimate,0.380000,0.317100,0.317100,0.000000,", StringComparison.Ordinal)),
+                    "the resolved row: " + string.Join(" | ", lines));
+                Check(lines.Any(line => line.Contains(",\"'=HYPERLINK(\"\"http://evil.example\"\")\",", StringComparison.Ordinal)), "a formula note is neutralised");
+                var openai = await app.Get("/api/spend/ledger.csv?provider=openai");
+                Equal(2, openai.Text.TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Length, "the CSV keeps the filters");
+
+                var json = await app.Get("/api/spend/ledger?status=estimate");
+                Equal((1, 5), (json.Body!["total"]!.GetValue<int>(), json.Body["totalAll"]!.GetValue<int>()), "the ledger as JSON");
+                Equal("account acc-1", json.Body!["items"]![0]!["account"]!.GetValue<string>(), "rows name their account");
+                Check(!app.Log.Contains("Exception", StringComparison.Ordinal), "no exception in the log: " + app.Log);
+                await app.StopAsync();
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
+    ];
+
+    /// <summary>The shell rules every page keeps: a doctype, no inline script, no inline handler.</summary>
+    private static void Sp4CheckPage(string path, string html)
+    {
+        Check(html.TrimStart().StartsWith("<!doctype html>", StringComparison.Ordinal), path + ": the doctype comes first");
+        foreach (Match script in Regex.Matches(html, "<script\\b[^>]*>"))
+            Check(script.Value.Contains("src=", StringComparison.Ordinal), $"{path}: no inline script ({script.Value})");
+        Check(!Regex.IsMatch(html, "\\son[a-z]+\\s*=", RegexOptions.IgnoreCase), path + ": no inline event handlers");
+        Check(!html.Contains("An unhandled exception", StringComparison.Ordinal), path + ": no error page");
+    }
+
+    /// <summary>A fragment (the Resolve modal's content): no inline script, no inline handler, no layout.</summary>
+    private static void Sp4CheckFragment(string html)
+    {
+        Check(!html.Contains("<script", StringComparison.Ordinal) && !Regex.IsMatch(html, "\\son[a-z]+\\s*=", RegexOptions.IgnoreCase), "no script in the fragment");
+        Check(!html.Contains("<!doctype", StringComparison.OrdinalIgnoreCase), "a fragment, not a page");
+    }
+
+    private static string Sp4Around(string text, string marker)
+    {
+        var at = text.IndexOf(marker, StringComparison.Ordinal);
+        return at < 0 ? "(" + marker + " not found)" : text.Substring(at, Math.Min(600, text.Length - at));
+    }
+
+    /// <summary>A metered (or <paramref name="billing"/>) estimate of <paramref name="provider"/>'s model through account acc-1: 12,000 input
+    /// and 8,192 output tokens at $2/$10 per million, with this worst case.</summary>
+    private static SpendEstimate Sp4Estimate(string provider, long worst, BillingKind billing = BillingKind.Metered) => new()
+    {
+        Provider = provider,
+        Model = provider == "anthropic" ? "claude-sonnet-5-5" : provider + "-model",
+        Account = "acc-1",
+        Billing = billing,
+        Price = new SpendPrice(2, 10),
+        InputTokens = 12_000,
+        OutputTokens = 8_192,
+        WorstMicros = worst,
+    };
+
+    private static async Task Sp4Seed(SpendLedger ledger, string op, SpendEstimate estimate, SpendSource source, string run, Func<string, Task> end, string? note = null)
+    {
+        var reserved = await ledger.ReserveAsync(new SpendRequest { Op = op, Source = source, Run = run, Estimate = estimate, Approved = true, Note = note });
+        Check(reserved.Reserved, "seeded " + op);
+        await end(op);
+    }
+}

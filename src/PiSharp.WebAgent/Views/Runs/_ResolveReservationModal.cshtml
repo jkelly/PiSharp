@@ -1,0 +1,77 @@
+@* Decision 0011 (run W3, S4): the mockups' modal-resolve-reservation (_ResolveReservationModal, History › Spend): an uncertain row (the
+   stream dropped, no usage reported) and how to settle it: at the estimate (the reserved worst case when none was recorded), at the amount
+   the user enters, or released. It shows what it reserved and why, which caps it counts toward and what each would show afterwards.
+   PiSharp never settles it on its own. With a null model it is the empty shell the page keeps; GET /history/spend/resolve?op= renders it
+   with a row and spend-history.js swaps that content in and posts the choice to /api/spend/resolve. Model: ResolveReservationView? *@
+@model ResolveReservationView?
+<div class="modal fade" id="modal-resolve-reservation" tabindex="-1" aria-labelledby="modal-resolve-reservation-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <form class="modal-content" novalidate autocomplete="off" data-resolve-content data-op="@Model?.Row.Op" data-open="@(Model is null ? null : "true")">
+      @if (Model is { } view)
+      {
+        var row = view.Row;
+        var reserved = SpendMoney.Format(row.CountedMicros);
+        var estimate = SpendMoney.Format(view.EstimateMicros);
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title" id="modal-resolve-reservation-title">Resolve uncertain spend</h2>
+            <div class="modal-subtitle"><span class="ps-mono">@(row.Provider)/@(row.Model)</span> · @view.Subtitle</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="fs-7 text-secondary mb-3">@(row.Reason is { Length: > 0 } reason ? "The request ended with: " + reason + "." : "The request ended without reporting usage.") The real cost isn't known. Uncertain spend keeps counting toward your caps at the reserved amount until you resolve it. PiSharp never settles it on its own.</p>
+          <div class="ps-panel px-3 py-2 mb-3">
+            <div class="kv"><span class="k">Reserved</span><span class="v ps-mono">@reserved</span></div>
+            <div class="kv"><span class="k">Counts toward</span><span class="v">@view.CountsToward</span></div>
+            <div class="kv"><span class="k">Account</span><span class="v ps-mono">@view.Account</span></div>
+            @if (view.Formula is not null)
+            {
+              <details class="fs-8 text-ps-faint mt-1">
+                <summary>How the reservation was worked out</summary>
+                <div class="ps-mono mt-1 resolve-formula">@view.Formula</div>
+              </details>
+            }
+          </div>
+          <fieldset>
+            <legend class="ps-label mb-2">Settle it how?</legend>
+            <div class="d-grid gap-2">
+              <input type="radio" class="btn-check" name="rrChoice" id="rrEstimate" value="estimate" autocomplete="off" checked>
+              <label class="choice-card" for="rrEstimate">
+                <span class="d-flex justify-content-between gap-2"><span class="choice-title">Settle at the estimate</span><span class="ps-mono fs-7">@estimate</span></span>
+                <span class="choice-desc d-block">@view.EstimateText</span>
+              </label>
+              <input type="radio" class="btn-check" name="rrChoice" id="rrActual" value="amount" autocomplete="off">
+              <label class="choice-card" for="rrActual">
+                <span class="choice-title d-block">Enter the actual amount</span>
+                <span class="choice-desc d-block">Use the amount from the provider's usage or billing page.</span>
+              </label>
+              <input type="radio" class="btn-check" name="rrChoice" id="rrRelease" value="release" autocomplete="off">
+              <label class="choice-card" for="rrRelease">
+                <span class="d-flex justify-content-between gap-2"><span class="choice-title">Release</span><span class="ps-mono fs-7">$0.00</span></span>
+                <span class="choice-desc d-block">Stop counting it. Choose this only if you're sure the request wasn't billed.</span>
+              </label>
+            </div>
+          </fieldset>
+          <div class="fs-8 text-ps-faint mt-3" data-rr-pane="estimate">@(view.AfterEstimate ?? "It counts toward no cap.")</div>
+          <div class="mt-3" data-rr-pane="amount" hidden>
+            <label class="form-label" for="rrAmount">Actual amount</label>
+            <div class="input-group input-group-sm" style="max-width:12rem">
+              <span class="input-group-text">$</span>
+              <input class="form-control ps-mono" type="number" id="rrAmount" min="0" step="0.0001" inputmode="decimal" placeholder="0.0000" data-rr-amount>
+            </div>
+            <div class="form-text">Replaces the @reserved reservation in your totals.</div>
+          </div>
+          <div class="fs-8 text-ps-faint mt-3" data-rr-pane="release" hidden>@(view.AfterRelease ?? "It counts toward no cap.")</div>
+          <div class="text-ps-danger fs-7 mt-3" role="alert" data-rr-error hidden></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" data-rr-pane="estimate" data-rr-submit>Settle at @estimate</button>
+          <button type="submit" class="btn btn-primary" data-rr-pane="amount" data-rr-submit hidden>Save amount</button>
+          <button type="submit" class="btn btn-primary" data-rr-pane="release" data-rr-submit hidden>Release @reserved</button>
+        </div>
+      }
+    </form>
+  </div>
+</div>

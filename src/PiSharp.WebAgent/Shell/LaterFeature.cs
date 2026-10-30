@@ -31,8 +31,6 @@ public sealed record LaterFeature(string Id, string Title, string Icon, string S
     /// <summary>The settings pages, by settings id.</summary>
     public static IReadOnlyDictionary<string, LaterFeature> SettingsPages { get; } = new Dictionary<string, LaterFeature>(StringComparer.OrdinalIgnoreCase)
     {
-        ["spend"] = new("spend", "Spend", "bi-wallet2",
-            "Limits on what metered providers can cost. Every request reserves its worst case before it is sent, then settles to the actual cost.", Settings: true),
         ["data"] = new("data", "Data & storage", "bi-database",
             "Everything the web agent keeps, in one folder on this machine, with retention and clean-up.", Settings: true),
     };
