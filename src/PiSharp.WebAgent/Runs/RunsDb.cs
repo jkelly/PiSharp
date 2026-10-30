@@ -98,6 +98,10 @@ public static class RunsMigrations
         CREATE INDEX run_raw_created ON run_raw (created);
         """);
 
+    /// <summary>2 (run W5, E4): the model the provider said answered (the final message's <c>responseModel</c>), which Drift Watch compares
+    /// with a suite target's baseline. Rows recorded before it read as null.</summary>
+    public static SqlMigration ResponseModel { get; } = new(2, "runs: response model", "ALTER TABLE runs ADD COLUMN response_model TEXT;");
+
     /// <summary>Every step, lowest id first.</summary>
-    public static IReadOnlyList<IWebAgentMigration> All { get; } = [Runs];
+    public static IReadOnlyList<IWebAgentMigration> All { get; } = [Runs, ResponseModel];
 }

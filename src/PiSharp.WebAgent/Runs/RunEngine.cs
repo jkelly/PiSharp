@@ -494,6 +494,7 @@ public sealed class RunEngine : IAsyncDisposable
             Error = RunText.Cut(error, 4000),
             Notes = notes.Count > 0 ? string.Join(" ", notes) : null,
             Usage = usage,
+            ResponseModel = message is null ? null : ResponseModel(message),
             CostMicros = cost,
             CostKind = costKind,
             Billing = billing,
@@ -578,6 +579,11 @@ public sealed class RunEngine : IAsyncDisposable
 
     private static string? ErrorText(AssistantMessage message) =>
         message.ExtraProperties is { } extra && extra.TryGet("errorMessage", out var value) && value is { Value.ValueKind: System.Text.Json.JsonValueKind.String }
+            ? value.Value.GetString() : null;
+
+    /// <summary>The model the provider said answered (the transports keep it as the message's <c>responseModel</c>), or null.</summary>
+    private static string? ResponseModel(AssistantMessage message) =>
+        message.ExtraProperties is { } extra && extra.TryGet("responseModel", out var value) && value is { Value.ValueKind: System.Text.Json.JsonValueKind.String }
             ? value.Value.GetString() : null;
 
     private sealed class Work(string id, RunRequestPlan plan, string? account, SpendCall call, GuardedLease lease, RunLiveRun live,

@@ -122,6 +122,10 @@ public sealed record RunRecord
     /// <summary>The stop reason (Pi wire: <c>stop</c>, <c>length</c>, <c>toolUse</c>, <c>error</c>, <c>aborted</c>), or null.</summary>
     public string? StopReason { get; init; }
 
+    /// <summary>The model the provider said answered (the final message's <c>responseModel</c>), or null when it did not say (or the row
+    /// is older than runs.db migration 2).</summary>
+    public string? ResponseModel { get; init; }
+
     /// <summary>The error text, or null.</summary>
     public string? Error { get; init; }
 
