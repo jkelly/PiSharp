@@ -42,6 +42,8 @@ builder.Services.AddSpendArea(options);
 PiSharp.WebAgent.AgentCompare.Workspaces.WorkspacesModule.AddAgentCompareWorkspaces(builder.Services, options);
 // Run engine and history (run W4, R0): after the Spend Guard, so the recorder wraps the guarded models; runs.db, /api/runs.
 builder.Services.AddRunsArea(options);
+// Agent compare runner (run W4, R5): after the run history, so its device models are the recorder over the Spend Guard; /api/compare/agent.
+PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.AddAgentCompareRunner(builder.Services, options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -54,6 +56,7 @@ app.MapSetupArea();
 app.MapAboutArea();
 app.MapCustomProvidersArea();
 app.MapRunsArea();
+PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.MapAgentCompareRunner(app);
 app.MapWebAgentCore();
 app.Run();
 return 0;
