@@ -44,7 +44,10 @@ internal static class WindowsConPtyTerminalSessionFixture
             var assistant = context.LlmMessages.Last(entry => entry.WireBody.Value.GetProperty("role").GetString() == "assistant").WireBody.Value;
             Check(TextOf(assistant) == files.Final, "Durable final content was reconstructed from presentation deltas.");
             var ui = toolResults.First(entry => entry.WireBody.Value.GetProperty("toolName").GetString() == "fixture.cli.ui").WireBody.Value;
-            Check(ui.GetProperty("details").GetProperty("approved").GetBoolean() && ui.GetProperty("details").GetProperty("mode").GetString() == "Rpc", "Real native dialog result or capability scope differs.");
+            // The terminal session hands extensions its TUI scope (TerminalCustomComponentUiProvider), which adds custom terminal components.
+            var dialog = ui.GetProperty("details");
+            Check(dialog.GetProperty("approved").GetBoolean() && dialog.GetProperty("mode").GetString() == "Tui" &&
+                dialog.GetProperty("features").EnumerateArray().Any(feature => feature.GetString() == "CustomTerminalComponent"), "Real native dialog result or capability scope differs.");
             Check(toolResults.Any(entry => TextOf(entry.WireBody.Value).Contains("Successfully wrote", StringComparison.Ordinal)), "Actual durable native tool acknowledgement is missing.");
             Check(files.MarkerLines.Count(value => value == "tool:confirm") == 1 && files.MarkerLines.Count(value => value == "tool-closed") == 1 &&
                 Directory.GetDirectories(files.Snapshots).Length == 0, "Published callback or package ownership was not joined.");

@@ -60,14 +60,25 @@ internal static class NativeLsInstallationTests
         Check(defaults.Zip(original.Declarations).All(pair => JsonElement.DeepEquals(pair.First.Value, pair.Second.Value)), "Existing read/write declarations changed.");
         await session.SetActiveToolsAsync(["read", "ls", "write"]);
         Names(["read", "ls", "write"], session.GetActiveTools());
-        var declaration = new SessionSystemReplay().Replay(session.Snapshot.Context.LlmMessages).Tools.Single(tool => tool.Value.GetProperty("name").GetString() == "ls");
+        // Pi 1.1.0 setActiveToolsByName applies the selection in memory: the transcript declares read, write until the next prompt.
+        Names(["read", "write"], new SessionSystemReplay().Replay(session.Snapshot.Context.LlmMessages).Tools.Select(tool => tool.Value.GetProperty("name").GetString()!));
+        var count = session.Snapshot.Log.Entries.Length;
+        await session.PromptAsync(Input());
+        Check(session.Snapshot.Fault is null && profile.UsedTurns == 4, "Actual session did not finish all original tool turns.");
+        // agent-loop declareToolChanges: the run's first entry records the delta (ls added) before the prompt's user message, so the
+        // transcript replays read, write, ls in declaration order.
+        var record = session.Snapshot.Log.Entries[count].WireBody.Value.GetProperty("message");
+        Check(record.GetProperty("role").GetString() == "system" && !record.TryGetProperty("toolsRemoved", out _) &&
+            record.GetProperty("toolsAdded").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual(["ls"]) &&
+            session.Snapshot.Log.Entries[count + 1].WireBody.Value.GetProperty("message").GetProperty("role").GetString() == "user", "The prompt did not record the ls selection first.");
+        var replayed = new SessionSystemReplay().Replay(session.Snapshot.Context.LlmMessages).Tools;
+        Names(["read", "write", "ls"], replayed.Select(tool => tool.Value.GetProperty("name").GetString()!));
+        var declaration = replayed.Single(tool => tool.Value.GetProperty("name").GetString() == "ls");
         Check(SameDeclaration(new LsTool(profile.Workspace, profile.Workspace).Declaration, declaration), "Session registration changed ls schema.");
         var parameters = declaration.Value.GetProperty("parameters");
         Check(parameters.GetProperty("properties").GetProperty("path").GetProperty("type").GetString() == "string" &&
             parameters.GetProperty("properties").GetProperty("limit").GetProperty("type").GetString() == "number" &&
             !parameters.TryGetProperty("required", out _) && !declaration.Value.TryGetProperty("namespace", out _), "Optional schema or unannotated built-in metadata changed.");
-        await session.PromptAsync(Input());
-        Check(session.Snapshot.Fault is null && profile.UsedTurns == 4, "Actual session did not finish all original tool turns.");
         var actions = JsonSerializer.SerializeToElement(profile.Actions).EnumerateArray().ToArray();
         Names(["ls", "read", "write"], actions.Select(action => action.GetProperty("ToolName").GetString()!));
         Check(actions.All(action => action.GetProperty("allowed").GetBoolean()), "Exact explicit tool grants failed.");
@@ -76,8 +87,9 @@ internal static class NativeLsInstallationTests
         Check(!result.GetProperty("isError").GetBoolean() && ResultText(result) == ".hidden\nalpha\nBeta/" &&
             !result.TryGetProperty("details", out _), "Actual persistent listing changed content or fabricated details.");
         Check(await File.ReadAllTextAsync(files.Target) == "original write semantics" && await File.ReadAllTextAsync(files.Source) == "original read semantics", "Read/write effects changed.");
+        // Requests declare the transcript's tools (agent-loop normalizeContext over the replayed system messages), in declaration order.
         foreach (var request in JsonSerializer.SerializeToElement(profile.Requests).EnumerateArray())
-            Names(["read", "ls", "write"], request.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!));
+            Names(["read", "write", "ls"], request.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!));
     }
 
     private static async Task WorkspaceDenials()
@@ -106,11 +118,13 @@ internal static class NativeLsInstallationTests
     private static async Task CliResume()
     {
         using var files = new Fixture();
-        await using (var profile = await Profile(files, [], [], []))
+        await using (var profile = await Profile(files, Turns(SessionCommandTests.CompletionsText("selected")), [], []))
         {
             await using var session = await NewSession(files, profile); profile.AttachOwner(session);
             Names(["read", "write"], session.GetActiveTools());
-            await session.SetActiveToolsAsync(["read", "ls", "write"]);
+            // Pi 1.1.0 records an idle selection at the next prompt (agent-loop declareToolChanges), not when it is made.
+            await session.SetActiveToolsAsync(["read", "ls", "write"]); await session.PromptAsync(Input());
+            Check(session.Snapshot.Fault is null && profile.UsedTurns == 1 && profile.Actions.Length == 0, "Selection prompt did not settle without tool effects.");
         }
         await File.WriteAllTextAsync(files.Script, JsonSerializer.Serialize(new { schemaVersion = 1, turns = new[]
         {
@@ -125,8 +139,9 @@ internal static class NativeLsInstallationTests
         var actions = report.RootElement.GetProperty("actions");
         Check(actions.GetArrayLength() == 1 && actions[0].GetProperty("ToolName").GetString() == "ls" &&
             actions[0].GetProperty("allowed").GetBoolean() && actions[0].GetProperty("Target").GetString() == await Canonical(files.Listing), "CLI grant/registration bypassed final policy.");
+        // The resume restores the transcript's loadout by name (_restoreToolsFromTranscript), in its declaration order.
         foreach (var request in report.RootElement.GetProperty("requests").EnumerateArray())
-            Names(["read", "ls", "write"], request.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!));
+            Names(["read", "write", "ls"], request.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!));
         // The command and all session/profile owners have settled before a fresh reader observes the durable tool result.
         var log = await new PiSharp.Sessions.Storage.SessionLogReader().ReadFileAsync(files.Session);
         var result = log.ValidatedPrefix.Where(record => record.Entry.Type == "message")

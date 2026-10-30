@@ -1,4 +1,6 @@
-param([string]$Repo = (Split-Path -Parent $PSScriptRoot))
+# -RestoreSource names a feed (such as https://api.nuget.org/v3/index.json) for a NuGet cache that does not hold the locked
+# packages yet; without it, restore is offline from artifacts/nuget as the committed NuGet.Config requires.
+param([string]$Repo = (Split-Path -Parent $PSScriptRoot), [string]$RestoreSource)
 $ErrorActionPreference = 'Stop'
 $Repo = (Resolve-Path -LiteralPath $Repo).Path
 $artifacts = Join-Path $Repo 'artifacts'
@@ -17,6 +19,8 @@ $settings = @{
     DOTNET_CLI_USE_MSBUILD_SERVER = '0'
     UseSharedCompilation = 'false'
 }
+$restoreArguments = @('--configfile', 'NuGet.Config', '--locked-mode', '--disable-parallel', '--verbosity', 'minimal')
+if (-not [string]::IsNullOrWhiteSpace($RestoreSource)) { $restoreArguments += @('--source', $RestoreSource) }
 $saved = @{}
 try {
     foreach ($name in @('dotnet-cli','nuget','tmp','appdata','localappdata')) { New-Item -ItemType Directory -Force -Path (Join-Path $artifacts $name) | Out-Null }
@@ -30,18 +34,18 @@ try {
             $project = 'tests/fixtures/extensions/native/' + $fixture[0] + '/' + $fixture[0] + '.csproj'
             $output = Join-Path $artifacts ('extensions/published-fixtures/' + $fixture[1])
             # These fixed directories contain only this repository's generated developer fixtures.
-            & dotnet restore $project --configfile NuGet.Config --locked-mode --disable-parallel --verbosity minimal
+            & dotnet restore $project @restoreArguments
             if ($LASTEXITCODE -ne 0) { throw ('Offline fixture restore failed: ' + $project) }
             & dotnet publish $project --no-restore --configuration Release --output $output --verbosity minimal
             if ($LASTEXITCODE -ne 0) { throw ('Owned fixture publish failed: ' + $project) }
         }
         $todoProject = 'samples/extensions/StatefulTodo/StatefulTodo.csproj'
-        & dotnet restore $todoProject --configfile NuGet.Config --locked-mode --disable-parallel --verbosity minimal
+        & dotnet restore $todoProject @restoreArguments
         if ($LASTEXITCODE -ne 0) { throw 'Offline stateful sample restore failed.' }
         & dotnet publish $todoProject --no-restore --configuration Release --output (Join-Path $artifacts 'extensions/published-fixtures/todo') --verbosity minimal
         if ($LASTEXITCODE -ne 0) { throw 'Owned stateful sample publish failed.' }
         $checkpointProject = 'samples/extensions/SessionCheckpoint/SessionCheckpoint.csproj'
-        & dotnet restore $checkpointProject --configfile NuGet.Config --locked-mode --disable-parallel --verbosity minimal
+        & dotnet restore $checkpointProject @restoreArguments
         if ($LASTEXITCODE -ne 0) { throw 'Offline checkpoint sample restore failed.' }
         & dotnet publish $checkpointProject --no-restore --configuration Release --output (Join-Path $artifacts 'extensions/published-fixtures/checkpoint') --verbosity minimal
         if ($LASTEXITCODE -ne 0) { throw 'Owned checkpoint sample publish failed.' }

@@ -1,9 +1,6 @@
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using PiSharp.AI;
-using PiSharp.Agent;
 using PiSharp.Cli.Commands;
 using PiSharp.Cli.Extensions;
 using PiSharp.Cli.Reloading;
@@ -61,7 +58,8 @@ internal static class ProfileRuntimeViewNativeTests
                     try
                     {
                         profile.BindPreparedExtension(extension);
-                        var registry = new SessionRuntimeRegistry([new(profile.SelectedModel, new UnusedTransport())], [], new Policy());
+                        // The profile admits only a registry that carries its own prompt-section preparation and decorated bindings.
+                        var registry = candidate.Session.ReadToolCatalogRegistry().WithToolCatalog([], null);
                         return profile.PrepareRuntimeView(candidate, extension, null, null, null, registry, new Resource(), null, () => { });
                     }
                     catch { await extension.DisposeAsync(); throw; }
@@ -127,12 +125,5 @@ internal static class ProfileRuntimeViewNativeTests
         return NativeExtensionConfiguration.Optional(package, manifestPath, approvalPath, snapshots, [])!;
     }
     private sealed class Resource : IAsyncDisposable { public ValueTask DisposeAsync() => ValueTask.CompletedTask; }
-    private sealed class Policy : IToolActionPolicy
-    { public ValueTask<ToolActionAuthorization> AuthorizeAsync(ToolInvocation invocation, PreparedToolAction action, CancellationToken token) => ValueTask.FromResult(new ToolActionAuthorization(false)); }
-    private sealed class UnusedTransport : IChatTransport
-    {
-        public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
-        { await Task.FromException(new InvalidOperationException("No provider work admitted.")); yield break; }
-    }
     private static void Check(bool value) { if (!value) throw new InvalidOperationException("Native profile lifecycle contract failed."); }
 }

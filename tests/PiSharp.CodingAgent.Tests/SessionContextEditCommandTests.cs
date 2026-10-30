@@ -72,7 +72,7 @@ internal static class SessionContextEditCommandTests
             Check(invalid.Exit == 1 && !JsonData.Parse(invalid.Error).Value.GetProperty("commitMayHaveOccurred").GetBoolean() &&
                 (await File.ReadAllBytesAsync(files.Session)).SequenceEqual(original), "Missing/header/system target was editable.");
         }
-        foreach (var raw in new[] { "{\"content\":\"a\",\"content\":\"b\"}", "{\"content\":true}", "{\"content\":\"\\uD800\"}", "{}" })
+        foreach (var raw in new[] { "{\"content\":\"a\",\"content\":\"b\"}", "{\"content\":true}", "{}" })
         {
             await File.WriteAllTextAsync(files.Replacement, raw, Utf8);
             var invalid = await Child(files, Arguments(files));
@@ -81,9 +81,16 @@ internal static class SessionContextEditCommandTests
         await File.WriteAllTextAsync(files.Replacement, "null", Utf8);
         var accepted = await Child(files, Arguments(files, "left").Concat(new[] { "--leaf", "left" }).ToArray());
         Check(accepted.Exit == 0, "Explicit active selected branch could not edit.");
-        await using var store = await SessionLogStore.OpenAsync(files.Session);
-        Check(store.Snapshot.Entries[^1].ParentId == "left" && new SessionContextProjector().Project(store.Snapshot.Entries, "right").LlmMessages.Any(
-            message => message.WireBody.Value.GetProperty("content").ToString().Contains("right", StringComparison.Ordinal)), "Branch-relative edit leaked into sibling.");
+        await using (var store = await SessionLogStore.OpenAsync(files.Session))
+            Check(store.Snapshot.Entries[^1].ParentId == "left" && new SessionContextProjector().Project(store.Snapshot.Entries, "right").LlmMessages.Any(
+                message => message.WireBody.Value.GetProperty("content").ToString().Contains("right", StringComparison.Ordinal)), "Branch-relative edit leaked into sibling.");
+        // A lone surrogate string is a JavaScript string JSON.parse keeps (f0304a67): the replacement commits with its escape, after the prefix.
+        var edited = await File.ReadAllBytesAsync(files.Session);
+        await File.WriteAllTextAsync(files.Replacement, "{\"content\":\"\\uD800\"}", Utf8);
+        var lone = await Child(files, Arguments(files, "left").Concat(new[] { "--leaf", "left" }).ToArray());
+        var line = Utf8.GetString(await File.ReadAllBytesAsync(files.Session)).TrimEnd('\r', '\n').Split('\n')[^1];
+        Check(lone.Exit == 0 && lone.Error == "" && (await File.ReadAllBytesAsync(files.Session)).AsSpan().StartsWith(edited) &&
+            line.Contains("\"replacement\":{\"content\":\"\\uD800\"}", StringComparison.Ordinal), "Lone surrogate replacement was not carried: " + line);
     }
     private static async Task ReplacementIo()
     {

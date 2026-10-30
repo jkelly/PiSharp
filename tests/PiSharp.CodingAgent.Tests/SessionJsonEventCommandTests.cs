@@ -103,7 +103,9 @@ internal static class SessionJsonEventCommandTests
         {
             var ended = records.Single(record => Type(record) == "tool_execution_end" && record.GetProperty("toolCallId").GetString()!.StartsWith(id, StringComparison.Ordinal));
             Check(!ended.GetProperty("isError").GetBoolean(), "Allowed actual tool failed in JSON mode.");
-            Check(ended.GetProperty("result").TryGetProperty("content", out _) && ended.GetProperty("result").TryGetProperty("details", out _), "Tool result properties disappeared.");
+            // Source read.ts (untruncated) and write.ts leave details undefined; read.ts adds structuredContent (toReadOutput).
+            Equal(id == "json-read" ? "content,structuredContent" : "content",
+                string.Join(",", ended.GetProperty("result").EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal)));
         }
         var afterSourceHash = SHA256.HashData(await File.ReadAllBytesAsync(source));
         var afterScriptHash = SHA256.HashData(await File.ReadAllBytesAsync(files.Script));
@@ -306,7 +308,9 @@ internal static class SessionJsonEventCommandTests
         }
         foreach (var fits in new[] { false, true })
         {
-            using var bounded = new Files(); var session = await NativeSession(bounded, new ProbeTransport(), new ProbeExecutor());
+            // The header's cwd is the temp directory: multibyte padding keeps size - 1 above the 257-byte minimum record bound
+            // on a short temp path (C:\Users\<short name>\AppData\Local\Temp gave 256 bytes).
+            using var bounded = new Files(); var session = await NativeSession(bounded, new ProbeTransport(), new ProbeExecutor(), Visible + new string('\u6587', 32));
             var header = JsonlRecordFormatter.Format(session.Snapshot.Log.Header.WireBody);
             var size = Utf8.GetByteCount(header); Check(size > header.Length, "UTF-8 boundary control did not contain actual multibyte Unicode.");
             var options = new SessionJsonEventOutputOptions(MaximumRecordBytes: size - (fits ? 0 : 1), MaximumTotalBytes: size);
@@ -706,10 +710,10 @@ internal static class SessionJsonEventCommandTests
         }
     }
 
-    private static Task<PersistentAgentSession> NativeSession(Files files, ProbeTransport transport, ProbeExecutor executor)
+    private static Task<PersistentAgentSession> NativeSession(Files files, ProbeTransport transport, ProbeExecutor executor, string text = Visible)
     {
         var raw = JsonSerializer.Serialize(new { type = "session", version = 3, id = "json-session",
-            timestamp = "2026-10-01T00:00:00.000Z", cwd = files.Root, unknown = new { text = Visible, nil = (string?)null } });
+            timestamp = "2026-10-01T00:00:00.000Z", cwd = files.Root, unknown = new { text, nil = (string?)null } });
         // Keep actual Unicode in retained JSON syntax so byte quotas cannot accidentally become UTF-16 quotas.
         var header = new SessionEntryCodec().Parse(raw.Replace("\\u6587", "\u6587", StringComparison.Ordinal)
             .Replace("\\uD83D\\uDE42", "\U0001f642", StringComparison.Ordinal));

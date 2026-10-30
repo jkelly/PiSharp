@@ -245,7 +245,7 @@ internal static partial class ImageCapabilityFrontendTests
             directory = directory.Parent ?? throw new InvalidOperationException("Cannot locate owned image plugin publication.");
         var published = Path.Combine(directory.FullName, "artifacts", "extensions", "published-fixtures", "image");
         const string assembly = "PublishedFixture.Image.dll";
-        Check(File.Exists(Path.Combine(published, assembly)), "Publish the authored image fixture before these cases.");
+        PublishedFixtures.Require(published, assembly);
         var package = files.In("published"); var snapshots = files.In("snapshots"); Directory.CreateDirectory(package); Directory.CreateDirectory(snapshots);
         foreach (var source in Directory.GetFiles(published, "*", SearchOption.AllDirectories))
         { var copy = Path.GetFullPath(Path.Combine(package, Path.GetRelativePath(published, source))); Check(copy.StartsWith(package + Path.DirectorySeparatorChar, StringComparison.Ordinal), "Fixture publication escaped owned copy.");
