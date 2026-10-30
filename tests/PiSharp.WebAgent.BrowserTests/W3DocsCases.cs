@@ -16,10 +16,12 @@ internal static partial class Program
     private sealed record W3Gap(string Name, string Phrase, Func<string, string?> Closed);
 
     /// <summary>What the W3 browser cases did with spend caps, confirm panes and footer marks when decision 0011's line on their coverage
-    /// was written (<see cref="W3BrowserSpendFacts(string)"/>): caps per request on everything (one more saved per month, and the provider
-    /// pane looked at, neither of them enforced), the request pane, and the metered and uncertain marks.</summary>
+    /// was written (<see cref="W3BrowserSpendFacts(string)"/>): caps per request on everything and per day on one source (one more saved per
+    /// month, and the provider pane looked at, neither of them enforced), the request, period and unknown-price panes, and the metered and
+    /// uncertain marks.</summary>
     private static readonly string[] W3BrowserSpendFactsWhenWritten =
-        ["mark:metered", "mark:uncertain", "pane:sc-request", "period:month", "period:request", "scope:everything", "scope:provider"];
+        ["mark:metered", "mark:uncertain", "pane:sc-period", "pane:sc-request", "pane:sc-unknown", "period:day", "period:month", "period:request",
+            "scope:everything", "scope:provider", "scope:source"];
 
     private static readonly W3Gap[] W3Gaps =
     [
@@ -41,8 +43,8 @@ internal static partial class Program
                     .Any(text => text.Contains("FileLock", StringComparison.Ordinal) || text.Contains("FileShare.None", StringComparison.Ordinal) ||
                         text.Contains("DataLock", StringComparison.Ordinal))
                 ? null : "the Spend area now takes or waits for a lock on the data folder"),
-        // The W3 browser cases do no more with caps, confirm panes and marks than when the line was written.
-        new("W3's browser cases enforce only per-request caps on everything", "per-request caps on everything",
+        // The W3 browser cases do no more with caps, confirm panes and marks than when the line was last revised.
+        new("W3's browser cases enforce no run cap and no provider or account scope", "run and month caps, the provider and account scopes",
             root => W3BrowserSpendFacts(root).Except(W3BrowserSpendFactsWhenWritten, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList() is { Count: > 0 } added
                 ? "the W3 browser cases now also use " + string.Join(", ", added) + " (revise W3BrowserSpendFactsWhenWritten with the line)"
                 : null),
