@@ -16,6 +16,15 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "PiSharp.WebAgent (faux metered)": {
+      "commandName": "Project",
+      "commandLineArgs": "--faux-metered",
+      "launchBrowser": true,
+      "applicationUrl": "http://127.0.0.1:5180",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
     }
   }
 }

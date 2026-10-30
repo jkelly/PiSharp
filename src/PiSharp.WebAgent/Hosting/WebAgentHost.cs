@@ -122,11 +122,11 @@ public static class WebAgentHost
         return app;
     }
 
-    /// <summary>Maps <c>GET /api/health</c> (<c>{status, faux}</c>, for scripts and tests waiting for the app) and the MVC controllers.</summary>
+    /// <summary>Maps <c>GET /api/health</c> (<c>{status, faux, fauxMetered}</c>, for scripts and tests waiting for the app) and the MVC controllers.</summary>
     public static WebApplication MapWebAgentCore(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
-        app.MapGet("/api/health", (WebAgentOptions options) => Results.Json(new { status = "ok", faux = options.Faux }));
+        app.MapGet("/api/health", (WebAgentOptions options) => Results.Json(new { status = "ok", faux = options.Faux, fauxMetered = options.FauxMetered }));
         app.MapControllers();
         return app;
     }
