@@ -2,7 +2,9 @@
    the suggestions and the model switch. Nothing is saved until the first message: sending it creates the chat (POST /api/chats with a
    request id, so a retry never makes two) with the chosen model, thinking level, speed and the Settings › Tools working directory, then
    opens /chat/{id}. With no provider configured it shows the mockups' "Connect a provider to start" card and a "No model" switch instead.
-   The send estimate and the over-cap state belong to the Spend Guard (a later milestone), so they are left out. *@
+   W3 (S5): the composer's send estimate for the chosen model (refreshed as the draft and the model change) and the over-cap state: the
+   first message asks the Spend Guard first, and when it would ask or block, modal-spend-confirm (S4's _SpendConfirmModal) opens and no
+   chat is created until the user chooses. *@
 @model NewChatPage
 @{
     ViewData["Title"] = "New chat";
@@ -55,7 +57,7 @@
         {
           <div class="empty-hero">
             <h2>What can I help with?</h2>
-            <partial name="_ChatComposer" model="new ChatComposerView(true, Model.Thinking, Model.ThinkingLevels, null)" />
+            <partial name="_ChatComposer" model="new ChatComposerView(true, Model.Thinking, Model.ThinkingLevels, null) { Estimate = Model.Estimate }" />
             <div class="d-flex flex-wrap justify-content-center gap-2 mt-3" data-suggestions>
               <button class="suggestion" type="button" data-suggestion="Explain this file: "><i class="bi bi-file-earmark-code" aria-hidden="true"></i>Explain a file</button>
               <button class="suggestion" type="button" data-suggestion="Write tests for "><i class="bi bi-check2-square" aria-hidden="true"></i>Write tests</button>
@@ -74,6 +76,7 @@
   @if (selected is not null)
   {
     <partial name="_ChatModelPicker" model="picker" />
+    <partial name="~/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
   }
 }
 @section Scripts {

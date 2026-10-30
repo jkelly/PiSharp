@@ -8,7 +8,10 @@
    answer whose tool call a restart cut off; an aborted partial that was answered again ("Stream dropped … answered again below") and the
    answer after it ("Answered again after a server restart"); a provider error with Retry, Switch model and Details; and the expired
    sign-in ("Not sent: sign-in expired.") with Retry, which forks and sends again with the same account. Fork, Edit, Retry and Regenerate
-   act on an entry id (data-entry). *@
+   act on an entry id (data-entry). W3 (S5): footers mark costs from the spend ledger (ChatSpendText): metered "$x", list price "≈ $x list",
+   settled at an estimate "≈ $x · est.", uncertain (the chip, "$x reserved" and Resolve… on History › Spend), "price unknown"; the running
+   answer's live footer "≈ $x · est." from the tokens received so far; and a call the Spend Guard stopped before it was sent shows the
+   cap's stop (data-failure="spend") with Review…, which opens modal-spend-confirm and continues after the user's choice. *@
 @model ChatItemView
 @{
     var item = Model.Item;
@@ -46,7 +49,9 @@
             var rate = ChatDisplay.OutputRate(output, meta?.DurationMs);
             var texts = assistant.Blocks.OfType<TextBlockView>().ToList();
             var lastText = texts.LastOrDefault();
-            var failureName = failure switch { ChatFailureKind.Error => "error", ChatFailureKind.Expired => "expired", ChatFailureKind.Aborted => "aborted", _ => null };
+            var failureName = failure switch { ChatFailureKind.Error => "error", ChatFailureKind.Expired => "expired", ChatFailureKind.Aborted => "aborted", ChatFailureKind.Spend => "spend", _ => null };
+            var spendMark = live ? context.Spend.LiveFor(assistant) : context.Spend.For(assistant.Id);
+            var spendStop = failure == ChatFailureKind.Spend ? ChatSpendStopView.From(meta?.ErrorMessage ?? assistant.Error, assistant.Id) : null;
             var errorText = ChatFailures.Display(meta?.ErrorMessage ?? assistant.Error);
             <article class="msg msg-assistant" data-key="@assistant.Key" data-entry="@assistant.Id" data-stop="@meta?.StopReason" data-failure="@failureName" data-tail="@(facts.Tail ? "true" : null)">
               <div class="msg-body">
@@ -99,6 +104,24 @@
                 }
                 @switch (failure)
                 {
+                    case ChatFailureKind.Spend when spendStop is not null:
+                      <div class="msg-error msg-spend mt-2" role="alert" data-spend-stop data-op="@spendStop.Op" data-code="@spendStop.Code">
+                        <div class="d-flex align-items-start gap-2">
+                          <i class="bi bi-shield-exclamation mt-1" aria-hidden="true"></i>
+                          <div class="flex-grow-1 min-w-0">
+                            <div class="fw-semibold">@spendStop.Title</div>
+                            <div class="small text-break">@ChatDisplay.Cut(spendStop.Text, 600) Nothing was sent or reserved.</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                              @if (spendStop.Op is { Length: > 0 } stopOp)
+                              {
+                                <button class="btn btn-sm btn-outline-danger" type="button" data-action="spend-review" data-op="@stopOp" data-entry="@assistant.Id" title="See what the cap allows and choose how to go on. PiSharp never switches your model or account.">@(spendStop.CanProceed ? "Review and continue…" : "Review…")</button>
+                              }
+                              <a class="btn btn-sm btn-ghost" href="@spendStop.SettingsUrl">Settings › Spend</a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      break;
                     case ChatFailureKind.Expired:
                       <div class="msg-error mt-2" role="alert">
                         <div class="d-flex flex-wrap align-items-center gap-2">
@@ -151,6 +174,10 @@
                     @{ var turn = facts.Turn > 0 ? $" · turn {facts.Turn} of agent run" : ""; var status = facts.LiveStatus ?? "streaming"; }
                     <span data-live-status="live">@(status + turn)</span>
                     <span data-live-status="reconnecting">@("paused while reconnecting" + turn)</span>
+                    @if (spendMark is not null)
+                    {
+                      <span class="text-nowrap" tabindex="0" data-bs-toggle="tooltip" title="@spendMark.Title" data-spend-mark="live">@spendMark.Text</span>
+                    }
                   </div>
                 }
                 else if (assistant.Id is { } entryId)
@@ -184,6 +211,17 @@
                       </span>
                     </div>
                   }
+                  else if (failure == ChatFailureKind.Spend)
+                  {
+                    <div class="msg-footer">
+                      <span class="ps-chip" data-tone="warn">stopped</span>
+                      <span>nothing sent · nothing counted</span>
+                      <span class="msg-actions">
+                        <button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @entryId" data-action="fork" data-entry="@entryId"><i class="bi bi-signpost-split"></i></button>
+                        <span class="entry-id">#@entryId</span>
+                      </span>
+                    </div>
+                  }
                   else if (failure != ChatFailureKind.Error)
                   {
                     <div class="msg-footer" data-message-metrics data-output-tokens="@(output?.ToString(System.Globalization.CultureInfo.InvariantCulture))" data-elapsed-ms="@(meta?.DurationMs?.ToString(System.Globalization.CultureInfo.InvariantCulture))">
@@ -195,10 +233,22 @@
                         {
                           <span title="Cache read tokens"><i class="bi bi-lightning-charge"></i>@ChatDisplay.Count(meta.CacheRead) cached</span>
                         }
-                        if (ChatDisplay.CostText(meta, context.Billing, meta.Provider is { } p && meta.Model is { } m ? context.Catalog?.FindModel(p, m) : null, account) is { } cost)
+                      }
+                      @if (spendMark is not null)
+                      {
+                        if (spendMark.Chip is { } markChip)
                         {
-                          <span class="text-nowrap" tabindex="0" data-bs-toggle="tooltip" title="@cost.Title">@cost.Text</span>
+                          <span class="ps-chip" data-tone="warn" tabindex="0" data-bs-toggle="tooltip" title="@spendMark.ChipTitle">@markChip</span>
                         }
+                        <span class="text-nowrap" tabindex="0" data-bs-toggle="tooltip" title="@spendMark.Title" data-spend-mark="@spendMark.Kind.ToString().ToLowerInvariant()">@spendMark.Text</span>
+                        if (spendMark.ResolveUrl is { } resolve)
+                        {
+                          <a class="text-ps-faint" href="@resolve" data-spend-resolve>Resolve…</a>
+                        }
+                      }
+                      else if (meta is { HasUsage: true } && ChatDisplay.CostText(meta, context.Billing, meta.Provider is { } p && meta.Model is { } m ? context.Catalog?.FindModel(p, m) : null, account) is { } cost)
+                      {
+                        <span class="text-nowrap" tabindex="0" data-bs-toggle="tooltip" title="@cost.Title">@cost.Text</span>
                       }
                       @if (meta?.DurationMs is { } elapsed)
                       {

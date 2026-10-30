@@ -102,3 +102,17 @@ button.tree-node:focus-visible { outline: 2px solid var(--ps-border-strong); out
   .app-banner { flex-wrap: wrap; }
   .app-banner .btn { margin-left: 0 !important; }
 }
+
+/* ---------- W3 (S5): the send estimate, over-cap chip, cost marks and the spend stop ---------- */
+.composer-spend { display: contents; }
+.run-estimate { cursor: help; }
+.ps-tip-left .tooltip-inner { text-align: left; max-width: 20rem; }
+.composer-estimate { background: transparent; border: 0; border-radius: 999px; padding: .2rem .45rem; font-size: .8125rem; color: var(--ps-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.composer-estimate:hover, .composer-estimate:focus-visible { background: var(--ps-hover); color: var(--ps-text); }
+.msg-spend { background: var(--ps-warn-bg); border-color: transparent; color: var(--ps-text); }
+.msg-spend .bi-shield-exclamation { color: var(--ps-warn); }
+[data-spend-mark], [data-spend-resolve] { font-variant-numeric: tabular-nums; }
+@media (max-width: 575.98px) {
+  .composer-estimate { padding: .2rem .3rem; }
+  [data-banner="spend"] > .ms-auto { margin-left: 0 !important; }
+}

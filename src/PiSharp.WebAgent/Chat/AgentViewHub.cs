@@ -9,6 +9,8 @@
 // panels: `notices` (compacting, a compaction failure, an automatic retry's wait), `banners` (no providers, an expired sign-in) and `info`
 // (the session details). The state's busy flag also reads the device's running flag (DeviceHostService), which changes outside the
 // agent's frames, so every feed renders again when that flag changes (ActivityChanged); otherwise a page could keep showing busy after a run.
+// W3 (S5): the render context carries the answers' cost marks from the spend ledger (ChatSpend, read at most every second or when the
+// entries or the running state change), and an item's fingerprint includes its mark, so a footer changes when its request settles.
 using System.Text.Json.Nodes;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Hosting;
@@ -134,7 +136,7 @@ public sealed class AgentViewHub : IAsyncDisposable
     };
 
     /// <summary>What an item's HTML depends on: its JSON, its facts (time, usage, failure, restarts, the running tail), its calls' stored
-    /// results and waiting approvals, and the account label.</summary>
+    /// results and waiting approvals, the account label and billing, and its cost mark.</summary>
     internal static string Print(TranscriptItem item, ChatRenderContext context)
     {
         var json = Transcript.ToJson([item]).ToJsonString() + "|" + context.FactsOf(item);
@@ -143,7 +145,7 @@ public sealed class AgentViewHub : IAsyncDisposable
             if (context.Approval(callId) is { } approval) json += "|approval:" + approval.Request.TaskId;
             if (context.Result(callId) is { } result) json += "|result:" + result;
         }
-        return json + "|" + context.AccountLabel + "|" + context.Billing;
+        return json + "|" + context.AccountLabel + "|" + context.Billing + "|" + context.Spend.Print(item);
     }
 
     private sealed class Viewer(Action<JsonObject> send)
@@ -311,7 +313,8 @@ public sealed class AgentViewHub : IAsyncDisposable
                 var entries = model.Entries;
                 var run = new ChatRunState(model.Running || model.Generating, model.Generating,
                     approvals.Any(approval => approval.Request.AgentId == agentId), model.Pending.Count > 0);
-                var context = hub.chats.RenderContext(binding, agentId, accountLabel, entries, model.Items, run);
+                var spend = await hub.chats.SpendFactsAsync(binding, entries, run.Running, accountLabel, stop.Token).ConfigureAwait(false);
+                var context = hub.chats.RenderContext(binding, agentId, accountLabel, entries, model.Items, run, spend);
                 var upsert = new JsonArray();
                 var keys = new HashSet<string>(StringComparer.Ordinal);
                 var inline = new HashSet<string>(StringComparer.Ordinal);

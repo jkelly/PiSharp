@@ -3,7 +3,9 @@
 // Key, so a reattached page and its stream agree; ChatFacts adds what the entries know beyond the transcript (time, usage, failures,
 // restarts, the running turn's tail). Model and user text goes through Web.Common's MarkdownRenderer (sanitized) or Razor's encoding, never
 // raw. The stream also renders panels: the "Waiting for you" panel, the queue, the session details (_ChatInfo), the banners (_ChatBanners)
-// and the run notices (_ChatNotices). ChatDisplay holds the small formatting helpers the partials share.
+// and the run notices (_ChatNotices). ChatDisplay holds the small formatting helpers the partials share. W3 (S5) adds the Spend Guard's
+// parts: the answers' cost marks from the ledger (ChatRenderContext.Spend), the composer's send estimate (ChatComposerView.Estimate), the
+// chat's spend in the session panel (ChatInfoView.Spend) and the banner of a call stopped at a cap (ChatBannersView.Spend).
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -46,6 +48,9 @@ public sealed class ChatRenderContext
 
     /// <summary>The stored tool results, by call id (<see cref="ChatFacts.ToolResults"/>).</summary>
     public IReadOnlyDictionary<string, ChatToolResultMeta> Results { get; init; } = new Dictionary<string, ChatToolResultMeta>(StringComparer.Ordinal);
+
+    /// <summary>The answers' cost marks from the spend ledger, and the running answer's reservation (empty without the Spend area).</summary>
+    public ChatSpendFacts Spend { get; init; } = ChatSpendFacts.Empty;
 
     /// <summary>The pending approval of tool call <paramref name="callId"/>, or null.</summary>
     public PendingApproval? Approval(string callId) => Approvals.TryGetValue(callId, out var approval) ? approval : null;
@@ -90,7 +95,11 @@ public sealed record ChatPendingView(IReadOnlyList<PendingCall> Calls, IReadOnly
 /// <param name="Thinking">The selected thinking level.</param>
 /// <param name="ThinkingLevels">The levels the model supports (a model that cannot turn thinking off shows "off" disabled).</param>
 /// <param name="Tier">The selected service tier, or null for the default.</param>
-public sealed record ChatComposerView(bool NewChat, string Thinking, IReadOnlyList<string> ThinkingLevels, string? Tier);
+public sealed record ChatComposerView(bool NewChat, string Thinking, IReadOnlyList<string> ThinkingLevels, string? Tier)
+{
+    /// <summary>The send estimate by Send (the empty draft's, until the page asks again), or null to show none.</summary>
+    public ChatSpendEstimateView? Estimate { get; init; }
+}
 
 /// <summary>The session details panel (<c>Views/Chat/_ChatInfo.cshtml</c>), rendered on the page and by the stream.</summary>
 public sealed record ChatInfoView
@@ -151,9 +160,13 @@ public sealed record ChatInfoView
 
     /// <summary>Tool results in this branch's context.</summary>
     public int ToolCount { get; init; }
+
+    /// <summary>The chat's spend from the ledger and its per-chat cap, or null without the Spend area.</summary>
+    public ChatSpendSummary? Spend { get; init; }
 }
 
-/// <summary>The banners under the top bar (<c>Views/Chat/_ChatBanners.cshtml</c>): no providers, or the chat's sign-in expired.</summary>
+/// <summary>The banners under the top bar (<c>Views/Chat/_ChatBanners.cshtml</c>): no providers, the chat's sign-in expired, or its newest
+/// request was stopped at a spend cap.</summary>
 /// <param name="NoProviders">The catalog has no provider.</param>
 /// <param name="ExpiredProvider">The provider whose account could not be used for the newest answer, or null.</param>
 /// <param name="ExpiredProviderName">Its display name.</param>
@@ -164,6 +177,9 @@ public sealed record ChatBannersView(bool NoProviders, string? ExpiredProvider =
 {
     /// <summary>No banner.</summary>
     public static ChatBannersView None { get; } = new(false);
+
+    /// <summary>The newest answer is a call the Spend Guard stopped (over a cap, or no price), or null.</summary>
+    public ChatSpendStopView? Spend { get; init; }
 }
 
 /// <summary>The run notices above the composer (<c>Views/Chat/_ChatNotices.cshtml</c>): compacting, a compaction failure and an automatic
@@ -240,7 +256,11 @@ public sealed record ChatKeptRunningView(IReadOnlyList<RecentChat> Chats, string
 /// <param name="Thinking">The default thinking level, clamped to the model.</param>
 /// <param name="ThinkingLevels">The model's levels.</param>
 /// <param name="WorkingDirectory">Where the chat's tools will work.</param>
-public sealed record NewChatPage(string? Provider, string? Model, string Thinking, IReadOnlyList<string> ThinkingLevels, string WorkingDirectory);
+public sealed record NewChatPage(string? Provider, string? Model, string Thinking, IReadOnlyList<string> ThinkingLevels, string WorkingDirectory)
+{
+    /// <summary>The send estimate of an empty first message, or null.</summary>
+    public ChatSpendEstimateView? Estimate { get; init; }
+}
 
 /// <summary>A chat page (<c>Views/Chat/Session.cshtml</c>): the stored transcript of one agent, which the stream then catches up.</summary>
 public sealed record ChatPage
@@ -286,6 +306,9 @@ public sealed record ChatPage
 
     /// <summary>The banners.</summary>
     public ChatBannersView Banners { get; init; } = ChatBannersView.None;
+
+    /// <summary>The send estimate of an empty draft on this branch, or null.</summary>
+    public ChatSpendEstimateView? Estimate { get; init; }
 
     /// <summary>The <c>chat/{session}/{agent}</c> stream key.</summary>
     public string StreamKey => ChatStreamMux.AgentKey(Binding.SessionId, Agent.Id);
