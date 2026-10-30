@@ -17,7 +17,9 @@
 // from a host environment that shows only the variables the provider references) or, with no key at all, the placeholder "no-key". An
 // unset variable or a rejected key ends the request with an AccountRouteErrors text that points to Settings > Custom providers; a key-less
 // generation is never marked expired (there is no account). Every generation reads the store's routes copy as its models.json, so model
-// overrides and custom headers apply, and a change of the file retires every generation for the next request. The variables a custom
+// overrides and custom headers apply, and a change of the file retires every generation for the next request. A built-in provider's entry
+// in that copy holds only its modelOverrides (CustomProviderJson.RouteCopy), so the file never changes where a built-in account's key goes:
+// that is the account's own baseUrl setting, or the catalog's. The variables a custom
 // provider references are read when its generation is made; a request that finds one changed (or set, or unset) retires that generation, so
 // the variable is read again on each request in effect (only a hash of the values is kept, in memory).
 using System.Collections.Concurrent;

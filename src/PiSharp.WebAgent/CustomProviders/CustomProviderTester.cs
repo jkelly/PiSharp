@@ -3,8 +3,9 @@
 // CredentialsOptions.TestTimeout, and with every secret scrubbed from the answer. The request is the free model list, never a chat request:
 // GET {baseUrl}/models with a Bearer key for the OpenAI, Mistral and Pi APIs (what LM Studio, Ollama, vLLM and llama.cpp serve),
 // GET {baseUrl}/v1/models with x-api-key and anthropic-version for Anthropic Messages, GET {baseUrl}/models with x-goog-api-key for Google.
-// The key is the one the editor would save: a key typed but not saved yet (used once, never kept), the stored vault key, or the referenced
-// variable's value on the web host. The provider's headers are sent as configured, their $VAR references resolved, never a !command.
+// The key is the one the editor would save: a key typed but not saved yet (used once, never kept), the stored vault key (only to a server
+// the saved entry already uses), or the referenced variable's value on the web host. The provider's headers are sent as configured, their
+// $VAR references resolved, never a !command.
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -72,6 +73,8 @@ public sealed class CustomProviderTester(CustomProviderService service, ICredent
                 if (draft.Key!.ApiKey?.Trim() is { Length: > 0 } typed) return (typed, null);
                 var id = draft.OriginalId is { Length: > 0 } original ? original : draft.Id?.Trim() ?? "";
                 if (service.StoredKey(id) is not { } account) return (null, "Paste the API key to test it.");
+                // The stored key is tested only against a server the saved entry already uses (as a save keeps it only then).
+                if (!service.StoredKeyMayGo(draft.OriginalId, draft.BaseUrl?.Trim().TrimEnd('/') ?? "")) return (null, CustomProviderService.StoredKeyElsewhere);
                 try { return ((await vault.ReadAsync(account.Id, token).ConfigureAwait(false))?.ApiKey, null); }
                 catch (CredentialUnavailableException error) { return (null, error.Message); }
             default:
