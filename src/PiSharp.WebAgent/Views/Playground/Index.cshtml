@@ -18,6 +18,7 @@
     };
 }
 @section Styles {
+  <link href="~/css/presets.css" rel="stylesheet" asp-append-version="true" />
   <link href="~/css/playground.css" rel="stylesheet" asp-append-version="true">
 }
 <partial name="_PlaygroundToolbar" model="Model" />
@@ -39,7 +40,11 @@
   <partial name="_ToolEditorModal" model="Model.Tools" />
   <partial name="_ErrorDetailsModal" model="Model.Error" />
   <partial name="_SpendConfirmModal" model="null" />
+  @* Presets (R8): Save preset (Ctrl+S) and Load preset; presets-host.js wires [data-preset-save] / [data-preset-load]. *@
+  <partial name="_SavePresetModal" model='PiSharp.WebAgent.Presets.SavePresetView.Host("playground")' />
+  <partial name="_LoadPresetModal" model='PiSharp.WebAgent.Presets.LoadPresetView.Host("playground")' />
 }
 @section Scripts {
   <script type="module" src="~/js/playground.js" asp-append-version="true"></script>
+  <script type="module" src="~/js/presets-host.js" asp-append-version="true"></script>
 }

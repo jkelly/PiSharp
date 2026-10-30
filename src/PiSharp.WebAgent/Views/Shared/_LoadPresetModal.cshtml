@@ -1,0 +1,158 @@
+@* Decision 0011 (run W4, R8): the mockups' _LoadPresetModal (#modal-load-preset), shared by the Playground, Compare and Tool Bench: search
+   (name, model or tag) and tag chips over the list of presets (pinned first, then the most recently used; each with its age and model), and
+   the selected preset's preview (description, model and API, parameters, how many messages and tools, how often it was used, tags and when
+   it changed). A preset from another page loads converted, and the page says what was left out. A preset whose model cannot run here is
+   listed with the reason and cannot be loaded. A page hosts the empty shell (Hosted); presets-host.js swaps in GET /presets/picker?page= when
+   it opens. Model: LoadPresetView. *@
+@using PiSharp.WebAgent.Presets
+@model LoadPresetView
+@{
+    var first = Model.Items.FirstOrDefault();
+}
+<div class="modal fade" id="modal-load-preset" tabindex="-1" aria-labelledby="modal-load-preset-title" aria-hidden="true" data-preset-load-modal data-page="@Model.Page">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" data-preset-load-content data-hosted="@(Model.Hosted ? "true" : "false")">
+      <div class="modal-header">
+        <div class="min-w-0">
+          <h2 class="modal-title" id="modal-load-preset-title">Load preset</h2>
+          <div class="modal-subtitle">@Model.Subtitle</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        @if (Model.Hosted)
+        {
+          <div class="d-flex align-items-center gap-2 fs-7 text-secondary py-5 justify-content-center" role="status">
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Loading presets…
+          </div>
+        }
+        else if (Model.Items.Count == 0)
+        {
+          <div class="empty-state py-5" data-lp-empty>
+            <div class="empty-icon"><i class="bi bi-bookmark-star" aria-hidden="true"></i></div>
+            <div class="fw-semibold text-body mb-1">No presets yet</div>
+            <p class="fs-7 mx-auto mb-0 presets-empty-text">Save this page's setup with <kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">S</kbd>, or import a JSON file on <a href="/presets">Presets</a>.</p>
+          </div>
+        }
+        else
+        {
+          <div class="row g-0">
+            <div class="col-md-5 border-end border-ps lp-list-col">
+              <div class="p-3 border-bottom">
+                <label class="visually-hidden" for="lp-search">Search presets</label>
+                <div class="position-relative">
+                  <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-ps-faint fs-8" aria-hidden="true"></i>
+                  <input class="form-control form-control-sm ps-4" type="search" id="lp-search" placeholder="Search name, model or tag" autocomplete="off" data-lp-search>
+                </div>
+                @if (Model.Tags.Count > 0)
+                {
+                  <div class="d-flex flex-wrap gap-1 mt-2" role="group" aria-label="Filter by tag">
+                    <button type="button" class="ps-chip" data-tone="accent" aria-pressed="true" data-lp-tag="">all</button>
+                    @foreach (var tag in Model.Tags.Take(12))
+                    {
+                      <button type="button" class="ps-chip" aria-pressed="false" data-lp-tag="@tag">@tag</button>
+                    }
+                  </div>
+                }
+              </div>
+              <div class="list-group list-group-flush lp-list" aria-label="Presets" data-lp-list>
+                @foreach (var item in Model.Items)
+                {
+                  var preset = item.Preset;
+                  var search = string.Join(" ", new[] { preset.Name, preset.Description ?? "" }.Concat(preset.Models.Select(model => model.Provider + "/" + model.Model)).Concat(preset.Tags)).ToLowerInvariant();
+                  <button type="button" class="list-group-item list-group-item-action@(item == first ? " active" : "")" aria-current="@(item == first ? "true" : null)"
+                          data-lp-item="@preset.Id" data-lp-text="@search" data-lp-tags="@string.Join("|", preset.Tags.Select(tag => tag.ToLowerInvariant()))"
+                          data-lp-ok="@(item.Availability.Ok ? "true" : "false")" data-lp-problem="@item.Availability.Problem">
+                    <span class="d-flex justify-content-between gap-2">
+                      <span class="fw-semibold fs-7 text-truncate">@if (preset.Pinned) {<i class="bi bi-pin-angle me-1" aria-hidden="true"></i>}@preset.Name</span>
+                      <span class="fs-8 text-ps-faint text-nowrap">@item.Age</span>
+                    </span>
+                    <span class="d-block ps-mono fs-8 text-ps-faint text-truncate">@if (!item.Availability.Ok) {<span class="status-dot warn me-1"></span>}@(item.Model?.Id ?? "no model saved")@(item.ModelCount > 1 ? $" +{item.ModelCount - 1}" : "")@(preset.Kind == Model.Page ? "" : " · " + PresetPages.Title(preset.Kind).ToLowerInvariant())</span>
+                  </button>
+                }
+              </div>
+              <div class="p-3 fs-7 text-secondary" data-lp-none hidden>No presets match.</div>
+            </div>
+            <div class="col-md-7">
+              @foreach (var item in Model.Items)
+              {
+                var preset = item.Preset;
+                var shown = item.Model;
+                <div class="p-3" data-lp-pane="@preset.Id" hidden="@(item != first)">
+                  <h3 class="fs-6 mb-1 text-break">@preset.Name</h3>
+                  @if (preset.Description is { } description)
+                  {
+                    <p class="fs-7 text-secondary mb-3 text-break">@description</p>
+                  }
+                  @if (preset.Kind != Model.Page)
+                  {
+                    <div class="fs-8 text-ps-faint mb-3"><i class="bi @PresetPages.Icon(preset.Kind) me-1" aria-hidden="true"></i>Saved from @PresetPages.Title(preset.Kind); it loads converted for @PresetPages.Title(Model.Page), and the page says what is left out.</div>
+                  }
+                  <div class="ps-label mb-1">@(item.ModelCount > 1 ? "Models" : "Model")</div>
+                  @if (shown is null)
+                  {
+                    <div class="fs-7 text-secondary mb-3">No model saved: the page keeps its own.</div>
+                  }
+                  else
+                  {
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                      @if (shown.LogoUrl is { } logo)
+                      {
+                        <span class="provider-logo" role="img" aria-label="@shown.ProviderName logo"><img class="provider-logo-mark" src="@logo" alt="" width="20" height="20" decoding="async"></span>
+                      }
+                      else
+                      {
+                        <span class="provider-logo" aria-hidden="true"><i class="bi bi-cpu"></i></span>
+                      }
+                      <div class="min-w-0">
+                        <div class="fw-semibold fs-7">@shown.Name@(item.ModelCount > 1 ? $" and {item.ModelCount - 1} more" : "")</div>
+                        <div class="ps-mono fs-8 text-ps-faint text-break">@shown.Id@(shown.Api is { } api ? " · " + api : "")</div>
+                      </div>
+                    </div>
+                  }
+                  @if (!item.Availability.Ok)
+                  {
+                    <div class="alert alert-warning py-2 px-3 fs-7 mb-3" role="status">
+                      <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@item.Availability.Problem
+                      @if (item.Availability.ConnectUrl is { } connect)
+                      {
+                        <a class="ms-1" href="@connect">@item.Availability.ConnectLabel</a>
+                      }
+                    </div>
+                  }
+                  @if (item.Parameters.Count > 0)
+                  {
+                    <div class="ps-label mb-1">Parameters</div>
+                    <div class="ps-panel px-3 py-2 mb-3">
+                      @foreach (var (key, value) in item.Parameters)
+                      {
+                        <div class="kv"><span class="k">@key</span><span class="v text-break">@value</span></div>
+                      }
+                    </div>
+                  }
+                  <div class="row g-2 text-center">
+                    <div class="col-4"><div class="ps-panel p-2"><div class="ps-label">Messages</div><div class="ps-mono">@(preset.Messages?.Count ?? 0)</div></div></div>
+                    <div class="col-4"><div class="ps-panel p-2"><div class="ps-label">Tools</div><div class="ps-mono">@(preset.Tools?.Count ?? 0)</div></div></div>
+                    <div class="col-4"><div class="ps-panel p-2"><div class="ps-label">Used</div><div class="ps-mono">@(preset.Uses)×</div></div></div>
+                  </div>
+                  <div class="d-flex flex-wrap align-items-center gap-1 mt-3">
+                    @foreach (var tag in preset.Tags)
+                    {
+                      <span class="ps-chip">@tag</span>
+                    }
+                    <span class="fs-8 text-ps-faint ms-auto">updated @preset.Updated.ToLocalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <a class="me-auto fs-7" href="/presets">@(Model.Hosted ? "Manage presets →" : Model.Items.Count == 1 ? "Manage your preset →" : $"Manage all {Model.Items.Count} presets →")</a>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" disabled="@(first is null || !first.Availability.Ok)" title="@(first is { Availability.Ok: false } ? first.Availability.Problem : null)" data-lp-load><i class="bi bi-box-arrow-in-down me-1" aria-hidden="true"></i>Load preset</button>
+      </div>
+    </div>
+  </div>
+</div>

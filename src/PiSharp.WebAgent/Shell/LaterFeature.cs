@@ -17,8 +17,6 @@ public sealed record LaterFeature(string Id, string Title, string Icon, string S
     {
         ["/evals/leaderboard"] = new(ShellNav.Evals, "Evals", "bi-clipboard-check",
             "Your own leaderboard from blind votes in Compare, and test suites that catch silent changes in quality, speed and price."),
-        ["/presets"] = new(ShellNav.Presets, "Presets", "bi-bookmark",
-            "Saved bundles of model, parameters, prompts and tools, to load into the Playground, Compare or Tool Bench."),
     };
 
     /// <summary>The settings pages, by settings id.</summary>

@@ -23,6 +23,7 @@
 @section Styles {
   <link href="~/css/playground.css" rel="stylesheet" asp-append-version="true" />
   <link href="~/css/bench.css" rel="stylesheet" asp-append-version="true" />
+  <link href="~/css/presets.css" rel="stylesheet" asp-append-version="true" />
 }
 @section TopbarStart {
   <h1 class="app-title">Tool Bench <small class="d-none d-sm-inline">test tool calling with mock results</small></h1>
@@ -48,8 +49,12 @@
   <partial name="_ModelPickerModal" model="picker" />
   <partial name="_ToolEditorModal" model="editor" />
   <partial name="_SpendConfirmModal" model="null" />
-  @* Presets (R8) host the save-preset modal here and wire [data-preset-save] / [data-preset-load] (bench-setup.js reads and applies the setup). *@
+  @* Presets (R8): Save preset and load a bench preset; presets-host.js wires [data-preset-save] / [data-preset-load] (bench-setup.js reads the
+     setup, and a loaded preset opens a new session). *@
+  <partial name="_SavePresetModal" model='PiSharp.WebAgent.Presets.SavePresetView.Host("bench")' />
+  <partial name="_LoadPresetModal" model='PiSharp.WebAgent.Presets.LoadPresetView.Host("bench")' />
 }
 @section Scripts {
   <script type="module" src="~/js/bench.js" asp-append-version="true"></script>
+  <script type="module" src="~/js/presets-host.js" asp-append-version="true"></script>
 }

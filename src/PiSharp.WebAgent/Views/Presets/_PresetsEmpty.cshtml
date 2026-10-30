@@ -1,0 +1,14 @@
+@* Decision 0011 (run W4, R8): the mockups' _PresetsEmpty, when webagent.db holds no preset: Open Playground, and Import JSON for a file
+   someone shared. *@
+<div class="ps-card" data-presets-empty>
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-bookmark-star" aria-hidden="true"></i></div>
+    <h3 class="ps-heading fs-2 text-body mb-2">No presets <em>yet</em></h3>
+    <p class="fs-7 mx-auto mb-4 presets-empty-text">Save a model and its settings from the Playground, Compare or Tool Bench with <kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">S</kbd>, or import a JSON file someone shared with you.</p>
+    <div class="d-flex flex-wrap justify-content-center gap-2">
+      <a class="btn btn-primary" href="/playground"><i class="bi bi-sliders2 me-1" aria-hidden="true"></i>Open Playground</a>
+      <label class="btn btn-outline-secondary mb-0" for="importPresetEmpty"><i class="bi bi-upload me-1" aria-hidden="true"></i>Import JSON</label>
+      <input class="visually-hidden" type="file" id="importPresetEmpty" accept=".json,application/json" data-preset-import>
+    </div>
+  </div>
+</div>
