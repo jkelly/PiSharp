@@ -1,8 +1,10 @@
 @* Decision 0011 (run W3, S4): the mockups' _SpendAccounts: every connected account (and each provider that needs none) with how it is
    billed, worked out from how it connects (BillingModes: a stored or environment key is Metered, a ChatGPT or Copilot sign-in Subscription,
    a loopback server Free, a provider without prices Unknown price). The mode is a dropdown: choosing another mode saves an override for
-   that account (spend.billingOverrides), choosing the detected one removes it. Left out: the subscription allowance gate (no account
-   reports allowance windows yet). Model: SpendSettingsPage. *@
+   that account (spend.billingOverrides), choosing the detected one removes it. The select is as wide as its longest option, so "Unknown
+   price (detected)" is never clipped; on a narrow screen it moves under the name (spend.css). Offline (--faux) only the faux catalog's
+   providers are listed (BillingModes.Offline). Left out: the subscription allowance gate (no account reports allowance windows yet).
+   Model: SpendSettingsPage. *@
 @using PiSharp.WebAgent.Spend
 @model SpendSettingsPage
 @{
@@ -24,7 +26,7 @@
         var current = SpendPages.ModeWire(row.Billing.Mode);
         <div class="provider-row" data-setting-row="@field">
           <partial name="/Views/Settings/_ProviderLogo.cshtml" model="new LogoModel(row.Row.ProviderName, row.LogoUrl)" />
-          <div class="flex-grow-1" style="min-width:0">
+          <div class="spend-account-main">
             <div class="d-flex flex-wrap align-items-center gap-2"><span class="provider-name">@row.Name</span><span class="provider-id">@row.Provider</span><span class="ps-chip" data-tone="warn" data-modified-chip hidden>modified</span></div>
             <div class="fs-8 text-ps-faint">
               @row.Basis

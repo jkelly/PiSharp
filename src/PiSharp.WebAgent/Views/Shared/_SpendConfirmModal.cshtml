@@ -2,9 +2,9 @@
    Spend Guard says Ask or Block. One pane, for the first cause (Block before Ask): sc-request, sc-chat (a run cap: this chat's, or this
    run's), sc-period (a day or month cap) or sc-unknown (no price); sc-allowance is left out, since no account reports allowance windows.
    The worst case's parts, what is left, a shorter output that fits, the other causes, and cheaper models as suggestions only: PiSharp never
-   switches the model or account. Footer: Cancel, Proceed once (disabled for Block), Cap output at N. A host page renders it with a null
-   model (an empty shell) and spend-confirm.js fills it from POST /api/spend/confirm, which renders it with a model. Model:
-   SpendConfirmView? *@
+   switches the model or account (the footnote mentions "the models above" only when some are listed). Footer: Cancel, Proceed once
+   (disabled for Block), Cap output at N. A host page renders it with a null model (an empty shell) and spend-confirm.js fills it from
+   POST /api/spend/confirm, which renders it with a model. Model: SpendConfirmView? *@
 @using PiSharp.WebAgent.Spend
 @model SpendConfirmView?
 <div class="modal fade" id="modal-spend-confirm" tabindex="-1" aria-labelledby="modal-spend-confirm-title" aria-hidden="true">
@@ -61,7 +61,7 @@
             }
           </div>
           <div class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
-            <span class="fs-8 text-ps-faint flex-grow-1">PiSharp never switches your model or account. The models above change nothing until you pick one yourself.</span>
+            <span class="fs-8 text-ps-faint flex-grow-1" data-spend-footnote>@view.Footnote</span>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-spend-choice="choose-model" hidden>Choose a model…</button>
           </div>
         </div>

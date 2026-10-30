@@ -6,7 +6,9 @@
 // entered in Settings › Spend) is Unknown; everything else, which is API keys, environment keys and ambient credentials, is Metered. A
 // billing override in Settings › Spend wins (an account's over its provider's), and the detected mode stays visible beside it. The basis
 // says why in a few words, without a secret: an account's masked hint is never part of it. IDurableModels (the model base URLs) is resolved
-// on use, not injected, for the same reason as ModelPrices'.
+// on use, not injected, for the same reason as ModelPrices'. Offline (--faux, Offline) the active catalog is the faux one and nothing else is
+// ever called, so Accounts lists only the providers it holds: a machine's environment keys for real providers are not shown as unpriced
+// accounts with Unknown-price rules that cannot apply (W3 fix, spend-ui).
 using System.Collections.Frozen;
 using System.Net;
 using PiSharp.Durable;
@@ -67,9 +69,13 @@ public sealed class BillingModes : IBillingModes
         return Apply(provider, account, detected, basis);
     }
 
+    /// <summary>Whether the app runs offline (<c>--faux</c>, <see cref="Hosting.WebAgentOptions.Faux"/>): the catalog is the faux one and no
+    /// other provider is ever called, so <see cref="Accounts"/> leaves out accounts of providers the catalog does not list.</summary>
+    public bool Offline { get; init; }
+
     /// <summary>Every account and how it is billed, for Settings › Spend: the catalog's providers in display order, each provider's accounts
     /// (<see cref="IAccountStore.List"/> order), and one row without an account for a provider that needs none; then accounts of providers
-    /// the catalog does not list.</summary>
+    /// the catalog does not list, unless <see cref="Offline"/> (they are not used offline).</summary>
     public IReadOnlyList<BillingAccount> Accounts()
     {
         var all = accounts?.List() ?? [];
@@ -81,7 +87,8 @@ public sealed class BillingModes : IBillingModes
                 rows.Add(Row(provider.Id, provider, null));
             rows.AddRange(own.Select(account => Row(provider.Id, provider, account)));
         }
-        rows.AddRange(all.Where(account => catalog.FindProvider(account.Provider) is null).Select(account => Row(account.Provider, null, account)));
+        if (!Offline)
+            rows.AddRange(all.Where(account => catalog.FindProvider(account.Provider) is null).Select(account => Row(account.Provider, null, account)));
         return rows;
     }
 

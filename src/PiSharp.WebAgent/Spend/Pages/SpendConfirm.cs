@@ -3,7 +3,9 @@
 // sc-period (a day or month cap) and sc-unknown (no price). The worst case's parts add up, what is left in the cap, a shorter output that
 // fits, the other causes, and cheaper models as suggestions only: PiSharp never switches the model or the account. sc-allowance is left out:
 // no subscription allowance data exists yet. The decision comes from the guard's preflight (ISpendGuard, S3) when it is registered, else
-// from the estimator and the ledger's own check, which is the same rule without the guard's approvals.
+// from the estimator and the ledger's own check, which is the same rule without the guard's approvals. Amounts under a dollar show four
+// decimals, as the composer's tooltip and the spend errors do, and the input and output parts are rounded so that they add up to the worst
+// case shown; the footnote speaks of "the models above" only when there are some (W3 fix, spend-ui).
 using PiSharp.WebAgent.Contracts;
 
 namespace PiSharp.WebAgent.Spend;
@@ -12,6 +14,9 @@ public sealed partial class SpendPages
 {
     /// <summary>The output cap offered for a request whose price is unknown ("keeps the answer short").</summary>
     public const int UnknownPriceOutputTokens = 2_048;
+
+    /// <summary>The confirm modal's promise, said whatever the cause.</summary>
+    public const string NeverSwitches = "PiSharp never switches your model or account.";
 
     /// <summary>What the guard says about <paramref name="call"/> before it is sent; nothing is reserved.</summary>
     /// <exception cref="ArgumentException">The call is not allowed (no provider or model, a negative size).</exception>
@@ -43,7 +48,7 @@ public sealed partial class SpendPages
         var cap = cause.Cap;
         var pane = cause.Pane;
         var worst = estimate.WorstMicros ?? 0;
-        var places = worst is > 0 and < 100_000 ? 4 : 2;
+        var places = worst is > 0 and < SpendMoney.MicrosPerDollar ? 4 : 2;
         string Money(long micros) => SpendMoney.Format(micros, places);
         var provider = catalog.FindProvider(estimate.Provider)?.DisplayName ?? estimate.Provider;
         var who = estimate.Account is { } account ? AccountText(account) : provider;
@@ -105,10 +110,11 @@ public sealed partial class SpendPages
             }
             if (estimate.Price is { } price)
             {
+                var (input, output) = WorstCaseParts(worst, places, price.InputMicros(estimate.InputTokens), price.OutputMicros(estimate.OutputTokens));
                 parts.Add(new SpendConfirmPart($"Input · about {SpendEstimateText.Tokens(estimate.InputTokens)} tokens × {SpendEstimateText.RateAmount(price.WorstInput)} per 1M",
-                    Money(price.InputMicros(estimate.InputTokens))));
+                    Money(input)));
                 parts.Add(new SpendConfirmPart($"Output · up to {SpendEstimateText.Tokens(estimate.OutputTokens)} tokens × {SpendEstimateText.RateAmount(price.Output)} per 1M",
-                    Money(price.OutputMicros(estimate.OutputTokens))));
+                    Money(output)));
             }
             parts.Add(new SpendConfirmPart("Worst case", Money(worst), Strong: true));
             if (pane == "sc-request" && estimate.TypicalMicros is { } typical) parts.Add(new SpendConfirmPart("Typical for this model", "≈ " + Money(typical)));
@@ -180,6 +186,7 @@ public sealed partial class SpendPages
             Suggestions = suggestions,
             SubscriptionNote = suggestions.Any(suggestion => suggestion.Title is not null)
                 ? "Subscription models show a list price for comparison only; it never counts toward money caps." : null,
+            Footnote = suggestions.Count > 0 ? NeverSwitches + " The models above change nothing until you pick one yourself." : NeverSwitches,
             CanProceed = decision.Verdict == SpendVerdict.Ask,
             CapOutputTokens = capOutput,
             Call = call,
@@ -191,6 +198,31 @@ public sealed partial class SpendPages
             CapScope.Account or CapScope.Source => ScopeName(scoped),
             _ => null,
         };
+    }
+
+    /// <summary>The input and output parts of a worst case, in micro-USD, each rounded to <paramref name="places"/> decimals (halves away
+    /// from zero, as <see cref="SpendMoney.Format"/> rounds) so that they add up to <paramref name="worst"/> as it is shown. Each part is
+    /// rounded up to a micro-USD on its own and the worst case once, and rounding each to cents or hundredths of a cent can lose or add a
+    /// unit; that unit goes to the part its rounding moved furthest the other way.</summary>
+    private static (long Input, long Output) WorstCaseParts(long worst, int places, long input, long output)
+    {
+        var unit = 1L;
+        for (var digit = places; digit < 6; digit++) unit *= 10;
+        long Shown(long micros) => micros <= 0 ? 0 : (micros + unit / 2) / unit * unit;
+        long[] exact = [input, output];
+        long[] shown = [Shown(input), Shown(output)];
+        var missing = (Shown(worst) - shown[0] - shown[1]) / unit;
+        for (; missing > 0; missing--)
+        {
+            var part = exact[0] - shown[0] >= exact[1] - shown[1] ? 0 : 1;
+            shown[part] += unit;
+        }
+        for (; missing < 0; missing++)
+        {
+            var part = shown[1] < unit || (shown[0] >= unit && exact[0] - shown[0] <= exact[1] - shown[1]) ? 0 : 1;
+            shown[part] -= unit;
+        }
+        return (shown[0], shown[1]);
     }
 }
 
@@ -240,6 +272,10 @@ public sealed record SpendConfirmView
     public required IReadOnlyList<SpendConfirmSuggestion> Suggestions { get; init; }
 
     public string? SubscriptionNote { get; init; }
+
+    /// <summary>The note above the footer: PiSharp never switches the model or account, and, when <see cref="Suggestions"/> lists models,
+    /// that they change nothing until the user picks one.</summary>
+    public string Footnote { get; init; } = SpendPages.NeverSwitches;
 
     /// <summary>Whether "Proceed once" is offered (Ask; never for Block).</summary>
     public bool CanProceed { get; init; }

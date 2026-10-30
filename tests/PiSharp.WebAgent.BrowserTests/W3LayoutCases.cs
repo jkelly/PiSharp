@@ -103,5 +103,56 @@ internal static partial class Program
             Equal(2, window.Refusals.Count, "one refused send per theme");
             Equal(2, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "the refused sends created no chat");
         }, width: 375, height: 812),
+
+        // W3 fix (spend-ui): an Accounts row whose billing mode is detected as Unknown price, the longest choice ("Unknown price (detected)"),
+        // which a fixed-width select used to clip ("Unknown price (detect" at 1440 px, less at 375). Live, so the catalog lists a custom
+        // provider: one on a made-up gateway with no price and no key (nothing is called; the page only reads the catalog). At 375 × 812 in the
+        // dark and then the light theme, and at 1440 × 900: the select shows its chosen option in full, inside its row, and nothing scrolls
+        // sideways.
+        BrowseW3("browser.w3.layout.an-unknown-price-account-is-never-clipped", W3Mode.Live, async (app, window) =>
+        {
+            var provider = await app.PostAsync("/api/custom-providers", new JsonObject
+            {
+                ["id"] = "work-gateway", ["name"] = "Contoso LLM Gateway", ["baseUrl"] = "https://gateway.contoso.invalid/v1", ["api"] = "openai-completions",
+                ["key"] = new JsonObject { ["source"] = "none" },
+                ["models"] = new JsonArray(new JsonObject { ["id"] = "gateway-large", ["name"] = "Gateway large", ["contextWindow"] = 128000, ["maxTokens"] = 16384 }),
+            });
+            Equal(200, provider.Status, "a custom provider without a price: " + provider.Text);
+            var page = window.Page;
+            var select = page.Locator("[data-setting-row^='billing:work-gateway|'] select");
+            foreach (var (theme, width, height) in new[] { ("dark", 375, 812), ("light", 375, 812), ("light", 1440, 900) })
+            {
+                await page.SetViewportSizeAsync(width, height);
+                await page.GotoAsync("/settings/spend#accounts");
+                if (theme == "light" && width == 375) await page.UseThemeAsync("light");
+                await Expect(select).ToHaveValueAsync("unknown");
+                await Expect(select.Locator("option:checked")).ToHaveTextAsync("Unknown price (detected)");
+                await page.FitsPhoneAsync($"Settings › Spend › Accounts at {width}px", theme);
+                await page.ShowsChoiceInFullAsync(select, $"the Unknown-price account's billing mode at {width}px ({theme})");
+            }
+        }, width: 375, height: 812),
     ];
+
+    /// <summary>Whether <paramref name="select"/> shows its chosen option's text in full (the text fits between its paddings, the arrow
+    /// included) and stays inside its row.</summary>
+    internal static async Task ShowsChoiceInFullAsync(this IPage page, ILocator select, string what)
+    {
+        var fit = JsonNode.Parse(await select.EvaluateAsync<string>("""
+            (select) => {
+              const style = getComputedStyle(select);
+              const context = document.createElement('canvas').getContext('2d');
+              context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+              const text = select.options[select.selectedIndex].text;
+              const room = select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+              const box = select.getBoundingClientRect();
+              const row = select.closest('.provider-row').getBoundingClientRect();
+              return JSON.stringify({ text, need: Math.ceil(context.measureText(text).width), room: Math.floor(room), left: box.left - row.left, right: row.right - box.right });
+            }
+            """))!.AsObject();
+        var text = fit["text"]!.GetValue<string>();
+        var need = fit["need"]!.GetValue<double>();
+        var room = fit["room"]!.GetValue<double>();
+        Check(need <= room + 1, $"{what}: \"{text}\" needs {need}px but the select has {room}px");
+        Check(fit["left"]!.GetValue<double>() >= -1 && fit["right"]!.GetValue<double>() >= -1, $"{what}: the select sticks out of its row: {fit.ToJsonString()}");
+    }
 }
