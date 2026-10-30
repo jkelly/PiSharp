@@ -94,11 +94,15 @@ internal static class SessionReplacementTests
         await using (var session = await PersistentAgentSession.OpenAsync(files.A, Configuration,
             () => { clocks++; return 0; }, () => { ids++; return "entry"; }))
         {
-            foreach (var draft in new[] { Draft() with { SchemaVersion = 2 }, Draft() with { ExtensionId = "bad/id" },
-                Draft() with { Data = JsonData.Parse(JsonSerializer.Serialize(new string('x', 65_537))) } })
+            foreach (var draft in new[] { Draft() with { SchemaVersion = 2 }, Draft() with { ExtensionId = "bad/id" } })
                 await Throws<PersistentAgentSessionException>(() => session.AppendExtensionEntryAsync("A", draft));
             await Throws<PersistentAgentSessionException>(() => session.AppendExtensionEntryAsync("wrong", Draft()));
             Check(ids == 0 && clocks == 0 && (await Bytes(files.A)).SequenceEqual(before), "Invalid admission consumed delegates or wrote bytes.");
+            // session-manager.ts appendCustomEntry stores data of any size (415aded6): the former 65,536-character cap admits.
+            var large = await session.AppendExtensionEntryAsync("A", Draft() with { Data = JsonData.Parse(JsonSerializer.Serialize(new string('x', 65_537))) });
+            Check(ids == 1 && clocks == 1 && large.Append.DurableCheckpointAcknowledged && (await Bytes(files.A)).AsSpan().StartsWith(before) &&
+                large.Entry.WireBody.Value.GetProperty("data").GetProperty("data").GetString()!.Length == 65_537, "Large extension data was not appended whole.");
+            clocks = 0;
         }
         using var cancel = new CancellationTokenSource();
         await using (var session = await PersistentAgentSession.OpenAsync(files.A, Configuration,

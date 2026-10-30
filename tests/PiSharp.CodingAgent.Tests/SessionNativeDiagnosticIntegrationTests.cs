@@ -117,7 +117,9 @@ internal static class SessionNativeDiagnosticIntegrationTests
         using var files=new Files();var opaque=new OpaqueTransport();await using var session=await Create(files,opaque,[]);
         await Within(session.PromptAsync(Input()));Equal(0,session.GetNativeDiagnostics().Entries.Length);
         var stored=session.Snapshot.Context.LlmMessages[^1].WireBody;
-        Equal(PiWireJson.WriteMessage(opaque.Message).ToString(),stored.ToString());
+        // The session times the response like the source AgentSession (durationMs, 28a560d6); the source message is otherwise unchanged.
+        var duration=stored.Value.GetProperty("durationMs").GetInt64();Check(duration>=0,"Response duration was negative.");
+        Equal(PiWireJson.WriteMessage(opaque.Message with{DurationMs=duration}).ToString(),stored.ToString());
         Equal("imported-unknown-code",stored.Value.GetProperty("openAICompletionsFailure").GetString());
         Check(stored.Value.GetProperty("opaque").GetProperty("null").ValueKind==JsonValueKind.Null,"Opaque source data was stripped.");
     }

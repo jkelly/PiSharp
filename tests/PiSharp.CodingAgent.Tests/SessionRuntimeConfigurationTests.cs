@@ -64,9 +64,10 @@ internal static class SessionRuntimeConfigurationTests
         var depth = new SessionRuntimeRegistry([new(ModelA, transport)], [], new Policy(), new(MaximumJsonDepth: 2));
         Equal(SessionRuntimeRegistryFailure.ResourceLimit,
             Throws<SessionRuntimeRegistryException>(() => depth.Resolve(ModelA, [User("x")])).Failure);
-        var badUnicode = new TranscriptEntry("user", JsonData.Parse("""{"role":"user","content":"\ud800","timestamp":123}"""));
-        Equal(SessionRuntimeRegistryFailure.InvalidTranscript,
-            Throws<SessionRuntimeRegistryException>(() => registry.Resolve(ModelA, [badUnicode])).Failure);
+        // A string value keeps a lone surrogate as a JavaScript string does (f0304a67); providers sanitize it from request text.
+        var loneSurrogate = new TranscriptEntry("user", JsonData.Parse("""{"role":"user","content":"\ud800","timestamp":123}"""));
+        var lone = registry.Resolve(ModelA, [SystemDelta([Decl("read")]), loneSurrogate]).Configuration;
+        Equal(ModelA, lone.Model); Names(["read"], lone.Tools);
         var custom = JsonData.Parse("""{"type":"custom","name":"read","description":"read tool","parameters":{}}""");
         Equal(SessionRuntimeRegistryFailure.UnsupportedDeclaration,
             Throws<SessionRuntimeRegistryException>(() => registry.Resolve(ModelA, [SystemDelta([custom])])).Failure);

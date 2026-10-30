@@ -42,16 +42,19 @@ internal static class SessionTreeNavigationTests
             Equal("base-model", preview.CommonAncestorId);
             Check(preview.AbandonedEntries.Select(entry => entry.Id).SequenceEqual(
                 new[] { "right-model", "right-system", "right-user", "right-assistant", "right-tail" }), "Abandoned raw branch differs.");
-            Equal("left-system", preview.NewLeafId); Equal(A, preview.Configuration.Model);
+            // agent-session.ts navigateTree keeps agent.state.model (a2ce9db6): left's recorded model A does not replace the session's B.
+            Equal("left-system", preview.NewLeafId); Equal(B, preview.Configuration.Model);
             return ValueTask.FromResult(true);
         });
         Equal(SessionTreeNavigationDisposition.Selected, result.Disposition);
-        Equal("left-system", result.LeafId); Equal(A, result.Agent.Model);
+        Equal("left-system", result.LeafId); Equal(B, result.Agent.Model); Equal(B, f.Session.Snapshot.Agent.Model);
         Equal("read", string.Join(",", f.Session.GetActiveTools()));
         Check(ReferenceEquals(expected, result.View.Attachment) && ReferenceEquals(expected, f.Owner.Current), "Navigation replaced attachment authority.");
         Equal(1L, result.View.Generation); Equal(f.Path, result.View.Path); Equal(null, result.EditorText);
         SameMessages(SessionContextProjector.AgentMessages(result.Context), result.Agent.Messages);
-        Check(ReferenceEquals(view.Tree, result.View.Tree) && view.LeafId == "right-tail", "Captured tree/view was mutated.");
+        // Publication builds the selected view's tree afresh over the same acknowledged records; the captured view is untouched.
+        Check(view.Tree.Entries == result.View.Tree.Entries && view.Tree.PhysicalLeafId == "right-tail" && result.View.Tree.PhysicalLeafId == "right-tail" &&
+            view.LeafId == "right-tail", "Captured tree/view was mutated.");
         Check(ReferenceEquals(log, f.Session.Snapshot.Log), "Navigation fabricated a log checkpoint.");
         var afterBytes = await f.Bytes();
         Check(bytes.AsSpan().SequenceEqual(afterBytes), "No-summary navigation changed durable bytes.");
@@ -158,12 +161,22 @@ internal static class SessionTreeNavigationTests
                     var receipt = await run; Check(receipt.Aborted, "Owned abort did not retain explicit disposition.");
                     Equal(kind == "abort-callback-failure", receipt.CancellationCallbackFailed);
                 }
-                else if (kind == "late-io") await Throws<IOException>(() => run);
-                else
+                else if (kind is "foreign" or "late-io")
                 {
-                    var error = await Throws<OperationCanceledException>(() => run);
-                    if (kind == "foreign") Equal(foreign.Token, error.CancellationToken);
+                    // SessionBoundaryOriginals custody: a callback fault, or a cancellation the navigation's own work token did not cause,
+                    // settles as a boundary failure carrying the unchanged raw tree-veto original instead of surfacing bare.
+                    var error = await Throws<SessionBoundarySettlementException>(() => run); var row = error.Originals.Single(original => original.Phase == "tree-veto");
+                    Check(error.Originals.All(original => ReferenceEquals(original, row) || original.Original.IsCompletedSuccessfully && original.Observed is null) &&
+                        error.InnerExceptions.Count > 0 && (kind == "foreign"
+                        ? row.Original.IsCanceled && row.Observed is OperationCanceledException { } canceled && canceled.CancellationToken == foreign.Token &&
+                            error.InnerExceptions.All(inner => inner is SessionBoundaryCanceledOriginalException carrier && ReferenceEquals(carrier.Original, row.Original) &&
+                                ReferenceEquals(carrier.Observed, row.Observed) && carrier.CancellationToken == foreign.Token)
+                        : row.Original.IsFaulted && row.Observed is IOException { Message: "navigation held callback failed" } &&
+                            error.InnerExceptions.All(inner => inner is SessionBoundaryOriginalFaultException carrier && ReferenceEquals(carrier.Original, row.Original) &&
+                                ReferenceEquals(carrier.CachedFault, row.Fault) && ReferenceEquals(carrier.InnerException, row.Observed))),
+                        "Unacknowledged " + kind + " callback failure lost its raw tree-veto original.");
                 }
+                else await Throws<OperationCanceledException>(() => run);
             }
             finally { release.TrySetResult(); await Join(run); }
         }
