@@ -1,0 +1,50 @@
+@* Decision 0011 (run W3, SU): the wizard's Default model step: Provider → Model (_ProviderModelSelect, connected providers only, starting on
+   the saved default or the first connected model), the thinking level (levels the model does not support are disabled; setup.js clamps
+   the choice as Pi does when the model changes) and "Use as default in Chat and Playground". Save and continue (_SetupFooter) POSTs
+   /api/setup/finish, which saves them as the Defaults section (the same keys Settings › Defaults edits) and ends the wizard. The mockup's
+   "Recommended" line becomes the saved default, when there is one: the app has no basis to recommend a model. Model: SetupPage. *@
+@model SetupPage
+@{
+    var choice = Model.Choice;
+    string? saved = Model.Defaults.Provider is { } provider && Model.Defaults.Model is { } model ? provider + "/" + model : null;
+}
+<section data-setup-step="model" hidden="@(Model.Step != SetupStep.Model)" aria-labelledby="setupModelTitle">
+  <h2 class="fs-4 mb-1" id="setupModelTitle" tabindex="-1">Pick a default model</h2>
+  <p class="text-secondary fs-7 mb-4">From the providers you connected. You can switch models in any chat with <kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">K</kbd>.</p>
+
+  @if (choice is null)
+  {
+    <div class="ps-panel p-3 fs-7 text-secondary mb-4" data-setup-no-models>None of the connected providers lists a chat model yet. You can finish setup now and choose a default model later in <a href="/settings/defaults">Settings › Defaults</a>.</div>
+  }
+  else
+  {
+    <div class="mb-4" data-setup-model>
+      <partial name="_ProviderModelSelect" model='new ProviderModelSelect("sm") { Provider = choice.Provider.Id, Model = choice.Model.Id, Providers = Model.ConnectedIds, IncludeHidden = true }' />
+      @if (saved is not null)
+      {
+        <div class="form-text mt-2" data-setup-saved-default>Saved default: <span class="ps-mono">@saved</span>.</div>
+      }
+    </div>
+
+    <div class="mb-4">
+      <div class="ps-label mb-2" id="setupThinkLbl">Thinking level</div>
+      <div class="btn-group btn-group-sm flex-wrap" role="group" aria-labelledby="setupThinkLbl" data-setup-thinking>
+        @foreach (var level in PiSharp.AI.ThinkingLevels.Ordered)
+        {
+          var supported = choice.Model.ThinkingLevels.Contains(level, StringComparer.Ordinal);
+          <input type="radio" class="btn-check" name="setupThink" id="st-@level" value="@level" checked="@(level == choice.Thinking)" disabled="@(!supported)" data-thinking-level="@level"><label class="btn btn-outline-secondary" for="st-@level" title="@(supported ? null : choice.Model.Name + " doesn't support " + level)">@level</label>
+        }
+      </div>
+      <div class="form-text" data-setup-thinking-note>@SetupText.ThinkingNote(choice.Model)</div>
+    </div>
+
+    <div class="ps-panel p-3">
+      <div class="form-check form-switch mb-1">
+        <input class="form-check-input" type="checkbox" role="switch" id="setupUseDefault" checked data-setup-use-default>
+        <label class="form-check-label fw-medium" for="setupUseDefault">Use as default in Chat and Playground</label>
+      </div>
+      <div class="fs-8 text-ps-faint">Saved as <span class="ps-mono">defaults.provider</span>, <span class="ps-mono">defaults.model</span> and <span class="ps-mono">defaults.thinking</span>. Change them later in <a href="/settings/defaults">Settings › Defaults</a>.</div>
+    </div>
+  }
+  <div class="alert alert-danger d-flex gap-2 py-2 fs-7 mt-3 mb-0" role="alert" data-setup-finish-error hidden><i class="bi bi-x-octagon" aria-hidden="true"></i><div data-setup-finish-error-text></div></div>
+</section>

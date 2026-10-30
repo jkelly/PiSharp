@@ -1,0 +1,26 @@
+@* Decision 0011 (run W3, SU): the wizard's Done step, shown once the wizard is finished: what is set up now (the connected providers, the
+   saved default model and thinking level, the catalog models those providers offer less the hidden ones, the Tools working directory and
+   the data folder), then Start chatting and Open Playground. Model: SetupPage. *@
+@model SetupPage
+@{
+    var defaults = Model.Defaults;
+    var defaultModel = defaults.Provider is { } provider && defaults.Model is { } model ? provider + "/" + model : "not set";
+    var providers = Model.NothingConnected ? "none" : string.Join(" · ", Model.ConnectedIds);
+}
+<section data-setup-step="done" class="text-center" hidden="@(Model.Step != SetupStep.Done)" aria-labelledby="setupDoneTitle">
+  <div class="big-check mb-3"><i class="bi bi-check-lg" aria-hidden="true"></i></div>
+  <h2 class="ps-heading fs-1 mb-2" id="setupDoneTitle" tabindex="-1">You're <em>all set</em></h2>
+  <p class="text-secondary fs-7 mb-4">PiSharp Web Agent is ready. You can change any of this in Settings.</p>
+  <div class="ps-panel p-3 text-start mx-auto mb-4 setup-summary" data-setup-summary>
+    <div class="kv"><span class="k">Providers</span><span class="v text-break" data-setup-summary-providers>@providers</span></div>
+    <div class="kv"><span class="k">Default model</span><span class="v text-break" data-setup-summary-model>@defaultModel</span></div>
+    <div class="kv"><span class="k">Thinking level</span><span class="v" data-setup-summary-thinking>@(defaults.Thinking ?? "model default")</span></div>
+    <div class="kv"><span class="k">Models available</span><span class="v" data-setup-summary-models>@SettingsText.Count(Model.ModelsAvailable)</span></div>
+    <div class="kv"><span class="k">Workspace</span><span class="v text-break" data-setup-summary-workspace>@Model.Workspace</span></div>
+    <div class="kv"><span class="k">Data folder</span><span class="v text-break" data-setup-summary-data>@Model.DataDirectory</span></div>
+  </div>
+  <div class="d-flex flex-wrap justify-content-center gap-2">
+    <a class="btn btn-primary btn-ps" href="/chat/new"><i class="bi bi-chat-square-text me-1" aria-hidden="true"></i>Start chatting</a>
+    <a class="btn btn-outline-secondary" href="/playground"><i class="bi bi-sliders2 me-1" aria-hidden="true"></i>Open Playground</a>
+  </div>
+</section>

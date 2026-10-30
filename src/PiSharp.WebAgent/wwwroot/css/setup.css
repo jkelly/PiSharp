@@ -1,0 +1,20 @@
+/* Decision 0011 (run W3, SU): the setup wizard (Views/Setup), folded from the mockups' app.css setup block: a full page without the sidebar,
+   one card on the page background (elevated, borderless in dark), the hero heading, and the step and footer items switched by the hidden
+   attribute. The stepper (.ps-stepper), the choice cards, .kv rows and .big-check are the shell's (site.css, Web.Common's shell.css). */
+body.setup-body { background: var(--ps-bg); }
+.setup-shell { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 3rem 1rem; background: var(--ps-bg); }
+.setup-topbar { max-width: 760px; }
+.setup-card { width: 100%; max-width: 680px; background: var(--ps-surface); border: 1px solid var(--ps-border); border-radius: 18px; box-shadow: none; overflow: hidden; }
+[data-bs-theme="dark"] .setup-card { background: var(--ps-elevated); border-color: transparent; }
+.setup-hero { font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1.05; }
+.setup-card [tabindex="-1"]:focus { outline: none; }
+.setup-card .setup-option { cursor: default; }
+.setup-card .setup-option:hover { background: transparent; }
+.setup-option .flex-grow-1 { flex: 1 1 14rem; }
+.setup-summary { max-width: 520px; }
+.setup-summary .kv .v { min-width: 0; }
+.setup-card [hidden] { display: none !important; }
+@media (max-width: 575.98px) {
+  .setup-shell { padding: 1.5rem 1rem; }
+  .setup-card .ps-stepper li + li::before { width: 10px; }
+}
