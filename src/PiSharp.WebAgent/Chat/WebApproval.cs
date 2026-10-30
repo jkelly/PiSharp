@@ -8,7 +8,8 @@
 //
 // Run W4 (R5): a per-session override. Agent compare's runner attaches a resolver to the app's ApprovalBroker (SetOverrides); for a session
 // it names (a model's workspace session that was not opened as a chat), the run's approval mode replaces Settings › Tools: Ask asks before
-// every command and every other changing tool, except write and edit calls whose path is inside the workspace (no link on the way); Allow-list
+// every command and every other changing tool, except write and edit calls whose path is inside the workspace (no link on the way, and not
+// through a .git file or folder, which names the repository the app's own git commands would use there: those writes ask); Allow-list
 // is Ask plus the commands on Settings › Tools' allow-list; Auto asks nothing (workspaces are copies, not sandboxes). The run's own grants
 // ("allow this command in all workspaces") let matching calls through in every mode. A resolver that fails asks (it never lets a call
 // through unchecked). Every other session (every chat) keeps Settings › Tools.
@@ -33,7 +34,7 @@ public sealed record ApprovalOverride(ToolApprovalMode Mode, string WorkspaceRoo
 }
 
 /// <summary>The <c>web-approval</c> extension: tool calls wait for the user's decision in the browser.</summary>
-public static class WebApproval
+public static partial class WebApproval
 {
     private static readonly ConditionalWeakTable<ApprovalBroker, Func<string, ApprovalOverride?>> Overrides = new();
 
@@ -74,8 +75,8 @@ public static class WebApproval
     }
 
     /// <summary>Whether <paramref name="path"/> (a write or edit call's, relative to the working directory or absolute; a leading <c>@</c>
-    /// is dropped) is inside the override's workspace with no link (reparse point) between the workspace root and it. <c>~</c> and
-    /// anything that can't be resolved count as outside.</summary>
+    /// is dropped) is inside the override's workspace with no link (reparse point) between the workspace root and it. <c>~</c>, anything
+    /// that can't be resolved, and any path through git's metadata (see <see cref="IsGitMetadata"/>) count as outside.</summary>
     public static bool IsInside(ApprovalOverride over, string? path)
     {
         ArgumentNullException.ThrowIfNull(over);
@@ -89,6 +90,9 @@ public static class WebApproval
             var full = Path.GetFullPath(Path.IsPathFullyQualified(text) ? text : Path.Join(over.WorkingDirectory, text));
             var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
             if (!full.StartsWith(root + Path.DirectorySeparatorChar, comparison)) return false;
+            // A worktree's .git file (or a .git folder anywhere) names the repository git uses there: writing it could plant a config that
+            // runs commands when the app diffs or keeps the workspace. Such writes always ask.
+            if (full[(root.Length + 1)..].Split(Separators, StringSplitOptions.RemoveEmptyEntries).Any(IsGitMetadata)) return false;
             if (!Directory.Exists(root) || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) return false;
             // A link inside the workspace may point anywhere: a path through one (or a file that is one) asks.
             for (var current = Path.TrimEndingDirectorySeparator(full); current.Length > root.Length;
@@ -103,6 +107,26 @@ public static class WebApproval
             return false;
         }
     }
+
+    /// <summary>Whether one path component may name git's metadata: <c>.git</c> in any case. On Windows also a name the file system reads
+    /// as <c>.git</c> (trailing dots or spaces), a stream of a file (any <c>:</c>), and an 8.3 short name (<c>GIT~1</c> may be
+    /// <c>.git</c>'s).</summary>
+    public static bool IsGitMetadata(string component)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+        var name = component;
+        if (OperatingSystem.IsWindows())
+        {
+            if (name.Contains(':', StringComparison.Ordinal) || ShortName().IsMatch(name)) return true;
+            name = name.TrimEnd('.', ' ');
+        }
+        return string.Equals(name, ".git", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static readonly char[] Separators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"~[0-9]+(\.[^.]*)?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex ShortName();
 
     /// <summary>The extension's name.</summary>
     public const string ExtensionName = "web-approval";

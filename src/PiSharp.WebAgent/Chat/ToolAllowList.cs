@@ -3,6 +3,11 @@
 // matches no arguments: "dotnet test *" allows "dotnet test"). A chained command (&&, ||, ;, |, & or a new line, outside quotes) is allowed
 // only when every part is. A part with command substitution ($(...), backticks, <(...), >(...)) never matches a pattern, since it can run
 // anything; only a rule without a command allows it. Patterns compare with runs of white space collapsed.
+//
+// Run W4 (fix): \* in a pattern is a literal star (any other backslash is literal). The rules "Allow always" (chats) and "Allow this command
+// in all workspaces" (agent compare) make are exact: RulesFor writes each literal * of the approved command as \*, so a pattern without an
+// unescaped * matches only that command (its collapsed text, compared for equality). Approving "rm -rf *" allows "rm -rf *" and nothing
+// else, never "rm -rf <any path>".
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -35,18 +40,28 @@ public static partial class ToolAllowList
         return parts.Count > 0 && parts.All(part => forTool.Any(rule => MatchesPattern(rule.Command!, part)));
     }
 
-    /// <summary>The rules "Allow always" adds for a call: one per part of a bash or powershell command (exactly as run), else the whole
-    /// tool.</summary>
+    /// <summary>The rules "Allow always" adds for a call: one exact rule per part of a bash or powershell command (exactly as run, see
+    /// <see cref="ExactPattern"/>), else the whole tool.</summary>
     public static IReadOnlyList<ToolAllowRule> RulesFor(string tool, JsonObject? arguments)
     {
         ArgumentNullException.ThrowIfNull(tool);
         var command = CommandOf(tool, arguments);
         if (command is null) return [new ToolAllowRule(tool)];
         var parts = SplitCommand(command);
-        return parts.Count == 0 ? [new ToolAllowRule(tool)] : [.. parts.Distinct(StringComparer.Ordinal).Select(part => new ToolAllowRule(tool, part))];
+        return parts.Count == 0 ? [new ToolAllowRule(tool)] : [.. parts.Distinct(StringComparer.Ordinal).Select(part => new ToolAllowRule(tool, ExactPattern(part)))];
     }
 
-    /// <summary>Whether one command <paramref name="part"/> (no chaining) matches <paramref name="pattern"/>.</summary>
+    /// <summary>The pattern that matches exactly <paramref name="part"/> (with white space collapsed) and nothing else: each literal
+    /// <c>*</c> is written <c>\*</c>.</summary>
+    public static string ExactPattern(string part)
+    {
+        ArgumentNullException.ThrowIfNull(part);
+        return part.Replace("*", @"\*", StringComparison.Ordinal);
+    }
+
+    /// <summary>Whether one command <paramref name="part"/> (no chaining) matches <paramref name="pattern"/>: <c>*</c> matches anything,
+    /// a trailing <c> *</c> also no arguments, and <c>\*</c> is a literal star. A pattern without an unescaped <c>*</c> is exact: it
+    /// matches only the same text (white space collapsed).</summary>
     public static bool MatchesPattern(string pattern, string part)
     {
         ArgumentNullException.ThrowIfNull(pattern);
@@ -55,10 +70,30 @@ public static partial class ToolAllowList
         if (text.Length == 0 || Substitution().IsMatch(text)) return false;
         var normalized = Collapse(pattern);
         if (normalized.Length == 0) return false;
-        var anyArguments = normalized.EndsWith(" *", StringComparison.Ordinal);
+        // An unescaped trailing " *": the escaped " \*" ends in "\*", so its star never follows a space.
+        var anyArguments = normalized.Length >= 2 && normalized[^1] == '*' && normalized[^2] == ' ';
         var stem = anyArguments ? normalized[..^2] : normalized;
+        var literals = new List<string>();
+        var literal = new StringBuilder();
+        for (var index = 0; index < stem.Length; index++)
+        {
+            var c = stem[index];
+            if (c == '\\' && index + 1 < stem.Length && stem[index + 1] == '*')
+            {
+                literal.Append('*');
+                index++;
+            }
+            else if (c == '*')
+            {
+                literals.Add(literal.ToString());
+                literal.Clear();
+            }
+            else literal.Append(c);
+        }
+        literals.Add(literal.ToString());
+        if (literals.Count == 1 && !anyArguments) return string.Equals(literals[0], text, StringComparison.Ordinal);
         var regex = new StringBuilder("^");
-        regex.Append(string.Join(".*", stem.Split('*').Select(Regex.Escape)));
+        regex.Append(string.Join(".*", literals.Select(Regex.Escape)));
         regex.Append(anyArguments ? "(?: .*)?$" : "$");
         return Regex.IsMatch(text, regex.ToString(), RegexOptions.CultureInvariant | RegexOptions.Singleline, TimeSpan.FromSeconds(1));
     }

@@ -50,8 +50,9 @@ public enum ToolApprovalMode
 
 /// <summary>A tool call that runs without asking in <see cref="ToolApprovalMode.AllowList"/> mode (and that "Allow always" adds).</summary>
 /// <param name="Tool">The tool's name, such as <c>bash</c> or <c>edit</c>.</param>
-/// <param name="Command">For <c>bash</c>, a command pattern where <c>*</c> matches any arguments (such as <c>dotnet test *</c>); a chained
-/// command must match for every part. Null allows every call of <paramref name="Tool"/>.</param>
+/// <param name="Command">For <c>bash</c>, a command pattern where <c>*</c> matches any arguments (such as <c>dotnet test *</c>) and <c>\*</c>
+/// is a literal star (the exact rules "Allow always" adds); a chained command must match for every part. Null allows every call of
+/// <paramref name="Tool"/>.</param>
 public sealed record ToolAllowRule(string Tool, string? Command = null);
 
 /// <summary>Where tools work and when they ask (Settings › Tools &amp; workspace).</summary>

@@ -4,7 +4,8 @@
 //   markup changed since the last fetch are swapped (the ticking clocks are left out of that comparison), so a column the user reads, an
 //   open output tail or an open menu elsewhere stays as it is. The stream is closed once the run is done (else EventSource reconnects).
 // - The clocks ([data-ac-elapsed][data-since]) tick every second between server renders.
-// - Actions are R5's: stop (one, or all after a confirm), approve (one call, this command in every workspace, all waiting), continue over
+// - Actions are R5's: stop (one, or all after a confirm), approve (one call, this command in every workspace, all the waiting calls the
+//   page listed: [data-ac-items] names them, so a call that arrives after the render is not answered unseen), continue over
 //   a budget share, discard a workspace (after a confirm), open as chat. Each answer is followed by a fetch of the view.
 // - View diff loads modal-agent-diff's content (GET /compare/agent/runs/{run}/diff?slot=); Copy patch copies R4's whole patch.
 // - Keep loads modal-keep-result's content (GET /compare/agent/runs/{run}/keep?slot=); Keep x posts apply or keep-branch with the user's
@@ -180,6 +181,15 @@ async function stopAll(button) {
 
 function approve(button, body) {
   return act(button, 'Not answered', () => postRequest(runUrl('/approve'), body));
+}
+
+/** The calls "Allow all" / "Deny all" showed ("a:12 b:7" from the server's render) as [{slot, taskId}]: the server answers only these, so a
+ * call that starts waiting after the render keeps waiting (and the button comes back with the new count). */
+function listedCalls(text) {
+  return String(text ?? '').split(' ').filter(Boolean).map((item) => {
+    const [slot, taskId] = item.split(':');
+    return { slot, taskId: Number(taskId) };
+  }).filter((item) => item.slot && Number.isSafeInteger(item.taskId));
 }
 
 async function discard(button, slot) {
@@ -391,7 +401,7 @@ function onClick(event) {
   else if (target.matches('[data-ac-stop]')) stop(target, data.acStop);
   else if (target.matches('[data-ac-approve]')) approve(target, { scope: 'call', slot: data.slot, taskId: Number(data.taskId), decision: data.acApprove === 'deny' ? 'deny' : 'allow' });
   else if (target.matches('[data-ac-approve-command]')) approve(target, { scope: 'command', slot: data.slot, taskId: Number(data.taskId), decision: 'allow' });
-  else if (target.matches('[data-ac-approve-all]')) approve(target, { scope: 'all', decision: data.acApproveAll === 'deny' ? 'deny' : 'allow' });
+  else if (target.matches('[data-ac-approve-all]')) approve(target, { scope: 'all', items: listedCalls(data.acItems), decision: data.acApproveAll === 'deny' ? 'deny' : 'allow' });
   else if (target.matches('[data-ac-continue]')) act(target, 'Not continued', () => postRequest(runUrl('/continue'), { slot: data.slot, scope: data.acContinue === 'run' ? 'run' : 'turn' }));
   else if (target.matches('[data-ac-discard]')) discard(target, data.acDiscard);
   else if (target.matches('[data-ac-copy]')) copyPath(data.acCopy);

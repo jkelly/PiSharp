@@ -537,6 +537,9 @@ public sealed class WorkspaceException(string code, string message, Exception? i
     /// other files (or it is a file), so no workspace is made there and nothing in it is ever removed.</summary>
     public const string RootInUse = "root-in-use";
 
+    /// <summary>A worktree's <c>.git</c> file no longer names its own repository (an agent rewrote it), so git is not run there.</summary>
+    public const string Tampered = "tampered";
+
     /// <summary>The code.</summary>
     public string Code { get; } = code;
 }

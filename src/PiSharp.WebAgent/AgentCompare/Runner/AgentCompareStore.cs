@@ -4,8 +4,12 @@
 // was let through, keyed by its op (metadata.pisharp.op, the same when a request is recovered), so turns are counted exactly across restarts.
 // The store keeps every run it has read in memory and changes one run at a time (read, change, write under the run's lock), then raises
 // Changed outside the lock. It also indexes runs by session id, which the model gate and the approval override look up on every call.
+// Changed is raised from Add, Update and Touch, which the gate (every admitted model request) and the runner (every state change) call, so
+// each handler is invoked on its own and a handler that throws is logged and skipped: a subscriber (such as an event stream whose tab just
+// closed) can never fail a model's request or a state change.
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.WebAgent.Data;
 
 namespace PiSharp.WebAgent.AgentCompare.Runner;
@@ -34,6 +38,7 @@ public sealed class AgentCompareStore
         """);
 
     private readonly WebAgentDb db;
+    private readonly ILogger log;
     private readonly ConcurrentDictionary<string, AgentCompareRun> runs = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (string Run, string Slot)> sessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lock> locks = new(StringComparer.Ordinal);
@@ -41,14 +46,16 @@ public sealed class AgentCompareStore
     private readonly Lock loading = new();
     private volatile bool loaded;
 
-    /// <summary>A store over <paramref name="db"/>.</summary>
-    public AgentCompareStore(WebAgentDb db)
+    /// <summary>A store over <paramref name="db"/>; <paramref name="logger"/> gets the failures of <see cref="Changed"/> handlers.</summary>
+    public AgentCompareStore(WebAgentDb db, ILogger<AgentCompareStore>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         this.db = db;
+        log = (ILogger?)logger ?? NullLogger.Instance;
     }
 
-    /// <summary>Raised after a run changed (its id), outside any lock. A handler must not throw.</summary>
+    /// <summary>Raised after a run changed (its id), outside any lock. Each handler is called on its own; one that throws is logged and the
+    /// others are still called (the change itself has happened).</summary>
     public event Action<string>? Changed;
 
     /// <summary>Reads every run into memory (once; later calls do nothing).</summary>
@@ -109,7 +116,7 @@ public sealed class AgentCompareStore
                 ("$created", run.Created.ToUnixTimeMilliseconds()), ("$updated", now));
             Remember(run);
         }
-        Changed?.Invoke(run.Id);
+        Raise(run.Id);
         return run;
     }
 
@@ -130,7 +137,7 @@ public sealed class AgentCompareStore
                 ("$updated", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
             Remember(updated);
         }
-        Changed?.Invoke(id);
+        Raise(id);
         return updated;
     }
 
@@ -152,7 +159,7 @@ public sealed class AgentCompareStore
 
     /// <summary>Raises <see cref="Changed"/> for <paramref name="id"/> (something the run's status shows changed outside the store: an
     /// approval, a turn).</summary>
-    public void Touch(string id) => Changed?.Invoke(id);
+    public void Touch(string id) => Raise(id);
 
     /// <summary>Whether <paramref name="op"/> is a turn of <paramref name="modelKey"/> already (a recovered request).</summary>
     public bool HasTurn(string modelKey, string op) =>
@@ -166,6 +173,23 @@ public sealed class AgentCompareStore
     public void AddTurn(string modelKey, string op) =>
         db.Execute("INSERT OR IGNORE INTO agent_compare_turns (model_key, op, at) VALUES ($key, $op, $at);",
             ("$key", modelKey), ("$op", op), ("$at", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+
+    // Calls each Changed handler on its own: a handler that throws is logged, never passed to the caller (a model request, a state change).
+    private void Raise(string id)
+    {
+        if (Changed is not { } handlers) return;
+        foreach (var handler in handlers.GetInvocationList().Cast<Action<string>>())
+        {
+            try
+            {
+                handler(id);
+            }
+            catch (Exception error)
+            {
+                log.LogWarning(error, "Agent compare run {Run}: a change listener failed; the change itself was stored.", id);
+            }
+        }
+    }
 
     private void Remember(AgentCompareRun run)
     {

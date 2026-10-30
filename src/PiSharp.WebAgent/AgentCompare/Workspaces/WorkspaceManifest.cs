@@ -39,6 +39,11 @@ internal sealed class ManifestSlot
 
     /// <summary>The kept branch's commit.</summary>
     public string? BranchCommit { get; set; }
+
+    /// <summary>A worktree's own repository folder (<c>&lt;repo&gt;\.git\worktrees\&lt;name&gt;</c>), recorded right after
+    /// <c>git worktree add</c>, before any agent ran there. Every git command in the slot names it (GIT_DIR) instead of reading the slot's
+    /// <c>.git</c> file.</summary>
+    public string? GitDir { get; set; }
 }
 
 /// <summary>A run's manifest.</summary>

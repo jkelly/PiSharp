@@ -90,6 +90,8 @@
         var letter = first.Slot.ToUpperInvariant();
         var others = Model.Columns.Where(column => column.Slot != first.Slot && column.View is "running" or "checking").Select(column => column.Letter).ToList();
         var waitingCount = Model.Pending.Count;
+        @* The calls "Allow all" and "Deny all" answer: exactly those counted here (slot:taskId), never one that starts waiting later. *@
+        var waitingItems = string.Join(' ', Model.Pending.Select(item => item.Slot + ":" + item.Approval.Request.TaskId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         <div class="app-banner info mx-0 mt-2 mb-0" role="status" data-ac-approval-banner>
           <span class="ps-chip" data-tone="warn">@waitingCount waiting</span>
           <span class="fs-7 ac-banner-text">@letter wants to run <code>@AgentColumnView.CallText(request)</code>@(request.Command is null ? " (" + request.Tool + ")" : "").@if (others.Count > 0) {<text> @AgentText.Join(others) @(others.Count == 1 ? "keeps" : "keep") running.</text>}@if (waitingCount > 1) {<text> @(waitingCount - 1) more @(waitingCount == 2 ? "call waits" : "calls wait") in @(Model.Pending.Select(item => item.Slot).Distinct().Count() > 1 ? "the columns" : "its column").</text>}</span>
@@ -100,8 +102,8 @@
             }
             @if (waitingCount > 1)
             {
-              <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-approve-all="allow">Allow all @waitingCount</button>
-              <button class="btn btn-sm btn-ghost" type="button" data-ac-approve-all="deny">Deny all</button>
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-approve-all="allow" data-ac-items="@waitingItems">Allow all @waitingCount</button>
+              <button class="btn btn-sm btn-ghost" type="button" data-ac-approve-all="deny" data-ac-items="@waitingItems">Deny all</button>
             }
           </div>
           @if (request.Command is not null && grants.Count > 0)

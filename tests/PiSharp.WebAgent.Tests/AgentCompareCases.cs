@@ -95,6 +95,181 @@ internal static partial class Program
             }
         }),
 
+        Case("agent-compare.override-asks-before-a-write-to-git-metadata", () =>
+        {
+            // A worktree's .git file names the repository git uses there; Ask must not let a model rewrite it (or any .git folder) unasked.
+            var root = Temp("ac-dotgit");
+            try
+            {
+                var workspace = Path.Join(root, "ws", "a");
+                var project = Path.Join(workspace, "project");
+                Directory.CreateDirectory(project);
+                File.WriteAllText(Path.Join(workspace, ".git"), "gitdir: elsewhere\n");
+                var ask = new ApprovalOverride(ToolApprovalMode.Ask, workspace, project);
+                var settings = new ToolsSettings(root, ToolApprovalMode.Auto, []);
+                JsonObject Path_(string path) => new() { ["path"] = path };
+                bool Needs(ApprovalOverride over, string tool, string path) => WebApproval.NeedsApproval(over, settings, [], tool, Path_(path));
+
+                Check(Needs(ask, "write", Path.Join(workspace, ".git")), "a write to the worktree's .git file asks");
+                Check(Needs(ask, "write", "../.git"), "also by a relative path");
+                Check(Needs(ask, "edit", ".git/config"), "an edit inside a .git folder asks");
+                Check(Needs(ask, "write", "sub/.git/HEAD"), "a nested .git folder asks");
+                Check(Needs(ask, "write", "../.GIT"), "in any case");
+                Check(Needs(ask with { Mode = ToolApprovalMode.AllowList }, "write", "../.git"), "Allow-list asks too");
+                Check(!Needs(ask, "write", ".gitignore") && !Needs(ask, "write", ".gitattributes") && !Needs(ask, "write", "git/notes.txt") &&
+                    !Needs(ask, "write", "a.git"), "other files whose names start or end like it don't ask");
+                if (OperatingSystem.IsWindows())
+                {
+                    Check(Needs(ask, "write", "../.git."), "a trailing dot (Windows drops it)");
+                    Check(Needs(ask, "write", "../.git::$DATA"), "a stream of the file");
+                    Check(Needs(ask, "write", "../GIT~1"), "an 8.3 short name that may be .git's");
+                }
+                Check(WebApproval.IsGitMetadata(".git") && !WebApproval.IsGitMetadata(".github"), "the component rule");
+            }
+            finally
+            {
+                DeleteTemp(root);
+            }
+        }),
+
+        Case("agent-compare.planted-gitdir-is-never-used", async () =>
+        {
+            // A model (or a prompt injection) rewrites its worktree's .git to point at a repository of its own whose config runs a command
+            // (a clean filter) when git adds files. The app's diff and keep must never load it, and must refuse while .git is changed. The
+            // project's own hooks and fsmonitor don't run for the app's git commands either.
+            await using var lab = WsLab.Create("ac-gitdir");
+            var repo = await lab.RepoAsync("project", ("a.txt", "one\n"));
+            var markers = lab.Folder("markers");
+            var hooked = Path.Join(markers, "hook.txt");
+            var monitored = Path.Join(markers, "fsmonitor.txt");
+            var filtered = Path.Join(markers, "filter.txt");
+            WriteScript(Path.Join(repo, ".git", "hooks", "post-checkout"), $"echo hooked > {ShellPath(hooked)}");
+            var monitor = Path.Join(markers, "fsmonitor.sh");
+            WriteScript(monitor, $"echo ran > {ShellPath(monitored)}");
+            await lab.GitAsync(repo, "config", "core.fsmonitor", ShellPath(monitor));
+
+            await lab.Manager.InspectAsync(repo);
+            var run = await lab.Manager.CreateAsync(new WorkspaceRequest { Run = "cmp_planted", ProjectPath = repo, Slots = WsSlots("a") });
+            Check(!File.Exists(hooked), "the project's post-checkout hook did not run for worktree add");
+            Check(!File.Exists(monitored), "the project's fsmonitor command did not run for git status");
+            var folder = Path.Join(lab.Root, "cmp_planted");
+            var admin = WorkspaceManifest.Read(folder)!.Find("a")!.GitDir;
+            Check(admin is not null && WorkspaceTree.IsWithin(Path.Join(repo, ".git", "worktrees"), admin), "the worktree's repository folder is recorded: " + admin);
+
+            var slot = run.Slots.Single().Path;
+            var dotGit = Path.Join(slot, ".git");
+            var original = File.ReadAllText(dotGit);
+            File.SetAttributes(dotGit, FileAttributes.Normal); // git hides it on Windows, and a hidden file can't be overwritten in place
+            var evil = Path.Join(slot, ".evil");
+            Directory.CreateDirectory(Path.Join(evil, "objects", "info"));
+            Directory.CreateDirectory(Path.Join(evil, "refs"));
+            File.WriteAllText(Path.Join(evil, "HEAD"), "ref: refs/heads/main\n");
+            File.WriteAllText(Path.Join(evil, "objects", "info", "alternates"), Path.Join(repo, ".git", "objects").Replace('\\', '/') + "\n");
+            File.WriteAllText(Path.Join(evil, "config"), "[core]\n\trepositoryformatversion = 0\n[filter \"x\"]\n\tclean = tee "
+                + ShellPath(filtered).Replace("\"", "\\\"", StringComparison.Ordinal) + "\n");
+            File.WriteAllText(Path.Join(slot, ".gitattributes"), "* filter=x\n");
+            File.WriteAllText(Path.Join(slot, "a.txt"), "two\n");
+            File.WriteAllText(Path.Join(slot, "b.txt"), "new\n");
+            File.WriteAllText(dotGit, "gitdir: .evil\n");
+
+            var refused = await ThrowsAsync<WorkspaceException>(() => lab.Manager.DiffAsync("cmp_planted", "a"), "a diff with a rewritten .git");
+            Equal(WorkspaceException.Tampered, refused.Code, "is refused: " + refused.Message);
+            Equal(WorkspaceException.Tampered, (await ThrowsAsync<WorkspaceException>(() => lab.Manager.PreviewKeepAsync("cmp_planted", "a"), "keep's preview")).Code, "refused");
+            Equal(WorkspaceException.Tampered, (await ThrowsAsync<WorkspaceException>(() => lab.Manager.KeepBranchAsync("cmp_planted", "a"), "keep the branch")).Code, "refused");
+            Equal(WorkspaceException.Tampered, (await ThrowsAsync<WorkspaceException>(() => lab.Manager.ApplyAsync("cmp_planted", "a"), "apply")).Code, "refused");
+            Check(!File.Exists(filtered), "the planted filter never ran");
+
+            // With .git put back, git uses the recorded repository: the planted one (still in the folder) is never loaded.
+            File.WriteAllText(dotGit, original);
+            var diff = await lab.Manager.DiffAsync("cmp_planted", "a");
+            Check(diff.Files.Any(file => file.Path == "a.txt") && diff.Files.Any(file => file.Path == "b.txt"), "the diff has the model's changes: " + diff.Summary);
+            Check(!File.Exists(filtered) && !File.Exists(monitored) && !File.Exists(hooked), "no planted filter, fsmonitor or hook ran");
+
+            // A run made before the folder was recorded finds it in the project's repository (and records it).
+            var manifest = WorkspaceManifest.Read(folder)!;
+            manifest.Find("a")!.GitDir = null;
+            manifest.Write(folder);
+            Equal(diff.Patch, (await lab.Manager.DiffAsync("cmp_planted", "a")).Patch, "the same diff");
+            Check(WorkspaceTree.SamePath(WorkspaceManifest.Read(folder)!.Find("a")!.GitDir!, admin!), "the folder is recorded again");
+            Check(!File.Exists(filtered), "still no filter");
+
+            await lab.GitAsync(repo, "config", "--unset", "core.fsmonitor");
+            Check(await lab.Manager.DiscardRunAsync("cmp_planted"), "discarded");
+            Check(!(await lab.GitAsync(repo, "worktree", "list", "--porcelain")).Contains("cmp_planted", StringComparison.OrdinalIgnoreCase), "and unregistered");
+        }),
+
+        Case("agent-compare.command-grants-are-exact", () =>
+        {
+            JsonObject Command(string command) => new() { ["command"] = command };
+            var rules = ToolAllowList.RulesFor("bash", Command("rm -rf *"));
+            Equal(@"rm -rf \*", rules.Single().Command, "a literal star is stored escaped");
+            Check(ToolAllowList.Allows(rules, "bash", Command("rm -rf *")), "the approved command is allowed");
+            Check(ToolAllowList.Allows(rules, "bash", Command("rm   -rf  *")), "with other spacing");
+            Check(!ToolAllowList.Allows(rules, "bash", Command("rm -rf /tmp/x")), "granting rm -rf * does not allow rm -rf /tmp/x");
+            Check(!ToolAllowList.Allows(rules, "bash", Command("rm -rf ~")) && !ToolAllowList.Allows(rules, "bash", Command("rm -rf")), "nor any other path, nor none");
+            var grant = new ApprovalOverride(ToolApprovalMode.Ask, "", "") { Grants = rules };
+            var settings = new ToolsSettings("x", ToolApprovalMode.Ask, []);
+            Check(!WebApproval.NeedsApproval(grant, settings, [], "bash", Command("rm -rf *")), "the run grant lets the same command through");
+            Check(WebApproval.NeedsApproval(grant, settings, [], "bash", Command("rm -rf /tmp/x")), "and asks for rm -rf /tmp/x");
+
+            var powershell = ToolAllowList.RulesFor("powershell", Command("Remove-Item * -Recurse"));
+            Check(ToolAllowList.Allows(powershell, "powershell", Command("Remove-Item * -Recurse")), "Remove-Item * -Recurse");
+            Check(!ToolAllowList.Allows(powershell, "powershell", Command(@"Remove-Item C:\Users -Recurse")), "never Remove-Item <anything> -Recurse");
+            var chained = ToolAllowList.RulesFor("bash", Command("ls *.txt && rm -rf *"));
+            Check(ToolAllowList.Allows(chained, "bash", Command("ls *.txt && rm -rf *")), "a chained command, part by part");
+            Check(!ToolAllowList.Allows(chained, "bash", Command("ls *.txt && rm -rf build")), "each part exactly");
+            var escaped = ToolAllowList.RulesFor("bash", Command(@"find . -name \*.txt"));
+            Check(ToolAllowList.Allows(escaped, "bash", Command(@"find . -name \*.txt")) && !ToolAllowList.Allows(escaped, "bash", Command("find . -name a.txt")),
+                "a backslash before a star stays literal");
+
+            Check(ToolAllowList.MatchesPattern("dotnet test *", "dotnet test --no-build") && ToolAllowList.MatchesPattern("dotnet test *", "dotnet test") &&
+                ToolAllowList.MatchesPattern("git log*", "git log --oneline"), "patterns typed in Settings › Tools keep their wildcards");
+            Check(ToolAllowList.MatchesPattern(@"echo \*", "echo *") && !ToolAllowList.MatchesPattern(@"echo \*", "echo hi"), @"\* is a literal star");
+        }),
+
+        Case("agent-compare.store-listeners-never-break-a-change", async () =>
+        {
+            // An event stream whose tab closed may still be called (the store raises from a snapshot of its handlers): whatever a listener
+            // throws, Add, Update and Touch (a model's request, a state change) go on.
+            var root = Temp("ac-store");
+            try
+            {
+                var db = new WebAgentDb(Path.Join(root, "webagent.db"), [CoreMigrations.AppInfo, AgentCompareStore.Migration]);
+                db.Migrate();
+                var store = new AgentCompareStore(db);
+                var heard = new List<string>();
+                store.Changed += _ => throw new ObjectDisposedException("a closed event stream");
+                store.Changed += heard.Add;
+                var run = store.Add(new AgentCompareRun
+                {
+                    Id = "cmp_store",
+                    RequestId = "store-1",
+                    Spec = new AgentCompareSpec { Task = "t", ProjectPath = root, Instructions = "i", Models = [] },
+                    Order = [],
+                    Created = DateTimeOffset.UtcNow,
+                    Models = [],
+                });
+                store.Update(run.Id, current => current with { Error = "changed" });
+                store.Touch(run.Id);
+                Equal(3, heard.Count, "the other listener heard every change");
+                Equal("changed", store.Get(run.Id)!.Error, "the change was stored");
+
+                var signal = new ChangeSignal();
+                signal.Set();
+                signal.Set();
+                Check(await signal.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None), "a change wakes the stream");
+                Check(!await signal.WaitAsync(TimeSpan.FromMilliseconds(50), CancellationToken.None), "two changes are one wake-up");
+                signal.Close();
+                signal.Set();
+                Check(!await signal.WaitAsync(TimeSpan.FromMilliseconds(50), CancellationToken.None), "a closed signal is safe to set and never wakes");
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
+
         Case("agent-compare.check-command-passes-fails-and-times-out-cleanly", async () =>
         {
             var root = Temp("ac-check");
@@ -220,7 +395,7 @@ internal static partial class Program
             var resumed = await app.WaitAsync(run.Id(), status => status.Models().All(model => model.Str("waiting") == "approval"),
                 "every model asks again after the restart");
             Equal("running", resumed.Str("state"), "the run is running");
-            var answered = await app.PostAsync($"/api/compare/agent/{run.Id()}/approve", new JsonObject { ["scope"] = "all", ["decision"] = "allow" });
+            var answered = await app.PostAsync($"/api/compare/agent/{run.Id()}/approve", new JsonObject { ["scope"] = "all", ["items"] = Listed(resumed), ["decision"] = "allow" });
             Equal(200, answered.Status, "approved for all columns: " + answered.Text);
             Equal(3, answered.Body!["answers"]!.AsArray().Count, "three calls answered at once");
 
@@ -289,8 +464,9 @@ internal static partial class Program
                 ["models"] = Models("echo", "echo-small"),
                 ["isolation"] = "copy",
             });
-            await app.WaitAsync(denied.Id(), status => status.Models().All(model => model.Str("waiting") == "approval"), "both models ask again");
-            var no = await app.PostAsync($"/api/compare/agent/{denied.Id()}/approve", new JsonObject { ["scope"] = "all", ["decision"] = "deny", ["reason"] = "not today" });
+            var asking = await app.WaitAsync(denied.Id(), status => status.Models().All(model => model.Str("waiting") == "approval"), "both models ask again");
+            var no = await app.PostAsync($"/api/compare/agent/{denied.Id()}/approve",
+                new JsonObject { ["scope"] = "all", ["items"] = Listed(asking), ["decision"] = "deny", ["reason"] = "not today" });
             Equal(200, no.Status, "denied for all: " + no.Text);
             Equal(2, no.Body!["answers"]!.AsArray().Count, "both calls");
             var done = await app.WaitAsync(denied.Id(), status => status.Str("state") == "finished", "the denied run finished");
@@ -299,6 +475,39 @@ internal static partial class Program
                 Check(!File.Exists(Path.Join(model.Str("workingDirectory"), "two.txt")), "the denied command did not run");
                 Check(model.Str("answer")!.Contains("not today", StringComparison.Ordinal), "the model got the reason: " + model.Str("answer"));
             }
+        }),
+
+        Case("agent-compare.app.allow-all-answers-only-the-calls-the-page-listed", async () =>
+        {
+            await using var app = await CompareApp.StartAsync("ac-allow-all", ToolApprovalMode.Auto);
+            var run = await app.CreateAsync(new JsonObject
+            {
+                ["requestId"] = "listed-1",
+                ["task"] = "!echo listed > listed.txt",
+                ["projectPath"] = app.Project,
+                ["models"] = Models("echo", "echo-small"),
+                ["isolation"] = "copy",
+            });
+            var waiting = await app.WaitAsync(run.Id(), status => status.Models().All(model => model.Str("waiting") == "approval"), "both models ask");
+            var approve = $"/api/compare/agent/{run.Id()}/approve";
+            var unlisted = await app.PostAsync(approve, new JsonObject { ["scope"] = "all", ["decision"] = "allow" });
+            Equal(400, unlisted.Status, "Allow all must name the calls it answers: " + unlisted.Text);
+
+            // The page showed only A's call: B's started waiting after it rendered, so Allow all leaves it waiting.
+            var answered = await app.PostAsync(approve, new JsonObject { ["scope"] = "all", ["items"] = Listed(waiting, "a"), ["decision"] = "allow" });
+            Equal(200, answered.Status, "allowed: " + answered.Text);
+            Equal("a", answered.Body!["answers"]!.AsArray().Single()!.Str("slot"), "only the listed call was answered");
+            var after = answered.Body!["status"]!;
+            Equal("approval", after.Models().Single(model => model.Str("slot") == "b").Str("waiting"), "B's call still waits for its own answer");
+            Equal(1, after["waiting"]!.GetValue<int>(), "one call waits (the button comes back with the new count)");
+
+            // A listed call that no longer waits is skipped, not an error; B's call is answered once it is listed.
+            var later = await app.PostAsync(approve, new JsonObject { ["scope"] = "all", ["items"] = Listed(waiting), ["decision"] = "deny", ["reason"] = "not this one" });
+            Equal(200, later.Status, "denied: " + later.Text);
+            Equal("b", later.Body!["answers"]!.AsArray().Single()!.Str("slot"), "only B's call was still waiting");
+            var finished = await app.WaitAsync(run.Id(), status => status.Str("state") == "finished", "the run finished");
+            Check(File.Exists(Path.Join(finished.Models().Single(model => model.Str("slot") == "a").Str("workingDirectory"), "listed.txt")), "A's allowed call ran");
+            Check(!File.Exists(Path.Join(finished.Models().Single(model => model.Str("slot") == "b").Str("workingDirectory"), "listed.txt")), "B's call never ran unseen");
         }),
 
         Case("agent-compare.app.budget-share-stops-only-that-model", async () =>
@@ -505,6 +714,23 @@ internal static partial class Program
 
     private static JsonArray Models(params string[] models) =>
         new([.. models.Select(model => (JsonNode)new JsonObject { ["provider"] = "faux", ["model"] = model })]);
+
+    // The waiting calls a status shows (of the given slots, else all), as the page sends them with "Allow all": [{slot, taskId}].
+    private static JsonArray Listed(JsonNode status, params string[] slots) =>
+        new([.. status.Models().Where(model => slots.Length == 0 || slots.Contains(model.Str("slot") ?? ""))
+            .SelectMany(model => (model["approvals"] as JsonArray ?? []).Select(call =>
+                (JsonNode)new JsonObject { ["slot"] = model.Str("slot"), ["taskId"] = call!["taskId"]!.GetValue<long>() }))]);
+
+    // A path for a shell or a git config value: forward slashes (sh on Windows reads them), quoted for the shell.
+    private static string ShellPath(string path) => "\"" + path.Replace('\\', '/') + "\"";
+
+    // A hook or helper script git runs through sh; executable where that matters.
+    private static void WriteScript(string path, string body)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "#!/bin/sh\n" + body + "\n");
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    }
 
     private static string Id(this JsonNode status) => status.Str("id")!;
 

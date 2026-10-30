@@ -26,7 +26,7 @@ public static class AgentCompareModule
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
         services.AddWebAgentMigration(AgentCompareStore.Migration);
-        services.TryAddSingleton(provider => new AgentCompareStore(provider.GetRequiredService<WebAgentDb>()));
+        services.TryAddSingleton(provider => new AgentCompareStore(provider.GetRequiredService<WebAgentDb>(), provider.GetService<ILogger<AgentCompareStore>>()));
         services.TryAddSingleton(provider => new AgentCompareGate(provider.GetRequiredService<AgentCompareStore>(), provider,
             provider.GetService<ILogger<AgentCompareGate>>()));
         services.TryAddSingleton(provider => ActivatorUtilities.CreateInstance<AgentCompareRunner>(provider));

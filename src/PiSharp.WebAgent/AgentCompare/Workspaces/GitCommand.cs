@@ -9,6 +9,8 @@
 // branch's `update-ref`. The user's hooks still run when they commit themselves. An inspection's `git status` also switches off the filter
 // drivers the repository's own config defines (WorkspaceManager.NeutralFiltersAsync: a clean filter runs during `git status`).
 // No secret ever reaches a git command line: the arguments are paths, commit ids and fixed options.
+// Command-line config wins over every config file (W4 fix, agent-runner). A worktree slot's commands also name its repository explicitly
+// (GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE, WorkspaceManager.Diff.cs), so the slot's own .git file is never read.
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;

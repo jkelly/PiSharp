@@ -1,9 +1,9 @@
 // Decision 0011 (run W4, R5): what the user does with a run: stop one model or all, continue a model that reached its share of the run cap,
-// answer approvals (one call; every waiting call of every model at once; or "allow this command in all workspaces", which becomes a run
-// grant that answers matching calls now and later), look at a model's diff, keep its changes (apply them to the project as uncommitted
-// changes, or keep a branch; both through R4, which refuses on a conflict and never commits to the user's branches or pushes), discard
-// workspaces, and open a model as a chat (a chat binding for its session: from then on it is a plain chat with Settings › Tools approvals,
-// working in its workspace). Every action is idempotent: repeating it answers what the first one did.
+// answer approvals (one call; the waiting calls of every model the page listed, at once; or "allow this command in all workspaces", which
+// becomes an exact run grant that answers the same command now and later), look at a model's diff, keep its changes (apply them to the
+// project as uncommitted changes, or keep a branch; both through R4, which refuses on a conflict and never commits to the user's branches
+// or pushes), discard workspaces, and open a model as a chat (a chat binding for its session: from then on it is a plain chat with
+// Settings › Tools approvals, working in its workspace). Every action is idempotent: repeating it answers what the first one did.
 using PiSharp.Durable.Hosting;
 using PiSharp.WebAgent.AgentCompare.Workspaces;
 using PiSharp.WebAgent.Chat;
@@ -22,12 +22,19 @@ public enum AgentApprovalScope
     /// <summary>One call (slot and task id).</summary>
     Call,
 
-    /// <summary>Allow the call's command in every workspace for the rest of the run (a run grant), answering every waiting call it covers.</summary>
+    /// <summary>Allow the call's command (exactly that command) in every workspace for the rest of the run (a run grant), answering every
+    /// waiting call it covers.</summary>
     Command,
 
-    /// <summary>Every waiting call of every model.</summary>
+    /// <summary>The waiting calls the page listed (<see cref="AgentApprovalItem"/>), in every column; a call that started waiting after
+    /// the page showed its list is left waiting.</summary>
     All,
 }
+
+/// <summary>One waiting call a page showed and answers with <see cref="AgentApprovalScope.All"/>.</summary>
+/// <param name="Slot">The model's slot.</param>
+/// <param name="TaskId">The call's task.</param>
+public sealed record AgentApprovalItem(string Slot, long TaskId);
 
 /// <summary>One call an approval request answered.</summary>
 /// <param name="Slot">The model's slot.</param>
@@ -84,10 +91,12 @@ public sealed partial class AgentCompareRunner
     }
 
     /// <summary>Answers waiting tool calls (see <see cref="AgentApprovalScope"/>). <paramref name="allow"/> false denies (with
-    /// <paramref name="reason"/> for the model); <see cref="AgentApprovalScope.Command"/> only allows.</summary>
-    /// <exception cref="AgentCompareException">A slot or call is missing (404), the call no longer waits (409), or the request is not allowed.</exception>
+    /// <paramref name="reason"/> for the model); <see cref="AgentApprovalScope.Command"/> only allows. <see cref="AgentApprovalScope.All"/>
+    /// answers only the <paramref name="items"/> that still wait (the calls the page showed), never a call that started waiting since.</summary>
+    /// <exception cref="AgentCompareException">A slot or call is missing (404), the call no longer waits (409), or the request is not allowed
+    /// (400; also All without <paramref name="items"/>).</exception>
     public async Task<IReadOnlyList<AgentApprovalAnswer>> ApproveAsync(string id, AgentApprovalScope scope, string? slot, long? taskId, bool allow, string? reason,
-        CancellationToken cancellationToken = default)
+        IReadOnlyList<AgentApprovalItem>? items = null, CancellationToken cancellationToken = default)
     {
         var run = Require(id);
         var decision = new ApprovalDecision(allow ? ApprovalChoice.AllowOnce : ApprovalChoice.Deny, allow ? null : reason);
@@ -100,7 +109,12 @@ public sealed partial class AgentCompareRunner
                 return [await DecideAsync(target, decision, cancellationToken).ConfigureAwait(false)];
             }
             case AgentApprovalScope.All:
-                return await Task.WhenAll(pending.Select(item => DecideAsync(item, decision, cancellationToken))).ConfigureAwait(false);
+            {
+                if (items is null) throw AgentCompareException.BadRequest("List the calls to answer (items: [{slot, taskId}]), as the page showed them.");
+                var listed = items.Select(item => (Slot: item.Slot.Trim().ToLowerInvariant(), item.TaskId)).ToHashSet();
+                var chosen = pending.Where(item => listed.Contains((item.Slot, item.Approval.Request.TaskId))).ToList();
+                return await Task.WhenAll(chosen.Select(item => DecideAsync(item, decision, cancellationToken))).ConfigureAwait(false);
+            }
             case AgentApprovalScope.Command:
             {
                 if (!allow) throw AgentCompareException.BadRequest("Allowing a command in every workspace only allows; deny the call instead.");
