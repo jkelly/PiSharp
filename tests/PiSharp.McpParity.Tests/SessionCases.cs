@@ -104,26 +104,45 @@ internal static partial class Program
     // index.ts startConnection/isCurrent and mcp_servers_change: a server whose connection is closed while it still connects (here an
     // extension unregisters it; the session's shutdown, which stops the servers concurrently with their connections, does the same)
     // drops the attempt's result. reportProblems lists only the current servers, so the closed attempt's failure is never reported.
+    // Closing one server does not fail another: `docs`, held here until the close holds the session (its replacement reservation, kept
+    // until the closed attempt ends), binds and connects.
     private static Task ClosedWhileConnecting() => WithRoot("closed-connecting",
         """{"mcpServers":{"docs":{"command":"docs-server","exposure":"direct"},"bad":{"command":5}}}""",
         async fixture =>
     {
         var initializing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        fixture.HeldUntilClosed["late"] = initializing;
+        var lateFails = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var docsBinds = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var docsBinding = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.HeldUntilClosed["late"] = initializing; fixture.FailingAfterClose["late"] = lateFails.Task;
+        fixture.BindingHeld["docs"] = (docsBinds.Task, docsBinding);
         var host = fixture.Host();
         host.Registrations.Register("extension-owner", "late", PiSharp.Contracts.JsonData.Parse("""{"command":"late-server","exposure":"deferred"}"""));
         var global = Path.Combine(fixture.Agent, "mcp.json");
         await using var rpc = new Rpc(Args(fixture.Root, "new-memory"), new Endpoint(), host);
         Check(await Task.WhenAny(initializing.Task, rpc.Completion, Task.Delay(TimeSpan.FromSeconds(30))) == initializing.Task, "late started connecting; " + rpc.Error);
         host.Registrations.Unregister("extension-owner", "late");
-        // reportProblems runs once every background server settled; the config error makes it report.
+        var session = (await fixture.Manager.Task).Session()!.Value.Attachment.Session;
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (!Reserved(session))
+        {
+            if (rpc.Completion.IsCompleted || DateTime.UtcNow > deadline) throw new TimeoutException("the close never held the session; " + Snapshot(rpc.Error));
+            await Task.Delay(10);
+        }
+        docsBinds.TrySetResult();
+        await docsBinding.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        // A binding the held session refuses fails at once: give it the time to before the close ends.
+        await Task.Delay(250);
+        lateFails.TrySetResult();
+        // reportProblems runs once every background server settled; the config error makes it report.
+        deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (!McpDiagnostics(Snapshot(rpc.Error)).Any(line => line.StartsWith("MCP servers need attention", StringComparison.Ordinal)))
         {
             if (rpc.Completion.IsCompleted || DateTime.UtcNow > deadline) throw new TimeoutException("no report; " + Snapshot(rpc.Error));
             await Task.Delay(20);
         }
         Check(fixture.Server("late").Closes > 0, "the late server's channel closed");
+        Check(fixture.Reports.Any(report => report.Entry.Name == "docs" && report.Failure is null), "docs connected; " + Snapshot(rpc.Error));
         await rpc.Prompt("p1", "hello");
         Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
         Names([$"MCP servers need attention:\n  config: {global}: server \"bad\" needs either \"command\" (stdio) or \"url\" (streamable HTTP)"],
@@ -133,6 +152,13 @@ internal static partial class Program
 
     /// <summary>The diagnostics written so far (the host writes them from another thread).</summary>
     private static string Snapshot(StringWriter writer) { try { return writer.ToString(); } catch (Exception) { return ""; } }
+
+    /// <summary>Whether an owner operation (here a server's close) holds the session's replacement reservation.</summary>
+    private static bool Reserved(PiSharp.CodingAgent.PersistentAgentSession session)
+    {
+        try { session.CaptureToolCatalogRegistry(); return false; }
+        catch (InvalidOperationException error) when (error.Message == "Session replacement is in progress.") { return true; }
+    }
 
     // syncResourceTools: a direct server with resources registers the resource tools as direct, so the first request declares them,
     // and read_mcp_resource reads from the server.

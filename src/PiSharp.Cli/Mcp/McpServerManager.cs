@@ -418,7 +418,7 @@ public sealed class McpServerManager
     // Actions
     // ---------------------------------------------------------------------------------------------
 
-    private (ReplaceableAgentSession Owner, AgentSessionAttachment Attachment)? Session()
+    internal (ReplaceableAgentSession Owner, AgentSessionAttachment Attachment)? Session()
     {
         lock (gate) return owner is { } o && attachment is { } a && ReferenceEquals(o.Current, a) && !a.LifetimeToken.IsCancellationRequested ? (o, a) : null;
     }
