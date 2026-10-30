@@ -33,12 +33,14 @@ internal static class MistralLiveSelectionTests
     {
         var selected = LiveSessionSelection.Parse("mistral", "open-mistral-7b", "8000");
         using var handler = new Handler(); var reads = new List<string>();
-        using var connection = selected.Connect(new(name => { reads.Add(name); return "fixture-only"; }, () => handler));
+        using var connection = selected.Connect(new(name => { reads.Add(name); return name == "MISTRAL_API_KEY" ? "fixture-only" : null; }, () => handler));
         var normal = connection.CreateTransport(); var summary = connection.CreateTransport(summary: true);
         var request = new ChatRequest(selected.Model, [new("user", JsonData.Parse("{\"content\":\"hello\"}"))], 1);
         var normalEvents = await Collect(normal.StreamAsync(request)); var summaryEvents = await Collect(summary.StreamAsync(request));
         Check(normalEvents[^1] is StreamDone && summaryEvents[^1] is StreamDone);
-        Check(reads.SequenceEqual(new[] { "MISTRAL_API_KEY" }) && handler.Payloads.Count == 2);
+        // Pi 1.1.0 resolution (7b4590d7): the session's environment is read once per provider variable at start, and
+        // MISTRAL_API_KEY alone keys the route; neither request reads it again.
+        Check(reads.SequenceEqual(LiveSessionRuntime.ProviderVariables) && handler.Payloads.Count == 2);
         var first = handler.Payloads[0].Value; var second = handler.Payloads[1].Value;
         Check(first.GetProperty("max_tokens").GetDouble() > 0 && first.GetProperty("max_tokens").GetDouble() <= 3904);
         Check(second.GetProperty("max_tokens").GetDouble() == 8000);
