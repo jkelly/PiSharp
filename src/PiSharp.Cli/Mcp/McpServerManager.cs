@@ -259,7 +259,7 @@ public sealed class McpServerManager
             ImmutableArray<McpServerEntry> entries; lock (gate) entries = [.. servers.Select(slot => slot.Entry)];
             try { dependencies.ServersChanged?.Invoke(entries); } catch (Exception) { /* The section follows on the next change. */ }
             await Task.WhenAll(added.Where(IsEnabled).Select(slot => Attempt(slot, () => StartAsync(slot, CancellationToken.None)))).ConfigureAwait(false);
-            EnsureDiscoveryActive();
+            await EnsureDiscoveryActiveAsync().ConfigureAwait(false);
             Changed();
         }
         catch (Exception) { /* A session that ended meanwhile keeps nothing to apply. */ }
@@ -418,7 +418,7 @@ public sealed class McpServerManager
     // Actions
     // ---------------------------------------------------------------------------------------------
 
-    private (ReplaceableAgentSession Owner, AgentSessionAttachment Attachment)? Session()
+    internal (ReplaceableAgentSession Owner, AgentSessionAttachment Attachment)? Session()
     {
         lock (gate) return owner is { } o && attachment is { } a && ReferenceEquals(o.Current, a) && !a.LifetimeToken.IsCancellationRequested ? (o, a) : null;
     }
@@ -430,7 +430,7 @@ public sealed class McpServerManager
         if (slot is null) return $"No MCP server named \"{name}\".";
         if (!IsEnabled(slot) || slot.Server is null) return $"MCP server \"{name}\" is disabled.";
         await ReconnectCoreAsync(slot, token).ConfigureAwait(false);
-        EnsureDiscoveryActive();
+        await EnsureDiscoveryActiveAsync(token).ConfigureAwait(false);
         lock (gate) return ReconnectFailure(slot);
     }
 
@@ -580,7 +580,7 @@ public sealed class McpServerManager
         }
         // startConnection: the server connects again with the registration it had.
         await Attempt(slot, () => server is null ? StartAsync(slot, token) : EnableAsync(previous, server, token)).ConfigureAwait(false);
-        EnsureDiscoveryActive();
+        await EnsureDiscoveryActiveAsync(token).ConfigureAwait(false);
         return null;
     }
 
@@ -633,18 +633,23 @@ public sealed class McpServerManager
                 try { await resources.UpdateAsync(slot.Entry.Name, server, slot.Entry.Config.Exposure, server.Snapshot.Catalog is { Connected: true, HasResources: true }, token).ConfigureAwait(false); }
                 catch (Exception) when (!token.IsCancellationRequested) { /* The resource tools follow on the next change. */ }
         }
+        // Another server closing meanwhile holds the session until its close ended: the change waits for it rather than fail.
         if (Session() is { } session)
-        {
-            var indirect = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools
-                .Where(tool => tool.Exposure != PiSharp.Contracts.ToolExposure.Direct).Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
-            var serverTools = ServerToolNames(session.Attachment, slot.Entry.Name);
-            var active = session.Attachment.Session.GetToolActivationSelection().Names;
-            var kept = active.Where(tool => !serverTools.Contains(tool) || !indirect.Contains(tool)).ToImmutableArray();
-            if (kept.Length != active.Length)
-                try { session.Attachment.Session.ScheduleToolActivation(kept, token); }
-                catch (InvalidOperationException) { /* Another selected-state change runs; the tools stay until the next change. */ }
-        }
-        EnsureDiscoveryActive();
+            try
+            {
+                await session.Owner.AccessSessionAsync(session.Attachment, current =>
+                {
+                    var registry = current.CaptureToolCatalogRegistry();
+                    var indirect = registry.RegisteredTools.Where(tool => tool.Exposure != PiSharp.Contracts.ToolExposure.Direct)
+                        .Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
+                    var serverTools = ServerToolNames(registry, slot.Entry.Name);
+                    var active = current.GetToolActivationSelection().Names;
+                    var kept = active.Where(tool => !serverTools.Contains(tool) || !indirect.Contains(tool)).ToImmutableArray();
+                    if (kept.Length != active.Length) current.ScheduleToolActivation(kept, token);
+                }, token).ConfigureAwait(false);
+            }
+            catch (InvalidOperationException) { /* Another selected-state change runs; the tools stay until the next change. */ }
+        await EnsureDiscoveryActiveAsync(token).ConfigureAwait(false);
         Changed();
         return null;
     }
@@ -652,40 +657,46 @@ public sealed class McpServerManager
     /// <summary>index.ts session_start: ensureDiscoveryActive from the configuration, once the session is current, so the codemode or
     /// tool_search tool the servers need is active before they connect (another extension's tool of these names too, when it declares
     /// reachesTools; the built-in ones are registered active for them).</summary>
-    internal void SessionStarted()
+    internal Task SessionStartedAsync()
     {
-        if (Session() is null || Interlocked.Exchange(ref sessionStarted, 1) != 0) return;
-        EnsureDiscoveryActive();
+        if (Session() is null || Interlocked.Exchange(ref sessionStarted, 1) != 0) return Task.CompletedTask;
+        return EnsureDiscoveryActiveAsync();
     }
     private int sessionStarted;
 
     /// <summary>ensureDiscoveryActive after a change: activate codemode for enabled `codemode` servers (unless autoEnableCodemode is
-    /// false) and tool_search for `deferred` ones, when the session registers them and they are not active yet.</summary>
-    private void EnsureDiscoveryActive()
+    /// false) and tool_search for `deferred` ones, when the session registers them and they are not active yet. Another server
+    /// closing meanwhile holds the session until its close ended: the activation waits for it rather than fail.</summary>
+    private async Task EnsureDiscoveryActiveAsync(CancellationToken token = default)
     {
         if (Session() is not { } session) return;
         HashSet<McpExposure> exposures;
         lock (gate) exposures = [.. servers.Where(IsEnabled).SelectMany(slot => McpConfigurationReader.ConfiguredExposures(slot.Entry.Config))];
-        // Only a tool of these names that declares reachesTools can reach MCP tools; another extension's tool of the same name
-        // without it is never activated.
-        var registered = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.Where(tool => tool.ReachesTools is not null)
-            .Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
-        var active = session.Attachment.Session.GetToolActivationSelection().Names;
-        var activate = new List<string>();
-        if (exposures.Contains(McpExposure.Codemode) && dependencies.AutoEnableCodemode && registered.Contains(McpCodemode.Name) && !active.Contains(McpCodemode.Name))
-            activate.Add(McpCodemode.Name);
-        if (exposures.Contains(McpExposure.Deferred) && registered.Contains(McpToolSearch.Name) && !active.Contains(McpToolSearch.Name))
-            activate.Add(McpToolSearch.Name);
-        if (activate.Count == 0) return;
-        try { session.Attachment.Session.ScheduleToolActivation([.. active, .. activate]); }
+        try
+        {
+            await session.Owner.AccessSessionAsync(session.Attachment, current =>
+            {
+                // Only a tool of these names that declares reachesTools can reach MCP tools; another extension's tool of the same name
+                // without it is never activated.
+                var registered = current.CaptureToolCatalogRegistry().RegisteredTools.Where(tool => tool.ReachesTools is not null)
+                    .Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
+                var active = current.GetToolActivationSelection().Names;
+                var activate = new List<string>();
+                if (exposures.Contains(McpExposure.Codemode) && dependencies.AutoEnableCodemode && registered.Contains(McpCodemode.Name) && !active.Contains(McpCodemode.Name))
+                    activate.Add(McpCodemode.Name);
+                if (exposures.Contains(McpExposure.Deferred) && registered.Contains(McpToolSearch.Name) && !active.Contains(McpToolSearch.Name))
+                    activate.Add(McpToolSearch.Name);
+                if (activate.Count != 0) current.ScheduleToolActivation([.. active, .. activate]);
+            }, token).ConfigureAwait(false);
+        }
         catch (InvalidOperationException) { /* A run started meanwhile; the next change activates them. */ }
     }
 
     /// <summary>The registered tools of a server: those in its namespace.</summary>
-    private static HashSet<string> ServerToolNames(AgentSessionAttachment attachment, string server)
+    private static HashSet<string> ServerToolNames(SessionRuntimeRegistry registry, string server)
     {
         var namespaceName = McpCatalogPlanner.Namespace(server);
-        return attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.Where(tool => tool.Namespace?.Name == namespaceName)
+        return registry.RegisteredTools.Where(tool => tool.Namespace?.Name == namespaceName)
             .Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
     }
 
@@ -712,7 +723,7 @@ public sealed class McpServerManager
         try { dependencies.ClearChallenge?.Invoke(slot.Entry.Name); } catch (Exception) { /* Only the next sign-in reads it. */ }
         lock (gate) slot.TokensAtSignIn = null;
         await ReconnectCoreAsync(slot, cancel).ConfigureAwait(false);
-        EnsureDiscoveryActive();
+        await EnsureDiscoveryActiveAsync(cancel).ConfigureAwait(false);
         lock (gate) return slot.State is ConnectionState.Failed or ConnectionState.NeedsAuth
             ? "Signed in, but " + (slot.State == ConnectionState.NeedsAuth ? $"MCP server \"{name}\" requires sign-in. Run /mcp to sign in." : slot.Error) : null;
     }

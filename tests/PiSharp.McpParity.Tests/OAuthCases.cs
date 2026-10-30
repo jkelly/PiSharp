@@ -126,6 +126,12 @@ internal static partial class Program
             File.WriteAllText(path, ""); File.SetLastWriteTimeUtc(path, DateTime.UtcNow - TimeSpan.FromSeconds(30));
             await (await acquire(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5))).DisposeAsync();
             Directory.CreateDirectory(path);
+            // The waiter takes the directory over once it looks stale, so ageing it below must be one call. On macOS, a modification
+            // time before the birth time takes two (utimensat, then setattrlist restoring the birth time), and a takeover in between
+            // fails the second ("Invalid argument"). So the birth time is set a minute back first (elsewhere this sets the modification
+            // time, made fresh again before the waiter starts).
+            Directory.SetCreationTimeUtc(path, DateTime.UtcNow - TimeSpan.FromMinutes(1));
+            Directory.SetLastWriteTimeUtc(path, DateTime.UtcNow);
             var waiting = acquire(CancellationToken.None);
             await Task.Delay(300);
             Check(!waiting.IsCompleted, "the original's fresh lock directory is waited for");
