@@ -504,13 +504,18 @@ public sealed class EvalPages
     // ----- modals -----
 
     /// <summary><c>_SuiteScheduleModal</c> for <paramref name="suiteId"/>, with the cap field at <paramref name="capMicros"/> (the saved cap
-    /// when null); null when there is no such suite.</summary>
+    /// when null, or for a suite that has none, SuiteService.SuggestedCap: the dialog opens on the fits pane, as the mockup does, not with a
+    /// refusal before anything was typed); null when there is no such suite.</summary>
     public ScheduleModalView? ScheduleOf(string suiteId, long? capMicros = null)
     {
         if (Store.Suite(suiteId) is not { } suite) return null;
         var cases = Store.Cases(suite.Id);
         var estimate = Suites.Estimate(suite, cases);
-        var cap = capMicros ?? suite.CapMicros;
+        var cap = capMicros ?? suite.CapMicros ?? SuiteService.SuggestedCap(estimate);
+        var refusal = SuiteService.Refusal(suite, cases.Count, estimate, cap);
+        // Opened with no cap to show (none saved, none to suggest, nothing typed yet): an empty field is not an error until the user types
+        // or saves (evals.js and the server refuse it then). A refusal no cap can lift still shows.
+        if (refusal?.Code == ScheduleRefusal.NoCap && capMicros is null) refusal = null;
         var schedule = suite.Schedule ?? new SuiteSchedule { Repeat = ScheduleRepeat.Daily, At = "07:00" };
         var local = TimeZoneInfo.Local.Id;
         var zone = schedule.TimeZone ?? local;
@@ -521,7 +526,7 @@ public sealed class EvalPages
             Estimate = estimate,
             Schedule = schedule,
             CapMicros = cap,
-            Refusal = SuiteService.Refusal(suite, cases.Count, estimate, cap),
+            Refusal = refusal,
             TimeZone = zone,
             ZoneText = string.Equals(zone, local, StringComparison.OrdinalIgnoreCase) ? "Local time on this computer." : $"Times are in {zone}.",
         };

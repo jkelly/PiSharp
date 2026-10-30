@@ -15,7 +15,8 @@
 // Answers run four at a time; a result goes queued → running → done or error (cancelled when the run stops first). The account of each
 // target is resolved once when the run starts and pinned on every call, so a run never switches accounts halfway. The app stopping marks
 // a running run interrupted (its finished results stay, its unfinished ones are cancelled, its holds released); a run left active by a
-// crash is marked interrupted when the app starts again, and its slot is never run again (the slot row stays).
+// crash is marked interrupted when the app starts again, and its slot is never run again (the slot row stays). Recovery is retried (on
+// every scheduler tick and start) until a pass has marked every such run, so one failure never leaves a run going until the next restart.
 using System.Collections.Concurrent;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
@@ -142,7 +143,12 @@ public sealed class SuiteRunner : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
-        await RecoverAsync(cancellationToken).ConfigureAwait(false);
+        try { await RecoverAsync(cancellationToken).ConfigureAwait(false); }
+        catch (Exception error) when (error is not OperationCanceledException and not OutOfMemoryException and not ObjectDisposedException)
+        {
+            // Recovery is tried again on the next start and scheduler tick; a run it could not mark keeps its own suite refused as running.
+            log.LogWarning(error, "Suite runs left going by the last session could not be marked interrupted yet.");
+        }
         await startGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -273,24 +279,60 @@ public sealed class SuiteRunner : IAsyncDisposable
         return new SuiteRunStart(true, inserted, null, null);
     }
 
-    /// <summary>Marks every run left queued or running by an earlier process interrupted (its unfinished results cancelled, its holds
-    /// released). Runs once per process; later calls do nothing.</summary>
+    /// <summary>Marks every run left queued or running by an earlier process interrupted (its holds released, its unfinished results
+    /// cancelled). Until one pass has recovered every such run, each call tries again (the scheduler calls it on every tick, and every
+    /// start does), so one failure (a busy database, a ledger query that throws, one bad row) never leaves a run going for the life of the
+    /// process; a run that fails is logged and the others are still recovered. After a pass that finishes, later calls do nothing. When
+    /// the active runs cannot be read at all, the store's exception is thrown and the next call tries again.</summary>
     /// <returns>How many runs it marked.</returns>
     public async Task<int> RecoverAsync(CancellationToken cancellationToken = default)
     {
-        if (Interlocked.Exchange(ref recovered, 1) != 0) return 0;
-        var count = 0;
-        foreach (var run in store.ActiveRuns())
+        if (Volatile.Read(ref recovered) != 0 || Volatile.Read(ref disposed) != 0) return 0;
+        // Under the start gate: a run StartLockedAsync has just inserted is in `running` before the gate is released, so a retried pass
+        // never takes a run of this process for one a crash left behind.
+        await startGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            if (running.ContainsKey(run.Id)) continue;
-            var now = time.GetUtcNow();
-            store.CancelUnfinished(run.Id, now);
-            store.UpdateRun(Totals(run, store.Results(run.Id)) with { Status = SuiteRunStatus.Interrupted, Problem = InterruptedProblem, Finished = now });
-            await ReleaseHoldsAsync(run.Id, cancellationToken).ConfigureAwait(false);
-            log.LogWarning("Suite run {Run} (#{Number}) was going when the app stopped; it is marked interrupted.", run.Id, run.Number);
-            count++;
+            if (recovered != 0) return 0;
+            var count = 0;
+            var failed = 0;
+            foreach (var run in store.ActiveRuns())
+            {
+                if (running.ContainsKey(run.Id)) continue;
+                try
+                {
+                    await RecoverRunAsync(run, cancellationToken).ConfigureAwait(false);
+                    count++;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception error) when (error is not OutOfMemoryException)
+                {
+                    failed++;
+                    log.LogWarning(error, "Suite run {Run} (#{Number}), left going by the last session, could not be marked interrupted yet; it is tried again.",
+                        run.Id, run.Number);
+                }
+            }
+            if (failed == 0) Volatile.Write(ref recovered, 1);
+            return count;
         }
-        return count;
+        finally
+        {
+            startGate.Release();
+        }
+    }
+
+    /// <summary>Recovers one run a crash left going. Each step can be done again: its holds are released first, then its unfinished results
+    /// cancelled, and it is marked interrupted last, so a run whose recovery failed part way stays active and is picked up whole next time.</summary>
+    private async Task RecoverRunAsync(SuiteRun run, CancellationToken cancellationToken)
+    {
+        await ReleaseHoldsAsync(run.Id, cancellationToken).ConfigureAwait(false);
+        var now = time.GetUtcNow();
+        store.CancelUnfinished(run.Id, now);
+        store.UpdateRun(Totals(run, store.Results(run.Id)) with { Status = SuiteRunStatus.Interrupted, Problem = InterruptedProblem, Finished = now });
+        log.LogWarning("Suite run {Run} (#{Number}) was going when the app stopped; it is marked interrupted.", run.Id, run.Number);
     }
 
     /// <summary>Analyses the complete run <paramref name="runId"/> against each target's current baseline and stores the signals (what the

@@ -140,11 +140,19 @@ public sealed class EvalStore
         Records<SuiteRun>($"SELECT data FROM eval_runs WHERE suite_id = $suite AND status IN {Active} ORDER BY number DESC LIMIT 1;", ("$suite", suiteId))
             .FirstOrDefault();
 
-    /// <summary>The metered costs of the last <paramref name="count"/> complete runs of <paramref name="suiteId"/>, newest first (for the
-    /// typical cost).</summary>
+    /// <summary>The metered costs of the last <paramref name="count"/> complete full runs of <paramref name="suiteId"/>, newest first (for
+    /// the typical cost). A full run asked as many cases, on as many targets, k times as the suite has now: a "Run this case" subset run
+    /// (which the runner does not analyse for drift either) is left out, and so is a run of an older shape (a case or target since added or
+    /// removed, k changed), so the typical cost is what a scheduled run of the suite as it is now costs.</summary>
     public IReadOnlyList<long> RecentCosts(string suiteId, int count = 20) =>
-        Db.Query("SELECT cost_micros FROM eval_runs WHERE suite_id = $suite AND status = 'complete' ORDER BY number DESC LIMIT $count;",
-            reader => reader.GetInt64(0), ("$suite", suiteId), ("$count", Math.Clamp(count, 1, 1000)));
+        Db.Query("""
+            SELECT r.cost_micros FROM eval_runs r JOIN eval_suites s ON s.id = r.suite_id
+            WHERE r.suite_id = $suite AND r.status = 'complete'
+                AND json_array_length(r.data, '$.caseIds') = (SELECT COUNT(*) FROM eval_cases c WHERE c.suite_id = r.suite_id)
+                AND json_array_length(r.data, '$.targets') = json_array_length(s.data, '$.targets')
+                AND json_extract(r.data, '$.k') = json_extract(s.data, '$.k')
+            ORDER BY r.number DESC LIMIT $count;
+            """, reader => reader.GetInt64(0), ("$suite", suiteId), ("$count", Math.Clamp(count, 1, 1000)));
 
     /// <summary>Inserts <paramref name="run"/> as its suite's next run, with its <paramref name="results"/> and, for a scheduled run, its slot's
     /// <see cref="SlotOutcome.Started"/> decision, in one transaction.</summary>

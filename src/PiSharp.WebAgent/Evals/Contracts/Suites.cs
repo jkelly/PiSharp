@@ -158,7 +158,8 @@ public sealed record Suite
 /// <summary>What one run of a suite would cost (mockup modal-suite-schedule's "How the worst case is worked out").</summary>
 /// <param name="WorstMicros">The metered worst case: every call's worst case (input tokens × input rate + max output tokens × output rate)
 /// of every metered target, plus the judge calls; what the run reserves.</param>
-/// <param name="TypicalMicros">The median metered cost of the suite's last 20 finished runs, or null before there are any.</param>
+/// <param name="TypicalMicros">The median metered cost of the suite's last 20 complete full runs (every case, target and repeat of the suite
+/// as it is now; "Run this case" subset runs left out), or null before there are any.</param>
 /// <param name="ListMicros">The worst case of the subscription targets at list price (never counted toward money caps).</param>
 /// <param name="Lines">The calls per run by model, metered first.</param>
 public sealed record SuiteEstimate(long WorstMicros, long? TypicalMicros, long ListMicros, IReadOnlyList<SuiteEstimateLine> Lines)
