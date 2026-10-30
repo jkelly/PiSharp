@@ -58,6 +58,9 @@ PiSharp.WebAgent.Bench.BenchModule.AddBenchArea(builder.Services, options);
 PiSharp.WebAgent.AgentCompare.Pages.AgentComparePagesModule.AddAgentComparePages(builder.Services, options);
 // Presets (run W4, R8): GET /presets and /api/presets (saved bundles of model, parameters, prompts and tools; JSON import and export).
 PiSharp.WebAgent.Presets.PresetsModule.AddPresetsArea(builder.Services, options);
+// Evals (run W5, E0): after the Spend Guard and the run engine, so suite runs, judge calls and Arena columns are guarded and recorded;
+// the evals webagent.db migrations (2000-2999) and one hook per W5 unit (Evals/EvalsModule.cs).
+PiSharp.WebAgent.Evals.EvalsModule.AddEvalsArea(builder.Services, options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -78,6 +81,7 @@ PiSharp.WebAgent.Runs.RunHistoryModule.MapRunHistoryArea(app);
 PiSharp.WebAgent.Bench.BenchModule.MapBenchArea(app);
 PiSharp.WebAgent.AgentCompare.Pages.AgentComparePagesModule.MapAgentComparePages(app);
 PiSharp.WebAgent.Presets.PresetsModule.MapPresetsArea(app);
+PiSharp.WebAgent.Evals.EvalsModule.MapEvalsArea(app);
 app.MapWebAgentCore();
 app.Run();
 return 0;
