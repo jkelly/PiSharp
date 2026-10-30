@@ -2,6 +2,8 @@
 // %LOCALAPPDATA%\PiSharpWebAgent by default; the PISHARP_WEBAGENT_DATA environment variable moves it, and --data moves it again (the command
 // line wins). --faux answers every request with FauxDurableModels and lists only the faux catalog, so no provider code runs at all.
 // Both switches are read here, before ASP.NET Core sees the arguments: its command-line provider would take "--faux --data x" as faux="--data".
+// Run W3 (S0) adds --faux-metered: still --faux (offline, no provider code), but the faux provider is Metered at a list price and its
+// answers report usage, so the Spend Guard, its ledger and its pages can be exercised without a provider (Faux/FauxPricing.cs).
 namespace PiSharp.WebAgent.Hosting;
 
 /// <summary>The Web Agent's data folder and mode, read once at start (<see cref="FromCommandLine"/>) and registered as a singleton.</summary>
@@ -18,6 +20,11 @@ public sealed class WebAgentOptions
 
     /// <summary>Whether the app runs on faux models only (<c>--faux</c>): no provider is called, and only the faux catalog is listed.</summary>
     public bool Faux { get; init; }
+
+    /// <summary>Whether the faux provider is priced (<c>--faux-metered</c>, which implies <see cref="Faux"/>): Metered at
+    /// <see cref="Faux.FauxPricing.Price"/>, with answers that report usage (tokens from text length). Plain <c>--faux</c> is free and reports
+    /// zero usage.</summary>
+    public bool FauxMetered { get; init; }
 
     /// <summary><c>device\</c>: the durable device host's data (one <c>agent.sqlite</c> per chat session).</summary>
     public string DeviceDirectory => Path.Join(DataDirectory, "device");
@@ -50,18 +57,20 @@ public sealed class WebAgentOptions
         return Path.GetFullPath(chosen);
     }
 
-    /// <summary>Reads <c>--faux</c> and <c>--data &lt;folder&gt;</c> (or <c>--data=&lt;folder&gt;</c>) from <paramref name="args"/>, and
-    /// returns the options with the arguments left for ASP.NET Core (<c>--urls</c>, logging and other configuration).</summary>
+    /// <summary>Reads <c>--faux</c>, <c>--faux-metered</c> (which implies <c>--faux</c>) and <c>--data &lt;folder&gt;</c> (or
+    /// <c>--data=&lt;folder&gt;</c>) from <paramref name="args"/>, and returns the options with the arguments left for ASP.NET Core
+    /// (<c>--urls</c>, logging and other configuration).</summary>
     /// <param name="args">The process arguments.</param>
     /// <param name="environment">Reads an environment variable; default <see cref="Environment.GetEnvironmentVariable(string)"/>.</param>
     /// <param name="localApplicationData">The %LOCALAPPDATA% folder; default the current user's.</param>
-    /// <exception cref="ArgumentException"><c>--data</c> has no folder, or <c>--faux=</c> is not true or false.</exception>
+    /// <exception cref="ArgumentException"><c>--data</c> has no folder, or <c>--faux=</c> or <c>--faux-metered=</c> is not true or false.</exception>
     public static (WebAgentOptions Options, string[] HostArgs) FromCommandLine(IReadOnlyList<string> args, Func<string, string?>? environment = null,
         string? localApplicationData = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         string? data = null;
         var faux = false;
+        var metered = false;
         var rest = new List<string>();
         for (var index = 0; index < args.Count; index++)
         {
@@ -69,6 +78,10 @@ public sealed class WebAgentOptions
             if (arg == "--faux") faux = true;
             else if (arg.StartsWith("--faux=", StringComparison.Ordinal))
                 faux = bool.TryParse(arg["--faux=".Length..], out var value) ? value : throw new ArgumentException("--faux= takes true or false.");
+            else if (arg == "--faux-metered") metered = true;
+            else if (arg.StartsWith("--faux-metered=", StringComparison.Ordinal))
+                metered = bool.TryParse(arg["--faux-metered=".Length..], out var value) ? value
+                    : throw new ArgumentException("--faux-metered= takes true or false.");
             else if (arg == "--data")
                 data = index + 1 < args.Count && !args[index + 1].StartsWith("--", StringComparison.Ordinal)
                     ? args[++index] : throw new ArgumentException("--data needs a folder: --data <folder>.");
@@ -79,6 +92,6 @@ public sealed class WebAgentOptions
         environment ??= Environment.GetEnvironmentVariable;
         var directory = ResolveDataDirectory(data, environment(DataEnvironmentVariable),
             localApplicationData ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
-        return (new WebAgentOptions { DataDirectory = directory, Faux = faux }, [.. rest]);
+        return (new WebAgentOptions { DataDirectory = directory, Faux = faux || metered, FauxMetered = metered }, [.. rest]);
     }
 }
