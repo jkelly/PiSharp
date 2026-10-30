@@ -73,8 +73,9 @@ public sealed record DataChatFacts(bool Available, int Count, int Running, strin
 /// <summary>runs.db.</summary>
 /// <param name="Available">Whether run history is part of the app.</param>
 /// <param name="Display">runs.db as shown.</param>
-/// <param name="Count">Runs stored.</param>
-/// <param name="Pinned">Pinned runs.</param>
+/// <param name="Count">Runs stored, counted as History › Runs counts them: top-level runs only, so an agent compare run with its models and
+/// their calls is one run (<see cref="RunStore.CountRoots"/>).</param>
+/// <param name="Pinned">Pinned runs (top-level, as History counts them).</param>
 /// <param name="Bytes">runs.db with its -wal and -shm files.</param>
 /// <param name="RawBytes">The raw payloads' text.</param>
 /// <param name="RawRuns">Runs with raw payloads stored.</param>
@@ -86,6 +87,14 @@ public sealed record DataRunFacts(bool Available, string Display, long Count, lo
 {
     /// <summary>The retentions the page offers, in days (null: forever).</summary>
     public static IReadOnlyList<int?> Choices { get; } = [7, 30, 90, null];
+
+    /// <summary>The rows runs.db holds (<see cref="RunStore.Count"/>): each run, plus each model and call a run that groups calls keeps.
+    /// The page shows it as records, beside <see cref="Count"/>, only when the two differ.</summary>
+    public long Records { get; init; }
+
+    /// <summary>The records as the page shows them beside the runs ("10 records"), or null when each record is a run.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? RecordsText => Records != Count ? DataStorageService.Plural(Records, "record") : null;
 }
 
 /// <summary>The Data Protection key ring.</summary>

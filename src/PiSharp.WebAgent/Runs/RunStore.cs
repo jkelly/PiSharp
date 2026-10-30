@@ -379,11 +379,21 @@ public sealed class RunStore
         return size;
     }
 
-    /// <summary>How many runs are stored.</summary>
+    /// <summary>How many rows runs.db holds: every provider call, and every run that groups calls (an agent compare run, each of its
+    /// models and each of their calls is a row). Pages that count runs for the user count <see cref="CountRoots"/> instead.</summary>
     public long Count()
     {
         EnsureReady();
         return Convert.ToInt64(Db.Db.Scalar("SELECT COUNT(*) FROM runs;") ?? 0L, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>How many top-level runs are stored (<c>parent_id IS NULL</c>): the rows History › Runs lists, where an agent compare run
+    /// with its models and their calls is one run. With <paramref name="pinned"/>, only the pinned ones.</summary>
+    public long CountRoots(bool pinned = false)
+    {
+        EnsureReady();
+        return Convert.ToInt64(Db.Db.Scalar("SELECT COUNT(*) FROM runs WHERE parent_id IS NULL" + (pinned ? " AND pinned = 1;" : ";")) ?? 0L,
+            CultureInfo.InvariantCulture);
     }
 
     /// <summary>Marks every running row of another runner interrupted (the app stopped while it ran). Runs once per store before its first
