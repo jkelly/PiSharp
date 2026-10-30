@@ -160,6 +160,60 @@ internal static partial class Program
         catch (InvalidOperationException error) when (error.Message == "Session replacement is in progress.") { return true; }
     }
 
+    /// <summary>Registers `late` (an extension's server, before the session starts): its connection is held until its channel closes,
+    /// then fails once <c>Release</c> completed. See <see cref="HoldLateCloseAsync"/>.</summary>
+    private static (Task Connecting, TaskCompletionSource Release) RegisterLate(Fixture fixture, McpSessionHost host)
+    {
+        var connecting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.HeldUntilClosed["late"] = connecting; fixture.FailingAfterClose["late"] = release.Task;
+        host.Registrations.Register("extension-owner", "late", PiSharp.Contracts.JsonData.Parse("""{"command":"late-server","exposure":"codemode"}"""));
+        return (connecting.Task, release);
+    }
+
+    /// <summary>Unregisters `late` once it connects. Its close holds the session (the replacement reservation, kept until the closed
+    /// attempt ends at `late`'s release); returns once it does.</summary>
+    private static async Task<(PiSharp.CodingAgent.ReplaceableAgentSession Owner, PiSharp.CodingAgent.AgentSessionAttachment Attachment)> HoldLateCloseAsync(
+        Fixture fixture, McpSessionHost host, Rpc rpc, Task connecting)
+    {
+        Check(await Task.WhenAny(connecting, rpc.Completion, Task.Delay(TimeSpan.FromSeconds(30))) == connecting, "late started connecting; " + rpc.Error);
+        host.Registrations.Unregister("extension-owner", "late");
+        var session = (await fixture.Manager.Task).Session()!.Value;
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (!Reserved(session.Attachment.Session))
+        {
+            if (rpc.Completion.IsCompleted || DateTime.UtcNow > deadline) throw new TimeoutException("the close never held the session; " + Snapshot(rpc.Error));
+            await Task.Delay(10);
+        }
+        return session;
+    }
+
+    // Pi admits a prompt while a server closes. A prompt sent while closing `late` (unregistered while it connects) holds the session
+    // waits for the close, then runs, instead of being refused.
+    private static Task PromptWhileAnotherServerCloses() => WithRoot("prompt-close", DirectDocs, async fixture =>
+    {
+        var host = fixture.Host();
+        var (connecting, release) = RegisterLate(fixture, host);
+        var provider = new Endpoint();
+        await using (var rpc = new Rpc(Args(fixture.Root, "new-memory"), provider, host))
+            try
+            {
+                await Settled(fixture, rpc, 1);
+                await HoldLateCloseAsync(fixture, host, rpc, connecting);
+                var prompt = rpc.Prompt("p1", "while late closes");
+                // A prompt the held session refuses fails at once: give it the time to before the close ends.
+                await Task.Delay(250);
+                Check(!prompt.IsCompleted, "the prompt waits for the close; " + prompt.Exception?.InnerException?.Message);
+                Equal(0, provider.Snapshot().Length, "no request while the close holds the session");
+                release.TrySetResult();
+                await prompt;
+                Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
+            }
+            // The held close would hold the session's shutdown too.
+            finally { release.TrySetResult(); }
+        Check(ToolNames(provider.Snapshot().Single()).Contains("mcp__docs__search"), "the prompt ran with docs: " + string.Join(",", ToolNames(provider.Snapshot().Single())));
+    });
+
     // syncResourceTools: a direct server with resources registers the resource tools as direct, so the first request declares them,
     // and read_mcp_resource reads from the server.
     private static Task DirectResources() => WithRoot("resources-direct", DirectDocs, async fixture =>
