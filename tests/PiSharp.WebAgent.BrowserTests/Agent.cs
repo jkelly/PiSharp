@@ -192,9 +192,31 @@ internal static partial class Program
             return created.Body!["id"]!.GetValue<string>();
         }
 
-        /// <summary>Waits until the chat's run is over.</summary>
-        public Task WaitIdleAsync(string chatId) => WaitUntilAsync(async () => (await Get("/api/chats/" + chatId)).Body?["running"]?.GetValue<bool>() == false,
-            $"chat {chatId} is idle", TimeSpan.FromSeconds(60));
+        /// <summary>Waits until the chat's run is over and returns its current branch as Markdown (<c>/chat/{id}/export.md</c>): the device says
+        /// the chat is not running, the branch holds at least <paramref name="messages"/> of your messages and its last one has a stored answer
+        /// (an agent entry with an id, not one still working), and <paramref name="done"/> holds for the Markdown when given. W4 L3: the
+        /// running flag is the device's last reading (refreshed from its coalesced changes, about every 250 ms), so right after a send it can
+        /// still say false before the run began; only the stored answer shows that the run happened. Pass <paramref name="messages"/> after a
+        /// send to a chat that already has answers, and <paramref name="done"/> after a restart (a recovered answer is stored after the cut-off
+        /// partial, which is an answer too).</summary>
+        public async Task<string> WaitIdleAsync(string chatId, int messages = 1, Func<string, bool>? done = null)
+        {
+            var markdown = "";
+            await WaitUntilAsync(async () =>
+            {
+                if ((await Get("/api/chats/" + chatId)).Body?["running"]?.GetValue<bool>() != false) return false;
+                var export = await Get($"/chat/{chatId}/export.md");
+                if (export.Status != 200) return false;
+                markdown = export.Text.Replace("\r\n", "\n", StringComparison.Ordinal);
+                var yours = 0;
+                for (var at = markdown.IndexOf("\n### You (#", StringComparison.Ordinal); at >= 0; at = markdown.IndexOf("\n### You (#", at + 1, StringComparison.Ordinal)) yours++;
+                var you = markdown.LastIndexOf("\n### You (#", StringComparison.Ordinal);
+                var answer = markdown.LastIndexOf("\n### Agent (#", StringComparison.Ordinal);
+                var working = markdown.LastIndexOf("\n### Agent (working)", StringComparison.Ordinal);
+                return yours >= messages && answer > you && working < answer && (done is null || done(markdown));
+            }, $"chat {chatId} is idle with an answer to message {messages}", TimeSpan.FromSeconds(60));
+            return markdown;
+        }
 
         /// <summary>The lines of a file in <see cref="Work"/> (none when it does not exist).</summary>
         public string[] Lines(string file)

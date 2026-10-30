@@ -16,7 +16,9 @@ using static Microsoft.Playwright.Assertions;
 // message on sc-period with what is left today after the chat's first answer, and "Cap output" sends it once inside what is left. Faux billed
 // as Unknown price (an override chosen in Settings › Spend › Accounts and saved through the save bar) asks on sc-unknown, with "enter a price"
 // leading to its Unknown prices row, a 2,048-token output cap and Proceed once, which creates the chat once. A refused send is answered 200
-// {posted: false}, so the browser logs nothing for it; each case counts the refusals it expects (Window.RefusedAsync).
+// {posted: false}, so the browser logs nothing for it; each case counts the refusals it expects (Window.RefusedAsync). W4 L3: a case waits
+// for an answer itself (Agent.WaitIdleAsync: a stored answer to the message it sent, not only the device's running flag, which can still say
+// false right after a send) and for the ledger rows it reads to end (SettledLedgerAsync), so the cases no longer race the run they started.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> W3SpendCases() =>
@@ -74,7 +76,7 @@ internal static partial class Program
             await app.WaitIdleAsync(id);
             var chat = (await app.Get("/api/chats/" + id)).Body!;
             var (provider, model) = (chat["provider"]!.GetValue<string>(), chat["model"]!.GetValue<string>());
-            Equal(1, (await app.LedgerAsync()).Count, "the first answer's request");
+            Equal(1, (await app.SettledLedgerAsync(1)).Count, "the first answer's request");
             var capped = await app.PostAsync("/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "request", ["limit"] = "0.01", ["action"] = "block" });
             Equal(200, capped.Status, "a one-cent Block cap per request: " + capped.Text);
 
@@ -124,9 +126,9 @@ internal static partial class Program
             await cap.ClickAsync();
             await Expect(box).ToHaveValueAsync("");
             await Expect(page.Answers().Last).ToContainTextAsync("Echo: one more, please");
-            await app.WaitIdleAsync(id);
+            await app.WaitIdleAsync(id, messages: 2);
             Equal(2, Mentions((await app.Get($"/chat/{id}/export.md")).Text, "### You"), "the message was posted once");
-            var ledger = await app.LedgerAsync();
+            var ledger = await app.SettledLedgerAsync(2);
             Equal(2, ledger.Count, "one more request");
             var sent = ledger[0];
             Equal(provider + "/" + model, Reservation(sent, "provider") + "/" + Reservation(sent, "model"), "sent to the chat's own model");
@@ -160,7 +162,7 @@ internal static partial class Program
             // Sent without the pre-send check (as a script would): the guard stops the call inside the run, before anything reaches the model.
             var posted = await app.PostAsync($"/api/chats/{id}/messages", new JsonObject { ["requestId"] = "unchecked", ["text"] = "past the cap" });
             Equal(200, posted.Status, "posted: " + posted.Text);
-            await app.WaitIdleAsync(id);
+            await app.WaitIdleAsync(id, messages: 2);
 
             var page = window.Page;
             await page.OpenChatAsync(id);
@@ -184,11 +186,11 @@ internal static partial class Program
             await proceed.ClickAsync();
             await page.ToastAsync("Continuing");
             await Expect(page.Answers().Last).ToContainTextAsync("Echo: Continue.");
-            await app.WaitIdleAsync(id);
+            await app.WaitIdleAsync(id, messages: 3);
             var export = (await app.Get($"/chat/{id}/export.md")).Text;
             Equal(3, Mentions(export, "### You"), "the run continued once, with one \"Continue.\": " + export);
             Equal(1, Mentions(export, "Echo: Continue."), "and one answer to it");
-            ledger = await app.LedgerAsync();
+            ledger = await app.SettledLedgerAsync(2);
             Equal(2, ledger.Count, "the continued call was reserved once");
             Check(Reservation(ledger[0], "note")?.Contains("sent once", StringComparison.Ordinal) == true, "after the user's one-time approval: " + ledger[0].ToJsonString());
             Equal("settled", Reservation(ledger[0], "state"), "and settled");
@@ -214,7 +216,9 @@ internal static partial class Program
             await app.KillAndRestartAsync();
             var after = await window.ReopenAsync();
             var second = after.Page;
-            await app.WaitIdleAsync(id);
+            // The recovered answer is stored after the cut-off partial: wait for its last word, and for the usage its resend reported.
+            await app.WaitIdleAsync(id, done: markdown => markdown.Contains("w150", StringComparison.Ordinal));
+            await WaitUntilAsync(async () => (await app.LedgerAsync()).Single()["reservation"]?["usage"] is JsonObject, "the resend's usage is on the row");
             Equal("uncertain", Reservation((await app.LedgerAsync()).Single(), "state"), "uncertain after the restart");
             // A second tab keeps the chat open: its footer follows the ledger, so the Resolve below shows there without a reload.
             var chatTab = await after.NewPageAsync();
@@ -247,7 +251,7 @@ internal static partial class Program
         {
             var id = await app.CreateChatAsync("hello before the cap", "before");
             await app.WaitIdleAsync(id);
-            var first = (await app.LedgerAsync()).Single();
+            var first = (await app.SettledLedgerAsync(1)).Single();
             Equal("settled|chat", Reservation(first, "state") + "|" + Reservation(first, "source"), "the first answer, settled, from a chat");
             var spent = first["countedMicros"]!.GetValue<long>();
             Check(spent is > 0 and < 100_000, "the first answer cost something under the cap: " + first.ToJsonString());
@@ -305,9 +309,9 @@ internal static partial class Program
             await fit.ClickAsync();
             await Expect(box).ToHaveValueAsync("");
             await Expect(page.Answers().Last).ToContainTextAsync("Echo: one more today");
-            await app.WaitIdleAsync(id);
+            await app.WaitIdleAsync(id, messages: 2);
             Equal(2, Mentions((await app.Get($"/chat/{id}/export.md")).Text, "### You"), "the message was posted once");
-            var ledger = await app.LedgerAsync();
+            var ledger = await app.SettledLedgerAsync(2);
             Equal(2, ledger.Count, "one more request");
             Equal("settled|chat|" + id, $"{Reservation(ledger[0], "state")}|{Reservation(ledger[0], "source")}|{Reservation(ledger[0], "run")}", "settled, from the chat");
             Check(Reservation(ledger[0], "note")?.Contains("output capped at", StringComparison.Ordinal) == true, "with the output capped: " + ledger[0].ToJsonString());

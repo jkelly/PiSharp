@@ -16,7 +16,9 @@ using PiSharp.WebAgent.Spend;
 // answer. A daily Block cap with room for one worst case but not two proves both halves: the recovered request is not checked again (a
 // second reservation would not fit), and the next message is refused ({posted: false}, spend_blocked, nothing posted) until the uncertain
 // row is released, after which the same request id posts once and settles at its actual cost; one more crash leaves those settled and
-// released rows as they were. Nothing here calls a provider.
+// released rows as they were. Nothing here calls a provider. W4 L3: a chat send the guard admitted is kept in webagent.db (ChatSpendSends,
+// spend_chat_sends), so after a crash a retry of that POST (the same request id, still asking for the check) is not checked again: it
+// answers posted with nothing new, though a cap added since refuses every new send.
 internal static partial class Program
 {
     /// <summary>The app with <c>--faux-metered</c> as a child process over a case folder (<c>data</c> and <c>work</c>), whose Settings › Tools
@@ -249,6 +251,47 @@ internal static partial class Program
             Equal(string.Join("\n", rows.Select(item => item.ToJsonString()).Order(StringComparer.Ordinal)),
                 string.Join("\n", kept.Select(item => item.ToJsonString()).Order(StringComparer.Ordinal)), "a restart leaves settled and resolved rows alone");
             Equal(2, Count((await app.App.Get($"/chat/{id}/export.md")).Text, "### You"), "and posts nothing again");
+        }),
+
+        // W4 L3: the admitted send ids outlive the process. A checked send is admitted and answered; a one-micro Block cap per request then
+        // refuses every new send. After a crash, the browser's retry of the admitted POST (same request id, still asking for the check) is
+        // not checked again: it answers posted, and nothing is posted or reserved twice.
+        Case("spend.recovery.an-admitted-send-is-not-checked-again-after-a-restart", async () =>
+        {
+            await using var app = await MeteredRecoveryApp.StartAsync("spend-recovery-admitted");
+            var id = await app.CreateAsync("hello", "first");
+            await app.WaitIdleAsync(id, html => html.Contains("Echo: hello", StringComparison.Ordinal), "the first answer");
+            var send = new JsonObject { ["requestId"] = "kept", ["text"] = "checked once", ["spend"] = new JsonObject { ["check"] = true } };
+            var admitted = await app.PostAsync($"/api/chats/{id}/messages", (JsonObject)send.DeepClone());
+            Equal((200, true), (admitted.Status, admitted.Body?["posted"]?.GetValue<bool>()), "no cap: the checked send is admitted and posted: " + admitted.Text);
+            await app.WaitIdleAsync(id, html => html.Contains("Echo: checked once", StringComparison.Ordinal), "the checked send's answer");
+            var rows = (await app.RowsAsync(id)).Count;
+
+            var capped = await app.PostAsync("/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "request", ["limit"] = "0.000001", ["action"] = "block" });
+            Equal(200, capped.Status, "a one-micro Block cap per request: " + capped.Text);
+            var fresh = await app.PostAsync($"/api/chats/{id}/messages", new JsonObject
+            {
+                ["requestId"] = "fresh", ["text"] = "a new send", ["spend"] = new JsonObject { ["check"] = true },
+            });
+            Equal((200, false, SpendErrors.Blocked), (fresh.Status, fresh.Body?["posted"]?.GetValue<bool>(), fresh.Body?["code"]?.GetValue<string>()),
+                "the cap refuses a new send: " + fresh.Text);
+
+            await app.KillAndRestartAsync();
+            var retried = await app.PostAsync($"/api/chats/{id}/messages", (JsonObject)send.DeepClone());
+            Equal((200, true), (retried.Status, retried.Body?["posted"]?.GetValue<bool>()),
+                "after the restart the retry of the admitted send is not checked again: " + retried.Text);
+            Equal(admitted.Body?["submissionId"]?.GetValue<long>(), retried.Body?["submissionId"]?.GetValue<long>(), "it answers the same submission");
+            await app.WaitIdleAsync(id, html => html.Contains("Echo: checked once", StringComparison.Ordinal), "the chat after the retry");
+            var export = (await app.App.Get($"/chat/{id}/export.md")).Text;
+            Equal(2, Count(export, "### You"), "nothing was posted twice, and the refused send not at all: " + export);
+            Equal(1, Count(export, "Echo: checked once"), "one answer to the admitted send");
+            Equal(rows, (await app.RowsAsync(id)).Count, "and nothing was reserved again");
+
+            var refusedAgain = await app.PostAsync($"/api/chats/{id}/messages", new JsonObject
+            {
+                ["requestId"] = "fresh", ["text"] = "a new send", ["spend"] = new JsonObject { ["check"] = true },
+            });
+            Equal((200, false), (refusedAgain.Status, refusedAgain.Body?["posted"]?.GetValue<bool>()), "the refused send is still checked: " + refusedAgain.Text);
         }),
     ];
 }

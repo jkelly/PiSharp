@@ -9,7 +9,9 @@
 // of a detail page. It takes no key through the generic API key modal (KeyForm None), it is not a no-credentials (faux) provider, and it
 // counts as connected only when it is routed (never with --faux) and its key source is usable: no key, a stored key that works, or a set
 // variable. So the first-run redirect (SetupState.HasConnection) no longer counts a custom provider whose variable is unset, or one that
-// is not routed.
+// is not routed. W4 L3: "no key" is usable only for a server on this machine (a loopback base URL: LM Studio, Ollama, vLLM); a keyless
+// custom provider elsewhere is listed with its key source but not counted as connected, so it never ends the first-run redirect on its
+// own (it is still routed and in the model picker).
 using PiSharp.AI.Catalogs;
 using PiSharp.Web.Common;
 using PiSharp.WebAgent.Contracts;
@@ -82,14 +84,18 @@ public sealed record CustomProviderFacts(CustomKeySource KeySource, string? Vari
         _ => "no key",
     };
 
-    /// <summary>The chip's tone.</summary>
+    /// <summary>The chip's tone: neutral for "no key" on a server elsewhere, which does not count as connected (W4 L3).</summary>
     public string Tone => KeySource switch
     {
         CustomKeySource.Stored => "ok",
         CustomKeySource.Environment => VariableSet ? "info" : "warn",
         CustomKeySource.Unsupported => "warn",
-        _ => "ok",
+        _ => Loopback ? "ok" : "outline",
     };
+
+    /// <summary>Whether "no key" lets it count as connected: only for a server on this machine (W4 L3). A keyless provider elsewhere is
+    /// still routed with the placeholder key, but connecting it is not assumed.</summary>
+    public bool KeylessCounts => KeySource == CustomKeySource.None && Loopback;
 
     /// <summary>The chip's Bootstrap icon.</summary>
     public string Icon => KeySource switch
@@ -307,7 +313,7 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
     }
 
     /// <summary>A custom provider (W3 fix): its key source instead of an API key form, and connected only when it is routed and its key
-    /// source is usable.</summary>
+    /// source is usable (W4 L3: no key only for a server on this machine).</summary>
     private ProviderEntry BuildCustom(CustomProviderInfo custom, CustomProviderService service, IReadOnlyList<AccountInfo> own)
     {
         var listed = catalog.FindProvider(custom.Id);
@@ -332,10 +338,11 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
             Accounts = own,
             Active = active,
             KeyForm = ApiKeyForm.None,
-            // With --faux no custom provider is routed (the faux catalog stands in), so none counts as connected.
+            // With --faux no custom provider is routed (the faux catalog stands in), so none counts as connected. Without a key it counts
+            // only on this machine (W4 L3): a server elsewhere that takes the placeholder key is not assumed to be connected.
             State = !custom.Routed || Offline ? ProviderState.NotConfigured : source switch
             {
-                CustomKeySource.None => ProviderState.Connected,
+                CustomKeySource.None => facts.KeylessCounts ? ProviderState.Connected : ProviderState.NotConfigured,
                 CustomKeySource.Environment => facts.VariableSet ? ProviderState.Environment : ProviderState.NotConfigured,
                 CustomKeySource.Stored => StateOf(false, active, own),
                 _ => ProviderState.NotConfigured,
@@ -353,7 +360,9 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
             CustomKeySource.Stored => "Its key is stored encrypted in the credential vault.",
             CustomKeySource.Environment => $"Its key is read from {facts.Variable}" + (facts.VariableSet ? "." : ", which isn't set for the web host."),
             CustomKeySource.Unsupported => "The key in models.json isn't one the web app uses, so it isn't routed until it is saved with another key source.",
-            _ => "It needs no key; requests carry a placeholder key.",
+            _ when facts.Loopback => "It needs no key; requests carry a placeholder key.",
+            _ => "It has no key, so requests carry a placeholder key; a server on another machine usually needs one, so it doesn't count as " +
+                "connected until it has a key.",
         };
         var routed = offline ? " With --faux it isn't routed."
             : custom.Routed || facts.KeySource == CustomKeySource.Unsupported ? ""

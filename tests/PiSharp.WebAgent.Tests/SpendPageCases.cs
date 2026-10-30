@@ -475,8 +475,16 @@ internal static partial class Program
                     "its file name");
                 var lines = csv.Text.TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
                 Equal(6, lines.Length, "a header and five rows");
-                Check(lines.Any(line => line.Contains(",op-uncertain,chat,anthropic,claude-sonnet-5-5,acc-1,account acc-1,metered,estimate,0.380000,0.317100,0.317100,0.000000,", StringComparison.Ordinal)),
-                    "the resolved row: " + string.Join(" | ", lines));
+                // W4 L3: the tokens a reservation assumed say so, and the usage the provider reported stands beside them where there is any.
+                Equal(SpendEndpoints.CsvHeader, lines[0], "the header");
+                Check(lines[0].Contains(",list_usd,assumed_input_tokens,assumed_output_tokens,reported_input_tokens,reported_output_tokens,reported_cache_read_tokens,reported_cache_write_tokens,run,", StringComparison.Ordinal) &&
+                    !lines[0].Contains(",input_tokens,", StringComparison.Ordinal) && !lines[0].Contains(",output_tokens,", StringComparison.Ordinal), "the token columns say what they hold: " + lines[0]);
+                Check(lines.Any(line => line.Contains(",op-uncertain,chat,anthropic,claude-sonnet-5-5,acc-1,account acc-1,metered,estimate,0.380000,0.317100,0.317100,0.000000,12000,8192,,,,,chat-2,", StringComparison.Ordinal)),
+                    "the resolved row, with the tokens it assumed and no reported usage: " + string.Join(" | ", lines));
+                Check(lines.Any(line => line.Contains(",op-settled,chat,anthropic,claude-sonnet-5-5,acc-1,account acc-1,metered,settled,0.120000,0.003000,0.003000,0.000000,12000,8192,1000,100,0,0,chat-1,", StringComparison.Ordinal)),
+                    "the settled row, with the usage the provider reported beside the tokens it assumed: " + string.Join(" | ", lines));
+                Check(lines.Any(line => line.Contains(",op-released,playground,openai,openai-model,acc-1,account acc-1,metered,released,0.050000,,0.000000,0.000000,12000,8192,,,,,pg-1,", StringComparison.Ordinal)),
+                    "a released row reports nothing: " + string.Join(" | ", lines));
                 Check(lines.Any(line => line.Contains(",\"'=HYPERLINK(\"\"http://evil.example\"\")\",", StringComparison.Ordinal)), "a formula note is neutralised");
                 var openai = await app.Get("/api/spend/ledger.csv?provider=openai");
                 Equal(2, openai.Text.TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Length, "the CSV keeps the filters");

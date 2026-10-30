@@ -14,7 +14,9 @@ using static Microsoft.Playwright.Assertions;
 // footer; the cap dialog's one-provider and one-source panes and its Edit pane (a cap row's edit button); About's connectivity check after
 // the click (its results pane); the custom provider's remove confirmation, cancelled; and the API key dialog of Setup's Connect step. Nothing
 // is settled or removed. W3 retest 2: History › Spend's Saved filters menu and its Save current filters… and Manage saved filters dialogs
-// (W3 fix, spend-ui), each cancelled, so the three saved filters a new data folder starts with stay.
+// (W3 fix, spend-ui), each cancelled, so the three saved filters a new data folder starts with stay. W4 L3: Escape is pressed only once a
+// dialog has finished opening (EscapeModalAsync waits for shown.bs.modal; Bootstrap ignores Escape while the show transition runs), and the
+// chats it holds are waited for by their stored answers (Agent.WaitIdleAsync), not only by the device's running flag.
 internal static partial class Program
 {
     private static readonly string[] W3PhonePages =
@@ -41,7 +43,7 @@ internal static partial class Program
             });
             Equal(200, provider.Status, "a custom provider: " + provider.Text);
             var answered = await app.CreateChatAsync("slow: " + Words(30), "phone-answered");
-            await app.WaitIdleAsync(answered);
+            await app.WaitIdleAsync(answered, done: markdown => markdown.Contains("w030", StringComparison.Ordinal));
 
             // A request left uncertain: the app dies while a slow: answer streams, and after the restart its reservation is uncertain. The
             // browser profile opens on the restarted app's address.
@@ -51,7 +53,8 @@ internal static partial class Program
                 Reservation(row, "state") == "reserved" && (op = Reservation(row, "op")!) is not null, "the dropped request's reservation", TimeSpan.FromSeconds(30));
             await app.KillAndRestartAsync();
             var phone = await window.ReopenAsync(375, 812);
-            await app.WaitIdleAsync(dropped);
+            // The recovered answer is stored after the cut-off partial: wait for its last word.
+            await app.WaitIdleAsync(dropped, done: markdown => markdown.Contains("w150", StringComparison.Ordinal));
             Equal("uncertain", Reservation((await app.LedgerAsync()).Single(item => Reservation(item, "op") == op), "state"), "uncertain after the restart");
 
             var stopped = await app.CreateChatAsync("first", "phone-stopped");
@@ -60,7 +63,7 @@ internal static partial class Program
             Equal(200, cap.Status, "a per-request cap: " + cap.Text);
             var past = await app.PostAsync($"/api/chats/{stopped}/messages", new JsonObject { ["requestId"] = "phone-past", ["text"] = "past the cap" });
             Equal(200, past.Status, "posted without a check: " + past.Text);
-            await app.WaitIdleAsync(stopped);
+            await app.WaitIdleAsync(stopped, messages: 2);
             Check((await app.LedgerAsync()).Count >= 3, "the ledger has rows to show");
             var capId = (await app.Get("/api/spend/caps")).Body!["caps"]!.AsArray().Single()!["id"]!.GetValue<long>();
 
@@ -81,8 +84,7 @@ internal static partial class Program
                         await page.Locator("[data-setup-key-modal] >> visible=true").First.ClickAsync();
                         await Expect(page.Locator("#modal-api-key.show")).ToBeVisibleAsync();
                         await page.FitsPhoneAsync("Setup › Connect › the API key dialog", theme);
-                        await page.Keyboard.PressAsync("Escape");
-                        await Expect(page.Locator("#modal-api-key")).ToBeHiddenAsync();
+                        await page.EscapeModalAsync("modal-api-key");
                     }
                 }
 
@@ -166,14 +168,12 @@ internal static partial class Program
                     await Expect(page.Locator($"#modal-spend-cap [data-cap-scope-pane='{scope}']")).ToBeVisibleAsync();
                     await page.FitsPhoneAsync("Add a spend cap › one " + scope, theme);
                 }
-                await page.Keyboard.PressAsync("Escape");
-                await Expect(page.Locator("#modal-spend-cap")).ToBeHiddenAsync();
+                await page.EscapeModalAsync("modal-spend-cap");
                 await page.Locator($"[data-cap-edit][data-cap-id='{capId}']").ClickAsync();
                 await Expect(page.Locator("#modal-spend-cap.show [data-cap-amount-edit]")).ToBeVisibleAsync();
                 await Expect(page.Locator("#modal-spend-cap [data-cap-amount-edit]")).ToHaveValueAsync("0.01");
                 await page.FitsPhoneAsync("Edit cap", theme);
-                await page.Keyboard.PressAsync("Escape");
-                await Expect(page.Locator("#modal-spend-cap")).ToBeHiddenAsync();
+                await page.EscapeModalAsync("modal-spend-cap");
                 await page.GotoAsync("/settings/custom-providers");
                 await Expect(page.Locator("[data-cp-row='phone-box']")).ToBeVisibleAsync();
                 await page.Locator("[data-cp-edit='phone-box']").ClickAsync();
@@ -183,8 +183,7 @@ internal static partial class Program
                     await page.Locator($"#modal-custom-provider [data-cp-tab='{tab}']").ClickAsync();
                     await page.FitsPhoneAsync("the custom provider editor › " + tab, theme);
                 }
-                await page.Keyboard.PressAsync("Escape");
-                await Expect(page.Locator("#modal-custom-provider")).ToBeHiddenAsync();
+                await page.EscapeModalAsync("modal-custom-provider");
                 await page.Locator("[data-cp-delete='phone-box']").ClickAsync();
                 var remove = page.Locator("#modal-confirm");
                 await Expect(page.Locator("#modal-confirm.show")).ToBeVisibleAsync();

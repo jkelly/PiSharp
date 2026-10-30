@@ -8,9 +8,50 @@ using static Microsoft.Playwright.Assertions;
 // were merged into. A send the Spend Guard refuses is answered 200 {posted: false} (nothing was posted), so the browser logs no error for it
 // and every case still fails on any page or console error; Window.Refusals counts those answers. The support case below plants a refused
 // send, a 409 on another path and a 404, and checks that the refusal is counted and logs nothing while the other two still fail the case.
+// W4 L3: two waits the flaky cases lacked. ModalShownAsync waits until a Bootstrap modal has finished opening before a case presses Escape
+// (Bootstrap ignores hide() while the show transition runs, so an early Escape left the dialog open), and SettledLedgerAsync waits until the
+// ledger rows a case reads have ended (the guard settles a call as its stream closes, which can come a moment after the answer is stored).
 internal static partial class Program
 {
     // ─── Page helpers ────────────────────────────────────────────────────────
+
+    /// <summary>Waits until the Bootstrap modal <paramref name="id"/> has finished opening (<c>shown.bs.modal</c>: its show transition is
+    /// over and its focus trap holds the focus), so Escape closes it. Bootstrap ignores <c>hide()</c>, and so Escape, while the modal is
+    /// still opening (W4 L3).</summary>
+    internal static async Task ModalShownAsync(this IPage page, string id)
+    {
+        await Expect(page.Locator($"#{id}.show")).ToBeVisibleAsync();
+        var shown = await page.EvaluateAsync<bool>("""
+            (id) => new Promise((resolve) => {
+              const el = document.getElementById(id);
+              const modal = window.bootstrap?.Modal.getInstance(el);
+              if (!el || !modal) { resolve(false); return; }
+              const settled = () => el.classList.contains('show') && !modal._isTransitioning && el.contains(document.activeElement);
+              if (settled()) { resolve(true); return; }
+              const timer = setTimeout(() => resolve(settled()), 10000);
+              el.addEventListener('shown.bs.modal', () => { clearTimeout(timer); resolve(true); }, { once: true });
+            })
+            """, id);
+        Check(shown, $"#{id} finished opening (shown.bs.modal)");
+    }
+
+    /// <summary>Presses Escape on the open modal <paramref name="id"/> once it has finished opening, and waits until it is closed.</summary>
+    internal static async Task EscapeModalAsync(this IPage page, string id)
+    {
+        await page.ModalShownAsync(id);
+        await page.Keyboard.PressAsync("Escape");
+        await Expect(page.Locator("#" + id)).ToBeHiddenAsync();
+    }
+
+    /// <summary>The ledger's rows (newest first) once it holds <paramref name="count"/> and none of them is still reserved: the guard settles
+    /// a call as its stream closes, a moment after the durable engine may have stored the answer (W4 L3).</summary>
+    internal static async Task<List<JsonObject>> SettledLedgerAsync(this Agent app, int count)
+    {
+        List<JsonObject> rows = [];
+        await WaitUntilAsync(async () => (rows = await app.LedgerAsync()).Count == count && rows.All(row => Reservation(row, "state") != "reserved"),
+            $"the ledger holds {count} ended row(s)", TimeSpan.FromSeconds(30));
+        return rows;
+    }
 
     /// <summary>Stores <paramref name="theme"/> as this browser's choice (as Settings › Appearance and the top bar's toggle do) and reloads.</summary>
     internal static async Task UseThemeAsync(this IPage page, string theme)
