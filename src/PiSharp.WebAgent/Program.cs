@@ -11,6 +11,7 @@ using PiSharp.WebAgent.Spend;
 using PiSharp.WebAgent.Setup;
 using PiSharp.WebAgent.About;
 using PiSharp.WebAgent.CustomProviders;
+using PiSharp.WebAgent.Runs;
 
 WebAgentOptions options;
 WebApplicationBuilder builder;
@@ -37,6 +38,8 @@ builder.Services.AddCustomProvidersArea(options);
 builder.Services.AddWebAgentFallbacks(options);
 // Spend Guard (run W3): after the fallbacks, so the guard decorates the app's final IDurableModels (--faux-metered prices the faux ones).
 builder.Services.AddSpendArea(options);
+// Run engine and history (run W4, R0): after the Spend Guard, so the recorder wraps the guarded models; runs.db, /api/runs.
+builder.Services.AddRunsArea(options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -48,6 +51,7 @@ app.MapSpendArea();
 app.MapSetupArea();
 app.MapAboutArea();
 app.MapCustomProvidersArea();
+app.MapRunsArea();
 app.MapWebAgentCore();
 app.Run();
 return 0;
