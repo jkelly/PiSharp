@@ -3,7 +3,8 @@
 // the run engine (Spend Guard, runs.db, live events at /api/runs/{id}/events, cancel at /api/runs/{id}/cancel). The JSON endpoints:
 //   POST /api/compare/plan                   a draft -> {valid, message, columns: [{index, ok, error, thinking, temperature, maxTokens, chips,
 //                                            refused}], estimate: {html, verdict, chip, over, pane}}: each column as it would be sent, and the
-//                                            estimate by Run all (the Spend Guard's preflight; nothing reserved).
+//                                            estimate by Run all (the Spend Guard's group preflight, with group-total caps;
+//                                            nothing reserved).
 //   POST /api/compare/run                    {...draft, groupId?, spend?} -> {posted: true, groupId, ids, columns: [{index, runId, events}]}, or
 //                                            200 {posted: false, code, message, groupId, provider, model, spend: {...}} when the Spend Guard asks or blocks the
 //                                            group (nothing reserved or sent; resend with the same groupId and spend: {choice, maxOutputTokens?}),

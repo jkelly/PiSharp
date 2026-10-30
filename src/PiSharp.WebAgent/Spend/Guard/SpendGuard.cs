@@ -14,6 +14,10 @@
 // it and fits the caps as it is retires it as unneeded. PreflightAsync(call, withApprovals: false) answers whether a call needs the user's
 // answer itself, without counting an approval that waits for another send.
 //
+// W4 fix (compare): PreflightGroupAsync answers what ReserveGroupAsync would decide for a group (the ledger's CheckGroupAsync: each call
+// checked with the group's earlier calls counted), reserving nothing, so Compare's estimate by Run all warns before Run about a run, day or
+// month cap that only the group's total crosses.
+//
 // Ops and recovery: a durable request keeps its op when it is recovered, and the ledger returns an op's row unchanged whatever its state.
 // So the guard walks the op's ledger keys (op, op~2, op~3, ...): a key still reserved or uncertain is that request's own reservation and is
 // reused (a recovered request never reserves twice; its uncertain row stays uncertain until the user resolves it, and the usage its resend
@@ -152,6 +156,44 @@ public sealed class SpendGuard : ISpendGuard
             is not { } approval) return first;
         var (answered, _) = Apply(estimate, approval.Approval);
         return await ledger.CheckAsync(Request(checkedCall, key, answered, approved: true, null), cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    public Task<SpendGroupDecision> PreflightGroupAsync(IReadOnlyList<SpendCall> calls, CancellationToken cancellationToken = default) =>
+        PreflightGroupAsync(calls, withApprovals: true, cancellationToken);
+
+    /// <summary><see cref="PreflightGroupAsync(IReadOnlyList{SpendCall}, CancellationToken)"/>: the ledger's group check
+    /// (<see cref="ISpendLedger.CheckGroupAsync"/>) of the calls as <see cref="ReserveGroupAsync"/> would reserve them (each estimated, under
+    /// its op's next ledger key; a call without an op gets a key of its own), so a run, day or month cap that only the group's total crosses
+    /// refuses the call that crosses it. With <paramref name="withApprovals"/> true, a refused group is checked again as the run's waiting
+    /// approval (of the run, or of the first call's op) would answer it; false leaves it out (an estimate that asks whether the group needs the
+    /// user's answer itself). Reserves nothing and uses no approval.</summary>
+    /// <exception cref="ArgumentException">The group is empty, two calls share an op, the calls are of different runs, or a value is not
+    /// allowed.</exception>
+    public async Task<SpendGroupDecision> PreflightGroupAsync(IReadOnlyList<SpendCall> calls, bool withApprovals, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calls);
+        if (calls.Count == 0) throw new ArgumentException("A group needs at least one call.", nameof(calls));
+        var checkedCalls = calls.Select(call => Check(call, requireOp: false)).ToList();
+        if (checkedCalls.Where(call => call.Op.Length > 0).GroupBy(call => call.Op, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1) is { } shared)
+            throw new ArgumentException($"Two calls of the group share the op {shared.Key}.", nameof(calls));
+        var run = checkedCalls[0].Run;
+        if (checkedCalls.Any(call => call.Run != run)) throw new ArgumentException("Every call of a group belongs to one run.", nameof(calls));
+        var estimates = new List<SpendEstimate>();
+        var keys = new List<string>();
+        foreach (var call in checkedCalls)
+        {
+            estimates.Add(await estimator.EstimateAsync(call.EstimateInput, cancellationToken).ConfigureAwait(false));
+            keys.Add(call.Op.Length == 0 ? "preflight-" + Guid.NewGuid().ToString("N") : (await LedgerKeyAsync(call.Op, cancellationToken).ConfigureAwait(false)).Key);
+        }
+        List<SpendRequest> Requests(IReadOnlyList<SpendEstimate> priced, bool approved) =>
+            [.. checkedCalls.Select((call, index) => Request(call, keys[index], priced[index], approved || call.Approved, null))];
+
+        var first = await ledger.CheckGroupAsync(Requests(estimates, false), cancellationToken).ConfigureAwait(false);
+        if (first.Allowed || !withApprovals) return first;
+        if (await approvals.PeekAsync(run, Blank(checkedCalls[0].Op), cancellationToken).ConfigureAwait(false) is not { } approval) return first;
+        var answered = estimates.Select(estimate => Apply(estimate, approval.Approval).Estimate).ToList();
+        return await ledger.CheckGroupAsync(Requests(answered, true), cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>

@@ -4,8 +4,9 @@
 // while they run, so a closed tab reconnects) and the mark. Run all plans every column (ComparePlanner), then starts them through the run
 // engine as one group (RunEngine.StartGroupAsync: the Spend Guard reserves the columns all or none; a refusal answers {posted: false} with
 // the confirm modal's content, and the user's choice comes back as a one-time approval of the group), and stores the group. A re-run sends
-// one column again into its group (its own reservation, recorded under the group's run). The estimate is the Spend Guard's preflight of
-// each column (CompareEstimate). Accounts are resolved as the run engine resolves them and named by their labels only.
+// one column again into its group (its own reservation, recorded under the group's run). The estimate is the Spend Guard's group preflight
+// of the columns (W4 fix: PreflightGroupAsync, each column checked with the ones before it counted, as Run all reserves them; CompareEstimate).
+// Accounts are resolved as the run engine resolves them and named by their labels only.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Web.Common;
@@ -153,6 +154,14 @@ public sealed class ComparePages(IServiceProvider services, ILogger<ComparePages
                 ["pane"] = estimate.Pane,
             },
         };
+    }
+
+    /// <summary>The estimate by Run all of <paramref name="draft"/>: the Spend Guard's group preflight of the columns that can run (each with
+    /// the columns before it counted, as Run all reserves them). Nothing is reserved or sent.</summary>
+    public Task<RunEstimateView> EstimateAsync(CompareDraft draft, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        return EstimateAsync(ComparePlanner.Plan(draft, Engine), cancellationToken);
     }
 
     /// <summary>Run all: every column of <paramref name="draft"/> as one group, reserved all or none.</summary>
@@ -378,15 +387,18 @@ public sealed class ComparePages(IServiceProvider services, ILogger<ComparePages
         var executor = services.GetService<GuardedRunExecutor>();
         var pages = services.GetService<SpendPages>();
         if (executor is null && pages is null) return RunEstimateView.None;
+        // One run key for the whole group, as Run all reserves it, so a run cap counts every column.
         var run = "preflight-" + Guid.NewGuid().ToString("N");
         var estimates = new List<CompareColumnEstimate>();
         try
         {
+            var calls = new List<SpendCall>();
+            var names = new List<(string Name, string Who)>();
             foreach (var column in columns)
             {
                 var request = column.Plan!;
                 var account = await AccountAsync(request, cancellationToken).ConfigureAwait(false);
-                var call = new SpendCall
+                calls.Add(new SpendCall
                 {
                     Provider = request.Model.Provider,
                     Model = request.Model.Id,
@@ -395,14 +407,22 @@ public sealed class ComparePages(IServiceProvider services, ILogger<ComparePages
                     Run = run,
                     InputBytes = CostEstimator.InputBytes(request.Messages),
                     MaxTokens = request.Spec.MaxTokens,
-                };
-                var decision = executor is not null
-                    ? await executor.Guard.PreflightAsync(call, withApprovals: false, cancellationToken).ConfigureAwait(false)
-                    : await pages!.PreflightAsync(call, cancellationToken).ConfigureAwait(false);
+                });
                 var providerName = Catalog?.FindProvider(request.Model.Provider)?.DisplayName ?? request.Model.Provider;
-                var name = column.Capabilities?.Name ?? request.Model.Id;
-                estimates.Add(new CompareColumnEstimate(name, account?.Label is { Length: > 0 } label ? $"{providerName} · {label}" : providerName, decision));
+                names.Add((column.Capabilities?.Name ?? request.Model.Id, account?.Label is { Length: > 0 } label ? $"{providerName} · {label}" : providerName));
             }
+            // The group preflight checks each column with the columns before it counted, as Run all's all-or-none reservation does, so a run,
+            // daily or monthly cap that only their total crosses is named before Run. Without the guard (no executor), each column alone.
+            IReadOnlyList<SpendDecision> decisions;
+            if (executor is not null)
+                decisions = (await executor.Guard.PreflightGroupAsync(calls, withApprovals: false, cancellationToken).ConfigureAwait(false)).Items;
+            else
+            {
+                var each = new List<SpendDecision>();
+                foreach (var call in calls) each.Add(await pages!.PreflightAsync(call, cancellationToken).ConfigureAwait(false));
+                decisions = each;
+            }
+            for (var index = 0; index < calls.Count; index++) estimates.Add(new CompareColumnEstimate(names[index].Name, names[index].Who, decisions[index]));
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {

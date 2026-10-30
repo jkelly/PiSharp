@@ -4,10 +4,12 @@
 // transaction (one snapshot) and no lock. Reserve checks every enabled cap the request falls under (request, run, UTC day, UTC month; for
 // everything metered, a provider, an account or a source) against what already counts in its window plus the request's worst case, and
 // writes the row only when it fits every Block cap and every Ask cap was approved; reaching the limit exactly fits. A group reserves all
-// or nothing, each request checked with the group's earlier ones counted. An op already in the ledger is returned unchanged, whatever its
-// state, so nothing is reserved twice. Settle, settle-at-estimate, release and mark-uncertain change only a reserved row (the first ending
-// wins); an uncertain row keeps counting until the user resolves it (W3 fix: a recovered request's resend may attach the usage it reported,
-// which leaves it uncertain and lets Resolve settle it at that cost). Subscription rows are recorded at list price, free rows at $0 and
+// or nothing, each request checked with the group's earlier ones counted; CheckGroupAsync answers what that would decide by the same rule,
+// writing nothing (W4 fix: Compare's estimate by Run all sees a cap only the group's total crosses; a cause names what the group's earlier
+// requests add, GroupMicros). An op already in the ledger is returned unchanged, whatever its state, so nothing is reserved twice. Settle,
+// settle-at-estimate, release and mark-uncertain change only a reserved row (the first ending wins); an uncertain row keeps counting until
+// the user resolves it (W3 fix: a recovered request's resend may attach the usage it reported, which leaves it uncertain and lets Resolve
+// settle it at that cost). Subscription rows are recorded at list price, free rows at $0 and
 // unknown-price rows without a cost; none of them counts toward a money cap, and a request whose price is unknown gets the provider's
 // unknown-price behaviour instead (Ask by default). Caps at the warning threshold (SpendSettings.WarnPercent) come back as warnings.
 //
@@ -175,40 +177,24 @@ public sealed partial class SpendLedger : ISpendLedger
     /// <inheritdoc/>
     public Task<SpendGroupReservation> ReserveGroupAsync(IReadOnlyList<SpendRequest> requests, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(requests);
-        if (requests.Count == 0) throw new ArgumentException("A group needs at least one request.", nameof(requests));
-        var normalized = requests.Select(request => (request ?? throw new ArgumentException("A request of the group is missing.", nameof(requests))).Normalize()).ToList();
-        if (normalized.GroupBy(request => request.Op, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1) is { } shared)
-            throw new ArgumentException($"Two requests of the group share the op {shared.Key}.", nameof(requests));
+        var normalized = Group(requests);
         return WriteAsync((connection, transaction, now) =>
         {
-            var caps = ReadCaps(connection, transaction);
-            var spend = settings.Get<SpendSettings>();
-            var pending = new List<Reservation>();
-            var items = new List<SpendReservation>();
-            foreach (var request in normalized)
-            {
-                if (Find(connection, transaction, request.Op) is { } existing)
-                {
-                    items.Add(new SpendReservation(SpendDecision.Allow(request.Estimate), existing, Existing: true));
-                    continue;
-                }
-                var decision = Decide(connection, transaction, request, caps, spend, now, pending);
-                if (!decision.Allowed)
-                {
-                    items.Add(new SpendReservation(decision, null));
-                    continue;
-                }
-                var row = NewRow(request, now);
-                pending.Add(row);
-                items.Add(new SpendReservation(decision, row));
-            }
+            var (items, pending) = DecideGroup(connection, transaction, normalized, now);
             // All or nothing: when one request does not fit, nothing is written and no item keeps a new reservation.
             if (items.Any(item => !item.Decision.Allowed))
                 return new SpendGroupReservation([.. items.Select(item => item.Existing ? item : item with { Reservation = null })]);
             foreach (var row in pending) Insert(connection, transaction, row);
             return new SpendGroupReservation(items);
         }, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public Task<SpendGroupDecision> CheckGroupAsync(IReadOnlyList<SpendRequest> requests, CancellationToken cancellationToken = default)
+    {
+        var normalized = Group(requests);
+        return ReadAsync((connection, transaction) =>
+            new SpendGroupDecision([.. DecideGroup(connection, transaction, normalized, Now()).Items.Select(item => item.Decision)]), cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -388,8 +374,50 @@ public sealed partial class SpendLedger : ISpendLedger
         }, cancellationToken);
     }
 
+    /// <summary>The requests of a group, normalized and checked.</summary>
+    /// <exception cref="ArgumentException">The group is empty, a request is missing or not allowed, or two share an op.</exception>
+    private static List<SpendRequest> Group(IReadOnlyList<SpendRequest> requests)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        if (requests.Count == 0) throw new ArgumentException("A group needs at least one request.", nameof(requests));
+        var normalized = requests.Select(request => (request ?? throw new ArgumentException("A request of the group is missing.", nameof(requests))).Normalize()).ToList();
+        if (normalized.GroupBy(request => request.Op, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1) is { } shared)
+            throw new ArgumentException($"Two requests of the group share the op {shared.Key}.", nameof(requests));
+        return normalized;
+    }
+
+    /// <summary>The group's decisions, the one rule of <see cref="ReserveGroupAsync"/> and <see cref="CheckGroupAsync"/>: an op already in the
+    /// ledger is returned unchanged (it fits); every other request is checked with the group's earlier requests that fit counted, and the
+    /// rows those would be (not written here).</summary>
+    private (List<SpendReservation> Items, List<Reservation> Pending) DecideGroup(SqliteConnection connection, SqliteTransaction transaction,
+        IReadOnlyList<SpendRequest> requests, DateTimeOffset now)
+    {
+        var caps = ReadCaps(connection, transaction);
+        var spend = settings.Get<SpendSettings>();
+        var pending = new List<Reservation>();
+        var items = new List<SpendReservation>();
+        foreach (var request in requests)
+        {
+            if (Find(connection, transaction, request.Op) is { } existing)
+            {
+                items.Add(new SpendReservation(SpendDecision.Allow(request.Estimate), existing, Existing: true));
+                continue;
+            }
+            var decision = Decide(connection, transaction, request, caps, spend, now, pending);
+            if (!decision.Allowed)
+            {
+                items.Add(new SpendReservation(decision, null));
+                continue;
+            }
+            var row = NewRow(request, now);
+            pending.Add(row);
+            items.Add(new SpendReservation(decision, row));
+        }
+        return (items, pending);
+    }
+
     /// <summary>The decision on <paramref name="request"/> with what counts now plus <paramref name="pending"/> (a group's earlier
-    /// requests, not written yet).</summary>
+    /// requests, not written yet; what they add to a cap the request does not fit is its cause's <see cref="SpendCause.GroupMicros"/>).</summary>
     private static SpendDecision Decide(SqliteConnection connection, SqliteTransaction transaction, SpendRequest request, IReadOnlyList<SpendCap> caps,
         SpendSettings spend, DateTimeOffset now, IReadOnlyList<Reservation> pending)
     {
@@ -410,12 +438,16 @@ public sealed partial class SpendLedger : ISpendLedger
         {
             if (!cap.Enabled || !cap.AppliesTo(request) || (cap.Period == CapPeriod.Run && request.Run is null)) continue;
             var window = SpendWindows.Of(cap.Period, now);
-            var spent = cap.Period == CapPeriod.Request ? 0
-                : Spent(connection, transaction, cap, request.Run, window) + pending.Where(row => CountsFor(cap, row, request.Run, window)).Sum(row => row.CountedMicros);
+            var group = cap.Period == CapPeriod.Request ? 0 : pending.Where(row => CountsFor(cap, row, request.Run, window)).Sum(row => row.CountedMicros);
+            var spent = cap.Period == CapPeriod.Request ? 0 : Spent(connection, transaction, cap, request.Run, window) + group;
             if (spent + worst > cap.LimitMicros)
             {
                 var left = Math.Max(0, cap.LimitMicros - spent);
-                causes.Add(new SpendCause { Kind = SpendCauseKind.Cap, Action = cap.Action, Cap = cap, SpentMicros = spent, LeftMicros = left, FitOutputTokens = Fit(estimate, left) });
+                causes.Add(new SpendCause
+                {
+                    Kind = SpendCauseKind.Cap, Action = cap.Action, Cap = cap, SpentMicros = spent, LeftMicros = left, FitOutputTokens = Fit(estimate, left),
+                    GroupMicros = group > 0 ? group : null,
+                });
                 continue;
             }
             var status = new SpendCapStatus(cap, spent + worst, window?.Start, window?.End, spend.WarnPercent);
