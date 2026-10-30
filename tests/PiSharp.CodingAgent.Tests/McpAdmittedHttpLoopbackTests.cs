@@ -64,12 +64,20 @@ internal static class McpAdmittedHttpLoopbackTests
         var factory = AdmittedMcpHttpChannelFactory.Create(entry, binding, client, options);
         try { AdmittedMcpHttpChannelFactory.Create(entry, binding, client, options, new(MaximumFrameBytes: options.Limits.MaximumResponseBytes + 1)); throw new IOException("Oversized wire ceiling accepted"); }
         catch (ArgumentException) { }
-        try { await factory(entry with { }, default); throw new IOException("Foreign copied entry accepted"); }
-        catch (InvalidOperationException) { }
+        // `/mcp` reconfigures a server (enabled, exposure) without a new connection: a copy of the same connection is admitted,
+        // another endpoint or a disabled copy is not.
+        var disabled = new McpServerEntry("demo", McpConfigurationReader.Validate("demo", JsonData.Parse(JsonSerializer.Serialize(
+            new { url = entry.Config.Raw.Value.GetProperty("url").GetString(), exposure = "direct", enabled = false })).Value).Config!, entry.Source, entry.Scope);
+        foreach (var foreign in new[] { Entry(new("http://127.0.0.1:2/mcp")), disabled })
+        {
+            try { await factory(foreign, default); throw new IOException("Foreign or disabled entry accepted"); }
+            catch (InvalidOperationException) { }
+        }
         using var canceled = new CancellationTokenSource(); canceled.Cancel();
         try { await factory(entry, canceled.Token); throw new IOException("Canceled admission accepted"); }
         catch (OperationCanceledException) { }
-        var channel = await factory(entry, default); await channel.CloseAsync(); Check(handler.Calls == 0);
+        var channel = await factory(entry, default); await channel.CloseAsync();
+        var copied = await factory(entry with { }, default); await copied.CloseAsync(); Check(handler.Calls == 0);
     }
     private sealed class Resource(Func<Task> release) : IAsyncDisposable
     {

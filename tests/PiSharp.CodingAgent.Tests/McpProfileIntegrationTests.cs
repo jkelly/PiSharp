@@ -42,13 +42,15 @@ internal static class McpProfileIntegrationTests
                 : await SessionCommands.RunAsync(args, output, error, mcpAdmission: host.Acquire);
             Check(code == 0 && error.ToString() == "", "Ordinary create rejected supplied runtime admission.");
             Check(File.Exists(files.Session), "Create failed to acknowledge a durable session.");
-            Check((await File.ReadAllLinesAsync(files.Session)).Select(line => JsonData.Parse(line)).Any(record =>
+            // Source _refreshToolRegistry: the captured direct tool is active in memory and the next request would record it
+            // (declareToolChanges); create makes no request, so its file declares no tool.
+            Check(!(await File.ReadAllLinesAsync(files.Session)).Select(line => JsonData.Parse(line)).Any(record =>
                 record.Value.TryGetProperty("message", out var message) && message.TryGetProperty("toolsAdded", out var tools) &&
                 tools.EnumerateArray().Any(tool => tool.GetProperty("name").GetString() == host.ToolName)),
-                "Create exposed a captured direct tool without acknowledging its actual activation declaration.");
+                "Create recorded its in-memory MCP loadout without a request.");
             Check(host.Acquisitions.Count == 1 && host.Acquisitions[0].Generation == 1, "Create did not reserve generation one.");
             host.AssertReleased(1);
-            await AssertWithdrawalReport(files, host.ToolName, output.ToString());
+            await AssertClosedReport(files, host.ToolName, output.ToString());
         }
     }
 
@@ -70,25 +72,26 @@ internal static class McpProfileIntegrationTests
         Check(host.Acquisitions.Select(item => item.Generation).SequenceEqual(new long[] { 1, 1 }),
             "Independent command resume reused an old owning attachment.");
         host.AssertReleased(2);
-        await AssertWithdrawalReport(files, host.ToolName, output.ToString());
+        await AssertClosedReport(files, host.ToolName, output.ToString());
     }
 
-    private static async Task AssertWithdrawalReport(Files files, string toolName, string output)
+    private static async Task AssertClosedReport(Files files, string toolName, string output)
     {
         var log = await new SessionLogReader().ReadFileAsync(files.Session);
         Check(log.SourceComplete && log.Status == SessionLogReadStatus.Complete &&
             log.ValidatedPrefixByteLength == log.OriginalBytes.Length, "Command cleanup left an incomplete durable log.");
         var entries = log.ValidatedPrefix.Skip(1).Select(record => record.Entry).ToImmutableArray();
-        Check(entries.Any(entry => entry.WireBody.Value.TryGetProperty("message", out var message) &&
+        // The close after the last request withdraws the server's tools in memory: no request records the removal.
+        Check(!entries.Any(entry => entry.WireBody.Value.TryGetProperty("message", out var message) &&
             message.TryGetProperty("toolsRemoved", out var removed) && removed.EnumerateArray().Any(tool =>
-                tool.GetProperty("name").GetString() == toolName)), "Command disposed its writer before acknowledging MCP withdrawal.");
+                tool.GetProperty("name").GetString() == toolName)), "Command wrote its in-memory MCP withdrawal.");
         var leaf = entries.Last().Id;
         var context = new SessionContextProjector().Project(entries, leaf);
         using var document = JsonDocument.Parse(output); var report = document.RootElement;
         Check(report.GetProperty("committedByteLength").GetInt64() == log.OriginalBytes.Length &&
             report.GetProperty("physicalLeafId").GetString() == leaf && report.GetProperty("selectedLeafId").GetString() == context.LeafId &&
             report.GetProperty("messageCount").GetInt32() == context.LlmMessages.Length,
-            "Command report describes the pre-withdrawal checkpoint instead of its acknowledged closed file.");
+            "Command report does not describe its acknowledged closed file.");
     }
 
     private static async Task Replacement()

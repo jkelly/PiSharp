@@ -18,11 +18,11 @@ internal static class McpProfileReviewTests
     private const string Tool = "mcp__profile__echo";
     public static (string Name, Func<Task> Run)[] Cases() =>
     [
-        ("mcp-profile-review. explicit and configured discovered create names activate durably", Create),
+        ("mcp-profile-review. explicit and configured discovered create names apply without a record", Create),
         ("mcp-profile-review. explicit discovered resume whitelist reaches actual provider request", Resume),
-        ("mcp-profile-review. explicit discovered RPC whitelist reaches bound startup", Rpc),
+        ("mcp-profile-review. explicit discovered RPC whitelist reaches bound startup and first request", Rpc),
         ("mcp-profile-review. unknown create resume RPC names are ignored and discovery rejection joins held acquired cleanup", Unknown),
-        ("mcp-profile-review. summary and context-edit operation failures withdraw before writer close", ExceptionalCommands),
+        ("mcp-profile-review. summary and context-edit operation failures join MCP close and leave the file unwritten", ExceptionalCommands),
         ("mcp-profile-review. operation and distinct cleanup originals survive repeated owner joins", FaultIdentity)
     ];
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -36,7 +36,10 @@ internal static class McpProfileReviewTests
             string[] flags = configured ? ["--user-settings", files.Settings] : ["--tools", Tool];
             var result = await Command(files, "create", host, flags);
             Check(result.Code == 0 && result.Error == "", "Valid discovered startup selection was rejected before acquisition.");
-            Check(await Declared(files, "toolsAdded") && await Declared(files, "toolsRemoved"), "Selected discovered declaration was not activated and withdrawn durably.");
+            // Source _buildRuntime: the selection applies in memory and the next request would record it (declareToolChanges); create
+            // makes no request, so neither the declaration nor its withdrawal at close is written. Resume and RPC show the selection
+            // reaching a request.
+            Check(!await Declared(files, "toolsAdded") && !await Declared(files, "toolsRemoved"), "Create recorded its in-memory MCP loadout without a request.");
             host.AssertClosed();
         }
     }
@@ -54,9 +57,13 @@ internal static class McpProfileReviewTests
     private static async Task Rpc()
     {
         using var files = new Files(); await files.Seed(); var host = new Admission(); host.Release.TrySetResult();
-        var state = Gate(); JsonData? received = null;
+        var state = Gate(); var ended = Gate(); JsonData? received = null;
         await using var connection = new BoundedRpcConnection((record, token) =>
-        { if (record.Value.TryGetProperty("id", out var id) && id.GetString() == "state") { received = record; state.TrySetResult(); } return ValueTask.CompletedTask; });
+        {
+            if (record.Value.TryGetProperty("id", out var id) && id.GetString() == "state") { received = record; state.TrySetResult(); }
+            if (record.Value.TryGetProperty("type", out var type) && type.GetString() == "agent_end") ended.TrySetResult();
+            return ValueTask.CompletedTask;
+        });
         var error = new StringWriter();
         var original = RpcSessionCommand.RunAsync(files.Args("rpc", "--offline-script", files.Script, "--tools", Tool),
             connection.Input, connection.Output, error, mcpAdmission: host.Acquire);
@@ -66,13 +73,17 @@ internal static class McpProfileReviewTests
             await connection.SendAsync(JsonData.Parse("{\"id\":\"state\",\"type\":\"get_state\"}"), CancellationToken.None);
             Check(ReferenceEquals(await Task.WhenAny(state.Task, original), state.Task) && received!.Value.GetProperty("success").GetBoolean(),
                 "Explicit discovered RPC startup did not bind before state acknowledgment.");
-            Check(await Declared(files, "toolsAdded"), "RPC startup did not acknowledge actual selected MCP tools.");
+            // Source _buildRuntime: the whitelist applies in memory at startup; the first request records it (declareToolChanges).
+            Check(!await Declared(files, "toolsAdded"), "RPC startup wrote the selected MCP tools before a request.");
+            await connection.SendAsync(JsonData.Parse("{\"id\":\"prompt\",\"type\":\"prompt\",\"message\":\"next\"}"), CancellationToken.None);
+            Check(ReferenceEquals(await Task.WhenAny(ended.Task, original), ended.Task) && await Declared(files, "toolsAdded"),
+                "RPC whitelist did not reach the first request with the actual selected MCP tools.");
         }
         catch (Exception failure) { assertion = failure; }
         finally { connection.CompleteInput(); }
         var code = await original;
         if (assertion is not null) throw assertion;
-        Check(code == 0 && error.ToString() == "" && await Declared(files, "toolsRemoved"), "RPC whitelist failed its owning cleanup."); host.AssertClosed();
+        Check(code == 0 && error.ToString() == "" && !await Declared(files, "toolsRemoved"), "RPC whitelist failed its owning cleanup."); host.AssertClosed();
     }
     private static async Task Unknown()
     {
@@ -183,7 +194,8 @@ internal static class McpProfileReviewTests
                     await SessionContextEditCommand.RunAsync(args, output, error, mcpAdmission: admitted is null ? null : admitted.Acquire);
                 Check(output.ToString() == "", "Failed operation delivered a success report."); return (code, error.ToString());
             }
-            var baseline = await Run(null); var host = new Admission(); var original = Run(host); Exception? assertion = null;
+            var baseline = await Run(null); var unwritten = await File.ReadAllBytesAsync(files.Session);
+            var host = new Admission(); var original = Run(host); Exception? assertion = null;
             try
             {
                 Check(ReferenceEquals(await Task.WhenAny(host.Closing.Task, original), host.Closing.Task) && !original.IsCompleted,
@@ -195,14 +207,15 @@ internal static class McpProfileReviewTests
             using var first = JsonDocument.Parse(baseline.Error); using var actual = JsonDocument.Parse(failed.Error);
             Check(failed.Code == 1 && first.RootElement.GetProperty("code").GetString() == actual.RootElement.GetProperty("code").GetString(),
                 "Writer-first MCP cleanup replaced the original operation failure.");
-            Check(await Declared(files, "toolsRemoved"), "Exceptional command closed its writer before reserved catalog withdrawal.");
+            // The connected catalog and its withdrawal apply in memory only (no request records them).
+            Check((await File.ReadAllBytesAsync(files.Session)).SequenceEqual(unwritten), "Exceptional command wrote its in-memory MCP catalog.");
             host.AssertClosed();
             await using var reopened = await SessionLogStore.OpenAsync(files.Session);
         }
     }
     private static async Task FaultIdentity()
     {
-        using var files = new Files(); await files.Seed(); var host = new Admission();
+        using var files = new Files(); await files.Seed(); var host = new Admission(); var unwritten = await File.ReadAllBytesAsync(files.Session);
         var primary = new IOException("original command failure"); var stop = new IOException("original channel stop failure");
         var discovery = new IOException("original discovery cleanup failure"); host.StopFault = stop; host.DiscoveryFault = discovery;
         var profile = await OfflineSessionProfile.CreateAsync(files.Root, files.Session, null, [], [], [], CancellationToken.None, mcpAdmission: host.Acquire);
@@ -230,7 +243,8 @@ internal static class McpProfileReviewTests
             "Factory cleanup lost its exact discovery task and original fault inventory.");
         Check(leaves.Length == 3 && new[] { primary, stop, discovery }.All(expected => leaves.Count(actual => ReferenceEquals(expected, actual)) == 1),
             "Primary and cleanup originals were replaced, duplicated, or lost across repeated owner/profile joins.");
-        Check(await Declared(files, "toolsRemoved"), "Faulting stop prevented acknowledged reserved withdrawal."); host.AssertClosed();
+        // The connected catalog and its withdrawal apply in memory only (no request records them).
+        Check((await File.ReadAllBytesAsync(files.Session)).SequenceEqual(unwritten), "Faulting command wrote its in-memory MCP catalog."); host.AssertClosed();
     }
     private static IEnumerable<Exception> Children(Exception error) => error switch
     {
@@ -310,7 +324,7 @@ internal static class McpProfileReviewTests
         internal async Task Seed()
         {
             var result = await Command(this, "create", null); Check(result.Code == 0, "Seed failed.");
-            await File.WriteAllTextAsync(Script, JsonSerializer.Serialize(new { schemaVersion = 1, turns = new[] { new { events = new object[] {
+            await File.WriteAllTextAsync(Script,JsonSerializer.Serialize(new { schemaVersion = 1, turns = new[] { new { events = new object[] {
                 new { type = "response.output_item.added", output_index = 0, item = new { type = "message", id = "final", content = Array.Empty<object>() } },
                 new { type = "response.output_text.delta", output_index = 0, item_id = "final", delta = "final" },
                 new { type = "response.output_item.done", output_index = 0, item = new { type = "message", id = "final", content = new[] { new { type = "output_text", text = "final" } } } },
