@@ -1,6 +1,7 @@
 // Decision 0011 (run W2, WU4): the pages the sidebar and settings nav link to that later milestones build (Playground, Compare, Tool Bench and
-// History in W4, Evals in W5, Presets later; Settings' Custom providers, Spend, Appearance, Data and About). Each opens one neutral "Coming in
-// a later milestone" page, so every link works and nothing pretends to exist. The summaries are the mockups' own page descriptions.
+// History in W4, Evals in W5, Presets later; Settings' Data & storage). Each opens one neutral "Coming in a later milestone" page, so every
+// link works and nothing pretends to exist. The summaries are the mockups' own page descriptions. W3 built Settings' Custom providers,
+// Spend, Appearance and About, and removed their entries.
 namespace PiSharp.WebAgent.Shell;
 
 /// <summary>A page a later milestone builds.</summary>

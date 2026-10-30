@@ -3,6 +3,7 @@
 // credentials area, a fake environment, an ephemeral key ring and the fake provider (ProviderFake), so every chat request goes through the
 // account its chat was created with: a chat keeps that account when another becomes active, and a chat whose account was removed or expired
 // shows the expired state (the chat page's banner) and sends nothing (never another account). No request leaves the process.
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -136,8 +137,11 @@ internal static partial class Program
                 var health = await app.Get("/api/health");
                 Equal(200, health.Status, "health");
                 Equal(false, health.Body!["faux"]!.GetValue<bool>(), "the faux switch is off");
+                // W3 (SU): with nothing connected the first run sends /chat/new to /setup; skipping setup ends that, as a user would.
+                Equal(200, (await app.SendAsync(HttpMethod.Post, "/api/setup/skip", new JsonObject(), origin: app.Origin)).Status, "setup skipped");
                 var page = await app.Get("/chat/new");
                 Equal(200, page.Status, "the new chat page");
+                Equal("/chat/new", page.Response.RequestMessage?.RequestUri?.AbsolutePath, "not sent to /setup");
                 Check(page.Text.Contains("OpenAI Codex", StringComparison.Ordinal) && page.Text.Contains("Anthropic", StringComparison.Ordinal),
                     "it offers the built-in providers");
                 Check(!app.Log.Contains("fail:", StringComparison.Ordinal) && !app.Log.Contains("Exception", StringComparison.Ordinal), "a clean start: " + app.Log);

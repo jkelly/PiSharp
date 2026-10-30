@@ -125,7 +125,8 @@ internal static partial class Program
         Case("appearance.every-page-applies-it-before-the-first-paint", async () =>
         {
             await using var app = await WebAgentApp.StartAsync("appearance-head");
-            foreach (var href in new[] { "/chat/new", "/settings/tools", "/settings/about", "/playground" })
+            // W3 integration: /setup has its own layout (_SetupLayout), which carries the same Appearance head.
+            foreach (var href in new[] { "/chat/new", "/settings/tools", "/settings/about", "/playground", "/setup" })
             {
                 var page = await app.Get(href);
                 Equal(200, page.Status, href);

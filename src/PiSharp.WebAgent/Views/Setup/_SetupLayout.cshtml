@@ -13,6 +13,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>@title · PiSharp Web Agent</title>
   <partial name="_WebCommonHead" model='"pisharp-theme"' />
+  @* W3 integration (AP meets SU): the same Appearance head as _Layout, so the wizard honours this browser's theme (a System choice too),
+     font size and motion before the first paint, and the toggle switches through window.PiSharpAppearance instead of overwriting System. *@
+  <script src="~/js/appearance.js" asp-append-version="true"></script>
+  <link href="~/css/appearance.css" rel="stylesheet" asp-append-version="true">
   <link href="~/css/site.css" rel="stylesheet" asp-append-version="true">
   @await RenderSectionAsync("Styles", required: false)
 </head>
