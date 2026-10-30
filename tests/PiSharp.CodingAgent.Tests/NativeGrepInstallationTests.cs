@@ -62,14 +62,19 @@ internal static class NativeGrepInstallationTests
     }
     private static async Task Unavailable()
     {
+        // Pi 1.1.0 sdk.ts initialActiveToolNames and _applyToolLoadout drop a selected name that is not registered: without its
+        // borrowed host the ordinary profile registers no grep, so selecting it selects nothing instead of an argument error.
         using var fixture = new Fixture();
-        try
-        {
-            await using var unexpected = await OfflineSessionProfile.CreateAsync(fixture.Root, fixture.Log, null,
-                [], [], [], default, offlineApi: "openai-completions", toolSelection: new(["grep"], false));
-            throw new InvalidOperationException("Ordinary profile silently supplied grep capabilities.");
-        }
-        catch (SessionCommandException error) when (error.Failure == SessionCommandFailure.InvalidArguments) { }
+        await using var profile = await OfflineSessionProfile.CreateAsync(fixture.Root, fixture.Log, null,
+            [], [], [], default, offlineApi: "openai-completions", toolSelection: new(["grep"], false));
+        Check(profile.Registry.RegisteredTools.All(tool => tool.Adapter.Name != "grep") &&
+            profile.InitialSystem.Value.GetProperty("toolsAdded").GetArrayLength() == 0 &&
+            profile.Registry.Resolve(profile.SelectedModel, [new("system", profile.InitialSystem)]).Configuration.Tools.IsEmpty,
+            "Ordinary profile silently supplied grep capabilities.");
+        // setActiveToolsByName ignores the unregistered name the same way.
+        await using var session = await Session(fixture, profile); profile.AttachOwner(session);
+        await session.SetActiveToolsAsync(["grep"]);
+        Check(session.GetActiveTools().IsEmpty && session.PendingToolNames.IsEmpty && session.Snapshot.Fault is null, "Explicit activation selected an unregistered grep.");
     }
     private static Task<OfflineSessionProfile> Profile(Fixture fixture, OfflineGrepHost host, ImmutableArray<string> reads)
     {
