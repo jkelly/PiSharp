@@ -29,8 +29,8 @@ internal static class McpPreparedPublicationTests
         (Prefix + "cleanup and withdrawal failures retain originals and catalog state", FailedWithdrawal),
         (Prefix + "actual owning shutdown joins channel and withdraws before attachment retirement", OwningShutdown),
         (Prefix + "held reporter cancellation joins preparation without catalog commit", HeldPreparation),
-        (Prefix + "post-ack publication failure faults session and preserves original exception", FailedCommit),
-        (Prefix + "connected post-ack failure joins held physical close without acknowledging withdrawal", ConnectedFailedCommit)
+        (Prefix + "failed in-memory publication preserves original exception without faulting session", FailedCommit),
+        (Prefix + "connected failed publication keeps catalog and held close still withdraws it", ConnectedFailedCommit)
     ];
     private static void Check(bool value) { if (!value) throw new InvalidOperationException("MCP prepared publication contract failed."); }
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -111,7 +111,6 @@ internal static class McpPreparedPublicationTests
         internal string Path => System.IO.Path.Combine(Files.Root, "catalog.jsonl");
         internal bool ReporterEnabled; internal Func<CancellationToken, ValueTask>? Reporter;
         internal Exception? ExpectedCloseFailure;
-        internal Exception? ExpectedOwnerCloseFailure;
         internal readonly Hooks NativeHooks = new();
         internal readonly UnrelatedAdapter Unrelated = new();
         internal static async Task<Fixture> Create(bool withUnrelated = false, bool nativeCall = false)
@@ -150,8 +149,7 @@ internal static class McpPreparedPublicationTests
             finally
             {
                 try { if (Owner is not null) await Owner.DisposeAsync(); else if (Session is not null) await Session.DisposeAsync(); }
-                catch (Exception error) when (ReferenceEquals(error, ExpectedOwnerCloseFailure)) { }
-                catch (Exception error) when (ExpectedOwnerCloseFailure is null && ExpectedCloseFailure is not null &&
+                catch (Exception error) when (ExpectedCloseFailure is not null &&
                     OriginalFailures(error).SequenceEqual(OriginalFailures(ExpectedCloseFailure), ReferenceEqualityComparer.Instance)) { }
                 finally { try { await Extensions.DisposeAsync(); } finally { try { if (Profile is not null) await Profile.DisposeAsync(); } finally { Files.Dispose(); } } }
             }
@@ -169,39 +167,51 @@ internal static class McpPreparedPublicationTests
         Check(initial.Select(entry => entry.Kind).SequenceEqual([SessionEntryKind.ModelChange, SessionEntryKind.ThinkingLevelChange]));
         return initial;
     }
-    private static void CatalogEntries(Fixture f, ImmutableArray<SessionEntry> initial, int added, string name, bool withdrawn)
+    // Source _refreshToolRegistry: a catalog publication or withdrawal applies in memory and writes nothing; the next request
+    // records the loadout's difference from the declared tools (agent-loop declareToolChanges).
+    private static void Unwritten(Fixture f, ImmutableArray<SessionEntry> written) => Check(f.Session.Snapshot.Log.Entries.SequenceEqual(written));
+    private static JsonElement Registered(Fixture f, string name) =>
+        f.Session.CaptureToolCatalogRegistry().RegisteredTools.Single(tool => tool.Adapter.Name == name).Declaration.Value;
+    private static void Declaration(JsonElement declaration, string name, int version)
     {
-        var entries = f.Session.Snapshot.Log.Entries;
-        Check(entries.Length == initial.Length + added && entries.Take(initial.Length).SequenceEqual(initial));
-        var message = entries[initial.Length].WireBody.Value.GetProperty("message");
-        Check(message.GetProperty("toolsRemoved").GetArrayLength() == 0 && message.GetProperty("toolsAdded").GetArrayLength() == 1);
-        var declaration = message.GetProperty("toolsAdded")[0];
-        Check(declaration.GetProperty("name").GetString() == name && declaration.GetProperty("description").GetString()!.Contains("version 1", StringComparison.Ordinal));
+        Check(declaration.GetProperty("name").GetString() == name && declaration.GetProperty("description").GetString()!.Contains("version " + version, StringComparison.Ordinal));
         var schema = declaration.GetProperty("parameters");
         Check(schema.EnumerateObject().Count() == 3 && schema.GetProperty("type").GetString() == "object" && schema.GetProperty("properties").EnumerateObject().Count() == 1 &&
             schema.GetProperty("properties").GetProperty("value").EnumerateObject().Count() == 1 &&
             schema.GetProperty("properties").GetProperty("value").GetProperty("type").GetString() == "string" &&
             schema.GetProperty("required").EnumerateArray().Select(value => value.GetString()).SequenceEqual(["value"]));
-        if (withdrawn)
-        {
-            var withdrawal = entries[initial.Length + 1].WireBody.Value.GetProperty("message");
-            Check(withdrawal.GetProperty("toolsAdded").GetArrayLength() == 0 && withdrawal.GetProperty("toolsRemoved").GetArrayLength() == 1 &&
-                withdrawal.GetProperty("toolsRemoved")[0].GetProperty("name").GetString() == name);
-        }
     }
+    /// <summary>The tool records written after <paramref name="initial"/>, each before the user message of its request.</summary>
+    private static JsonElement[] ToolRecords(Fixture f, ImmutableArray<SessionEntry> initial)
+    {
+        var messages = f.Session.Snapshot.Log.Entries.Skip(initial.Length).Select(entry => entry.WireBody.Value)
+            .Where(body => body.TryGetProperty("message", out _)).Select(body => body.GetProperty("message")).ToArray();
+        var records = new List<JsonElement>();
+        for (var index = 0; index < messages.Length; index++)
+        {
+            if (!messages[index].TryGetProperty("toolsAdded", out _) && !messages[index].TryGetProperty("toolsRemoved", out _)) continue;
+            Check(messages[index].GetProperty("role").GetString() == "system" && index + 1 < messages.Length &&
+                messages[index + 1].GetProperty("role").GetString() == "user");
+            records.Add(messages[index]);
+        }
+        return records.ToArray();
+    }
+    private static TranscriptEntry User(string text) =>
+        new("user", JsonData.Parse(JsonSerializer.Serialize(new { role = "user", content = text, timestamp = 1 })));
     private static ToolInvocation Call(string name, JsonData arguments)
     {
         var call = new ToolCallContent("native-call", name, arguments);
         return new(new AssistantMessage("openai-responses", "fixture", "model", 0, [call], TokenUsage.Zero, StopReason.ToolUse), call, 0);
     }
-    private static IToolExecutor Invoker(Fixture f) => f.Session.CaptureToolCatalogRegistry()
-        .Resolve(f.Session.Snapshot.Context, f.Profile.SelectedModel).Configuration.Tools.Single().Executor;
+    // The agent's configured tools: the in-memory loadout, which the transcript declares only at the next request.
+    private static IToolExecutor Invoker(Fixture f) => f.Session.Snapshot.Agent.Tools.Single().Executor;
+    /// <summary>Calls <see cref="ToolName"/> in its first response when one is set, and answers with text otherwise.</summary>
     private sealed class NativeCallingTransport(ModelDescriptor model) : IChatTransport
     {
         internal string ToolName = ""; private int requests;
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
         {
-            var useTool = Interlocked.Increment(ref requests) == 1;
+            var useTool = Interlocked.Increment(ref requests) == 1 && ToolName.Length != 0;
             AssistantContent content = useTool ? new ToolCallContent("native-call", ToolName, JsonData.Parse("{\"value\":\"original\"}")) : new TextContent("done");
             var final = new AssistantMessage(model.Api, model.Provider, model.Id, 1, [content], TokenUsage.Zero, useTool ? StopReason.ToolUse : StopReason.Stop);
             yield return new StreamStarted(final with { Content = [], StopReason = StopReason.Pending });
@@ -240,15 +250,20 @@ internal static class McpPreparedPublicationTests
     }
     private static async Task Pipeline()
     {
-        await using var f = await Fixture.Create(); var initial = InitialEntries(f); await f.Server.ConnectAsync();
+        await using var f = await Fixture.Create(nativeCall: true); var initial = InitialEntries(f); await f.Server.ConnectAsync();
         var name = f.Extensions.CaptureSnapshot().Tools.Single().Name;
-        Check(f.Session.GetActiveTools().SequenceEqual([name])); CatalogEntries(f, initial, 1, name, false);
+        Check(f.Session.GetActiveTools().SequenceEqual([name])); Unwritten(f, initial); Declaration(Registered(f, name), name, 1);
         var invocation = Call(name, JsonData.Parse("{\"value\":\"original\"}"));
         var result = await Invoker(f).ExecuteAsync(invocation, default);
         Check(!result.IsError && f.Policy.Calls == 1 && ReferenceEquals(f.Policy.Invocation!.Call, invocation.Call) &&
             ReferenceEquals(f.Policy.Invocation.AssistantMessage, invocation.AssistantMessage));
         Check(f.Channel.Calls == 1 && f.Channel.Identity is { OwnerId: "mcp-owner", SessionGeneration: 1, ToolCallId: "native-call" });
         Check(f.Channel.Arguments!.ToString() == f.Policy.Action!.Arguments.ToString());
+        // The next request records the connected catalog before its user message.
+        await f.Session.PromptAsync(User("declare"));
+        var records = ToolRecords(f, initial);
+        Check(records.Length == 1 && !records[0].TryGetProperty("toolsRemoved", out _) && records[0].GetProperty("toolsAdded").GetArrayLength() == 1);
+        Declaration(records[0].GetProperty("toolsAdded")[0], name, 1);
     }
     private static async Task Denial()
     {
@@ -265,19 +280,25 @@ internal static class McpPreparedPublicationTests
         await using var f = await Fixture.Create(); await f.Server.ConnectAsync();
         var name = f.Extensions.CaptureSnapshot().Tools.Single().Name;
         f.Channel.Version = 2; await f.Server.RefreshToolsAsync();
-        var declaration = f.Session.Snapshot.Context.LlmMessages.Last().WireBody.Value.GetProperty("toolsAdded")[0];
-        Check(declaration.GetProperty("description").GetString()!.Contains("version 2", StringComparison.Ordinal));
+        Declaration(Registered(f, name), name, 2);
         Check(f.Session.GetActiveTools().SequenceEqual([name]));
         await f.Session.SetActiveToolsAsync([]); f.Channel.Version = 3; await f.Server.RefreshToolsAsync();
         Check(f.Session.GetActiveTools().IsEmpty && f.Session.CaptureToolCatalogRegistry().RegisteredTools.Single().Declaration.Value.GetProperty("description").GetString()!.Contains("version 3", StringComparison.Ordinal));
     }
     private static async Task Withdrawal()
     {
-        await using var f = await Fixture.Create(); var initial = InitialEntries(f); await f.Server.ConnectAsync();
-        var name = f.Extensions.CaptureSnapshot().Tools.Single().Name; CatalogEntries(f, initial, 1, name, false);
+        await using var f = await Fixture.Create(nativeCall: true); var initial = InitialEntries(f); await f.Server.ConnectAsync();
+        var name = f.Extensions.CaptureSnapshot().Tools.Single().Name; Unwritten(f, initial); Declaration(Registered(f, name), name, 1);
+        await f.Session.PromptAsync(User("declare")); var declared = f.Session.Snapshot.Log.Entries;
         var original = f.Server.CloseAsync(); Check(ReferenceEquals(original, f.Server.CloseAsync())); await original;
-        Check(f.Channel.Closes == 1 && f.Extensions.CaptureSnapshot().Tools.IsEmpty && f.Session.GetActiveTools().IsEmpty);
-        CatalogEntries(f, initial, 2, name, true); Check(f.Server.CatalogWithdrawalAcknowledged);
+        Check(f.Channel.Closes == 1 && f.Extensions.CaptureSnapshot().Tools.IsEmpty && f.Session.GetActiveTools().IsEmpty &&
+            f.Session.CaptureToolCatalogRegistry().RegisteredTools.IsEmpty && f.Server.CatalogWithdrawalAcknowledged);
+        // The withdrawal applies in memory too; the next request records the removal.
+        Unwritten(f, declared); await f.Session.PromptAsync(User("withdrawn"));
+        var records = ToolRecords(f, initial);
+        Check(records.Length == 2 && records[0].GetProperty("toolsAdded").GetArrayLength() == 1 && !records[1].TryGetProperty("toolsAdded", out _) &&
+            records[1].GetProperty("toolsRemoved").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual([name]));
+        Declaration(records[0].GetProperty("toolsAdded")[0], name, 1);
     }
     private static async Task UnrelatedWithdrawal()
     {
@@ -296,8 +317,8 @@ internal static class McpPreparedPublicationTests
     private static async Task HeldRefreshClose()
     {
         await using var f = await Fixture.Create(); var initial = InitialEntries(f); await f.Server.ConnectAsync();
-        var name = f.Extensions.CaptureSnapshot().Tools.Single().Name; CatalogEntries(f, initial, 1, name, false);
-        var committed = f.Session.Snapshot.Log.Entries.Last().WireBody.ToString();
+        var name = f.Extensions.CaptureSnapshot().Tools.Single().Name; Unwritten(f, initial); Declaration(Registered(f, name), name, 1);
+        var committed = Registered(f, name).GetRawText();
         var entered = Gate(); var release = Gate(); var canceled = Gate(); var visits = 0;
         CancellationToken reporterToken = default;
         CancellationTokenRegistration cancellationObservation = default;
@@ -325,8 +346,7 @@ internal static class McpPreparedPublicationTests
             repeatedClose = f.Server.CloseAsync();
             Check(reporterToken.IsCancellationRequested && !release.Task.IsCompleted && !refresh.IsCompleted && !closing.IsCompleted &&
                 ReferenceEquals(closing, repeatedClose) && f.Channel.Closes == 1);
-            CatalogEntries(f, initial, 1, name, false);
-            Check(f.Session.Snapshot.Log.Entries.Last().WireBody.ToString() == committed);
+            Unwritten(f, initial); Check(Registered(f, name).GetRawText() == committed);
         }
         catch (Exception error) { failures.Add(error); }
         finally
@@ -350,11 +370,10 @@ internal static class McpPreparedPublicationTests
         if (failures.Count == 1)
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
         if (failures.Count > 1) throw new AggregateException(failures);
+        // The held version 2 never reached the session; close withdrew the last committed catalog (version 1), in memory.
         Check(f.Channel.Closes == 1 && f.Server.CatalogWithdrawalAcknowledged && f.Extensions.CaptureSnapshot().Tools.IsEmpty &&
-            f.Session.GetActiveTools().IsEmpty);
-        CatalogEntries(f, initial, 2, name, true);
-        Check(f.Session.Snapshot.Log.Entries[initial.Length].WireBody.ToString() == committed &&
-            f.Session.Snapshot.Log.Entries.All(entry => !entry.WireBody.ToString().Contains("version 2", StringComparison.Ordinal)));
+            f.Session.GetActiveTools().IsEmpty && f.Session.CaptureToolCatalogRegistry().RegisteredTools.IsEmpty);
+        Unwritten(f, initial);
     }
     private static async Task FailedWithdrawal()
     {
@@ -415,79 +434,45 @@ internal static class McpPreparedPublicationTests
         finally { release.TrySetResult(); await Failure(operation); f.ReporterEnabled = false; }
         Check(ReferenceEquals(await Failure(operation), originalError) && commits == 0 && f.Session.Snapshot.Log.Entries.Length == before && f.Session.Snapshot.Fault is null);
     }
+    // A catalog publication writes nothing before its registry commit (the next request records the loadout), so a failing commit
+    // leaves the session as it was: unfaulted, unwritten and still publishable, with the original exception.
     private static async Task FailedCommit()
     {
-        await using var f = await Fixture.Create(); var expected = f.Session.CaptureToolCatalogRegistry();
-        var acknowledged = f.Session.Snapshot.Log.Entries;
+        await using var f = await Fixture.Create(); var expected = f.Session.CaptureToolCatalogRegistry(); var before = f.Session.Snapshot;
         var original = new IOException("original publication commit");
         var operation = f.Owner.PublishToolCatalogAsync(f.Owner.Current, expected, expected.WithToolCatalog([], null), [], () => throw original);
-        var error = await Failure(operation);
-        Check(ReferenceEquals(error, original) && f.Session.Snapshot.Fault is not null && f.Session.Snapshot.Agent.Tools.IsEmpty);
-        Check(operation.IsFaulted && ReferenceEquals(await Failure(operation), original) &&
-            f.Session.Snapshot.Fault?.Failure == PersistentAgentSessionFailure.InvalidCommit && f.Session.Snapshot.Log.Entries.SequenceEqual(acknowledged));
-        var closing = f.Server.CloseAsync(); var closeError = await Failure(closing);
-        Check(closeError is PersistentAgentSessionException { Fault.Failure: PersistentAgentSessionFailure.Faulted });
-        f.ExpectedCloseFailure = closeError;
-        // No catalog was ever connected: empty registration IDs require no withdrawal append.
+        Check(ReferenceEquals(await Failure(operation), original) && operation.IsFaulted && ReferenceEquals(await Failure(operation), original));
+        Check(f.Session.Snapshot.Fault is null && ReferenceEquals(f.Session.CaptureToolCatalogRegistry(), expected) &&
+            f.Session.Snapshot.Log.Entries.SequenceEqual(before.Log.Entries) && f.Session.Snapshot.Agent.Tools.SequenceEqual(before.Agent.Tools));
+        var commits = 0;
+        await f.Owner.PublishToolCatalogAsync(f.Owner.Current, expected, expected.WithToolCatalog([], null), [], () => commits++);
+        Check(commits == 1 && f.Session.Snapshot.Fault is null && f.Session.Snapshot.Log.Entries.SequenceEqual(before.Log.Entries));
+        // No catalog was ever connected: close stops no channel and needs no withdrawal.
+        await f.Server.CloseAsync();
         Check(f.Channel.Closes == 0 && f.Server.CatalogWithdrawalAcknowledged && f.Extensions.CaptureSnapshot().Tools.IsEmpty);
-        await JoinFaultedOwner(f, closing, closeError);
-        await InspectPostAckRecord(f, acknowledged, []);
     }
     private static async Task ConnectedFailedCommit()
     {
         await using var f = await Fixture.Create(); await f.Server.ConnectAsync();
         var expected = f.Session.CaptureToolCatalogRegistry(); var before = f.Session.Snapshot;
-        var declarations = f.Extensions.CaptureSnapshot().Tools;
-        var name = declarations.Single().Name;
+        var declarations = f.Extensions.CaptureSnapshot().Tools; var name = declarations.Single().Name;
         var original = new IOException("original connected publication commit");
         var operation = f.Owner.PublishToolCatalogAsync(f.Owner.Current, expected, expected.WithToolCatalog([], null), [], () => throw original);
-        Check(ReferenceEquals(await Failure(operation), original) && operation.IsFaulted &&
-            f.Session.Snapshot.Fault?.Failure == PersistentAgentSessionFailure.InvalidCommit &&
+        Check(ReferenceEquals(await Failure(operation), original) && operation.IsFaulted && f.Session.Snapshot.Fault is null &&
+            ReferenceEquals(f.Session.CaptureToolCatalogRegistry(), expected) && f.Session.GetActiveTools().SequenceEqual([name]) &&
             f.Session.Snapshot.Log.Entries.SequenceEqual(before.Log.Entries) && f.Session.Snapshot.Agent.Tools.SequenceEqual(before.Agent.Tools));
+        // The server's own catalog is intact, so its close joins the held physical stop and then withdraws it.
         var release = Gate(); f.Channel.CloseAction = () => release.Task;
-        var closing = f.Server.CloseAsync(); Exception closeError;
+        var closing = f.Server.CloseAsync();
         try
         {
             await f.Channel.StopEntered.Task;
             Check(!closing.IsCompleted && ReferenceEquals(closing, f.Server.CloseAsync()) && f.Channel.Closes == 1 &&
                 !f.Server.CatalogWithdrawalAcknowledged && f.Extensions.CaptureSnapshot().Tools.SequenceEqual(declarations));
         }
-        finally { release.TrySetResult(); closeError = await Failure(closing); f.ExpectedCloseFailure = closeError; }
-        var failures = OriginalFailures(closeError).ToArray();
-        Check(closing.IsFaulted && failures.Length == 2 &&
-            failures[0] is PersistentAgentSessionException { Fault.Failure: PersistentAgentSessionFailure.Faulted } &&
-            failures[1].GetType() == typeof(InvalidOperationException) &&
-            failures[1].Message == "Faulted shutdown permits resource cleanup but cannot acknowledge catalog publication." &&
-            f.Channel.CloseAsync().IsCompletedSuccessfully && f.Channel.Closes == 1 && !f.Server.CatalogWithdrawalAcknowledged &&
-            f.Extensions.CaptureSnapshot().Tools.SequenceEqual(declarations) && f.Session.Snapshot.Log.Entries.SequenceEqual(before.Log.Entries) &&
-            f.Session.Snapshot.Agent.Tools.SequenceEqual(before.Agent.Tools));
-        await JoinFaultedOwner(f, closing, closeError);
-        Check(!f.Server.CatalogWithdrawalAcknowledged && f.Extensions.CaptureSnapshot().Tools.SequenceEqual(declarations));
-        await InspectPostAckRecord(f, before.Log.Entries, [name]);
-    }
-    private static async Task JoinFaultedOwner(Fixture f, Task closing, Exception closeError)
-    {
-        var fault = f.Session.Snapshot.Fault;
-        Check(ReferenceEquals(closing, f.Server.CloseAsync()) && ReferenceEquals(await Failure(closing), closeError));
-        var disposing = f.Owner.DisposeAsync().AsTask(); var ownerError = await Failure(disposing);
-        Check(disposing.IsFaulted && ownerError is AggregateException &&
-            OriginalFailures(ownerError).SequenceEqual(OriginalFailures(closeError), ReferenceEqualityComparer.Instance));
-        f.ExpectedOwnerCloseFailure = ownerError;
-        Check(ReferenceEquals(disposing, f.Owner.DisposeAsync().AsTask()) && ReferenceEquals(await Failure(disposing), ownerError) &&
-            ReferenceEquals(closing, f.Server.CloseAsync()) && ReferenceEquals(await Failure(closing), closeError) &&
-            f.Session.Snapshot.IsDisposed && ReferenceEquals(fault, f.Session.Snapshot.Fault) && fault?.Failure == PersistentAgentSessionFailure.InvalidCommit);
-        var sessionDisposal = f.Session.DisposeAsync().AsTask(); await sessionDisposal;
-        Check(sessionDisposal.IsCompletedSuccessfully);
-    }
-    private static async Task InspectPostAckRecord(Fixture f, ImmutableArray<SessionEntry> acknowledged, string[] removed)
-    {
-        // Owner disposal has joined the physical writer. Inspect the acknowledged bytes before file cleanup.
-        Check(f.Session.Snapshot.IsDisposed);
-        var codec = new SessionEntryCodec(); var records = (await File.ReadAllLinesAsync(f.Path)).Select(codec.Parse).ToArray();
-        Check(records.Length == acknowledged.Length + 2 && records[0].IsHeader &&
-            records.Skip(1).Take(acknowledged.Length).Select(entry => entry.WireBody.ToString()).SequenceEqual(acknowledged.Select(entry => entry.WireBody.ToString())));
-        var message = records[^1].WireBody.Value.GetProperty("message");
-        Check(message.GetProperty("toolsAdded").GetArrayLength() == 0 &&
-            message.GetProperty("toolsRemoved").EnumerateArray().Select(value => value.GetProperty("name").GetString()).SequenceEqual(removed));
+        finally { release.TrySetResult(); }
+        await closing;
+        Check(f.Channel.Closes == 1 && f.Server.CatalogWithdrawalAcknowledged && f.Extensions.CaptureSnapshot().Tools.IsEmpty &&
+            f.Session.GetActiveTools().IsEmpty && f.Session.Snapshot.Fault is null && f.Session.Snapshot.Log.Entries.SequenceEqual(before.Log.Entries));
     }
 }

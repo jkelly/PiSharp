@@ -150,8 +150,9 @@ internal static class McpOwnedResourceDispatchTests
         var call = new ToolCallContent("actual-resource-call", name, arguments);
         return new(new AssistantMessage("openai-responses", "fixture", "model", 0, [call], TokenUsage.Zero, StopReason.ToolUse), call, 0);
     }
-    private static IToolExecutor Executor(Fixture fixture, string name) => fixture.Session.CaptureToolCatalogRegistry()
-        .Resolve(fixture.Session.Snapshot.Context, fixture.Profile.SelectedModel).Configuration.Tools.Single(tool => tool.Name == name).Executor;
+    // The agent's configured tools: the in-memory loadout, which the transcript declares only at the next request.
+    private static IToolExecutor Executor(Fixture fixture, string name) =>
+        fixture.Session.Snapshot.Agent.Tools.Single(tool => tool.Name == name).Executor;
     private static async Task Pipeline()
     {
         await using var f = await Fixture.Create();
@@ -169,23 +170,11 @@ internal static class McpOwnedResourceDispatchTests
         Check(f.Policy.Calls == 3 && f.Captures == 3 && f.Saves == 1 && f.Session.GetActiveTools().Length == 3);
         Check(f.InitialEntries.Select(entry => entry.WireBody.Value.GetProperty("type").GetString())
             .SequenceEqual(new[] { "model_change", "thinking_level_change" }));
-        // Even a resources-only server acknowledges an empty tool catalog at connect.
-        // The separately admitted resource descriptors have their own durable boundary.
-        Check(f.ConnectedEntries.Length == f.InitialEntries.Length + 1 && f.ConnectedEntries.Take(f.InitialEntries.Length)
-             .Select(entry => entry.WireBody.ToString()).SequenceEqual(f.InitialEntries.Select(entry => entry.WireBody.ToString())));
-        var connected = f.ConnectedEntries[^1].WireBody.Value;
-        Check(connected.GetProperty("type").GetString() == "message");
-        var emptyCatalog = connected.GetProperty("message");
-        Check(emptyCatalog.GetProperty("role").GetString() == "system" &&
-            emptyCatalog.GetProperty("toolsAdded").GetArrayLength() == 0 && emptyCatalog.GetProperty("toolsRemoved").GetArrayLength() == 0);
-        Check(entries.Length == f.ConnectedEntries.Length + 1 && entries.Take(f.ConnectedEntries.Length)
-            .Select(entry => entry.WireBody.ToString()).SequenceEqual(f.ConnectedEntries.Select(entry => entry.WireBody.ToString())));
-        var catalog = entries[^1].WireBody.Value;
-        Check(catalog.GetProperty("type").GetString() == "message");
-        var message = catalog.GetProperty("message");
-        Check(message.GetProperty("role").GetString() == "system" && message.GetProperty("toolsRemoved").GetArrayLength() == 0 &&
-            message.GetProperty("toolsAdded").EnumerateArray().Select(tool => tool.GetProperty("name").GetString())
-                .SequenceEqual(new[] { McpResourceTools.ListResources, McpResourceTools.ListTemplates, McpResourceTools.ReadResource }));
+        // Source _refreshToolRegistry: the server's (empty) tool catalog and the separately admitted resource catalog both apply in
+        // memory; neither writes a record (the next request declares the loadout).
+        Check(f.ConnectedEntries.SequenceEqual(f.InitialEntries) && entries.SequenceEqual(f.InitialEntries));
+        Check(f.Session.CaptureToolCatalogRegistry().RegisteredTools.Select(tool => tool.Adapter.Name)
+            .SequenceEqual(new[] { McpResourceTools.ListResources, McpResourceTools.ListTemplates, McpResourceTools.ReadResource }));
     }
     private static async Task Denial()
     {

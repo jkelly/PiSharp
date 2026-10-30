@@ -151,12 +151,13 @@ internal static class McpHostShutdownTests
     private static async Task Replacement()
     {
         await using var f = await Fixture.Create(); await f.Server.ConnectAsync(); await f.SeedTarget();
-        var old = f.Owner.Current; var notified = false;
+        var old = f.Owner.Current; var notified = false; var written = old.Session.Snapshot.Log.Entries;
+        Check(old.Session.Snapshot.Agent.Tools.Any(tool => tool.Name == "mcp__demo__a"));
+        // Source _refreshToolRegistry: the withdrawal applies to the old session's loadout in memory and writes nothing.
         f.Owner.AttachmentChanged = replacement =>
         {
             Check(f.Server.CatalogWithdrawalAcknowledged && f.Extensions.CaptureSnapshot().Tools.IsEmpty &&
-                old.Session.Snapshot.Context.LlmMessages.Any(message => message.WireBody.Value.TryGetProperty("toolsRemoved", out var removed) &&
-                    removed.EnumerateArray().Any(row => row.GetProperty("name").GetString() == "mcp__demo__a")));
+                old.Session.Snapshot.Agent.Tools.All(tool => tool.Name != "mcp__demo__a") && old.Session.Snapshot.Log.Entries.SequenceEqual(written));
             notified = true; return ValueTask.CompletedTask;
         };
         var switching = f.Owner.SwitchAsync(old, new(f.TargetPath)); Exception? assertion = null;

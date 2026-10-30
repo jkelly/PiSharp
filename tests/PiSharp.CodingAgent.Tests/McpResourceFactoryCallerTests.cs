@@ -126,12 +126,9 @@ internal static class McpResourceFactoryCallerTests
                     if (!active.SequenceEqual(expected))
                         throw new InvalidOperationException($"Explicit resource selection mismatch; activeCount={active.Length}; activeNames={string.Join(",", active.Take(8).Select(name => expected.Contains(name) ? name : "other"))}.");
                     Check(session.CaptureToolCatalogRegistry().UsesFinalActionPolicy(f.Policy));
-                    var after = session.Snapshot.Log.Entries;
-                    Check(after.Length == before.Length + 1 && after.Take(before.Length).Select(entry => entry.WireBody.ToString())
-                        .SequenceEqual(before.Select(entry => entry.WireBody.ToString())));
-                    var declared = after[^1].WireBody.Value.GetProperty("message");
-                    Check(declared.GetProperty("toolsRemoved").GetArrayLength() == 0 &&
-                        declared.GetProperty("toolsAdded").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).SequenceEqual(expected));
+                    // Source setActiveToolsByName: an idle selection applies in memory; the next request declares it.
+                    Check(session.Snapshot.Log.Entries.SequenceEqual(before) &&
+                        session.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(expected));
                 }
                 return f;
             }
@@ -146,12 +143,13 @@ internal static class McpResourceFactoryCallerTests
     private static async Task Pipeline()
     {
         await using var f = await Fixture.Create(true); var session = f.Owner.Current.Session;
-        var configuration = session.CaptureToolCatalogRegistry().Resolve(session.Snapshot.Context, Model).Configuration;
+        // The agent's configured tools: the in-memory loadout, which the transcript declares only at the next request.
+        var tools = session.Snapshot.Agent.Tools;
         foreach (var name in new[] { McpResourceTools.ListResources, McpResourceTools.ListTemplates, McpResourceTools.ReadResource })
         {
             var call = new ToolCallContent("factory-resource", name, name == McpResourceTools.ReadResource ? Json("""{"server":"demo","uri":"data://a.bin"}""") : Json("{}"));
             var invocation = new ToolInvocation(new AssistantMessage(Model.Api, Model.Provider, Model.Id, 1, [call], TokenUsage.Zero, StopReason.ToolUse), call, 0);
-            var result = await configuration.Tools.Single(tool => tool.Name == name).Executor.ExecuteAsync(invocation, default);
+            var result = await tools.Single(tool => tool.Name == name).Executor.ExecuteAsync(invocation, default);
             Check(!result.IsError && f.Channel.Identity is { OwnerId: "factory-resources", ToolCallId: "factory-resource" });
             Check(f.Channel.Identity!.SessionGeneration == f.Owner.Current.Generation);
         }
