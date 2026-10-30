@@ -395,7 +395,7 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
 
     // ─── Run history ────────────────────────────────────────────────────────
 
-    /// <summary>Saves run history's settings and applies the retention now (runs past it are deleted, as the daily cleanup would).</summary>
+    /// <summary>Saves run history's settings and applies the retention now (runs past it are deleted, as the hourly cleanup would).</summary>
     /// <exception cref="ArgumentException">A retention outside 1 to 3,650 days.</exception>
     public async Task<DataHistorySaved> SaveHistoryAsync(RunHistorySettings value, CancellationToken cancellationToken = default)
     {

@@ -91,7 +91,10 @@ public static class SettingsEndpoints
                 return Json(new ForgetAnswer(entry.Id, removed, unhidden));
             }));
 
-        api.MapGet("/folders", (string? path) => Run(() => Json(FolderBrowser.List(path))));
+        // A GET another website can send (an <img>, a no-cors fetch): answered only to the app's own pages or a typed address.
+        api.MapGet("/folders", (string? path, HttpRequest request) => AgentCompare.Pages.AgentComparePagesModule.SameOrigin(request)
+            ? Run(() => Json(FolderBrowser.List(path)))
+            : Error(StatusCodes.Status403Forbidden, "The folder browser answers only this app's own pages."));
         return routes;
     }
 

@@ -759,10 +759,13 @@ internal static partial class Program
         {
             await using var chat = await ChatApp.StartAsync("data-chats");
             var id = await chat.CreateAsync("Remember the data page", "req-data-1");
-            await WaitUntilAsync(async () => (await chat.App.Get("/api/chats/" + id)).Body?["running"]?.GetValue<bool>() == false, "the chat is idle", TimeSpan.FromSeconds(30));
+            // "running" can still read false right after the create, so wait for the answer itself and then for its recorded call.
+            await chat.WaitForAsync(id, "Echo: Remember the data page");
             var runs = Path.Join(chat.Data, RunsDb.FileName);
             long RunRows() => ReadDb(runs, "SELECT COUNT(*) FROM runs;", reader => reader.GetInt64(0))[0];
-            Check(File.Exists(runs), "runs.db exists");
+            long OpenRows() => ReadDb(runs, "SELECT COUNT(*) FROM runs WHERE status = 'running';", reader => reader.GetInt64(0))[0];
+            await WaitUntilAsync(() => Task.FromResult(File.Exists(runs) && RunRows() >= 1 && OpenRows() == 0), "the chat's call is recorded and ended",
+                TimeSpan.FromSeconds(30));
             var before = RunRows();
             Check(before >= 1, "the chat's model call is recorded in run history, so keeping it means something: " + before);
             var page = (await chat.App.Get(DataController.Route)).Text;

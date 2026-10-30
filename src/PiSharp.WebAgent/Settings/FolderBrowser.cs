@@ -3,6 +3,11 @@
 // system and dot folders left out), each marked when it is a git repository or holds AGENTS.md, and the context files of the folder itself
 // (the candidates PiSharp's CLI reads: AGENTS.override.md, AGENTS.md, CLAUDE.md, and .pi/settings.json). Without a path it lists the
 // drives (Windows) or the root. The app binds loopback only and runs as the user, so this shows the user nothing the user cannot open.
+// A network or device path (\\server\share, \\?\, \\.\) is refused before anything touches it (W4 retest): listing one reaches the host it
+// names over SMB or WebDAV and offers it the user's Windows credentials, and another website can send this GET (SettingsEndpoints refuses
+// a request the browser marks as cross-site too). A network folder can still be typed as the working directory.
+using PiSharp.WebAgent.AgentCompare.Workspaces;
+
 namespace PiSharp.WebAgent.Settings;
 
 /// <summary>A subfolder in a <see cref="FolderListing"/>.</summary>
@@ -38,8 +43,12 @@ public static class FolderBrowser
 
     private static readonly string[] AgentFiles = ["AGENTS.override.md", "AGENTS.md", "CLAUDE.md"];
 
+    /// <summary>Why a network or device path is not listed.</summary>
+    public const string NetworkPathMessage =
+        @"Only folders on this computer are listed: a network path (\\server\share) or a device path (\\?\, \\.\) isn't opened here. Type it as the working directory instead.";
+
     /// <summary>The subfolders of <paramref name="path"/>, or the drives (the root outside Windows) when it is blank.</summary>
-    /// <exception cref="ArgumentException">The path is not a full path, or the folder does not exist.</exception>
+    /// <exception cref="ArgumentException">The path is not a full path, is a network or device path, or the folder does not exist.</exception>
     /// <exception cref="InvalidOperationException">The folder cannot be read (access denied, a device error).</exception>
     public static FolderListing List(string? path)
     {
@@ -49,7 +58,10 @@ public static class FolderBrowser
             var drives = DriveInfo.GetDrives().Where(Ready).Select(drive => new FolderEntry(drive.Name.TrimEnd('\\', '/'), drive.Name, false, false)).ToList();
             return new FolderListing(null, null, [new FolderCrumb(TopName, null)], drives, [], false);
         }
+        // Before anything touches the path, and again once it is resolved.
+        if (WorkspaceManager.IsNetworkOrDevicePath(path)) throw new ArgumentException(NetworkPathMessage);
         var folder = Full(path);
+        if (WorkspaceManager.IsNetworkOrDevicePath(folder)) throw new ArgumentException(NetworkPathMessage);
         if (!Directory.Exists(folder)) throw new ArgumentException($"There is no folder {folder}.");
         try
         {
