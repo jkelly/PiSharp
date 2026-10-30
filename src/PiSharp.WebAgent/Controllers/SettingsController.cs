@@ -2,7 +2,7 @@
 // for every provider (settings-provider-openai, settings-provider-codex), Accounts & sign-ins (settings-accounts), Models (settings-models),
 // Defaults (settings-defaults) and Tools & workspace (settings-tools). The pages read ProviderDirectory and ISettingsStore and change things
 // only through the JSON APIs (/api/credentials of WU5, /api/settings of this area), so a key is POSTed once from the modal and no page ever
-// holds one: an account shows its masked hint at most. Settings pages that later milestones build stay ShellController's. Every page is
+// holds one: an account shows its masked hint at most. Every page is
 // no-store, since it lists accounts.
 using Microsoft.AspNetCore.Mvc;
 using PiSharp.WebAgent.Contracts;
