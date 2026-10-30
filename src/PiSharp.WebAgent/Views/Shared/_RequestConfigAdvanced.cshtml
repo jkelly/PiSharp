@@ -1,8 +1,11 @@
-@* Decision 0011 (run W4, R1): _RequestConfig's last sections: Caching & session and Transport (shown, not sent yet: runs use PiSharp's
-   defaults), Speed / service tier (sent only where the model takes it: the OpenAI Responses API of provider OpenAI, never Azure; Fast and
-   UltraFast listed, not sent yet), Custom headers (name/value rows; a credential-like name is refused by the run engine, and the effective
-   headers table masks every value whose name could carry a credential) and Provider-specific (raw providerOptions merged into the request
-   body of a patched API; the Azure and Bedrock panes show their options, set on the provider, not per run). Model: RequestConfigView. *@
+@* Decision 0011 (run W4, R1; W4 fix): _RequestConfig's last sections: Caching & session (sessionId: sent as prompt_cache_key where the
+   OpenAI Responses, Azure and Codex APIs take it, Codex also as its session headers; cacheRetention shown, not sent yet), Speed / service
+   tier (every tier PLAN.md "Request speed" lists, RunSpec.ServiceTiers, is sent where the model's API takes it: all seven on the OpenAI
+   Responses API of provider OpenAI, auto, default, flex and priority on Codex, where Codex CLI's Fast is priority; never Azure),
+   Transport (timeoutMs, 1,000 to 3,600,000 ms for the response headers, on any API; retries shown, not sent yet: runs use PiSharp's
+   defaults), Custom headers (name/value rows; a credential-like name is refused by the run engine, and the effective headers table masks
+   every value whose name could carry a credential) and Provider-specific (raw providerOptions merged into the request body of a patched
+   API; the Azure and Bedrock panes show their options, set on the provider, not per run). Model: RequestConfigView. *@
 @using PiSharp.WebAgent.Playground
 @using PiSharp.WebAgent.Runs
 @model RequestConfigView
@@ -15,11 +18,13 @@
     var headerDot = Model.ModifiedOf(RunModelOptions.Headers);
     var tierDot = Model.ModifiedOf(RunModelOptions.ServiceTier);
     var providerDot = Model.ModifiedOf(RunModelOptions.ProviderOptions);
+    var cacheDot = Model.ModifiedOf(RunModelOptions.SessionId);
+    var transportDot = Model.ModifiedOf(RunModelOptions.TimeoutMs);
 }
 <!-- Caching & session -->
 <div class="accordion-item">
   <h3 class="accordion-header">
-    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-cache" aria-expanded="false" aria-controls="@(p)-cfg-cache"><i class="bi bi-lightning-charge me-2 text-ps-faint"></i><span class="flex-grow-1">Caching &amp; session</span></button>
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-cache" aria-expanded="false" aria-controls="@(p)-cfg-cache"><i class="bi bi-lightning-charge me-2 text-ps-faint"></i><span class="flex-grow-1">Caching &amp; session</span><span class="status-dot info me-2" title="@cacheDot modified" data-section-dot hidden="@(cacheDot == 0)"></span></button>
   </h3>
   <div id="@(p)-cfg-cache" class="accordion-collapse collapse" data-section="cache">
     <div class="accordion-body">
@@ -35,12 +40,15 @@
         </div>
         <div class="form-text mt-1">@RequestConfigView.Unsent["cacheRetention"].Reason</div>
       </div>
-      <div class="param-row param-disabled" data-unsent="sessionId">
+      <div class="@Row(RunModelOptions.SessionId)" data-option="sessionId" data-set="@Set(RunModelOptions.SessionId)" data-conflict="@Conflict(RunModelOptions.SessionId)">
         <div class="param-head">
-          <label class="param-name" for="@(p)-session">sessionId <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Codex: prompt_cache_key plus the session-id and x-client-request-id headers (up to 64 characters)."></i></label>
+          <label class="param-name" for="@(p)-session">sessionId <span class="status-dot info ms-1" data-option-dot title="Modified · default PiSharp's own"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="The key the provider caches the prompt under: prompt_cache_key (Responses, Azure and Codex), plus Codex's session-id and x-client-request-id headers. Letters, digits, '-', '_', '.' and ':', up to @RunSpec.MaxSessionId characters."></i></label>
         </div>
-        <input class="form-control form-control-sm ps-mono" id="@(p)-session" placeholder="—" disabled>
-        <div class="form-text mt-1">@RequestConfigView.Unsent["sessionId"].Reason</div>
+        <div class="input-group input-group-sm">
+          <input class="form-control ps-mono" id="@(p)-session" maxlength="@RunSpec.MaxSessionId" placeholder="— (PiSharp's own)" autocomplete="off" spellcheck="false" value="@Model.Draft.SessionId" data-opt="sessionId" data-kind="text" disabled="@Model.Off(RunModelOptions.SessionId)">
+          <button class="btn btn-outline-secondary" type="button" title="New sessionId" aria-label="New sessionId" data-session-new disabled="@Model.Off(RunModelOptions.SessionId)"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+        <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note data-default-note="Keep it the same between runs to hit the provider's prompt cache.">@(Model.Why(RunModelOptions.SessionId) ?? "Keep it the same between runs to hit the provider's prompt cache.")</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.SessionId))">Clear</button></div>
       </div>
     </div>
   </div>
@@ -55,7 +63,7 @@
     <div class="accordion-body">
       <div class="@Row(RunModelOptions.ServiceTier)" data-option="serviceTier" data-set="@Set(RunModelOptions.ServiceTier)" data-conflict="@Conflict(RunModelOptions.ServiceTier)">
         <div class="param-head">
-          <label class="param-name" for="@(p)-tier">serviceTier <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="OpenAI Responses: service_tier. Availability depends on the model and account."></i></label>
+          <label class="param-name" for="@(p)-tier">serviceTier <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="service_tier: all seven tiers on the OpenAI Responses API of provider OpenAI; auto, default, flex and priority on Codex (Codex CLI's Fast is priority); never Azure. Availability depends on the model and account."></i></label>
         </div>
         <select class="form-select form-select-sm" id="@(p)-tier" aria-label="Speed / service tier" data-opt="serviceTier" data-kind="tier" disabled="@Model.Off(RunModelOptions.ServiceTier)">
           @foreach (var tier in RequestConfigView.Tiers)
@@ -73,13 +81,19 @@
 <!-- Transport -->
 <div class="accordion-item">
   <h3 class="accordion-header">
-    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-transport" aria-expanded="false" aria-controls="@(p)-cfg-transport"><i class="bi bi-hdd-network me-2 text-ps-faint"></i><span class="flex-grow-1">Transport</span></button>
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-transport" aria-expanded="false" aria-controls="@(p)-cfg-transport"><i class="bi bi-hdd-network me-2 text-ps-faint"></i><span class="flex-grow-1">Transport</span><span class="status-dot info me-2" title="@transportDot modified" data-section-dot hidden="@(transportDot == 0)"></span></button>
   </h3>
   <div id="@(p)-cfg-transport" class="accordion-collapse collapse" data-section="transport">
     <div class="accordion-body">
+      <div class="@Row(RunModelOptions.TimeoutMs)" data-option="timeoutMs" data-set="@Set(RunModelOptions.TimeoutMs)" data-conflict="@Conflict(RunModelOptions.TimeoutMs)">
+        <div class="param-head">
+          <label class="param-name" for="@(p)-timeoutMs">timeoutMs <span class="status-dot info ms-1" data-option-dot title="Modified · default none (wait indefinitely)"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="How long to wait for the provider's response headers, @RequestConfigView.TimeoutRange, on any API. Empty waits indefinitely."></i></label>
+          <input type="number" class="form-control form-control-sm param-value input" id="@(p)-timeoutMs" min="@RunSpec.MinTimeoutMs" max="@RunSpec.MaxTimeoutMs" step="1000" placeholder="none" value="@RequestConfigView.Number(Model.Draft.TimeoutMs)" data-opt="timeoutMs" data-kind="int" disabled="@Model.Off(RunModelOptions.TimeoutMs)">
+        </div>
+        <div class="d-flex align-items-start gap-2"><div class="form-text mt-0 flex-grow-1" data-option-note data-default-note="Empty waits indefinitely.">@(Model.Why(RunModelOptions.TimeoutMs) ?? "Empty waits indefinitely.")</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.TimeoutMs))">Clear</button></div>
+      </div>
       @foreach (var (name, help, placeholder) in new[]
       {
-          ("timeoutMs", "Per-attempt timeout for the response headers. Empty waits indefinitely.", "none"),
           ("maxRetries", "Client-side retries for 429 and 5xx responses.", "default"),
           ("maxRetryDelayMs", "Longest server-requested retry delay that is honoured; a longer retry-after fails at once. 0 disables the cap.", "60000"),
       })

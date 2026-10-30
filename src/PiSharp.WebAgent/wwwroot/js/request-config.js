@@ -3,19 +3,27 @@
 // (applyCapabilities, from the run engine's RunCapabilities: data-capabilities, or GET /api/playground/model after a model change). A set
 // option the model does not take keeps its value and its row says the run will be refused until it is cleared (brief rule 4: never
 // dropped silently); "Clear them" clears every such option at once. Rows marked [data-unsent] are never enabled. The modified count and the
-// accordions' dots follow what is set.
+// accordions' dots follow what is set. A tool's strict flag lives in the tool list (request-tools.js): the tools row is marked when a
+// strict tool meets a model that takes no strict tools (RunModelOptions' "strict"), and "Clear them" turns strict off rather than
+// removing the tools.
 
+// Every option with its own row (RequestConfigView.Counted on the server).
 const COUNTED = ['thinking', 'maxTokens', 'temperature', 'topP', 'topK', 'stop', 'seed', 'presencePenalty', 'frequencyPenalty',
-  'responseFormat', 'toolChoice', 'serviceTier', 'headers', 'providerOptions'];
+  'responseFormat', 'toolChoice', 'serviceTier', 'headers', 'providerOptions', 'parallelToolCalls', 'textVerbosity', 'reasoningSummary',
+  'sessionId', 'timeoutMs'];
 const SECTIONS = {
   sampling: ['temperature', 'topP', 'topK', 'presencePenalty', 'frequencyPenalty', 'stop', 'seed'],
-  output: ['maxTokens', 'responseFormat'],
-  reasoning: ['thinking'],
+  output: ['maxTokens', 'responseFormat', 'textVerbosity'],
+  reasoning: ['thinking', 'reasoningSummary'],
+  cache: ['sessionId'],
   tier: ['serviceTier'],
+  transport: ['timeoutMs'],
   headers: ['headers'],
   provider: ['providerOptions'],
 };
+// The thinking levels a run sends (RunSpec.ThinkingLevels, max last).
 const SEND_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+const REFUSED = 'Set: the run will be refused until you clear it.';
 
 function changed(config) {
   config.dispatchEvent(new CustomEvent('request-change', { bubbles: true }));
@@ -44,6 +52,11 @@ export function takes(config, option, caps = capabilities(config)) {
   return thinkingLevel(config) !== 'off' ? (entry.withThinking ?? entry.supported) : entry.supported;
 }
 
+/** Why the model does not take `option` (or how it does), or ''. */
+export function optionReason(config, option, caps = capabilities(config)) {
+  return why(config, option, caps);
+}
+
 function why(config, option, caps) {
   if (!caps) return 'Choose a model PiSharp knows.';
   const entry = support(caps, option);
@@ -57,7 +70,27 @@ function displayValue(row) {
   const shown = row.querySelector('[data-option-value]');
   if (!shown || !input) return;
   if (input.dataset.kind === 'level') shown.textContent = thinkingLevel(row.closest('[data-request-config]'));
-  else shown.textContent = row.dataset.set === 'true' ? input.value : 'default';
+  else if (row.dataset.set !== 'true') shown.textContent = 'default';
+  else if (input.dataset.kind === 'radio') shown.textContent = row.querySelector('[data-opt]:checked')?.value ?? 'default';
+  else if (input.dataset.kind === 'bool') shown.textContent = input.checked ? 'true' : 'false';
+  else shown.textContent = input.value;
+}
+
+/** How many of the switched-on tools are strict (their definition, data-tool, says strict: true). */
+function strictTools(config) {
+  let count = 0;
+  config.querySelectorAll('[data-tool-list] [data-tool]').forEach((item) => {
+    if (!item.querySelector('[data-tool-on]')?.checked) return;
+    try { if (JSON.parse(item.dataset.tool).strict === true) count++; } catch { /* the tool editor writes JSON */ }
+  });
+  return count;
+}
+
+/** A new session id for the sessionId row's "New" button: pg- and 8 hex digits. */
+function newSessionId() {
+  const bytes = new Uint8Array(4);
+  window.crypto.getRandomValues(bytes);
+  return 'pg-' + [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function markSet(row, set) {
@@ -71,6 +104,7 @@ function resetRow(row) {
   const option = row.dataset.option;
   row.querySelectorAll('[data-opt]').forEach((input) => {
     if (input.type === 'radio') input.checked = input.value === 'off';
+    else if (input.type === 'checkbox') input.checked = input.dataset.default === 'true';
     else if (input.tagName === 'SELECT') input.value = '';
     else input.value = input.dataset.default ?? '';
   });
@@ -97,20 +131,32 @@ export function refresh(config) {
     const option = row.dataset.option;
     const set = row.dataset.set === 'true';
     const ok = option === 'tools' ? true : takes(config, option, caps);
-    const conflict = set && (option === 'thinking' ? !levelTaken(caps, thinkingLevel(config)) : option === 'tools' ? !takes(config, 'tools', caps) : !ok);
+    // The tools row also carries the tools' strict flags: a strict tool on a model that takes none is refused like any option.
+    const strict = option === 'tools' ? strictTools(config) : 0;
+    const toolsRefused = option === 'tools' && set && !takes(config, 'tools', caps);
+    const strictRefused = strict > 0 && !takes(config, 'strict', caps);
+    const conflict = option === 'tools' ? toolsRefused || strictRefused
+      : set && (option === 'thinking' ? !levelTaken(caps, thinkingLevel(config)) : !ok);
     if (conflict) conflicts++;
     row.classList.toggle('param-disabled', !ok && !set);
     if (conflict) row.dataset.conflict = 'true';
     else delete row.dataset.conflict;
     if (option !== 'thinking' && option !== 'tools') {
       // A set option the model does not take stays editable so it can be cleared or fixed; an unset one is disabled.
-      row.querySelectorAll('[data-opt], [data-header-name], [data-header-value], [data-header-add], [data-format-name], [data-format-schema-text], [data-format-strict], [data-choice-tool]')
+      row.querySelectorAll('[data-opt], [data-header-name], [data-header-value], [data-header-add], [data-format-name], [data-format-schema-text], [data-format-strict], [data-choice-tool], [data-session-new]')
         .forEach((input) => { input.disabled = !ok && !set; });
     }
+    const clear = row.querySelector('[data-option-clear]');
+    if (clear) clear.hidden = !set;
+    displayValue(row);
     const note = row.querySelector('[data-option-note]');
-    if (note && option !== 'thinking') {
+    if (note && option === 'tools') {
+      note.textContent = toolsRefused ? `${why(config, 'tools', caps)}. ${REFUSED}`
+        : strictRefused ? `${strict} strict ${strict === 1 ? 'tool' : 'tools'}: ${why(config, 'strict', caps)}. ${REFUSED}` : '';
+      note.classList.toggle('text-ps-warn', conflict);
+    } else if (note && option !== 'thinking') {
       const reason = why(config, option, caps);
-      note.textContent = conflict ? `${reason ? reason + '. ' : ''}Set: the run will be refused until you clear it.` : (ok ? (option === 'tools' ? '' : reason) : reason);
+      note.textContent = conflict ? `${reason ? reason + '. ' : ''}${REFUSED}` : reason || (note.dataset.defaultNote ?? '');
       note.classList.toggle('text-ps-warn', conflict);
     }
     if (option === 'temperature') {
@@ -284,7 +330,7 @@ export function initConfig(config) {
       return;
     }
     // Selects, radios and checkboxes report through change only.
-    if (event.target.matches('select[data-opt], [data-opt][type="radio"], [data-format-strict], [data-choice-tool]')) onInput(config, event);
+    if (event.target.matches('select[data-opt], [data-opt][type="radio"], [data-opt][type="checkbox"], [data-format-strict], [data-choice-tool]')) onInput(config, event);
   });
   config.addEventListener('click', (event) => {
     const button = event.target.closest('button');
@@ -294,12 +340,23 @@ export function initConfig(config) {
       refresh(config);
       changed(config);
     } else if (button.matches('[data-config-clear-conflicts]')) {
+      const caps = capabilities(config);
       config.querySelectorAll('[data-option][data-conflict="true"]').forEach((row) => {
-        if (row.dataset.option === 'tools') {
+        if (row.dataset.option !== 'tools') resetRow(row);
+        else if (takes(config, 'tools', caps)) {
+          // Only the strict flags are refused: request-tools.js turns them off and keeps the tools.
+          config.dispatchEvent(new CustomEvent('request-clear-strict'));
+        } else {
           row.querySelector('[data-tool-list]')?.replaceChildren();
           row.dataset.set = 'false';
-        } else resetRow(row);
+        }
       });
+      refresh(config);
+      changed(config);
+    } else if (button.matches('[data-session-new]')) {
+      const row = button.closest('[data-option]');
+      row.querySelector('[data-opt="sessionId"]').value = newSessionId();
+      markSet(row, true);
       refresh(config);
       changed(config);
     } else if (button.matches('[data-header-add]')) {
@@ -316,13 +373,16 @@ export function initConfig(config) {
     }
   });
   config.addEventListener('request-options-applied', () => refresh(config));
+  // A tool added, edited, removed or switched (request-tools.js): its strict flag may meet the model differently.
+  config.addEventListener('request-tools-changed', () => refresh(config));
   refresh(config);
 }
 
 /** Marks the rows of options a run refused ([{ option, reason }] from POST /api/runs) and opens their sections. */
 export function markRefused(config, refused) {
   for (const entry of refused ?? []) {
-    const row = config.querySelector(`[data-option="${entry.option}"]`);
+    // A tool's strict flag has no row of its own: the tools row says it.
+    const row = config.querySelector(`[data-option="${entry.option === 'strict' ? 'tools' : entry.option}"]`);
     if (!row) continue;
     row.dataset.conflict = 'true';
     const note = row.querySelector('[data-option-note]');

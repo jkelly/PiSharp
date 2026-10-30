@@ -113,7 +113,7 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
             },
             Output = output,
             Estimate = estimate,
-            Tools = new ToolEditorView { Templates = Templates() },
+            Tools = new ToolEditorView { Templates = Templates(), Strict = true },
             Error = output.State == "error" ? ErrorDetails(run!) : null,
             Notice = notice,
             ModelName = catalogModel?.Name ?? capabilities?.Name ?? draft.Model,

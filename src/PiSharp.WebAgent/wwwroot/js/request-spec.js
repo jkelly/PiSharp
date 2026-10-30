@@ -2,13 +2,19 @@
 // and _MessageListEditor ([data-message-list]) under `root` into the RunSpec POST /api/runs takes; applySpec(root, spec) sets the controls
 // from one (Presets load, Compare columns, History's "Open in Playground"). An option row is sent only when the user set it
 // ([data-option][data-set="true"]): at its default nothing is sent and the provider's default applies. A set option the model does not
-// take is still sent, so the run engine refuses it with a clear message instead of the page dropping it silently (brief rule 4). Options
-// the run engine has no field for ([data-unsent]) are never read.
+// take is still sent, so the run engine refuses it with a clear message instead of the page dropping it silently (brief rule 4). Every
+// option RunSpec takes is read (SENT_OPTIONS, and a tool's strict flag with its definition); options the run engine has no field for
+// ([data-unsent]) are never read.
 
 import { editorMessage, setMessages } from './request-messages.js';
 import { setTools } from './request-tools.js';
 
 export { editorMessage };
+
+/** The options collectSpec sends when their row is set, by RunSpec's names (tools and their strict flags go with the tool list). */
+export const SENT_OPTIONS = ['thinking', 'maxTokens', 'temperature', 'topP', 'topK', 'stop', 'seed', 'presencePenalty', 'frequencyPenalty',
+  'responseFormat', 'toolChoice', 'serviceTier', 'headers', 'providerOptions', 'parallelToolCalls', 'textVerbosity', 'reasoningSummary',
+  'sessionId', 'timeoutMs'];
 
 const KINDS = {
   range: (input) => (input.value === '' ? null : Number(input.value)),
@@ -17,6 +23,13 @@ const KINDS = {
     const lines = input.value.split('\n').map((line) => line.replace(/\r$/, '')).filter((line) => line.length > 0);
     return lines.length > 0 ? lines : null;
   },
+  // A group of radios (text verbosity): the checked one's value.
+  radio: (input) => input.closest('[data-option]')?.querySelector('[data-opt]:checked')?.value ?? null,
+  // A select whose first option is "default (not sent)".
+  select: (input) => input.value || null,
+  text: (input) => input.value.trim() || null,
+  // A switch the user touched sends its state, on or off (parallel tool calls).
+  bool: (input) => input.checked,
 };
 
 /** The config pane and the message list under `root` (a page, a Compare column...). */
@@ -101,14 +114,16 @@ export function optionValue(config, option) {
   }
 }
 
-/** The tools of the config's tool list that are switched on: [{ name, description, parameters }]. */
+/** The tools of the config's tool list that are switched on: [{ name, description, parameters, strict? }]. */
 export function collectTools(config) {
   const tools = [];
   config?.querySelectorAll('[data-tool-list] [data-tool]').forEach((item) => {
     if (!item.querySelector('[data-tool-on]')?.checked) return;
     try {
       const tool = JSON.parse(item.dataset.tool);
-      tools.push({ name: tool.name, description: tool.description || undefined, parameters: tool.parameters ?? undefined });
+      const sent = { name: tool.name, description: tool.description || undefined, parameters: tool.parameters ?? undefined };
+      if (tool.strict === true) sent.strict = true;
+      tools.push(sent);
     } catch { /* a definition the editor wrote is always JSON */ }
   });
   return tools;
@@ -134,8 +149,7 @@ export function collectSpec(root, { source = 'playground' } = {}) {
   spec.messages = messages;
   const tools = collectTools(config);
   if (tools.length > 0) spec.tools = tools;
-  for (const option of ['thinking', 'maxTokens', 'temperature', 'topP', 'topK', 'stop', 'seed', 'presencePenalty', 'frequencyPenalty',
-    'responseFormat', 'toolChoice', 'serviceTier', 'headers', 'providerOptions']) {
+  for (const option of SENT_OPTIONS) {
     const value = optionValue(config, option);
     if (value !== null && value !== undefined) spec[option] = value;
   }
@@ -157,11 +171,16 @@ export function applyOptions(config, spec) {
     const input = element?.querySelector('[data-opt]');
     if (input) input.value = value(option) ?? input.dataset.default ?? '';
   }
-  for (const option of ['maxTokens', 'topK', 'seed']) {
+  for (const option of ['maxTokens', 'topK', 'seed', 'timeoutMs', 'sessionId', 'reasoningSummary']) {
     const element = setRow(config, option, value(option) !== null);
     const input = element?.querySelector('[data-opt]');
     if (input) input.value = value(option) ?? '';
   }
+  const verbosity = setRow(config, 'textVerbosity', value('textVerbosity') !== null);
+  verbosity?.querySelectorAll('[data-opt="textVerbosity"]').forEach((radio) => { radio.checked = radio.value === value('textVerbosity'); });
+  const parallel = setRow(config, 'parallelToolCalls', typeof spec?.parallelToolCalls === 'boolean');
+  const parallelSwitch = parallel?.querySelector('[data-opt="parallelToolCalls"]');
+  if (parallelSwitch) parallelSwitch.checked = typeof spec?.parallelToolCalls === 'boolean' ? spec.parallelToolCalls : parallelSwitch.dataset.default === 'true';
   const stop = setRow(config, 'stop', Array.isArray(spec?.stop) && spec.stop.length > 0);
   if (stop) stop.querySelector('[data-opt]').value = (spec?.stop ?? []).join('\n');
   const level = value('thinking') ?? 'off';

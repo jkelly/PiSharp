@@ -3,9 +3,10 @@
 // the chosen model takes), _MessageListEditor (role-based messages), _ModelPickerModal, _ToolEditorModal and _ViewCodeModal. Every option
 // row says whether the model takes it from RunModelOptions' capabilities (the same source the run engine refuses by), so a row is enabled
 // only when the run would send it. An option the user set that the model does not take stays set (its draft value is kept) and the row
-// says the run will be refused until it is cleared: nothing is dropped silently (brief rule 4). Options PiSharp's run engine has no field
-// for yet (baseUrl, textVerbosity, thinking budgets, reasoning summary, cache retention, session id, transport, Azure and Bedrock) are
-// shown disabled with the reason, never sent; an API key is never taken from the page (W2 rule 3: secrets stay on the server).
+// says the run will be refused until it is cleared: nothing is dropped silently (brief rule 4). Every option RunSpec takes has a live
+// control (W4 fix: text verbosity, the reasoning summary, the session id, the timeout, parallel tool calls and a tool's strict flag joined
+// the rest). Options PiSharp's run engine has no field for yet (baseUrl, thinking budgets, cache retention, retries, Azure and Bedrock)
+// are shown disabled with the reason, never sent; an API key is never taken from the page (W2 rule 3: secrets stay on the server).
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -90,12 +91,14 @@ public sealed record RequestConfigView
     /// <summary>Why a listed tier or level is not sent.</summary>
     public const string NotSentYet = "PiSharp's run engine does not send it yet.";
 
-    /// <summary>The options a run sends that count as "modified" (set away from the provider's default).</summary>
+    /// <summary>The options a run sends that count as "modified" (set away from the provider's default): every option with its own row
+    /// (request-config.js counts the same list).</summary>
     public static IReadOnlyList<string> Counted { get; } =
     [
         RunModelOptions.Thinking, RunModelOptions.MaxTokens, RunModelOptions.Temperature, RunModelOptions.TopP, RunModelOptions.TopK, RunModelOptions.Stop,
         RunModelOptions.Seed, RunModelOptions.PresencePenalty, RunModelOptions.FrequencyPenalty, RunModelOptions.ResponseFormat, RunModelOptions.ToolChoice,
-        RunModelOptions.ServiceTier, RunModelOptions.Headers, RunModelOptions.ProviderOptions,
+        RunModelOptions.ServiceTier, RunModelOptions.Headers, RunModelOptions.ProviderOptions, RunModelOptions.ParallelToolCalls, RunModelOptions.TextVerbosity,
+        RunModelOptions.ReasoningSummary, RunModelOptions.SessionId, RunModelOptions.TimeoutMs,
     ];
 
     /// <summary>The element id of <paramref name="name"/>.</summary>
@@ -151,6 +154,12 @@ public sealed record RequestConfigView
         RunModelOptions.ProviderOptions => Draft.ProviderOptions is { Count: > 0 },
         RunModelOptions.Tools => Draft.Tools is { Count: > 0 },
         RunModelOptions.Images => Draft.Messages.Any(message => message.Images is { Count: > 0 }),
+        RunModelOptions.ParallelToolCalls => Draft.ParallelToolCalls is not null,
+        RunModelOptions.StrictTools => Draft.Tools?.Any(tool => tool.Strict == true) == true,
+        RunModelOptions.TextVerbosity => !string.IsNullOrWhiteSpace(Draft.TextVerbosity),
+        RunModelOptions.ReasoningSummary => !string.IsNullOrWhiteSpace(Draft.ReasoningSummary),
+        RunModelOptions.SessionId => !string.IsNullOrWhiteSpace(Draft.SessionId),
+        RunModelOptions.TimeoutMs => Draft.TimeoutMs is not null,
         _ => false,
     };
 
@@ -218,22 +227,44 @@ public sealed record RequestConfigView
     /// <summary>The tool a <c>tool</c> choice names.</summary>
     public string? ChoiceTool => ChoiceKind == "tool" ? Draft.ToolChoice : null;
 
-    /// <summary>The options this page does not send, by section: some the run engine does not take yet, and some it takes (RunSpec's
-    /// textVerbosity, reasoningSummary, sessionId and timeoutMs, and a tool's strict flag) that this page has no control wired for yet.</summary>
+    /// <summary>The options this page does not send, by section: options the run engine has no field for yet (every option RunSpec takes
+    /// has a live control).</summary>
     public static IReadOnlyDictionary<string, RequestUnsentOption> Unsent { get; } = new Dictionary<string, RequestUnsentOption>(StringComparer.Ordinal)
     {
         ["baseUrl"] = new("baseUrl", "Runs use the provider's base URL from Settings › Providers; a per-run override is not sent yet."),
         ["apiKey"] = new("apiKey", "The Playground never takes a key from the page: runs use the account below, whose credential stays on the server."),
-        ["textVerbosity"] = new("textVerbosity", "The run engine takes it on Responses, Azure and Codex models; this page does not send it yet."),
         ["thinkingBudgets"] = new("thinkingBudgets", "The run engine sends the thinking level only; per-level token budgets are not sent yet."),
-        ["reasoningSummary"] = new("reasoningSummary", "The run engine takes it while a Responses, Azure or Codex model thinks; this page does not send it yet."),
         ["cacheRetention"] = new("cacheRetention", "Runs use PiSharp's prompt-cache defaults; a per-run value is not sent yet."),
-        ["sessionId"] = new("sessionId", "The run engine takes it on Responses, Azure and Codex models; this page does not send it yet."),
-        ["timeoutMs"] = new("timeoutMs", "The run engine takes a response-header timeout of 1 second to 1 hour; this page does not send it yet."),
         ["maxRetries"] = new("maxRetries", "Runs use PiSharp's transport defaults; per-run retries are not sent yet."),
         ["maxRetryDelayMs"] = new("maxRetryDelayMs", "Runs use PiSharp's transport defaults; a per-run retry delay is not sent yet."),
-        ["strict"] = new("strict", "The run engine takes a tool's strict flag where the API has one; the tool editor does not send it yet."),
     };
+
+    /// <summary>The timeout's range as the Transport row says it (1,000 to 3,600,000 ms).</summary>
+    public static string TimeoutRange { get; } =
+        string.Create(CultureInfo.InvariantCulture, $"{RunSpec.MinTimeoutMs:N0} to {RunSpec.MaxTimeoutMs:N0} ms");
+
+    /// <summary>The draft's tools marked strict.</summary>
+    public int StrictTools => Draft.Tools?.Count(tool => tool.Strict == true) ?? 0;
+
+    /// <summary>Whether the tools row is marked: the model takes no tools, or a tool is strict and the model takes no strict tools.</summary>
+    public bool ToolsConflict => Conflict(RunModelOptions.Tools) || Conflict(RunModelOptions.StrictTools);
+
+    /// <summary>What the tools row says when it is marked, or null.</summary>
+    public string? ToolsWhy => Conflict(RunModelOptions.Tools) ? $"{Why(RunModelOptions.Tools)}. {Refused}"
+        : Conflict(RunModelOptions.StrictTools) ? $"{StrictTools} strict {(StrictTools == 1 ? "tool" : "tools")}: {Why(RunModelOptions.StrictTools)}. {Refused}"
+        : null;
+
+    /// <summary>What a marked row adds after its reason (request-config.js says the same).</summary>
+    public const string Refused = "Set: the run will be refused until you clear it.";
+
+    /// <summary>A tool as the tool list keeps it (<c>data-tool</c>): its name, description and parameters, and <c>strict</c> when set.</summary>
+    public static string ToolJson(RunTool tool)
+    {
+        ArgumentNullException.ThrowIfNull(tool);
+        var json = new JsonObject { ["name"] = tool.Name, ["description"] = tool.Description ?? "", ["parameters"] = tool.Parameters?.DeepClone() };
+        if (tool.Strict == true) json["strict"] = true;
+        return json.ToJsonString();
+    }
 
     /// <summary>The Azure OpenAI Responses options (set on the provider; not sent per run yet).</summary>
     public static IReadOnlyList<(string Name, string Placeholder, string Help)> AzureOptions { get; } =
@@ -344,6 +375,16 @@ public sealed record ToolEditorView
 
     /// <summary>Whether the mock response fields show (the Playground and Compare answer tool calls with them).</summary>
     public bool Mock { get; init; } = true;
+
+    /// <summary>Whether the Strict switch is live: the page sends a tool's strict flag (<see cref="RunTool.Strict"/>). A page that does not
+    /// send it leaves this off, and the switch shows disabled with why, so a strict flag is never set and then dropped.</summary>
+    public bool Strict { get; init; }
+
+    /// <summary>What the Strict switch's note says.</summary>
+    public string StrictNote => Strict
+        ? "Sends strict: true, so the provider keeps the arguments to the schema (OpenAI's APIs; strict mode needs every property in required and " +
+          "additionalProperties: false). Anthropic and Google take no strict tools: a run with one is refused, never sent without it."
+        : "This page does not send a tool's strict flag.";
 
     /// <summary>Where "Open in Tool Bench" goes, or null to leave it out.</summary>
     public string? BenchUrl { get; init; } = "/bench";
