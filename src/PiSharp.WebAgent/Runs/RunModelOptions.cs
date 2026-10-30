@@ -4,9 +4,19 @@
 // headers. Only options the API has are sent: temperature is never sent to a model that rejects it (OpenAI reasoning models; Anthropic
 // while thinking), service tier only to the OpenAI Responses API of provider openai (never Azure, and not Codex, whose adapter PiSharp
 // does not patch yet), and APIs PiSharp cannot patch yet (Codex, Mistral, Bedrock, Vertex and the rest) take thinking, max tokens, tools
-// and images only. An option the user set that the model does not take is never dropped: the plan lists it as refused with the reason, and
-// the engine refuses the run with that message. The faux models accept the sampling options offline and do not apply them (a note says
-// so); echo-thinking refuses temperature and top P while thinking, as Anthropic does, so the refusal can be seen offline.
+// and images only (Codex: no max tokens, see below). An option the user set that the model does not take is never dropped: the plan lists
+// it as refused with the reason, and the engine refuses the run with that message. The faux models accept the sampling options offline
+// and do not apply them (a note says so); echo-thinking refuses temperature and top P while thinking, as Anthropic does, so the refusal
+// can be seen offline.
+// One rule for the output cap (the user's max tokens, or the Spend Guard's "cap the output"): it is the whole output the request may write,
+// thinking included, and the max tokens that goes on the wire, so the Spend Guard's reservation (which assumes it) holds. PiSharp's
+// Anthropic Messages route raises a capped request's max_tokens by the thinking budget on a budget-thinking model (no
+// compat.forceAdaptiveThinking), so the run's patch sets max_tokens to the cap and a thinking budget that fits inside it (the level's,
+// at most the cap less 1,024 to answer); a cap below 2,048 cannot hold budget thinking and is refused. Amazon Bedrock raises it the same
+// way but its requests are signed, so a cap with thinking on a Bedrock budget-thinking Claude model is refused. The Codex backend takes
+// no output cap at all, so max tokens is refused there and the Spend Guard does not offer to cap its output. Anthropic takes tool choice
+// auto or none only while the model thinks. Provider options never set the output's length or count (max_tokens, max_output_tokens,
+// generationConfig.maxOutputTokens, n, candidateCount and the like): Max tokens and the Spend Guard's worst case decide those.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json.Nodes;
@@ -127,7 +137,13 @@ public static class RunModelOptions
     public static IReadOnlyList<string> PatchedApis { get; } = [CompletionsApi, ResponsesApi, AzureResponsesApi, AnthropicApi, GoogleApi];
 
     internal const string FauxApi = "faux", CompletionsApi = "openai-completions", ResponsesApi = "openai-responses", AzureResponsesApi = "azure-openai-responses",
-        AnthropicApi = "anthropic-messages", GoogleApi = "google-generative-ai", BedrockApi = "bedrock-converse-stream";
+        AnthropicApi = "anthropic-messages", GoogleApi = "google-generative-ai", BedrockApi = "bedrock-converse-stream", CodexApi = "openai-codex-responses";
+
+    /// <summary>The least output cap budget thinking takes on Anthropic: 1,024 tokens to think and 1,024 to answer.</summary>
+    public const int MinThinkingOutputTokens = 2 * AnswerTokens;
+
+    // What Anthropic budget thinking leaves to answer, as PiSharp's routes (and upstream Pi) do.
+    private const int AnswerTokens = 1024;
 
     /// <summary>What <paramref name="model"/> takes (<paramref name="catalog"/>: its catalog row, for thinking levels and limits).</summary>
     public static RunCapabilities Capabilities(DurableModel model, CatalogModel? catalog)
@@ -182,7 +198,8 @@ public static class RunModelOptions
             Use(Thinking, true, levels.Contains(thinking) ? null
                 : levels.Count <= 1 ? "this model does not think" : $"it thinks at {string.Join(", ", levels.Skip(1))}");
         var cap = OutputCap(model, catalog);
-        Use(MaxTokens, spec.MaxTokens is not null, spec.MaxTokens > cap ? $"at most {cap:N0} output tokens" : null);
+        Use(MaxTokens, spec.MaxTokens is not null, spec.MaxTokens > cap ? $"at most {cap:N0} output tokens"
+            : spec.MaxTokens is { } maximum && Support(MaxTokens, model, catalog, thinking is not null).Ok ? OutputCapRefusal(model, thinking, maximum) : null);
         var anthropic = model.Api == AnthropicApi;
         Use(Temperature, spec.Temperature is not null, anthropic && spec.Temperature > 1 ? "Anthropic takes temperature 0 to 1" : null);
         Use(TopP, spec.TopP is not null, anthropic && spec.Temperature is not null && spec.TopP is not null ? "Anthropic takes temperature or top P, not both" : null);
@@ -193,10 +210,12 @@ public static class RunModelOptions
         Use(FrequencyPenalty, spec.FrequencyPenalty is not null);
         Use(ResponseFormat, spec.ResponseFormat is not null && Format(spec.ResponseFormat) != "text");
         if (spec.ResponseFormat is not null && Format(spec.ResponseFormat) == "text") applied.Add(ResponseFormat);
-        Use(ToolChoice, spec.ToolChoice is not null);
+        Use(ToolChoice, spec.ToolChoice is not null, anthropic && thinking is not null && spec.ToolChoice is not ("auto" or "none")
+            ? "Anthropic takes only auto or none while the model thinks; turn thinking off to force a tool call" : null);
         Use(ServiceTier, spec.ServiceTier is not null);
         Use(Headers, spec.Headers is not null);
-        Use(ProviderOptions, spec.ProviderOptions is not null);
+        Use(ProviderOptions, spec.ProviderOptions is not null, spec.ProviderOptions is { } options && Support(ProviderOptions, model, catalog, thinking is not null).Ok
+            ? OutputOptionRefusal(options) : null);
         Use(Images, spec.Messages.Any(message => message.Images is { Count: > 0 }));
         Use(Tools, spec.Tools is { Count: > 0 });
 
@@ -205,6 +224,14 @@ public static class RunModelOptions
         if (refused.Count == 0 && PatchedApis.Contains(model.Api))
         {
             patch = Patch(spec, model.Api);
+            if (OutputCapPatch(model, thinking, spec.MaxTokens) is { } output)
+            {
+                var budget = output["thinking"]!["budget_tokens"]!.GetValue<int>();
+                Merge(patch, output, "", null);
+                var full = LevelBudget(thinking!);
+                notes.Add($"Max tokens {Count(spec.MaxTokens!.Value)} is the whole output: thinking at {thinking} gets {Count(budget)} tokens" +
+                    (budget < full ? $" of its {Count(full)}" : "") + $", and at least {Count(AnswerTokens)} are left to answer.");
+            }
             if (spec.ProviderOptions is { } extra)
             {
                 var conflicts = new List<string>();
@@ -256,7 +283,10 @@ public static class RunModelOptions
             case Thinking:
                 return Levels(model, catalog).Count > 1 ? (true, null) : (false, "this model does not think");
             case MaxTokens:
-                return api == FauxApi ? (true, "the faux model ignores it") : (true, null);
+                return api == FauxApi ? (true, "the faux model ignores it")
+                    : api == CodexApi ? (false, NoCodexCap)
+                    : thinking && BedrockBudgetThinking(model) ? (false, BedrockCap)
+                    : (true, null);
             case Tools:
                 return (true, null);
             case Images:
@@ -306,6 +336,105 @@ public static class RunModelOptions
                 return option == ServiceTier ? (false, "only the OpenAI Responses API takes a service tier") : (true, null);
         }
         return (false, $"PiSharp does not send it on the {api} API yet");
+    }
+
+    private const string NoCodexCap = "the Codex backend takes no output cap";
+
+    private const string BedrockCap = "Amazon Bedrock adds the thinking budget to max tokens and PiSharp cannot change a signed Bedrock request, so the cap " +
+        "would not hold; turn thinking off or clear max tokens";
+
+    /// <summary>Why an output cap of <paramref name="maxTokens"/> (the user's max tokens, or the Spend Guard's "cap the output") cannot be the
+    /// whole output of a request to <paramref name="model"/> at <paramref name="thinking"/> (null for off), or null when it can.</summary>
+    public static string? OutputCapRefusal(DurableModel model, string? thinking, int maxTokens)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        if (model.Api == CodexApi) return NoCodexCap;
+        if (thinking is null) return null;
+        if (BedrockBudgetThinking(model)) return BedrockCap;
+        if (AnthropicBudgetThinking(model) && maxTokens < MinThinkingOutputTokens)
+            return $"Anthropic budget thinking needs a max tokens of at least {Count(MinThinkingOutputTokens)} ({Count(AnswerTokens)} to think and " +
+                $"{Count(AnswerTokens)} to answer), and max tokens is the whole output; raise it to {Count(MinThinkingOutputTokens)} or more, or turn thinking off";
+        return null;
+    }
+
+    /// <summary>The fields a request to <paramref name="model"/> at <paramref name="thinking"/> needs so that <paramref name="maxTokens"/> is
+    /// its whole output: on Anthropic budget thinking, <c>max_tokens</c> and a thinking budget that fits inside it (the level's, at most
+    /// <paramref name="maxTokens"/> less 1,024); null when the request needs none (no cap, thinking off, another API).</summary>
+    /// <exception cref="ArgumentException">The cap cannot hold budget thinking (<see cref="OutputCapRefusal"/>).</exception>
+    public static JsonObject? OutputCapPatch(DurableModel model, string? thinking, int? maxTokens)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        if (thinking is null || maxTokens is not { } cap || !AnthropicBudgetThinking(model)) return null;
+        if (OutputCapRefusal(model, thinking, cap) is { } why) throw new ArgumentException(why);
+        return new JsonObject
+        {
+            ["max_tokens"] = cap,
+            ["thinking"] = new JsonObject { ["type"] = "enabled", ["budget_tokens"] = Math.Min(LevelBudget(thinking), cap - AnswerTokens) },
+        };
+    }
+
+    /// <summary>The patch and its path a run of <paramref name="plan"/> sends when its output is capped at <paramref name="maxTokens"/> (the
+    /// Spend Guard's <c>GuardedSend.MaxTokens</c>): the plan's own when that is the plan's cap, else the plan's patch with the output-cap
+    /// fields of <paramref name="maxTokens"/> (<see cref="OutputCapPatch"/>).</summary>
+    /// <exception cref="ArgumentException">The cap cannot be the whole output (<see cref="OutputCapRefusal"/>).</exception>
+    public static (JsonObject? Patch, string? Path) SendPatch(RunRequestPlan plan, int? maxTokens)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        if (maxTokens == plan.Spec.MaxTokens) return (plan.Patch, plan.PatchPath);
+        if (maxTokens is { } cap && OutputCapRefusal(plan.Model, plan.Thinking, cap) is { } why) throw new ArgumentException(why);
+        if (OutputCapPatch(plan.Model, plan.Thinking, maxTokens) is not { } output) return (plan.Patch, plan.PatchPath);
+        var patch = plan.Patch is { } own ? (JsonObject)own.DeepClone() : new JsonObject();
+        Merge(patch, output, "", null);
+        return (patch, PatchPathOf(plan.Model.Api));
+    }
+
+    /// <summary>Anthropic Messages budget thinking: a reasoning model without <c>compat.forceAdaptiveThinking</c>, whose capped requests
+    /// PiSharp's route raises by the thinking budget.</summary>
+    internal static bool AnthropicBudgetThinking(DurableModel model) =>
+        model.Api == AnthropicApi && model.Reasoning &&
+        !(model.Wire is { } wire && wire.TryGetValue("compat", out var compat) && compat is PiSharp.Durable.Chord.JsonObjectValue fields &&
+          fields.TryGetValue("forceAdaptiveThinking", out var adaptive) && adaptive is PiSharp.Durable.Chord.JsonBooleanValue { Value: true });
+
+    /// <summary>A Bedrock Claude model with budget thinking, whose capped requests PiSharp.AI raises by the thinking budget (as
+    /// BedrockConverseRequest.Simple and SupportsAdaptiveThinking decide it: by the model's id and name).</summary>
+    internal static bool BedrockBudgetThinking(DurableModel model)
+    {
+        if (model.Api != BedrockApi || !model.Reasoning) return false;
+        var names = new[] { model.Id, model.Name }.Where(name => !string.IsNullOrEmpty(name))
+            .SelectMany(name => new[] { name.ToLowerInvariant(), System.Text.RegularExpressions.Regex.Replace(name.ToLowerInvariant(), @"[\s_.:]+", "-") })
+            .ToList();
+        if (!names.Any(name => name.Contains("claude", StringComparison.Ordinal))) return false;
+        string[] adaptive = ["opus-4-6", "opus-4-7", "opus-4-8", "opus-5", "sonnet-4-6", "sonnet-5", "haiku-5", "fable-5"];
+        return !names.Any(name => adaptive.Any(marker => name.Contains(marker, StringComparison.Ordinal)));
+    }
+
+    /// <summary>The thinking budget of <paramref name="level"/> (minimal 1,024, low 2,048, medium 8,192, otherwise 16,384), as PiSharp's routes.</summary>
+    private static int LevelBudget(string level) => level switch { "minimal" => 1024, "low" => 2048, "medium" => 8192, _ => 16384 };
+
+    private static string Count(int value) => value.ToString("N0", CultureInfo.InvariantCulture);
+
+    // Provider option names that set the output's length or how many answers are written (compared without '_' and case): Max tokens and
+    // the Spend Guard's worst case decide those.
+    private static readonly string[] OutputNames =
+        ["maxtokens", "maxcompletiontokens", "maxoutputtokens", "maxtokenstosample", "maxnewtokens", "n", "bestof", "candidatecount"];
+
+    /// <summary>Whether the provider option <paramref name="key"/> sets the output's length or how many answers are written (so
+    /// <see cref="RunSpec.Normalize"/> leaves it to the plan's refusal rather than reading "max_tokens" as a credential).</summary>
+    internal static bool OutputOptionName(string key) => OutputNames.Contains(key.Replace("_", "", StringComparison.Ordinal).ToLowerInvariant());
+
+    /// <summary>Why <paramref name="options"/> may not be sent, when they set the output's length or count; null otherwise.</summary>
+    private static string? OutputOptionRefusal(JsonObject options)
+    {
+        var found = new List<string>();
+        foreach (var (key, value) in options)
+        {
+            if (OutputOptionName(key)) found.Add(key);
+            else if (key.Replace("_", "", StringComparison.Ordinal).Equals("generationconfig", StringComparison.OrdinalIgnoreCase) && value is JsonObject config)
+                found.AddRange(config.Where(pair => OutputOptionName(pair.Key)).Select(pair => key + "." + pair.Key));
+        }
+        return found.Count == 0 ? null
+            : $"providerOptions.{string.Join(", providerOptions.", found)} would change how long or how many answers the provider writes, which Max tokens " +
+              "and the Spend Guard's worst case decide; use Max tokens instead (a run asks for one answer)";
     }
 
     private static string? Format(JsonObject? format) => format?["type"] is JsonValue value && value.TryGetValue<string>(out var type) ? type : null;

@@ -218,6 +218,200 @@ internal static partial class Program
             NoSecret(host.LogText, "the log", key);
         }),
 
+        Case("runs.engine.max-tokens-is-the-whole-output-on-anthropic-budget-thinking", async () =>
+        {
+            await using var host = RunsHost.Routing("runs-engine-anthropic-cap");
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", Planted("sk-ant-api03-")));
+            var model = ModelOf(host.Services.GetRequiredService<IModelCatalog>(), "anthropic", "anthropic-messages", "claude-haiku-4-5");
+            var ledger = host.Services.GetRequiredService<ISpendLedger>();
+            RunSpec Spec(string text, int? maxTokens) => new()
+            {
+                Provider = "anthropic",
+                Model = model,
+                Thinking = "high",
+                MaxTokens = maxTokens,
+                Messages = [new RunMessage { Text = text }],
+            };
+            JsonNode Sent(string text) => JsonNode.Parse(host.Provider.Requests.Single(request => request.Body?.Contains(text, StringComparison.Ordinal) == true).Body!)!;
+
+            var start = await host.Engine.StartAsync(Spec("capped at four thousand", 4000));
+            Check(start.Posted, "posted: " + start.Refusal?.Message);
+            var run = await RunsFinishedAsync(host.Store, start.Id!);
+            Equal(RunStatus.Completed, run.Status, "completed: " + run.Error);
+            var body = Sent("capped at four thousand");
+            Equal(4000, body["max_tokens"]!.GetValue<int>(), "max tokens is the whole output, thinking included: " + body.ToJsonString()[..Math.Min(300, body.ToJsonString().Length)]);
+            Equal(("enabled", 2976), (body["thinking"]!["type"]!.GetValue<string>(), body["thinking"]!["budget_tokens"]!.GetValue<int>()),
+                "the thinking budget fits inside it, leaving 1,024 to answer");
+            Equal(4000, (await ledger.GetAsync(run.SpendOp!))!.OutputTokens, "the reservation is what was sent");
+            var plan = host.Engine.Plan(Spec("x", 4000));
+            Equal(4000, plan.Patch?["max_tokens"]?.GetValue<int>(), "View code shows the max tokens that goes on the wire");
+
+            var low = host.Engine.Plan(Spec("x", 1000));
+            Check(!low.Allowed && low.Refused.Single().Option == RunModelOptions.MaxTokens && low.RefusalMessage!.Contains("2,048", StringComparison.Ordinal),
+                "a cap below what budget thinking needs is refused, not raised: " + low.RefusalMessage);
+            await ThrowsAsync<RunOptionException>(() => host.Engine.StartAsync(Spec("too small", 1000)), "and is not sent");
+            Check(host.Provider.Requests.All(request => request.Body?.Contains("too small", StringComparison.Ordinal) != true), "nothing went out");
+
+            // The Spend Guard's "cap the output": the cap it chose is the request's whole output.
+            await ledger.SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Request, 1, CapAction.Ask));
+            var asked = await host.Engine.StartAsync(Spec("asked first", 8000));
+            Check(asked is { Posted: false, Refusal.Code: SpendErrors.Ask }, "a request cap asks: " + asked.Refusal?.Code);
+            var capped = await host.Engine.StartAsync(Spec("capped by the guard", 8000), new RunSpendAnswer(SpendChoice.CapOutput, 3000));
+            Check(capped.Posted, "posted with the output capped: " + capped.Refusal?.Message);
+            var cappedRun = await RunsFinishedAsync(host.Store, capped.Id!);
+            Equal(RunStatus.Completed, cappedRun.Status, "completed: " + cappedRun.Error);
+            var cappedBody = Sent("capped by the guard");
+            Equal((3000, 1976), (cappedBody["max_tokens"]!.GetValue<int>(), cappedBody["thinking"]!["budget_tokens"]!.GetValue<int>()), "the guard's cap is the whole output");
+            Equal(3000, (await ledger.GetAsync(cappedRun.SpendOp!))!.OutputTokens, "and what it reserved");
+            var tooLow = await ThrowsAsync<ArgumentException>(() => host.Engine.StartAsync(Spec("capped too low", 8000), new RunSpendAnswer(SpendChoice.CapOutput, 1500)),
+                "a guard cap that leaves no room to think is refused, not raised");
+            Check(tooLow.Message.Contains("2,048", StringComparison.Ordinal), "it says why: " + tooLow.Message);
+            Check(host.Provider.Requests.All(request => request.Body?.Contains("capped too low", StringComparison.Ordinal) != true), "nothing went out for it");
+        }),
+
+        Case("runs.options.refuses-what-the-api-would-reject-or-not-send", () =>
+        {
+            DurableModel Model(string provider, string id, string api, bool reasoning = true) =>
+                new() { Id = id, Name = id, Api = api, Provider = provider, Reasoning = reasoning, MaxTokens = 64_000, ContextWindow = 200_000 };
+            RunRequestPlan Plan(DurableModel model, RunSpec spec) =>
+                RunModelOptions.Plan((spec with { Provider = model.Provider, Model = model.Id, Messages = [new RunMessage { Text = "hi" }] }).Normalize(), model, null, 0);
+            RunOptionSupport Refused(RunRequestPlan plan, string option) =>
+                plan.Refused.SingleOrDefault(item => item.Option == option) ?? throw new InvalidOperationException($"{option} was not refused: applied {string.Join(",", plan.Applied)}");
+            var tools = new List<RunTool> { new("lookup") };
+
+            // Anthropic forces no tool call while the model thinks: required and a named tool are refused, auto and none are sent.
+            var claude = Model("anthropic", "claude-test", "anthropic-messages");
+            foreach (var forced in new[] { "required", "lookup" })
+            {
+                var plan = Plan(claude, new RunSpec { Thinking = "high", Tools = tools, ToolChoice = forced });
+                Check(Refused(plan, RunModelOptions.ToolChoice).Reason!.Contains("auto or none", StringComparison.Ordinal) && plan.Patch is null,
+                    $"tool choice {forced} while thinking is refused, nothing patched: " + plan.RefusalMessage);
+                var off = Plan(claude, new RunSpec { Tools = tools, ToolChoice = forced });
+                Check(off.Allowed && off.Applied.Contains(RunModelOptions.ToolChoice), $"{forced} without thinking is sent: " + off.RefusalMessage);
+            }
+            foreach (var free in new[] { "auto", "none" })
+            {
+                var plan = Plan(claude, new RunSpec { Thinking = "high", Tools = tools, ToolChoice = free });
+                Equal(free, plan.Patch?["tool_choice"]?["type"]?.GetValue<string>(), $"{free} while thinking is sent");
+            }
+
+            // Codex takes no output cap: max tokens is refused (never reported as applied), and the guard is told it cannot cap it.
+            var codex = Model("openai-codex", "gpt-codex-test", "openai-codex-responses");
+            var codexPlan = Plan(codex, new RunSpec { MaxTokens = 1000 });
+            Check(Refused(codexPlan, RunModelOptions.MaxTokens).Reason!.Contains("Codex", StringComparison.Ordinal) && !codexPlan.Applied.Contains(RunModelOptions.MaxTokens),
+                "max tokens on Codex is refused: " + codexPlan.RefusalMessage);
+            var codexCaps = RunModelOptions.Capabilities(codex, null).Find(RunModelOptions.MaxTokens)!;
+            Check(!codexCaps.Supported && codexCaps.WithThinking == false, "the Playground shows it unsupported");
+            Check(RunModelOptions.OutputCapRefusal(codex, null, 500) is not null, "the Spend Guard's cap the output would not hold either");
+            Check(Plan(codex, new RunSpec()).Allowed, "a Codex run without max tokens is sent");
+
+            // Anthropic budget thinking: max tokens is the whole output; adaptive models keep the cap as it is.
+            var budget = Plan(claude, new RunSpec { Thinking = "medium", MaxTokens = 20_000 });
+            Equal((20_000, 8192), (budget.Patch!["max_tokens"]!.GetValue<int>(), budget.Patch["thinking"]!["budget_tokens"]!.GetValue<int>()),
+                "the level's budget when it fits");
+            Check(budget.Notes.Any(note => note.Contains("whole output", StringComparison.Ordinal)), "and a note says so");
+            Check(Plan(claude, new RunSpec { MaxTokens = 1000 }).Allowed, "without thinking any cap is sent as it is");
+            var adaptive = Model("anthropic", "claude-adaptive", "anthropic-messages") with
+            {
+                Wire = (ChordObject)ChordJson.Parse("""{"compat":{"forceAdaptiveThinking":true}}"""),
+            };
+            var adaptivePlan = Plan(adaptive, new RunSpec { Thinking = "high", MaxTokens = 1000 });
+            Check(adaptivePlan.Allowed && adaptivePlan.Patch is null, "adaptive thinking adds no budget, so its cap needs no patch: " + adaptivePlan.RefusalMessage);
+            // Bedrock adds the budget too and its requests are signed: a cap with thinking on a budget-thinking Claude model is refused.
+            var bedrock = Model("amazon-bedrock", "anthropic.claude-sonnet-4-5-20250929-v1:0", "bedrock-converse-stream");
+            Check(Refused(Plan(bedrock, new RunSpec { Thinking = "low", MaxTokens = 8000 }), RunModelOptions.MaxTokens).Reason!.Contains("Bedrock", StringComparison.Ordinal),
+                "Bedrock budget thinking with a cap is refused");
+            Check(Plan(bedrock, new RunSpec { MaxTokens = 8000 }).Allowed && Plan(bedrock, new RunSpec { Thinking = "low" }).Allowed, "either alone is sent");
+            Check(Plan(Model("amazon-bedrock", "anthropic.claude-opus-4-8", "bedrock-converse-stream"), new RunSpec { Thinking = "low", MaxTokens = 8000 }).Allowed,
+                "an adaptive Bedrock Claude model keeps its cap");
+
+            // Provider options never set the output's length or count.
+            var gpt = Model("openai", "gpt-test", "openai-responses", reasoning: false);
+            var completions = Model("openai", "gpt-chat-test", "openai-completions", reasoning: false);
+            var gemini = Model("google", "gemini-test", "google-generative-ai", reasoning: false);
+            foreach (var (model, options, key) in new (DurableModel, string, string)[]
+            {
+                (claude, """{"max_tokens":64000}""", "max_tokens"),
+                (gpt, """{"max_output_tokens":64000}""", "max_output_tokens"),
+                (completions, """{"max_completion_tokens":64000}""", "max_completion_tokens"),
+                (completions, """{"n":8}""", "n"),
+                (gemini, """{"generationConfig":{"maxOutputTokens":64000}}""", "generationConfig.maxOutputTokens"),
+                (gemini, """{"generationConfig":{"candidateCount":4}}""", "generationConfig.candidateCount"),
+            })
+            {
+                var plan = Plan(model, new RunSpec { ProviderOptions = JsonNode.Parse(options)!.AsObject() });
+                var reason = Refused(plan, RunModelOptions.ProviderOptions).Reason!;
+                Check(reason.Contains("providerOptions." + key, StringComparison.Ordinal) && reason.Contains("Max tokens", StringComparison.Ordinal) && plan.Patch is null,
+                    $"{model.Api} providerOptions {options} is refused: " + reason);
+            }
+            Check(Plan(gpt, new RunSpec { ProviderOptions = JsonNode.Parse("""{"user":"run-test"}""")!.AsObject() }).Allowed, "other provider options are sent");
+        }),
+
+        Case("runs.engine.provider-options-never-lift-the-spend-guards-output-cap", async () =>
+        {
+            await using var host = RunsHost.Routing("runs-engine-cap-options");
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("openai", Planted("sk-proj-")));
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", Planted("sk-ant-api03-")));
+            var catalog = host.Services.GetRequiredService<IModelCatalog>();
+            var gpt = ModelOf(catalog, "openai", "openai-responses", "gpt-4.1");
+            var claude = ModelOf(catalog, "anthropic", "anthropic-messages", "claude-haiku-4-5");
+            await host.Services.GetRequiredService<ISpendLedger>().SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Request, 1, CapAction.Ask));
+            RunSpec Spec(string provider, string model, string text, string options) => new()
+            {
+                Provider = provider,
+                Model = model,
+                ProviderOptions = JsonNode.Parse(options)!.AsObject(),
+                Messages = [new RunMessage { Text = text }],
+            };
+
+            foreach (var (provider, model, options) in new[] { ("openai", gpt, """{"max_output_tokens":64000}"""), ("anthropic", claude, """{"max_tokens":64000}""") })
+            {
+                var error = await ThrowsAsync<RunOptionException>(() => host.Engine.StartAsync(Spec(provider, model, "lifted " + provider, options),
+                    new RunSpendAnswer(SpendChoice.CapOutput, 500)), $"{provider}: provider options that set the output length are refused");
+                Check(error.Plan.Refused.Any(item => item.Option == RunModelOptions.ProviderOptions), "named: " + error.Message);
+            }
+            Equal(0, host.Provider.Requests.Count, "nothing was sent");
+
+            var capped = await host.Engine.StartAsync(Spec("openai", gpt, "capped at five hundred", """{"user":"run-test"}"""), new RunSpendAnswer(SpendChoice.CapOutput, 500));
+            Check(capped.Posted, "posted with the output capped: " + capped.Refusal?.Message);
+            var run = await RunsFinishedAsync(host.Store, capped.Id!);
+            Equal(RunStatus.Completed, run.Status, "completed: " + run.Error);
+            var body = JsonNode.Parse(host.Provider.Requests.Single(request => request.Body?.Contains("capped at five hundred", StringComparison.Ordinal) == true).Body!)!;
+            Equal((500, "run-test"), (body["max_output_tokens"]!.GetValue<int>(), body["user"]!.GetValue<string>()), "the body carries the guard's cap and the other options");
+        }),
+
+        Case("runs.endpoints.the-confirm-modal-offers-only-a-cap-the-run-holds", async () =>
+        {
+            await using var host = RunsHost.Routing("runs-endpoints-cap-offer");
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", Planted("sk-ant-api03-")));
+            var model = ModelOf(host.Services.GetRequiredService<IModelCatalog>(), "anthropic", "anthropic-messages", "claude-haiku-4-5");
+            // A request cap of half a cent asks; what fits under it is well below the 2,048 tokens budget thinking needs.
+            await host.Services.GetRequiredService<ISpendLedger>().SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Request, 5_000, CapAction.Ask));
+            RunSpec Spec(string? thinking) => new()
+            {
+                Provider = "anthropic",
+                Model = model,
+                Thinking = thinking,
+                MaxTokens = 8000,
+                Messages = [new RunMessage { Text = "how much" }],
+            };
+            var plain = await host.Engine.StartAsync(Spec(null));
+            Check(plain is { Posted: false, Refusal: not null }, "the cap asks: " + plain.Refusal?.Code);
+            var offered = await RunEndpoints.SpendAsync(plain.Refusal!, host.Services);
+            var tokens = offered["capOutputTokens"]?.GetValue<int>();
+            Check(tokens is > 0 and < RunModelOptions.MinThinkingOutputTokens, "without thinking it offers to cap the output: " + offered.ToJsonString());
+
+            var thinking = await host.Engine.StartAsync(Spec("high"));
+            Check(thinking is { Posted: false, Refusal: not null }, "the cap asks: " + thinking.Refusal?.Code);
+            Check(thinking.Refusal!.CapOutputRefusal?.Invoke(tokens!.Value) is { } why && why.Contains("2,048", StringComparison.Ordinal), "the run says why it cannot hold it");
+            var withheld = await RunEndpoints.SpendAsync(thinking.Refusal, host.Services);
+            Check(withheld["capOutputTokens"] is null && withheld["canProceed"]!.GetValue<bool>(), "with budget thinking the cap is not offered; proceeding once still is: " + withheld.ToJsonString());
+            await ThrowsAsync<ArgumentException>(() => host.Engine.StartAsync(Spec("high"), new RunSpendAnswer(SpendChoice.CapOutput, tokens!.Value)),
+                "and an answer that caps it anyway is refused");
+            Equal(0, host.Provider.Requests.Count, "nothing was sent");
+            Equal(0L, host.Store.Count(), "nor recorded");
+        }),
+
         Case("runs.app.streams-over-sse-records-chats-and-a-restart-marks-a-run-interrupted", async () =>
         {
             var root = Temp("runs-app");

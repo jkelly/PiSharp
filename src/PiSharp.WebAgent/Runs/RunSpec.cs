@@ -266,7 +266,7 @@ public sealed partial record RunSpec
             foreach (var key in extra.Select(pair => pair.Key))
                 if (StructuralKeys.Contains(key, StringComparer.OrdinalIgnoreCase))
                     throw new ArgumentException($"Provider options cannot set \"{key}\": the run sets the request's model, messages and tools itself.");
-                else if (SecretName(key))
+                else if (SecretName(key) && !RunModelOptions.OutputOptionName(key))
                     throw new ArgumentException($"Provider options cannot set \"{key}\": the account supplies its own credentials.");
         var normalized = this with
         {

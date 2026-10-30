@@ -29,11 +29,12 @@ public sealed class RunHttpContext
     /// <summary>The model's API.</summary>
     public string? Api { get; init; }
 
-    /// <summary>The JSON merged into the model request's body, or null.</summary>
-    public JsonObject? Patch { get; init; }
+    /// <summary>The JSON merged into the model request's body, or null. The engine sets it for the output cap it sends
+    /// (<see cref="RunModelOptions.SendPatch"/>) before the request starts.</summary>
+    public JsonObject? Patch { get; set; }
 
     /// <summary>The end of the model request's path (<see cref="RunRequestPlan.PatchPath"/>), or null.</summary>
-    public string? PatchPath { get; init; }
+    public string? PatchPath { get; set; }
 
     /// <summary>Extra headers for every request of the call, or null.</summary>
     public IReadOnlyDictionary<string, string>? Headers { get; init; }

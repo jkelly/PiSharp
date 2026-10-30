@@ -211,6 +211,14 @@ public static class RunEndpoints
         try
         {
             var view = pages.ConfirmView(refusal.Call, decision);
+            // "Cap the output" is offered only when the run would hold that cap (RunModelOptions.OutputCapRefusal).
+            if (view.CapOutputTokens is { } tokens && refusal.CapOutputRefusal?.Invoke(tokens) is { } why)
+                view = view with
+                {
+                    CapOutputTokens = null,
+                    Fit = $"Capping the output is not offered for this request: {why}.",
+                    Others = view.Others?.Replace(" Capping the output also answers that Ask, for this request only.", "", StringComparison.Ordinal),
+                };
             answer["pane"] = view.Pane;
             answer["canProceed"] = view.CanProceed;
             answer["capOutputTokens"] = view.CapOutputTokens;

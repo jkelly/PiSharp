@@ -4,8 +4,9 @@
 // dropped) instead of adding a second one. Each store instance has a runner id; the first use in a process marks every row still running
 // under another runner interrupted (the app stopped while it ran: it is never retried by itself; a recovered chat call sets it running
 // again). Cleanup deletes unpinned runs older than the retention (never a running one, nor an ancestor or a descendant of a pinned run, at
-// any depth: an agent compare run is three levels) and raw payloads older than RawRetentionDays, whatever the run's own retention. Delete
-// takes a run's whole tree. Every method is synchronous (SQLite on the
+// any depth: an agent compare run is three levels) and raw payloads older than RawRetentionDays, whatever the run's own retention. Raw
+// payloads are never read past RawRetentionDays either: Raw leaves out rows older than that and a run whose rows are all older reads as
+// expired, so the limit holds to the minute between cleanups. Delete takes a run's whole tree. Every method is synchronous (SQLite on the
 // caller's thread) and safe from many threads.
 using System.Globalization;
 using System.Text;
@@ -81,9 +82,13 @@ public sealed class RunStore
     /// <summary>The most ids one delete takes.</summary>
     public const int MaxDelete = 1_000;
 
+    // A run's raw state as read: stored payloads that are all past RawRetentionDays ($rawCutoff) read as expired before a cleanup removes them.
+    private const string RawStateColumn = "CASE WHEN raw_state = 'stored' AND NOT EXISTS (SELECT 1 FROM run_raw WHERE run_raw.run_id = runs.id AND " +
+        "run_raw.created >= $rawCutoff) THEN 'expired' ELSE raw_state END";
+
     private const string ListColumns = "id, op, kind, source, status, provider, model, api, account, group_id, parent_id, session, title, messages_ref, " +
         "output_text, stop_reason, error, notes, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens, cost_micros, cost_kind, " +
-        "billing, spend_op, ttft_ms, duration_ms, tokens_per_second, pinned, raw_state, created, started, finished, updated";
+        "billing, spend_op, ttft_ms, duration_ms, tokens_per_second, pinned, " + RawStateColumn + ", created, started, finished, updated";
 
     private const string FullColumns = ListColumns + ", options, messages, output";
 
@@ -104,14 +109,16 @@ public sealed class RunStore
 
     private readonly Lock gate = new();
     private readonly ILogger log;
+    private readonly TimeProvider time;
     private volatile bool ready;
 
-    /// <summary>A store over <paramref name="db"/>.</summary>
-    public RunStore(RunsDb db, ILogger<RunStore>? log = null)
+    /// <summary>A store over <paramref name="db"/>; <paramref name="time"/> (default: the system's) dates the raw payloads' age limit.</summary>
+    public RunStore(RunsDb db, ILogger<RunStore>? log = null, TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         Db = db;
         this.log = (ILogger?)log ?? NullLogger.Instance;
+        this.time = time ?? TimeProvider.System;
     }
 
     /// <summary>The database.</summary>
@@ -227,7 +234,7 @@ public sealed class RunStore
     {
         ArgumentNullException.ThrowIfNull(id);
         EnsureReady();
-        return Db.Db.Query($"SELECT {FullColumns} FROM runs WHERE id = $id;", reader => Read(reader, full: true), ("$id", id)).FirstOrDefault();
+        return Db.Db.Query($"SELECT {FullColumns} FROM runs WHERE id = $id;", reader => Read(reader, full: true), ("$id", id), RawCutoff()).FirstOrDefault();
     }
 
     /// <summary>The run whose op is <paramref name="op"/>, or null.</summary>
@@ -235,7 +242,7 @@ public sealed class RunStore
     {
         ArgumentNullException.ThrowIfNull(op);
         EnsureReady();
-        return Db.Db.Query($"SELECT {FullColumns} FROM runs WHERE op = $op;", reader => Read(reader, full: true), ("$op", op)).FirstOrDefault();
+        return Db.Db.Query($"SELECT {FullColumns} FROM runs WHERE op = $op;", reader => Read(reader, full: true), ("$op", op), RawCutoff()).FirstOrDefault();
     }
 
     /// <summary>One page of the runs <paramref name="query"/> matches, newest first, without their options, messages and output.</summary>
@@ -249,7 +256,7 @@ public sealed class RunStore
         var (where, parameters) = Where(query);
         var total = Convert.ToInt64(Db.Db.Scalar($"SELECT COUNT(*) FROM runs{where};", [.. parameters]) ?? 0L, CultureInfo.InvariantCulture);
         var items = Db.Db.Query($"SELECT {ListColumns} FROM runs{where} ORDER BY created DESC, id DESC LIMIT $limit OFFSET $offset;",
-            reader => Read(reader, full: false), [.. parameters, ("$limit", query.Limit), ("$offset", query.Offset)]);
+            reader => Read(reader, full: false), [.. parameters, ("$limit", query.Limit), ("$offset", query.Offset), RawCutoff()]);
         return new RunPage(items, total);
     }
 
@@ -278,14 +285,18 @@ public sealed class RunStore
             ("$id", id), ("$after", after), ("$limit", Math.Max(1, limit)));
     }
 
-    /// <summary>The stored raw payload items of <paramref name="id"/>, in order (empty when none were stored or they expired).</summary>
+    /// <summary>The stored raw payload items of <paramref name="id"/>, in order (empty when none were stored or they expired: an item older
+    /// than <see cref="RunHistorySettings.RawRetentionDays"/> is never read, even before a cleanup removes it).</summary>
     public IReadOnlyList<RunRawItem> Raw(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
         EnsureReady();
-        return Db.Db.Query("SELECT seq, kind, at_ms, data FROM run_raw WHERE run_id = $id ORDER BY seq;",
-            reader => new RunRawItem(reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2), reader.GetString(3)), ("$id", id));
+        return Db.Db.Query("SELECT seq, kind, at_ms, data FROM run_raw WHERE run_id = $id AND created >= $rawCutoff ORDER BY seq;",
+            reader => new RunRawItem(reader.GetInt64(0), reader.GetString(1), reader.GetInt64(2), reader.GetString(3)), ("$id", id), RawCutoff());
     }
+
+    /// <summary>The <c>$rawCutoff</c> parameter: the oldest time a raw payload may have been stored at and still be read.</summary>
+    private (string, object?) RawCutoff() => ("$rawCutoff", Ms(time.GetUtcNow() - TimeSpan.FromDays(RunHistorySettings.RawRetentionDays)));
 
     /// <summary>Pins or unpins <paramref name="id"/>.</summary>
     /// <returns>Whether the run exists.</returns>
