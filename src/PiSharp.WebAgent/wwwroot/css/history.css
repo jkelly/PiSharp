@@ -36,8 +36,8 @@
 .run-sse-head { font-size: .62rem; }
 #sseList.sse-wrap .sse-row .data,
 #sseList.sse-wrap .sse-row .ev { white-space: pre-wrap; word-break: break-all; }
-.run-events[data-collapsed="true"] .sse-row[data-extra] { display: none; }
-.run-events[data-collapsed="false"] .sse-row[data-summary] { display: none; }
+.run-events[data-collapsed="true"] .sse-row[data-extra="true"] { display: none; }
+.run-events[data-collapsed="false"] .sse-row[data-summary="true"] { display: none; }
 .run-term pre { max-height: 32rem; overflow: auto; }
 .waterfall-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 80px; gap: .75rem; align-items: center; padding: .3rem 0; font-size: .8rem; }
 @media (max-width: 767.98px) { .waterfall-row { grid-template-columns: 96px minmax(0, 1fr) 56px; gap: .5rem; } }
