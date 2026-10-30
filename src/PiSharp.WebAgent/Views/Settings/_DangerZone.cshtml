@@ -1,0 +1,86 @@
+@* Decision 0011 (run W4, unit R9): the mockups' _DangerZone (Settings › Data & storage): Clear run history, Delete all chats, Delete all
+   credentials and Reset all settings. Each says what it deletes with this machine's numbers, opens _DataConfirmModal with the same facts,
+   and runs only after DELETE is typed exactly (the server checks it too: POST /api/data/danger/{action} with {confirm}). Each deletes only
+   what it names: history keeps chats, chats keep history (they move to the 30-day archive), credentials keep environment variables and the
+   key ring, and the reset keeps credentials, chats and history (after a copy of the settings is written to the data folder). A button with
+   nothing to delete is disabled. Model: DataPage. *@
+@using PiSharp.WebAgent.DataStorage
+@model DataPage
+@{
+    var runs = Model.Runs;
+    var chats = Model.Chats;
+    var credentials = Model.Credentials;
+    var reset = Model.Reset;
+    string Join(IReadOnlyList<string> names) => names.Count <= 1 ? string.Join("", names) : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+    var environment = credentials.Environment.Count == 0 ? null
+        : credentials.Environment.Count == 1 ? credentials.Environment[0] + " from the environment keeps working."
+        : Join(credentials.Environment) + " from the environment keep working.";
+    var stored = new List<string>();
+    if (credentials.ApiKeys.Count > 0) stored.Add("the " + Join(credentials.ApiKeys) + (credentials.ApiKeys.Count == 1 ? " API key" : " API keys"));
+    if (credentials.SignIns.Count > 0) stored.Add("the tokens for the " + Join(credentials.SignIns) + (credentials.SignIns.Count == 1 ? " sign-in" : " sign-ins"));
+    var credentialsBody = $"The {DataStorageService.Plural(credentials.Stored, "stored entry", "stored entries")} {(credentials.Stored == 1 ? "is" : "are")} deleted from this machine" +
+        (stored.Count > 0 ? ": " + string.Join(", and ", stored) : "") + ". Models from those providers stop working until you reconnect." + (environment is null ? "" : " " + environment);
+    var resetBody = (reset.Changes.Count > 0 ? "Every setting goes back to its default: " + string.Join("; ", reset.Changes) + "." : "Every setting is at its default already.") +
+        " Credentials, chats and history are kept." +
+        (reset.RetentionChanges ? $" Runs are then kept {(reset.RetentionDaysAfter is { } days ? "for " + DataStorageService.Plural(days, "day") : "forever")}" +
+            (reset.RunsPastRetention > 0 ? $", so the next cleanup deletes {DataStorageService.Plural(reset.RunsPastRetention, "older run")}." : ".") : "");
+}
+<section class="settings-section" id="danger-zone">
+  <h3 class="text-ps-danger">Danger zone</h3>
+  <p class="section-desc">Each one asks you to type @DataStorageService.ConfirmWord first. Deleted chats stay in the archive for @DataStorageOptions.ArchiveRetentionDays days; the rest can't be undone.</p>
+  <div class="ps-card danger-zone">
+    <div class="setting-row" data-danger-row="history">
+      <div>
+        <div class="setting-label">Clear run history</div>
+        <div class="setting-desc">Deletes all @DataStorageService.Plural(runs.Count, "run"), their payloads and events from <span class="ps-mono">runs.db</span> (@DataFolders.Size(runs.Bytes)). Chats are kept.</div>
+      </div>
+      <div class="setting-control">
+        <button class="btn btn-sm btn-outline-danger" type="button" data-danger="history" disabled="@(!runs.Available || runs.Count == 0)"
+                data-confirm-title="Clear all run history?"
+                data-confirm-body="All @DataStorageService.Plural(runs.Count, "run"), with their raw payloads and SSE events, are deleted from runs.db, pinned ones too. Chats and presets are kept."
+                data-confirm-detail="runs.db · @DataFolders.Size(runs.Bytes) · compacted afterwards (VACUUM)"
+                data-confirm-ok="Clear history">Clear history…</button>
+      </div>
+    </div>
+    <div class="setting-row" data-danger-row="chats">
+      <div>
+        <div class="setting-label">Delete all chats</div>
+        <div class="setting-desc">Stops any running chats and moves all @chats.Count (@DataFolders.Size(chats.SessionBytes)) to the archive, where they are purged after @DataStorageOptions.ArchiveRetentionDays days.</div>
+      </div>
+      <div class="setting-control">
+        <button class="btn btn-sm btn-outline-danger" type="button" data-danger="chats" disabled="@(!chats.Available || chats.Count == 0)"
+                data-confirm-title="Delete all chats?"
+                data-confirm-body="All @DataStorageService.Plural(chats.Count, "chat") stop and move to the archive, with every branch. They are purged after @DataStorageOptions.ArchiveRetentionDays days. Runs in History stay."
+                data-confirm-detail="@chats.ArchiveDisplay · @DataStorageService.Plural(chats.Count, "chat") · @DataFolders.Size(chats.SessionBytes) · purged after @DataStorageOptions.ArchiveRetentionDays days"
+                data-confirm-ok="Delete chats">Delete chats…</button>
+      </div>
+    </div>
+    <div class="setting-row" data-danger-row="credentials">
+      <div>
+        <div class="setting-label">Delete all credentials</div>
+        <div class="setting-desc">Removes @DataStorageService.Plural(credentials.Stored, "stored API key and sign-in", "stored API keys and sign-ins").@if (credentials.Environment.Count > 0) { <text> <span class="ps-mono">@credentials.Environment[0]</span>@(credentials.Environment.Count > 1 ? " and other environment variables" : "") still work@(credentials.Environment.Count > 1 ? "" : "s").</text> } else { <text> Environment variables still work.</text> }</div>
+      </div>
+      <div class="setting-control">
+        <button class="btn btn-sm btn-outline-danger" type="button" data-danger="credentials" disabled="@(!credentials.Available || credentials.Stored == 0)"
+                data-confirm-title="Delete all credentials?"
+                data-confirm-body="@credentialsBody"
+                data-confirm-detail="credentials.json · @DataStorageService.Plural(credentials.Stored, "entry", "entries") · the key ring is kept"
+                data-confirm-ok="Delete credentials">Delete credentials…</button>
+      </div>
+    </div>
+    <div class="setting-row" data-danger-row="settings">
+      <div>
+        <div class="setting-label">Reset all settings</div>
+        <div class="setting-desc">Every setting goes back to its default. Credentials, chats and history are kept.</div>
+      </div>
+      <div class="setting-control">
+        <button class="btn btn-sm btn-outline-danger" type="button" data-danger="settings" disabled="@(reset.Changes.Count == 0)"
+                title="@(reset.Changes.Count == 0 ? "Every setting is at its default already" : "Reset all settings")"
+                data-confirm-title="Reset all settings?"
+                data-confirm-body="@resetBody"
+                data-confirm-detail="A copy is saved first as @(DataStorageService.BackupPrefix)….json in the data folder; import it to undo"
+                data-confirm-ok="Reset settings">Reset settings…</button>
+      </div>
+    </div>
+  </div>
+</section>

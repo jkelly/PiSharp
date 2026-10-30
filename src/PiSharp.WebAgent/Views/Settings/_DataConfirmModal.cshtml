@@ -1,0 +1,32 @@
+@* Decision 0011 (run W4, unit R9): the mockups' confirm dialog of Settings › Data & storage (#modal-data-confirm; the mockup's _ConfirmModal
+   variants credentials, history, sessions, settings and ac-cleanup). data.js fills it from the clicked button's data-confirm-title, -body,
+   -note, -detail and -ok, as text. The danger zone's variants show the typed confirmation: the button unlocks only when the field holds
+   DELETE exactly; removing compare workspaces needs no typing. The shared _ConfirmModal has no typed variant, so this page has its own.
+   Model: none. *@
+@using PiSharp.WebAgent.DataStorage
+<div class="modal fade" id="modal-data-confirm" tabindex="-1" aria-labelledby="modal-data-confirm-title" aria-hidden="true" data-data-confirm>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body p-4">
+        <div class="d-flex gap-3">
+          <span class="provider-logo lg confirm-icon is-danger" aria-hidden="true"><i class="bi bi-trash3"></i></span>
+          <div class="flex-grow-1" style="min-width:0">
+            <h2 class="modal-title mb-1" id="modal-data-confirm-title" data-confirm-title>Are you sure?</h2>
+            <p class="text-secondary fs-7 mb-2" data-confirm-body></p>
+            <p class="text-secondary fs-7 mb-2" data-confirm-note hidden></p>
+            <div class="ps-mono fs-8 text-ps-faint mb-3 text-break" data-confirm-detail></div>
+            <div data-confirm-typed hidden>
+              <label class="form-label fs-7" for="dataConfirmType">Type <span class="ps-mono fw-bold">@DataStorageService.ConfirmWord</span> to confirm</label>
+              <input class="form-control font-monospace" id="dataConfirmType" autocomplete="off" spellcheck="false" placeholder="@DataStorageService.ConfirmWord" data-confirm-input aria-describedby="dataConfirmHelp">
+              <div class="form-text" id="dataConfirmHelp">The button unlocks when the text matches exactly.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" data-confirm-ok>Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>

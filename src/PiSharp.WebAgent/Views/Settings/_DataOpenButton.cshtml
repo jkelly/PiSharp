@@ -1,0 +1,7 @@
+@* Decision 0011 (run W4, unit R9): the mockups' "Open folder" button of Settings › Data & storage. It names a target (and for a workspace its
+   run and slot), never a path; data.js POSTs it to /api/data/open, which resolves the folder on the server and starts the file manager of
+   this machine. Disabled, with why, when the folder doesn't exist yet or opening folders is turned off. Model: DataOpenButton. *@
+@using PiSharp.WebAgent.DataStorage
+@model DataOpenButton
+<button class="btn btn-sm btn-outline-secondary flex-shrink-0" type="button" data-open-folder="@Model.Target" data-run="@Model.Run" data-slot="@Model.Slot"
+        aria-label="@Model.Label" title="@(Model.Disabled ?? Model.Label)" disabled="@(Model.Disabled is not null)"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">Open folder</span></button>

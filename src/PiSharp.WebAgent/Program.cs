@@ -48,6 +48,8 @@ PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.AddAgentCompareRunner(bu
 PiSharp.WebAgent.Playground.PlaygroundModule.AddPlaygroundArea(builder.Services, options);
 // Compare (run W4, R2): GET /compare and /api/compare (request mode: a group of 2 to 4 columns, reserved all or none).
 PiSharp.WebAgent.Compare.CompareModule.AddCompareArea(builder.Services, options);
+// Settings › Data & storage (run W4, R9): after the areas it reports on; locations, retention, workspaces, export and import, danger zone.
+PiSharp.WebAgent.DataStorage.DataStorageModule.AddDataStorageArea(builder.Services, options, builder.Configuration);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -63,6 +65,7 @@ app.MapRunsArea();
 PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.MapAgentCompareRunner(app);
 PiSharp.WebAgent.Playground.PlaygroundModule.MapPlaygroundArea(app);
 PiSharp.WebAgent.Compare.CompareModule.MapCompareArea(app);
+PiSharp.WebAgent.DataStorage.DataStorageModule.MapDataStorageArea(app);
 app.MapWebAgentCore();
 app.Run();
 return 0;

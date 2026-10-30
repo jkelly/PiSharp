@@ -1,0 +1,24 @@
+@* Decision 0011 (run W4, unit R9): the mockups' _ChatStorage (Settings › Data & storage, section Chats): what a durable session is (saved as
+   it runs; a run keeps going with the tab closed, and resumes after a restart with a cut-off tool marked interrupted, never run twice),
+   and the archive of deleted chats: how many and how large, purged after 30 days by ChatArchiveJanitor, with Open folder. Model: DataPage. *@
+@using PiSharp.WebAgent.DataStorage
+@model DataPage
+@{
+    var chats = Model.Chats;
+}
+<section class="settings-section" id="chats">
+  <h3>Chats</h3>
+  <p class="section-desc">Each chat is a durable session on this machine, saved as it runs. Closing the tab doesn't stop a run: it keeps going here, and the chat catches up when you open it again, in any tab. If the web agent restarts mid-run, the run continues where it stopped, and a tool that was cut off is marked interrupted instead of being run twice. See <a href="#locations">Locations</a> for the folder.</p>
+  <div class="ps-card">
+    <div class="setting-row" data-archive>
+      <div>
+        <div class="setting-label">Deleted chats</div>
+        <div class="setting-desc">Deleting a chat stops its run and moves it to the archive in <span class="ps-mono">@chats.ArchiveDisplay</span>. Archived chats are purged after @DataStorageOptions.ArchiveRetentionDays days.</div>
+      </div>
+      <div class="setting-control">
+        <span class="ps-chip" data-archive-chip>@chats.Archived archived · @DataFolders.Size(chats.ArchiveBytes)</span>
+        <partial name="/Views/Settings/_DataOpenButton.cshtml" model='Model.Open(DataOpenTargets.Archive, "Open archive folder")' />
+      </div>
+    </div>
+  </div>
+</section>
