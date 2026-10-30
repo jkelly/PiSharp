@@ -162,7 +162,7 @@
                   <input type="radio" class="btn-check" name="@(p)-thinking" id="@(p)-th-@level" value="@level" checked="@(Model.Level == level)" disabled="@(!taken)" data-opt="thinking" data-kind="level"><label class="btn btn-outline-secondary" for="@(p)-th-@level" title="@Model.LevelWhy(level)">@level</label>
                 }
               </div>
-              <div class="form-text mt-1" data-option-note>@(Model.Capabilities is { ThinkingLevels.Count: > 1 } caps ? $"This model thinks at {string.Join(", ", caps.ThinkingLevels.Skip(1))}. Default: off. max isn't sent by the run engine yet." : "This model does not think. max isn't sent by the run engine yet.")</div>
+              <div class="form-text mt-1" data-option-note>@(Model.Capabilities is { ThinkingLevels.Count: > 1 } caps ? $"This model thinks at {string.Join(", ", caps.ThinkingLevels.Skip(1))}. Default: off." : "This model does not think.")</div>
             </div>
             <div class="param-row param-disabled" data-unsent="thinkingBudgets">
               <div class="param-head">

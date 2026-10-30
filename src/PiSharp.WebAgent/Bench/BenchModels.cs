@@ -289,6 +289,9 @@ public sealed record BenchCall
     /// <summary>The arguments as sent when they are not an object, or null.</summary>
     public string? RawArguments { get; init; }
 
+    /// <summary>The provider's signature of the call (Google's thought signature), sent back with it on the next turn; null when it had none.</summary>
+    public string? ThoughtSignature { get; init; }
+
     /// <summary>Whether it names a tool the bench offered.</summary>
     public bool Known { get; init; }
 
@@ -338,6 +341,10 @@ public sealed record BenchTurn
 
     /// <summary>The thinking text, or null.</summary>
     public string? Thinking { get; init; }
+
+    /// <summary>The thinking blocks as the provider sent them (with their signatures), sent back with the turn's calls on the next turn:
+    /// Anthropic refuses a thinking model's tool loop without them, and OpenAI Responses keeps its reasoning item there. Null for none.</summary>
+    public IReadOnlyList<Runs.RunThinking>? ThinkingBlocks { get; init; }
 
     /// <summary>The ids of the calls it made, in order.</summary>
     public IReadOnlyList<string> Calls { get; init; } = [];

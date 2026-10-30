@@ -209,6 +209,14 @@ public sealed record RunQuery
     /// <summary>Only the children of this parent.</summary>
     public string? ParentId { get; init; }
 
+    /// <summary>Only top-level runs (no parent): a call of its own, a Compare or Bench group's calls, an agent compare run's top row; not
+    /// an agent compare model's row or its calls.</summary>
+    public bool TopLevelOnly { get; init; }
+
+    /// <summary>Only this stop reason (the run's own, as recorded: <c>stop</c>, <c>length</c>, <c>toolUse</c>, or an agent compare model's
+    /// outcome); its status is not implied, so a caller that means "completed with" also sets <see cref="Status"/>.</summary>
+    public string? StopReason { get; init; }
+
     /// <summary>Only pinned (true) or unpinned (false) runs.</summary>
     public bool? Pinned { get; init; }
 

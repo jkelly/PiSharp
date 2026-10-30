@@ -71,15 +71,21 @@ public sealed record RequestConfigView
     /// <summary>Where the "defaults" link of the pane header goes.</summary>
     public string DefaultsUrl { get; init; } = "/settings/defaults";
 
-    /// <summary>The thinking levels the Reasoning control lists: the run engine's, then <c>max</c> (listed, not sent yet).</summary>
-    public static IReadOnlyList<string> Levels { get; } = [.. RunSpec.ThinkingLevels, "max"];
+    /// <summary>The thinking levels the Reasoning control lists: the run engine's (<see cref="RunSpec.ThinkingLevels"/>, <c>max</c> last).</summary>
+    public static IReadOnlyList<string> Levels { get; } = RunSpec.ThinkingLevels;
 
-    /// <summary>The service tiers the Speed list shows, PLAN.md "Request speed" order; Fast and UltraFast are listed, not sent yet.</summary>
+    /// <summary>The service tiers the Speed list shows, PLAN.md "Request speed" order; each is sent when <see cref="RunSpec.ServiceTiers"/>
+    /// names it, and taken when the model's API does (<see cref="TierTaken"/>).</summary>
     public static IReadOnlyList<RequestTier> Tiers { get; } =
     [
-        new("", "Use default", true), new("auto", "Auto", true), new("default", "Standard", true), new("flex", "Flex", true),
-        new("scale", "Scale", true), new("priority", "Priority", true), new("fast", "Fast", false), new("ultrafast", "UltraFast", false),
+        Tier("", "Use default"), Tier("auto", "Auto"), Tier("default", "Standard"), Tier("flex", "Flex"),
+        Tier("scale", "Scale"), Tier("priority", "Priority"), Tier("fast", "Fast"), Tier("ultrafast", "UltraFast"),
     ];
+
+    private static RequestTier Tier(string value, string label) => new(value, label, value.Length == 0 || RunSpec.ServiceTiers.Contains(value));
+
+    /// <summary>Whether the model takes service tier <paramref name="value"/> (the empty value, the configured default, always).</summary>
+    public bool TierTaken(string value) => value.Length == 0 || (Capabilities?.ServiceTiers.Contains(value) ?? false);
 
     /// <summary>Why a listed tier or level is not sent.</summary>
     public const string NotSentYet = "PiSharp's run engine does not send it yet.";
@@ -212,20 +218,21 @@ public sealed record RequestConfigView
     /// <summary>The tool a <c>tool</c> choice names.</summary>
     public string? ChoiceTool => ChoiceKind == "tool" ? Draft.ToolChoice : null;
 
-    /// <summary>The options of other APIs and transport settings PiSharp's run engine does not send yet, by section.</summary>
+    /// <summary>The options this page does not send, by section: some the run engine does not take yet, and some it takes (RunSpec's
+    /// textVerbosity, reasoningSummary, sessionId and timeoutMs, and a tool's strict flag) that this page has no control wired for yet.</summary>
     public static IReadOnlyDictionary<string, RequestUnsentOption> Unsent { get; } = new Dictionary<string, RequestUnsentOption>(StringComparer.Ordinal)
     {
         ["baseUrl"] = new("baseUrl", "Runs use the provider's base URL from Settings › Providers; a per-run override is not sent yet."),
         ["apiKey"] = new("apiKey", "The Playground never takes a key from the page: runs use the account below, whose credential stays on the server."),
-        ["textVerbosity"] = new("textVerbosity", "Codex only, and PiSharp's run engine does not patch Codex requests yet."),
+        ["textVerbosity"] = new("textVerbosity", "The run engine takes it on Responses, Azure and Codex models; this page does not send it yet."),
         ["thinkingBudgets"] = new("thinkingBudgets", "The run engine sends the thinking level only; per-level token budgets are not sent yet."),
-        ["reasoningSummary"] = new("reasoningSummary", "The run engine does not send reasoning.summary yet."),
+        ["reasoningSummary"] = new("reasoningSummary", "The run engine takes it while a Responses, Azure or Codex model thinks; this page does not send it yet."),
         ["cacheRetention"] = new("cacheRetention", "Runs use PiSharp's prompt-cache defaults; a per-run value is not sent yet."),
-        ["sessionId"] = new("sessionId", "Runs use PiSharp's session defaults; a per-run session id is not sent yet."),
-        ["timeoutMs"] = new("timeoutMs", "Runs use PiSharp's transport defaults; a per-run timeout is not sent yet."),
+        ["sessionId"] = new("sessionId", "The run engine takes it on Responses, Azure and Codex models; this page does not send it yet."),
+        ["timeoutMs"] = new("timeoutMs", "The run engine takes a response-header timeout of 1 second to 1 hour; this page does not send it yet."),
         ["maxRetries"] = new("maxRetries", "Runs use PiSharp's transport defaults; per-run retries are not sent yet."),
         ["maxRetryDelayMs"] = new("maxRetryDelayMs", "Runs use PiSharp's transport defaults; a per-run retry delay is not sent yet."),
-        ["strict"] = new("strict", "The run engine sends name, description and parameters only; strict tools are not sent yet."),
+        ["strict"] = new("strict", "The run engine takes a tool's strict flag where the API has one; the tool editor does not send it yet."),
     };
 
     /// <summary>The Azure OpenAI Responses options (set on the provider; not sent per run yet).</summary>

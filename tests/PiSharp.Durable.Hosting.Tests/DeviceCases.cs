@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
 using PiSharp.Durable.Hosting;
 using PiSharp.Durable.Hosting.Testing;
@@ -48,6 +49,26 @@ internal static partial class Program
                 new("content", JsonValue.Array([JsonValue.Object([new("type", "text"), new("text", "out")])]))]);
             Equal("Tool finished: bash: out", FauxDurableModels.Reply(ImmutableArray.Create(User("!x"), result)).Text, "a tool result");
             Equal("Echo: ", FauxDurableModels.Reply([]).Text, "no message");
+            Equal("upstream down", FauxDurableModels.Reply([User("error: upstream down")]).Error, "error: fails with the message");
+            Equal(FauxDurableModels.ErrorMessage, FauxDurableModels.Reply([User("error:")]).Error, "or with the default one");
+            Check(FauxDurableModels.Reply([User("errors: are echoed")]).Error is null, "only the exact prefix fails");
+        }),
+
+        Case("device.faux-error-prompt-ends-with-a-provider-error", async () =>
+        {
+            var faux = new FauxDurableModels();
+            var model = faux.GetModel(FauxDurableModels.ProviderId, FauxDurableModels.Echo.Id)!;
+            var events = new List<StreamEvent>();
+            await foreach (var item in faux.StreamSimple(model, [JsonValue.Object([new("role", "user"), new("content", "error: The upstream said no.")])], null, default))
+                events.Add(item);
+            Check(events[0] is StreamStarted, "it starts as any answer does");
+            var end = events[^1] as StreamError ?? throw new InvalidOperationException("ends with a StreamError: " + events[^1]);
+            Equal(StopReason.Error, end.Reason, "stop reason error");
+            Equal(StopReason.Error, end.Message.StopReason, "on the message too");
+            Check(end.Message.Content.IsEmpty, "no content");
+            Check(end.Message.ExtraProperties is { } extra && extra.TryGet("errorMessage", out var message) && message!.Value.GetString() == "The upstream said no.",
+                "the message is its errorMessage");
+            Equal(2, events.Count, "nothing streams in between");
         }),
     ];
 }

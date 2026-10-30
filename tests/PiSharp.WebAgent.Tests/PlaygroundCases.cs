@@ -37,13 +37,20 @@ internal static partial class Program
             Check(html.Contains("data-playground-toolbar data-state=\"empty\"", StringComparison.Ordinal) && html.Contains("not run yet", StringComparison.Ordinal), "the toolbar's");
             foreach (var section in PlaygroundSections)
                 Check(html.Contains($"id=\"pg-cfg-{section}\"", StringComparison.Ordinal), "the config accordion has " + section);
-            foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images]))
+            // The options the run engine took after R1 (parallel tool calls, strict tools, text verbosity, reasoning summary, session id,
+            // timeout) have no control here yet: the last four show as unsent rows (below), the first two have none.
+            string[] notWired = [RunModelOptions.ParallelToolCalls, RunModelOptions.StrictTools, RunModelOptions.TextVerbosity, RunModelOptions.ReasoningSummary,
+                RunModelOptions.SessionId, RunModelOptions.TimeoutMs];
+            foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images, .. notWired]))
                 Check(html.Contains($"data-option=\"{option}\"", StringComparison.Ordinal), "a row for " + option);
+            foreach (var option in notWired)
+                Check(!html.Contains($"data-option=\"{option}\"", StringComparison.Ordinal), "no control sends " + option + " yet");
             foreach (var unsent in RequestConfigView.Unsent.Keys.Except(["strict"]))
                 Check(Regex.IsMatch(html, $"data-unsent=\"{unsent}\""), "the unsent option " + unsent + " is shown");
             Check(Regex.IsMatch(html, "<input type=\"password\"[^>]*id=\"pg-api-key\"[^>]*disabled"), "the API key field is never usable");
-            Check(Regex.IsMatch(html, "<option value=\"ultrafast\" disabled=\"disabled\">UltraFast (·|&#xB7;) not sent yet</option>"), "UltraFast is listed, not sent");
-            Check(Regex.IsMatch(html, "id=\"pg-th-max\" value=\"max\" disabled=\"disabled\""), "max is listed, not sent");
+            Check(html.Contains("<option value=\"ultrafast\">UltraFast</option>", StringComparison.Ordinal) && !html.Contains("not sent yet</option>", StringComparison.Ordinal),
+                "UltraFast is listed and sent (the run engine takes every tier PLAN.md lists)");
+            Check(Regex.IsMatch(html, "id=\"pg-th-max\" value=\"max\" disabled=\"disabled\""), "max is listed, off for a model that does not think");
             Check(Regex.IsMatch(html, "data-provider-pane=\"azure\"") && Regex.IsMatch(html, "data-unsent=\"azureApiVersion\"") && html.Contains("data-provider-pane=\"bedrock\"", StringComparison.Ordinal),
                 "the Azure and Bedrock panes");
             Check(Regex.IsMatch(html, "data-preset-save>") && Regex.IsMatch(html, "data-preset-load>") && !html.Contains("Presets are not available yet", StringComparison.Ordinal),
@@ -244,7 +251,7 @@ internal static partial class Program
             var estimate = await app.SendAsync(HttpMethod.Post, "/api/playground/estimate", Spec("echo-thinking", ("thinking", "high"), ("temperature", 0.5)), origin: app.Origin);
             Check(estimate.Body?["valid"]?.GetValue<bool>() == false && estimate.Body["refused"]?.AsArray().Any(item => item?["option"]?.GetValue<string>() == "temperature") == true,
                 "the estimate says so before Run: " + estimate.Text);
-            Equal(400, (await app.SendAsync(HttpMethod.Post, "/api/runs", Spec("echo", ("thinking", "max")), origin: app.Origin)).Status, "max is not sent by the run engine yet");
+            Equal(400, (await app.SendAsync(HttpMethod.Post, "/api/runs", Spec("echo", ("thinking", "max")), origin: app.Origin)).Status, "max on a model that does not think");
 
             // The config keeps a value the model does not take, marked, and editable so it can be cleared; an unset one is disabled.
             await using var runs = RunsHost.Faux("pg-refused-render");

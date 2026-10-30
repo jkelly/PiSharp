@@ -1,9 +1,11 @@
 // PiSharp-only (decision 0008). A model that needs no provider, for tests and UI work at no cost. Streaming follows the durable examples'
 // ScriptedModels (samples/Durable.Examples/ScriptedModels.cs, after pi-ai's faux provider); the prompt grammar adapts durable-pi's faux model
 // (apps/dpi-backend/src/faux.ts, MIT): "!command" runs bash, "slow:" streams slowly, a tool result is answered "Tool finished: …", anything
-// else is echoed. "tool: <name> <json>" calls any tool.
+// else is echoed. "tool: <name> <json>" calls any tool, and "error: <message>" ends the answer with a provider error (PiSharp-only: a host's
+// error paths, offline).
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using PiSharp.Contracts;
 using PiSharp.Durable.Chord;
 
@@ -26,6 +28,9 @@ public sealed record FauxChat(string ModelId, string? Reasoning, string Text)
 /// <item><c>!command</c> calls <c>bash</c> with the command.</item>
 /// <item><c>tool: name {json}</c> calls any tool with the JSON object as its arguments (default <c>{}</c>); so does a scripted answer of that form.</item>
 /// <item><c>slow: text</c> answers the text a word at a time, <see cref="SlowDelay"/> apart.</item>
+/// <item><c>error: message</c> ends the answer with a provider error (<see cref="StreamError"/>, stop reason <c>error</c>, the message as its
+/// <c>errorMessage</c>; <see cref="ErrorMessage"/> when none is given) and no content. A message a provider would be retried for (such as
+/// <c>overloaded</c>) is retried by a durable session as that provider's would be.</item>
 /// <item>A tool result is answered <c>Tool finished: &lt;tool&gt;: &lt;its first 200 characters&gt;</c>.</item>
 /// <item>Anything else is answered <c>Echo: &lt;text&gt;</c>.</item>
 /// </list>
@@ -54,6 +59,12 @@ public sealed class FauxDurableModels : IDurableModels
 
     /// <summary>The provider's models.</summary>
     public ImmutableArray<FauxModel> Models { get; }
+
+    /// <summary>The prompt prefix of an answer that ends with a provider error: <c>error:</c>.</summary>
+    public const string ErrorPrefix = "error:";
+
+    /// <summary>The error of an <c>error:</c> prompt with no message of its own.</summary>
+    public const string ErrorMessage = "The faux provider failed this request.";
 
     /// <summary>The pause between the words of a <c>slow:</c> answer.</summary>
     public TimeSpan SlowDelay { get; init; } = TimeSpan.FromMilliseconds(40);
@@ -138,6 +149,16 @@ public sealed class FauxDurableModels : IDurableModels
         var reply = awaited is not null ? Scripted(awaited)
             : Respond is { } respond && asked is not null && respond(asked) is { } scripted ? Scripted(scripted) : Reply(messages);
         yield return new StreamStarted(partial);
+        if (reply.Error is { } error)
+        {
+            var failed = partial with
+            {
+                StopReason = StopReason.Error,
+                ExtraProperties = JsonFields.Empty.Set("errorMessage", JsonData.Parse(JsonSerializer.Serialize(error))),
+            };
+            yield return new StreamError(StopReason.Error, failed);
+            yield break;
+        }
         if (reply.Call is { } call)
         {
             yield return new ToolCallStarted(0, call with { Arguments = JsonData.Parse("{}") });
@@ -198,6 +219,7 @@ public sealed class FauxDurableModels : IDurableModels
         if (input.StartsWith('!')) return FauxReply.Calling("bash", JsonValue.Object([new("command", input[1..].Trim())]));
         if (input.StartsWith("tool:", StringComparison.Ordinal)) return ToolCall(input);
         if (input.StartsWith("slow:", StringComparison.Ordinal)) return FauxReply.Answer(input[5..].Trim(), slow: true);
+        if (input.StartsWith(ErrorPrefix, StringComparison.Ordinal)) return FauxReply.Failing(input[ErrorPrefix.Length..].Trim() is { Length: > 0 } message ? message : ErrorMessage);
         return FauxReply.Answer("Echo: " + input);
     }
 
@@ -267,10 +289,12 @@ public sealed class FauxDurableModels : IDurableModels
     } : "";
 }
 
-/// <summary>What <see cref="FauxDurableModels"/> answers: a text, or one tool call.</summary>
-internal sealed record FauxReply(string Text, ToolCallContent? Call, bool Slow)
+/// <summary>What <see cref="FauxDurableModels"/> answers: a text, one tool call, or a provider error.</summary>
+internal sealed record FauxReply(string Text, ToolCallContent? Call, bool Slow, string? Error = null)
 {
     public static FauxReply Answer(string text, bool slow = false) => new(text, null, slow);
+
+    public static FauxReply Failing(string message) => new("", null, false, message);
 
     public static FauxReply Calling(string tool, JsonObjectValue arguments) =>
         new("", new ToolCallContent("faux:" + Guid.NewGuid().ToString("N")[..12], tool, JsonData.Parse(arguments.ToJson())), false);

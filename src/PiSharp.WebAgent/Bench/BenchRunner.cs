@@ -8,7 +8,9 @@
 // turn has a result, the next turn starts by itself (at most MaxAutoTurns in a row). A paused call is answered by hand ("Send result",
 // "Send & continue"). The bench never runs a tool, built-ins included. A turn the Spend Guard refuses is not sent: from a request, the page
 // gets the refusal (and the confirm modal); in the background, the session is "blocked" and Run asks again. One gate per session orders the
-// user's actions and the loop.
+// user's actions and the loop. A turn's signed parts (its thinking blocks with their signatures, each call's thought signature) are kept
+// with the turn and sent back with its calls, so a thinking model's tool loop continues on Anthropic and Google; Parallel tool calls off
+// is the run's first-class switch, which the run engine sends where the API has one and refuses where it has none.
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -450,10 +452,7 @@ public sealed class BenchRunner : IAsyncDisposable
         if (setup.Tools.Count == 0) throw new ArgumentException("Define a tool first: the bench sends your tools with every request.");
         var enabled = setup.Enabled;
         if (enabled.Count == 0) throw new ArgumentException("Switch on at least one tool: the bench sends only the tools that are on.");
-        var capabilities = engine.Capabilities(setup.Provider, setup.Model) ?? throw new ArgumentException($"There is no model {setup.Provider}/{setup.Model}; choose another.");
-        if (capabilities.Api == "anthropic-messages" && setup.Thinking is not null)
-            throw new ArgumentException("The Tool Bench cannot continue a thinking Anthropic model yet: Anthropic needs the model's thinking blocks sent back with " +
-                "the tool results, and PiSharp's run engine does not send them. Set thinking off for this model.");
+        _ = engine.Capabilities(setup.Provider, setup.Model) ?? throw new ArgumentException($"There is no model {setup.Provider}/{setup.Model}; choose another.");
         var choice = setup.ToolChoice == "any" ? "required" : setup.ToolChoice;
         return new RunSpec
         {
@@ -467,7 +466,9 @@ public sealed class BenchRunner : IAsyncDisposable
             Tools = [.. enabled.Select(tool => new RunTool(tool.Name, tool.Description, (JsonObject?)tool.Parameters?.DeepClone()))],
             ToolChoice = choice,
             Thinking = setup.Thinking,
-            ProviderOptions = setup.Parallel || choice == "none" ? null : ParallelOff(capabilities.Api, choice),
+            // Off is sent where the API has a switch (parallel_tool_calls, or Anthropic's disable_parallel_tool_use); the run engine refuses it
+            // on an API without one, so the request never allows parallel calls the user switched off.
+            ParallelToolCalls = setup.Parallel || choice == "none" ? null : false,
         };
     }
 
@@ -491,7 +492,11 @@ public sealed class BenchRunner : IAsyncDisposable
             {
                 Role = "assistant",
                 Text = string.IsNullOrEmpty(turn.Text) ? null : turn.Text,
-                ToolCalls = calls.Count == 0 ? null : [.. calls.Select(call => new RunToolCall(call.Id, call.Tool, (JsonObject?)call.Arguments?.DeepClone() ?? new JsonObject()))],
+                // The provider's signed parts go back as they came, so a thinking model's tool loop continues (Anthropic's thinking blocks,
+                // Google's thought signatures).
+                Thinking = turn.ThinkingBlocks is { Count: > 0 } blocks ? blocks : null,
+                ToolCalls = calls.Count == 0 ? null
+                    : [.. calls.Select(call => new RunToolCall(call.Id, call.Tool, (JsonObject?)call.Arguments?.DeepClone() ?? new JsonObject(), call.ThoughtSignature))],
             });
             foreach (var call in calls)
                 if (call.Result is { } result)
@@ -511,17 +516,6 @@ public sealed class BenchRunner : IAsyncDisposable
         foreach (var loop in loops.Values) loop.Dispose();
         stopping.Dispose();
     }
-
-    private static JsonObject? ParallelOff(string api, string? choice) => api switch
-    {
-        "faux" => null,
-        "openai-completions" or "openai-responses" or "azure-openai-responses" => new JsonObject { ["parallel_tool_calls"] = false },
-        "anthropic-messages" => choice is null
-            ? new JsonObject { ["tool_choice"] = new JsonObject { ["type"] = "auto", ["disable_parallel_tool_use"] = true } }
-            : new JsonObject { ["tool_choice"] = new JsonObject { ["disable_parallel_tool_use"] = true } },
-        _ => throw new ArgumentException($"Parallel tool calls can be switched off on the OpenAI and Anthropic APIs only; {api} has no such switch, " +
-            "so the request would still allow them. Switch Parallel tool calls back on for this model."),
-    };
 
     private static BenchResult NoMockResult(BenchRules rules) =>
         new() { Text = NoMockText, IsError = true, Source = BenchResultSources.NoMock, Ms = BenchLatency.Delay(rules.Latency) };
@@ -686,6 +680,7 @@ public sealed class BenchRunner : IAsyncDisposable
             DurationMs = outcome.DurationMs,
             Text = outcome.Text,
             Thinking = outcome.Thinking,
+            ThinkingBlocks = outcome.Blocks,
             Calls = outcome.Completed ? [.. outcome.Calls.Select(call => call.Id)] : [],
             Input = outcome.Usage.Input,
             Output = outcome.Usage.Output,
@@ -714,6 +709,7 @@ public sealed class BenchRunner : IAsyncDisposable
                     Count = outcome.Calls.Count,
                     Arguments = made.Arguments as JsonObject,
                     RawArguments = made.Arguments is JsonObject ? null : made.Arguments?.ToJsonString(),
+                    ThoughtSignature = made.Signature,
                     Known = decision.Known,
                     Violations = decision.Violations,
                     At = at,
@@ -764,8 +760,9 @@ public sealed class BenchRunner : IAsyncDisposable
     }
 
     /// <summary>What a finished run of a turn said.</summary>
-    private sealed record TurnOutcome(string Status, string? StopReason, long? DurationMs, string? Text, string? Thinking,
-        IReadOnlyList<(string Id, string Name, JsonNode? Arguments)> Calls, RunUsage Usage, long? CostMicros, string? CostKind, string? Error)
+    internal sealed record TurnOutcome(string Status, string? StopReason, long? DurationMs, string? Text, string? Thinking,
+        IReadOnlyList<(string Id, string Name, JsonNode? Arguments, string? Signature)> Calls, RunUsage Usage, long? CostMicros, string? CostKind, string? Error,
+        IReadOnlyList<RunThinking>? Blocks = null)
     {
         public bool Completed => Status == RunStatus.Completed;
 
@@ -774,7 +771,8 @@ public sealed class BenchRunner : IAsyncDisposable
             if (row is null) return new TurnOutcome(RunStatus.Error, null, null, null, null, [], RunUsage.Zero, null, null, "The turn's run was not recorded.");
             var text = new System.Text.StringBuilder();
             var thinking = new System.Text.StringBuilder();
-            var calls = new List<(string, string, JsonNode?)>();
+            var blocks = new List<RunThinking>();
+            var calls = new List<(string, string, JsonNode?, string?)>();
             if (row.Output?["content"] is JsonArray content)
             {
                 foreach (var block in content.OfType<JsonObject>())
@@ -786,20 +784,28 @@ public sealed class BenchRunner : IAsyncDisposable
                             text.Append(part);
                             break;
                         case "thinking" when block["thinking"] is JsonValue value && value.TryGetValue<string>(out var thought):
-                            if (thinking.Length > 0) thinking.Append("\n\n");
-                            thinking.Append(thought);
+                            if (thought.Length > 0)
+                            {
+                                if (thinking.Length > 0) thinking.Append("\n\n");
+                                thinking.Append(thought);
+                            }
+                            blocks.Add(new RunThinking(thought, Field(block, "thinkingSignature"),
+                                block["redacted"] is JsonValue redacted && redacted.TryGetValue<bool>(out var isRedacted) && isRedacted));
                             break;
                         case "toolCall":
                             var id = block["id"] is JsonValue idValue && idValue.TryGetValue<string>(out var callId) ? callId : "";
                             var name = block["name"] is JsonValue nameValue && nameValue.TryGetValue<string>(out var toolName) ? toolName : "";
-                            if (id.Length > 0 && name.Length > 0) calls.Add((id, name, block["arguments"]?.DeepClone()));
+                            if (id.Length > 0 && name.Length > 0) calls.Add((id, name, block["arguments"]?.DeepClone(), Field(block, "thoughtSignature")));
                             break;
                     }
                 }
             }
             else if (row.OutputText is { } partial) text.Append(partial);
             return new TurnOutcome(row.Status, row.StopReason, row.DurationMs, text.Length == 0 ? null : text.ToString(),
-                thinking.Length == 0 ? null : thinking.ToString(), calls, row.Usage, row.CostMicros, row.CostKind, row.Error);
+                thinking.Length == 0 ? null : thinking.ToString(), calls, row.Usage, row.CostMicros, row.CostKind, row.Error, blocks.Count == 0 ? null : blocks);
         }
+
+        private static string? Field(JsonObject block, string name) =>
+            block[name] is JsonValue value && value.TryGetValue<string>(out var text) && text.Length > 0 ? text : null;
     }
 }

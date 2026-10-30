@@ -239,7 +239,9 @@ public sealed class AccountRouter : IAsyncDisposable
             OAuthFlows = (id, context) => WebCredentialSource.SignInProviders.Contains(id)
                 ? SignInFlows.CreateFlow(id, context.Http, credentials, model => catalog.Find("github-copilot", model) is not null)
                 : throw new InvalidOperationException($"{id} does not sign in in the Web Agent."),
-            Transport = () => options.CodexTransport,
+            // A run whose request the capture hook must change (W4: a patch, strict tools or a timeout) goes over SSE: the hook cannot reach a
+            // WebSocket frame, and its options would otherwise be dropped. Read per request, in the run's async flow.
+            Transport = () => Runs.RunHttpScope.Current is { NeedsHttp: true } ? "sse" : options.CodexTransport,
             HomeDirectory = credentials.Home,
             CreateCatalogClient = () => new HttpClient(new OfflineCatalogHandler()),
             ConfigureRegistry = baseUrl is not null

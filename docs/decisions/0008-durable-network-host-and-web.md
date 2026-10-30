@@ -132,6 +132,7 @@ Each runs through a bounded channel whose writer waits, so a slow reader pushes 
 **Faux model.** `FauxDurableModels` answers without a provider for zero-cost tests and UI work. Its prompt grammar adapts durable-pi's `faux.ts`:
 - `!command` calls `bash`;
 - `slow: text` streams text in small, delayed pieces;
+- `error: message` ends the answer with a provider error whose message is the text (PiSharp-only, added for the Web Agent's error paths, decision 0011);
 - after a tool result it answers `Tool finished: <tool>: <output>`;
 - anything else is answered `Echo: <text>`.
 

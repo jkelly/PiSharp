@@ -199,14 +199,23 @@ public static class RunHistoryText
     }
 
     /// <summary>The inspector of a History › Spend ledger row's run: <c>/runs/{id}</c> for a run engine's op (<c>run-&lt;id&gt;</c>), the
-    /// op itself otherwise (the inspector finds a run by its op: an agent compare turn is recorded under its ledger op). Null for a chat's row (it opens
-    /// the chat).</summary>
+    /// op itself otherwise (the inspector finds a run by its op: an agent compare turn is recorded under its ledger op). A later send of an op
+    /// (the guard's <c>op~n</c>) opens the op's run, which that send updated. Null for a chat's row (it opens the chat).</summary>
     public static string? LedgerRunHref(Spend.Reservation row)
     {
         ArgumentNullException.ThrowIfNull(row);
         if (row.Source == Spend.SpendSource.Chat) return null;
-        if (row.Op.StartsWith("run-", StringComparison.Ordinal) && row.Op.Length > 4) return "/runs/" + Uri.EscapeDataString(row.Op[4..].Split('~')[0]);
-        return "/runs/" + Uri.EscapeDataString(row.Op);
+        var op = SendOf(row.Op);
+        if (op.StartsWith("run-", StringComparison.Ordinal) && op.Length > 4) return "/runs/" + Uri.EscapeDataString(op[4..]);
+        return "/runs/" + Uri.EscapeDataString(op);
+    }
+
+    /// <summary><paramref name="op"/> without the Spend Guard's later-send suffix (<c>~2</c>, <c>~3</c>, ...): the op the run was recorded under.</summary>
+    public static string SendOf(string op)
+    {
+        ArgumentNullException.ThrowIfNull(op);
+        var at = op.LastIndexOf('~');
+        return at > 0 && at < op.Length - 1 && op.AsSpan(at + 1).IndexOfAnyExceptInRange('0', '9') < 0 ? op[..at] : op;
     }
 
     /// <summary>The agent compare page of an agent compare run's top row (<c>/compare?mode=agent&amp;run={id}</c>: runs.db's parent row has the

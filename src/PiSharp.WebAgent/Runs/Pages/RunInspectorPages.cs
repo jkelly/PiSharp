@@ -27,11 +27,14 @@ public sealed class RunInspectorPages(IServiceProvider services, ILogger<RunInsp
 
     private RunStore Store => services.GetRequiredService<RunStore>();
 
-    /// <summary>The run whose id or op is <paramref name="idOrOp"/>, or null.</summary>
+    /// <summary>The run whose id or op is <paramref name="idOrOp"/> (a ledger row's later send, <c>op~n</c>, finds the op's run), or null.</summary>
     public RunRecord? Find(string idOrOp)
     {
         ArgumentNullException.ThrowIfNull(idOrOp);
-        return Store.Get(idOrOp) ?? Store.GetByOp(idOrOp);
+        var store = Store;
+        if ((store.Get(idOrOp) ?? store.GetByOp(idOrOp)) is { } found) return found;
+        var op = RunHistoryText.SendOf(idOrOp);
+        return op.Length == idOrOp.Length ? null : store.GetByOp(op);
     }
 
     /// <summary>The inspector of <paramref name="run"/>; View code addresses <paramref name="origin"/>.</summary>

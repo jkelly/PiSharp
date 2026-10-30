@@ -1,13 +1,16 @@
 // Decision 0011 (run W4, R0; brief rule 4): which request options a model and its API take, and the request a run sends. PiSharp's
 // ChatRequest carries the transcript, the thinking level and the output cap only, so the rest of a run's options travel as a JSON patch
-// that RunCaptureHandler merges into the provider's request body on its way out (objects merge, anything else replaces), and as extra
-// headers. Only options the API has are sent: temperature is never sent to a model that rejects it (OpenAI reasoning models; Anthropic
-// while thinking), service tier only to the OpenAI Responses API of provider openai (never Azure, and not Codex, whose adapter PiSharp
-// does not patch yet), and APIs PiSharp cannot patch yet (Codex, Mistral, Bedrock, Vertex and the rest) take thinking, max tokens, tools
-// and images only (Codex: no max tokens, see below). An option the user set that the model does not take is never dropped: the plan lists
-// it as refused with the reason, and the engine refuses the run with that message. The faux models accept the sampling options offline
-// and do not apply them (a note says so); echo-thinking refuses temperature and top P while thinking, as Anthropic does, so the refusal
-// can be seen offline.
+// that RunCaptureHandler merges into the provider's request body on its way out (objects merge, anything else replaces; a zstd body, as
+// Codex sends, is decoded and encoded again), with the names of the tools to mark strict, and as extra headers; the run's timeout is the
+// hook's too. Only options the API has are sent: temperature is never sent to a model that rejects it (OpenAI reasoning models; Anthropic
+// while thinking), service tier only to the OpenAI Responses API of provider openai (all seven of PLAN.md's values) and to the Codex
+// backend of provider openai-codex (auto, default, flex and priority: Codex CLI's Fast is priority), never Azure; text verbosity, the
+// reasoning summary and the session id (prompt_cache_key) only to the Responses and Codex APIs; parallel tool calls to the OpenAI APIs
+// (parallel_tool_calls) and Anthropic (disable_parallel_tool_use); strict tools to the OpenAI APIs. APIs PiSharp cannot patch yet
+// (Mistral, Bedrock, Vertex and the rest) take thinking, max tokens, tools, images and the timeout only (Codex: no max tokens, see
+// below). An option the user set that the model does not take is never dropped: the plan lists it as refused with the reason, and the
+// engine refuses the run with that message. The faux models accept the sampling options offline and do not apply them (a note says so);
+// echo-thinking refuses temperature and top P while thinking, as Anthropic does, so the refusal can be seen offline.
 // One rule for the output cap (the user's max tokens, or the Spend Guard's "cap the output"): it is the whole output the request may write,
 // thinking included, and the max tokens that goes on the wire, so the Spend Guard's reservation (which assumes it) holds. PiSharp's
 // Anthropic Messages route raises a capped request's max_tokens by the thinking budget on a budget-thinking model (no
@@ -67,6 +70,9 @@ public sealed record RunCapabilities
     /// <summary>One entry per option.</summary>
     public required IReadOnlyList<RunOptionSupport> Options { get; init; }
 
+    /// <summary>The service tiers it takes (<see cref="RunSpec.ServiceTiers"/> or fewer); empty when it takes none.</summary>
+    public IReadOnlyList<string> ServiceTiers { get; init; } = [];
+
     /// <summary>The entry of <paramref name="option"/>, or null.</summary>
     public RunOptionSupport? Find(string option) => Options.FirstOrDefault(entry => entry.Option == option);
 }
@@ -95,6 +101,9 @@ public sealed record RunRequestPlan
 
     /// <summary>Extra headers sent with the request, or null.</summary>
     public IReadOnlyDictionary<string, string>? Headers { get; init; }
+
+    /// <summary>The tools marked strict in the provider's request body, or null.</summary>
+    public IReadOnlyList<string>? StrictTools { get; init; }
 
     /// <summary>The options the user set that are sent.</summary>
     public IReadOnlyList<string> Applied { get; init; } = [];
@@ -127,17 +136,27 @@ public static class RunModelOptions
     /// <summary>Option names.</summary>
     public const string Thinking = "thinking", MaxTokens = "maxTokens", Temperature = "temperature", TopP = "topP", TopK = "topK", Stop = "stop",
         Seed = "seed", PresencePenalty = "presencePenalty", FrequencyPenalty = "frequencyPenalty", ResponseFormat = "responseFormat",
-        ToolChoice = "toolChoice", ServiceTier = "serviceTier", Headers = "headers", ProviderOptions = "providerOptions", Images = "images", Tools = "tools";
+        ToolChoice = "toolChoice", ServiceTier = "serviceTier", Headers = "headers", ProviderOptions = "providerOptions", Images = "images", Tools = "tools",
+        ParallelToolCalls = "parallelToolCalls", StrictTools = "strict", TextVerbosity = "textVerbosity", ReasoningSummary = "reasoningSummary",
+        SessionId = "sessionId", TimeoutMs = "timeoutMs";
 
     /// <summary>Every option, in the Playground's order.</summary>
     public static IReadOnlyList<string> All { get; } =
-        [Thinking, MaxTokens, Temperature, TopP, TopK, Stop, Seed, PresencePenalty, FrequencyPenalty, ResponseFormat, ToolChoice, ServiceTier, Headers, ProviderOptions, Images, Tools];
+        [Thinking, MaxTokens, Temperature, TopP, TopK, Stop, Seed, PresencePenalty, FrequencyPenalty, ResponseFormat, ToolChoice, ServiceTier, Headers, ProviderOptions, Images, Tools,
+         ParallelToolCalls, StrictTools, TextVerbosity, ReasoningSummary, SessionId, TimeoutMs];
 
     /// <summary>The APIs whose request body a run patches.</summary>
-    public static IReadOnlyList<string> PatchedApis { get; } = [CompletionsApi, ResponsesApi, AzureResponsesApi, AnthropicApi, GoogleApi];
+    public static IReadOnlyList<string> PatchedApis { get; } = [CompletionsApi, ResponsesApi, AzureResponsesApi, CodexApi, AnthropicApi, GoogleApi];
+
+    /// <summary>The service tiers the Codex backend takes (Codex CLI sends its Fast mode as <c>priority</c>, and Flex as <c>flex</c>; auto and
+    /// default are the Responses API's own).</summary>
+    public static IReadOnlyList<string> CodexServiceTiers { get; } = ["auto", "default", "flex", "priority"];
 
     internal const string FauxApi = "faux", CompletionsApi = "openai-completions", ResponsesApi = "openai-responses", AzureResponsesApi = "azure-openai-responses",
-        AnthropicApi = "anthropic-messages", GoogleApi = "google-generative-ai", BedrockApi = "bedrock-converse-stream", CodexApi = "openai-codex-responses";
+        CodexApi = "openai-codex-responses", AnthropicApi = "anthropic-messages", GoogleApi = "google-generative-ai", BedrockApi = "bedrock-converse-stream";
+
+    /// <summary>Why a spec's options are only for the Responses and Codex APIs.</summary>
+    private const string ResponsesOnly = "only the OpenAI Responses and Codex APIs take it";
 
     /// <summary>The least output cap budget thinking takes on Anthropic: 1,024 tokens to think and 1,024 to answer.</summary>
     public const int MinThinkingOutputTokens = 2 * AnswerTokens;
@@ -167,7 +186,15 @@ public static class RunModelOptions
                 var on = levels.Count > 1 ? Support(option, model, catalog, thinking: true) : off;
                 return new RunOptionSupport(option, off.Ok, off.Why ?? (on.Ok ? null : on.Why), on.Ok);
             })],
+            ServiceTiers = Tiers(model, catalog),
         };
+    }
+
+    /// <summary>The service tiers <paramref name="model"/> takes: none, the Codex backend's, or all of <see cref="RunSpec.ServiceTiers"/>.</summary>
+    public static IReadOnlyList<string> Tiers(DurableModel model, CatalogModel? catalog)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        return !Support(ServiceTier, model, catalog, thinking: false).Ok ? [] : model.Api == CodexApi ? CodexServiceTiers : RunSpec.ServiceTiers;
     }
 
     /// <summary>The request <paramref name="spec"/> (normalized) sends to <paramref name="model"/>: its messages, patch and headers, and
@@ -212,15 +239,26 @@ public static class RunModelOptions
         if (spec.ResponseFormat is not null && Format(spec.ResponseFormat) == "text") applied.Add(ResponseFormat);
         Use(ToolChoice, spec.ToolChoice is not null, anthropic && thinking is not null && spec.ToolChoice is not ("auto" or "none")
             ? "Anthropic takes only auto or none while the model thinks; turn thinking off to force a tool call" : null);
-        Use(ServiceTier, spec.ServiceTier is not null);
+        var tiers = Tiers(model, catalog);
+        Use(ServiceTier, spec.ServiceTier is not null, spec.ServiceTier is { } tier && tiers.Count > 0 && !tiers.Contains(tier)
+            ? $"the {(model.Api == CodexApi ? "Codex backend" : model.Api + " API")} takes {string.Join(", ", tiers)}, not {tier}" : null);
         Use(Headers, spec.Headers is not null);
         Use(ProviderOptions, spec.ProviderOptions is not null, spec.ProviderOptions is { } options && Support(ProviderOptions, model, catalog, thinking is not null).Ok
             ? OutputOptionRefusal(options) : null);
         Use(Images, spec.Messages.Any(message => message.Images is { Count: > 0 }));
         Use(Tools, spec.Tools is { Count: > 0 });
+        Use(ParallelToolCalls, spec.ParallelToolCalls is not null,
+            anthropic && spec.ParallelToolCalls is not null && spec.ToolChoice == "none" ? "Anthropic takes no parallel switch with tool choice none" : null);
+        var strict = spec.Tools?.Where(tool => tool.Strict == true).Select(tool => tool.Name).ToList();
+        Use(StrictTools, strict is { Count: > 0 });
+        Use(TextVerbosity, spec.TextVerbosity is not null);
+        Use(ReasoningSummary, spec.ReasoningSummary is not null);
+        Use(SessionId, spec.SessionId is not null);
+        Use(TimeoutMs, spec.TimeoutMs is not null);
 
         JsonObject? patch = null;
         string? path = null;
+        var headers = spec.Headers;
         if (refused.Count == 0 && PatchedApis.Contains(model.Api))
         {
             patch = Patch(spec, model.Api);
@@ -239,10 +277,18 @@ public static class RunModelOptions
                 foreach (var conflict in conflicts)
                     refused.Add(new RunOptionSupport(ProviderOptions, false, $"providerOptions.{conflict} conflicts with an option the run sets; set it in one place"));
             }
-            if (patch.Count == 0) patch = null;
+            if (patch.Count == 0 && strict is not { Count: > 0 }) patch = null;
             else path = PatchPathOf(model.Api);
+            // Codex keys its session by headers as well as by prompt_cache_key (buildSSEHeaders): a run's session id sets both.
+            if (model.Api == CodexApi && spec.SessionId is { } session)
+                headers = new Dictionary<string, string>(spec.Headers ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase)
+                {
+                    ["session-id"] = session,
+                    ["x-client-request-id"] = session,
+                };
         }
-        if (model.Api == FauxApi && applied.Any(option => option is Temperature or TopP or TopK or Stop or Seed or PresencePenalty or FrequencyPenalty or ResponseFormat or ToolChoice))
+        if (model.Api == FauxApi && applied.Any(option => option is Temperature or TopP or TopK or Stop or Seed or PresencePenalty or FrequencyPenalty or ResponseFormat or ToolChoice
+            or ParallelToolCalls or StrictTools or TextVerbosity or ReasoningSummary or TimeoutMs))
             notes.Add("The faux model runs offline: it accepts sampling options and does not apply them.");
         if (spec.MaxTokens is not null && model.Api != FauxApi)
             notes.Add("A max tokens setting sends the request without prompt caching (PiSharp's capped route).");
@@ -254,7 +300,8 @@ public static class RunModelOptions
             Thinking = thinking,
             Patch = refused.Count == 0 ? patch : null,
             PatchPath = refused.Count == 0 ? path : null,
-            Headers = refused.Count == 0 ? spec.Headers : null,
+            Headers = refused.Count == 0 ? headers : null,
+            StrictTools = refused.Count == 0 && path is not null && strict is { Count: > 0 } ? strict : null,
             Applied = applied,
             Refused = refused,
             Notes = notes,
@@ -295,11 +342,14 @@ public static class RunModelOptions
                 return api == FauxApi ? (false, "the offline faux provider sends no HTTP request")
                     : api == BedrockApi ? (false, "Bedrock requests are signed, so PiSharp adds no headers to them")
                     : (true, null);
+            case TimeoutMs:
+                return api == FauxApi ? (true, "the faux model ignores it") : (true, null);
         }
         if (api == FauxApi)
         {
-            if (option is ServiceTier or ProviderOptions) return (false, "the offline faux provider sends no HTTP request");
+            if (option is ServiceTier or ProviderOptions or SessionId) return (false, "the offline faux provider sends no HTTP request");
             if (thinking && option is Temperature or TopP) return (false, "not while this model thinks");
+            if (!thinking && option == ReasoningSummary) return (false, "only while the model thinks");
             return (true, null);
         }
         if (!PatchedApis.Contains(api)) return (false, $"PiSharp does not send it on the {api} API yet");
@@ -310,17 +360,20 @@ public static class RunModelOptions
                 return option switch
                 {
                     TopK => (false, "the Chat Completions API has no top_k"),
-                    ServiceTier => (false, "only the OpenAI Responses API takes a service tier"),
+                    ServiceTier => (false, "only the OpenAI Responses and Codex APIs take a service tier"),
+                    TextVerbosity or ReasoningSummary or SessionId => (false, ResponsesOnly),
                     Temperature or TopP or PresencePenalty or FrequencyPenalty when reasoningOpenAI => (false, "OpenAI reasoning models reject it"),
                     _ => (true, null),
                 };
-            case ResponsesApi or AzureResponsesApi:
+            case ResponsesApi or AzureResponsesApi or CodexApi:
                 return option switch
                 {
                     Temperature or TopP when model.Reasoning => (false, "reasoning models on the Responses API reject it"),
                     TopK or Seed or PresencePenalty or FrequencyPenalty or Stop => (false, "the Responses API has no such parameter"),
                     ServiceTier when api == AzureResponsesApi => (false, "Azure OpenAI takes no service tier"),
-                    ServiceTier when model.Provider != "openai" => (false, "only provider OpenAI takes a service tier"),
+                    ServiceTier when api == CodexApi && model.Provider != "openai-codex" => (false, "only provider OpenAI Codex takes a service tier on the Codex API"),
+                    ServiceTier when api == ResponsesApi && model.Provider != "openai" => (false, "only provider OpenAI takes a service tier"),
+                    ReasoningSummary when !thinking => (false, "only while the model thinks"),
                     _ => (true, null),
                 };
             case AnthropicApi:
@@ -329,11 +382,20 @@ public static class RunModelOptions
                     Temperature or TopP or TopK when thinking => (false, "Anthropic rejects it while the model thinks"),
                     ToolChoice when thinking => (true, "only auto or none while the model thinks"),
                     Seed or PresencePenalty or FrequencyPenalty or ResponseFormat => (false, "the Anthropic Messages API has no such parameter"),
-                    ServiceTier => (false, "only the OpenAI Responses API takes a service tier"),
+                    ServiceTier => (false, "only the OpenAI Responses and Codex APIs take a service tier"),
+                    TextVerbosity or ReasoningSummary or SessionId => (false, ResponsesOnly),
+                    StrictTools => (false, "PiSharp does not send strict tools to the Anthropic Messages API yet"),
                     _ => (true, null),
                 };
             case GoogleApi:
-                return option == ServiceTier ? (false, "only the OpenAI Responses API takes a service tier") : (true, null);
+                return option switch
+                {
+                    ServiceTier => (false, "only the OpenAI Responses and Codex APIs take a service tier"),
+                    TextVerbosity or ReasoningSummary or SessionId => (false, ResponsesOnly),
+                    ParallelToolCalls => (false, "the Gemini API has no parallel tool call switch"),
+                    StrictTools => (false, "the Gemini API has no strict tools"),
+                    _ => (true, null),
+                };
         }
         return (false, $"PiSharp does not send it on the {api} API yet");
     }
@@ -443,6 +505,7 @@ public static class RunModelOptions
     {
         CompletionsApi => "/chat/completions",
         ResponsesApi or AzureResponsesApi => "/responses",
+        CodexApi => "/codex/responses",
         AnthropicApi => "/messages",
         GoogleApi => ":streamGenerateContent",
         _ => throw new ArgumentOutOfRangeException(nameof(api)),
@@ -471,32 +534,46 @@ public static class RunModelOptions
                         : new JsonObject { ["type"] = format };
                 if (spec.ToolChoice is not null)
                     patch["tool_choice"] = tool is null ? JsonValue.Create(spec.ToolChoice) : new JsonObject { ["type"] = "function", ["function"] = new JsonObject { ["name"] = tool } };
+                if (spec.ParallelToolCalls is { } parallelCompletions) patch["parallel_tool_calls"] = parallelCompletions;
                 break;
-            case ResponsesApi or AzureResponsesApi:
+            case ResponsesApi or AzureResponsesApi or CodexApi:
                 Set(patch, "temperature", spec.Temperature);
                 Set(patch, "top_p", spec.TopP);
-                if (format is not null)
+                if (format is not null || spec.TextVerbosity is not null)
                 {
-                    var described = format == "json_schema" ? Schema(schemaName, schema, strict) : new JsonObject();
-                    described.Insert(0, "type", format);
-                    patch["text"] = new JsonObject { ["format"] = described };
+                    var text = new JsonObject();
+                    if (format is not null)
+                    {
+                        var described = format == "json_schema" ? Schema(schemaName, schema, strict) : new JsonObject();
+                        described.Insert(0, "type", format);
+                        text["format"] = described;
+                    }
+                    if (spec.TextVerbosity is { } verbosity) text["verbosity"] = verbosity;
+                    patch["text"] = text;
                 }
                 if (spec.ToolChoice is not null) patch["tool_choice"] = tool is null ? JsonValue.Create(spec.ToolChoice) : new JsonObject { ["type"] = "function", ["name"] = tool };
+                if (spec.ParallelToolCalls is { } parallelResponses) patch["parallel_tool_calls"] = parallelResponses;
                 if (spec.ServiceTier is { } tier) patch["service_tier"] = tier;
+                if (spec.ReasoningSummary is { } summary) patch["reasoning"] = new JsonObject { ["summary"] = summary };
+                if (spec.SessionId is { } session) patch["prompt_cache_key"] = session;
                 break;
             case AnthropicApi:
                 Set(patch, "temperature", spec.Temperature);
                 Set(patch, "top_p", spec.TopP);
                 if (spec.TopK is { } topK) patch["top_k"] = topK;
                 if (spec.Stop is { } sequences) patch["stop_sequences"] = Strings(sequences);
-                if (spec.ToolChoice is not null)
-                    patch["tool_choice"] = spec.ToolChoice switch
+                if (spec.ToolChoice is not null || spec.ParallelToolCalls is not null)
+                {
+                    var choice = spec.ToolChoice switch
                     {
-                        "auto" => new JsonObject { ["type"] = "auto" },
+                        null or "auto" => new JsonObject { ["type"] = "auto" },
                         "none" => new JsonObject { ["type"] = "none" },
                         "required" => new JsonObject { ["type"] = "any" },
                         _ => new JsonObject { ["type"] = "tool", ["name"] = tool },
                     };
+                    if (spec.ParallelToolCalls is { } parallelAnthropic) choice["disable_parallel_tool_use"] = !parallelAnthropic;
+                    patch["tool_choice"] = choice;
+                }
                 break;
             case GoogleApi:
                 var generation = new JsonObject();
@@ -549,6 +626,25 @@ public static class RunModelOptions
         }
     }
 
+    /// <summary>Applies a run's request changes to the provider's request body (<paramref name="api"/>'s shape): merges
+    /// <paramref name="patch"/> (objects merge, anything else replaces) and marks the tools named in <paramref name="strictTools"/> strict.</summary>
+    /// <returns>The strict tools it did not find in the body (the request must not be sent without them).</returns>
+    public static IReadOnlyList<string> ApplyToBody(JsonObject body, JsonObject? patch, IReadOnlyCollection<string>? strictTools, string? api)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (patch is not null) Merge(body, (JsonObject)patch.DeepClone(), "", null);
+        if (strictTools is not { Count: > 0 }) return [];
+        var missing = new HashSet<string>(strictTools, StringComparer.Ordinal);
+        foreach (var tool in (body["tools"] as JsonArray ?? []).OfType<JsonObject>())
+        {
+            // Chat Completions nests a function's definition ({type: function, function: {name, parameters, strict}}); the Responses and
+            // Codex APIs keep it flat ({type: function, name, parameters, strict}).
+            var definition = api == CompletionsApi ? tool["function"] as JsonObject : tool;
+            if (definition?["name"] is JsonValue value && value.TryGetValue<string>(out var name) && missing.Remove(name)) definition["strict"] = true;
+        }
+        return [.. missing.Order(StringComparer.Ordinal)];
+    }
+
     /// <summary>Pi wire messages of <paramref name="spec"/>: a system message with the system prompt and the tools, then the messages.</summary>
     internal static ImmutableArray<ChordJson> Messages(RunSpec spec, DurableModel model, long timestamp)
     {
@@ -585,7 +681,9 @@ public static class RunModelOptions
                         content.Add(new ToolCallContent(call.Id, call.Name, JsonData.Parse((call.Arguments ?? new JsonObject()).ToJsonString())));
                     var assistant = new AssistantMessage(model.Api, model.Provider, model.Id, at, content.ToImmutable(), TokenUsage.Zero,
                         message.ToolCalls is { Count: > 0 } ? StopReason.ToolUse : StopReason.Stop);
-                    messages.Add(JsonNode.Parse(PiWireJson.WriteMessage(assistant).ToString())!.AsObject());
+                    var wire = JsonNode.Parse(PiWireJson.WriteMessage(assistant).ToString())!.AsObject();
+                    Signed(wire, message);
+                    messages.Add(wire);
                     break;
                 case "toolResult":
                     messages.Add(new JsonObject
@@ -601,6 +699,30 @@ public static class RunModelOptions
             }
         }
         return [.. messages.Select(message => ChordJson.Parse(message.ToJsonString()))];
+    }
+
+    /// <summary>Adds an assistant message's signed parts to its Pi wire JSON: its thinking blocks first (Pi's <c>thinking</c> blocks with
+    /// <c>thinkingSignature</c> and <c>redacted</c>), and each tool call's <c>thoughtSignature</c>. The message is the model's own (its
+    /// API, provider and model), so the provider adapters replay them as they were streamed.</summary>
+    private static void Signed(JsonObject wire, RunMessage message)
+    {
+        if (wire["content"] is not JsonArray content) return;
+        var position = 0;
+        foreach (var block in message.Thinking ?? [])
+        {
+            var thinking = new JsonObject { ["type"] = "thinking", ["thinking"] = block.Text };
+            if (block.Signature is { } signature) thinking["thinkingSignature"] = signature;
+            if (block.Redacted) thinking["redacted"] = true;
+            content.Insert(position++, thinking);
+        }
+        var calls = (message.ToolCalls ?? []).ToList();
+        var index = 0;
+        foreach (var part in content.OfType<JsonObject>())
+        {
+            if (part["type"] is not JsonValue type || type.GetValue<string>() != "toolCall") continue;
+            if (index < calls.Count && calls[index].ThoughtSignature is { } thought) part["thoughtSignature"] = thought;
+            index++;
+        }
     }
 
     private static JsonNode Content(RunMessage message, bool plainWhenText)

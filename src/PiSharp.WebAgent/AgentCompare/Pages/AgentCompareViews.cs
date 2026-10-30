@@ -231,6 +231,15 @@ public sealed record AgentProjectView
     /// <summary>The chip's tone: warn when uncommitted changes are left out or the copy is large.</summary>
     public string? Tone => Inspection is { } inspection && (inspection.Kind == WorkspaceKind.Worktree && inspection.Uncommitted.Count > 0 || inspection.OverWarnLimit) ? "warn" : null;
 
+    /// <summary>The isolation chip: R4's label ("git worktree from main @ 4f9c2e1", "temporary copy · 84 MB"), or, for a worktree whose
+    /// base the user chose in Workspace details, that branch or commit ("git worktree from release", "git worktree from 1a2b3c4").</summary>
+    public string ChipLabel => Inspection is { Kind: WorkspaceKind.Worktree } inspection && Workspace.BaseRef is { Length: > 0 } chosen
+        && chosen != inspection.CurrentBranch && chosen != inspection.HeadCommit
+            ? "git worktree from " + (IsCommit(chosen) && chosen.Length > 7 ? chosen[..Math.Max(7, inspection.ShortCommit?.Length ?? 7)] : chosen)
+            : Inspection?.Label ?? "";
+
+    private static bool IsCommit(string text) => text.Length is >= 7 and <= 64 && text.All(char.IsAsciiHexDigit);
+
     /// <summary>The chip's tooltip.</summary>
     public string ChipTitle => Inspection switch
     {
