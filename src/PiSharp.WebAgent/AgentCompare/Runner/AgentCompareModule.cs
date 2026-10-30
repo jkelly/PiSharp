@@ -8,7 +8,8 @@
 //     hook (AddDeviceModelsDecorator; W4 fix 2: DeviceHostService's registration is no longer replaced); the IDurableModels registration
 //     itself is unchanged, so the run engine and the rest keep the plain models;
 //   - AgentCompareSessionViews tells the chat stream (ChatStreamMux's session/{session}/{agent} keys) what a model's session is before it is
-//     opened as a chat, so a column can show its live transcript, read-only (W4 fix 2).
+//     opened as a chat, so a column can show its live transcript, read-only (W4 fix 2);
+//   - the store, the gate and the runner read the app's TimeProvider when it registers one (a test's clock), else the system's.
 // MapAgentCompareRunner maps /api/compare/agent (AgentCompareEndpoints).
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -30,9 +31,10 @@ public static class AgentCompareModule
         ArgumentNullException.ThrowIfNull(options);
         services.AddWebAgentMigration(AgentCompareStore.Migration);
         services.AddWebAgentMigration(AgentCompareStore.PatchMigration);
-        services.TryAddSingleton(provider => new AgentCompareStore(provider.GetRequiredService<WebAgentDb>(), provider.GetService<ILogger<AgentCompareStore>>()));
+        services.TryAddSingleton(provider => new AgentCompareStore(provider.GetRequiredService<WebAgentDb>(), provider.GetService<ILogger<AgentCompareStore>>(),
+            provider.GetService<TimeProvider>()));
         services.TryAddSingleton(provider => new AgentCompareGate(provider.GetRequiredService<AgentCompareStore>(), provider,
-            provider.GetService<ILogger<AgentCompareGate>>()));
+            provider.GetService<ILogger<AgentCompareGate>>(), provider.GetService<TimeProvider>()));
         services.TryAddSingleton(provider => ActivatorUtilities.CreateInstance<AgentCompareRunner>(provider));
         services.AddDeviceModelsDecorator((provider, models) => new AgentCompareModels(models, provider.GetRequiredService<AgentCompareGate>()));
         services.AddSingleton<ISessionViewSource>(provider => new AgentCompareSessionViews(provider.GetRequiredService<AgentCompareStore>()));

@@ -4,6 +4,8 @@
 // was let through, keyed by its op (metadata.pisharp.op, the same when a request is recovered), so turns are counted exactly across restarts.
 // The store keeps every run it has read in memory and changes one run at a time (read, change, write under the run's lock), then raises
 // Changed outside the lock. It also indexes runs by session id, which the model gate and the approval override look up on every call.
+// Fix 2 (W4): a run being deleted (AgentCompareRunner.DeleteAsync marks it first) is no longer answered by Get or List; Delete removes its
+// rows (the run and its turns) and drops it from memory. Times come from the app's TimeProvider.
 // Changed is raised from Add, Update and Touch, which the gate (every admitted model request) and the runner (every state change) call, so
 // each handler is invoked on its own and a handler that throws is logged and skipped: a subscriber (such as an event stream whose tab just
 // closed) can never fail a model's request or a state change.
@@ -71,6 +73,7 @@ public sealed class AgentCompareStore
 
     private readonly WebAgentDb db;
     private readonly ILogger log;
+    private readonly TimeProvider clock;
     private readonly ConcurrentDictionary<string, AgentCompareRun> runs = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, (string Run, string Slot)> sessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lock> locks = new(StringComparer.Ordinal);
@@ -78,12 +81,14 @@ public sealed class AgentCompareStore
     private readonly Lock loading = new();
     private volatile bool loaded;
 
-    /// <summary>A store over <paramref name="db"/>; <paramref name="logger"/> gets the failures of <see cref="Changed"/> handlers.</summary>
-    public AgentCompareStore(WebAgentDb db, ILogger<AgentCompareStore>? logger = null)
+    /// <summary>A store over <paramref name="db"/>; <paramref name="logger"/> gets the failures of <see cref="Changed"/> handlers;
+    /// <paramref name="time"/> (default: the system's) dates rows and turns.</summary>
+    public AgentCompareStore(WebAgentDb db, ILogger<AgentCompareStore>? logger = null, TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         this.db = db;
         log = (ILogger?)logger ?? NullLogger.Instance;
+        clock = time ?? TimeProvider.System;
     }
 
     /// <summary>Raised after a run changed (its id), outside any lock. Each handler is called on its own; one that throws is logged and the
@@ -103,15 +108,30 @@ public sealed class AgentCompareStore
         }
     }
 
-    /// <summary>The run <paramref name="id"/>, or null.</summary>
+    /// <summary>The run <paramref name="id"/>, or null: also null while it is being deleted (<see cref="Find"/> answers it then).</summary>
     public AgentCompareRun? Get(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        Load();
+        return runs.TryGetValue(id, out var run) && !run.Deleting ? run : null;
+    }
+
+    /// <summary>The run <paramref name="id"/> as stored, also while it is being deleted, or null.</summary>
+    public AgentCompareRun? Find(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
         Load();
         return runs.TryGetValue(id, out var run) ? run : null;
     }
 
-    /// <summary>The run a create request made, or null.</summary>
+    /// <summary>Every stored run, also those being deleted (the runner's prune and its start).</summary>
+    public IReadOnlyList<AgentCompareRun> All()
+    {
+        Load();
+        return [.. runs.Values];
+    }
+
+    /// <summary>The run a create request made (also while it is being deleted), or null.</summary>
     public AgentCompareRun? FindByRequest(string requestId)
     {
         Load();
@@ -127,11 +147,11 @@ public sealed class AgentCompareStore
         return (run, model);
     }
 
-    /// <summary>Runs, newest first.</summary>
+    /// <summary>Runs, newest first (not those being deleted).</summary>
     public IReadOnlyList<AgentCompareRun> List(int limit = 50)
     {
         Load();
-        return [.. runs.Values.OrderByDescending(run => run.Created).ThenByDescending(run => run.Id, StringComparer.Ordinal).Take(Math.Clamp(limit, 1, 500))];
+        return [.. runs.Values.Where(run => !run.Deleting).OrderByDescending(run => run.Created).ThenByDescending(run => run.Id, StringComparer.Ordinal).Take(Math.Clamp(limit, 1, 500))];
     }
 
     /// <summary>Stores a new run; when a run of the same request id exists, returns that one instead (the first create wins).</summary>
@@ -142,7 +162,7 @@ public sealed class AgentCompareStore
         lock (adding)
         {
             if (FindByRequest(run.RequestId) is { } existing) return existing;
-            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var now = clock.GetUtcNow().ToUnixTimeMilliseconds();
             db.Execute("INSERT INTO agent_compare_runs (id, request_id, state, data, created, updated) VALUES ($id, $request, $state, $data, $created, $updated);",
                 ("$id", run.Id), ("$request", run.RequestId), ("$state", run.State), ("$data", JsonSerializer.Serialize(run, SettingsStore.JsonOptions)),
                 ("$created", run.Created.ToUnixTimeMilliseconds()), ("$updated", now));
@@ -166,7 +186,7 @@ public sealed class AgentCompareStore
             if (ReferenceEquals(updated, current)) return current;
             db.Execute("UPDATE agent_compare_runs SET state = $state, data = $data, updated = $updated WHERE id = $id;",
                 ("$id", id), ("$state", updated.State), ("$data", JsonSerializer.Serialize(updated, SettingsStore.JsonOptions)),
-                ("$updated", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+                ("$updated", clock.GetUtcNow().ToUnixTimeMilliseconds()));
             Remember(updated);
         }
         Raise(id);
@@ -189,6 +209,36 @@ public sealed class AgentCompareStore
         });
     }
 
+    /// <summary>Marks run <paramref name="id"/> as being deleted: from now on <see cref="Get"/> and <see cref="List"/> leave it out.</summary>
+    /// <returns>The run as stored, or null when there is no such run.</returns>
+    public AgentCompareRun? MarkDeleting(string id) => Update(id, run => run.Deleting ? run : run with { Deleting = true });
+
+    /// <summary>Removes run <paramref name="id"/>: its row, its models' turns, and the run from memory (with its sessions' index entries).</summary>
+    /// <returns>The run that was removed, or null when there was none.</returns>
+    public AgentCompareRun? Delete(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        Load();
+        AgentCompareRun? removed;
+        lock (locks.GetOrAdd(id, _ => new Lock()))
+        {
+            if (!runs.TryGetValue(id, out removed)) return null;
+            var keys = removed.Models.Select(model => AgentCompareRun.ModelKey(id, model.Slot)).ToList();
+            db.Transaction((connection, transaction) =>
+            {
+                foreach (var key in keys) WebAgentDb.Execute(connection, transaction, "DELETE FROM agent_compare_turns WHERE model_key = $key;", ("$key", key));
+                return WebAgentDb.Execute(connection, transaction, "DELETE FROM agent_compare_runs WHERE id = $id;", ("$id", id));
+            });
+            runs.TryRemove(id, out _);
+            foreach (var model in removed.Models)
+                if (model.SessionId is { Length: > 0 } session && sessions.TryGetValue(session, out var owner) && owner.Run == id)
+                    sessions.TryRemove(session, out _);
+        }
+        locks.TryRemove(id, out _);
+        Raise(id);
+        return removed;
+    }
+
     /// <summary>Raises <see cref="Changed"/> for <paramref name="id"/> (something the run's status shows changed outside the store: an
     /// approval, a turn).</summary>
     public void Touch(string id) => Raise(id);
@@ -204,7 +254,7 @@ public sealed class AgentCompareStore
     /// <summary>Records a turn of <paramref name="modelKey"/> (once per op).</summary>
     public void AddTurn(string modelKey, string op) =>
         db.Execute("INSERT OR IGNORE INTO agent_compare_turns (model_key, op, at) VALUES ($key, $op, $at);",
-            ("$key", modelKey), ("$op", op), ("$at", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+            ("$key", modelKey), ("$op", op), ("$at", clock.GetUtcNow().ToUnixTimeMilliseconds()));
 
     /// <summary>Keeps <paramref name="patch"/> as the patch of <paramref name="slot"/> in run <paramref name="run"/>, replacing one kept
     /// before; above <see cref="MaxPatchBytes"/> only its first whole files are kept.</summary>

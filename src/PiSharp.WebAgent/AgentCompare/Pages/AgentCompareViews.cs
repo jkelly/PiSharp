@@ -719,6 +719,7 @@ public sealed record AgentColumnView
         AgentCheckState.Failed => new CompareChipText("Check failed", "danger"),
         AgentCheckState.TimedOut => new CompareChipText("Check timed out", "warn", $"It ran longer than {AgentText.Duration((State.Check?.TimeoutSeconds ?? 0) * 1000L)} and was stopped."),
         AgentCheckState.Error => new CompareChipText("Check didn't run", "danger", State.Check?.Tail),
+        AgentCheckState.Stopped => new CompareChipText("Check stopped", "outline", "You stopped this model while its check ran (or before it started), so the check was ended."),
         _ => null,
     };
 
@@ -1027,12 +1028,13 @@ public static class AgentText
         _ => "Error",
     };
 
-    /// <summary>"passed", "failed", "timed out", "didn't run".</summary>
+    /// <summary>"passed", "failed", "timed out", "stopped", "didn't run".</summary>
     public static string CheckWord(string state) => state switch
     {
         AgentCheckState.Passed => "passed",
         AgentCheckState.Failed => "failed",
         AgentCheckState.TimedOut => "timed out",
+        AgentCheckState.Stopped => "stopped",
         _ => "didn't run",
     };
 

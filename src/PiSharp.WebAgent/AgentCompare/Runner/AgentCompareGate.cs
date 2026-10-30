@@ -9,6 +9,7 @@
 // refused request is never sent: its stream is one StreamError with stop reason "aborted" and the reason as errorMessage, which the durable
 // engine never retries; the run of the model's task ends unanswered and the runner checks its workspace. The gate also notes each model's
 // latest tool call and the files its write and edit calls name, and answers the approval override (the run's mode) for its sessions.
+// Fix 2 (W4): the time limit is read on the app's TimeProvider (a test's clock), and a request of a run being deleted is refused.
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
@@ -23,13 +24,17 @@ using PiSharp.WebAgent.Spend;
 namespace PiSharp.WebAgent.AgentCompare.Runner;
 
 /// <summary>Admits, rewrites and observes agent compare models' requests (see the file comment). A singleton.</summary>
-public sealed class AgentCompareGate(AgentCompareStore store, IServiceProvider services, ILogger<AgentCompareGate>? logger = null)
+public sealed class AgentCompareGate(AgentCompareStore store, IServiceProvider services, ILogger<AgentCompareGate>? logger = null, TimeProvider? time = null)
 {
+    /// <summary>The sentence of a request of a run that is being deleted.</summary>
+    public const string DeletedText = "Agent compare: this run was deleted, so this model's request was not sent.";
+
     /// <summary>The most files a model's touched list keeps.</summary>
     public const int MaxTouched = 200;
 
     private readonly ConcurrentDictionary<string, TaskCompletionSource> signals = new(StringComparer.Ordinal);
     private readonly ILogger log = (ILogger?)logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+    private readonly TimeProvider clock = time ?? TimeProvider.System;
 
     /// <summary>Raised when a model was stopped by a limit at a request (its run id and slot), outside any lock.</summary>
     public event Action<string, string>? LimitReached;
@@ -67,10 +72,11 @@ public sealed class AgentCompareGate(AgentCompareStore store, IServiceProvider s
         ArgumentNullException.ThrowIfNull(model);
         var key = AgentCompareRun.ModelKey(run.Id, model.Slot);
         var op = SessionStreamMetadata.Field(options, SessionStreamMetadata.OperationField);
+        if (store.Get(run.Id) is null) return DeletedText;
         var current = Current(run.Id, model.Slot) ?? model;
         if (current.Outcome is not null) return StopText(run, current);
         if (turn && op is not null && store.HasTurn(key, op)) return null;
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         if (current.StartedAt is { } started && now >= started.AddMinutes(run.Spec.MaxMinutes))
             return Stop(run, current.Slot, AgentModelOutcome.TimeLimit, TimeText(run.Spec.MaxMinutes));
         if (turn && store.Turns(key) >= run.Spec.MaxTurns)
@@ -98,7 +104,7 @@ public sealed class AgentCompareGate(AgentCompareStore store, IServiceProvider s
                     var arguments = call.Arguments.Value;
                     var path = Text(arguments, "path");
                     var summary = Text(arguments, "command") ?? path ?? "";
-                    latest = new AgentToolCall(call.Name, summary.Length > 200 ? summary[..199] + "…" : summary, DateTimeOffset.UtcNow);
+                    latest = new AgentToolCall(call.Name, summary.Length > 200 ? summary[..199] + "…" : summary, clock.GetUtcNow());
                     if (WebApproval.FileTools.Contains(call.Name) && path is not null && Relative(state, path) is { } file && touched.Count < MaxTouched &&
                         !touched.Contains(file, StringComparer.Ordinal))
                         touched.Add(file);
@@ -190,7 +196,7 @@ public sealed class AgentCompareGate(AgentCompareStore store, IServiceProvider s
         if (spent + next <= share) return null;
         if (TakePass(run.Id, model.Slot)) return null;
         if (run.Spec.CapAction == CapAction.Block) return Stop(run, model.Slot, AgentModelOutcome.Budget, BudgetText(spent, next, share));
-        store.UpdateModel(run.Id, model.Slot, state => state with { BudgetAsk = new AgentBudgetAsk(spent, next, share, DateTimeOffset.UtcNow) });
+        store.UpdateModel(run.Id, model.Slot, state => state with { BudgetAsk = new AgentBudgetAsk(spent, next, share, clock.GetUtcNow()) });
         while (true)
         {
             var signal = signals.GetOrAdd(key, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
@@ -198,7 +204,7 @@ public sealed class AgentCompareGate(AgentCompareStore store, IServiceProvider s
             if (current is null || current.Outcome is not null)
             {
                 store.UpdateModel(run.Id, model.Slot, state => state.BudgetAsk is null ? state : state with { BudgetAsk = null });
-                return current is null ? "Agent compare: this run is gone." : StopText(run, current);
+                return current is null ? DeletedText : StopText(run, current);
             }
             if (current.BudgetLifted)
             {

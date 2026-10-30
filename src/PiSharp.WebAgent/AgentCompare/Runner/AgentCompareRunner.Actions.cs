@@ -58,7 +58,8 @@ public sealed partial class AgentCompareRunner
     }
 
     /// <summary>Stops one model (<paramref name="slot"/>) or every model of the run (null): its task is aborted and it is not checked. A model
-    /// that is done (or being checked) is left alone.</summary>
+    /// whose check runs has its check ended (the check and every process it started are killed; the check is recorded as stopped), and a
+    /// model that a limit stopped and that waits for its check is not checked (W4 fix 2). A model that is done is left alone.</summary>
     public async Task<AgentCompareRun> StopAsync(string id, string? slot, CancellationToken cancellationToken = default)
     {
         var run = Require(id);
@@ -66,7 +67,14 @@ public sealed partial class AgentCompareRunner
         foreach (var name in slots)
         {
             var model = run.Model(name)!;
-            if (model.Phase is AgentModelPhase.Done or AgentModelPhase.Checking || model.Outcome is not null) continue;
+            if (model.Phase == AgentModelPhase.Done) continue;
+            if (model.Phase == AgentModelPhase.Checking || model.Outcome is not null)
+            {
+                // Its task ended (or is ending): what is left to stop is its check (a model the user stopped is never checked).
+                if (model.Phase == AgentModelPhase.Checking || (model.Outcome != AgentModelOutcome.Stopped && run.Spec.CheckCommand is not null))
+                    StopCheck(id, name);
+                continue;
+            }
             gate.Stop(run, name, AgentModelOutcome.Stopped, AgentCompareGate.StoppedText);
             if (model.SessionId is { } session && device.IsOpen && device.Host.Sessions.FirstOrDefault(item => item.Id == session) is { } hosted)
                 await AbortQuietlyAsync(hosted, cancellationToken).ConfigureAwait(false);
@@ -310,7 +318,7 @@ public sealed partial class AgentCompareRunner
         var now = bindings.Now();
         var title = ChatDisplay.Cut($"{spec.Name ?? spec.Model} · {run.Spec.Task.ReplaceLineEndings(" ")}", 100);
         var binding = bindings.Add(new ChatBinding(session, title, spec.Provider, spec.Model, spec.Account, spec.Thinking, null, 1, now, now, null,
-            "agent-compare:" + AgentCompareRun.ModelKey(id, model.Slot)));
+            ChatRequestId(id, model.Slot)));
         store.UpdateModel(id, model.Slot, state => state.ChatId is not null ? state : state with { ChatId = binding.SessionId });
         _ = device.RefreshAsync(binding.SessionId);
         return binding.SessionId;

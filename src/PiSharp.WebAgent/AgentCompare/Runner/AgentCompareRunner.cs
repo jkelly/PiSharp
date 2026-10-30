@@ -16,6 +16,11 @@
 // the runner follows each model's task to its end again, and a check that was running runs again. runs.db has one parent row per run and one
 // child row per model (kind "parent", parent = the run); each model's provider calls are recorded by R0's recorder as children of its row. The
 // parent and child rows carry no cost or usage of their own (History's totals would count them twice): sum a model's calls for its cost.
+//
+// Fix 2 (W4): times (a model's start, its time limit, the run's dates) are read on the app's TimeProvider when it registers one (a test's
+// clock); while a model works, a timer on that clock wakes its follower at the model's deadline, so its time limit stops it (and only it) at
+// once. Each run's follower has its own cancellation, and each model's check its own stop: Stop ends a check that is running (the process
+// tree is killed and the check is recorded as stopped). Deleting a run is AgentCompareRunner.Delete's.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -48,10 +53,18 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
     /// <summary>The most a finished model's background work is waited for before its check runs.</summary>
     private static readonly TimeSpan IdleLimit = TimeSpan.FromSeconds(30);
 
+    /// <summary>The longest a deadline timer is set for (a model's time limit is at most four hours; a start time far off is not trusted).</summary>
+    private static readonly TimeSpan MaxDeadlineWait = TimeSpan.FromDays(1);
+
     private readonly CancellationTokenSource stopping = new();
-    private readonly Dictionary<string, Task> drivers = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RunDriver> drivers = new(StringComparer.Ordinal);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource> checkStops = new(StringComparer.Ordinal);
     private readonly ILogger log = (ILogger?)logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+    private readonly TimeProvider clock = services.GetService<TimeProvider>() ?? TimeProvider.System;
     private int disposed;
+
+    /// <summary>A run's follower and its own cancellation (linked to the app's stopping).</summary>
+    private sealed record RunDriver(Task Task, CancellationTokenSource Stop);
 
     /// <summary>The store.</summary>
     public AgentCompareStore Store => store;
@@ -70,13 +83,18 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         WebApproval.SetOverrides(broker, gate.OverrideFor);
         broker.Changed += OnApprovalsChanged;
         gate.LimitReached += OnLimitReached;
+        if (Runs is { } runs && Interlocked.CompareExchange(ref followedRuns, runs, null) is null) runs.Changed += OnRunsChanged;
         return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        foreach (var run in store.List(500).Where(run => run.IsActive)) Drive(run.Id);
+        // Deletes a stop interrupted go on, and finished runs whose History row went while the app was not running (or whose delete never
+        // started) go too; then every active run is followed again.
+        foreach (var run in store.All().Where(run => run.Deleting)) StartDelete(run.Id);
+        Prune(includeActive: false);
+        foreach (var run in store.All().Where(run => run.IsActive && !run.Deleting)) Drive(run.Id);
         return Task.CompletedTask;
     }
 
@@ -94,7 +112,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
     {
         if (Volatile.Read(ref disposed) != 0) return;
         await stopping.CancelAsync().ConfigureAwait(false);
-        try { await Task.WhenAll(Drivers()).WaitAsync(TimeSpan.FromSeconds(15), cancellationToken).ConfigureAwait(false); }
+        try { await Task.WhenAll([.. Drivers(), .. Deletions()]).WaitAsync(TimeSpan.FromSeconds(15), cancellationToken).ConfigureAwait(false); }
         catch (Exception error) when (error is OperationCanceledException or TimeoutException) { /* Resumed at the next start. */ }
     }
 
@@ -104,8 +122,12 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
     /// <inheritdoc/>
     public bool IsActive(string run)
     {
-        if (store.Get(run) is not { } found) return false;
-        if (found.IsActive) return true;
+        if (store.Find(run) is not { } found)
+        {
+            // A deleted run keeps the workspace of a model continued as a chat while that chat lives (the chat works in it).
+            return Slots.Any(slot => bindings.FindByRequest(ChatRequestId(run, slot)) is { IsArchived: false });
+        }
+        if (found.IsActive && !found.Deleting) return true;
         return found.Models.Any(model => model.ChatId is { } chat && !model.Discarded && bindings.Get(chat) is { IsArchived: false });
     }
 
@@ -115,9 +137,10 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         if (Interlocked.Exchange(ref disposed, 1) != 0) return;
         broker.Changed -= OnApprovalsChanged;
         gate.LimitReached -= OnLimitReached;
+        if (Interlocked.Exchange(ref followedRuns, null) is { } runs) runs.Changed -= OnRunsChanged;
         WebApproval.SetOverrides(broker, null);
         await stopping.CancelAsync().ConfigureAwait(false);
-        try { await Task.WhenAll(Drivers()).WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); }
+        try { await Task.WhenAll([.. Drivers(), .. Deletions()]).WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); }
         catch (Exception error) when (error is OperationCanceledException or TimeoutException) { /* Stopped. */ }
         stopping.Dispose();
     }
@@ -133,6 +156,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         if (requestId.Length is 0 or > 128) throw AgentCompareException.BadRequest("A create needs a request id of 1 to 128 characters.");
         if (store.FindByRequest(requestId) is { } existing)
         {
+            if (existing.Deleting) throw AgentCompareException.Conflict(AgentCompareException.Busy, "The run this request made is being deleted.");
             if (existing.IsActive) Drive(existing.Id);
             return existing;
         }
@@ -203,7 +227,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
 
         var order = models.Select(model => model.Slot).ToArray();
         Random.Shared.Shuffle(order);
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var run = new AgentCompareRun
         {
             Id = NewRunId(now),
@@ -283,27 +307,68 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         return "cmp_" + new string(text);
     }
 
-    /// <summary>Starts following run <paramref name="id"/> in the background (once; a run already followed is left alone).</summary>
+    /// <summary>Starts following run <paramref name="id"/> in the background (once; a run already followed, or being deleted, is left alone).</summary>
     private void Drive(string id)
     {
         if (stopping.IsCancellationRequested) return;
         var go = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (drivers)
         {
-            if (drivers.ContainsKey(id)) return;
-            drivers[id] = Task.Run(async () =>
+            // Under the lock a delete takes to cancel the follower and hide the run, so no follower starts for a run being deleted.
+            if (drivers.ContainsKey(id) || store.Get(id) is null) return;
+            CancellationTokenSource stop;
+            try { stop = CancellationTokenSource.CreateLinkedTokenSource(stopping.Token); }
+            catch (ObjectDisposedException) { return; }
+            var task = Task.Run(async () =>
             {
                 await go.Task.ConfigureAwait(false);
-                try { await DriveAsync(id, stopping.Token).ConfigureAwait(false); }
-                finally { lock (drivers) drivers.Remove(id); }
+                try { await DriveAsync(id, stop.Token).ConfigureAwait(false); }
+                finally
+                {
+                    lock (drivers) drivers.Remove(id);
+                    stop.Dispose();
+                }
             });
+            drivers[id] = new RunDriver(task, stop);
         }
         go.TrySetResult();
     }
 
     private Task[] Drivers()
     {
-        lock (drivers) return [.. drivers.Values];
+        lock (drivers) return [.. drivers.Values.Select(driver => driver.Task)];
+    }
+
+    /// <summary>Ends the follower of run <paramref name="id"/> (quietly: it sees its token cancelled) and returns it, or null when none runs.</summary>
+    private Task? CancelDriver(string id)
+    {
+        RunDriver? driver;
+        lock (drivers) drivers.TryGetValue(id, out driver);
+        if (driver is null) return null;
+        try { driver.Stop.Cancel(); }
+        catch (ObjectDisposedException) { /* It just ended. */ }
+        return driver.Task;
+    }
+
+    /// <summary>The run as stored. A run deleted meanwhile ends its follower quietly: the delete cancelled the follower's token before it
+    /// hid the run.</summary>
+    private AgentCompareRun Live(string id, CancellationToken token) =>
+        store.Get(id) ?? throw new OperationCanceledException($"The agent compare run {id} was deleted.", token);
+
+    /// <summary>The stop of <paramref name="slot"/>'s check (made on first use; cancelled by Stop, also before the check starts).</summary>
+    private CancellationTokenSource CheckStop(string id, string slot) =>
+        checkStops.GetOrAdd(AgentCompareRun.ModelKey(id, slot), _ => new CancellationTokenSource());
+
+    /// <summary>Ends <paramref name="slot"/>'s check: a running one is killed with every process it started, one not started yet won't run.</summary>
+    private void StopCheck(string id, string slot)
+    {
+        try { CheckStop(id, slot).Cancel(); }
+        catch (ObjectDisposedException) { /* Its check just ended. */ }
+    }
+
+    private void ForgetCheck(string id, string slot)
+    {
+        if (checkStops.TryRemove(AgentCompareRun.ModelKey(id, slot), out var stop)) stop.Dispose();
     }
 
     private async Task DriveAsync(string id, CancellationToken token)
@@ -312,17 +377,17 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         {
             if (store.Get(id) is not { } run) return;
             if (run.State == AgentRunState.Preparing && !await PrepareAsync(run, token).ConfigureAwait(false)) return;
-            run = store.Get(id)!;
+            run = Live(id, token);
             if (run.State != AgentRunState.Running) return;
             var host = await device.WhenOpen.WaitAsync(token).ConfigureAwait(false);
             BeginParentRow(run);
             foreach (var slot in run.Order)
             {
                 token.ThrowIfCancellationRequested();
-                if (store.Get(id)?.Model(slot) is { Phase: AgentModelPhase.Pending, Outcome: null })
+                if (Live(id, token).Model(slot) is { Phase: AgentModelPhase.Pending, Outcome: null })
                     await StartModelAsync(id, slot, host, token).ConfigureAwait(false);
             }
-            run = store.Get(id)!;
+            run = Live(id, token);
             await Task.WhenAll(run.Models.Select(model => FollowAsync(id, model.Slot, host, token))).ConfigureAwait(false);
             FinishRun(id);
         }
@@ -362,7 +427,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
             {
                 State = AgentRunState.Failed,
                 Error = message,
-                Finished = DateTimeOffset.UtcNow,
+                Finished = clock.GetUtcNow(),
                 Models = [.. current.Models.Select(model => model with
                 {
                     Phase = AgentModelPhase.Done,
@@ -398,7 +463,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
 
     private async Task StartModelAsync(string id, string slot, DurableDeviceHost host, CancellationToken token)
     {
-        var run = store.Get(id)!;
+        var run = Live(id, token);
         var spec = run.ModelSpec(slot)!;
         var model = run.Model(slot)!;
         try
@@ -412,10 +477,12 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 ThinkingLevel = spec.Thinking,
                 SpawnKey = $"agent-compare:{run.Id}:{slot}",
             }, token).ConfigureAwait(false);
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.GetUtcNow();
             // Stored before anything is sent, so the gate knows the session from its first request.
-            run = store.UpdateModel(id, slot, state => state with { SessionId = session.Id, StartedAt = state.StartedAt ?? now })!;
-            run = store.Update(id, current => current.Started is null ? current with { Started = now } : current)!;
+            run = store.UpdateModel(id, slot, state => state with { SessionId = session.Id, StartedAt = state.StartedAt ?? now })
+                ?? throw new OperationCanceledException("The run was deleted.", token);
+            run = store.Update(id, current => current.Started is null ? current with { Started = now } : current)
+                ?? throw new OperationCanceledException("The run was deleted.", token);
             BeginChildRow(run, slot);
             await session.ConfigureAsync(1, new AgentConfigurationChange { Instructions = run.Spec.Instructions }, token).ConfigureAwait(false);
             var sent = await session.SendAsync(1, new SendRequest(run.Spec.Task, TaskRequestId(id, slot)), token).ConfigureAwait(false);
@@ -430,7 +497,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 Outcome = state.Outcome ?? AgentModelOutcome.Error,
                 Message = state.Message ?? "This model could not be started: " + error.Message,
                 Error = error.Message,
-                EndedAt = DateTimeOffset.UtcNow,
+                EndedAt = clock.GetUtcNow(),
             });
             FinishChildRow(id, slot);
         }
@@ -440,7 +507,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
     {
         try
         {
-            var model = store.Get(id)?.Model(slot);
+            var model = Live(id, token).Model(slot);
             if (model is null || model.Phase == AgentModelPhase.Done) return;
             if (model.Phase == AgentModelPhase.Pending)
             {
@@ -450,13 +517,13 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                     Phase = AgentModelPhase.Done,
                     Outcome = state.Outcome ?? AgentModelOutcome.Stopped,
                     Message = state.Message ?? AgentCompareGate.StoppedText,
-                    EndedAt = state.EndedAt ?? DateTimeOffset.UtcNow,
+                    EndedAt = state.EndedAt ?? clock.GetUtcNow(),
                 });
                 FinishChildRow(id, slot);
                 return;
             }
             if (model.Phase == AgentModelPhase.Running) await WaitForModelAsync(id, slot, host, token).ConfigureAwait(false);
-            model = store.Get(id)?.Model(slot);
+            model = Live(id, token).Model(slot);
             if (model?.Phase == AgentModelPhase.Checking) await CheckAsync(id, slot, token).ConfigureAwait(false);
             await SummarizeAsync(id, slot, token).ConfigureAwait(false);
         }
@@ -473,7 +540,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 Outcome = state.Outcome ?? AgentModelOutcome.Error,
                 Message = state.Message ?? "The runner lost track of this model: " + error.Message,
                 Error = state.Error ?? error.Message,
-                EndedAt = state.EndedAt ?? DateTimeOffset.UtcNow,
+                EndedAt = state.EndedAt ?? clock.GetUtcNow(),
             });
             FinishChildRow(id, slot);
         }
@@ -481,7 +548,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
 
     private async Task WaitForModelAsync(string id, string slot, DurableDeviceHost host, CancellationToken token)
     {
-        var run = store.Get(id)!;
+        var run = Live(id, token);
         var model = run.Model(slot)!;
         var session = host.Sessions.FirstOrDefault(item => item.Id == model.SessionId)
             ?? throw new InvalidOperationException($"Its session {model.SessionId} is gone.");
@@ -497,19 +564,30 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         SendResult result;
         while (true)
         {
-            model = store.Get(id)!.Model(slot)!;
-            var deadline = (model.StartedAt ?? DateTimeOffset.UtcNow).AddMinutes(run.Spec.MaxMinutes);
-            var remaining = deadline - DateTimeOffset.UtcNow;
+            model = Live(id, token).Model(slot)!;
+            var now = clock.GetUtcNow();
+            var deadline = (model.StartedAt ?? now).AddMinutes(run.Spec.MaxMinutes);
+            var remaining = deadline - now;
             if (remaining <= TimeSpan.Zero && model.Outcome is null)
             {
+                // Its own time is up: only this model stops (the others have their own deadlines).
                 gate.Stop(run, slot, AgentModelOutcome.TimeLimit, AgentCompareGate.TimeText(run.Spec.MaxMinutes));
                 await AbortQuietlyAsync(session, token).ConfigureAwait(false);
             }
-            var wait = remaining > TimeSpan.Zero && remaining < FollowInterval ? remaining + TimeSpan.FromMilliseconds(50) : FollowInterval;
-            result = await session.SubmissionAsync(submission.Value, wait, token).ConfigureAwait(false);
+            // Wait for its task to end, at most FollowInterval; a timer on the app's clock wakes the wait at the model's deadline.
+            using var due = remaining > TimeSpan.Zero && remaining <= MaxDeadlineWait && model.Outcome is null ? new CancellationTokenSource(remaining, clock) : null;
+            using var wake = due is null ? null : CancellationTokenSource.CreateLinkedTokenSource(token, due.Token);
+            try
+            {
+                result = await session.SubmissionAsync(submission.Value, FollowInterval, wake?.Token ?? token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested)
+            {
+                continue; // The deadline: look at the time limit again.
+            }
             if (result.Status is SendStatus.Done or SendStatus.Unanswered) break;
         }
-        model = store.Get(id)!.Model(slot)!;
+        model = Live(id, token).Model(slot)!;
         if (model.Outcome is not null) await AbortQuietlyAsync(session, token).ConfigureAwait(false);
         else await IdleAsync(session, token).ConfigureAwait(false);
         var answered = result.Status == SendStatus.Done;
@@ -524,7 +602,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 Message = state.Message ?? (answered ? null : "The model stopped without an answer" + (result.Reason is { Length: > 0 } reason ? ": " + reason : ".")),
                 Error = answered || state.Outcome is not null ? state.Error : result.Reason,
                 Answer = answer ?? state.Answer,
-                EndedAt = state.EndedAt ?? DateTimeOffset.UtcNow,
+                EndedAt = state.EndedAt ?? clock.GetUtcNow(),
                 BudgetAsk = null,
                 Phase = check ? AgentModelPhase.Checking : state.Phase,
             };
@@ -533,17 +611,27 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
 
     private async Task CheckAsync(string id, string slot, CancellationToken token)
     {
-        var run = store.Get(id)!;
+        var run = Live(id, token);
         var model = run.Model(slot)!;
         if (run.Spec.CheckCommand is not { } command || model.WorkingDirectory is not { } cwd || !Directory.Exists(cwd)) return;
-        var result = await AgentCheckCommand.RunAsync(command, cwd, TimeSpan.FromSeconds(run.Spec.CheckTimeoutSeconds), token).ConfigureAwait(false);
-        store.UpdateModel(id, slot, state => state with { Check = result });
+        // Stop (StopAsync) cancels this model's check stop: the check's process tree is killed and the check is recorded as stopped.
+        var stop = CheckStop(id, slot);
+        try
+        {
+            var result = await AgentCheckCommand.RunAsync(command, cwd, TimeSpan.FromSeconds(run.Spec.CheckTimeoutSeconds), token, stop.Token)
+                .ConfigureAwait(false);
+            store.UpdateModel(id, slot, state => state with { Check = result });
+        }
+        finally
+        {
+            ForgetCheck(id, slot);
+        }
     }
 
     private async Task SummarizeAsync(string id, string slot, CancellationToken token)
     {
         AgentDiffSummary? summary = null;
-        var model = store.Get(id)?.Model(slot);
+        var model = Live(id, token).Model(slot);
         if (model is { Discarded: false, WorkspacePath: not null })
         {
             try
@@ -558,7 +646,8 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 log.LogWarning(error, "Agent compare run {Run}: the changes of model {Slot} could not be read.", id, slot);
             }
         }
-        store.UpdateModel(id, slot, state => state with { Diff = summary ?? state.Diff, Phase = AgentModelPhase.Done, EndedAt = state.EndedAt ?? DateTimeOffset.UtcNow });
+        store.UpdateModel(id, slot, state => state with { Diff = summary ?? state.Diff, Phase = AgentModelPhase.Done, EndedAt = state.EndedAt ?? clock.GetUtcNow() });
+        ForgetCheck(id, slot);
         FinishChildRow(id, slot);
     }
 
@@ -584,8 +673,8 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
 
     private void FinishRun(string id)
     {
-        var finished = store.Update(id, run => run.State == AgentRunState.Running && run.Models.All(model => model.Phase == AgentModelPhase.Done)
-            ? run with { State = AgentRunState.Finished, Finished = DateTimeOffset.UtcNow }
+        var finished = store.Update(id, run => run.State == AgentRunState.Running && !run.Deleting && run.Models.All(model => model.Phase == AgentModelPhase.Done)
+            ? run with { State = AgentRunState.Finished, Finished = clock.GetUtcNow() }
             : run);
         if (finished is { State: AgentRunState.Finished }) FinishParentRow(finished);
     }
@@ -690,6 +779,9 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
     };
 
     private static string TaskRequestId(string run, string slot) => $"agent-compare:{run}:{slot}:task";
+
+    /// <summary>The request id of the chat binding Open as chat makes for <paramref name="slot"/>'s model.</summary>
+    private static string ChatRequestId(string run, string slot) => "agent-compare:" + AgentCompareRun.ModelKey(run, slot);
 
     // ─── runs.db ────────────────────────────────────────────────────────────
 

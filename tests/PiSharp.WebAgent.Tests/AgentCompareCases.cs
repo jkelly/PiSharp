@@ -1,17 +1,23 @@
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using PiSharp.WebAgent.AgentCompare;
 using PiSharp.WebAgent.AgentCompare.Runner;
 using PiSharp.WebAgent.AgentCompare.Workspaces;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Credentials;
+using PiSharp.WebAgent.CustomProviders;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Hosting;
+using PiSharp.WebAgent.Runs;
 using PiSharp.WebAgent.Spend;
 
 // Decision 0011 (run W4, R5): the agent compare runner. In-process cases cover its pieces (settings, the approval override's workspace
 // rule, the check command, run ids, the create request); the app cases run the built app (--faux, or --faux-metered for the budget share:
 // offline, no provider is called) over a temporary data folder and a temporary project, with git's global and system config switched off.
 // Faux models answer "!command" with a bash call, so each model edits its own workspace; a run is driven only through /api/compare/agent
-// (and /api/chats once a model is opened as a chat), as R6's pages will drive it.
+// (and /api/chats once a model is opened as a chat), as R6's pages will drive it. W4 fix 2 adds AgentCompareLifecycleCases (below): the time
+// limit on the app's clock, Stop during a check, deleting runs (the API, History, the danger zone) and the retention.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> AgentCompareCases() =>
@@ -711,6 +717,393 @@ internal static partial class Program
             Equal("/chat/" + chat, status.Models().Single().Str("chatUrl"), "the status links the chat");
         }),
     ];
+
+    // W4 fix 2: the time limit on the app's clock, Stop during a check, deleting a run (its API, History's delete and Clear, the danger zone)
+    // and the retention. The in-process cases run the runner over RunnerHost (the areas it needs, faux models, a clock that moves only when
+    // told to); the app cases drive the built app as the cases above do.
+    private static IEnumerable<(string, Func<Task>)> AgentCompareLifecycleCases() =>
+    [
+        Case("agent-compare.time-limit-on-the-app-clock-stops-only-that-model", async () =>
+        {
+            var clock = new RunsClock(DateTimeOffset.UtcNow);
+            await using var host = await RunnerHost.StartAsync("ac-time", clock);
+            var store = host.Runner.Store;
+            var staggered = 0;
+            // The first model to start is followed by five minutes on the clock before the next one starts: their deadlines differ.
+            void Stagger(string id)
+            {
+                if (store.Find(id) is { } current && current.Models.Count(model => model.StartedAt is not null) == 1 && Interlocked.Exchange(ref staggered, 1) == 0)
+                    clock.Advance(TimeSpan.FromMinutes(5));
+            }
+            store.Changed += Stagger;
+            var start = clock.GetUtcNow();
+            var run = await host.Runner.CreateAsync(new AgentCompareCreateRequest
+            {
+                RequestId = "time-1",
+                Task = "!echo t > t.txt",
+                ProjectPath = host.Project,
+                Models = [new AgentCompareModelRequest("faux", "echo"), new AgentCompareModelRequest("faux", "echo-small")],
+                Approval = ToolApprovalMode.Ask,
+                MaxMinutes = 10,
+                CheckCommand = "echo checked",
+            });
+            var (first, second) = (run.Order[0], run.Order[1]);
+            await WaitUntilAsync(() => Task.FromResult(store.Get(run.Id) is { } current && host.Runner.Pending(current).Count == 2 && clock.Waiting >= 2),
+                "both models wait for an approval, each with a deadline timer on the app's clock", TimeSpan.FromSeconds(60));
+            store.Changed -= Stagger;
+            var waiting = store.Get(run.Id)!;
+            Equal<DateTimeOffset?>(start, waiting.Model(first)!.StartedAt, "the first model started at the clock's start");
+            Equal<DateTimeOffset?>(start + TimeSpan.FromMinutes(5), waiting.Model(second)!.StartedAt, "the second five minutes later (the app's clock)");
+
+            // Six minutes more: past the first model's ten minutes, not the second's.
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            clock.Advance(TimeSpan.FromMinutes(6));
+            await WaitUntilAsync(() => Task.FromResult(store.Get(run.Id)!.Model(first)!.Outcome is not null), "the first model's time limit stopped it",
+                TimeSpan.FromSeconds(30));
+            Check(watch.Elapsed < TimeSpan.FromSeconds(8), "at once: its deadline timer woke its follower (not the next 10 s look): " + watch.Elapsed);
+            var limited = store.Get(run.Id)!.Model(first)!;
+            Equal(AgentModelOutcome.TimeLimit, limited.Outcome, "it reached its time limit");
+            Equal(AgentCompareGate.TimeText(10), limited.Message, "and says so");
+            Equal<string?>(null, store.Get(run.Id)!.Model(second)!.Outcome, "the second model goes on");
+            await WaitUntilAsync(() => Task.FromResult(store.Get(run.Id)!.Model(first)!.Phase == AgentModelPhase.Done), "the first model is done",
+                TimeSpan.FromSeconds(60));
+            limited = store.Get(run.Id)!.Model(first)!;
+            Check(!File.Exists(Path.Join(limited.WorkingDirectory!, "t.txt")), "its waiting call never ran");
+            Equal(AgentCheckState.Passed, limited.Check?.State, "a model its time limit stopped is still checked");
+            var pending = host.Runner.Pending(store.Get(run.Id)!);
+            Equal(second, pending.Single().Slot, "only the second model still waits");
+            Equal<string?>(null, store.Get(run.Id)!.Model(second)!.Outcome, "and its time is not up");
+
+            await host.Runner.ApproveAsync(run.Id, AgentApprovalScope.Call, second, pending.Single().Approval.Request.TaskId, allow: true, reason: null);
+            await WaitUntilAsync(() => Task.FromResult(store.Get(run.Id)!.State == AgentRunState.Finished), "the run finished", TimeSpan.FromSeconds(60));
+            var other = store.Get(run.Id)!.Model(second)!;
+            Equal(AgentModelOutcome.Finished, other.Outcome, "the second model finished within its own time");
+            Check(File.Exists(Path.Join(other.WorkingDirectory!, "t.txt")), "its call ran");
+            Equal(start + TimeSpan.FromMinutes(11), store.Get(run.Id)!.Finished!.Value, "the run's dates are the app's clock");
+        }),
+
+        Case("agent-compare.check-command-stop-kills-it-and-says-so", async () =>
+        {
+            var root = Temp("ac-check-stop");
+            try
+            {
+                var windows = OperatingSystem.IsWindows();
+                using var before = new CancellationTokenSource();
+                await before.CancelAsync();
+                var skipped = await AgentCheckCommand.RunAsync("echo ran > ran.txt", root, TimeSpan.FromSeconds(30),
+                    CancellationToken.None, before.Token);
+                Equal(AgentCheckState.Stopped, skipped.State, "a check stopped before it started is stopped");
+                Equal(AgentCheckCommand.StoppedBefore, skipped.Tail, "and says it did not run");
+                Check(!File.Exists(Path.Join(root, "ran.txt")), "it never started");
+
+                using var during = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                var stopped = await AgentCheckCommand.RunAsync(windows ? "echo started & ping -n 60 127.0.0.1 >nul" : "echo started; sleep 60", root,
+                    TimeSpan.FromMinutes(10), CancellationToken.None, during.Token);
+                Equal(AgentCheckState.Stopped, stopped.State, "a check stopped while it runs is stopped, not timed out");
+                Equal<int?>(null, stopped.ExitCode, "with no exit code");
+                Check(stopped.Tail.Contains("started", StringComparison.Ordinal) && stopped.Tail.Contains(AgentCheckCommand.StoppedWhileRunning, StringComparison.Ordinal),
+                    "its output so far and the stop: " + stopped.Tail);
+                Check(watch.Elapsed < TimeSpan.FromSeconds(20), "it ended promptly: " + watch.Elapsed);
+                Equal("stopped", PiSharp.WebAgent.AgentCompare.Pages.AgentText.CheckWord(AgentCheckState.Stopped), "the views' word for it");
+            }
+            finally
+            {
+                DeleteTemp(root);
+            }
+        }),
+
+        Case("agent-compare.retention-removes-a-run-with-its-history-row", async () =>
+        {
+            // The app's clock is 31 days back, so runs made now are past History's 30-day retention by the real date.
+            var clock = new RunsClock(DateTimeOffset.UtcNow - TimeSpan.FromDays(31));
+            await using var host = await RunnerHost.StartAsync("ac-retention", clock);
+            var store = host.Runner.Store;
+            var old = await host.Runner.CreateAsync(new AgentCompareCreateRequest
+            {
+                RequestId = "old-1",
+                Task = "!echo r > r.txt",
+                ProjectPath = host.Project,
+                Models = [new AgentCompareModelRequest("faux", "echo")],
+                Approval = ToolApprovalMode.Auto,
+            });
+            await WaitUntilAsync(() => Task.FromResult(store.Get(old.Id)?.State == AgentRunState.Finished), "the old run finished", TimeSpan.FromSeconds(60));
+            var running = await host.Runner.CreateAsync(new AgentCompareCreateRequest
+            {
+                RequestId = "running-1",
+                Task = "!echo w > w.txt",
+                ProjectPath = host.Project,
+                Models = [new AgentCompareModelRequest("faux", "echo")],
+                Approval = ToolApprovalMode.Ask,
+                MaxMinutes = 240,
+            });
+            await WaitUntilAsync(() => Task.FromResult(store.Get(running.Id) is { } current && host.Runner.Pending(current).Count == 1),
+                "the other run waits for an approval", TimeSpan.FromSeconds(60));
+            var model = store.Get(old.Id)!.Models.Single();
+            var device = host.Device.Host;
+            var session = device.Sessions.Single(item => item.Id == model.SessionId).DirectoryPath;
+            Check(Directory.Exists(session) && Directory.Exists(model.WorkspacePath), "its session and workspace are on disk");
+            Check(host.Runs.Get(old.Id) is not null && host.Runs.Get(AgentCompareRun.ModelKey(old.Id, "a")) is not null, "History has its rows");
+
+            var cleaned = host.Runs.Cleanup(RunHistorySettings.CreateDefault(), DateTimeOffset.UtcNow);
+            Check(cleaned.Runs > 0, "the retention removed its rows");
+            await WaitUntilAsync(() => Task.FromResult(store.Find(old.Id) is null), "the run went with its History row", TimeSpan.FromSeconds(30));
+            Check(store.List().All(item => item.Id != old.Id), "it is no longer listed");
+            Check(!Directory.Exists(session), "its session's files are deleted");
+            Check(device.Sessions.All(item => item.Id != model.SessionId), "and the device no longer has the session");
+            Check(!Directory.Exists(model.WorkspacePath), "its workspace is removed");
+            Equal(0L, ReadDb(host.Runs.Db.Path, $"SELECT COUNT(*) FROM runs WHERE id = '{old.Id}' OR id LIKE '{old.Id}-%' OR parent_id = '{old.Id}' OR parent_id LIKE '{old.Id}-%'",
+                reader => reader.GetInt64(0)).Single(), "no row of it is left");
+            Check(store.Get(running.Id) is { IsActive: true }, "a running run is never removed by the retention");
+            Check(host.Runs.Get(running.Id) is not null, "nor its History row");
+        }),
+
+        Case("agent-compare.app.stop-ends-a-running-check", async () =>
+        {
+            await using var app = await CompareApp.StartAsync("ac-stop-check", ToolApprovalMode.Auto);
+            var run = await app.CreateAsync(new JsonObject
+            {
+                ["requestId"] = "stop-check-1",
+                ["task"] = "!echo first > first.txt",
+                ["projectPath"] = app.Project,
+                ["models"] = Models("echo"),
+                ["approval"] = "auto",
+                ["checkCommand"] = OperatingSystem.IsWindows() ? "echo started & ping -n 120 127.0.0.1 >nul" : "echo started; sleep 120",
+                ["checkTimeoutSeconds"] = 600,
+            });
+            await app.WaitAsync(run.Id(), status => status.Models().Single().Str("phase") == "checking", "its check runs");
+            await Task.Delay(TimeSpan.FromSeconds(1)); // the check prints its first line
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var stopped = await app.PostAsync($"/api/compare/agent/{run.Id()}/stop", new JsonObject { ["slot"] = "a" });
+            Equal(200, stopped.Status, "stopped: " + stopped.Text);
+            var finished = await app.WaitAsync(run.Id(), status => status.Str("state") == "finished", "the run finished");
+            Check(watch.Elapsed < TimeSpan.FromSeconds(30), "its check ended at once, not after its two minutes: " + watch.Elapsed);
+            var model = finished.Models().Single();
+            Equal("finished", model.Str("outcome"), "the model's own outcome stays (it finished its task)");
+            var check = model["check"]!;
+            Equal("stopped", check.Str("state"), "its check is recorded as stopped: " + check);
+            Check(check["exitCode"] is null, "with no exit code");
+            Check(check.Str("tail")!.Contains("started", StringComparison.Ordinal) && check.Str("tail")!.Contains("[Stopped: you stopped this model", StringComparison.Ordinal),
+                "its output and the stop are kept: " + check.Str("tail"));
+            Check(File.Exists(Path.Join(model.Str("workingDirectory"), "first.txt")), "the model's work is still there");
+            var notes = ReadDb(Path.Join(app.Data, "runs.db"), $"SELECT notes FROM runs WHERE id = '{run.Id()}-a'", row => row.GetString(0)).Single();
+            Check(notes.Contains("check stopped", StringComparison.Ordinal), "the runs.db row notes the check: " + notes);
+            var page = await app.App.Get("/compare?mode=agent&run=" + run.Id());
+            Equal(200, page.Status, "the run page");
+            Check(page.Text.Contains("Check stopped", StringComparison.Ordinal), "the run page shows the stopped check");
+            Equal(200, (await app.PostAsync($"/api/compare/agent/{run.Id()}/stop", new JsonObject())).Status, "stopping it again changes nothing");
+            Equal("stopped", (await app.StatusAsync(run.Id())).Models().Single()["check"]!.Str("state"), "still stopped");
+        }),
+
+        Case("agent-compare.app.delete-removes-a-run-its-sessions-and-workspaces", async () =>
+        {
+            await using var app = await CompareApp.StartAsync("ac-delete", ToolApprovalMode.Auto);
+            Equal(404, (await app.PostAsync("/api/compare/agent/cmp_missing/delete", new JsonObject())).Status, "an unknown run");
+            string SessionFolder(JsonNode model) => Path.Join(app.Data, "device", "sessions", model.Str("sessionId")!);
+            long Rows(string id) => ReadDb(Path.Join(app.Data, "runs.db"),
+                $"SELECT COUNT(*) FROM runs WHERE id = '{id}' OR id LIKE '{id}-%' OR parent_id = '{id}' OR parent_id LIKE '{id}-%'", row => row.GetInt64(0)).Single();
+
+            // A finished run.
+            var done = await app.CreateAsync(new JsonObject
+            {
+                ["requestId"] = "delete-1",
+                ["task"] = "!echo delete-marker-one > one.txt",
+                ["projectPath"] = app.Project,
+                ["models"] = Models("echo"),
+                ["approval"] = "auto",
+                ["checkCommand"] = "echo checked",
+            });
+            var model = (await app.WaitAsync(done.Id(), status => status.Str("state") == "finished", "the run finished")).Models().Single();
+            Check(Directory.Exists(SessionFolder(model)) && Directory.Exists(model.Str("workspacePath")), "its session and workspace are on disk");
+            Check(Rows(done.Id()) >= 2, "History has its rows");
+            Check((await app.App.Get("/compare?mode=agent&run=" + done.Id())).Text.Contains($"data-run=\"{done.Id()}\"", StringComparison.Ordinal), "its page opens");
+            var deleted = await app.PostAsync($"/api/compare/agent/{done.Id()}/delete", new JsonObject());
+            Equal(200, deleted.Status, "deleted: " + deleted.Text);
+            Equal(true, deleted.Body!["deleted"]!.GetValue<bool>(), "all of it: " + deleted.Text);
+            Equal(1, deleted.Body!["sessions"]!.GetValue<int>(), "its session");
+            Equal("a", deleted.Body!["workspaces"]!.AsArray().Single()!.GetValue<string>(), "its workspace");
+            Equal(404, (await app.App.Get("/api/compare/agent/" + done.Id())).Status, "the run is gone");
+            Check((await app.App.Get("/api/compare/agent")).Body!["items"]!.AsArray().All(item => item.Str("id") != done.Id()), "and no longer listed");
+            Check(!Directory.Exists(SessionFolder(model)), "its session's files are deleted");
+            Check(!Directory.Exists(model.Str("workspacePath")), "its workspace is removed");
+            Equal(0L, Rows(done.Id()), "its History rows are deleted");
+            var page = await app.App.Get("/compare?mode=agent&run=" + done.Id());
+            Check(!page.Text.Contains($"data-run=\"{done.Id()}\"", StringComparison.Ordinal) && !page.Text.Contains("delete-marker-one", StringComparison.Ordinal),
+                "/compare?mode=agent&run= no longer opens it");
+            Equal(404, (await app.PostAsync($"/api/compare/agent/{done.Id()}/delete", new JsonObject())).Status, "deleting it again");
+            Check(File.Exists(Path.Join(app.Project, "README.md")) && !File.Exists(Path.Join(app.Project, "one.txt")), "the project is as it was");
+
+            // A running run (both models wait for an approval): the delete stops it first.
+            var waiting = await app.CreateAsync(new JsonObject
+            {
+                ["requestId"] = "delete-2",
+                ["task"] = "!echo two > two.txt",
+                ["projectPath"] = app.Project,
+                ["models"] = Models("echo", "echo-small"),
+                ["approval"] = "ask",
+            });
+            var asking = await app.WaitAsync(waiting.Id(), status => status.Models().All(item => item.Str("waiting") == "approval"), "both models ask");
+            var models = asking.Models().ToList();
+            var running = await app.PostAsync($"/api/compare/agent/{waiting.Id()}/delete", new JsonObject());
+            Equal(200, running.Status, "a running run deleted: " + running.Text);
+            Equal(true, running.Body!["deleted"]!.GetValue<bool>(), "all of it: " + running.Text);
+            Equal(2, running.Body!["sessions"]!.GetValue<int>(), "both sessions");
+            Equal(404, (await app.App.Get("/api/compare/agent/" + waiting.Id())).Status, "the run is gone");
+            Check(models.All(item => !Directory.Exists(SessionFolder(item)) && !Directory.Exists(item.Str("workspacePath"))), "both sessions and workspaces are gone");
+            Equal(0L, Rows(waiting.Id()), "its History rows are deleted");
+            Check(!File.Exists(Path.Join(app.Project, "two.txt")), "no waiting call ran");
+
+            // A model continued as a chat keeps its session and workspace: the chat is the user's now.
+            var chatRun = await app.CreateAsync(new JsonObject
+            {
+                ["requestId"] = "delete-3",
+                ["task"] = "!echo three > three.txt",
+                ["projectPath"] = app.Project,
+                ["models"] = Models("echo"),
+                ["approval"] = "auto",
+            });
+            var chatModel = (await app.WaitAsync(chatRun.Id(), status => status.Str("state") == "finished", "the third run finished")).Models().Single();
+            var opened = await app.PostAsync($"/api/compare/agent/{chatRun.Id()}/open-chat", new JsonObject { ["slot"] = "a" });
+            Equal(200, opened.Status, "opened as a chat: " + opened.Text);
+            var chat = opened.Body!.Str("chatId")!;
+            var kept = await app.PostAsync($"/api/compare/agent/{chatRun.Id()}/delete", new JsonObject());
+            Equal(200, kept.Status, "deleted: " + kept.Text);
+            Equal(true, kept.Body!["deleted"]!.GetValue<bool>(), "the run is deleted: " + kept.Text);
+            Equal("a", kept.Body!["keptForChats"]!.AsArray().Single()!.GetValue<string>(), "its model's chat is kept");
+            Equal(0, kept.Body!["sessions"]!.GetValue<int>(), "with its session");
+            Equal(404, (await app.App.Get("/api/compare/agent/" + chatRun.Id())).Status, "the run is gone");
+            Check(Directory.Exists(SessionFolder(chatModel)) && File.Exists(Path.Join(chatModel.Str("workingDirectory"), "three.txt")), "the chat's session and workspace stay");
+            Equal(200, (await app.App.Get($"/api/chats/{chat}")).Status, "the chat still opens");
+        }),
+
+        Case("agent-compare.app.history-and-the-danger-zone-delete-agent-compare-runs", async () =>
+        {
+            await using var app = await CompareApp.StartAsync("ac-history", ToolApprovalMode.Auto);
+            async Task<(string Id, string Workspace, string Session)> FinishedAsync(string request)
+            {
+                var run = await app.CreateAsync(new JsonObject
+                {
+                    ["requestId"] = request,
+                    ["task"] = "!echo h > h.txt",
+                    ["projectPath"] = app.Project,
+                    ["models"] = Models("echo"),
+                    ["approval"] = "auto",
+                });
+                var model = (await app.WaitAsync(run.Id(), status => status.Str("state") == "finished", request + " finished")).Models().Single();
+                var found = (run.Id(), model.Str("workspacePath")!, Path.Join(app.Data, "device", "sessions", model.Str("sessionId")!));
+                Check(Directory.Exists(found.Item2) && Directory.Exists(found.Item3), request + ": its workspace and session are on disk");
+                return found;
+            }
+            async Task GoneAsync((string Id, string Workspace, string Session) run, string how)
+            {
+                await WaitUntilAsync(async () => (await app.App.Get("/api/compare/agent/" + run.Id)).Status == 404, how + " deleted the run", TimeSpan.FromSeconds(30));
+                await WaitUntilAsync(() => Task.FromResult(!Directory.Exists(run.Workspace) && !Directory.Exists(run.Session)), how + ": its workspace and session went",
+                    TimeSpan.FromSeconds(30));
+                Check((await app.App.Get("/compare?mode=agent&run=" + run.Id)).Text.Contains($"data-run=\"{run.Id}\"", StringComparison.Ordinal) == false,
+                    how + ": /compare?mode=agent&run= no longer opens it");
+            }
+
+            var first = await FinishedAsync("history-1");
+            var deleted = await app.App.SendAsync(HttpMethod.Post, "/api/runs/delete", new JsonObject { ["ids"] = new JsonArray(first.Id) }, origin: app.App.Origin);
+            Equal(200, deleted.Status, "History's delete: " + deleted.Text);
+            await GoneAsync(first, "History's delete");
+
+            var second = await FinishedAsync("history-2");
+            var cleared = await app.App.SendAsync(HttpMethod.Post, "/api/history/clear", new JsonObject { ["keepPinned"] = false }, origin: app.App.Origin);
+            Equal(200, cleared.Status, "History's Clear: " + cleared.Text);
+            await GoneAsync(second, "History's Clear");
+
+            var third = await FinishedAsync("history-3");
+            var danger = await app.App.SendAsync(HttpMethod.Post, "/api/data/danger/history", new JsonObject { ["confirm"] = "DELETE" }, origin: app.App.Origin);
+            Equal(200, danger.Status, "the danger zone's Clear history: " + danger.Text);
+            Equal(0, danger.Body!["failed"]!.AsArray().Count, "nothing failed: " + danger.Text);
+            Equal(404, (await app.App.Get("/api/compare/agent/" + third.Id)).Status, "the run was deleted before the danger zone answered");
+            Check(!Directory.Exists(third.Workspace) && !Directory.Exists(third.Session), "with its workspace and session");
+            Equal(0, (await app.App.Get("/api/compare/agent")).Body!["items"]!.AsArray().Count, "no agent compare run is left");
+        }),
+    ];
+
+    /// <summary>The agent compare runner in process (W4 fix 2): the core, credentials (a fake environment, never this machine's), chat, spend,
+    /// workspaces, runs and runner areas over a temporary data folder, on faux models and the given clock (the app's TimeProvider). Only the
+    /// device and the runner are started: no retention or workspace cleanup pass runs on its own.</summary>
+    private sealed class RunnerHost : IAsyncDisposable
+    {
+        private readonly ServiceProvider provider;
+
+        private RunnerHost(string root, ServiceProvider provider)
+        {
+            Root = root;
+            this.provider = provider;
+        }
+
+        public string Root { get; }
+
+        public string Project => Path.Join(Root, "project");
+
+        public AgentCompareRunner Runner => provider.GetRequiredService<AgentCompareRunner>();
+
+        public DeviceHostService Device => provider.GetRequiredService<DeviceHostService>();
+
+        public RunStore Runs => provider.GetRequiredService<RunStore>();
+
+        public static async Task<RunnerHost> StartAsync(string name, TimeProvider clock)
+        {
+            var root = Temp(name);
+            ServiceProvider? provider = null;
+            try
+            {
+                var options = new WebAgentOptions { DataDirectory = Path.Join(root, "data"), Faux = true };
+                options.EnsureDirectories();
+                Directory.CreateDirectory(Path.Join(root, "work"));
+                Directory.CreateDirectory(Path.Join(root, "project", "src"));
+                File.WriteAllText(Path.Join(root, "project", "README.md"), "# Sample\n");
+                File.WriteAllText(Path.Join(root, "project", "src", "app.txt"), "one\n");
+                var gitConfig = Path.Join(root, "gitconfig");
+                File.WriteAllText(gitConfig, "");
+                var services = new ServiceCollection();
+                services.AddLogging();
+                services.AddSingleton(clock);
+                services.AddSingleton(new CredentialsOptions { Environment = _ => null, FileExists = _ => false, Home = root, Offline = true });
+                services.AddSingleton(new WorkspaceManagerOptions
+                {
+                    Root = Path.Join(options.DataDirectory, WorkspaceManagerOptions.FolderName),
+                    GitEnvironment = new Dictionary<string, string?> { ["GIT_CONFIG_GLOBAL"] = gitConfig, ["GIT_CONFIG_NOSYSTEM"] = "1" },
+                });
+                services.AddWebAgentCore(options);
+                services.AddCredentialsArea(options);
+                services.AddChatArea(options);
+                services.AddCustomProvidersArea(options);
+                services.AddWebAgentFallbacks(options);
+                services.AddSpendArea(options);
+                WorkspacesModule.AddAgentCompareWorkspaces(services, options);
+                services.AddRunsArea(options);
+                services.AddAgentCompareRunner(options);
+                provider = services.BuildServiceProvider();
+                provider.GetRequiredService<WebAgentDb>().Migrate();
+                await provider.GetRequiredService<ISettingsStore>().SaveAsync(new ToolsSettings(Path.Join(root, "work"), ToolApprovalMode.Ask, []));
+                var host = new RunnerHost(root, provider);
+                await host.Runner.StartingAsync(CancellationToken.None);
+                await host.Device.StartAsync(CancellationToken.None);
+                await host.Runner.StartAsync(CancellationToken.None);
+                return host;
+            }
+            catch
+            {
+                if (provider is not null) await provider.DisposeAsync();
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+                throw;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Runner.StopAsync(CancellationToken.None);
+            await provider.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            DeleteTemp(Root);
+        }
+    }
 
     private static JsonArray Models(params string[] models) =>
         new([.. models.Select(model => (JsonNode)new JsonObject { ["provider"] = "faux", ["model"] = model })]);
