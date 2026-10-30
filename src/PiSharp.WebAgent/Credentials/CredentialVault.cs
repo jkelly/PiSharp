@@ -376,6 +376,46 @@ public sealed partial class CredentialVault : IAccountStore, ICredentialVault
         return Task.FromResult<AccountCredential?>(new AccountCredential(account, key, oauth));
     }
 
+    /// <summary>The shortest credential <see cref="SecretMatcher"/> looks for (shorter values would match ordinary text).</summary>
+    internal const int MinimumMatchedSecret = 8;
+
+    /// <summary>A test of whether a text contains a credential the app holds: a stored API key, a sign-in's access or refresh token, or an
+    /// environment account's variable value (each of <see cref="MinimumMatchedSecret"/> characters or more), read once for the caller's
+    /// checks. It is for refusing a value about to be saved where a secret never goes (W5: a test case's request); reading for it marks no
+    /// account used, a credential that cannot be read is skipped, and the test hands no secret out. Keep it for one check, not longer.</summary>
+    internal Func<string?, bool> SecretMatcher()
+    {
+        var secrets = new List<string>();
+        void Add(string? value)
+        {
+            if (value is { Length: >= MinimumMatchedSecret }) secrets.Add(value);
+        }
+        foreach (var account in List())
+        {
+            try
+            {
+                switch (account.Kind)
+                {
+                    case AccountKind.ApiKey:
+                        Add(file.Read(account.Id, SecretKind.ApiKey));
+                        break;
+                    case AccountKind.OAuth when ReadOAuth(account.Id) is { } oauth:
+                        Add(oauth.Access);
+                        Add(oauth.Refresh);
+                        break;
+                    case AccountKind.Environment:
+                        Add(ProviderEnvironmentKeys.Value(options.Environment, account.Source ?? ""));
+                        break;
+                }
+            }
+            catch (Exception error) when (error is CredentialUnavailableException or InvalidDataException)
+            {
+                // Skipped: the caller's key-prefix rule still applies to it.
+            }
+        }
+        return text => !string.IsNullOrEmpty(text) && secrets.Any(secret => text.Contains(secret, StringComparison.Ordinal));
+    }
+
     /// <inheritdoc/>
     public IAdmittedOAuthCredentialSource OAuthSource(string accountId)
     {

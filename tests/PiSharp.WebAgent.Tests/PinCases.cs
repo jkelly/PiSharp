@@ -13,9 +13,11 @@ using PiSharp.WebAgent.Runs;
 
 // Decision 0011 (run W5, E7): Pin as test case. The brief's cases: pinning from each source (the Playground, History, the inspector, Compare,
 // an Arena reveal after the vote and a chat message, plus the suite page's Add case and Edit case) stores a case a suite run answers, every
-// check passing; the over-cap pane says the schedule pauses and saving pauses it; nothing pinned holds a secret (the modal, the save's
-// answer, the case, the suite export, webagent.db and the log, with a planted environment key and a stored key; a run whose stored
-// options carry a credential header or provider option is refused without echoing it). Also: targets, refusals (a run still going, a
+// check passing (Compare's column too, W5 fix 1); the over-cap pane says the schedule pauses and saving pauses it, its text plain with an
+// "over its cap" warn chip; nothing pinned holds a secret (the modal, the save's answer, the case, the suite export, eval_cases and the log,
+// with planted environment and stored keys; a run whose stored options carry a credential header, a credential's name at any depth of the
+// provider options, a key-shaped value under a neutral header name, or a stored key's value anywhere is refused without echoing it, and so
+// is the same request sent to the cases API). Also: targets, refusals (a run still going, a
 // stopped run, an agent run, a blind battle before its vote), the chat transcript replayed as the provider received it, the suggested
 // checks and the modal's texts. Faux and priced-faux transports only.
 internal static partial class Program
@@ -174,6 +176,63 @@ internal static partial class Program
             Equal(0, PinService.Suggested(spec with { ResponseFormat = null }, null).Count, "no reference: nothing to suggest");
         }),
 
+        Case("pins.case-spec.refuses-a-credential-at-any-depth", () =>
+        {
+            var basic = new RunSpec { Provider = "faux", Model = "echo", Messages = [new RunMessage { Role = "user", Text = "hello" }] };
+            static JsonObject Json(string text) => JsonNode.Parse(text)!.AsObject();
+            var key = Planted("sk-proj-");
+            var stored = Planted("plain-");
+
+            // RunSpec (so a run too): a credential's name anywhere in the provider or Bedrock options, named by its path.
+            foreach (var (options, path) in new[]
+            {
+                ("""{"extra_body":{"api_key":"x"}}""", "extra_body.api_key"),
+                ("""{"metadata":{"auth":{"user":"me"}}}""", "metadata.auth"),
+                ("""{"list":[{"ok":1},{"access_token":"x"}]}""", "list[1].access_token"),
+            })
+            {
+                var error = Throws<ArgumentException>(() => (basic with { ProviderOptions = Json(options) }).Normalize(), path + " is refused");
+                Check(error.Message.Contains("\"" + path + "\"", StringComparison.Ordinal) && error.Message.Contains("own credentials", StringComparison.Ordinal), "it names the path: " + error.Message);
+            }
+            Check((basic with { ProviderOptions = Json("""{"generationConfig":{"maxOutputTokens":64},"metadata":{"user":"me"}}""") }).Normalize().ProviderOptions is not null,
+                "plain options pass, and an output option at depth is left to RunModelOptions' own refusal");
+            Check(Throws<ArgumentException>(() => (basic with { Bedrock = Json("""{"profile":{"secretAccessKey":"x"}}""") }).Normalize(), "a credential inside a Bedrock option")
+                .Message.Contains("\"profile.secretAccessKey\"", StringComparison.Ordinal), "named by its path");
+
+            // TestCase.CaseSpec: a value that looks like a key or token, at any depth, named by where it is and never repeated.
+            foreach (var (spec, where) in new (RunSpec, string)[]
+            {
+                (basic with { Headers = new Dictionary<string, string> { ["X-Trace"] = key } }, "The header X-Trace"),
+                (basic with { Headers = new Dictionary<string, string> { ["X-Note"] = "Bearer abc.def.ghi" } }, "The header X-Note"),
+                (basic with { SessionId = key }, "The session id"),
+                (basic with { ProviderOptions = Json("{\"metadata\":{\"note\":\"" + key + "\"}}") }, "providerOptions.metadata.note"),
+                (basic with { ProviderOptions = Json("{\"list\":[\"ok\",\"" + key + "\"]}") }, "providerOptions.list[1]"),
+                (basic with { ProviderOptions = Json("{\"metadata\":{\"" + key + "\":1}}") }, "A name in providerOptions.metadata"),
+            })
+            {
+                Check(spec.Normalize() is not null, where + ": a run may still send it");
+                var error = Throws<ArgumentException>(() => TestCase.CaseSpec(spec), where + " is refused in a case");
+                Check(error.Message.StartsWith(where, StringComparison.Ordinal) && error.Message.Contains("never stores a credential", StringComparison.Ordinal), "it says where: " + error.Message);
+                NoSecret(error.Message, "the refusal", key, "abc.def");
+            }
+
+            // A stored credential with no key's shape: only the vault's matcher knows it, wherever it is.
+            bool Stored(string? text) => text?.Contains(stored, StringComparison.Ordinal) == true;
+            var plain = basic with { Headers = new Dictionary<string, string> { ["X-Note"] = "id " + stored } };
+            Check(TestCase.CaseSpec(plain).Headers is { Count: 1 }, "without a vault, a value with no key's shape passes");
+            NoSecret(Throws<ArgumentException>(() => TestCase.CaseSpec(plain, Stored), "a stored credential in a header").Message, "the refusal", stored);
+            Throws<ArgumentException>(() => TestCase.CaseSpec(basic with { ProviderOptions = Json("{\"a\":{\"b\":[\"" + stored + "\"]}}") }, Stored), "a stored credential deep in the options");
+            Throws<ArgumentException>(() => TestCase.CaseSpec(basic with { SessionId = stored }, Stored), "a stored credential as the session id");
+            var clean = TestCase.CaseSpec(basic with
+            {
+                Headers = new Dictionary<string, string> { ["X-Trace"] = "on" }, SessionId = "run-1", ProviderOptions = Json("""{"metadata":{"user":"me","tags":["a","b"]}}"""),
+            }, Stored);
+            Check(clean is { Headers.Count: 1, SessionId: "run-1", ProviderOptions: not null }, "plain values pass");
+            var testCase = new TestCase { Id = EvalIds.New(EvalIds.Case), SuiteId = EvalIds.New(EvalIds.Suite), Name = "Leaky", Spec = plain, Origin = new TestCaseOrigin(PinSource.Suite) };
+            Check(testCase.Normalize().Spec.Headers is { Count: 1 }, "a case normalized without a vault");
+            Throws<ArgumentException>(() => testCase.Normalize(Stored), "a case normalized with the vault's matcher is refused");
+        }),
+
         Case("pins.in-process.a-case-holds-no-account-and-a-credential-run-is-refused", async () =>
         {
             await using var host = SuHost.Create("pin-inproc");
@@ -186,6 +245,12 @@ internal static partial class Program
             var options = PinRun("r-option");
             options.Options!["providerOptions"] = new JsonObject { ["apiKey"] = key };
             host.Runs.Insert(options);
+            var nested = PinRun("r-nested");
+            nested.Options!["providerOptions"] = new JsonObject { ["extra_body"] = new JsonObject { ["api_key"] = key } };
+            host.Runs.Insert(nested);
+            var shaped = PinRun("r-shaped");
+            shaped.Options!["headers"] = new JsonObject { ["X-Trace"] = key };
+            host.Runs.Insert(shaped);
             host.Runs.Insert(PinRun("r-live", status: RunStatus.Running));
             host.Runs.Insert(PinRun("r-turn", source: "agent-compare"));
 
@@ -200,7 +265,7 @@ internal static partial class Program
             var again = await pins.SaveAsync(new PinSaveRequest(draft.Target, view.CaseId!, NewSuiteId: view.NewSuiteId, NewSuiteName: "In process"));
             Check(again is { Created: false, SuiteCreated: false } && host.Store.Suites().Count == 1, "a retry saves once");
 
-            foreach (var id in new[] { "r-header", "r-option" })
+            foreach (var id in new[] { "r-header", "r-option", "r-nested", "r-shaped" })
             {
                 var refused = await pins.ModalAsync(new PinTarget(PinSource.Playground, id));
                 Check(refused.Refusal is { Length: > 0 } && !refused.Refusal.Contains(key, StringComparison.Ordinal), $"{id} is refused without its secret: {refused.Refusal}");
@@ -448,9 +513,14 @@ internal static partial class Program
                 var cappedText = WebUtility.HtmlDecode(cappedPane.Groups[3].Value);
                 Check(cappedText.StartsWith($"Runs on 1 target with k {Suite.DefaultK}, daily at {at}. Adds {Suite.DefaultK} answers per run", StringComparison.Ordinal) && cappedText.Contains(", above the ", StringComparison.Ordinal)
                     && cappedText.EndsWith("The schedule pauses until you raise the cap.", StringComparison.Ordinal), "the over-cap pane: " + cappedText);
-                Check(modal.Html.Contains("form-text text-warning-emphasis", StringComparison.Ordinal), "shown as a warning");
+                // Colour only for status: the pane's text stays plain form-text, and a warn chip says it is over its cap.
+                const string overCapChip = "<span class=\"ps-chip mt-1\" data-tone=\"warn\" data-pin-over-cap-chip>over its cap</span>";
+                Check(PinPane(modal.Html, capped).Contains(overCapChip, StringComparison.Ordinal), "the over-cap pane carries a warn chip: " + PinPane(modal.Html, capped));
+                Check(Regex.IsMatch(modal.Html, $"<div data-pin-pane=\"{capped}\"[^>]*>\\s*<div class=\"form-text\">") && !modal.Html.Contains("text-warning", StringComparison.Ordinal),
+                    "its text is plain grey form-text, never warning-coloured");
                 var roomyPane = Regex.Match(modal.Html, $"<div data-pin-pane=\"{roomy}\" data-pin-over-cap=\"false\" data-pin-pauses=\"false\"[^>]*>\\s*<div[^>]*>([^<]*)</div>");
                 Check(roomyPane.Success && WebUtility.HtmlDecode(roomyPane.Groups[1].Value).Contains(", within the $50", StringComparison.Ordinal), "a suite with room: " + roomyPane.Value);
+                Check(!PinPane(modal.Html, roomy).Contains("data-pin-over-cap-chip", StringComparison.Ordinal), "and no chip");
 
                 var saved = await PinSaveAsync(app, PinBodyOf(modal, suiteId: capped));
                 Check(saved["created"]?.GetValue<bool>() == true && saved["suite"]?["paused"]?.GetValue<bool>() == true
@@ -461,6 +531,7 @@ internal static partial class Program
                 var after = await PinModalAsync(app, $"source=playground&run={run}");
                 Check(after.Html.Contains($"data-pin-pane=\"{capped}\" data-pin-over-cap=\"true\" data-pin-pauses=\"false\"", StringComparison.Ordinal)
                     && WebUtility.HtmlDecode(after.Html).Contains($"daily at {at} (paused).", StringComparison.Ordinal), "once paused, a further case is refused a run, not paused again");
+                Check(PinPane(after.Html, capped).Contains(overCapChip, StringComparison.Ordinal), "still over its cap");
             }
             finally
             {
@@ -486,12 +557,15 @@ internal static partial class Program
             Check((await app.Get("/compare?group=" + group)).Text.Contains("id=\"modal-test-case\"", StringComparison.Ordinal), "Compare hosts the modal");
             var modal = await PinModalAsync(app, $"source=compare&run={ids[1]}");
             Equal("ready", modal.State, "ready: " + Cut(modal.Html));
-            await PinSaveAsync(app, PinBodyOf(modal, newSuite: "Compare picks"));
+            var compareSaved = await PinSaveAsync(app, PinBodyOf(modal, newSuite: "Compare picks"));
             var stored = await PinCaseAsync(app, modal.CaseId!);
             Check(stored["spec"]?["model"]?.GetValue<string>() == "echo-small" && stored["spec"]?["systemPrompt"]?.GetValue<string>() == "Be brief."
                 && stored["spec"]?["messages"]?[0]?["text"]?.GetValue<string>() == "hello compare" && stored["spec"]?["groupId"] is null, "the column's request, without its group: " + stored["spec"]?.ToJsonString());
             Check(stored["origin"]?["source"]?.GetValue<string>() == "compare" && stored["origin"]?["runId"]?.GetValue<string>() == ids[1] && stored["reference"]?["text"]?.GetValue<string>() == "Echo: hello compare",
                 "from the column, with its answer: " + stored.ToJsonString());
+            // The one source whose request comes from a group run with shared options: its case runs in its suite too, every check passing.
+            Check(compareSaved["created"]?.GetValue<bool>() == true && compareSaved["suiteCreated"]?.GetValue<bool>() == true, "saved in a new suite: " + compareSaved.ToJsonString());
+            PinAllPassed(await PinRunSuiteAsync(app, compareSaved["suite"]!["id"]!.GetValue<string>()), 1, "the Compare case's suite run");
 
             // The Arena: refused while blind, pinned after the vote with the battle and its tag.
             var created = await app.SendAsync(HttpMethod.Post, EvalRoutes.ApiArena, ArenaDraftJson("What is two plus two?", ArenaThree), origin: app.Origin);
@@ -603,18 +677,47 @@ internal static partial class Program
 
         Case("pins.no-secret-in-the-modal-the-save-the-case-the-export-or-the-db", async () =>
         {
-            var envKey = Planted("sk-proj-");
+            // An environment key and a stored key with no well-known prefix (only the vault's match finds them), a stored key with one, a
+            // key-shaped value that is stored nowhere (only its prefix gives it away), and a key under a credential's name inside an option.
+            var envKey = Planted("env-");
+            var storedKey = Planted("sk-ant-api03-");
+            var plainKey = Planted("plain-");
+            var shapedKey = Planted("sk-or-v1-");
+            var nestedKey = Planted("nested-");
+            string[] planted = [envKey, storedKey, plainKey, shapedKey, nestedKey];
             var root = Temp("pin-secret");
             try
             {
+                // History rows whose recorded options carry one of them (written before the app starts, as an earlier build could have).
+                var data = Path.Join(root, "data");
+                Directory.CreateDirectory(data);
+                var seeds = new (string Id, string Option, JsonObject Value)[]
+                {
+                    ("r-nested", "providerOptions", new JsonObject { ["extra_body"] = new JsonObject { ["api_key"] = nestedKey } }),
+                    ("r-shaped", "headers", new JsonObject { ["X-Trace"] = shapedKey }),
+                    ("r-stored", "headers", new JsonObject { ["X-Note"] = "id " + plainKey }),
+                    ("r-stored-option", "providerOptions", new JsonObject { ["metadata"] = new JsonObject { ["notes"] = new JsonArray("ok", plainKey) } }),
+                    ("r-env", "headers", new JsonObject { ["X-Env"] = envKey }),
+                };
+                var seeded = new RunStore(new RunsDb(Path.Join(data, RunsDb.FileName)));
+                var now = DateTimeOffset.UtcNow;
+                foreach (var (id, option, value) in seeds)
+                {
+                    var row = PinRun(id) with { Created = now, Started = now, Finished = now, Updated = now };
+                    row.Options![option] = value;
+                    seeded.Insert(row);
+                }
+                SqliteClearPools();
+
                 await using var app = await WebAgentApp.StartAsync(root, new AppStart
                 {
-                    DataDirectory = Path.Join(root, "data"),
+                    DataDirectory = data,
                     Environment = new Dictionary<string, string> { ["OPENAI_API_KEY"] = envKey },
                 });
-                var storedKey = Planted("sk-ant-api03-");
                 Equal(200, (await app.SendAsync(HttpMethod.Post, "/api/credentials/accounts",
                     new JsonObject { ["provider"] = "anthropic", ["apiKey"] = storedKey, ["label"] = "Work key" }, origin: app.Origin)).Status, "a stored key");
+                Equal(200, (await app.SendAsync(HttpMethod.Post, "/api/credentials/accounts",
+                    new JsonObject { ["provider"] = "google", ["apiKey"] = plainKey, ["label"] = "Plain key" }, origin: app.Origin)).Status, "a stored key with no known prefix");
                 var run = await HistoryRunAsync(app, new JsonObject
                 {
                     ["provider"] = "faux", ["model"] = "echo", ["source"] = "playground", ["systemPrompt"] = "Be brief.",
@@ -629,17 +732,55 @@ internal static partial class Program
                 var stored = await PinCaseAsync(app, modal.CaseId!);
                 seen.AppendLine(stored.ToJsonString());
                 Check(stored["spec"]?["account"] is null, "the case names no account");
-                seen.AppendLine((await app.Get(EvalRoutes.ApiSuites + "/" + suiteId + "/export")).Text);
+
+                // Each seeded row: the modal says why it can't be a case, and a save is refused, neither naming the value.
+                foreach (var (id, _, _) in seeds)
+                {
+                    var refused = await PinModalAsync(app, $"source=history&run={id}");
+                    Check(refused.State == "refused" && refused.Text.Contains("This request can't be a test case: ", StringComparison.Ordinal), $"{id}: the modal refuses it: " + Cut(refused.Html));
+                    seen.AppendLine(refused.Html);
+                    var save = await app.SendAsync(HttpMethod.Post, EvalRoutes.ApiPins, new JsonObject
+                    {
+                        ["target"] = new JsonObject { ["source"] = "history", ["run"] = id }, ["caseId"] = EvalIds.New(EvalIds.Case),
+                        ["newSuite"] = new JsonObject { ["id"] = EvalIds.New(EvalIds.Suite), ["name"] = "Never" },
+                    }, origin: app.Origin);
+                    Check(save.Status == 409 && save.Body?["error"]?["message"]?.GetValue<string>().StartsWith("This request can't be a test case: ", StringComparison.Ordinal) == true,
+                        $"{id}: the save is refused: " + save.Text);
+                    seen.AppendLine(save.Text);
+                }
+                // The cases API (the suite page's own saves) refuses the same requests.
+                foreach (var (what, extra) in new (string, JsonObject)[]
+                {
+                    ("a key under a credential's name inside an option", new JsonObject { ["providerOptions"] = new JsonObject { ["extra_body"] = new JsonObject { ["api_key"] = nestedKey } } }),
+                    ("a key-shaped value under a neutral header name", new JsonObject { ["headers"] = new JsonObject { ["X-Trace"] = shapedKey } }),
+                    ("a stored key in a header", new JsonObject { ["headers"] = new JsonObject { ["X-Note"] = plainKey } }),
+                    ("a stored key deep in the options", new JsonObject { ["providerOptions"] = new JsonObject { ["metadata"] = new JsonObject { ["notes"] = new JsonArray(plainKey) } } }),
+                    ("the environment key as the session id", new JsonObject { ["sessionId"] = envKey }),
+                })
+                {
+                    extra["provider"] = "faux";
+                    extra["model"] = "echo";
+                    extra["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["text"] = "hello secret" });
+                    var answer = await app.SendAsync(HttpMethod.Post, EvalRoutes.ApiCases, new JsonObject { ["suiteId"] = suiteId, ["name"] = "Leaky", ["spec"] = extra }, origin: app.Origin);
+                    Check(answer.Status == 400, what + " is refused by the cases API: " + answer.Text);
+                    seen.AppendLine(answer.Text);
+                }
+
+                var export = await app.Get(EvalRoutes.ApiSuites + "/" + suiteId + "/export");
+                Check(export.Body?["cases"] is JsonArray { Count: 1 }, "the export holds the one clean case: " + Cut(export.Text));
+                seen.AppendLine(export.Text);
                 seen.AppendLine((await app.Get(EvalRoutes.ApiSuites + "/" + suiteId)).Text);
+                Equal(1, (await app.Get(EvalRoutes.ApiSuites)).Body?["items"]?.AsArray().Count, "no suite was made for a refused pin");
                 var checks = await app.SendAsync(HttpMethod.Post, EvalRoutes.ApiPins + "/checks",
                     new JsonObject { ["target"] = modal.Target!.DeepClone(), ["add"] = new JsonObject { ["kind"] = "contains", ["value"] = "hello" } }, origin: app.Origin);
                 seen.AppendLine(checks.Text);
                 var database = Path.Join(app.Root, "data", "webagent.db");
+                Equal(1L, ReadDb(database, "SELECT COUNT(*) FROM eval_cases", reader => reader.GetInt64(0)).Single(), "eval_cases holds the one clean case");
                 foreach (var table in new[] { "eval_cases", "eval_suites" })
-                    foreach (var data in ReadDb(database, $"SELECT data FROM {table}", reader => reader.GetString(0))) seen.AppendLine(data);
+                    foreach (var row in ReadDb(database, $"SELECT data FROM {table}", reader => reader.GetString(0))) seen.AppendLine(row);
                 Check(seen.ToString().Contains("hello secret", StringComparison.Ordinal), "what was read holds the pinned request");
-                NoSecret(seen.ToString(), "what Pin as test case shows and stores", envKey, storedKey, "Work key");
-                NoSecret(app.Log, "the log", envKey, storedKey);
+                NoSecret(seen.ToString(), "what Pin as test case shows and stores", [.. planted, "Work key", "Plain key"]);
+                NoSecret(app.Log, "the log", planted);
             }
             finally
             {
@@ -689,6 +830,15 @@ internal static partial class Program
         if (suiteId is not null) body["suiteId"] = suiteId;
         if (newSuite is not null) body["newSuite"] = new JsonObject { ["id"] = modal.NewSuiteId, ["name"] = newSuite };
         return body;
+    }
+
+    /// <summary>The markup of the suite pane <paramref name="id"/> in a modal, up to the next pane (empty when there is none).</summary>
+    private static string PinPane(string html, string id)
+    {
+        var start = html.IndexOf($"data-pin-pane=\"{id}\"", StringComparison.Ordinal);
+        if (start < 0) return "";
+        var end = html.IndexOf("data-pin-pane=", start + 1, StringComparison.Ordinal);
+        return end < 0 ? html[start..] : html[start..end];
     }
 
     /// <summary>The modal body's text without the markup, for a failure message.</summary>

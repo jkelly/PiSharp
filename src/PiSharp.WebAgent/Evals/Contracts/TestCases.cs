@@ -1,15 +1,17 @@
 // Decision 0011 (run W5, E0): test cases (mockup modal-test-case, _TestCaseModal; evals-suite _SuiteCases). A case is pinned from a run (a
 // chat message, Playground, Compare, an Arena reveal, History or the inspector) or added on a suite page: it keeps the full request as a
 // RunSpec, the pinned answer as its reference output, the checks to run on every answer, and where it came from. The request never holds a
-// secret (RunSpec refuses credential headers and option names) and never an account: "each suite target picks its own provider, model and
-// account", so Normalize clears the account, and the per-run values that are refused by design (base URL, the Azure endpoint, resource and
-// deployment, Bedrock) and the run's own grouping (source, group, parent). A case belongs to one suite.
+// secret (RunSpec refuses credential headers and option names at any depth; CaseSpec refuses a header, session id or provider option value
+// that looks like a key or holds one of the app's stored credentials, W5 fix 1) and never an account: "each suite target picks its own
+// provider, model and account", so Normalize clears the account, and the per-run values that are refused by design (base URL, the Azure
+// endpoint, resource and deployment, Bedrock) and the run's own grouping (source, group, parent). A case belongs to one suite.
 //
 // EvalAnswer is what checks read: an answer's text, its tool calls, the model that answered (responseModel), its stop reason or error, and
 // its cost and time, from a runs.db record (a suite run's answer) or a case's reference output (the check editor's "passes on the
 // reference" line).
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using PiSharp.WebAgent.Presets;
 using PiSharp.WebAgent.Runs;
 
 namespace PiSharp.WebAgent.Evals;
@@ -215,16 +217,19 @@ public sealed record TestCase
     public DateTimeOffset Updated { get; init; }
 
     /// <summary>The same case, checked and stored as it should be: the request normalized without its account, grouping or refused per-run
-    /// values; tags normalized; every check normalized with a unique id (missing ids become <c>k1</c>, <c>k2</c>, ...).</summary>
+    /// values, and holding no credential (<see cref="CaseSpec"/>); tags normalized; every check normalized with a unique id (missing ids
+    /// become <c>k1</c>, <c>k2</c>, ...).</summary>
+    /// <param name="storedSecret">Whether a text holds one of the app's stored credentials (the credential vault's matcher), or null where
+    /// there is no vault.</param>
     /// <exception cref="ArgumentException">Something is not allowed; the message says what, for the page to show.</exception>
-    public TestCase Normalize()
+    public TestCase Normalize(Func<string?, bool>? storedSecret = null)
     {
         var id = EvalIds.Require(EvalIds.Case, Id, "test case");
         var suite = EvalIds.Require(EvalIds.Suite, SuiteId, "suite");
         var name = Name?.Trim() ?? "";
         if (name.Length == 0) throw new ArgumentException("Give the test case a name.");
         if (name.Length > MaxName || name.Any(char.IsControl)) throw new ArgumentException($"A test case's name is at most {MaxName} characters on one line.");
-        var spec = CaseSpec(Spec ?? throw new ArgumentException("A test case needs its request."));
+        var spec = CaseSpec(Spec ?? throw new ArgumentException("A test case needs its request."), storedSecret);
         var checks = (Checks ?? []).ToList();
         if (checks.Count > MaxChecks) throw new ArgumentException($"A test case has at most {MaxChecks} checks.");
         if (checks.Any(check => check is null)) throw new ArgumentException("A check is empty.");
@@ -252,15 +257,20 @@ public sealed record TestCase
         };
     }
 
-    /// <summary><paramref name="spec"/> as a case stores it: normalized (RunSpec's rules), without the account, the run's source, group,
-    /// parent and title, and without the per-run values that are refused by design (base URL, Azure base URL, resource and deployment,
-    /// Bedrock options).</summary>
-    /// <exception cref="ArgumentException">The request is not valid.</exception>
-    public static RunSpec CaseSpec(RunSpec spec)
+    /// <summary><paramref name="spec"/> as a case stores it: normalized (RunSpec's rules, which refuse a credential's name in a header or at
+    /// any depth of the provider options), without the account, the run's source, group, parent and title, and without the per-run values
+    /// that are refused by design (base URL, Azure base URL, resource and deployment, Bedrock options). A case is also refused when a header
+    /// value, the session id, or a provider option's name or text value (at any depth) looks like a credential (a bearer or basic value, or a
+    /// well-known key prefix: <see cref="PresetRules.LooksSecret"/>) or holds one of the app's stored credentials
+    /// (<paramref name="storedSecret"/>). A refusal names where, never the value.</summary>
+    /// <param name="spec">The request.</param>
+    /// <param name="storedSecret">Whether a text holds one of the app's stored credentials, or null where there is no credential vault.</param>
+    /// <exception cref="ArgumentException">The request is not valid, or holds a credential.</exception>
+    public static RunSpec CaseSpec(RunSpec spec, Func<string?, bool>? storedSecret = null)
     {
         ArgumentNullException.ThrowIfNull(spec);
         // Stripped before normalizing, so a request pinned from a chat (source chat, which a run may not use) is still a case.
-        return (spec with
+        var normalized = (spec with
         {
             Account = null,
             Source = null,
@@ -273,6 +283,31 @@ public sealed record TestCase
             AzureDeploymentName = null,
             Bedrock = null,
         }).Normalize();
+        bool Secret(string? text) => PresetRules.LooksSecret(text) || storedSecret?.Invoke(text) == true;
+        foreach (var (name, value) in normalized.Headers ?? new Dictionary<string, string>())
+            if (Secret(value)) throw new ArgumentException($"The header {name} holds what looks like a key or token, and a test case never stores a credential.");
+        if (Secret(normalized.SessionId)) throw new ArgumentException("The session id looks like a key or token, and a test case never stores a credential.");
+        if (normalized.ProviderOptions is { } options) CheckOptionValues(options, "providerOptions", Secret);
+        return normalized;
+    }
+
+    private static void CheckOptionValues(JsonNode? node, string path, Func<string?, bool> secret)
+    {
+        switch (node)
+        {
+            case JsonObject json:
+                foreach (var (key, value) in json)
+                {
+                    if (secret(key)) throw new ArgumentException($"A name in {path} looks like a key or token, and a test case never stores a credential.");
+                    CheckOptionValues(value, path + "." + key, secret);
+                }
+                break;
+            case JsonArray array:
+                for (var index = 0; index < array.Count; index++) CheckOptionValues(array[index], $"{path}[{index}]", secret);
+                break;
+            case JsonValue value when value.TryGetValue<string>(out var text) && secret(text):
+                throw new ArgumentException($"{path} holds what looks like a key or token, and a test case never stores a credential.");
+        }
     }
 }
 

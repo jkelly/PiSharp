@@ -13,6 +13,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using PiSharp.Durable.Hosting;
+using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Runs;
 using PiSharp.WebAgent.Spend;
 using ChordJson = PiSharp.Durable.Chord.JsonValue;
@@ -53,12 +54,15 @@ public sealed class CheckRunner
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
     private static readonly string RegexLimit = ((long)CheckLimits.RegexTimeout.TotalMilliseconds).ToString(Invariant) + " ms";
     private readonly RubricJudge judge;
+    private readonly CredentialVault? vault;
 
-    /// <summary>A runner whose judge checks go through <paramref name="judge"/>.</summary>
-    public CheckRunner(RubricJudge judge)
+    /// <summary>A runner whose judge checks go through <paramref name="judge"/>; a case it saves (<see cref="Validate(TestCase)"/>) is also
+    /// checked against <paramref name="vault"/>'s stored credentials, when the app has a vault.</summary>
+    public CheckRunner(RubricJudge judge, CredentialVault? vault = null)
     {
         ArgumentNullException.ThrowIfNull(judge);
         this.judge = judge;
+        this.vault = vault;
     }
 
     /// <summary>The judge the runner's judge checks go through.</summary>
@@ -74,13 +78,13 @@ public sealed class CheckRunner
         return normalized.Kind == CheckKind.Judge ? normalized with { Judge = judge.Validate(normalized.Judge!) } : normalized;
     }
 
-    /// <summary><paramref name="testCase"/> as it is saved: normalized (<see cref="TestCase.Normalize"/>), with every judge check validated
-    /// as <see cref="Validate(Check)"/> does.</summary>
+    /// <summary><paramref name="testCase"/> as it is saved: normalized (<see cref="TestCase.Normalize"/>, its request holding none of the
+    /// app's stored credentials), with every judge check validated as <see cref="Validate(Check)"/> does.</summary>
     /// <exception cref="ArgumentException">Something is not allowed; the message says what (and which check).</exception>
     public TestCase Validate(TestCase testCase)
     {
         ArgumentNullException.ThrowIfNull(testCase);
-        var normalized = testCase.Normalize();
+        var normalized = testCase.Normalize(vault?.SecretMatcher());
         var checks = new List<Check>(normalized.Checks.Count);
         foreach (var check in normalized.Checks)
         {

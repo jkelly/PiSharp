@@ -8,8 +8,10 @@
 // Rules: a pinned run is one call that completed (PinRules); an Arena answer is pinned only after its battle's vote (or once it is void),
 // and an agent run never (agent test cases come later); a chat answer is pinned from the branch it is in, with the request the provider
 // received (PinMessages), and its run row when runs.db has it (matched by the Spend Guard's op, else by model, usage and time). Refusals
-// never name a model, provider or account. The case never holds an account or a secret (TestCase.CaseSpec, RunSpec's header rules), and the
-// reference output loses the Spend Guard's field (pisharp) so it is the answer as the provider gave it.
+// never name a model, provider or account. The case never holds an account or a secret (TestCase.CaseSpec: RunSpec's header and option
+// name rules at any depth, and no header, session id or provider option value that looks like a key or holds one of the vault's stored
+// credentials; the draft is refused, so the modal says so and a save is refused too), and the reference output loses the Spend Guard's
+// field (pisharp) so it is the answer as the provider gave it.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -583,11 +585,14 @@ public sealed partial class PinService
 
     // ----- helpers -----
 
-    private static RunSpec CaseSpec(RunSpec spec)
+    /// <summary>The request as the case stores it (<see cref="TestCase.CaseSpec"/>): refused, without naming the value, when it holds a
+    /// credential: a credential's name in a header or anywhere in the provider options, or a header, session id or option value that looks
+    /// like a key or holds one of the app's stored credentials.</summary>
+    private RunSpec CaseSpec(RunSpec spec)
     {
         try
         {
-            return TestCase.CaseSpec(spec);
+            return TestCase.CaseSpec(spec, services.GetService<CredentialVault>()?.SecretMatcher());
         }
         catch (ArgumentException error)
         {
