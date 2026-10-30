@@ -13,7 +13,8 @@ using static Microsoft.Playwright.Assertions;
 // Spend shows its uncertain banner and row, ?resolve= opens the Resolve dialog (on each of its choices), and the chat shows its uncertain
 // footer; the cap dialog's one-provider and one-source panes and its Edit pane (a cap row's edit button); About's connectivity check after
 // the click (its results pane); the custom provider's remove confirmation, cancelled; and the API key dialog of Setup's Connect step. Nothing
-// is settled or removed.
+// is settled or removed. W3 retest 2: History › Spend's Saved filters menu and its Save current filters… and Manage saved filters dialogs
+// (W3 fix, spend-ui), each cancelled, so the three saved filters a new data folder starts with stay.
 internal static partial class Program
 {
     private static readonly string[] W3PhonePages =
@@ -117,6 +118,30 @@ internal static partial class Program
                 await resolve.Locator(".modal-footer [data-bs-dismiss='modal']").ClickAsync();
                 await Expect(resolve).ToBeHiddenAsync();
 
+                // Saved filters on a filtered view (a new data folder starts with three, Uncertain only among them, which this view is): the
+                // menu, then Save current filters… and Manage saved filters, each cancelled.
+                await page.GotoAsync("/history/spend?status=uncertain");
+                var savedMenu = page.Locator("[data-saved-filters]");
+                var savedToggle = page.Locator(".dropdown:has([data-saved-filters]) > [data-bs-toggle='dropdown']");
+                await savedToggle.ClickAsync();
+                await Expect(savedMenu).ToBeVisibleAsync();
+                await Expect(savedMenu.Locator("[data-saved-filter='Uncertain only']")).ToHaveAttributeAsync("aria-current", "true");
+                await page.FitsPhoneAsync("History › Spend › Saved filters", theme);
+                await savedMenu.Locator("[data-save-filter-open]").ClickAsync();
+                var saveFilter = page.Locator("#modal-save-spend-filter");
+                await Expect(page.Locator("#modal-save-spend-filter.show")).ToBeVisibleAsync();
+                await page.FitsPhoneAsync("Save current filters", theme);
+                await saveFilter.Locator(".modal-footer [data-bs-dismiss='modal']").ClickAsync();
+                await Expect(saveFilter).ToBeHiddenAsync();
+                await savedToggle.ClickAsync();
+                await savedMenu.Locator("[data-manage-filters-open]").ClickAsync();
+                var manageFilters = page.Locator("#modal-manage-spend-filters");
+                await Expect(page.Locator("#modal-manage-spend-filters.show")).ToBeVisibleAsync();
+                await Expect(manageFilters.Locator("[data-mf-row]")).ToHaveCountAsync(3);
+                await page.FitsPhoneAsync("Manage saved filters", theme);
+                await manageFilters.Locator(".modal-footer [data-bs-dismiss='modal']").ClickAsync();
+                await Expect(manageFilters).ToBeHiddenAsync();
+
                 // A new chat with a draft over the cap: the estimate and its chip, then the confirmation the refused send opens.
                 await page.GotoAsync("/chat/new");
                 var box = page.Locator("[data-composer-input]");
@@ -181,6 +206,7 @@ internal static partial class Program
             Equal(3, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "the refused sends created no chat");
             Equal("uncertain", Reservation((await app.LedgerAsync()).Single(item => Reservation(item, "op") == op), "state"), "the Resolve dialog settled nothing");
             Equal(200, (await app.Get("/api/custom-providers/phone-box")).Status, "the cancelled confirmation removed nothing");
+            Equal(3, (await app.Get("/api/spend/filters")).Body!["filters"]!.AsArray().Count, "the cancelled saved-filter dialogs changed nothing");
         }, width: 375, height: 812),
 
         // W3 fix (spend-ui): an Accounts row whose billing mode is detected as Unknown price, the longest choice ("Unknown price (detected)"),

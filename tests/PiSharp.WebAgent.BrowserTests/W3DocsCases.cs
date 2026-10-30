@@ -30,19 +30,8 @@ internal static partial class Program
             root => SourceHas(root, "tests/PiSharp.WebAgent.Tests/ChatSpendCases.cs", "chat.spend.queued-send-keeps-its-approval-from-the-running-turn",
                 "the follow-up stays queued", "\"the queued message is withdrawn\"")
                 ? null : "ChatSpendCases' queued-send case no longer withdraws a follow-up that stayed queued after the stop"),
-        // History › Spend's filters offer the quick filters, and nothing saves the user's own.
-        new("History › Spend has quick filters only", "not the mockup's saved filters",
-            root => SourceHas(root, "src/PiSharp.WebAgent/Views/Runs/_SpendFilters.cshtml", "Quick filters</button>") &&
-                !Regex.IsMatch(Source(root, "src/PiSharp.WebAgent/Views/Runs/_SpendFilters.cshtml"), "Saved filters|Save (current|these) filters", RegexOptions.IgnoreCase)
-                ? null : "_SpendFilters.cshtml offers saved filters"),
-        // SpendRecovery marks every row left reserved as uncertain, and nothing in the Spend area takes or waits for a lock on the data folder
-        // (a FileLock, a FileShare.None stream, or a data-folder lock of the app's).
-        new("SpendRecovery assumes one app process per data folder", "one app process per data folder",
-            root => SourceHas(root, "src/PiSharp.WebAgent/Spend/Ledger/SpendRecovery.cs", "IHostedService") &&
-                !Directory.EnumerateFiles(Path.Join(root, "src", "PiSharp.WebAgent", "Spend"), "*.cs", SearchOption.AllDirectories).Select(File.ReadAllText)
-                    .Any(text => text.Contains("FileLock", StringComparison.Ordinal) || text.Contains("FileShare.None", StringComparison.Ordinal) ||
-                        text.Contains("DataLock", StringComparison.Ordinal))
-                ? null : "the Spend area now takes or waits for a lock on the data folder"),
+        // W3 retest 2: "History › Spend has quick filters only" (closed by fix 2, spend-ui: Saved filters) and "SpendRecovery assumes one app
+        // process per data folder" (closed by fix 2, spend-core: WebAgentDataLock) left with their lines.
         // The W3 browser cases do no more with caps, confirm panes and marks than when the line was last revised.
         new("W3's browser cases enforce no run cap and no provider or account scope", "run and month caps, the provider and account scopes",
             root => W3BrowserSpendFacts(root).Except(W3BrowserSpendFactsWhenWritten, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList() is { Count: > 0 } added
