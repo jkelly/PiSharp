@@ -143,10 +143,10 @@ internal static partial class Program
             var hooked = Path.Join(markers, "hook.txt");
             var monitored = Path.Join(markers, "fsmonitor.txt");
             var filtered = Path.Join(markers, "filter.txt");
-            WriteScript(Path.Join(repo, ".git", "hooks", "post-checkout"), $"echo hooked > {ShellPath(hooked)}");
+            WriteScript(Path.Join(repo, ".git", "hooks", "post-checkout"), $"echo hooked > {QuotedShellPath(hooked)}");
             var monitor = Path.Join(markers, "fsmonitor.sh");
-            WriteScript(monitor, $"echo ran > {ShellPath(monitored)}");
-            await lab.GitAsync(repo, "config", "core.fsmonitor", ShellPath(monitor));
+            WriteScript(monitor, $"echo ran > {QuotedShellPath(monitored)}");
+            await lab.GitAsync(repo, "config", "core.fsmonitor", QuotedShellPath(monitor));
 
             await lab.Manager.InspectAsync(repo);
             var run = await lab.Manager.CreateAsync(new WorkspaceRequest { Run = "cmp_planted", ProjectPath = repo, Slots = WsSlots("a") });
@@ -166,7 +166,7 @@ internal static partial class Program
             File.WriteAllText(Path.Join(evil, "HEAD"), "ref: refs/heads/main\n");
             File.WriteAllText(Path.Join(evil, "objects", "info", "alternates"), Path.Join(repo, ".git", "objects").Replace('\\', '/') + "\n");
             File.WriteAllText(Path.Join(evil, "config"), "[core]\n\trepositoryformatversion = 0\n[filter \"x\"]\n\tclean = tee "
-                + ShellPath(filtered).Replace("\"", "\\\"", StringComparison.Ordinal) + "\n");
+                + QuotedShellPath(filtered).Replace("\"", "\\\"", StringComparison.Ordinal) + "\n");
             File.WriteAllText(Path.Join(slot, ".gitattributes"), "* filter=x\n");
             File.WriteAllText(Path.Join(slot, "a.txt"), "two\n");
             File.WriteAllText(Path.Join(slot, "b.txt"), "new\n");
@@ -722,7 +722,7 @@ internal static partial class Program
                 (JsonNode)new JsonObject { ["slot"] = model.Str("slot"), ["taskId"] = call!["taskId"]!.GetValue<long>() }))]);
 
     // A path for a shell or a git config value: forward slashes (sh on Windows reads them), quoted for the shell.
-    private static string ShellPath(string path) => "\"" + path.Replace('\\', '/') + "\"";
+    private static string QuotedShellPath(string path) => "\"" + path.Replace('\\', '/') + "\"";
 
     // A hook or helper script git runs through sh; executable where that matters.
     private static void WriteScript(string path, string body)
