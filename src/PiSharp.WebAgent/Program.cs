@@ -37,6 +37,8 @@ builder.Services.AddCustomProvidersArea(options);
 builder.Services.AddWebAgentFallbacks(options);
 // Spend Guard (run W3): after the fallbacks, so the guard decorates the app's final IDurableModels (--faux-metered prices the faux ones).
 builder.Services.AddSpendArea(options);
+// Agent compare workspaces (run W4, R4): a git worktree or a copy per model under <data>\workspaces, cleaned at start and daily.
+PiSharp.WebAgent.AgentCompare.Workspaces.WorkspacesModule.AddAgentCompareWorkspaces(builder.Services, options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
