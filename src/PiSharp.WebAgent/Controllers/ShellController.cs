@@ -11,7 +11,6 @@ public sealed class ShellController : Controller
 {
     /// <summary>A sidebar page a later milestone builds.</summary>
     [HttpGet("/evals/leaderboard")]
-    [HttpGet("/presets")]
     public IActionResult Later() =>
         LaterFeature.Pages.TryGetValue((Request.Path.Value ?? "").TrimEnd('/'), out var feature) ? View("Later", feature) : NotFound();
 

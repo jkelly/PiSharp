@@ -1,0 +1,74 @@
+/* Decision 0011 (run W4, R8): what Presets add to the shared theme (pisharp-theme.css, shell.css, site.css): the card's name and model chip,
+   the warning border of a preset that cannot load here, and the load modal's list. Everything else is Bootstrap and the theme's own classes
+   (ps-card, cap, ps-chip, kv, empty-state). Loaded by the Presets page and by the pages that host the shared modals. */
+
+.preset-card .min-w-0,
+#modal-save-preset .min-w-0,
+#modal-load-preset .min-w-0 {
+  min-width: 0;
+}
+
+.preset-name {
+  font-size: .98rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.preset-model {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-card.is-warn {
+  border-color: color-mix(in srgb, var(--ps-warn) 45%, var(--ps-border));
+}
+
+.preset-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.presets-empty-text {
+  max-width: 54ch;
+}
+
+/* The load modal: the list scrolls on its own beside the preview on wide screens. */
+.lp-list {
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.lp-list .list-group-item {
+  min-width: 0;
+}
+
+.lp-list .list-group-item[hidden] {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .lp-list-col {
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--ps-border);
+  }
+
+  .lp-list {
+    max-height: 14rem;
+  }
+}
+
+#modal-save-preset .ps-term pre {
+  max-height: 18rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#modal-save-preset [data-preset-tag] {
+  cursor: pointer;
+}

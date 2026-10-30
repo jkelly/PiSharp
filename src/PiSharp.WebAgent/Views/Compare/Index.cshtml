@@ -18,6 +18,7 @@
     var slots = CompareDraft.MaxColumns - Model.Columns.Count;
 }
 @section Styles {
+  <link href="~/css/presets.css" rel="stylesheet" asp-append-version="true" />
   <link href="~/css/compare.css" rel="stylesheet" asp-append-version="true">
 }
 @section TopbarStart {
@@ -72,8 +73,15 @@ else
   {
     <partial name="_ModelPickerModal" model="Model.Picker" />
     <partial name="_SpendConfirmModal" model="null" />
+    @* Presets (R8): Save as preset and Load preset; presets-host.js wires [data-preset-save] / [data-preset-load] (request mode only). *@
+    <partial name="_SavePresetModal" model='PiSharp.WebAgent.Presets.SavePresetView.Host("compare")' />
+    <partial name="_LoadPresetModal" model='PiSharp.WebAgent.Presets.LoadPresetView.Host("compare")' />
   }
 }
 @section Scripts {
   <script type="module" src="~/js/compare.js" asp-append-version="true"></script>
+  @if (!Model.AgentMode)
+  {
+    <script type="module" src="~/js/presets-host.js" asp-append-version="true"></script>
+  }
 }
