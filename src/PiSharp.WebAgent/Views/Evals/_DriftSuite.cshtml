@@ -2,7 +2,9 @@
    is paused (Raise cap opens the schedule modal); then a row per target: the model, the worst open signal's level, the signal's message
    and where it stands (the run that saw it first, or waiting for the next run: the next slot, or nothing while the schedule is paused), the
    other open signals folded away, and the row's actions: Compare answers (the run that raised it) and Accept as baseline for drift, Run now
-   to confirm for suspect. A target with no open signal says how it compares with its baseline. Model: DriftSuiteView. *@
+   to confirm for suspect. A target whose worst open signal is info (latency or tokens/s) has no actions, as the mockup's info row has none:
+   a speed change never replaces the answer baseline (fix W5 drift 2). A target with no open signal says how it compares with its baseline.
+   Model: DriftSuiteView. *@
 @model DriftSuiteView
 @{
     var suite = Model.Suite;
@@ -93,7 +95,7 @@
               }
             }
           </div>
-          @if (worst is not null)
+          @if (worst is not null && (worst.Signal.Level is DriftLevel.Suspect or DriftLevel.Drift))
           {
             <div class="d-flex flex-wrap gap-2">
               <a class="btn btn-sm btn-outline-secondary" href="@EvalRoutes.Run(worst.Signal.RunId)">Compare answers</a>
@@ -101,7 +103,7 @@
               {
                 <button class="btn btn-sm btn-outline-secondary" type="button" data-run-suite="@suite.Id" disabled="@(Model.Latest?.Run.Active == true)">Run now to confirm</button>
               }
-              else
+              else if (worst.Signal.Level == DriftLevel.Drift)
               {
                 <button class="btn btn-sm btn-outline-secondary" type="button" data-open-baseline="@suite.Id" data-target-id="@row.Target.Id">Accept as baseline</button>
               }

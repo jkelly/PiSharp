@@ -9,6 +9,13 @@
 //   response model     the target answered as a model the baseline never saw (responseModel)                   drift
 //   answer fingerprint most compared cases answered outside the baseline's own SimHash spread                 suspect
 //
+// Which answers count (fix W5 drift 1): the pass-rate, broken-case and judge-score rules count only answers that say something about the
+// model (Decisive): an answer whose checks decided (passed or failed), or a call that was sent and failed (a provider error fails). A call
+// that never reached the target (the Spend Guard refused it, it did not start, or its record is missing: SuiteResult.Sent false) and an
+// answer the checks could not decide (a judge that was refused, failed, or was unsure and sent it to review) are missing answers, as if the
+// case had fewer repeats: they never make a case worse, never break a case, and a judge score counts only from a judge that decided. A
+// lost race for a hold, or a cap reached halfway through a run, is therefore never drift.
+//
 // Every rule compares the cases both runs asked, on one target, against that target's accepted baseline run. A suspect signal becomes drift
 // only when the next analysed run of the suite raises the same rule for the same target again (DriftSignal.Confirm; for a broken case, the
 // same case must be broken again); otherwise that run closes it as not confirmed. A response model change is drift at once, and the next
@@ -184,6 +191,21 @@ public static class DriftAnalyzer
         return Measure(input, thresholds ?? DriftThresholds.Default);
     }
 
+    /// <summary>Whether <paramref name="result"/> counts toward the pass-rate, broken-case and judge-score rules: an answer whose checks
+    /// decided (passed or failed), or a call that was sent and failed (it fails). A call that never reached the target (not
+    /// <see cref="SuiteResult.Sent"/>: refused by the Spend Guard, not started, its record missing), an answer under review or whose checks
+    /// could not run (a judge refused or failed), and an unfinished or cancelled one do not count: they are missing answers.</summary>
+    public static bool Decisive(SuiteResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Status switch
+        {
+            ResultStatus.Done => result.Verdict is CheckVerdict.Passed or CheckVerdict.Failed,
+            ResultStatus.Error => result.Sent,
+            _ => false,
+        };
+    }
+
     /// <summary>Analyses one target's run against its baseline: what every rule finds, reconciled with the target's open signals (confirm,
     /// carry on, close), at <paramref name="now"/>.</summary>
     /// <exception cref="ArgumentException">The runs, baseline and results do not belong together.</exception>
@@ -312,6 +334,7 @@ public static class DriftAnalyzer
         var cases = beforeByCase.Keys.Intersect(afterByCase.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
 
         int paired = 0, passedBefore = 0, answersBefore = 0, passedAfter = 0, answersAfter = 0, worse = 0, better = 0;
+        int leftOutBefore = 0, leftOutAfter = 0;
         int judgeCases = 0, judgeWorse = 0, judgeBetter = 0;
         double judgeSumBefore = 0, judgeSumAfter = 0;
         int judgeCountBefore = 0, judgeCountAfter = 0;
@@ -323,25 +346,28 @@ public static class DriftAnalyzer
         {
             var then = beforeByCase[id];
             var now = afterByCase[id];
-            var finishedThen = then.Where(result => result.IsFinished).ToList();
-            var finishedNow = now.Where(result => result.IsFinished).ToList();
-            if (finishedThen.Count > 0 && finishedNow.Count > 0)
+            // Only decisive answers count (Decisive): a call that never reached the target, or a judge that could not decide, is missing.
+            var countedThen = then.Where(Decisive).ToList();
+            var countedNow = now.Where(Decisive).ToList();
+            leftOutBefore += then.Count(result => result.IsFinished) - countedThen.Count;
+            leftOutAfter += now.Count(result => result.IsFinished) - countedNow.Count;
+            if (countedThen.Count > 0 && countedNow.Count > 0)
             {
                 paired++;
-                var passThen = finishedThen.Count(result => result.Passed);
-                var passNow = finishedNow.Count(result => result.Passed);
+                var passThen = countedThen.Count(result => result.Passed);
+                var passNow = countedNow.Count(result => result.Passed);
                 passedBefore += passThen;
-                answersBefore += finishedThen.Count;
+                answersBefore += countedThen.Count;
                 passedAfter += passNow;
-                answersAfter += finishedNow.Count;
-                // Compare shares as exact fractions: passNow / finishedNow against passThen / finishedThen.
-                var sign = ((long)passNow * finishedThen.Count).CompareTo((long)passThen * finishedNow.Count);
+                answersAfter += countedNow.Count;
+                // Compare shares as exact fractions: passNow / countedNow against passThen / countedThen.
+                var sign = ((long)passNow * countedThen.Count).CompareTo((long)passThen * countedNow.Count);
                 if (sign < 0) worse++;
                 else if (sign > 0) better++;
             }
 
-            var scoresThen = JudgeScores(finishedThen);
-            var scoresNow = JudgeScores(finishedNow);
+            var scoresThen = JudgeScores(countedThen);
+            var scoresNow = JudgeScores(countedNow);
             if (scoresThen.Count > 0 && scoresNow.Count > 0)
             {
                 judgeCases++;
@@ -355,9 +381,10 @@ public static class DriftAnalyzer
                 else if (meanNow > meanThen + 1e-9) judgeBetter++;
             }
 
+            // Broken: every repeat on both sides counted (none missing), all passed then, and none passes now.
             if (input.BaselineRun.K >= limits.MinBrokenCaseRepeats && input.Run.K >= limits.MinBrokenCaseRepeats &&
-                finishedThen.Count >= input.BaselineRun.K && finishedNow.Count >= input.Run.K &&
-                finishedThen.All(result => result.Passed) && finishedNow.All(result => result.Verdict == CheckVerdict.Failed))
+                countedThen.Count >= input.BaselineRun.K && countedNow.Count >= input.Run.K &&
+                countedThen.All(result => result.Passed) && countedNow.All(result => !result.Passed))
                 broken.Add(id);
 
             var printsThen = then.Where(result => result.Status == ResultStatus.Done && result.Fingerprint is not null).Select(result => result.Fingerprint!.Value).Order().ToList();
@@ -380,8 +407,9 @@ public static class DriftAnalyzer
         var latencyNow = Values(after, common, result => result.DurationMs);
         var speedThen = Values(before, common, result => result.TokensPerSecond is > 0 ? result.TokensPerSecond : null);
         var speedNow = Values(after, common, result => result.TokensPerSecond is > 0 ? result.TokensPerSecond : null);
-        var costThen = before.Where(result => common.Contains(result.CaseId) && result.IsFinished && result.CostMicros is not null).ToList();
-        var costNow = after.Where(result => common.Contains(result.CaseId) && result.IsFinished && result.CostMicros is not null).ToList();
+        // A call that never reached the target cost nothing because nothing was sent: it is left out, as it is from the pass rate.
+        var costThen = before.Where(result => common.Contains(result.CaseId) && Reached(result) && result.CostMicros is not null).ToList();
+        var costNow = after.Where(result => common.Contains(result.CaseId) && Reached(result) && result.CostMicros is not null).ToList();
         var answersPerRun = (long)cases.Count * Math.Max(1, input.Run.K);
         long? PerRun(List<SuiteResult> costs) => costs.Count == 0 ? null
             : (long)Math.Round((decimal)costs.Sum(result => result.CostMicros!.Value) / costs.Count * answersPerRun, MidpointRounding.AwayFromZero);
@@ -394,6 +422,8 @@ public static class DriftAnalyzer
             AnswersBefore = answersBefore,
             PassedAfter = passedAfter,
             AnswersAfter = answersAfter,
+            LeftOutBefore = leftOutBefore,
+            LeftOutAfter = leftOutAfter,
             CasesWorse = worse,
             CasesBetter = better,
             PassRateP = DriftStatistics.SignTest(worse, better),
@@ -438,9 +468,16 @@ public static class DriftAnalyzer
         results.GroupBy(result => result.CaseId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.OrderBy(result => result.Repetition).ToList(), StringComparer.Ordinal);
 
-    private static List<double> JudgeScores(IEnumerable<SuiteResult> finished) =>
-        [.. finished.SelectMany(result => result.Checks).Where(check => check.Kind == CheckKind.Judge && check.Score is { } score && double.IsFinite(score))
+    /// <summary>The judge scores of <paramref name="counted"/> answers, from judges that decided (passed or failed): an unsure judge's score
+    /// (review) and a judge that could not run (error) are left out.</summary>
+    private static List<double> JudgeScores(IEnumerable<SuiteResult> counted) =>
+        [.. counted.SelectMany(result => result.Checks)
+            .Where(check => check.Kind == CheckKind.Judge && (check.Verdict is CheckVerdict.Passed or CheckVerdict.Failed) &&
+                check.Score is { } score && double.IsFinite(score))
             .Select(check => check.Score!.Value)];
+
+    /// <summary>Whether <paramref name="result"/>'s call reached the target: answered, or sent and failed.</summary>
+    private static bool Reached(SuiteResult result) => result.Status == ResultStatus.Done || (result.Status == ResultStatus.Error && result.Sent);
 
     private static List<double> Values(IEnumerable<SuiteResult> results, HashSet<string> cases, Func<SuiteResult, double?> value) =>
         [.. results.Where(result => result.Status == ResultStatus.Done && cases.Contains(result.CaseId)).Select(value)
@@ -531,6 +568,8 @@ public static class DriftAnalyzer
             ["cases"] = numbers.PairedCases,
             ["worse"] = numbers.CasesWorse,
             ["better"] = numbers.CasesBetter,
+            ["leftOutBefore"] = numbers.LeftOutBefore,
+            ["leftOutAfter"] = numbers.LeftOutAfter,
         });
     }
 

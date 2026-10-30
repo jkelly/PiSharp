@@ -1,8 +1,10 @@
 // Decision 0011 (run W5, E3): the numbers behind a target's drift row (mockup evals-drift _DriftSuite: the row's message, "Other signals",
 // "No changes against the baseline. Pass rate 0.97 → 0.97."). One target of one run against its baseline run, over the cases both runs
 // asked (a case added or removed since is left out of every rule, so editing a suite never looks like drift). Counting follows
-// SuiteResult: an answer passes when every check passed; errors fail; "finished" is done or error. DriftAnalyzer.Compare fills it; the
-// rules (DriftAnalyzer.Analyze) read it, and the pages show its texts.
+// SuiteResult (an answer passes when every check passed; a call that was sent and failed fails) over the answers that say something about
+// the model (DriftAnalyzer.Decisive): a call that never reached the target and an answer the checks could not decide (a judge refused,
+// failed or unsure) are left out, and LeftOutBefore and LeftOutAfter count them. DriftAnalyzer.Compare fills it; the rules
+// (DriftAnalyzer.Analyze) read it, and the pages show its texts.
 using System.Globalization;
 using System.Text.Json.Serialization;
 using PiSharp.WebAgent.Spend;
@@ -15,20 +17,27 @@ public sealed record DriftComparison
     /// <summary>Cases both runs asked (the cases every rule compares).</summary>
     public int Cases { get; init; }
 
-    /// <summary>Cases with a finished answer in both runs (the pass-rate sign test's cases).</summary>
+    /// <summary>Cases with a counted answer in both runs (the pass-rate sign test's cases; <see cref="DriftAnalyzer.Decisive"/>).</summary>
     public int PairedCases { get; init; }
 
     /// <summary>Baseline answers that passed, of <see cref="AnswersBefore"/> (paired cases).</summary>
     public int PassedBefore { get; init; }
 
-    /// <summary>Baseline answers finished (paired cases).</summary>
+    /// <summary>Baseline answers counted (paired cases).</summary>
     public int AnswersBefore { get; init; }
 
     /// <summary>Answers that passed now, of <see cref="AnswersAfter"/> (paired cases).</summary>
     public int PassedAfter { get; init; }
 
-    /// <summary>Answers finished now (paired cases).</summary>
+    /// <summary>Answers counted now (paired cases).</summary>
     public int AnswersAfter { get; init; }
+
+    /// <summary>Finished baseline answers of the compared cases left out as missing: calls that never reached the target, and answers the
+    /// checks could not decide (<see cref="DriftAnalyzer.Decisive"/>).</summary>
+    public int LeftOutBefore { get; init; }
+
+    /// <summary>Finished answers of the compared cases left out as missing now.</summary>
+    public int LeftOutAfter { get; init; }
 
     /// <summary>The baseline's pass rate (0 to 1), or null without answers.</summary>
     [JsonIgnore]

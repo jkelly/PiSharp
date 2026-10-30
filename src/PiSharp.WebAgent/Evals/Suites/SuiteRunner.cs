@@ -467,10 +467,14 @@ public sealed class SuiteRunner : IAsyncDisposable
         var stopped = token.IsCancellationRequested;
         var status = record.Status == RunStatus.Completed ? ResultStatus.Done
             : stopped && record.Status is RunStatus.Aborted or RunStatus.Interrupted ? ResultStatus.Cancelled : ResultStatus.Error;
+        var callError = status == ResultStatus.Error ? answer.Error ?? record.Error ?? "The call failed." : null;
         var finished = result with
         {
             Status = status,
             CallRunId = callId,
+            // Sent unless the Spend Guard stopped the call before it went out (its error starts with the guard's prefix and says nothing
+            // was sent); Drift Watch leaves out errors that never reached the target (fix W5 drift 1).
+            Sent = callError?.StartsWith(SpendGuard.ErrorPrefix, StringComparison.Ordinal) != true,
             Text = SuiteResult.Cut(answer.Text),
             Fingerprint = status == ResultStatus.Done ? AnswerFingerprint.Of(answer.Text) : null,
             ResponseModel = record.ResponseModel ?? (record.Output is null ? null : answer.ResponseModel),
@@ -482,7 +486,7 @@ public sealed class SuiteRunner : IAsyncDisposable
             DurationMs = record.DurationMs,
             TtftMs = record.TtftMs,
             TokensPerSecond = record.TokensPerSecond,
-            Error = status == ResultStatus.Error ? answer.Error ?? record.Error ?? "The call failed." : null,
+            Error = callError,
             Finished = time.GetUtcNow(),
         };
         if (status == ResultStatus.Cancelled)
