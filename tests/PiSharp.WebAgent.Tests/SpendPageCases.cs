@@ -1,12 +1,14 @@
 // Decision 0011 (run W3, S4): Settings › Spend, History › Spend, the spend modals and /api/spend. The page cases run the built app as a child
 // process with --faux-metered (the faux models at a test list price; no provider code path, no network) on a temporary data folder; ledger
 // rows are seeded through a SpendLedger on the same webagent.db before the app starts. A planted OPENAI_API_KEY (an environment account)
-// must never appear in any page, answer or CSV. The unit cases check the CSV's cells and the filters' query string.
+// must never appear in any page, answer or CSV. The unit cases check the CSV's cells and the filters' query string. The subscription card's
+// case signs in to ChatGPT through the fake OAuth endpoints and runs the app without --faux (pages and /api/spend only, nothing sent).
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Data;
 using PiSharp.WebAgent.Shell;
 using PiSharp.WebAgent.Spend;
@@ -377,7 +379,82 @@ internal static partial class Program
                 DeleteTemp(root);
             }
         }),
+
+        // W3 fix (tests-ci): the subscription account card. A ChatGPT sign-in is stored through the fake OAuth endpoints (the device code
+        // flow, in process), then the real Program runs without --faux (so openai-codex is in the catalog and resolves as Subscription) with
+        // no provider variable. Only pages and /api/spend are fetched: nothing is sent to a provider and no refresh is due.
+        Case("spend.pages.subscription-account-card-says-list-cost-not-counted", async () =>
+        {
+            var root = Temp("spend-pages-subscription");
+            try
+            {
+                var access = CodexJwt("acct-sub");
+                var refresh = Planted("rt-");
+                string accountId;
+                await using (var vault = new VaultHost("unused", root: root))
+                {
+                    CodexDevice(vault.Http);
+                    CodexTokens(vault.Http, "dac", access, refresh, verifier: "dcv");
+                    var started = await vault.SignIn.StartAsync(new SignInRequest("openai-codex", SignInMethod.DeviceCode));
+                    var done = await FinishedAsync(vault.SignIn, started.FlowId);
+                    Equal(SignInState.Succeeded, done.State, "the ChatGPT sign-in is stored: " + done.Message);
+                    Equal(AccountKind.OAuth, done.Account!.Kind, "a sign-in account");
+                    accountId = done.Account.Id;
+                }
+
+                await using var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = Path.Join(root, "data"), Faux = false, Environment = NoProviderEnvironment() });
+                // A shared daily cap: a card that wrongly treated the sign-in as metered would show "shared daily cap $0.00 / $5.00".
+                var cap = await app.SendAsync(HttpMethod.Post, "/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "day", ["limit"] = "5.00", ["action"] = "block" },
+                    origin: app.Origin);
+                Equal(200, cap.Status, "a shared daily cap: " + cap.Text);
+
+                var response = await app.Get("/settings/providers/openai-codex");
+                Equal(200, response.Status, "the provider page: " + Cut(response.Text));
+                Sp4CheckPage("/settings/providers/openai-codex", response.Text);
+                var page = WebUtility.HtmlDecode(response.Text);
+                var card = Sp4AccountCard(page, accountId);
+                var line = Regex.Match(card, "<div [^>]*title=\"(?<title>[^\"]*)\" data-account-spend=\"(?<mode>[a-z]+)\">(?<text>.*?)</div>", RegexOptions.Singleline);
+                Check(line.Success, "the card has a spend line: " + Sp4Around(card, "data-account-spend"));
+                Equal("subscription", line.Groups["mode"].Value, "the sign-in's spend line is the subscription's");
+                Equal("Subscription · list cost not counted", line.Groups["text"].Value, "the subscription note");
+                Equal("Requests show an ≈ list cost for comparison. It never counts toward spend caps.", line.Groups["title"].Value, "and why");
+                Check(line.Value.Contains("text-ps-faint", StringComparison.Ordinal), "in the quiet tone, never a warning");
+                Check(!card.Contains("/settings/spend#caps", StringComparison.Ordinal) && !card.Contains("daily cap", StringComparison.Ordinal)
+                    && !card.Contains("Today $", StringComparison.Ordinal) && !Regex.IsMatch(card, "\\$\\d+\\.\\d{2} / \\$\\d+\\.\\d{2}"),
+                    "no metered spend and no cap progress on the card: " + Sp4Around(card, "data-account-spend"));
+                Equal(1, Regex.Matches(card, "list cost not counted").Count, "the note is said once (the plan line names the plan)");
+                Check(card.Contains("ChatGPT Plus", StringComparison.Ordinal), "the plan");
+
+                // Settings › Spend agrees: the sign-in is detected as a subscription.
+                var settings = await app.Get("/settings/spend");
+                Equal(200, settings.Status, "Settings › Spend");
+                var spend = WebUtility.HtmlDecode(settings.Text);
+                Check(Regex.IsMatch(spend, $"data-spend-field=\"billing:openai-codex\\|{Regex.Escape(accountId)}\" data-provider=\"openai-codex\"[^>]*data-initial=\"subscription\">"),
+                    "the sign-in is billed as a subscription: " + Sp4Around(spend, "billing:openai-codex|"));
+                Check(spend.Contains("<option value=\"subscription\" selected=\"selected\">Subscription (detected)</option>", StringComparison.Ordinal), "detected");
+
+                NoSecret(response.Text + settings.Text + cap.Text, "a page or answer", access, refresh);
+                await app.StopAsync();
+                Check(!app.Log.Contains("fail:", StringComparison.Ordinal) && !app.Log.Contains("Exception", StringComparison.Ordinal), "a clean run: " + app.Log);
+                NoSecret(app.Log, "the app's log", access, refresh);
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
     ];
+
+    /// <summary>The account card of <paramref name="accountId"/> on a provider page: from its <c>data-account-card</c> to its test result.</summary>
+    private static string Sp4AccountCard(string html, string accountId)
+    {
+        var start = html.IndexOf($"data-account-card=\"{accountId}\"", StringComparison.Ordinal);
+        Check(start >= 0, "the page has the card of " + accountId);
+        var end = html.IndexOf("data-account-test-result", start, StringComparison.Ordinal);
+        Check(end > start, "the card of " + accountId + " ends");
+        return html[start..end];
+    }
 
     /// <summary>The shell rules every page keeps: a doctype, no inline script, no inline handler.</summary>
     private static void Sp4CheckPage(string path, string html)
