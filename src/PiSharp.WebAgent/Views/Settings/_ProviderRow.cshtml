@@ -1,20 +1,35 @@
 @* Decision 0011 (run W2, WU9): the mockups' _ProviderRow (settings-providers): logo, name (a link to the provider's page), id, how it is
    connected (a chip: stored key, env · VARIABLE, a plan, expired) or what connecting it takes (outline chips), one faint detail line, and
    its actions: Manage (with Replace key, Test connection, Models and Remove key for a stored key), or Sign in and Connect. A stored key shows
-   its masked hint only. data-state, data-auth and data-search drive the page's filters. Model: ProviderEntry. *@
+   its masked hint only. data-state, data-auth and data-search drive the page's filters. W3 fix: a custom provider of models.json shows its
+   key source (no key, stored key, env · VARIABLE and whether it is set) and its base URL, links to Settings › Custom providers (which edits
+   its key too) and offers no Connect or Replace key (the generic API key modal is not for it). Model: ProviderEntry. *@
 @model ProviderEntry
 @{
     var active = Model.Active;
     var models = Model.Models.Count > 0 ? SettingsText.Plural(Model.Models.Count, "model") : null;
     var expired = Model.State == ProviderState.Expired ? (active ?? Model.Accounts.FirstOrDefault(account => account.Status == AccountStatus.Expired)) : null;
-    var href = "/settings/providers/" + Uri.EscapeDataString(Model.Id);
+    var href = Model.Href;
+    var custom = Model.Custom;
 }
 <div class="provider-row" data-provider-row="@Model.Id" data-state="@Model.StateName" data-auth="@Model.AuthTags" data-search="@((Model.Id + " " + Model.Name).ToLowerInvariant())">
   <partial name="/Views/Settings/_ProviderLogo.cshtml" model="LogoModel.Of(Model)" />
   <div class="flex-grow-1 provider-row-main" style="min-width:0">
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <a class="provider-name text-reset text-decoration-none" href="@href">@Model.Name</a><span class="provider-id">@Model.Id</span>
-      @if (Model.NoCredentials)
+      @if (custom is not null)
+      {
+        <span class="ps-chip" data-tone="outline">custom</span>
+        @if (expired is not null)
+        {
+          <span class="ps-chip" data-tone="warn">key rejected</span>
+        }
+        else
+        {
+          <span class="ps-chip" data-tone="@custom.Tone" data-custom-key="@custom.KeySource.ToString().ToLowerInvariant()"><i class="bi @custom.Icon"></i>@custom.Chip</span>
+        }
+      }
+      else if (Model.NoCredentials)
       {
         <span class="ps-chip" data-tone="ok">no key needed</span>
       }
@@ -39,7 +54,23 @@
       }
     </div>
     <div class="fs-8 text-ps-faint">
-      @if (Model.NoCredentials)
+      @if (custom is not null)
+      {
+        if (custom.BaseUrl.Length > 0)
+        {
+          <span class="ps-mono text-break">@custom.BaseUrl</span>
+        }
+        else
+        {
+          <span>no base URL</span>
+        }
+        @if (active is { Kind: AccountKind.ApiKey, Hint.Length: > 0 })
+        {
+          <text> · </text><span class="ps-mono">@active.Hint</span>
+        }
+        @(" · " + ((custom.Routed ? models : custom.Problem) ?? "not in the model picker"))
+      }
+      else if (Model.NoCredentials)
       {
         @("Offline test models; nothing leaves this machine" + (models is null ? "" : " · " + models))
       }
@@ -87,7 +118,11 @@
     </div>
   </div>
   <div class="provider-row-actions d-flex flex-wrap gap-1">
-    @if (Model.State == ProviderState.NotConfigured)
+    @if (custom is not null)
+    {
+      <a class="btn btn-sm btn-outline-secondary" href="@href" data-custom-provider-link>Edit in Custom providers</a>
+    }
+    else if (Model.State == ProviderState.NotConfigured)
     {
       @if (Model.SignsIn)
       {

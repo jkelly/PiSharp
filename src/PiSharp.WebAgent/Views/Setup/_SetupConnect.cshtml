@@ -7,7 +7,7 @@
    - Environment variables: the provider key variables the host process was started with, as the credentials area read them at start
      (set or not set) and ambient credentials it found. The mockup's Rescan is left out: a running process's environment cannot change, so
      the note says to restart the app instead.
-   - Local model server: Settings › Custom providers.
+   - Local model server: Settings › Custom providers; "Add server" opens its editor on the LM Studio template (?add=lmstudio, read once by custom-providers.js).
    Model: SetupPage. *@
 @model SetupPage
 @{
@@ -128,7 +128,7 @@
           <div class="choice-title">Local model server (LM Studio, Ollama, vLLM)</div>
           <div class="choice-desc">Any OpenAI-compatible endpoint, such as <span class="ps-mono">http://localhost:1234/v1</span>. Defined like a models.json provider.</div>
         </div>
-        <a class="btn btn-sm btn-outline-secondary" href="/settings/custom-providers"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add server</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/settings/custom-providers?add=lmstudio" data-setup-add-server><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add server</a>
       </div>
     </div>
   </div>

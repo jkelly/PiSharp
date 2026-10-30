@@ -407,7 +407,8 @@ internal static partial class Program
             Check(TagWith(html, "data-setup-variable=\"ANTHROPIC_API_KEY\"").Contains("data-set=\"false\"", StringComparison.Ordinal), "variables that are not set");
             Check(html.Contains("data-setup-more-variables", StringComparison.Ordinal), "and how many more");
             Check(!html.Contains("data-offline-note", StringComparison.Ordinal), "online: no offline note");
-            Check(html.Contains("href=\"/settings/custom-providers\"", StringComparison.Ordinal), "a local server is added in Settings › Custom providers");
+            // W3 fix: the link opens the editor on the LM Studio template (custom-providers.js reads ?add= once).
+            Check(html.Contains("href=\"/settings/custom-providers?add=lmstudio\"", StringComparison.Ordinal), "a local server is added in Settings › Custom providers");
         }),
 
         Case("setup.render.connect-step-lists-what-is-connected", async () =>

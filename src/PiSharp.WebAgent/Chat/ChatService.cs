@@ -7,9 +7,9 @@
 // sidebar's recent chats come from the bindings, with the device's running flags. WU8 adds Retry (fork before the message an answer replies
 // to and send it again, with the chat's own model and account), the session tree (every branch's entries merged by id), the session
 // details panel, the banners and the automatic compaction switch. W3 (S5) adds the Spend Guard (ChatSpend): a create or send that carries
-// `spend` is checked before anything is posted (409 with the confirm modal when the guard would ask or block; the user's choice comes back
-// on the same request id), a call stopped inside a run continues after the user's choice, the composer's estimate, the answers' cost marks,
-// the chat's spend in the details panel and the banner of a stopped call. Billing comes from the Spend area's billing modes when present.
+// `spend` is checked before anything is posted ({posted: false} with the confirm modal when the guard would ask or block; the user's choice
+// comes back on the same request id), a call stopped inside a run continues after the user's choice, the composer's estimate, the answers'
+// cost marks, the chat's spend in the details panel and the banner of a stopped call. Billing comes from the Spend area's billing modes when present.
 // W3 fix (chat spend): a checked create, send or continue holds its send key (ChatSpend.EnterAsync) from the check to the send, so two
 // copies of one POST store one approval, which answers only the message it was given for; a send that fails after it was admitted
 // withdraws its approval, and its retry is checked again.
@@ -245,7 +245,7 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
 
     /// <summary>Continues a branch after a call the Spend Guard stopped inside its run (<paramref name="op"/>, named in the stopped answer's
     /// error): the stopped request plus a "Continue." message is checked with the user's <paramref name="answer"/> (proceed once, or cap
-    /// the output, stored as the chat's one-time approval when it is needed), then the message is sent on the branch. Refused (409, nothing
+    /// the output, stored as the chat's one-time approval when it is needed), then the message is sent on the branch. Refused (nothing
     /// sent) when the guard still would not let it through. A retry with the same request id sends nothing new.</summary>
     /// <exception cref="ChatSpendException">The guard would still ask or block.</exception>
     public async Task<ChatSent> ContinueAsync(string chatId, long? agentId, string op, string requestId, ChatSpendAnswer answer,

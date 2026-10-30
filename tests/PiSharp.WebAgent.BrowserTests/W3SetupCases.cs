@@ -12,7 +12,7 @@ internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> W3SetupCases() =>
     [
-        BrowseW3("browser.w3.setup.runs-end-to-end", W3Mode.Live, async (app, window) =>
+        Browse("browser.w3.setup.runs-end-to-end", AgentMode.Live, async (app, window) =>
         {
             var secret = "sk-proj-PLANTED" + Guid.NewGuid().ToString("N") + "Hk7Wq3";
             var page = window.Page;

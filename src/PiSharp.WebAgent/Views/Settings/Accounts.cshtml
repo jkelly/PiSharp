@@ -1,7 +1,9 @@
 @* Decision 0011 (run W2, WU9): the mockups' settings-accounts page (route GET /settings/accounts): what subscription sign-ins are (and why
    Anthropic has none), where tokens are stored, a summary, an _OAuthCard per sign-in provider (WU5 signs in to openai-codex and
    github-copilot; the mockups' xAI, Kimi, Meta, OpenRouter and Radius cards are later milestones), and Token refresh (how tokens stay valid,
-   and the browser callback host). The credential modals come from _CredentialModals. Model: AccountsPage. *@
+   and the browser callback host). The credential modals come from _CredentialModals. W3 fix: when a custom provider of models.json keeps
+   its key in the vault (an API key account named "<name> key"), a note says those are managed in Settings › Custom providers. Model:
+   AccountsPage. *@
 @model AccountsPage
 @{
     Layout = "_SettingsLayout";
@@ -25,6 +27,20 @@
 </header>
 
 <partial name="/Views/Settings/_OfflineNote.cshtml" model="Model.Offline" />
+
+@if (Model.CustomKeys.Count > 0)
+{
+  <div class="ps-panel p-3 mb-3 fs-7 text-secondary d-flex gap-2 align-items-start" data-accounts-custom-keys>
+    <i class="bi bi-hdd-network mt-1" aria-hidden="true"></i>
+    <div style="min-width:0">Custom providers keep their key in the same encrypted store, as an API key account named after the provider:
+      @for (var index = 0; index < Model.CustomKeys.Count; index++)
+      {
+        var entry = Model.CustomKeys[index];
+        <span class="ps-mono" data-accounts-custom-key="@entry.Id">@(entry.StoredAccounts.First().Label)</span>@(index < Model.CustomKeys.Count - 1 ? ", " : ".")
+      }
+      They aren't sign-ins; change or remove them with the provider in <a href="@CustomProviderFacts.PageUrl">Settings › Custom providers</a>.</div>
+  </div>
+}
 
 <div class="d-flex flex-wrap gap-2 mb-3" data-accounts-summary>
   <span class="ps-chip" data-tone="@(Model.ConnectedCount > 0 ? "ok" : "outline")"><span class="status-dot @(Model.ConnectedCount > 0 ? "ok" : null)"></span>@(SettingsText.Plural(Model.ConnectedCount, "connected account") + " · " + SettingsText.Plural(Model.ConnectedProviders, "provider"))</span>

@@ -239,6 +239,7 @@ public static class SpendEndpoints
             {
                 ResolveChoice.Estimate => row is { State: ReservationState.Settled, Settlement: SettlementKind.Estimate },
                 ResolveChoice.Amount => row is { State: ReservationState.Settled, Settlement: SettlementKind.Entered } && row.ActualMicros == amount,
+                ResolveChoice.Reported => row is { State: ReservationState.Settled, Settlement: SettlementKind.Actual },
                 _ => row.State == ReservationState.Released,
             };
             if (!same) throw SpendException.Conflict("This request's spend is not uncertain any more; reload the ledger.");
@@ -254,6 +255,7 @@ public static class SpendEndpoints
         {
             ResolveChoice.Estimate => ("Reservation resolved", $"Settled at the estimate, {SpendMoney.Format(row.ActualMicros ?? 0, 4)}. Today's metered spend is {today}."),
             ResolveChoice.Amount => ("Reservation resolved", $"Settled at the amount you entered. It replaces the {SpendMoney.Format(reserved)} reservation in your totals."),
+            ResolveChoice.Reported => ("Reservation resolved", $"Settled at the reported cost, {SpendMoney.Format(row.ActualMicros ?? 0, 4)}. Today's metered spend is {today}."),
             _ => ("Reservation released", $"The {SpendMoney.Format(reserved)} no longer counts. Today's metered spend is {today}."),
         };
         return Json(new { reservation = row, again, today, toast = new { title, body = text } });

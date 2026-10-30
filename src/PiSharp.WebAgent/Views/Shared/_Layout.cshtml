@@ -2,7 +2,8 @@
    (the mockups' "_Layout: topbar", here because only a layout can render a page's sections), banners, the page, the shared modals
    (_ShortcutsModal, _ConfirmModal), the toast area (_Toasts, and WU8's "kept running while you were away" toast, _ChatKeptRunning) and the
    scripts. Dark is the default; theme-boot.js applies a stored light
-   theme before the first paint. No inline script anywhere (the Content-Security-Policy has script-src 'self'). A page sets
+   theme before the first paint. The head (_AppHead) and the shared scripts (_AppScripts) are partials the setup wizard's layout renders too
+   (W3 fix). No inline script anywhere (the Content-Security-Policy has script-src 'self'). A page sets
    ViewData["Title"] and ShellViewData keys, and may define these sections: Styles (its stylesheets), TopbarStart (replaces the title: a
    model switch, a breadcrumb), TopbarEnd (icons before the theme toggle), Banners (under the top bar), Modals (after the app) and Scripts
    (its modules). *@
@@ -13,15 +14,7 @@
 <!doctype html>
 <html lang="en" data-bs-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>@title · PiSharp Web Agent</title>
-  <partial name="_WebCommonHead" model='"pisharp-theme"' />
-  @* Run W3, unit AP: Settings › Appearance before the first paint: appearance.js (a classic script, after theme-boot.js) sets this
-     browser's theme (dark, light or system), font size, density, code theme and chat display options on <html>; appearance.css reads them. *@
-  <script src="~/js/appearance.js" asp-append-version="true"></script>
-  <link href="~/css/appearance.css" rel="stylesheet" asp-append-version="true">
-  <link href="~/css/site.css" rel="stylesheet" asp-append-version="true">
+  <partial name="_AppHead" model="title" />
   @await RenderSectionAsync("Styles", required: false)
 </head>
 <body class="app-body" data-page="@ViewData[ShellViewData.Page]">
@@ -60,8 +53,7 @@
 <partial name="_Toasts" model="null" />
 <partial name="~/Views/Chat/_ChatKeptRunning.cshtml" model="null" />
 
-<script src="@WebCommonAssets.BootstrapJs"></script>
-<script type="module" src="~/js/site.js" asp-append-version="true"></script>
+<partial name="_AppScripts" model="null" />
 <script type="module" src="~/js/chat-kept-running.js" asp-append-version="true"></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>

@@ -1,6 +1,9 @@
 @* Decision 0011 (run W2, WU7, WU8): one transcript item of a chat (PiSharp.Durable.Client's TranscriptItem), after the mockups' chat.html
    messages. The same partial renders the stored transcript of a page and every streamed change, keyed by the item's Key (data-key), so a
-   reattached tab and its stream agree. User text is encoded; model text goes through Web.Common's sanitizing MarkdownRenderer.
+   reattached tab and its stream agree. User text is encoded; model text goes through Web.Common's sanitizing MarkdownRenderer. W3 fix
+   (Settings › Appearance, "Render markdown in user messages"): a user message is rendered as typed (encoded, the one Copy and Edit read)
+   and, next to it, through the same sanitizing MarkdownRenderer; appearance.css shows one by <html data-user-markdown> (pisharp.appearance's
+   userMarkdown, off by default). Nothing is rendered in the browser.
    WU8 adds the mockups' states from the item's facts (ChatFacts): the footer's tokens, list or metered cost, duration and tokens/s (or
    "— tokens/s"), the account on hover ("provider · label", the chat's account, never a credential); the running turn's tail with its live
    footer ("streaming · turn N of agent run", "paused while reconnecting" while the tab reconnects, "waiting for approval") and the
@@ -24,7 +27,15 @@
         <article class="msg msg-user" data-key="@user.Key" data-entry="@user.Id">
           <div class="msg-body">
             <div class="msg-role">You @if (facts.Meta?.Time is { } sent) {<time class="msg-time" datetime="@ChatDisplay.Iso(sent)">@ChatDisplay.Clock(sent)</time>}</div>
-            <div class="msg-content msg-plain" data-entry-text>@user.Text</div>
+            @if (user.Text is { Length: > 0 })
+            {
+              <div class="msg-content msg-plain" data-entry-text data-user-md>@user.Text</div>
+              <div class="msg-content msg-user-md">@Html.Raw(context.Markdown.Render(user.Text))</div>
+            }
+            else
+            {
+              <div class="msg-content msg-plain" data-entry-text>@user.Text</div>
+            }
             @foreach (var image in user.Images)
             {
               <img class="msg-image" src="@image.DataUrl" alt="Attached image">

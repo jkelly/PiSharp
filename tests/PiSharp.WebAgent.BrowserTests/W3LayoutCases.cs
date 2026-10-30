@@ -19,7 +19,7 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> W3LayoutCases() =>
     [
-        BrowseW3("browser.w3.layout.every-w3-page-fits-a-phone-in-both-themes", W3Mode.FauxMetered, async (app, window) =>
+        Browse("browser.w3.layout.every-w3-page-fits-a-phone-in-both-themes", AgentMode.FauxMetered, async (app, window) =>
         {
             // What the pages show when in use.
             var key = await app.PostAsync("/api/credentials/accounts",
@@ -44,7 +44,6 @@ internal static partial class Program
             Equal(200, past.Status, "posted without a check: " + past.Text);
             await app.WaitIdleAsync(stopped);
             Check((await app.LedgerAsync()).Count >= 2, "the ledger has rows to show");
-            window.ExpectRefusal("/api/chats");
 
             var page = window.Page;
             foreach (var theme in new[] { "dark", "light" })
@@ -100,7 +99,7 @@ internal static partial class Program
                 await page.Keyboard.PressAsync("Escape");
                 await Expect(page.Locator("#modal-custom-provider")).ToBeHiddenAsync();
             }
-            Equal(2, window.Refusals.Count, "one refused send per theme");
+            await window.RefusedAsync(2, "one refused send per theme");
             Equal(2, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "the refused sends created no chat");
         }, width: 375, height: 812),
 
@@ -109,7 +108,7 @@ internal static partial class Program
         // provider: one on a made-up gateway with no price and no key (nothing is called; the page only reads the catalog). At 375 × 812 in the
         // dark and then the light theme, and at 1440 × 900: the select shows its chosen option in full, inside its row, and nothing scrolls
         // sideways.
-        BrowseW3("browser.w3.layout.an-unknown-price-account-is-never-clipped", W3Mode.Live, async (app, window) =>
+        Browse("browser.w3.layout.an-unknown-price-account-is-never-clipped", AgentMode.Live, async (app, window) =>
         {
             var provider = await app.PostAsync("/api/custom-providers", new JsonObject
             {

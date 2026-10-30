@@ -501,9 +501,11 @@ public static class ChatSpendText
         };
     }
 
-    /// <summary>Links a branch's answers to the chat's ledger rows: an answer with usage to the row with the same usage, provider and model
-    /// nearest its time; one without (or with usage no settled row reported) to the nearest row without usage within two minutes. A call
-    /// the guard stopped has no row. While the chat runs, its newest row still reserved is the running answer's.</summary>
+    /// <summary>Links a branch's answers to the chat's ledger rows. An answer that names its row (<see cref="ChatEntryMeta.SpendOp"/>, W3 fix)
+    /// links to that row exactly, or to none when the row is not among <paramref name="rows"/>. An older answer that names none falls back
+    /// to matching: one with usage to the row with the same usage, provider and model nearest its time; one without (or with usage no
+    /// settled row reported) to the nearest row without usage within two minutes. A call the guard stopped has no row. While the chat
+    /// runs, its newest row still reserved is the running answer's.</summary>
     public static ChatSpendFacts Link(IReadOnlyList<JsonObject> entries, IReadOnlyList<Reservation> rows, bool running, Func<Reservation, ChatSpendMark?> mark)
     {
         ArgumentNullException.ThrowIfNull(entries);
@@ -512,10 +514,21 @@ public static class ChatSpendText
         var linked = new HashSet<string>(StringComparer.Ordinal);
         var marks = new Dictionary<long, ChatSpendMark>();
         var open = new List<(long Id, ChatEntryMeta Meta)>();
+        var answers = new List<(long Id, ChatEntryMeta Meta)>();
         foreach (var entry in entries.Where(entry => ChatDisplay.Str(entry, "kind") == "pi.assistant").OrderBy(entry => ChatDisplay.Long(entry, "id") ?? 0))
         {
             if (ChatDisplay.Long(entry, "id") is not { } id || ChatEntryMeta.Of(entry) is not { } meta) continue;
             if (SpendErrors.IsSpend(meta.ErrorMessage)) continue;
+            if (meta.SpendOp is { } op)
+            {
+                // Exact: the row the guard settled for this answer, never another one's.
+                if (rows.FirstOrDefault(row => row.Op == op) is { } own) Add(id, own);
+                continue;
+            }
+            answers.Add((id, meta));
+        }
+        foreach (var (id, meta) in answers)
+        {
             if (!meta.HasUsage)
             {
                 open.Add((id, meta));

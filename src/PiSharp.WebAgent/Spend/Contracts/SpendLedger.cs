@@ -5,8 +5,10 @@
 // resolves it, never automatically). Reserve checks every applicable cap and writes under one lock and one SQLite BEGIN IMMEDIATE
 // transaction, so concurrent requests can never overshoot a cap; a group reserves all or nothing; the same op never reserves twice. Settle,
 // settle-at-estimate, release and mark-uncertain change only a reserved row (the first ending wins; later ones return the row as it is);
-// an uncertain row changes only by Resolve. Subscription rows are recorded at list price and free rows at 0, and neither counts toward money
-// caps; an unknown-price row records tokens without a cost.
+// an uncertain row changes only by Resolve, except that the usage a recovered request's resend reported may be attached to it (W3 fix:
+// ReportUsageAsync), so Resolve can offer "settle at the reported cost"; it stays uncertain and counted until the user chooses. Subscription
+// rows are recorded at list price and free rows at 0, and neither counts toward money caps; an unknown-price row records tokens without a
+// cost.
 using System.Text.Json.Serialization;
 using PiSharp.WebAgent.Contracts;
 
@@ -159,6 +161,23 @@ public sealed record Reservation
         _ => ReservedMicros ?? 0,
     };
 
+    /// <summary>What the usage a provider reported for an uncertain row (a recovered request's resend: <see cref="ISpendLedger.ReportUsageAsync"/>)
+    /// would settle it at, in micro-USD: the cost "settle at the reported cost" offers; null when nothing was reported, the row is not
+    /// uncertain, or its price is unknown.</summary>
+    [JsonIgnore]
+    public long? ReportedMicros => State == ReservationState.Uncertain && Usage is { } usage ? CostOf(usage) : null;
+
+    /// <summary>What <paramref name="usage"/> costs on this row: $0 when free; none when the price is unknown; at the entered price for an
+    /// entered one; else the cost the provider layer reported, or the row's rates x its tokens when it reported none.</summary>
+    public long? CostOf(SpendUsage usage)
+    {
+        ArgumentNullException.ThrowIfNull(usage);
+        if (Billing == BillingKind.Free) return 0;
+        if (Price is not { } price || ReservedMicros is null) return null;
+        if (price.Source == SpendPriceSource.Entered) return price.CostMicros(usage);
+        return usage.CostMicros is > 0 ? usage.CostMicros : price.CostMicros(usage);
+    }
+
     /// <summary>The ledger's status word: <see cref="LedgerStatus.Estimate"/> for a row settled at an estimate, else its state.</summary>
     [JsonIgnore]
     public LedgerStatus Status => State switch
@@ -170,7 +189,7 @@ public sealed record Reservation
     };
 }
 
-/// <summary>How the user resolves an uncertain reservation. Sent as <c>estimate</c>, <c>amount</c>, <c>release</c>.</summary>
+/// <summary>How the user resolves an uncertain reservation. Sent as <c>estimate</c>, <c>amount</c>, <c>release</c>, <c>reported</c>.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<ResolveChoice>))]
 public enum ResolveChoice
 {
@@ -182,6 +201,10 @@ public enum ResolveChoice
 
     /// <summary>Stop counting it.</summary>
     [JsonStringEnumMemberName("release")] Release,
+
+    /// <summary>Settle at the cost of the usage the provider reported for it (<see cref="Reservation.ReportedMicros"/>: a recovered
+    /// request's resend), as an actual settlement.</summary>
+    [JsonStringEnumMemberName("reported")] Reported,
 }
 
 /// <summary>The user's resolution of an uncertain reservation.</summary>
@@ -385,10 +408,19 @@ public interface ISpendLedger
     /// <exception cref="SpendException">No row has that op (404).</exception>
     Task<Reservation> MarkUncertainAsync(string op, string reason, long? estimateMicros = null, CancellationToken cancellationToken = default);
 
-    /// <summary>Resolves an uncertain row as the user chose: settled at the estimate or an entered amount, or released.</summary>
-    /// <exception cref="ArgumentException"><paramref name="resolution"/> is not allowed (<see cref="SpendResolution.Normalize"/>).</exception>
+    /// <summary>Resolves an uncertain row as the user chose: settled at the estimate, an entered amount or the reported cost, or released.</summary>
+    /// <exception cref="ArgumentException"><paramref name="resolution"/> is not allowed (<see cref="SpendResolution.Normalize"/>), or it
+    /// settles at the reported cost of a row nothing was reported for.</exception>
     /// <exception cref="SpendException">No row has that op (404), or it is not uncertain (409).</exception>
     Task<Reservation> ResolveAsync(string op, SpendResolution resolution, CancellationToken cancellationToken = default);
+
+    /// <summary>Attaches what the provider reported (<paramref name="usage"/>) to an uncertain row: a recovered request's resend that reused
+    /// it. The row stays uncertain and keeps counting at its reserved amount until the user resolves it (Resolve then offers the reported
+    /// cost, <see cref="Reservation.ReportedMicros"/>). A row that is not uncertain is returned as it is; so is every row of a ledger that keeps
+    /// no reported usage (this default).</summary>
+    /// <exception cref="SpendException">No row has that op (404).</exception>
+    async Task<Reservation> ReportUsageAsync(string op, SpendUsage usage, CancellationToken cancellationToken = default) =>
+        await GetAsync(op, cancellationToken).ConfigureAwait(false) ?? throw SpendException.NotFound($"There is no reservation {op}.");
 
     /// <summary>Marks every row still reserved as uncertain with <paramref name="reason"/> (at start: those requests' process is gone);
     /// returns how many. Never settles one.</summary>

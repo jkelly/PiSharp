@@ -4,8 +4,9 @@
 // <html> that wwwroot/css/appearance.css reads; the top bar's moon and Ctrl+Shift+L change the same theme choice. The theme is kept under
 // Web.Common's theme key ("pisharp-theme": dark, light or system), the rest as one JSON object ("pisharp.appearance"). This catalogue is
 // the one list the page renders its controls from; AppearanceCases checks that the script and the stylesheet know every key, value and
-// attribute. Only what the app honours is offered: "Render markdown in user messages" is left out because the chat renders a user's text
-// as text only (nothing in the browser could render it safely).
+// attribute. Only what the app honours is offered. "Render markdown in user messages" (W3 fix) is honoured without the browser rendering
+// anything: _ChatItem renders a user message twice on the server, as typed and through Web.Common's sanitizing MarkdownRenderer (as model
+// text is), and appearance.css shows one of them by the data-user-markdown attribute (off by default: the text as typed).
 namespace PiSharp.WebAgent.Appearance;
 
 /// <summary>How a preference is edited.</summary>
@@ -95,6 +96,9 @@ public static class AppearancePrefs
         new("expandToolCalls", "messages", "Show tool calls expanded",
             "Open each tool card with its arguments and result. Errors and running commands always open.", AppearanceControl.Switch,
             "data-expand-tools", "off", OnOff),
+        new("userMarkdown", "messages", "Render markdown in user messages",
+            "Show your own messages' bold, code, lists and links formatted. Off shows exactly what you typed, which helps when you paste code or logs.",
+            AppearanceControl.Switch, "data-user-markdown", "off", OnOff),
         new("reduceMotion", "messages", "Reduce motion",
             "Stops the streaming cursor, pulsing status dots and animated transitions. Follows the system (Windows: animation effects off) until you change it.",
             AppearanceControl.Switch, "data-reduce-motion", "system", OnOff),

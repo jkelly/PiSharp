@@ -133,6 +133,10 @@ public sealed record AccountsPage(IReadOnlyList<ProviderEntry> Providers, string
 
     /// <summary>Providers without any sign-in account.</summary>
     public int NotConnected => Providers.Count(entry => !entry.Accounts.Any(account => account.Kind == AccountKind.OAuth));
+
+    /// <summary>The custom providers of models.json whose key is a vault account (named "&lt;name&gt; key"), which Settings › Custom providers
+    /// manages (W3 fix: the page notes them, since they are API keys, not sign-ins).</summary>
+    public IReadOnlyList<ProviderEntry> CustomKeys { get; init; } = [];
 }
 
 /// <summary>The Models page's filters, from its query string: <c>q</c>, <c>provider</c> (repeated), <c>connected</c>, <c>enabled</c>,
@@ -385,7 +389,7 @@ public sealed record ModelDetails(string Key, string Provider, string ProviderNa
         ArgumentNullException.ThrowIfNull(row);
         var provider = row.Provider;
         var active = provider.Active;
-        var credential = provider.NoCredentials ? "none needed" : active is null ? null
+        var credential = provider.Custom is { } custom ? custom.Chip : provider.NoCredentials ? "none needed" : active is null ? null
             : active.Hint.Length > 0 ? SettingsText.KindChip(active) + " · " + active.Hint : SettingsText.KindChip(active);
         return new ModelDetails(row.Key, provider.Id, provider.Name, provider.LogoUrl, row.Model.Id, row.Model.Name, credential,
             provider.Billing.ToString().ToLowerInvariant(), row.Model, row.Hidden, row.IsDefault);

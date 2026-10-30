@@ -1,20 +1,21 @@
 @* Decision 0011 (run W3, unit AP): the mockup's _AppearancePreview: a sample exchange in the chat's own message markup (_ChatItem's user
    bubble, thinking block, tool card, code block and usage footer), so every setting shows as it will in a chat. It is marked as a sample
    and holds no measured number: the footer names its fields instead. appearance.js sets the form's unsaved values on it (data-density,
-   data-code-theme, data-code-ligatures, data-usage-footer, data-reduce-motion; the font size as a zoom; the thinking and tool cards open or
+   data-code-theme, data-code-ligatures, data-usage-footer, data-user-markdown, data-reduce-motion; the font size as a zoom; the thinking and tool cards open or
    closed); the page's global settings never apply to it (appearance.css and appearance.js skip [data-appearance-preview]). The sample
    reply names the default model when one is set. Model: AppearancePage. *@
 @using PiSharp.WebAgent.Appearance
 @model AppearancePage
 <div class="ps-card ap-preview" id="livePreview" data-appearance-preview data-density="comfortable" data-code-theme="default" data-code-ligatures="off"
-     data-usage-footer="on" data-reduce-motion="off">
+     data-usage-footer="on" data-user-markdown="off" data-reduce-motion="off">
   <div class="ap-preview-head d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom fs-8 text-ps-faint">
     <span class="ps-chip" data-tone="outline">sample</span><span>Example text, not a chat of yours.</span>
   </div>
   <div class="p-3 ap-preview-scale" data-preview-scale>
     <article class="msg msg-user">
       <div class="msg-body">
-        <div class="msg-content msg-plain">Add a **null check** to `CacheStats.Merge` and run the tests.</div>
+        <div class="msg-content msg-plain" data-user-md>Add a **null check** to `CacheStats.Merge` and run the tests.</div>
+        <div class="msg-content msg-user-md"><p>Add a <strong>null check</strong> to <code>CacheStats.Merge</code> and run the tests.</p></div>
       </div>
     </article>
 

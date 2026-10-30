@@ -59,7 +59,7 @@ internal static partial class Program
                 work = Path.Join(root, "work");
                 Directory.CreateDirectory(work);
                 services.AddSingleton(options);
-                services.AddSingleton(new WebAgentDb(options.DatabasePath, [CoreMigrations.AppInfo, ChatBindings.Migration, SettingsStore.Migration]));
+                services.AddSingleton(new WebAgentDb(options.DatabasePath, [CoreMigrations.AppInfo, ChatBindings.Migration, SettingsStore.Migration, ChatSpendSends.Migration]));
                 services.AddSingleton<ISettingsStore>(provider => new SettingsStore(provider.GetRequiredService<WebAgentDb>()));
                 var faux = FauxModelCatalog.CreateModels();
                 services.AddSingleton(faux);

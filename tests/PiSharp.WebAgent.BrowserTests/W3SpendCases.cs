@@ -10,13 +10,14 @@ using static Microsoft.Playwright.Assertions;
 // the guard stops inside a run (an Ask cap, a message sent without the pre-send check) shows its stop card and banner; Review and continue…
 // opens the stop's own modal, and Proceed once continues the run with "Continue.". History › Spend shows a running request's reservation;
 // the server is then killed mid-answer, and after the restart the chat's footer links the now uncertain spend to Resolve…, which opens
-// History › Spend's modal and settles it at the estimate. The browser logs every 409 a refused send gets; each case declares those it expects
-// (W3Window.ExpectRefusal) and checks their number.
+// History › Spend's modal on "Settle at the reported cost" (the recovered request's resend reported its usage) and settles it there, and a
+// chat tab left open shows the settled cost without a reload. A refused send is answered 200 {posted: false}, so the browser logs nothing for it;
+// each case counts the refusals it expects (Window.RefusedAsync).
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> W3SpendCases() =>
     [
-        BrowseW3("browser.w3.spend.settings-adds-edits-and-removes-a-cap", W3Mode.FauxMetered, async (app, window) =>
+        Browse("browser.w3.spend.settings-adds-edits-and-removes-a-cap", AgentMode.FauxMetered, async (app, window) =>
         {
             var page = window.Page;
             await page.GotoAsync("/settings/spend");
@@ -63,7 +64,7 @@ internal static partial class Program
             Equal(0, (await app.Get("/api/spend/caps")).Body!["caps"]!.AsArray().Count, "removed");
         }),
 
-        BrowseW3("browser.w3.spend.a-one-cent-cap-blocks-a-send-without-switching-the-model", W3Mode.FauxMetered, async (app, window) =>
+        Browse("browser.w3.spend.a-one-cent-cap-blocks-a-send-without-switching-the-model", AgentMode.FauxMetered, async (app, window) =>
         {
             var id = await app.CreateChatAsync("hello before the cap", "before");
             await app.WaitIdleAsync(id);
@@ -72,8 +73,6 @@ internal static partial class Program
             Equal(1, (await app.LedgerAsync()).Count, "the first answer's request");
             var capped = await app.PostAsync("/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "request", ["limit"] = "0.01", ["action"] = "block" });
             Equal(200, capped.Status, "a one-cent Block cap per request: " + capped.Text);
-            window.ExpectRefusal($"/api/chats/{id}/messages");
-            window.ExpectRefusal("/api/chats");
 
             var page = window.Page;
             await page.OpenChatAsync(id);
@@ -100,7 +99,7 @@ internal static partial class Program
             await Expect(box).ToHaveValueAsync("one more, please");
             Equal(1, Mentions((await app.Get($"/chat/{id}/export.md")).Text, "### You"), "nothing was posted");
             Equal(1, (await app.LedgerAsync()).Count, "nothing was reserved");
-            Equal(1, window.Refusals.Count, "one refused send");
+            await window.RefusedAsync(1, "one refused send");
             var blocked = (await app.Get("/api/chats/" + id)).Body!;
             Equal(provider + "/" + model, blocked["provider"]!.GetValue<string>() + "/" + blocked["model"]!.GetValue<string>(), "the block switched nothing");
 
@@ -132,7 +131,7 @@ internal static partial class Program
             var after = (await app.Get("/api/chats/" + id)).Body!;
             Equal(provider + "/" + model, after["provider"]!.GetValue<string>() + "/" + after["model"]!.GetValue<string>(), "the chat's model is unchanged");
             await Expect(page.Locator("[data-model-name]").First).ToHaveTextAsync(shownModel ?? "");
-            Equal(2, window.Refusals.Count, "the send was checked first");
+            await window.RefusedAsync(2, "the send was checked first");
 
             // A new chat is refused the same way, and none is created.
             await page.GotoAsync("/chat/new");
@@ -145,10 +144,10 @@ internal static partial class Program
             await Expect(confirm).ToBeHiddenAsync();
             Check(new Uri(page.Url).AbsolutePath == "/chat/new", "still on the new chat page: " + page.Url);
             Equal(1, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "no chat was created");
-            Equal(3, window.Refusals.Count, "three refused sends in all");
+            await window.RefusedAsync(3, "three refused sends in all");
         }),
 
-        BrowseW3("browser.w3.spend.a-call-stopped-inside-a-run-continues-after-review", W3Mode.FauxMetered, async (app, window) =>
+        Browse("browser.w3.spend.a-call-stopped-inside-a-run-continues-after-review", AgentMode.FauxMetered, async (app, window) =>
         {
             var id = await app.CreateChatAsync("hello before the cap", "before");
             await app.WaitIdleAsync(id);
@@ -189,10 +188,10 @@ internal static partial class Program
             Equal(2, ledger.Count, "the continued call was reserved once");
             Check(Reservation(ledger[0], "note")?.Contains("sent once", StringComparison.Ordinal) == true, "after the user's one-time approval: " + ledger[0].ToJsonString());
             Equal("settled", Reservation(ledger[0], "state"), "and settled");
-            Equal(0, window.Refusals.Count, "Review asked the stop's own modal; nothing was refused");
+            await window.RefusedAsync(0, "Review asked the stop's own modal; nothing was refused");
         }),
 
-        BrowseW3("browser.w3.spend.history-shows-the-reservation-and-resolve-settles-it", W3Mode.FauxMetered, async (app, window) =>
+        Browse("browser.w3.spend.history-shows-the-reservation-and-resolve-settles-it", AgentMode.FauxMetered, async (app, window) =>
         {
             var id = await app.CreateChatAsync("slow: " + Words(150), "slow");
             JsonObject reserved = null!;
@@ -213,6 +212,10 @@ internal static partial class Program
             var second = after.Page;
             await app.WaitIdleAsync(id);
             Equal("uncertain", Reservation((await app.LedgerAsync()).Single(), "state"), "uncertain after the restart");
+            // A second tab keeps the chat open: its footer follows the ledger, so the Resolve below shows there without a reload.
+            var chatTab = await after.NewPageAsync();
+            await chatTab.OpenChatAsync(id);
+            await Expect(chatTab.Locator("[data-spend-mark='uncertain']").First).ToBeVisibleAsync();
             await second.OpenChatAsync(id);
             var resolve = second.Locator($"a[data-spend-resolve][href='/history/spend?resolve={Uri.EscapeDataString(op)}']");
             await Expect(resolve.First).ToBeVisibleAsync();
@@ -223,14 +226,17 @@ internal static partial class Program
             await Expect(modal).ToBeVisibleAsync();
             await Expect(modal).ToContainTextAsync("Resolve uncertain spend");
             await Expect(modal).ToContainTextAsync("stream dropped, no usage reported");
-            await Expect(modal.Locator("input#rrEstimate")).ToBeCheckedAsync();
+            await Expect(modal.Locator("input#rrReported")).ToBeCheckedAsync();
+            await Expect(modal.Locator("[data-rr-submit]:visible")).ToContainTextAsync("Settle at $");
             await modal.Locator("[data-rr-submit]:visible").ClickAsync();
-            await second.ToastAsync("Reservation resolved");
-            await Expect(second.Locator($"[data-spend-row='{op}']")).ToHaveAttributeAsync("data-status", "estimate");
+            await second.ToastAsync("Settled at the reported cost");
+            await Expect(second.Locator($"[data-spend-row='{op}']")).ToHaveAttributeAsync("data-status", "settled");
             Check(!second.Url.Contains("resolve=", StringComparison.Ordinal), "the address no longer opens the modal: " + second.Url);
             var settled = (await app.LedgerAsync()).Single();
-            Equal("settled|estimate|true", $"{Reservation(settled, "state")}|{Reservation(settled, "settlement")}|{settled["reservation"]!["resolvedByUser"]}",
-                "settled at the estimate by the user");
+            Equal("settled|actual|true", $"{Reservation(settled, "state")}|{Reservation(settled, "settlement")}|{settled["reservation"]!["resolvedByUser"]}",
+                "settled at the reported cost by the user");
+            await Expect(chatTab.Locator("[data-spend-mark='uncertain']")).ToHaveCountAsync(0);
+            await Expect(chatTab.Locator("[data-spend-mark='metered']").First).ToBeVisibleAsync();
         }),
     ];
 

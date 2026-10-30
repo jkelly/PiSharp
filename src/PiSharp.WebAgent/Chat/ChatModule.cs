@@ -2,7 +2,8 @@
 // WU7 fills it in: the chat bindings migration (200), the device host (a hosted service), the approval broker, the chat service (which is
 // also the sidebar's IRecentChats), the shared agent view feeds and the per-tab stream (GET /api/stream, PUT /api/stream/{streamId}). The
 // pages and the /api/chats commands are ChatController's. W3 (S5) registers ChatSpend, the Spend Guard on the chat pages (it reads the Spend
-// area's services when they are there, and does nothing without them).
+// area's services when they are there, and does nothing without them), and the W3 fixes ChatSpendSends (migration 1400), where the sends it
+// admitted are kept across restarts.
 using System.Text.Json;
 using PiSharp.Durable.Client;
 using PiSharp.WebAgent.Contracts;
@@ -24,6 +25,8 @@ public static class ChatModule
         services.AddSingleton<DeviceHostService>();
         services.AddHostedService(provider => provider.GetRequiredService<DeviceHostService>());
         services.AddSingleton<ChatService>();
+        services.AddWebAgentMigration(ChatSpendSends.Migration);
+        services.AddSingleton(provider => new ChatSpendSends(provider.GetRequiredService<WebAgentDb>(), provider.GetService<TimeProvider>()));
         services.AddSingleton<ChatSpend>();
         services.AddSingleton<IRecentChats>(provider => provider.GetRequiredService<ChatService>());
         services.AddSingleton<AgentViewHub>();

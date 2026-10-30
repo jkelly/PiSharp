@@ -29,8 +29,12 @@
           <th colspan="9" scope="colgroup">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <partial name="/Views/Settings/_ProviderLogo.cshtml" model='LogoModel.Of(provider, "sm")' />
-              <a class="provider-name text-reset text-decoration-none" href="/settings/providers/@Uri.EscapeDataString(provider.Id)">@provider.Name</a><span>@provider.Id</span>
-              @if (provider.NoCredentials)
+              <a class="provider-name text-reset text-decoration-none" href="@provider.Href">@provider.Name</a><span>@provider.Id</span>
+              @if (provider.Custom is { } custom)
+              {
+                <span class="ps-chip" data-tone="@custom.Tone"><i class="bi @custom.Icon" aria-hidden="true"></i>@custom.Chip</span>
+              }
+              else if (provider.NoCredentials)
               {
                 <span class="ps-chip" data-tone="ok">no key needed</span>
               }

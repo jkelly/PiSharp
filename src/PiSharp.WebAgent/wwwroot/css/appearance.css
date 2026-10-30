@@ -11,6 +11,7 @@
      data-code-theme      default | github | solarized
      data-code-ligatures  on | off
      data-usage-footer    on | off
+     data-user-markdown   on | off (W3 fix)
      data-reduce-motion   on | off (its "system" follows the system)
    Density, code theme and ligatures are custom properties set where
    the attribute is, so the nearest one wins: the Appearance page's
@@ -75,6 +76,17 @@ pre, code, kbd, samp, .font-monospace { font-variant-ligatures: var(--ap-code-li
 /* ---------- Usage footer: the numbers under a reply go; its buttons and the live status stay. ---------- */
 :root[data-usage-footer="off"] .msg-footer:not(.pv-usage) > :not(.msg-actions):not([data-live-status]) { display: none !important; }
 [data-appearance-preview][data-usage-footer="off"] .pv-usage { display: none !important; }
+
+/* ---------- Markdown in user messages (off by default). _ChatItem renders a user message as typed (.msg-plain[data-user-md]) and,
+   next to it, through the sanitizing MarkdownRenderer (.msg-user-md); the nearest attribute picks the one shown, so the live preview
+   can show an unsaved value. Copy and Edit read the text as typed. ---------- */
+[data-user-markdown="on"] { --ap-user-md: inline-block; --ap-user-plain: none; }
+[data-user-markdown="off"] { --ap-user-md: none; --ap-user-plain: inline-block; }
+.msg-user .msg-content.msg-user-md { display: var(--ap-user-md, none); }
+.msg-user .msg-content.msg-plain[data-user-md] { display: var(--ap-user-plain, inline-block); }
+.msg-user-md code:not(pre code) { background: var(--ps-surface-2); }
+.msg-user-md pre { white-space: pre-wrap; margin-bottom: .8rem; }
+.msg-user-md > :last-child { margin-bottom: 0; }
 
 /* ---------- Reduce motion: no animation or transition (spinners keep turning: they say the app is busy). ---------- */
 :root[data-reduce-motion="on"] { scroll-behavior: auto !important; }
