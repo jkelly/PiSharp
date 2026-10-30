@@ -5,6 +5,14 @@
 // the tool runs at most once; a crash while waiting finds no memo when the hook runs again on recovery, and asks again. Read-only tools
 // (ToolEffects) never ask. Deny blocks the call with the user's reason, which the model gets as the tool result. Only people's decisions are
 // memos: a call that the mode, the allow-list or a grant let through stores nothing, so it is judged again if it runs again.
+//
+// Run W4 (R5): a per-session override. Agent compare's runner attaches a resolver to the app's ApprovalBroker (SetOverrides); for a session
+// it names (a model's workspace session that was not opened as a chat), the run's approval mode replaces Settings › Tools: Ask asks before
+// every command and every other changing tool, except write and edit calls whose path is inside the workspace (no link on the way); Allow-list
+// is Ask plus the commands on Settings › Tools' allow-list; Auto asks nothing (workspaces are copies, not sandboxes). The run's own grants
+// ("allow this command in all workspaces") let matching calls through in every mode. A resolver that fails asks (it never lets a call
+// through unchecked). Every other session (every chat) keeps Settings › Tools.
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using PiSharp.Durable;
 using PiSharp.Durable.Chord;
@@ -14,9 +22,88 @@ using ChordJson = PiSharp.Durable.Chord.JsonValue;
 
 namespace PiSharp.WebAgent.Chat;
 
+/// <summary>How a session's tool calls are judged instead of Settings › Tools (agent compare's run approval mode for one workspace).</summary>
+/// <param name="Mode">The run's approval mode.</param>
+/// <param name="WorkspaceRoot">The workspace's root: write and edit calls inside it don't ask in Ask and Allow-list modes.</param>
+/// <param name="WorkingDirectory">The session's working directory, which relative paths are resolved against.</param>
+public sealed record ApprovalOverride(ToolApprovalMode Mode, string WorkspaceRoot, string WorkingDirectory)
+{
+    /// <summary>Rules that let matching calls through without asking in any mode (the run's "allow this command in all workspaces").</summary>
+    public IReadOnlyList<ToolAllowRule> Grants { get; init; } = [];
+}
+
 /// <summary>The <c>web-approval</c> extension: tool calls wait for the user's decision in the browser.</summary>
 public static class WebApproval
 {
+    private static readonly ConditionalWeakTable<ApprovalBroker, Func<string, ApprovalOverride?>> Overrides = new();
+
+    /// <summary>The tools whose <c>path</c> argument names the one file they change: <c>write</c> and <c>edit</c>.</summary>
+    public static IReadOnlySet<string> FileTools { get; } = new HashSet<string>(StringComparer.Ordinal) { "write", "edit" };
+
+    /// <summary>Attaches <paramref name="resolver"/> to <paramref name="broker"/>'s sessions: for a session it answers an override for, the
+    /// override replaces Settings › Tools. Null removes it. One resolver per broker; a later one replaces it.</summary>
+    public static void SetOverrides(ApprovalBroker broker, Func<string, ApprovalOverride?>? resolver)
+    {
+        ArgumentNullException.ThrowIfNull(broker);
+        if (resolver is null) Overrides.Remove(broker);
+        else Overrides.AddOrUpdate(broker, resolver);
+    }
+
+    /// <summary>The override of <paramref name="sessionId"/> on <paramref name="broker"/>, or null when it has none. A resolver that throws
+    /// throws here (the hook then asks).</summary>
+    public static ApprovalOverride? OverrideFor(ApprovalBroker broker, string sessionId)
+    {
+        ArgumentNullException.ThrowIfNull(broker);
+        return Overrides.TryGetValue(broker, out var resolver) ? resolver(sessionId) : null;
+    }
+
+    /// <summary>Whether a call of <paramref name="tool"/> must wait for a person under the session's override <paramref name="over"/> (the
+    /// run's mode and grants; <paramref name="settings"/> gives the allow-list for Allow-list mode) and the session's
+    /// <paramref name="grants"/>. Read-only tools are not asked about at all (the hook checks them first).</summary>
+    public static bool NeedsApproval(ApprovalOverride over, ToolsSettings settings, IReadOnlyList<ToolAllowRule> grants, string tool, JsonObject? arguments)
+    {
+        ArgumentNullException.ThrowIfNull(over);
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(grants);
+        if (over.Mode == ToolApprovalMode.Auto) return false;
+        if (ToolAllowList.Allows(grants, tool, arguments) || ToolAllowList.Allows(over.Grants, tool, arguments)) return false;
+        if (over.Mode == ToolApprovalMode.AllowList && ToolAllowList.Allows(settings.AllowList ?? [], tool, arguments)) return false;
+        var path = arguments?["path"] is System.Text.Json.Nodes.JsonValue value && value.GetValueKind() == System.Text.Json.JsonValueKind.String
+            ? value.GetValue<string>() : null;
+        return !(FileTools.Contains(tool) && IsInside(over, path));
+    }
+
+    /// <summary>Whether <paramref name="path"/> (a write or edit call's, relative to the working directory or absolute; a leading <c>@</c>
+    /// is dropped) is inside the override's workspace with no link (reparse point) between the workspace root and it. <c>~</c> and
+    /// anything that can't be resolved count as outside.</summary>
+    public static bool IsInside(ApprovalOverride over, string? path)
+    {
+        ArgumentNullException.ThrowIfNull(over);
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        var text = path.Trim();
+        if (text.StartsWith('@')) text = text[1..];
+        if (text.Length == 0 || text.StartsWith('~') || text.Contains('\0', StringComparison.Ordinal)) return false;
+        try
+        {
+            var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(over.WorkspaceRoot));
+            var full = Path.GetFullPath(Path.IsPathFullyQualified(text) ? text : Path.Join(over.WorkingDirectory, text));
+            var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (!full.StartsWith(root + Path.DirectorySeparatorChar, comparison)) return false;
+            if (!Directory.Exists(root) || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) return false;
+            // A link inside the workspace may point anywhere: a path through one (or a file that is one) asks.
+            for (var current = Path.TrimEndingDirectorySeparator(full); current.Length > root.Length;
+                current = Path.GetDirectoryName(current) is { Length: > 0 } parent ? parent : root)
+            {
+                if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return false;
+            }
+            return true;
+        }
+        catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>The extension's name.</summary>
     public const string ExtensionName = "web-approval";
 
@@ -66,7 +153,18 @@ public static class WebApproval
         if (!effects.IsWriter(tool)) return null;
         if (await api.MemoAsync(MemoName, context).ConfigureAwait(false) is JsonObjectValue memo) return Apply(memo, tool);
         var arguments = call.TryGetValue("arguments", out var args) && args is JsonObjectValue values ? ToNode(values) : new JsonObject();
-        if (!NeedsApproval(tools(), broker.Grants(sessionId), tool, arguments)) return null;
+        bool needed;
+        try
+        {
+            needed = OverrideFor(broker, sessionId) is { } over
+                ? NeedsApproval(over, tools(), broker.Grants(sessionId), tool, arguments)
+                : NeedsApproval(tools(), broker.Grants(sessionId), tool, arguments);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            needed = true; // A failed override never lets a call through unchecked.
+        }
+        if (!needed) return null;
         var callId = call.TryGetValue("id", out var id) && id is JsonStringValue text ? text.Value : "";
         var parent = call.TryGetValue("parent", out var owner) && owner is JsonObjectValue nested && nested.TryGetValue("callId", out var parentId) &&
             parentId is JsonStringValue parentText ? parentText.Value : null;
