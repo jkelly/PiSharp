@@ -1,7 +1,8 @@
 // Decision 0011 (run W4, R0; brief rule 6): what the routing path's capture hook (Routing/RunCaptureHandler) knows about the call it sees.
 // A run (RunEngine) or a recorded chat call (RecordingDurableModels) sets RunHttpScope.Current around the provider call; the hook reads it
-// on each HTTP request: the run's id, the JSON patch and headers to apply to the model request, and, only when the user turned raw payloads
-// on, a RunCapture to record into. An AsyncLocal set inside an async iterator is lost after its yield, so the iterators set it again before
+// on each HTTP request: the run's id, the JSON patch, strict tools and headers to apply to the model request, the run's timeout, and, only
+// when the user turned raw payloads on, a RunCapture to record into. A run that needs the HTTP request (a patch, strict tools or a
+// timeout) makes the account router choose Codex's SSE transport, whose request the hook sees, over its WebSocket one. An AsyncLocal set inside an async iterator is lost after its yield, so the iterators set it again before
 // every step they take of the inner stream.
 //
 // RunCapture keeps a run's raw items in memory until the run ends (the engine stores them with its row): the request (method, URL, headers,
@@ -37,6 +38,16 @@ public sealed class RunHttpContext
 
     /// <summary>Extra headers for every request of the call, or null.</summary>
     public IReadOnlyDictionary<string, string>? Headers { get; init; }
+
+    /// <summary>The tools marked strict in the model request's body, or null.</summary>
+    public IReadOnlyList<string>? StrictTools { get; init; }
+
+    /// <summary>How long each request of the call waits for the provider's response headers, in milliseconds, or null for no limit.</summary>
+    public int? TimeoutMs { get; init; }
+
+    /// <summary>Whether the call needs its model request to go over HTTP through the hook (a patch, strict tools or a timeout): the account
+    /// router then sends a Codex request over SSE rather than a WebSocket, which the hook cannot change.</summary>
+    public bool NeedsHttp => Patch is not null || StrictTools is { Count: > 0 } || TimeoutMs is not null;
 
     /// <summary>Where raw payloads go, or null when they are off.</summary>
     public RunCapture? Capture { get; init; }
@@ -269,7 +280,16 @@ public sealed class RunCapture
 
     private static string Text(HttpContentHeaders headers, byte[] raw)
     {
-        if (headers.ContentEncoding.Count > 0) return $"[{raw.Length:N0} bytes, {string.Join(", ", headers.ContentEncoding)}]";
+        if (headers.ContentEncoding.Count == 1 && headers.ContentEncoding.First().Equals("zstd", StringComparison.OrdinalIgnoreCase))
+        {
+            // OpenAI Codex sends its SSE request body as one zstd frame: kept as the JSON it holds.
+            try { raw = PiSharp.AI.Compression.ZstdDecoder.Decompress(raw, (int)MaxBytes); }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                return $"[{raw.Length:N0} bytes, zstd]";
+            }
+        }
+        else if (headers.ContentEncoding.Count > 0) return $"[{raw.Length:N0} bytes, {string.Join(", ", headers.ContentEncoding)}]";
         var type = headers.ContentType?.MediaType ?? "";
         if (type.Length > 0 && !type.Contains("json", StringComparison.OrdinalIgnoreCase) && !type.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
             && !type.Contains("x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase))

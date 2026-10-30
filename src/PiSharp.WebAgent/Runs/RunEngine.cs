@@ -327,7 +327,8 @@ public sealed class RunEngine : IAsyncDisposable
         var capture = settings.StoreRawPayloads && !offline ? new RunCapture(() => work.Clock.ElapsedMilliseconds) : null;
         var http = new RunHttpContext
         {
-            RunId = work.Id, Api = model.Api, Patch = plan.Patch, PatchPath = plan.PatchPath, Headers = plan.Headers, Capture = capture,
+            RunId = work.Id, Api = model.Api, Patch = plan.Patch, PatchPath = plan.PatchPath, Headers = plan.Headers, StrictTools = plan.StrictTools,
+            TimeoutMs = offline ? null : plan.Spec.TimeoutMs, Capture = capture,
         };
         var events = new List<RunEventRecord>();
         var partial = new StringBuilder();
@@ -414,7 +415,7 @@ public sealed class RunEngine : IAsyncDisposable
         var (cost, costKind, billing) = Cost(work.Lease.Settled, message);
         double? rate = usage.Output > 0 && ttft is { } first && duration > first ? usage.Output / ((duration - first) / 1000.0) : null;
         var notes = new List<string>(work.Plan.Notes);
-        if (work.Plan.Patch is not null && http.Requests > 0 && http.Patched == 0)
+        if ((work.Plan.Patch is not null || work.Plan.StrictTools is not null) && http.Requests > 0 && http.Patched == 0)
             notes.Add("PiSharp did not find the model request to apply this run's options to, so it was sent without them.");
         if (capture?.Truncated == true) notes.Add($"Raw payloads were cut at {RunCapture.MaxBytes / (1024 * 1024)} MB.");
         if (work.Lease.Reservation.OutputCapped) notes.Add($"The output was capped at {work.Lease.Reservation.MaxTokens:N0} tokens (your spend choice).");

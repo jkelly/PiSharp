@@ -60,10 +60,11 @@
         <select class="form-select form-select-sm" id="@(p)-tier" aria-label="Speed / service tier" data-opt="serviceTier" data-kind="tier" disabled="@Model.Off(RunModelOptions.ServiceTier)">
           @foreach (var tier in RequestConfigView.Tiers)
           {
-            <option value="@tier.Value" selected="@((Model.Draft.ServiceTier ?? "") == tier.Value)" disabled="@(!tier.Sent)">@tier.Label@(tier.Sent ? "" : " · not sent yet")</option>
+            var chosen = (Model.Draft.ServiceTier ?? "") == tier.Value;
+            <option value="@tier.Value" selected="@chosen" disabled="@(!tier.Sent || (!chosen && Model.Capabilities is not null && Model.Takes(RunModelOptions.ServiceTier) && !Model.TierTaken(tier.Value)))">@tier.Label@(tier.Sent ? "" : " · not sent yet")</option>
           }
         </select>
-        <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note>@(Model.Why(RunModelOptions.ServiceTier) ?? "Uses the configured default. Availability depends on the model and account.") Fast and UltraFast: @RequestConfigView.NotSentYet</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ServiceTier))">Clear</button></div>
+        <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note>@(Model.Why(RunModelOptions.ServiceTier) ?? "Uses the configured default. Availability depends on the model and account.")</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ServiceTier))">Clear</button></div>
       </div>
     </div>
   </div>

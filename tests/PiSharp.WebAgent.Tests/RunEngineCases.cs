@@ -354,6 +354,63 @@ internal static partial class Program
                 DeleteTemp(root);
             }
         }),
+
+        Case("runs.engine.codex-takes-its-service-tier-and-the-patched-options", async () =>
+        {
+            // CodexTransport auto (WebSocket first): a run whose request the hook must change goes over SSE, where the hook sees it.
+            await using var host = RunsHost.Routing("runs-engine-codex", codexTransport: null);
+            var vault = host.Services.GetRequiredService<CredentialVault>();
+            await vault.SaveSignInAsync("openai-codex", new PiSharp.AI.Authentication.OAuth.OAuthCredentialSnapshot(CodexJwt("acct-run"), Planted("rt-"),
+                DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeMilliseconds(), new Dictionary<string, string> { ["accountId"] = "acct-run" }),
+                "acct-run", new Dictionary<string, string>(), "ChatGPT acct-run", null, default);
+            var model = ModelOf(host.Services.GetRequiredService<IModelCatalog>(), "openai-codex", "openai-codex-responses");
+            var caps = host.Engine.Capabilities("openai-codex", model)!;
+            Equal("auto,default,flex,priority", string.Join(",", caps.ServiceTiers), "the Codex backend's tiers");
+            Check(caps.Find(RunModelOptions.ServiceTier) is { Supported: true }, "the service tier is offered on Codex");
+
+            var weather = new RunTool("get_weather", "Weather", new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject { ["city"] = new JsonObject { ["type"] = "string" } },
+                ["required"] = new JsonArray("city"),
+                ["additionalProperties"] = false,
+            }, Strict: true);
+            var spec = new RunSpec
+            {
+                Provider = "openai-codex",
+                Model = model,
+                ServiceTier = "priority",
+                TextVerbosity = "high",
+                SessionId = "run-session-1",
+                ParallelToolCalls = false,
+                Tools = [weather],
+                Messages = [new RunMessage { Text = "codex tier run" }],
+            };
+            var start = await host.Engine.StartAsync(spec);
+            Check(start.Posted, "posted: " + start.Refusal?.Message);
+            var run = await RunsFinishedAsync(host.Store, start.Id!);
+            Equal(RunStatus.Completed, run.Status, "completed: " + run.Error + " " + run.Notes);
+            Equal("Hello world", run.OutputText, "the provider's answer");
+            Check(host.Provider.Requests.All(request => request.Method == "POST"),
+                "over SSE, never the WebSocket the hook cannot change: " + string.Join(", ", host.Provider.Requests.Select(request => request.Key)));
+            var sent = host.Provider.Requests.Single(request => request.Body?.Contains("codex tier run", StringComparison.Ordinal) == true);
+            Check(sent.Url.AbsolutePath.EndsWith("/codex/responses", StringComparison.Ordinal), "the Codex endpoint: " + sent.Url);
+            Equal("zstd", sent.Header("content-encoding"), "the patched body is a zstd frame again");
+            var body = JsonNode.Parse(sent.Body!)!;
+            Equal("priority", body["service_tier"]?.GetValue<string>(), "the body carries service_tier");
+            Equal("high", body["text"]?["verbosity"]?.GetValue<string>(), "text verbosity");
+            Equal(false, body["parallel_tool_calls"]?.GetValue<bool>(), "parallel tool calls off");
+            Equal("run-session-1", body["prompt_cache_key"]?.GetValue<string>(), "the session id as prompt_cache_key");
+            Equal("run-session-1", sent.Header("session-id"), "and as Codex's session header");
+            Equal(true, body["tools"]?[0]?["strict"]?.GetValue<bool>(), "the strict tool");
+            Check(body["model"]?.GetValue<string>() == model && body["input"] is JsonArray && body["stream"]?.GetValue<bool>() == true, "otherwise the transport's own request");
+            Check(run.Options?["applied"]?.AsArray().Select(item => item!.GetValue<string>()).Contains(RunModelOptions.ServiceTier) == true, "History records the tier as applied");
+
+            var count = host.Provider.Requests.Count;
+            var refused = await ThrowsAsync<RunOptionException>(() => host.Engine.StartAsync(spec with { ServiceTier = "scale" }), "scale on Codex");
+            Check(refused.Message.Contains("Codex backend takes auto, default, flex, priority", StringComparison.Ordinal), "named: " + refused.Message);
+            Equal(count, host.Provider.Requests.Count, "nothing was sent for it");
+        }),
     ];
 
     /// <summary>The services of the run engine in process: the core, the spend area and the runs area over faux models (priced), or over
@@ -415,8 +472,9 @@ internal static partial class Program
             return Build(services, root, ownsRoot, options);
         }
 
-        /// <summary>Over real routing (not --faux) with <see cref="Provider"/> as every provider request's handler.</summary>
-        public static RunsHost Routing(string name)
+        /// <summary>Over real routing (not --faux) with <see cref="Provider"/> as every provider request's handler (Codex over
+        /// <paramref name="codexTransport"/>: SSE by default, null for auto).</summary>
+        public static RunsHost Routing(string name, string? codexTransport = "sse")
         {
             var root = Temp(name);
             var options = new WebAgentOptions { DataDirectory = Path.Join(root, "data") };
@@ -426,7 +484,7 @@ internal static partial class Program
             var services = new ServiceCollection();
             services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Debug).AddProvider(new ListLoggerProvider(logs)));
             services.AddSingleton(RoutingCredentials(new Dictionary<string, string>(), new FakeOAuth(), root));
-            services.AddSingleton(new RoutingOptions { ProviderHandler = fake, CodexTransport = "sse" });
+            services.AddSingleton(new RoutingOptions { ProviderHandler = fake, CodexTransport = codexTransport });
             services.AddWebAgentCore(options);
             services.AddCredentialsArea(options);
             services.AddRoutingArea(options);

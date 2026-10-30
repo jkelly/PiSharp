@@ -71,15 +71,21 @@ public sealed record RequestConfigView
     /// <summary>Where the "defaults" link of the pane header goes.</summary>
     public string DefaultsUrl { get; init; } = "/settings/defaults";
 
-    /// <summary>The thinking levels the Reasoning control lists: the run engine's, then <c>max</c> (listed, not sent yet).</summary>
-    public static IReadOnlyList<string> Levels { get; } = [.. RunSpec.ThinkingLevels, "max"];
+    /// <summary>The thinking levels the Reasoning control lists: the run engine's (<see cref="RunSpec.ThinkingLevels"/>, <c>max</c> last).</summary>
+    public static IReadOnlyList<string> Levels { get; } = RunSpec.ThinkingLevels;
 
-    /// <summary>The service tiers the Speed list shows, PLAN.md "Request speed" order; Fast and UltraFast are listed, not sent yet.</summary>
+    /// <summary>The service tiers the Speed list shows, PLAN.md "Request speed" order; each is sent when <see cref="RunSpec.ServiceTiers"/>
+    /// names it, and taken when the model's API does (<see cref="TierTaken"/>).</summary>
     public static IReadOnlyList<RequestTier> Tiers { get; } =
     [
-        new("", "Use default", true), new("auto", "Auto", true), new("default", "Standard", true), new("flex", "Flex", true),
-        new("scale", "Scale", true), new("priority", "Priority", true), new("fast", "Fast", false), new("ultrafast", "UltraFast", false),
+        Tier("", "Use default"), Tier("auto", "Auto"), Tier("default", "Standard"), Tier("flex", "Flex"),
+        Tier("scale", "Scale"), Tier("priority", "Priority"), Tier("fast", "Fast"), Tier("ultrafast", "UltraFast"),
     ];
+
+    private static RequestTier Tier(string value, string label) => new(value, label, value.Length == 0 || RunSpec.ServiceTiers.Contains(value));
+
+    /// <summary>Whether the model takes service tier <paramref name="value"/> (the empty value, the configured default, always).</summary>
+    public bool TierTaken(string value) => value.Length == 0 || (Capabilities?.ServiceTiers.Contains(value) ?? false);
 
     /// <summary>Why a listed tier or level is not sent.</summary>
     public const string NotSentYet = "PiSharp's run engine does not send it yet.";

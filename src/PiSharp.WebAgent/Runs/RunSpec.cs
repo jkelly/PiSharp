@@ -1,7 +1,9 @@
 // Decision 0011 (run W4, R0): what a Playground, Compare or Bench run asks for, as the pages post it (JSON, camelCase): the model and the
-// account (by id), the system prompt, the messages (system, user, assistant, tool result; text and images; an assistant's tool calls), the
-// tools, and every request option the Playground offers (thinking, max tokens, temperature, top P, top K, stop sequences, seed, presence and
-// frequency penalties, response format, tool choice, service tier, extra headers and provider options). A spec is checked here for what
+// account (by id), the system prompt, the messages (system, user, assistant, tool result; text and images; an assistant's tool calls, and
+// its signed thinking blocks and each call's thought signature, so a tool loop replays them as the provider sent them), the tools (a tool
+// may be strict), and every request option the Playground offers (thinking, max tokens, temperature, top P, top K, stop sequences, seed,
+// presence and frequency penalties, response format, tool choice, parallel tool calls, service tier, text verbosity, reasoning summary,
+// session id, timeout, extra headers and provider options). A spec is checked here for what
 // is never allowed whatever the model (sizes, ranges, names, credential headers, provider options that would replace the request's own
 // structure); whether the chosen model and its API take each option is RunModelOptions' check. The account is an id: a spec never carries
 // a key, and a header that could carry one is refused.
@@ -18,7 +20,19 @@ namespace PiSharp.WebAgent.Runs;
 public sealed record RunImage(string MimeType, string Data);
 
 /// <summary>A tool call of an assistant message.</summary>
-public sealed record RunToolCall(string Id, string Name, JsonObject? Arguments);
+/// <param name="Id">The call id.</param>
+/// <param name="Name">The tool's name.</param>
+/// <param name="Arguments">The arguments.</param>
+/// <param name="ThoughtSignature">The provider's signature of the call (Google's thought signature), sent back as the provider gave it so
+/// a thinking model's tool loop continues; null when it had none.</param>
+public sealed record RunToolCall(string Id, string Name, JsonObject? Arguments, string? ThoughtSignature = null);
+
+/// <summary>A thinking block of an assistant message, as the provider streamed it: the text and its signature (Anthropic signs every block
+/// and refuses a tool loop whose thinking comes back changed or missing; OpenAI Responses keeps its encrypted reasoning item here).</summary>
+/// <param name="Text">The thinking text (empty for a redacted block).</param>
+/// <param name="Signature">The provider's signature, or null.</param>
+/// <param name="Redacted">Whether the provider redacted it (the signature then holds the opaque data).</param>
+public sealed record RunThinking(string Text, string? Signature = null, bool Redacted = false);
 
 /// <summary>One message of a run.</summary>
 public sealed record RunMessage
@@ -31,6 +45,9 @@ public sealed record RunMessage
 
     /// <summary>Images (user and tool result messages).</summary>
     public IReadOnlyList<RunImage>? Images { get; init; }
+
+    /// <summary>An assistant message's thinking blocks, before its text, as the provider sent them (signed); null for none.</summary>
+    public IReadOnlyList<RunThinking>? Thinking { get; init; }
 
     /// <summary>An assistant message's tool calls.</summary>
     public IReadOnlyList<RunToolCall>? ToolCalls { get; init; }
@@ -46,7 +63,12 @@ public sealed record RunMessage
 }
 
 /// <summary>A tool the model may call: a name, a description and a JSON Schema for its arguments.</summary>
-public sealed record RunTool(string Name, string? Description = null, JsonObject? Parameters = null);
+/// <param name="Name">The name.</param>
+/// <param name="Description">The description.</param>
+/// <param name="Parameters">The JSON Schema of its arguments.</param>
+/// <param name="Strict">Whether the provider must keep the arguments to the schema (OpenAI's strict function calling); null or false for
+/// the provider's default.</param>
+public sealed record RunTool(string Name, string? Description = null, JsonObject? Parameters = null, bool? Strict = null);
 
 /// <summary>A run request. Unset options are not sent (the provider's defaults apply).</summary>
 public sealed partial record RunSpec
@@ -70,10 +92,26 @@ public sealed partial record RunSpec
     public const long MaxRequestBytes = 32L * 1024 * 1024;
 
     /// <summary>The thinking levels a spec may name (the model's own levels decide which it takes).</summary>
-    public static IReadOnlyList<string> ThinkingLevels { get; } = ["off", "minimal", "low", "medium", "high", "xhigh"];
+    public static IReadOnlyList<string> ThinkingLevels { get; } = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
-    /// <summary>The service tiers a spec may name.</summary>
-    public static IReadOnlyList<string> ServiceTiers { get; } = ["auto", "default", "flex", "priority", "scale"];
+    /// <summary>The service tiers a spec may name (PLAN.md "Request speed": the seven values PiSharp's Responses adapter accepts; the model's
+    /// API decides which it takes).</summary>
+    public static IReadOnlyList<string> ServiceTiers { get; } = ["auto", "default", "flex", "scale", "priority", "fast", "ultrafast"];
+
+    /// <summary>The text verbosities a spec may name.</summary>
+    public static IReadOnlyList<string> TextVerbosities { get; } = ["low", "medium", "high"];
+
+    /// <summary>The reasoning summaries a spec may name.</summary>
+    public static IReadOnlyList<string> ReasoningSummaries { get; } = ["auto", "concise", "detailed"];
+
+    /// <summary>The shortest per-run timeout, in milliseconds.</summary>
+    public const int MinTimeoutMs = 1_000;
+
+    /// <summary>The longest per-run timeout, in milliseconds (one hour).</summary>
+    public const int MaxTimeoutMs = 3_600_000;
+
+    /// <summary>The longest session id (OpenAI's prompt cache key).</summary>
+    public const int MaxSessionId = 64;
 
     /// <summary>Provider option keys that would replace the request's own structure, never accepted.</summary>
     public static IReadOnlyList<string> StructuralKeys { get; } =
@@ -143,8 +181,24 @@ public sealed partial record RunSpec
     /// <summary><c>{type: "text"}</c>, <c>{type: "json_object"}</c> or <c>{type: "json_schema", name, schema, strict?}</c>.</summary>
     public JsonObject? ResponseFormat { get; init; }
 
-    /// <summary><see cref="ServiceTiers"/>; only the OpenAI Responses API of provider openai takes one.</summary>
+    /// <summary><see cref="ServiceTiers"/>; only the OpenAI Responses API of provider openai, and the Codex backend of provider openai-codex
+    /// (auto, default, flex and priority), take one.</summary>
     public string? ServiceTier { get; init; }
+
+    /// <summary>Whether the model may call several tools in one turn (null for the provider's default).</summary>
+    public bool? ParallelToolCalls { get; init; }
+
+    /// <summary><see cref="TextVerbosities"/>: how long the answer is (the OpenAI Responses and Codex APIs).</summary>
+    public string? TextVerbosity { get; init; }
+
+    /// <summary><see cref="ReasoningSummaries"/>: the summary of the model's reasoning (the OpenAI Responses and Codex APIs, while thinking).</summary>
+    public string? ReasoningSummary { get; init; }
+
+    /// <summary>The session id the provider caches the prompt under (OpenAI's <c>prompt_cache_key</c>), or null for PiSharp's own.</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>How long to wait for the provider to start answering (its response headers), in milliseconds; null for no limit.</summary>
+    public int? TimeoutMs { get; init; }
 
     /// <summary>Extra request headers (never one that carries a credential).</summary>
     public IReadOnlyDictionary<string, string>? Headers { get; init; }
@@ -207,6 +261,9 @@ public sealed partial record RunSpec
                     break;
                 case "assistant":
                     if (message.Images is { Count: > 0 }) throw new ArgumentException($"{where}: an assistant message has no images.");
+                    foreach (var block in message.Thinking ?? [])
+                        if (block is null || block.Text is null || (block.Redacted && string.IsNullOrEmpty(block.Signature)))
+                            throw new ArgumentException($"{where}: a thinking block needs its text (a redacted one, its data).");
                     foreach (var call in message.ToolCalls ?? [])
                     {
                         if (call is null || string.IsNullOrWhiteSpace(call.Id)) throw new ArgumentException($"{where}: every tool call needs an id.");
@@ -222,6 +279,7 @@ public sealed partial record RunSpec
                     throw new ArgumentException($"{where}: the role is system, user, assistant or toolResult, not \"{message.Role}\".");
             }
             if (message.Role == "system" && message.Images is { Count: > 0 }) throw new ArgumentException($"{where}: a system message has no images.");
+            if (message.Role != "assistant" && message.Thinking is { Count: > 0 }) throw new ArgumentException($"{where}: only an assistant message has thinking blocks.");
             foreach (var image in message.Images ?? [])
             {
                 if (image is null || string.IsNullOrWhiteSpace(image.MimeType) || !image.MimeType.StartsWith("image/", StringComparison.Ordinal))
@@ -261,6 +319,18 @@ public sealed partial record RunSpec
         var tier = string.IsNullOrWhiteSpace(ServiceTier) ? null : ServiceTier.Trim();
         if (tier is not null && !ServiceTiers.Contains(tier)) throw new ArgumentException($"The service tier is {string.Join(", ", ServiceTiers)}, not \"{tier}\".");
         if (ResponseFormat is { } format) CheckFormat(format);
+        var verbosity = string.IsNullOrWhiteSpace(TextVerbosity) ? null : TextVerbosity.Trim();
+        if (verbosity is not null && !TextVerbosities.Contains(verbosity))
+            throw new ArgumentException($"Text verbosity is {string.Join(", ", TextVerbosities)}, not \"{verbosity}\".");
+        var summary = string.IsNullOrWhiteSpace(ReasoningSummary) ? null : ReasoningSummary.Trim();
+        if (summary is not null && !ReasoningSummaries.Contains(summary))
+            throw new ArgumentException($"The reasoning summary is {string.Join(", ", ReasoningSummaries)}, not \"{summary}\".");
+        var session = string.IsNullOrWhiteSpace(SessionId) ? null : SessionId.Trim();
+        if (session is not null && (session.Length > MaxSessionId || !SessionPattern().IsMatch(session)))
+            throw new ArgumentException($"A session id is letters, digits, '-', '_', '.' and ':' (at most {MaxSessionId}).");
+        if (TimeoutMs is { } timeout && (timeout < MinTimeoutMs || timeout > MaxTimeoutMs))
+            throw new ArgumentException($"The timeout is {MinTimeoutMs:N0} to {MaxTimeoutMs:N0} ms.");
+        if (ParallelToolCalls is not null && tools.Count == 0) throw new ArgumentException("Parallel tool calls need at least one tool.");
         var headers = Headers is null ? null : CheckHeaders(Headers);
         if (ProviderOptions is { } extra)
             foreach (var key in extra.Select(pair => pair.Key))
@@ -283,6 +353,9 @@ public sealed partial record RunSpec
             Thinking = thinking,
             Stop = stop is { Count: > 0 } ? stop : null,
             ServiceTier = tier,
+            TextVerbosity = verbosity,
+            ReasoningSummary = summary,
+            SessionId = session,
             Headers = headers is { Count: > 0 } ? headers : null,
             ProviderOptions = ProviderOptions is { Count: > 0 } ? ProviderOptions : null,
         };
@@ -388,6 +461,9 @@ public sealed partial record RunSpec
 
     [GeneratedRegex("^[A-Za-z0-9_-]{1,100}$")]
     private static partial Regex IdPattern();
+
+    [GeneratedRegex("^[A-Za-z0-9_.:-]+$")]
+    private static partial Regex SessionPattern();
 
     [GeneratedRegex("^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,100}$")]
     private static partial Regex HeaderName();

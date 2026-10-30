@@ -99,7 +99,7 @@ public sealed record BenchView
     public BenchTool? PreviewTool => Setup.Tools.FirstOrDefault(tool => tool.Enabled) ?? Setup.Tools.FirstOrDefault();
 
     /// <summary>Whether the parallel switch can be switched off on this model's API.</summary>
-    public bool ParallelSwitchable => Capabilities?.Api is null or "faux" or "openai-completions" or "openai-responses" or "azure-openai-responses" or "anthropic-messages";
+    public bool ParallelSwitchable => Capabilities?.Find(RunModelOptions.ParallelToolCalls) is not { } support || support.Supported;
 
     /// <summary>The line under the parallel switch.</summary>
     public string ParallelNote => Setup.Parallel
@@ -110,7 +110,7 @@ public sealed record BenchView
         }
         : Capabilities?.Api switch
         {
-            "openai-completions" or "openai-responses" or "azure-openai-responses" => "Sent as parallel_tool_calls: false.",
+            "openai-completions" or "openai-responses" or "azure-openai-responses" or "openai-codex-responses" => "Sent as parallel_tool_calls: false.",
             "anthropic-messages" => "Sent as tool_choice.disable_parallel_tool_use: true.",
             "faux" => "The faux model makes one call per turn either way; nothing is sent.",
             _ => "This model's API has no switch for parallel calls: Run refuses until you switch it back on.",

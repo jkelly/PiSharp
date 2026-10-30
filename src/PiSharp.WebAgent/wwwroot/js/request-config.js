@@ -15,7 +15,7 @@ const SECTIONS = {
   headers: ['headers'],
   provider: ['providerOptions'],
 };
-const SEND_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+const SEND_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 function changed(config) {
   config.dispatchEvent(new CustomEvent('request-change', { bubbles: true }));
@@ -126,6 +126,7 @@ export function refresh(config) {
     }
   });
   applyLevels(config, caps);
+  applyTiers(config, caps);
   const modified = COUNTED.filter((option) => config.querySelector(`[data-option="${option}"]`)?.dataset.set === 'true').length;
   const chip = config.querySelector('[data-modified-chip]');
   if (chip) {
@@ -152,6 +153,17 @@ export function refresh(config) {
   return conflicts;
 }
 
+/** Disables the service tiers the model's API does not take (capabilities.serviceTiers); the chosen one stays, so it can be changed. */
+function applyTiers(config, caps) {
+  const select = config.querySelector('[data-opt="serviceTier"]');
+  if (!select || !caps) return;
+  const tiers = caps.serviceTiers ?? [];
+  select.querySelectorAll('option').forEach((option) => {
+    if (option.value === '' || option.selected) return;
+    option.disabled = tiers.length > 0 && !tiers.includes(option.value);
+  });
+}
+
 function levelTaken(caps, level) {
   if (level === 'off') return true;
   return SEND_LEVELS.includes(level) && (caps?.thinkingLevels ?? ['off']).includes(level);
@@ -173,7 +185,7 @@ function applyLevels(config, caps) {
   const conflict = !levelTaken(caps, level);
   if (note) {
     note.textContent = conflict ? `${caps ? (levels.length <= 1 ? 'This model does not think' : `This model thinks at ${levels.slice(1).join(', ')}`) : 'Choose a model'}; ${level} is set, so the run will be refused until you change it.`
-      : levels.length > 1 ? `This model thinks at ${levels.slice(1).join(', ')}. Default: off. max isn't sent by the run engine yet.` : 'This model does not think. max isn\'t sent by the run engine yet.';
+      : levels.length > 1 ? `This model thinks at ${levels.slice(1).join(', ')}. Default: off.` : 'This model does not think.';
     note.classList.toggle('text-ps-warn', conflict);
   }
   displayValue(row);

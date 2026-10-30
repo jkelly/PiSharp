@@ -1,11 +1,13 @@
 // Decision 0011 (run W4, R0): the capture hook in the routing path. RunsModule wraps RoutingOptions.ProviderHandler with it, so every
 // provider request of every account route passes through it (the routes keep it for their life; it is never disposed by them). Outside a
 // run (RunHttpScope.Current is null) it passes requests through untouched. Inside one it:
-//   - merges the run's JSON patch into the model request's body (a POST whose path ends with the API's path, a JSON body), so the options
-//     ChatRequest cannot carry (temperature, top P, stop, seed, response format, tool choice, service tier, provider options) reach the
-//     provider; a model request it cannot patch (a compressed or non-JSON body) fails before it is sent, so an option the user set is never
-//     silently dropped;
+//   - merges the run's JSON patch into the model request's body (a POST whose path ends with the API's path, a JSON body, or a zstd frame
+//     of one as Codex sends, decoded and encoded again) and marks its strict tools, so the options ChatRequest cannot carry (temperature,
+//     top P, stop, seed, response format, tool choice, parallel tool calls, strict tools, service tier, text verbosity, reasoning summary,
+//     session id, provider options) reach the provider; a model request it cannot patch (another encoding, a non-JSON body, a strict
+//     tool missing from it) fails before it is sent, so an option the user set is never silently dropped;
 //   - adds the run's extra headers (never a credential: RunSpec refuses those);
+//   - stops a request whose response headers do not arrive within the run's timeout (timeoutMs; the body that follows is not timed);
 //   - only when the user turned raw payloads on (a RunCapture), keeps the redacted request, the response headers, each raw SSE line with
 //     its arrival time (the body is teed as the transport reads it, unchanged), a small non-SSE body, transport errors and timing marks.
 // WebSocket upgrades (101) are not teed. Keyed by op: the run (or chat call) it records into is the scope's.
@@ -41,8 +43,8 @@ public sealed class RunCaptureHandler : DelegatingHandler
         var context = RunHttpScope.Current;
         if (context is null) return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         context.CountRequest();
-        if (context.Patch is { } patch && IsModelRequest(request, context.PatchPath))
-            await PatchAsync(request, patch, context).ConfigureAwait(false);
+        if ((context.Patch is not null || context.StrictTools is { Count: > 0 }) && IsModelRequest(request, context.PatchPath))
+            await PatchAsync(request, context).ConfigureAwait(false);
         if (context.Headers is { } headers)
             foreach (var (name, value) in headers)
             {
@@ -51,14 +53,14 @@ public sealed class RunCaptureHandler : DelegatingHandler
                 request.Headers.TryAddWithoutValidation(name, value);
             }
         var capture = context.Capture;
-        if (capture is null) return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (capture is null) return await TimedAsync(request, context, cancellationToken).ConfigureAwait(false);
 
         await capture.RequestAsync(request, cancellationToken).ConfigureAwait(false);
         capture.Mark("request-sent");
         HttpResponseMessage response;
         try
         {
-            response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            response = await TimedAsync(request, context, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception error)
         {
@@ -81,31 +83,65 @@ public sealed class RunCaptureHandler : DelegatingHandler
         if (ownsInner) InnerHandler?.Dispose();
     }
 
+    /// <summary>Sends <paramref name="request"/>, waiting at most the run's timeout for the response headers. The timer stops once they
+    /// arrive; the link to <paramref name="cancellationToken"/> stays for the body (an HTTP/2 stream keeps watching the token it was sent with).</summary>
+    private async Task<HttpResponseMessage> TimedAsync(HttpRequestMessage request, RunHttpContext context, CancellationToken cancellationToken)
+    {
+        if (context.TimeoutMs is not { } milliseconds) return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(milliseconds);
+        try
+        {
+            var response = await base.SendAsync(request, timeout.Token).ConfigureAwait(false);
+            timeout.CancelAfter(Timeout.InfiniteTimeSpan);
+            return response;
+        }
+        catch (OperationCanceledException error) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            timeout.Dispose();
+            throw new TimeoutException($"The provider did not start answering within {milliseconds:N0} ms (the run's timeout), so PiSharp stopped the request.", error);
+        }
+        catch
+        {
+            timeout.Dispose();
+            throw;
+        }
+    }
+
     private static bool IsModelRequest(HttpRequestMessage request, string? path) =>
         path is not null && request.Method == HttpMethod.Post && request.RequestUri is { } uri &&
         (uri.IsAbsoluteUri ? uri.AbsolutePath : uri.OriginalString).EndsWith(path, StringComparison.Ordinal);
 
-    private static async Task PatchAsync(HttpRequestMessage request, JsonObject patch, RunHttpContext context)
+    private static async Task PatchAsync(HttpRequestMessage request, RunHttpContext context)
     {
         var api = context.Api ?? "provider";
         var content = request.Content ?? throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (it has no body), so it was not sent.");
-        if (content.Headers.ContentEncoding.Count > 0)
-            throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (its body is compressed), so it was not sent.");
+        var encodings = content.Headers.ContentEncoding;
+        var zstd = encodings.Count == 1 && encodings.First().Equals("zstd", StringComparison.OrdinalIgnoreCase);
+        if (encodings.Count > 0 && !zstd)
+            throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (its body is compressed as {string.Join(", ", encodings)}), so it was not sent.");
         var type = content.Headers.ContentType?.MediaType;
         if (type is not null && !type.Contains("json", StringComparison.OrdinalIgnoreCase))
             throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (its body is {type}), so it was not sent.");
+        var bytes = await content.ReadAsByteArrayAsync().ConfigureAwait(false);
         JsonObject body;
         try
         {
-            body = JsonNode.Parse(await content.ReadAsStringAsync().ConfigureAwait(false)) as JsonObject
+            if (zstd) bytes = PiSharp.AI.Compression.ZstdDecoder.Decompress(bytes);
+            body = JsonNode.Parse(bytes) as JsonObject
                 ?? throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (its body is not a JSON object), so it was not sent.");
         }
-        catch (System.Text.Json.JsonException)
+        catch (Exception error) when (error is not (RunPatchException or OutOfMemoryException))
         {
-            throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (its body is not JSON), so it was not sent.");
+            throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (its body is not {(zstd ? "a zstd frame of " : "")}JSON), so it was not sent.");
         }
-        RunModelOptions.Merge(body, (JsonObject)patch.DeepClone(), "", null);
-        var replaced = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        var missing = RunModelOptions.ApplyToBody(body, context.Patch, context.StrictTools, context.Api);
+        if (missing.Count > 0)
+            throw new RunPatchException($"PiSharp could not mark {string.Join(", ", missing)} strict in the {api} request (not among its tools), so it was not sent.");
+        var patched = Encoding.UTF8.GetBytes(body.ToJsonString());
+        // A zstd body goes out as zstd again (its Content-Encoding header is copied below), as the transport sent it.
+        var replaced = new ByteArrayContent(zstd ? PiSharp.AI.Compression.Zstd.Compress(patched) : patched);
+        replaced.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
         foreach (var header in content.Headers)
             if (!header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) && !header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
                 replaced.Headers.TryAddWithoutValidation(header.Key, header.Value);
