@@ -5,6 +5,8 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Evals;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Spend;
 
 namespace PiSharp.WebAgent.Runs;
@@ -13,8 +15,10 @@ public sealed partial class RunHistoryPages
 {
     private sealed record CallSums(long Calls, long Metered, long List, double Input, double Output);
 
-    internal static IReadOnlyList<RunHistoryRow> RowsOf(WebAgentDb db, IReadOnlyList<(RunRecord Run, string? ToolCalls)> records, DateTimeOffset now)
+    internal static IReadOnlyList<RunHistoryRow> RowsOf(WebAgentDb db, IReadOnlyList<(RunRecord Run, string? ToolCalls)> records, DateTimeOffset now,
+        ArenaBlindSet? blind = null)
     {
+        blind ??= ArenaBlindSet.Empty;
         var groups = records.Where(row => row.Run.Kind == RunKind.Parent).Select(row => row.Run.Id).ToList();
         var children = new Dictionary<string, List<RunRecord>>(StringComparer.Ordinal);
         var sums = new Dictionary<string, CallSums>(StringComparer.Ordinal);
@@ -38,9 +42,44 @@ public sealed partial class RunHistoryPages
                     sums[parent] = sum;
             }
         }
-        return [.. records.Select(row => row.Run.Kind == RunKind.Parent
+        return [.. records.Select(row => blind.BattleOf(row.Run) is { } battle
+            ? BlindRow(row.Run, children.GetValueOrDefault(row.Run.Id) ?? [], battle, now)
+            : row.Run.Kind == RunKind.Parent
             ? GroupRow(row.Run, children.GetValueOrDefault(row.Run.Id) ?? [], sums, now)
             : CallRow(row.Run, row.ToolCalls, now))];
+    }
+
+    // W5 (fix 1, arena): a run of a battle that is held or ready (ArenaBlindSet), as one row that names no model: a request battle's column
+    // (its title is the Arena's, which names none) or an agent battle's run, whose collapse row lists its slots by letter only (slot a is
+    // column A, so a slot's model, turns, check, time or cost would give a column away). No tokens, cost or timings; its links open the battle.
+    private static RunHistoryRow BlindRow(RunRecord run, IReadOnlyList<RunRecord> models, string battle, DateTimeOffset now)
+    {
+        var source = Source(run.Source);
+        var masked = ArenaBlindText.Mask(run);
+        var group = run.Kind == RunKind.Parent;
+        var hidden = new RunCell("—", null, "Hidden until you vote on the Arena battle.", Faint: true);
+        var lines = models.Select((model, index) => new RunHistoryModel(
+                Str(model.Options, "slot")?.ToUpperInvariant() ?? ArenaLetters.All.ElementAtOrDefault(index) ?? (index + 1).ToString(CultureInfo.InvariantCulture), "",
+                ArenaBlindText.Model, null, "blind · names, turns, time and cost appear after you vote", null, ArenaBlindText.Href(battle)))
+            .OrderBy(line => line.Letter, StringComparer.Ordinal).ToList();
+        return new RunHistoryRow
+        {
+            Run = masked,
+            Time = RunHistoryText.Time(run.Created),
+            Day = RunHistoryText.Day(run.Created, now),
+            SourceLabel = source.Label,
+            SourceIcon = source.Icon,
+            ModelSub = "",
+            Prompt = ArenaBlindText.Title,
+            Sub = run.Id + (group ? " · " + models.Count + (models.Count == 1 ? " model" : " models") : ""),
+            Tokens = hidden,
+            Cost = hidden,
+            Latency = hidden,
+            Stop = run.Status == RunStatus.Running ? new RunChip("running", "info", "bi-broadcast") : new RunChip("blind", "outline", "bi-eye-slash"),
+            IsGroup = group,
+            Models = lines,
+            Blind = battle,
+        };
     }
 
     private static RunHistoryRow CallRow(RunRecord run, string? toolCalls, DateTimeOffset now)
@@ -148,10 +187,10 @@ public sealed partial class RunHistoryPages
         };
     }
 
-    private static RunTotalsView Totals(WebAgentDb db, RunHistoryFilter filter, DateTimeOffset now, long totalAll)
+    private static RunTotalsView Totals(WebAgentDb db, RunHistoryFilter filter, DateTimeOffset now, long totalAll, ArenaBlindSet blind)
     {
         var filtered = filter.Active;
-        var (where, parameters) = RootWhere(filter, filtered ? null : now.AddDays(-30));
+        var (where, parameters) = RootWhere(filter, filtered ? null : now.AddDays(-30), blind);
         var calls = $"""
             WITH roots AS (SELECT r.id FROM runs r{where}),
             calls AS (SELECT c.* FROM runs c WHERE c.kind = 'call' AND (c.id IN (SELECT id FROM roots) OR c.parent_id IN (SELECT id FROM roots)

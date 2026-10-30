@@ -8,7 +8,7 @@
 @{
     var settings = Model.Settings;
     var latest = Model.LatestUncertain;
-    var review = "/history/spend?status=uncertain" + (Model.UncertainCount == 1 && latest is not null ? "&resolve=" + Uri.EscapeDataString(latest.Op) : "");
+    var review = "/history/spend?status=uncertain" + (Model.UncertainCount == 1 && latest is not null && latest.Blind is null ? "&resolve=" + Uri.EscapeDataString(latest.Op) : "");
 }
 <section class="settings-section" id="reservations">
   <h3>Reservations</h3>
@@ -46,7 +46,11 @@
       <div>
         <div class="setting-label">Uncertain reservations</div>
         <div class="setting-desc">If a stream drops without reporting usage, its reservation stays counted until you resolve it in the ledger. It is never settled automatically.</div>
-        @if (latest is not null)
+        @if (latest is { Blind: not null })
+        {
+          <div class="fs-8 text-ps-faint mt-1" data-uncertain-latest>@latest.SourceLabel · resolve it after you vote</div>
+        }
+        else if (latest is not null)
         {
           <div class="fs-8 text-ps-faint mt-1" data-uncertain-latest><span class="ps-mono">@latest.Row.Provider/@latest.Row.Model</span> · @latest.SourceLabel.ToLowerInvariant() · reserved @SpendMoney.Format(latest.Row.ReservedMicros ?? 0) · @(latest.Row.Reason ?? "no usage reported")</div>
         }

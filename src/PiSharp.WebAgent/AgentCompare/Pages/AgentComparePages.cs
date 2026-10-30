@@ -4,13 +4,15 @@
 // task, shared system prompt, folder, models, check and limits. ?run={id} opens a run: the stored run (R5's AgentCompareStore) with what is live (each model's
 // turns, the Spend Guard ledger's total of its run key "<run>-<slot>", the tool calls waiting for an answer). The project folder is
 // inspected by R4's WorkspaceManager on its own request, after the page loads, because a copy's size can take a while to count. Every
-// write goes through R5's /api/compare/agent; nothing here starts, answers or keeps anything, and no provider is called.
+// write goes through R5's /api/compare/agent; nothing here starts, answers or keeps anything, and no provider is called. W5 (fix 1, arena):
+// a run of an Arena battle not voted yet (BlindBattle) opens as its battle's notice, is never copied into a setup, and its fragments refuse.
 using PiSharp.Web.Common;
 using PiSharp.WebAgent.AgentCompare.Runner;
 using PiSharp.WebAgent.AgentCompare.Workspaces;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Playground;
 using PiSharp.WebAgent.Shell;
 using PiSharp.WebAgent.Spend;
@@ -52,6 +54,10 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
     /// <summary>What <c>_AgentMode</c> shows for <c>?run=</c> (a run) or <c>?from=</c> (a setup copied from a run), else a new setup.</summary>
     public async Task<AgentModeView> ModeAsync(string? runId, string? fromId, CancellationToken cancellationToken = default)
     {
+        // W5 (fix 1, arena): the gate is on the id the page would open (?run= when it names one, else ?from=), so a blank ?run= with a
+        // ?from= of a blind battle can't copy its models into a setup.
+        var effective = string.IsNullOrWhiteSpace(runId) ? fromId : runId;
+        if (BlindBattle(effective) is { } battle) return new AgentModeView { BlindBattle = battle };
         if (!string.IsNullOrWhiteSpace(runId))
         {
             var id = runId.Trim();
@@ -65,6 +71,8 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
     /// <summary>A new run's setup, copied from run <paramref name="fromId"/> when it exists.</summary>
     public async Task<AgentSetupView> SetupAsync(string? fromId, CancellationToken cancellationToken = default)
     {
+        // W5 (fix 1, arena): a blind battle's run is never copied (its models in column order would name its contestants).
+        if (BlindBattle(fromId) is not null) fromId = null;
         var defaults = Settings?.Get<AgentCompareSettings>() ?? new AgentCompareSettings();
         var tools = Settings?.Get<ToolsSettings>() ?? ToolsSettings.CreateDefault();
         var from = fromId is null ? null : Runner?.Store.Get(fromId);
@@ -112,6 +120,11 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
             AllowRules = tools.AllowList?.Count ?? 0,
         };
     }
+
+    /// <summary>W5 (fix 1, arena): the Arena battle (held or ready) that agent compare run <paramref name="runId"/> belongs to, or null:
+    /// until its vote nothing here opens, copies or renders that run, since its columns name the contestants in order.</summary>
+    public string? BlindBattle(string? runId) =>
+        string.IsNullOrWhiteSpace(runId) ? null : services.GetService<ArenaService>()?.HidingBattle(runId.Trim());
 
     /// <summary>A setup column: <paramref name="provider"/>/<paramref name="model"/> in <paramref name="slot"/>.</summary>
     /// <param name="slot">a to d.</param>

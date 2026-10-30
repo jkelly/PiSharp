@@ -159,11 +159,16 @@ public sealed record RunHistoryRow
     /// <summary>The grouped models (or calls).</summary>
     public IReadOnlyList<RunHistoryModel> Models { get; init; } = [];
 
-    /// <summary>The inspector.</summary>
-    public string InspectHref => "/runs/" + Uri.EscapeDataString(Run.Id);
+    /// <summary>W5: the Arena battle (held or ready) this run belongs to, whose vote reveals it, or null. A blind row names no model, shows no
+    /// tokens, cost or timings (<see cref="Run"/> is masked) and links to the battle.</summary>
+    public string? Blind { get; init; }
 
-    /// <summary>Whether Re-run and Load into playground apply (the run stored its request: not a chat's call or a recorded durable call).</summary>
-    public bool Replayable => RunHistoryText.Replayable(Run);
+    /// <summary>The inspector (a blind row: its battle).</summary>
+    public string InspectHref => Blind is { } battle ? Evals.Arena.ArenaBlindText.Href(battle) : "/runs/" + Uri.EscapeDataString(Run.Id);
+
+    /// <summary>Whether Re-run and Load into playground apply (the run stored its request: not a chat's call or a recorded durable call; not
+    /// blind).</summary>
+    public bool Replayable => Blind is null && RunHistoryText.Replayable(Run);
 
     /// <summary>The Playground with this run's request.</summary>
     public string PlaygroundHref => "/playground?run=" + Uri.EscapeDataString(Run.Id);
@@ -171,8 +176,8 @@ public sealed record RunHistoryRow
     /// <summary>The chat a chat's call belongs to, or null.</summary>
     public string? ChatHref => Run.Source == "chat" && !string.IsNullOrEmpty(Run.Session) ? "/chat/" + Uri.EscapeDataString(Run.Session) : null;
 
-    /// <summary>An agent compare run's page, or null.</summary>
-    public string? CompareHref => RunHistoryText.AgentCompareHref(Run);
+    /// <summary>An agent compare run's page, or null (a blind one opens its battle instead).</summary>
+    public string? CompareHref => Blind is null ? RunHistoryText.AgentCompareHref(Run) : null;
 
     /// <summary>The id of the collapse row of <see cref="Models"/>.</summary>
     public string ModelsId => "run-" + Run.Id + "-models";

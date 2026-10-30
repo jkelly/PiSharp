@@ -12,6 +12,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Playground;
 using PiSharp.WebAgent.Spend;
 
@@ -58,12 +59,14 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
         // The plain counts are the store's (RunQuery.TopLevelOnly); the filtered rows below stay this page's own query, since a provider or
         // model filter also matches a run through its children and a row carries its options and tool names, which RunStore.List leaves out.
         var totalAll = store.Totals(new RunQuery { TopLevelOnly = true }).Count;
-        var (where, parameters) = RootWhere(filter, since: null);
+        var blind = ArenaBlindSet.Of(services);
+        var (where, parameters) = RootWhere(filter, since: null, blind);
         var total = Convert.ToInt64(db.Scalar($"SELECT COUNT(*) FROM runs r{where};", [.. parameters]) ?? 0L, CultureInfo.InvariantCulture);
         var pages = total == 0 ? 1 : (int)Math.Ceiling(total / (double)filter.Size);
         if (filter.Page > pages) filter = filter with { Page = pages };
         var records = db.Query($"SELECT {RowColumns} FROM runs r{where} ORDER BY r.created DESC, r.id DESC LIMIT $limit OFFSET $offset;", ReadRow,
             [.. parameters, ("$limit", filter.Size), ("$offset", (filter.Page - 1) * filter.Size)]);
+        var hidden = blind.RunSql("r");
         var settings = services.GetService<ISettingsStore>();
         var history = settings?.Get<RunHistorySettings>() ?? RunHistorySettings.CreateDefault();
         var saved = settings?.Get<RunSavedFilters>() ?? RunSavedFilters.CreateDefault();
@@ -71,13 +74,15 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
         return new RunHistoryPage
         {
             Filter = filter,
-            Rows = RowsOf(db, records, now),
+            Rows = RowsOf(db, records, now, blind),
             Total = total,
             TotalAll = totalAll,
-            Totals = Totals(db, filter, now, totalAll),
-            Providers = Options(db, "SELECT DISTINCT provider FROM runs WHERE provider <> '' ORDER BY provider;", [], filter.Provider),
+            Totals = Totals(db, filter, now, totalAll, blind),
+            // A blind battle's runs name no provider or model here, not even as a filter choice.
+            Providers = Options(db, $"SELECT DISTINCT r.provider FROM runs r WHERE r.provider <> '' AND NOT {hidden.Sql} ORDER BY r.provider;", hidden.Parameters, filter.Provider),
             Models = filter.Provider is null ? []
-                : Options(db, "SELECT DISTINCT model FROM runs WHERE provider = $provider AND model <> '' ORDER BY model;", [("$provider", filter.Provider)], filter.Model),
+                : Options(db, $"SELECT DISTINCT r.model FROM runs r WHERE r.provider = $provider AND r.model <> '' AND NOT {hidden.Sql} ORDER BY r.model;",
+                    [("$provider", filter.Provider), .. hidden.Parameters], filter.Model),
             Saved = [.. (saved.Filters ?? []).Select(item => new RunSavedFilterView(item.Name, item.Query, item.Href, RunSavedFilters.Describe(item.Query), Icon(item.Query),
                 item.Query == current && current.Length > 0))],
             DbPath = store.Db.Path,
@@ -94,6 +99,7 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(id);
         if (Store.Get(id) is not { } run || !RunHistoryText.Replayable(run) || PlaygroundPages.FromRun(run) is not { } spec) return null;
+        if (ArenaBlindSet.Of(services).Hides(run)) return null;
         var source = run.Source is "playground" or "compare" or "bench" ? run.Source : "playground";
         var json = JsonSerializer.SerializeToNode(spec with { Source = source, GroupId = null, ParentId = null, Title = run.Title }, SettingsStore.JsonOptions)!.AsObject();
         foreach (var key in new[] { "spendSource", "thinkingLevel" }) json.Remove(key);
@@ -110,16 +116,18 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
         store.Count();
         var db = store.Db.Db;
         var limit = format == "json-raw" ? MaxRawExport : MaxExport;
+        // A blind battle's runs are left out until its vote (they would name its models).
+        var blind = ArenaBlindSet.Of(services);
         List<string> roots;
         if (ids is not null)
         {
             var chosen = ids.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).Distinct(StringComparer.Ordinal).ToList();
             if (chosen.Count > MaxIds) throw new ArgumentException($"Export at most {MaxIds:N0} chosen runs at a time.");
-            roots = [.. chosen.Where(id => store.Get(id) is not null).Take(limit)];
+            roots = [.. chosen.Where(id => store.Get(id) is { } run && !blind.Hides(run)).Take(limit)];
         }
         else
         {
-            var (where, parameters) = RootWhere(filter ?? new RunHistoryFilter(), since: null);
+            var (where, parameters) = RootWhere(filter ?? new RunHistoryFilter(), since: null, blind, leaveOutBlind: true);
             roots = [.. db.Query($"SELECT r.id FROM runs r{where} ORDER BY r.created DESC, r.id DESC LIMIT $limit;", reader => reader.GetString(0), [.. parameters, ("$limit", limit)])];
         }
         var stamp = Now.ToLocalTime().ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
@@ -204,11 +212,17 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
     }
 
     /// <summary>The WHERE clause (with its parameters) of the top-level runs <paramref name="filter"/> matches, created at or after
-    /// <paramref name="since"/> when given. The table is aliased <c>r</c>.</summary>
-    internal static (string Where, List<(string Name, object? Value)> Parameters) RootWhere(RunHistoryFilter filter, DateTimeOffset? since)
+    /// <paramref name="since"/> when given. The table is aliased <c>r</c>. The runs of a battle in <paramref name="blind"/> never match a
+    /// provider or model filter, nor a search by model, provider or error (so no filter can single out one contestant before the vote), and
+    /// are left out entirely with <paramref name="leaveOutBlind"/>.</summary>
+    internal static (string Where, List<(string Name, object? Value)> Parameters) RootWhere(RunHistoryFilter filter, DateTimeOffset? since,
+        ArenaBlindSet? blind = null, bool leaveOutBlind = false)
     {
         var clauses = new List<string> { "r.parent_id IS NULL" };
         var parameters = new List<(string Name, object? Value)>();
+        var (hidden, hiddenParameters) = (blind ?? ArenaBlindSet.Empty).RunSql("r", "$hidden");
+        parameters.AddRange(hiddenParameters);
+        if (leaveOutBlind || (hiddenParameters.Length > 0 && (filter.Provider is not null || filter.Model is not null))) clauses.Add($"NOT {hidden}");
         if (since is { } start)
         {
             clauses.Add("r.created >= $since");
@@ -247,7 +261,7 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
         if (filter.Search is { } search)
         {
             const string like = " LIKE $q ESCAPE '\\'";
-            clauses.Add($"(r.title{like} OR r.output_text{like} OR r.error{like} OR r.model{like} OR r.provider{like} OR r.session{like} OR r.id{like} OR r.op = $exact)");
+            clauses.Add($"(r.title{like} OR r.output_text{like} OR r.session{like} OR r.id{like} OR r.op = $exact OR (NOT {hidden} AND (r.error{like} OR r.model{like} OR r.provider{like})))");
             parameters.Add(("$q", "%" + search.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%"));
             parameters.Add(("$exact", search));
         }

@@ -264,6 +264,10 @@ public sealed record SpendLedgerQuery
     /// <summary>Text found (ignoring case) in the provider, model, account, op, run, source, note or reason.</summary>
     public string? Search { get; init; }
 
+    /// <summary>Leaves out the rows of these run keys, and the rows whose op is <c>run-&lt;key&gt;</c> (W5: the keys of blind Arena battles,
+    /// which a filter that could single out one model must not match before the vote), or none when null.</summary>
+    public IReadOnlyCollection<string>? ExceptRuns { get; init; }
+
     /// <summary>Rows to skip.</summary>
     public int Offset { get; init; }
 
@@ -299,6 +303,8 @@ public sealed record SpendLedgerQuery
         if (Status is { } status && row.Status != status) return false;
         if (Billing is { } billing && row.Billing != billing) return false;
         if (Run is not null && row.Run != Run) return false;
+        if (ExceptRuns is { Count: > 0 } except && except.Any(key => key == row.Run || row.Op == "run-" + key || row.Op.StartsWith("run-" + key + "~", StringComparison.Ordinal)))
+            return false;
         if (Search is { } search)
         {
             string?[] fields = [row.Provider, row.Model, row.Account, row.Op, row.Run, row.Source.Wire(), row.Note, row.Reason];

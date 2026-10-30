@@ -5,7 +5,8 @@
 // same-origin and JSON-only rules cover them; every answer is no-store. Writes are idempotent: adding a cap that already exists with the
 // same values answers that cap, removing one that is gone answers removed: false, resolving a row again the same way answers the row, and
 // saving a filter again under the same name with the same filters answers outcome: existing. Errors are {error, code}: 400 invalid, 404
-// not_found, 409 conflict. No answer carries a secret: accounts are ids, labels and masked hints.
+// not_found, 409 conflict. No answer carries a secret: accounts are ids, labels and masked hints. W5 (fix 1, arena): the ledger, its CSV
+// and Resolve treat a blind Arena battle's requests as History › Spend does (masked, left out of a narrowing filter, not resolved).
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -14,6 +15,7 @@ using PiSharp.Web.Common;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Evals.Arena;
 
 namespace PiSharp.WebAgent.Spend;
 
@@ -73,10 +75,15 @@ public static class SpendEndpoints
         api.MapGet("/ledger", (HttpRequest request, SpendPages pages, CancellationToken token) => RunAsync(async () =>
         {
             var filter = Filter(request);
-            var page = await pages.Ledger.QueryAsync(filter.Query(), token).ConfigureAwait(false);
+            // W5 (fix 1, arena): a blind battle's rows are masked (no provider, model, account, op, run, usage or amounts), and a filter that
+            // could single out one model leaves them out.
+            var blind = pages.Blind();
+            var page = await pages.Ledger.QueryAsync(SpendPages.BlindQuery(filter, blind), token).ConfigureAwait(false);
             return Json(new
             {
-                items = page.Items.Select(row => new { reservation = row, account = pages.AccountText(row.Account), status = row.Status, countedMicros = row.CountedMicros }).ToList(),
+                items = page.Items.Select(row => blind.BattleOf(row) is { } battle
+                    ? (object)new { reservation = SpendPages.MaskBlind(row), account = (string?)null, status = row.Status, countedMicros = (long?)null, blind = ArenaBlindText.Href(battle) }
+                    : new { reservation = row, account = pages.AccountText(row.Account), status = row.Status, countedMicros = (long?)row.CountedMicros, blind = (string?)null }).ToList(),
                 total = page.Total,
                 totalAll = page.TotalAll,
                 page = filter.Page,
@@ -291,6 +298,7 @@ public static class SpendEndpoints
         var amount = choice == ResolveChoice.Amount ? Money(body, "amount", "the actual amount") ?? throw new ArgumentException("Enter the actual amount, such as 0.32.") : (long?)null;
         var ledger = pages.Ledger;
         var row = await ledger.GetAsync(op, token).ConfigureAwait(false) ?? throw SpendException.NotFound("That request is not in the ledger.");
+        if (pages.Blind().Hides(row)) throw SpendException.Conflict(SpendPages.BlindRefusal);
         var reserved = row.CountedMicros;
         var again = false;
         if (row.State != ReservationState.Uncertain)
@@ -367,12 +375,25 @@ public static class SpendEndpoints
     {
         var text = new StringBuilder();
         text.Append(CsvHeader).Append("\r\n");
-        var query = filter.Query() with { Offset = 0, Limit = CsvBatch };
+        var blind = pages.Blind();
+        var query = SpendPages.BlindQuery(filter, blind) with { Offset = 0, Limit = CsvBatch };
         while (true)
         {
             var page = await pages.Ledger.QueryAsync(query, token).ConfigureAwait(false);
             foreach (var row in page.Items)
             {
+                if (blind.Hides(row))
+                {
+                    // W5 (fix 1, arena): a blind battle's request, masked until the vote: its time, source, billing and status only.
+                    string?[] masked =
+                    [
+                        row.Created.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", Invariant), null, row.Source.Wire(), null, null, null, ArenaBlindText.Title,
+                        SpendPages.ModeWire(row.Billing), SpendHistoryFilter.StatusWire(row.Status), null, null, null, null, null, null, null, null, null, null,
+                        null, null, null,
+                    ];
+                    text.Append(string.Join(',', masked.Select(Cell))).Append("\r\n");
+                    continue;
+                }
                 string?[] cells =
                 [
                     row.Created.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", Invariant), row.Op, row.Source.Wire(), row.Provider, row.Model, row.Account,

@@ -1,10 +1,13 @@
 // Decision 0011 (run W3, S4): History › Spend's read side: the filters (search, UTC date range, provider → model, source, account, status),
 // one page of the ledger as the table shows it, the summary (today and this month against the everything-metered day and month caps, the
 // other caps above their warning threshold, the prompt-cache meter, what is not counted), the uncertain banner, and the Resolve modal's
-// figures (what settling or releasing would leave in each cap the row counts toward). Every figure is the ledger's. The filter chips and
+// figures (what settling or releasing would leave in each cap the row counts toward). Every figure is the ledger's. W5 (fix 1, arena): a
+// request of an Arena battle not voted yet is shown as "Arena battle · blind" (no provider, model, account, op, run, usage, amounts or end
+// time, and no Resolve), and a filter that could single out one model (provider, model, account, text) leaves such rows out, totals too. The filter chips and
 // the saved filters are SpendPages.SavedFilters.cs (W3 fix, spend-ui).
 using System.Globalization;
 using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Evals.Arena;
 
 namespace PiSharp.WebAgent.Spend;
 
@@ -16,27 +19,28 @@ public sealed partial class SpendPages
     {
         ArgumentNullException.ThrowIfNull(filter);
         var now = Now;
-        var query = filter.Query();
+        var blind = Blind();
+        var query = BlindQuery(filter, blind);
         var page = await ledger.QueryAsync(query, cancellationToken).ConfigureAwait(false);
         if (page.Items.Count == 0 && filter.Page > 1 && page.Total > 0)
         {
             filter = filter with { Page = Math.Max(1, (page.Total + filter.Size - 1) / filter.Size) };
-            page = await ledger.QueryAsync(filter.Query(), cancellationToken).ConfigureAwait(false);
+            page = await ledger.QueryAsync(BlindQuery(filter, blind), cancellationToken).ConfigureAwait(false);
         }
         var uncertain = await ledger.QueryAsync(new SpendLedgerQuery { Status = LedgerStatus.Uncertain, Limit = 3 }, cancellationToken).ConfigureAwait(false);
         var uncertainTotal = uncertain.Total == 0 ? SpendTotal.Zero
             : await ledger.TotalAsync(new SpendLedgerQuery { Status = LedgerStatus.Uncertain }, cancellationToken).ConfigureAwait(false);
         ResolveReservationView? resolve = null;
-        if (filter.Resolve is { } op && await ledger.GetAsync(op, cancellationToken).ConfigureAwait(false) is { State: ReservationState.Uncertain } row)
+        if (filter.Resolve is { } op && await ledger.GetAsync(op, cancellationToken).ConfigureAwait(false) is { State: ReservationState.Uncertain } row && !blind.Hides(row))
             resolve = await ResolveViewAsync(row, cancellationToken).ConfigureAwait(false);
         var options = FilterOptions(filter);
         return new SpendHistoryPage
         {
             Filter = filter,
             Ledger = page,
-            Rows = [.. page.Items.Select(item => LedgerRow(item, now))],
-            Summary = await SummaryAsync(filter, now, cancellationToken).ConfigureAwait(false),
-            Uncertain = [.. uncertain.Items.Select(item => LedgerRow(item, now))],
+            Rows = [.. page.Items.Select(item => LedgerRow(item, now, blind))],
+            Summary = await SummaryAsync(filter, now, blind, cancellationToken).ConfigureAwait(false),
+            Uncertain = [.. uncertain.Items.Select(item => LedgerRow(item, now, blind))],
             UncertainCount = uncertain.Total,
             UncertainMicros = uncertainTotal.CountedMicros,
             Options = options,
@@ -54,8 +58,51 @@ public sealed partial class SpendPages
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(op);
         if (await ledger.GetAsync(op.Trim(), cancellationToken).ConfigureAwait(false) is not { } row) return null;
+        if (Blind().Hides(row)) throw SpendException.Conflict(BlindRefusal);
         if (row.State != ReservationState.Uncertain) throw SpendException.Conflict("This request's spend is not uncertain any more; reload the ledger.");
         return await ResolveViewAsync(row, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Why a blind Arena battle's request cannot be resolved (or shown) before the vote.</summary>
+    public const string BlindRefusal = "This request is part of a blind Arena battle that hasn't been voted on, so its model stays hidden. Vote first, then resolve it here.";
+
+    /// <summary>W5 (fix 1, arena): the blind Arena battles now (their run groups, runs and agent model keys), or none when the Arena is not
+    /// registered. Their ledger rows are shown masked (<see cref="MaskBlind"/>) and never match a filter that could single out one model.</summary>
+    public ArenaBlindSet Blind() => ArenaBlindSet.Of(services);
+
+    /// <summary>Whether <paramref name="filter"/> could single out one model (a provider, model, account or text): such a filter leaves blind
+    /// battles' rows out, rows and totals alike, until the vote.</summary>
+    public static bool Narrows(SpendHistoryFilter filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return filter.Provider is not null || filter.Model is not null || filter.Account is not null || filter.Search is not null;
+    }
+
+    /// <summary>The ledger query of <paramref name="filter"/>, leaving <paramref name="blind"/>'s rows out when the filter
+    /// <see cref="Narrows"/>.</summary>
+    public static SpendLedgerQuery BlindQuery(SpendHistoryFilter filter, ArenaBlindSet blind)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentNullException.ThrowIfNull(blind);
+        var query = filter.Query();
+        return !blind.IsEmpty && Narrows(filter) ? query with { ExceptRuns = blind.Keys } : query;
+    }
+
+    /// <summary><paramref name="row"/> as a page may show it before its battle's vote: its source, state, billing and reservation time only;
+    /// no provider, model, account, op, run, tokens, usage, price, cost, note, reason or end time. Its amount still counts in the totals.</summary>
+    public static Reservation MaskBlind(Reservation row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        return new Reservation
+        {
+            Op = "blind",
+            Provider = "",
+            Model = "",
+            Source = row.Source,
+            Billing = row.Billing,
+            State = row.State,
+            Created = row.Created,
+        };
     }
 
     private async Task<ResolveReservationView> ResolveViewAsync(Reservation row, CancellationToken cancellationToken)
@@ -128,7 +175,7 @@ public sealed partial class SpendPages
     public async Task<long> TodayAsync(CancellationToken cancellationToken = default) =>
         (await ledger.TotalAsync(new SpendLedgerQuery { From = SpendWindows.DayStart(Now) }, cancellationToken).ConfigureAwait(false)).CountedMicros;
 
-    private async Task<SpendSummaryView> SummaryAsync(SpendHistoryFilter filter, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<SpendSummaryView> SummaryAsync(SpendHistoryFilter filter, DateTimeOffset now, ArenaBlindSet blind, CancellationToken cancellationToken)
     {
         var today = SpendWindows.DayStart(now);
         var month = SpendWindows.MonthStart(now);
@@ -151,8 +198,10 @@ public sealed partial class SpendPages
         }
         else
         {
-            var matching = await ledger.TotalAsync(filter.Query(), cancellationToken).ConfigureAwait(false);
-            var matchingToday = await ledger.TotalAsync(filter.Query() with { From = Later(filter.Query().From, today) }, cancellationToken).ConfigureAwait(false);
+            // A filter that could single out one model leaves blind battles' rows out of its totals too (BlindQuery).
+            var query = BlindQuery(filter, blind);
+            var matching = await ledger.TotalAsync(query, cancellationToken).ConfigureAwait(false);
+            var matchingToday = await ledger.TotalAsync(query with { From = Later(query.From, today) }, cancellationToken).ConfigureAwait(false);
             var allToday = await ledger.TotalAsync(new SpendLedgerQuery { From = today }, cancellationToken).ConfigureAwait(false);
             var who = filter.Provider ?? "Matching";
             var scoped = filter.Provider is { } provider && filter.Model is null && filter.Account is null && filter.Source is null && filter.Status is null && filter.Search is null
@@ -161,7 +210,7 @@ public sealed partial class SpendPages
                 Includes(matching.UncertainMicros, Count(matching.Requests) + (matching.Requests == 1 ? " request" : " requests") + " in the filters"), null, []);
             if (scoped is not null && filter.From is null && filter.To is null)
             {
-                var monthly = await ledger.TotalAsync(filter.Query() with { From = month }, cancellationToken).ConfigureAwait(false);
+                var monthly = await ledger.TotalAsync(query with { From = month }, cancellationToken).ConfigureAwait(false);
                 all = Meter(who + " · this month", monthly, scoped, "monthly", [], scope: who);
             }
             cells.Add(all);
@@ -223,8 +272,27 @@ public sealed partial class SpendPages
         return new SpendFilterOptions(providers, models, groups);
     }
 
-    /// <summary>One ledger row as the table shows it.</summary>
-    public SpendLedgerRow LedgerRow(Reservation row) => LedgerRow(row, Now);
+    /// <summary>One ledger row as the table shows it (masked while its Arena battle is blind).</summary>
+    public SpendLedgerRow LedgerRow(Reservation row) => LedgerRow(row, Now, Blind());
+
+    private SpendLedgerRow LedgerRow(Reservation row, DateTimeOffset now, ArenaBlindSet blind) =>
+        blind.BattleOf(row) is { } battle ? BlindRow(row, now, battle) : LedgerRow(row, now);
+
+    // W5 (fix 1, arena): a request of a battle that is held or ready, as "Arena battle · blind": no provider, model, account, op, run, tokens,
+    // amounts or end time (a column's usage, cost or timing could be matched to its answer), and no Resolve until the vote; it opens the battle.
+    private static SpendLedgerRow BlindRow(Reservation row, DateTimeOffset now, string battle)
+    {
+        var created = row.Created.ToUniversalTime();
+        var day = created.Date == now.UtcDateTime.Date ? "Today" : created.Date == now.UtcDateTime.Date.AddDays(-1) ? "Yesterday"
+            : created.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        const string hidden = "Hidden until you vote; it counts in the totals.";
+        return new SpendLedgerRow(MaskBlind(row), created.ToString("HH:mm:ss", CultureInfo.InvariantCulture), day, SourceIcon(SpendSource.Arena), ArenaBlindText.Title,
+            "names and amounts hidden until you vote", "—", hidden, "hidden", null, hidden, row.State == ReservationState.Reserved ? "reserved" : "blind",
+            row.State == ReservationState.Reserved ? "info" : "outline", row.State == ReservationState.Uncertain ? "uncertain: resolve it after you vote" : null, null, false)
+        {
+            Blind = ArenaBlindText.Href(battle),
+        };
+    }
 
     private SpendLedgerRow LedgerRow(Reservation row, DateTimeOffset now)
     {
@@ -498,6 +566,10 @@ public sealed record SpendLedgerRow(Reservation Row, string Time, string Day, st
     string? ReservedTitle, string Actual, string? ActualSub, string? ActualTitle, string Status, string? StatusTone, string? Note, string? ChatHref, bool CanResolve)
 {
     public string Op => Row.Op;
+
+    /// <summary>W5: the page of the Arena battle (held or ready) this request belongs to, or null. A blind row's <see cref="Row"/> is masked
+    /// (<see cref="SpendPages.MaskBlind"/>).</summary>
+    public string? Blind { get; init; }
 }
 
 /// <summary>The Resolve modal of one uncertain row.</summary>

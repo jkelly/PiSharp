@@ -15,6 +15,7 @@ using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.CustomProviders;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Hosting;
 using PiSharp.WebAgent.Runs;
 using PiSharp.WebAgent.Settings;
@@ -279,20 +280,23 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
             return new DataWorkspaceFacts(false, DataFolders.Display(Path.Join(options.DataDirectory, WorkspaceManagerOptions.FolderName), folder: true), 0, false, [], TimeSpan.Zero);
         var runs = await manager.ListAsync(measure: true, cancellationToken).ConfigureAwait(false);
         var rows = new List<DataWorkspaceRow>();
+        var blind = ArenaBlindSet.Of(services);
         foreach (var run in runs)
         {
             foreach (var slot in run.Slots.Where(slot => slot.State == WorkspaceSlotState.Ready))
-                rows.Add(Row(run, slot));
+                rows.Add(Row(run, slot, blind));
         }
         var bytes = await manager.MeasureRootAsync(cancellationToken).ConfigureAwait(false);
         return new DataWorkspaceFacts(true, DataFolders.Display(manager.Root, folder: true), bytes, Directory.Exists(manager.Root), rows, manager.Options.Retention);
     }
 
-    private DataWorkspaceRow Row(WorkspaceRun run, WorkspaceSlot slot)
+    private DataWorkspaceRow Row(WorkspaceRun run, WorkspaceSlot slot, ArenaBlindSet blind)
     {
         var compare = Runner?.Store.Get(run.Run);
         var spec = compare?.ModelSpec(slot.Slot);
-        var model = spec is not null ? spec.Provider + "/" + spec.Model : slot.Label ?? "model " + slot.Slot.ToUpperInvariant();
+        // W5 (fix 1, arena): an agent battle not voted yet names no model (slot a is its column A, so a slot's model names a contestant).
+        var model = blind.Hides(run.Run) || blind.Hides(AgentCompareRun.ModelKey(run.Run, slot.Slot)) ? "blind round · workspace " + slot.Slot
+            : spec is not null ? spec.Provider + "/" + spec.Model : slot.Label ?? "model " + slot.Slot.ToUpperInvariant();
         return new DataWorkspaceRow(run.Run, slot.Slot, model, run.Kind == WorkspaceKind.Worktree ? "git worktree" : "temporary copy", run.Kind == WorkspaceKind.Worktree,
             slot.Bytes, slot.AppliedAt, slot.Branch, run.ExpiresAt, run.ProjectPath, compare is not null, Busy(run.Run, slot.Slot));
     }

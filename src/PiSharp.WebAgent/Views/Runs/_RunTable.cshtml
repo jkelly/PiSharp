@@ -3,7 +3,9 @@
    Cost (≈ list for a subscription), Latency (TTFT / total), Stop (the stop reason, or error with the HTTP status) and the actions: Inspect,
    then Re-run, Load into playground (runs that stored their request), Open chat (a chat's call), Pin, Delete run. An agent compare run is
    one row ("3 models ▾") whose collapse row lists each model with its outcome; its Open run goes to the inspector, Workspaces to Settings ›
-   Data. W5 (E7): Pin as test… opens _TestCaseModal for a call that completed (PinRules; not an agent compare run). Model: RunHistoryPage. *@
+   Data. W5 (E7): Pin as test… opens _TestCaseModal for a call that completed (PinRules; not an agent compare run). W5 (fix 1, arena): a
+   run of an Arena battle not voted yet (row.Blind) names no model, here or in its collapse row, and its links open the battle. Model:
+   RunHistoryPage. *@
 @model RunHistoryPage
 <div class="ps-table-wrap" data-run-table>
   <table class="table table-hover align-middle runs-table mb-0">
@@ -37,8 +39,12 @@
           @if (row.IsGroup)
           {
             <td>
-              <button class="btn btn-link p-0 fs-8 text-reset text-decoration-none text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#@row.ModelsId" aria-expanded="false" aria-controls="@row.ModelsId" title="@string.Join(" · ", row.Models.Select(item => item.Provider + "/" + item.Model))">@row.Models.Count @(row.Models.Count == 1 ? "model" : "models")<i class="bi bi-chevron-down ms-1 fs-8" aria-hidden="true"></i></button>
+              <button class="btn btn-link p-0 fs-8 text-reset text-decoration-none text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#@row.ModelsId" aria-expanded="false" aria-controls="@row.ModelsId" title="@(row.Blind is null ? string.Join(" · ", row.Models.Select(item => item.Provider + "/" + item.Model)) : "Names hidden until you vote")">@row.Models.Count @(row.Models.Count == 1 ? "model" : "models")<i class="bi bi-chevron-down ms-1 fs-8" aria-hidden="true"></i></button>
             </td>
+          }
+          else if (row.Blind is not null)
+          {
+            <td data-run-blind><div class="fs-8 text-ps-faint text-nowrap"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>@PiSharp.WebAgent.Evals.Arena.ArenaBlindText.Model</div></td>
           }
           else
           {
@@ -56,7 +62,11 @@
             }
           </td>
           <td class="text-end text-nowrap">
-            @if (row.IsGroup)
+            @if (row.Blind is not null)
+            {
+              <a class="btn btn-icon" href="@row.InspectHref" title="Open the blind battle" aria-label="Open the blind battle of @label" data-run-blind-battle><i class="bi bi-eye-slash" aria-hidden="true"></i></a>
+            }
+            else if (row.IsGroup)
             {
               <a class="btn btn-icon" href="@row.InspectHref" title="Open run" aria-label="Open @label"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
             }
@@ -84,13 +94,13 @@
                 {
                   <li><a class="dropdown-item" href="/settings/data#compare-workspaces"><i class="bi bi-folder2-open me-2" aria-hidden="true"></i>Workspaces</a></li>
                 }
-                @if (PiSharp.WebAgent.Evals.Pins.PinRules.Offered(run))
+                @if (row.Blind is null && PiSharp.WebAgent.Evals.Pins.PinRules.Offered(run))
                 {
                   <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-run="@run.Id" data-pin-source="history"><i class="bi bi-pin-angle me-2" aria-hidden="true"></i>Pin as test…</button></li>
                 }
                 <li><button class="dropdown-item" type="button" data-run-pin="@run.Id" data-pinned="@(run.Pinned ? "true" : "false")"><i class="@("bi me-2 " + (run.Pinned ? "bi-pin-angle-fill" : "bi-pin-angle"))" aria-hidden="true"></i>@(run.Pinned ? "Unpin (expires with retention)" : "Pin (never expires)")</button></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><button class="dropdown-item text-danger" type="button" data-run-delete="@run.Id" data-run-label="@(row.SourceLabel + " · " + (row.IsGroup ? row.Models.Count + " models" : run.Provider + "/" + run.Model))"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete run</button></li>
+                <li><button class="dropdown-item text-danger" type="button" data-run-delete="@run.Id" data-run-label="@(row.SourceLabel + " · " + (row.Blind is not null ? "blind round" : row.IsGroup ? row.Models.Count + " models" : run.Provider + "/" + run.Model))"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete run</button></li>
               </ul>
             </div>
           </td>
@@ -109,14 +119,14 @@
                 <div class="d-flex flex-wrap align-items-center gap-2 py-1">
                   <span class="arena-letter">@entry.Letter</span>
                   <div class="flex-grow-1 run-model-line">
-                    <div class="ps-mono fs-8"><span class="text-ps-faint">@(entry.Provider)/</span>@entry.Model@if (entry.Note is not null) {<span class="text-ps-faint"> · @entry.Note</span>}</div>
+                    <div class="ps-mono fs-8">@if (entry.Provider.Length > 0) {<span class="text-ps-faint">@(entry.Provider)/</span>}@entry.Model@if (entry.Note is not null) {<span class="text-ps-faint"> · @entry.Note</span>}</div>
                     <div class="fs-8 text-ps-faint">@entry.Line</div>
                   </div>
                   @if (entry.Check is not null)
                   {
                     <span class="ps-chip" data-tone="@entry.Check.Tone">@entry.Check.Text</span>
                   }
-                  <a class="btn btn-icon" href="@entry.Href" title="Inspect" aria-label="Inspect model @entry.Letter"><i class="bi bi-braces" aria-hidden="true"></i></a>
+                  <a class="btn btn-icon" href="@entry.Href" title="@(row.Blind is null ? "Inspect" : "Open the blind battle")" aria-label="@(row.Blind is null ? "Inspect model " + entry.Letter : "Open the blind battle")"><i class="@("bi " + (row.Blind is null ? "bi-braces" : "bi-eye-slash"))" aria-hidden="true"></i></a>
                 </div>
               }
             </td>

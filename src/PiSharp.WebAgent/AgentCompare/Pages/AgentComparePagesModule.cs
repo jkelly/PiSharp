@@ -17,10 +17,12 @@
 // body: HostGuard refuses a write from another origin (403), and the body binding refuses anything but application/json (415), which a
 // page on another site can't send without a CORS preflight this app never answers. Every fragment also refuses a request the browser
 // marks as coming from another site or origin (Sec-Fetch-Site other than same-origin or none: 403), so an <img> or a no-cors fetch from a
-// website can't make the app read a run's workspaces or diffs either.
+// website can't make the app read a run's workspaces or diffs either. W5 (fix 1, arena): a run of an Arena battle not voted yet is
+// refused (409, ArenaBlindText.Refusal) by every /runs/{run} fragment until the vote.
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PiSharp.Web.Common;
 using PiSharp.WebAgent.AgentCompare.Runner;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Hosting;
 
 namespace PiSharp.WebAgent.AgentCompare.Pages;
@@ -59,6 +61,9 @@ public static class AgentComparePagesModule
             var http = context.HttpContext;
             http.Response.Headers.CacheControl = "no-store";
             if (!SameOrigin(http.Request)) return Results.Text("Cross-site requests are refused.", statusCode: StatusCodes.Status403Forbidden);
+            // W5 (fix 1, arena): a run of an Arena battle not voted yet renders nothing here (its columns name the contestants in order).
+            if (http.Request.RouteValues["run"] is string run && http.RequestServices.GetService<AgentComparePages>()?.BlindBattle(run) is not null)
+                return Results.Text(ArenaBlindText.Refusal, statusCode: StatusCodes.Status409Conflict);
             return await next(context).ConfigureAwait(false);
         });
 

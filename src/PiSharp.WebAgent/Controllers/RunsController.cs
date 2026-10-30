@@ -2,6 +2,7 @@
 // inspector.html). /runs/{id} also takes a run's op (a ledger row's run-<id>, a chat call's op) and redirects to the run's own address; an
 // unknown run is a 404 page that says so. Both pages are no-store: they show runs.db as it is now.
 using Microsoft.AspNetCore.Mvc;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Runs;
 
 namespace PiSharp.WebAgent.Controllers;
@@ -27,6 +28,8 @@ public sealed class RunsController(RunHistoryPages history, RunInspectorPages in
             Response.StatusCode = StatusCodes.Status404NotFound;
             return View("NotFound", id);
         }
+        // W5 (fix 1, arena): a blind battle's run opens its battle's notice until the vote (no redirect from its op either: that names its id).
+        if (ArenaBlindSet.Of(HttpContext.RequestServices).BattleOf(run) is { } battle) return View("Blind", battle);
         if (!string.Equals(run.Id, id, StringComparison.Ordinal)) return Redirect("/runs/" + Uri.EscapeDataString(run.Id));
         return View(await inspector.ViewAsync(run, $"{Request.Scheme}://{Request.Host}", cancellationToken).ConfigureAwait(false));
     }

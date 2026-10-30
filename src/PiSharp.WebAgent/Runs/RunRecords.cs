@@ -224,6 +224,10 @@ public sealed record RunQuery
     /// <summary>Only pinned (true) or unpinned (false) runs.</summary>
     public bool? Pinned { get; init; }
 
+    /// <summary>Leaves out every row whose id, group or parent is one of these (W5: the keys of blind Arena battles, which a filter that could
+    /// single out one model must not match before the vote), or none when null.</summary>
+    public IReadOnlyCollection<string>? ExceptKeys { get; init; }
+
     /// <summary>The page size (1 to <see cref="MaxLimit"/>; default 50).</summary>
     public int Limit { get; init; } = 50;
 

@@ -2,7 +2,8 @@
    source, provider/model with the account (masked) and its billing, the worst case reserved, the actual cost (≈ list for a subscription,
    free, or price unknown), the status (settled, estimate, uncertain with Resolve…, released, reserved while running) with its note, and
    Open chat for a chat's rows (W4, R3: Inspect run, /runs/{id}, for Playground, Compare, Tool Bench and agent compare rows). Titles explain each figure from the row's own tokens and prices. Then "Showing 1–25 of N", rows per page
-   (25, 50, 100) and the pages. Model: SpendHistoryPage. *@
+   (25, 50, 100) and the pages. W5 (fix 1, arena): a request of an Arena battle not voted yet (row.Blind) shows as "Arena battle · blind",
+   naming no provider, model, account, op or amount, and opens the battle. Model: SpendHistoryPage. *@
 @using System.Globalization
 @model SpendHistoryPage
 @{
@@ -45,7 +46,14 @@ else
           <tr data-spend-row="@row.Op" data-status="@row.Status">
             <td class="text-nowrap"><div class="ps-mono fs-8">@row.Time</div><div class="fs-8 text-ps-faint">@row.Day</div></td>
             <td class="d-none d-md-table-cell"><span class="ps-chip" title="@row.SourceLabel"><i class="bi @row.SourceIcon" aria-hidden="true"></i><span class="visually-hidden">@row.SourceLabel</span></span></td>
-            <td><div class="ps-mono fs-8"><span class="text-ps-faint text-nowrap">@(row.Row.Provider)/</span><wbr><span class="text-nowrap">@row.Row.Model</span></div><div class="fs-8 text-ps-faint">@row.AccountText</div></td>
+            @if (row.Blind is not null)
+            {
+              <td data-spend-blind><div class="fs-8 text-nowrap"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>@row.SourceLabel</div><div class="fs-8 text-ps-faint">@row.AccountText</div></td>
+            }
+            else
+            {
+              <td><div class="ps-mono fs-8"><span class="text-ps-faint text-nowrap">@(row.Row.Provider)/</span><wbr><span class="text-nowrap">@row.Row.Model</span></div><div class="fs-8 text-ps-faint">@row.AccountText</div></td>
+            }
             <td class="@("ps-mono fs-8 text-end d-none d-md-table-cell" + (faint ? " text-ps-faint" : ""))" title="@row.ReservedTitle">@row.Reserved</td>
             <td class="ps-mono fs-8 text-end text-nowrap" title="@row.ActualTitle">
               <div class="@(row.Actual == "—" ? "text-ps-faint" : null)">@row.Actual</div>
@@ -77,7 +85,11 @@ else
               }
             </td>
             <td class="text-end text-nowrap d-none d-sm-table-cell">
-              @if (row.ChatHref is not null)
+              @if (row.Blind is not null)
+              {
+                <a class="btn btn-icon" href="@row.Blind" title="Open the blind battle" aria-label="Open the blind battle" data-ledger-blind><i class="bi bi-eye-slash" aria-hidden="true"></i></a>
+              }
+              else if (row.ChatHref is not null)
               {
                 <a class="btn btn-icon" href="@row.ChatHref" title="Open chat" aria-label="Open chat"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
               }

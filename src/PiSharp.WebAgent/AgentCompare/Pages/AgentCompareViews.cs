@@ -29,6 +29,10 @@ public sealed record AgentModeView
 
     /// <summary>A notice above the setup (the run asked for is gone), or null.</summary>
     public string? Notice { get; init; }
+
+    /// <summary>W5 (fix 1, arena): the Arena battle (held or ready) the run asked for belongs to, else null. Then neither
+    /// <see cref="Setup"/> nor <see cref="Run"/> is set: the page shows the battle's blind notice.</summary>
+    public string? BlindBattle { get; init; }
 }
 
 /// <summary>A choice of the setup's project folder menu.</summary>
