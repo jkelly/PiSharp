@@ -100,6 +100,7 @@ public static class AgentCompareStatus
             ["requestId"] = run.RequestId,
             ["state"] = run.State,
             ["task"] = run.Spec.Task,
+            ["systemPrompt"] = run.Spec.SystemPrompt,
             ["projectPath"] = run.Spec.ProjectPath,
             ["created"] = run.Created,
             ["started"] = run.Started,

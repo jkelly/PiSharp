@@ -42,6 +42,12 @@ public sealed record AgentSetupView
     /// <summary>The task.</summary>
     public string Task { get; init; } = "";
 
+    /// <summary>The shared system prompt every model gets (empty for none; New run copies the earlier run's).</summary>
+    public string SystemPrompt { get; init; } = "";
+
+    /// <summary>The System prompt toggle's preview: "· " and the prompt's first 70 characters, or "· none".</summary>
+    public string SystemPreview => SystemPrompt.Trim() is { Length: > 0 } text ? "· " + (text.Length > 70 ? text[..70] + "…" : text) : "· none";
+
     /// <summary>The project folder (the Settings › Tools working directory, or the earlier run's).</summary>
     public required string ProjectPath { get; init; }
 

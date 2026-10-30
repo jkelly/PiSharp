@@ -170,7 +170,11 @@ public sealed record AgentCompareSpec
     /// <summary>The run's tool approval mode for its workspaces (overrides Settings › Tools for these sessions only).</summary>
     public ToolApprovalMode Approval { get; init; } = ToolApprovalMode.Ask;
 
-    /// <summary>The instructions every model gets (the same text for all).</summary>
+    /// <summary>The user's shared system prompt (the setup's "System prompt"), or null for none. It is part of
+    /// <see cref="Instructions"/>; kept on its own so New run can copy it.</summary>
+    public string? SystemPrompt { get; init; }
+
+    /// <summary>The instructions every model gets (the same text for all): the shared system prompt, then the runner's workspace rules.</summary>
     public required string Instructions { get; init; }
 
     /// <summary>The models, by slot.</summary>
@@ -415,6 +419,9 @@ public sealed record AgentCompareCreateRequest
 
     /// <summary>The task.</summary>
     public required string Task { get; init; }
+
+    /// <summary>The shared system prompt every model gets, or null (or blank) for none.</summary>
+    public string? SystemPrompt { get; init; }
 
     /// <summary>The project folder.</summary>
     public required string ProjectPath { get; init; }

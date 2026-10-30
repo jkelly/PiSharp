@@ -9,7 +9,9 @@
 //    (WorkspaceJanitor).
 // Workspaces are copies, not sandboxes: agents run tools with the user's rights. Nothing here commits to the user's branches or pushes;
 // Keep the branch makes one commit on a new branch without switching to it. Git always runs with an argument list (GitCommand), and every
-// path is checked to stay inside its root (the workspaces root, or the project for Apply).
+// path is checked to stay inside its root (the workspaces root, or the project for Apply). Looking at a project runs none of its
+// repository's own commands (GitCommand: no fsmonitor, no hooks; StatusAsync: no repo-local filter drivers), and a network or device
+// path (\\server\share, \\?\) is refused before anything touches it (W4 fix, agent-ui).
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -390,7 +392,7 @@ public sealed partial class WorkspaceManager
         manifest.ShortCommit = (await git.RequireAsync(repo, ["rev-parse", "--short", baseCommit], cancellationToken: cancellationToken).ConfigureAwait(false)).Line;
         manifest.BaseBranch = baseRef is null ? facts.Branch
             : (await git.RunAsync(repo, ["rev-parse", "--verify", "--quiet", "refs/heads/" + baseRef], cancellationToken: cancellationToken).ConfigureAwait(false)).Ok ? baseRef : null;
-        manifest.NotCopied = (await StatusAsync(repo, cancellationToken).ConfigureAwait(false)).ToList();
+        manifest.NotCopied = (await StatusAsync(repo, inspecting: false, cancellationToken).ConfigureAwait(false)).ToList();
         manifest.Write(folder);
         await projects.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -587,11 +589,28 @@ public sealed partial class WorkspaceManager
                 + options.Retention.TotalDays.ToString("0", CultureInfo.InvariantCulture) + " days.\n");
     }
 
+    /// <summary>Why a network or device path is refused (<see cref="IsNetworkOrDevicePath"/>).</summary>
+    public const string NetworkPathMessage =
+        @"The project folder must be on this computer: a network path (\\server\share) or a device path (\\?\, \\.\) isn't looked at.";
+
+    /// <summary>Whether <paramref name="path"/> is a Windows network path (UNC: <c>\\server\share</c>, <c>//server/share</c>) or device path
+    /// (<c>\\?\</c>, <c>\\.\</c>, <c>\??\</c>). Agent compare never looks at one: <c>Directory.Exists</c> or git on a UNC path reaches the
+    /// named host over SMB or WebDAV and offers it the user's Windows (NTLM) credentials. Always false off Windows, which has neither.</summary>
+    public static bool IsNetworkOrDevicePath(string? path)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrEmpty(path)) return false;
+        var text = path.TrimStart();
+        return (text.Length >= 2 && text[0] is ('\\' or '/') && text[1] is ('\\' or '/')) || text.StartsWith(@"\??\", StringComparison.Ordinal);
+    }
+
     private string Project(string projectPath)
     {
         if (string.IsNullOrWhiteSpace(projectPath) || projectPath.Any(char.IsControl) || !Path.IsPathFullyQualified(projectPath))
             throw new WorkspaceException(WorkspaceException.Invalid, "The project folder must be an absolute path.");
+        // Before anything touches the path: a UNC path would send the user's credentials to the host it names.
+        if (IsNetworkOrDevicePath(projectPath)) throw new WorkspaceException(WorkspaceException.Invalid, NetworkPathMessage);
         var project = Path.TrimEndingDirectorySeparator(Path.GetFullPath(projectPath));
+        if (IsNetworkOrDevicePath(project)) throw new WorkspaceException(WorkspaceException.Invalid, NetworkPathMessage);
         if (!Directory.Exists(project)) throw new WorkspaceException(WorkspaceException.ProjectMissing, "The project folder doesn't exist.");
         if (WorkspaceTree.IsWithin(Root, project))
             throw new WorkspaceException(WorkspaceException.Invalid, "The project folder is inside the workspaces folder; choose the project itself.");
@@ -702,7 +721,7 @@ public sealed partial class WorkspaceManager
         var branchResult = await git.RunAsync(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], cancellationToken: cancellationToken).ConfigureAwait(false);
         var branch = branchResult.Ok && branchResult.Line.Length > 0 ? branchResult.Line : null;
         var head = await git.RunAsync(root, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], cancellationToken: cancellationToken).ConfigureAwait(false);
-        IReadOnlyList<UncommittedChange> uncommitted = withDetails ? await StatusAsync(root, cancellationToken).ConfigureAwait(false) : [];
+        IReadOnlyList<UncommittedChange> uncommitted = withDetails ? await StatusAsync(root, inspecting: true, cancellationToken).ConfigureAwait(false) : [];
         if (!head.Ok)
             return new GitFacts(true, root, subpath, null, null, branch, [], uncommitted, null, "The repository has no commits yet, so a worktree has nothing to start from.");
         var commit = head.Line;
@@ -734,10 +753,46 @@ public sealed partial class WorkspaceManager
             uncommitted, checkout, unavailable);
     }
 
-    private async Task<IReadOnlyList<UncommittedChange>> StatusAsync(string repoRoot, CancellationToken cancellationToken)
+    // inspecting: the folder is only being looked at (the setup's project row), so the repository's own filter drivers are switched off.
+    // Making the workspaces, Apply and Keep the branch run them as git normally does: the user chose to run agents on this project, a
+    // checkout runs its smudge filters anyway, and a filter such as git-crypt's must clean what Keep commits.
+    private async Task<IReadOnlyList<UncommittedChange>> StatusAsync(string repoRoot, bool inspecting, CancellationToken cancellationToken)
     {
-        var status = await git.RequireAsync(repoRoot, GitStatus.Arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+        List<string> arguments = inspecting ? [.. await NeutralFiltersAsync(repoRoot, cancellationToken).ConfigureAwait(false), .. GitStatus.Arguments]
+            : [.. GitStatus.Arguments];
+        var status = await git.RequireAsync(repoRoot, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
         return GitStatus.Parse(status.Output);
+    }
+
+    // `git status` runs a filter driver's clean command on a file whose stat no longer matches the index, so a folder whose own .git/config
+    // names a filter (an extracted download, say) would run that command just by being looked at. This switches off (-c
+    // filter.<driver>.clean= and so on) every driver the repository's own config defines (local or worktree scope, includes too); the
+    // drivers of the user's global and system config (git-lfs) keep working. A file such a driver would have cleaned is compared as it is,
+    // so it may be listed as changed when it isn't.
+    private async Task<IReadOnlyList<string>> NeutralFiltersAsync(string repoRoot, CancellationToken cancellationToken)
+    {
+        string[] arguments = ["config", "--show-scope", "--name-only", "-z", "--get-regexp", @"^filter\."];
+        var listed = await git.RunAsync(repoRoot, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (listed.ExitCode == 1) return []; // no filter at all
+        if (!listed.Ok) throw GitCommand.Failed(arguments, listed);
+        var fields = listed.Text.Split('\0');
+        var drivers = new SortedSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index + 1 < fields.Length; index += 2)
+        {
+            var (scope, name) = (fields[index].Trim(), fields[index + 1]);
+            if (scope is not ("local" or "worktree")) continue;
+            var last = name.LastIndexOf('.');
+            if (!name.StartsWith("filter.", StringComparison.OrdinalIgnoreCase) || last <= "filter.".Length) continue;
+            var driver = name["filter.".Length..last];
+            // "-c name=value" splits at the first '=', so such a driver can't be switched off on the command line.
+            if (driver.Contains('=') || driver.Any(char.IsControl))
+                throw new WorkspaceException(WorkspaceException.Invalid, "This repository's git config names a filter that can't be switched off safely, so its changes aren't listed.");
+            drivers.Add(driver);
+        }
+        return [.. drivers.SelectMany(driver => new[]
+        {
+            "-c", $"filter.{driver}.clean=", "-c", $"filter.{driver}.smudge=", "-c", $"filter.{driver}.process=", "-c", $"filter.{driver}.required=false",
+        })];
     }
 
     private async Task<string> ResolveCommitAsync(string repoRoot, string reference, CancellationToken cancellationToken)

@@ -1,10 +1,12 @@
-@* Decision 0011 (run W4, R6): compare.html's agent-setup and agent-dirty: the task, the project folder (Change: recent folders or another
+@* Decision 0011 (run W4, R6): compare.html's agent-setup and agent-dirty: the task with the collapsible shared System prompt beside its
+   label (as _ComparePrompt's: its start as a preview, collapsed unless it holds text; every model gets it as the same instructions,
+   before the workspace rules), the project folder (Change: recent folders or another
    one; the default is the Settings › Tools working directory) with its isolation chip, which opens modal-agent-workspace, the optional
    check command, "Limits and approvals" (turns, minutes, the run cap shared by the metered models with Ask or Block, the check timeout,
    and this run's tool approval: Ask, Allow-list or Auto in workspaces, the last two with the not-a-sandbox warning in plain text), the
    Request · Agent switch, the shared thinking level, Run agents (Ctrl+Enter) and the run cap chip. Below, one _AgentSetupColumn per model
    (1 to 4, picked with Provider → Model) and the Add model column. The project row's chip and banners (agent-dirty: uncommitted changes
-   worktrees leave out; a copy over the size warning) come from GET /compare/agent/project after the page loads, because a copy's size
+   worktrees leave out; a copy over the size warning) come from POST /compare/agent/project after the page loads, because a copy's size
    can take a while to count. Run agents posts to R5's POST /api/compare/agent; nothing runs before. Model: AgentSetupView. *@
 @using PiSharp.WebAgent.AgentCompare
 @using PiSharp.WebAgent.AgentCompare.Pages
@@ -17,12 +19,16 @@
     var approval = Model.Approval;
     var excludes = string.Join(", ", Model.ExtraExcludes);
     var capTitle = Model.Cap.Length > 0 ? "" : "<strong>No run cap</strong><br>Turns and time limit each model. Each turn still reserves its worst case first, and your Spend Guard caps still apply.";
+    var hasSystem = Model.SystemPrompt.Trim().Length > 0;
 }
 <div class="cmp-page ac-page" data-agent-mode data-agent-compare="setup" data-max-columns="@AgentCompareRunner.MaxModels" data-min-columns="1" data-from="@Model.FromRun"
      data-isolation="@AgentText.IsolationValue(Model.Isolation)" data-base-ref="@Model.BaseRef" data-subtitle="Agent · one task, several models">
   <section class="compare-prompt" aria-label="Task" data-ac-setup>
     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
       <span class="ps-label">Task</span>
+      <button class="btn btn-sm btn-ghost py-0 px-1 d-inline-flex align-items-center gap-1 fs-8 cmp-system-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#acSystem" aria-expanded="@(hasSystem ? "true" : "false")" aria-controls="acSystem" data-ac-system-toggle>
+        <i class="bi bi-chevron-right" aria-hidden="true"></i><span>System prompt</span><span class="text-ps-faint text-truncate d-none d-md-inline cmp-system-preview" data-ac-system-preview>@Model.SystemPreview</span>
+      </button>
       @if (Model.FromRun is { } from)
       {
         <span class="ms-auto fs-8 text-ps-faint">Copied from run <a class="font-monospace" href="/compare?mode=agent&amp;run=@Uri.EscapeDataString(from)">@from</a></span>
@@ -32,6 +38,10 @@
     {
       <div class="alert alert-warning py-2 px-3 mb-2 fs-7" role="status" data-ac-notice><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@notice</div>
     }
+    <div class="collapse@(hasSystem ? " show" : "")" id="acSystem">
+      <label class="visually-hidden" for="acSystemText">Shared system prompt</label>
+      <textarea class="form-control form-control-sm mb-2" id="acSystemText" rows="2" maxlength="@AgentCompareRunner.MaxSystemPromptLength" placeholder="Optional. Every model gets it, the same text, before the workspace rules." data-ac-system>@Model.SystemPrompt</textarea>
+    </div>
     <label class="visually-hidden" for="acTask">Task</label>
     <textarea class="form-control mb-2" id="acTask" rows="2" maxlength="100000" placeholder="Describe the task every model works on, for example: Fix the failing ModelRegistry test." data-ac-task>@Model.Task</textarea>
 

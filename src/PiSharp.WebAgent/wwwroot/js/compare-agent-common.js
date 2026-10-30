@@ -2,6 +2,7 @@
 // the modals' move to the body (the page renders them inside main; they go before the layout's #modal-confirm so a confirm opens on top),
 // the top bar's subtitle, and the clocks ([data-ac-elapsed][data-since]: ms since the epoch) that tick between server renders.
 import { showToast } from './shell.js';
+import { RequestError } from './request-api.js';
 
 export const API = '/api/compare/agent';
 export const PAGES = '/compare/agent';
@@ -95,6 +96,27 @@ export function hideModal(element) {
 export function modal(id) {
   const element = document.getElementById(id);
   return element && window.bootstrap ? { element, instance: window.bootstrap.Modal.getOrCreateInstance(element) } : null;
+}
+
+/** POSTs `body` as JSON and returns the server-rendered fragment's one root element (or null). A fragment that looks at the user's files
+ *  (the project row) is a JSON POST, so HostGuard's same-origin rule covers it. Throws RequestError. */
+export async function postFragment(url, body) {
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { Accept: 'text/html', 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new RequestError('The app could not be reached. Is it still running?', 0, null);
+  }
+  if (!response.ok) throw new RequestError(`The request failed (${response.status}).`, response.status, null);
+  const template = document.createElement('template');
+  template.innerHTML = (await response.text()).trim();
+  return template.content.firstElementChild;
 }
 
 /** A fresh request id for a create (R5 answers a repeated create with the run it made). */
