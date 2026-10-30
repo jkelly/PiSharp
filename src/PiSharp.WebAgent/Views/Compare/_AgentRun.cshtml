@@ -1,0 +1,163 @@
+@* Decision 0011 (run W4, R6): compare.html's agent run (agent-running, agent-approval, agent-done, agent-kept). The task is fixed for the
+   run, so it shows as text, with the project folder, the isolation chip (modal-agent-workspace, read-only) and Details (check, limits, run
+   cap, tool approval, what worktrees left out, start order). The controls: Stop all while it runs, New run (?from=) once it is done, and
+   the spend chip ("$0.17 of $1.50"; the tooltip has each model's share, a subscription's list cost apart). The banners: the not-a-sandbox
+   line whenever tools run without asking in this run (Allow-list, Auto, or a command allowed in every workspace), "runs continue in the
+   background", the approval banner (the first waiting call; Allow this command in all N workspaces, with its warning in plain text; Allow
+   all and Deny all when several wait), what Keep did (applied, or a branch; which workspaces were discarded) and a run that failed before
+   any model ran. Then the status line and one _AgentColumn per model. The same partial is GET /compare/agent/runs/{run}:
+   compare-agent-run.js swaps the parts marked [data-ac-region] and the columns ([data-ac-col]) whose markup changed after each "status"
+   frame of R5's event stream (GET /api/compare/agent/{run}/events), and reloads modal-agent-workspace's content
+   (GET /compare/agent/runs/{run}/workspace) once the project region changed. Model: AgentRunView. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Runner
+@using PiSharp.WebAgent.AgentCompare.Workspaces
+@using PiSharp.WebAgent.Spend
+@model AgentRunView
+@{
+    var run = Model.Run;
+    var spec = run.Spec;
+    var active = Model.Active;
+    var first = Model.FirstPending;
+    var grants = Model.GrantSlots;
+    var notCopied = run.Workspace?.NotCopied ?? [];
+    var tone = Model.StatusTone == "danger" ? "text-ps-danger" : "text-ps-faint";
+    var isoLabel = run.Workspace?.Label ?? spec.Isolation switch { WorkspaceIsolation.Copy => "temporary copy", WorkspaceIsolation.Worktree => "git worktree", _ => "automatic isolation" };
+    var since = run.Started is { } started && run.Finished is null ? started.ToUnixTimeMilliseconds() : (long?)null;
+    var runElapsed = run.Started is { } begun ? AgentText.Duration((long)Math.Max(0, ((run.Finished ?? Model.Now) - begun).TotalMilliseconds)) : null;
+}
+<div class="cmp-page ac-page" data-agent-mode data-agent-compare="run" data-run="@run.Id" data-state="@run.State" data-active="@(active ? "true" : "false")" data-subtitle="@Model.Subtitle">
+  <section class="compare-prompt" aria-label="Task">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span class="ps-label">Task</span>
+      <span class="ms-auto fs-8 text-ps-faint">Run <span class="font-monospace">@run.Id</span> · @Model.CreatedText</span>
+    </div>
+    <p class="ac-task mb-2" title="@spec.Task">@spec.Task</p>
+    <div class="ac-project mb-2" data-ac-region="project">
+      <i class="bi bi-folder2 text-ps-faint" aria-hidden="true"></i>
+      <span class="visually-hidden">Project folder:</span>
+      <span class="ac-path">@spec.ProjectPath</span>
+      <button class="ps-chip ac-iso" type="button" data-tone="@(notCopied.Count > 0 ? "warn" : null)" data-bs-toggle="modal" data-bs-target="#modal-agent-workspace" title="Workspace details" data-ac-iso>
+        <i class="bi @(run.Workspace?.Kind == WorkspaceKind.Copy ? "bi-files" : "bi-git")" aria-hidden="true"></i><span class="text-truncate">@isoLabel</span>
+      </button>
+      <button class="btn btn-sm btn-ghost py-0 px-1 d-inline-flex align-items-center gap-1 fs-8 ac-limits-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#acRunDetails" aria-expanded="false" aria-controls="acRunDetails"><i class="bi bi-chevron-right" aria-hidden="true"></i>Details</button>
+    </div>
+    <div class="collapse" id="acRunDetails">
+      <div class="ps-panel ac-limits px-3 py-2 mb-2" data-ac-region="details">
+        <div class="kv"><span class="k">Check</span><span class="v font-monospace text-break">@(spec.CheckCommand ?? "none")</span></div>
+        @if (spec.CheckCommand is not null)
+        {
+          <div class="kv"><span class="k">Check timeout</span><span class="v">@AgentText.Duration(spec.CheckTimeoutSeconds * 1000L)</span></div>
+        }
+        <div class="kv"><span class="k">Limits</span><span class="v">@spec.MaxTurns turns and @spec.MaxMinutes min per model</span></div>
+        <div class="kv"><span class="k">Run cap</span><span class="v">@Model.CapLine</span></div>
+        <div class="kv"><span class="k">Tool approval</span><span class="v">@AgentText.Approval(spec.Approval)</span></div>
+        @if (notCopied.Count > 0)
+        {
+          <div class="kv"><span class="k">Not copied</span><span class="v font-monospace text-break">@string.Join(", ", notCopied.Select(change => change.Path))</span></div>
+        }
+        <div class="kv"><span class="k">Start order</span><span class="v">@string.Join(", ", run.Order.Select(slot => slot.ToUpperInvariant())) <span class="text-ps-faint">· shuffled</span></span></div>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <partial name="/Views/Compare/_CompareModeSwitch.cshtml" model='new ComparePage { Mode = ComparePage.AgentModeName }' />
+      <div class="ms-auto d-flex flex-wrap align-items-center gap-2" data-ac-region="controls">
+        @if (active)
+        {
+          <button class="btn btn-sm btn-outline-danger" type="button" title="Stop every agent. Each workspace keeps what its agent changed so far." data-ac-stop-all><i class="bi bi-stop-fill me-1" aria-hidden="true"></i>Stop all</button>
+        }
+        else
+        {
+          <a class="btn btn-sm btn-outline-secondary" href="/compare?mode=agent&amp;from=@Uri.EscapeDataString(run.Id)" role="button" title="Start a new run with the same task and models" data-ac-new-run><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New run</a>
+        }
+        <button class="composer-estimate run-estimate" type="button" aria-label="@((active ? "Spent so far: " : "Spent: ") + Model.SpendText)" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="ps-tip-left" title="@Model.SpendTooltip" data-ac-spend>@Model.SpendText</button>
+      </div>
+    </div>
+
+    <div data-ac-region="banners">
+      @if (Model.SandboxWarning is { } warning)
+      {
+        <div class="fs-8 text-ps-faint mt-2 ac-sandbox" data-ac-sandbox><span class="ps-chip me-1" data-tone="warn">not a sandbox</span>@warning</div>
+      }
+      @if (active)
+      {
+        <div class="fs-8 text-ps-faint mt-2">Runs continue in the background and survive restarts, so you can close this tab.</div>
+      }
+      @if (first is not null)
+      {
+        var request = first.Approval.Request;
+        var letter = first.Slot.ToUpperInvariant();
+        var others = Model.Columns.Where(column => column.Slot != first.Slot && column.View is "running" or "checking").Select(column => column.Letter).ToList();
+        var waitingCount = Model.Pending.Count;
+        <div class="app-banner info mx-0 mt-2 mb-0" role="status" data-ac-approval-banner>
+          <span class="ps-chip" data-tone="warn">@waitingCount waiting</span>
+          <span class="fs-7 ac-banner-text">@letter wants to run <code>@AgentColumnView.CallText(request)</code>@(request.Command is null ? " (" + request.Tool + ")" : "").@if (others.Count > 0) {<text> @AgentText.Join(others) @(others.Count == 1 ? "keeps" : "keep") running.</text>}@if (waitingCount > 1) {<text> @(waitingCount - 1) more @(waitingCount == 2 ? "call waits" : "calls wait") in @(Model.Pending.Select(item => item.Slot).Distinct().Count() > 1 ? "the columns" : "its column").</text>}</span>
+          <div class="d-flex flex-wrap gap-2">
+            @if (request.Command is not null && grants.Count > 0)
+            {
+              <button class="btn btn-sm btn-outline-secondary" type="button" aria-describedby="acAllowAllWarn" data-ac-approve-command data-slot="@first.Slot" data-task-id="@request.TaskId">@(grants.Count == 1 ? "Allow this command for the rest of the run" : $"Allow this command in all {grants.Count} workspaces")</button>
+            }
+            @if (waitingCount > 1)
+            {
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-approve-all="allow">Allow all @waitingCount</button>
+              <button class="btn btn-sm btn-ghost" type="button" data-ac-approve-all="deny">Deny all</button>
+            }
+          </div>
+          @if (request.Command is not null && grants.Count > 0)
+          {
+            <div class="fs-8 text-ps-faint w-100" id="acAllowAllWarn" data-ac-grant-warning><span class="ps-chip me-1" data-tone="warn">not a sandbox</span>Allows this exact command in @(grants.Count == 1 ? "workspace" : "workspaces") @AgentText.Join(grants) for the rest of the run; other commands still ask. Workspaces are copies, not sandboxes: it runs with your rights.</div>
+          }
+        </div>
+      }
+      @foreach (var column in Model.Kept)
+      {
+        var kept = column.State.Kept!;
+        <div class="app-banner info mx-0 mt-2 mb-0" role="status" data-ac-kept="@column.Slot">
+          @if (kept.Outcome == KeepOutcome.Applied)
+          {
+            <span class="ps-chip" data-tone="ok">Applied</span>
+            <span class="fs-7 ac-banner-text">@column.Letter's changes are in <span class="ac-path">@spec.ProjectPath</span> as uncommitted changes: @AgentText.Count(kept.Files.Count, "file")@(column.State.Diff is { Files: > 0 } diff ? $", +{diff.Added} −{diff.Removed}" : ""). Nothing was committed or pushed.</span>
+          }
+          else
+          {
+            <span class="ps-chip" data-tone="ok">Branch kept</span>
+            <span class="fs-7 ac-banner-text">@column.Letter's changes are committed on the new branch <span class="ac-path">@kept.Branch</span>@(kept.Commit is { Length: >= 7 } commit ? " (" + commit[..7] + ")" : ""). Your current branch wasn't switched or changed, and nothing was pushed.</span>
+          }
+          @if (column.CanViewDiff)
+          {
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-ac-diff="@column.Slot">View changes</button>
+          }
+          <div class="fs-8 text-ps-faint w-100">@Model.WorkspacesLine(Model.Workspace.RetentionDays)</div>
+        </div>
+      }
+      @if (run.State == AgentRunState.Failed)
+      {
+        <div class="app-banner warn mx-0 mt-2 mb-0" role="alert" data-ac-failed>
+          <span class="ps-chip" data-tone="danger">Not run</span>
+          <span class="fs-7 ac-banner-text">@(run.Error ?? "The workspaces could not be made.") No model ran and nothing was spent.</span>
+          <a class="btn btn-sm btn-outline-secondary" href="/compare?mode=agent&amp;from=@Uri.EscapeDataString(run.Id)">New run</a>
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="cmp-views">
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 border-bottom flex-shrink-0">
+      <ul class="nav nav-tabs border-0" aria-label="Compare views">
+        <li class="nav-item"><span class="nav-link active" aria-current="page"><i class="bi bi-layout-three-columns me-1" aria-hidden="true"></i>Agents</span></li>
+      </ul>
+      <span class="ms-auto fs-8 text-truncate ac-summary @tone" role="status" title="@Model.StatusTitle" data-ac-region="status">@if (Model.StatusTone == "live") {<span class="status-dot live me-1" aria-hidden="true"></span>}<span>@Model.StatusText</span>@if (active && runElapsed is not null) {<text> · <span data-ac-elapsed data-since="@since">@runElapsed</span></text>}</span>
+    </div>
+    <div class="cmp-tab-content">
+      <div class="cmp-pane active">
+        <div class="compare-grid" style="--cmp-cols:@Model.Columns.Count" data-ac-grid>
+          @foreach (var column in Model.Columns)
+          {
+            <partial name="/Views/Compare/_AgentColumn.cshtml" model="column" />
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

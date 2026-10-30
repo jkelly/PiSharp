@@ -1,0 +1,17 @@
+@* Decision 0011 (run W4, R6): compare.html's _KeepResultModal (#modal-keep-result): Keep one model's changes, applied to the project as
+   uncommitted changes or kept on a new branch, and optionally discard the other workspaces. The content is _AgentKeep (its panes: the
+   options, the conflict R4's preview found, the refusal a Keep answered), loaded from GET /compare/agent/runs/{run}/keep?slot= when Keep
+   opens it. Nothing is committed to the user's branches and nothing is pushed; Keep is always the user's explicit choice. Model: none. *@
+<div class="modal fade" id="modal-keep-result" tabindex="-1" aria-labelledby="modal-keep-result-title" aria-hidden="true" data-ac-modal>
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" data-ac-keep-content>
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-keep-result-title">Keep</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex align-items-center gap-2 fs-7 text-ps-faint"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Checking your project…</div>
+      </div>
+    </div>
+  </div>
+</div>

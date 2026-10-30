@@ -54,6 +54,8 @@ PiSharp.WebAgent.DataStorage.DataStorageModule.AddDataStorageArea(builder.Servic
 PiSharp.WebAgent.Runs.RunHistoryModule.AddRunHistoryArea(builder.Services, options);
 // Tool Bench (run W4, R7): GET /bench and /api/bench (tool calls paused for manual or mock results; a turn is a guarded run; never runs a tool).
 PiSharp.WebAgent.Bench.BenchModule.AddBenchArea(builder.Services, options);
+// Agent compare views (run W4, R6): GET /compare?mode=agent's setup and run views, and their fragments under /compare/agent.
+PiSharp.WebAgent.AgentCompare.Pages.AgentComparePagesModule.AddAgentComparePages(builder.Services, options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -72,6 +74,7 @@ PiSharp.WebAgent.Compare.CompareModule.MapCompareArea(app);
 PiSharp.WebAgent.DataStorage.DataStorageModule.MapDataStorageArea(app);
 PiSharp.WebAgent.Runs.RunHistoryModule.MapRunHistoryArea(app);
 PiSharp.WebAgent.Bench.BenchModule.MapBenchArea(app);
+PiSharp.WebAgent.AgentCompare.Pages.AgentComparePagesModule.MapAgentComparePages(app);
 app.MapWebAgentCore();
 app.Run();
 return 0;

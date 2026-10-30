@@ -2,7 +2,8 @@
    picked with _FolderBrowser) with the context files found in it, and tool approvals: Ask before bash, edit and write (recommended, the
    default), Ask except the allow list, or Never ask (behind a confirm), with the allow list editor (a tool, and for bash a command pattern).
    Saved together through POST /api/settings/tools from _SettingsSaveBar. Read-only tools never ask, so the mockups' "Ask before every tool
-   call" has no mode. Recent workspaces, built-in tools, session grants and agent compare are later milestones. Model: ToolsPage. *@
+   call" has no mode. Recent workspaces, built-in tools and session grants are later milestones; agent compare's defaults are R6's
+   _AgentCompareDefaults (run W4), a form of its own after this one. Model: ToolsPage. *@
 @model ToolsPage
 @{
     Layout = "_SettingsLayout";
@@ -134,7 +135,10 @@
     </div>
   </section>
 
-  <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Built-in tools and agent compare", "Which built-in tools new chats start with, recent workspaces, and the defaults of agent compare runs.", "builtin-tools")' />
+  <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Built-in tools", "Which built-in tools new chats start with, and recent workspaces.", "builtin-tools")' />
 
   <partial name="/Views/Settings/_SettingsSaveBar.cshtml" model="null" />
 </form>
+
+@* Run W4, R6: agent compare's defaults, a form of its own (saved through /api/settings/agent-compare). *@
+<partial name="/Views/Settings/_AgentCompareDefaults.cshtml" model="null" />

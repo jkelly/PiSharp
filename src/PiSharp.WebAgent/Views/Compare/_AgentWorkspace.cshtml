@@ -1,0 +1,131 @@
+@* Decision 0011 (run W4, R6): modal-agent-workspace's content (compare.html's _AgentWorkspaceModal): how each model gets its own copy of the
+   project. Git worktree (base branch and commit, the uncommitted changes worktrees leave out, disk) or temporary copy (what is skipped,
+   Also skip, the size warning, disk), where workspaces live and how long they are kept, and the not-a-sandbox warning. In setup it is
+   editable (Use git worktrees / Use temporary copies set this run's isolation and base); once a run made its workspaces it is read-only.
+   Rendered inside the modal shell (_AgentWorkspaceModal) and inside _AgentProject (compare-agent-setup.js moves it in).
+   Model: AgentWorkspaceView. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Workspaces
+@model AgentWorkspaceView
+@{
+    var ro = Model.ReadOnly;
+    var pane = Model.Pane;
+    var worktreeKind = Model.ReadOnly ? Model.Kind == WorkspaceKind.Worktree : Model.WorktreeUnavailable is null;
+    var branchRef = Model.BaseRef is { } baseRef && Model.Branches.Contains(baseRef) ? baseRef : null;
+    var commitRef = Model.BaseRef is { } other && branchRef is null ? other : null;
+    var skipped = Model.DefaultExcludes.Concat(Model.SettingsExcludes).ToList();
+    const int Shown = 12;
+}
+<div class="modal-content" data-ac-workspace-content data-pane="@pane" data-readonly="@(ro ? "true" : "false")">
+  <div class="modal-header">
+    <div class="ac-modal-heading">
+      <h2 class="modal-title" id="modal-agent-workspace-title">Workspaces</h2>
+      <div class="modal-subtitle">Each agent works in its own copy of <span class="ac-path">@Model.ProjectPath</span>, so no agent sees another's changes.</div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  </div>
+  <div class="modal-body">
+    @if (ro)
+    {
+      <div class="fs-8 text-ps-faint mb-3">This run's workspaces are already set up, so these settings are shown read-only. Change them for the next run.</div>
+    }
+    @if (Model.Note is { } note)
+    {
+      <div class="alert alert-secondary py-2 px-3 fs-7 mb-3" role="status">@note</div>
+    }
+    <fieldset class="mb-3">
+      <legend class="visually-hidden">Isolation</legend>
+      <div class="form-check mb-2">
+        <input class="form-check-input" type="radio" name="acIso" id="acIsoWorktree" value="worktree" checked="@(pane == "worktree")" disabled="@(ro || Model.WorktreeUnavailable is not null)" data-ac-ws-radio>
+        <label class="form-check-label fs-7" for="acIsoWorktree">Git worktree <span class="text-ps-faint">· for git repos</span><span class="d-block fs-8 text-ps-faint">Checks out the same commit for each agent. Fast, and diffs come straight from git. Uncommitted changes aren't copied.</span>@if (!ro && Model.WorktreeUnavailable is { } why)
+          {<span class="d-block fs-8 text-ps-warn">Not available here: @why</span>}</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="acIso" id="acIsoCopy" value="copy" checked="@(pane == "copy")" disabled="@ro" data-ac-ws-radio>
+        <label class="form-check-label fs-7" for="acIsoCopy">Temporary copy<span class="d-block fs-8 text-ps-faint">Copies the folder as it is now, uncommitted changes included. Works for any folder, git or not.</span></label>
+      </div>
+    </fieldset>
+
+    <div data-ac-ws-pane="worktree" hidden="@(pane != "worktree")">
+      @if (worktreeKind || ro)
+      {
+        <div class="row g-2 mb-1">
+          <div class="col-6">
+            <label class="form-label fs-7" for="acIsoBranch">Base branch</label>
+            <select class="form-select form-select-sm" id="acIsoBranch" disabled="@ro" data-ac-ws-branch data-current="@Model.Branch">
+              @if (Model.Branches.Count == 0)
+              {
+                <option value="" selected>@(Model.Branch ?? "current HEAD")</option>
+              }
+              @foreach (var branch in Model.Branches)
+              {
+                <option value="@branch" selected="@(branch == (branchRef ?? Model.Branch))">@branch</option>
+              }
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label fs-7" for="acIsoCommit">Commit</label>
+            <input class="form-control form-control-sm font-monospace" id="acIsoCommit" value="@commitRef" placeholder="@(Model.ShortCommit ?? "HEAD")" spellcheck="false" maxlength="200" disabled="@ro" data-ac-ws-commit>
+          </div>
+        </div>
+        <div class="form-text mb-3">The base commit: by default the latest commit on the project's current branch. Each agent gets a detached worktree at this commit.</div>
+      }
+      <div class="ps-panel px-3 py-2 mb-3">
+        @if (Model.Uncommitted.Count == 0)
+        {
+          <div class="kv"><span class="k">Uncommitted changes</span><span class="v">none</span></div>
+        }
+        else
+        {
+          <div class="kv"><span class="k">Not copied</span><span class="v">@AgentText.Count(Model.Uncommitted.Count, "uncommitted file")</span></div>
+          @foreach (var change in Model.Uncommitted.Take(Shown))
+          {
+            <div class="ac-path text-ps-faint pb-1">@change.Path <span class="fs-8">· @AgentText.Status(change.Status)</span></div>
+          }
+          @if (Model.Uncommitted.Count > Shown)
+          {
+            <div class="fs-8 text-ps-faint pb-1">and @(Model.Uncommitted.Count - Shown) more</div>
+          }
+        }
+        <div class="kv"><span class="k">Disk</span><span class="v">@Model.WorktreeDisk</span></div>
+      </div>
+    </div>
+
+    <div data-ac-ws-pane="copy" hidden="@(pane != "copy")">
+      <div class="fs-7 mb-1">Skipped when copying</div>
+      <div class="ac-path text-ps-faint mb-2">@string.Join(" · ", skipped) · anything in .gitignore</div>
+      <label class="form-label fs-7" for="acIsoExclude">Also skip</label>
+      <input class="form-control form-control-sm font-monospace mb-1" id="acIsoExclude" value="@string.Join(", ", Model.ExtraExcludes)" placeholder="e.g. artifacts, *.log" spellcheck="false" maxlength="2000" disabled="@ro" data-ac-ws-excludes>
+      <div class="form-text mb-3">Comma-separated, for this run. You're asked before a copy larger than @WorkspaceText.Size(Model.WarnAboveBytes) for each model.</div>
+      <div class="ps-panel px-3 py-2 mb-3">
+        <div class="kv"><span class="k">Uncommitted changes</span><span class="v">included</span></div>
+        <div class="kv"><span class="k">Disk</span><span class="v">@Model.CopyDisk</span></div>
+        @if (Model.SkippedLinks.Count > 0)
+        {
+          <div class="kv"><span class="k">Links skipped</span><span class="v">@Model.SkippedLinks.Count</span></div>
+        }
+      </div>
+    </div>
+
+    <div class="ps-label mb-1">Where workspaces live</div>
+    <div class="ac-path mb-1">@(Model.Directory + (ro ? "" : System.IO.Path.DirectorySeparatorChar + "<run>") + Model.SlotList)</div>
+    <div class="fs-8 text-ps-faint mb-3">Removed when you discard them, or after @Model.RetentionDays days.</div>
+
+    <div class="d-flex gap-2 align-items-start fs-8 text-ps-faint" data-ac-sandbox-note>
+      <i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i>
+      <span><span class="text-body fw-semibold">Workspaces are copies, not sandboxes.</span> Agents run tools with your rights, so a command can still reach other folders, the network and your credentials. Keep tool approval on Ask unless you trust the task.</span>
+    </div>
+  </div>
+  <div class="modal-footer">
+    @if (ro)
+    {
+      <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+    }
+    else
+    {
+      <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="button" class="btn btn-primary" data-ac-ws-apply="worktree" hidden="@(pane != "worktree")">Use git worktrees</button>
+      <button type="button" class="btn btn-primary" data-ac-ws-apply="copy" hidden="@(pane != "copy")">Use temporary copies</button>
+    }
+  </div>
+</div>
