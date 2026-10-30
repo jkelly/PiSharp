@@ -2,10 +2,12 @@
 // workspaces areas and this one over a temporary data folder, a fake environment (never this machine's), a folder opener that records
 // instead of starting the file manager, and a fake workspace activity; the app cases start the built app with --faux, a temporary data
 // folder and DataStorage:OpenFolders=false. No provider is called and no key is real (planted values). The cases: sizes, paths and the
-// folder walk; the page's facts are this machine's; run history's retention saves and applies at once; Remove and Clean up remove
+// folder walk; the page's facts are this machine's; run history's retention saves and applies at once; runs are counted as History counts
+// them (an agent compare run is one run, its records shown apart), in process and on both pages in the app; Remove and Clean up remove
 // workspaces (and keep those in use); Open folder takes targets, never paths; the export holds no plaintext secret; an import is reviewed
-// item by item and applies only what was kept; the danger zone deletes only what it names, after DELETE; the archive purge; and in the app:
-// the page in its default state, its API, workspaces, and chats exported and deleted.
+// item by item and applies only what was kept; the danger zone deletes only what it names, after DELETE (presets and compare workspaces,
+// which no action names, survive each one); the archive purge; and in the app: the page in its default state, its API, workspaces, and
+// chats exported and deleted (the chat's recorded call, settings, credentials and presets kept).
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -19,6 +21,7 @@ using PiSharp.WebAgent.CustomProviders;
 using PiSharp.WebAgent.Data;
 using PiSharp.WebAgent.DataStorage;
 using PiSharp.WebAgent.Hosting;
+using PiSharp.WebAgent.Presets;
 using PiSharp.WebAgent.Runs;
 
 internal static partial class Program
@@ -49,7 +52,7 @@ internal static partial class Program
     {
         private readonly ServiceProvider provider;
 
-        public DataHost(string name, IReadOnlyDictionary<string, string>? environment = null, bool openFolders = true)
+        public DataHost(string name, IReadOnlyDictionary<string, string>? environment = null, bool openFolders = true, bool presets = false)
         {
             Root = Temp("data-" + name);
             Options = new WebAgentOptions { DataDirectory = Path.Join(Root, "data"), Faux = true };
@@ -80,6 +83,7 @@ internal static partial class Program
             services.AddWebAgentFallbacks(Options);
             services.AddRunsArea(Options);
             WorkspacesModule.AddAgentCompareWorkspaces(services, Options);
+            if (presets) services.AddPresetsArea(Options);
             services.AddDataStorageArea(Options);
             provider = services.BuildServiceProvider();
             provider.GetRequiredService<WebAgentDb>().Migrate();
@@ -110,6 +114,9 @@ internal static partial class Program
         public RunStore Runs => provider.GetRequiredService<RunStore>();
 
         public WorkspaceManager Workspaces => provider.GetRequiredService<WorkspaceManager>();
+
+        /// <summary>The presets (only with <c>presets: true</c>).</summary>
+        public PresetStore Presets => provider.GetRequiredService<PresetStore>();
 
         /// <summary>A project folder with two files, outside the data folder.</summary>
         public string Project()
@@ -154,6 +161,24 @@ internal static partial class Program
         store.Insert(RunsRow(id, created, RunStatus.Running));
         store.Finish(id, DataOutcome(created, raw));
         if (pinned) store.Pin(id, true);
+    }
+
+    // History's rows and runs.db's records: a pinned agent compare run with models a and b and two calls each (seven records, one run), a
+    // request compare of two columns (two runs in one group) and a playground run. Four runs, ten records.
+    private static void DataRunTree(RunStore store, DateTimeOffset at)
+    {
+        RunRecord Grouping(string id, string? parent) =>
+            RunsRow(id, at, kind: RunKind.Parent) with { Source = "agent-compare", ParentId = parent, Provider = "", Model = "" };
+        store.Insert(Grouping("cmp_count", null));
+        foreach (var slot in new[] { "a", "b" })
+        {
+            store.Insert(Grouping("cmp_count-" + slot, "cmp_count"));
+            for (var call = 1; call <= 2; call++)
+                store.Insert(RunsRow($"cmp_count-{slot}-call{call}", at) with { Source = "agent-compare", ParentId = "cmp_count-" + slot });
+        }
+        Check(store.Pin("cmp_count", true), "the agent compare run is pinned");
+        foreach (var column in new[] { "col1", "col2" }) store.Insert(RunsRow(column, at) with { Source = "compare", GroupId = "grp_count" });
+        DataRun(store, "solo", at);
     }
 
     private static string DataIds(RunStore store) =>
@@ -291,6 +316,68 @@ internal static partial class Program
             await ThrowsAsync<ArgumentException>(() => host.Storage.SaveHistoryAsync(new RunHistorySettings(0)), "no retention under a day");
             await ThrowsAsync<ArgumentException>(() => host.Storage.SaveHistoryAsync(new RunHistorySettings(RunHistorySettings.MaxRetentionDays + 1)), "nor over ten years");
             Equal<int?>(null, host.Settings.Get<RunHistorySettings>().RetentionDays, "a refused value is not saved");
+        }),
+
+        Case("data.runs.counted-as-history-counts-them", async () =>
+        {
+            await using var host = new DataHost("run-count");
+            DataRunTree(host.Runs, DateTimeOffset.UtcNow);
+            var history = new RunHistoryPages(host.Services).Page(new RunHistoryFilter());
+            Equal(4L, history.TotalAll, "History lists four runs: the agent compare run, two compare columns and a playground run");
+            var facts = host.Storage.RunFacts();
+            Equal((history.TotalAll, history.PinnedCount), (facts.Count, facts.Pinned), "Settings › Data counts runs, and pinned runs, as History does");
+            Equal(10L, facts.Records, "runs.db holds ten records: the agent compare run is seven of them");
+            Equal("10 records", facts.RecordsText, "shown apart from the runs");
+            var cleared = await host.Storage.ClearHistoryAsync("DELETE");
+            Equal(4, cleared.Count, "Clear history deletes the four runs the danger zone named");
+            Check(cleared.Message.StartsWith("Deleted 4 runs (10 records) ", StringComparison.Ordinal), "and says so: " + cleared.Message);
+            Equal(0L, host.Runs.Count(), "every record is gone");
+            facts = host.Storage.RunFacts();
+            Equal((0L, 0L), (facts.Count, facts.Records), "nothing left");
+            Check(facts.RecordsText is null, "no records line when each record is a run");
+        }),
+
+        Case("data.page.counts-runs-as-history-does", async () =>
+        {
+            var root = Temp("data-app-runs");
+            try
+            {
+                var data = Path.Join(root, "data");
+                Directory.CreateDirectory(data);
+                DataRunTree(new RunStore(new RunsDb(Path.Join(data, RunsDb.FileName))), DateTimeOffset.UtcNow);
+                SqliteClearPools();
+                await using var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = data, Arguments = ["--" + DataStorageOptions.OpenFoldersKey + "=false"] });
+                string RunsChip(string text) =>
+                    Regex.Match(text, "data-location=\"runs\".*?<span class=\"ps-chip\">([^<]+)</span>", RegexOptions.Singleline).Groups[1].Value;
+
+                var history = await app.Get("/history");
+                Equal(200, history.Status, "History: " + Cut(history.Text));
+                var total = Regex.Match(history.Text, "data-run-pagination>.*?Showing [^<]*? of ([0-9,]+) runs<", RegexOptions.Singleline);
+                Check(total.Success, "History's count of runs: " + Cut(history.Text));
+                Equal("4", total.Groups[1].Value, "History counts four runs");
+                Check(history.Text.Contains("All 4 runs and their stream events", StringComparison.Ordinal), "History's own Clear history names four");
+                var filtered = Regex.Match((await app.Get("/history?source=compare")).Text, "data-run-count>([0-9,]+) of ([0-9,]+) runs<");
+                Equal(("2", "4"), (filtered.Groups[1].Value, filtered.Groups[2].Value), "a filtered History counts its two compare columns of the same four");
+                var page = await app.Get(DataController.Route);
+                Equal(200, page.Status, "Settings › Data: " + Cut(page.Text));
+                Equal("4 runs", RunsChip(page.Text), "Settings › Data's run history line counts the same four");
+                Check(page.Text.Contains("in 10 records (an agent compare run keeps one for each model and call)", StringComparison.Ordinal), "the records are shown apart");
+                Check(page.Text.Contains("Deletes all 4 runs (10 records),", StringComparison.Ordinal), "the danger zone names the same four");
+                Check(page.Text.Contains("data-confirm-body=\"All 4 runs (10 records),", StringComparison.Ordinal), "and so does its confirmation");
+                var facts = (await app.Get("/api/data/facts")).Body!["runs"]!;
+                Equal((4L, 10L, 1L), (facts["count"]!.GetValue<long>(), facts["records"]!.GetValue<long>(), facts["pinned"]!.GetValue<long>()), "the facts as JSON");
+
+                var cleared = await app.SendAsync(HttpMethod.Post, "/api/data/danger/history", new JsonObject { ["confirm"] = "DELETE" }, origin: app.Origin);
+                Equal(200, cleared.Status, "cleared: " + cleared.Text);
+                Equal(4, cleared.Body!["count"]!.GetValue<int>(), "the four runs it named");
+                page = await app.Get(DataController.Route);
+                Equal("0 runs", RunsChip(page.Text), "none left");
+                Check(Regex.IsMatch(page.Text, "<button[^>]*data-danger=\"history\"[^>]*disabled=\"disabled\""), "nothing more to clear");
+            }
+            finally
+            {
+                DeleteTemp(root);
+            }
         }),
 
         Case("data.workspaces.remove-and-clean-up-remove-workspaces", async () =>
@@ -464,7 +551,7 @@ internal static partial class Program
             var envKey = Planted("sk-env-");
             var stored = Planted("sk-ant-");
             var literal = Planted("sk-gw-");
-            await using var host = new DataHost("danger", new Dictionary<string, string> { ["OPENAI_API_KEY"] = envKey });
+            await using var host = new DataHost("danger", new Dictionary<string, string> { ["OPENAI_API_KEY"] = envKey }, presets: true);
             await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", stored));
             await host.Custom.ImportAsync(DataModelsJson(literal));
             await host.Settings.SaveAsync(new RunHistorySettings(90));
@@ -474,6 +561,17 @@ internal static partial class Program
             int Stored() => host.Accounts.List().Count(account => !account.ReadOnly);
             Equal(2, Stored(), "an API key and the custom provider's key");
             var keyFiles = Directory.GetFiles(host.Options.KeysDirectory).Length;
+            // What no action names: a preset (a record, not a setting, so no IDataResetPart resets it) and an agent compare workspace.
+            var preset = host.Presets.Add(new Preset { Name = "Keep me", Kind = PresetPages.Playground, Provider = "faux", Model = "echo" });
+            var workspace = await host.WorkspaceAsync("cmp_keep", "a");
+            async Task UnnamedKeptAsync(string after)
+            {
+                Equal((1, preset.Name), (host.Presets.Count(), host.Presets.Get(preset.Id)?.Name), after + " keeps the preset");
+                Check(workspace.Slots.Count == 1 && workspace.Slots.All(slot => Directory.Exists(slot.Path)), after + " keeps the compare workspace's folder");
+                Equal(1, (await host.Workspaces.GetAsync("cmp_keep"))?.Slots.Count(slot => slot.State == WorkspaceSlotState.Ready), after + " keeps the workspace in the manager");
+                Equal(1, (await host.Storage.PageAsync()).Workspaces.Rows.Count, after + ": Settings › Data still lists the workspace");
+            }
+            await UnnamedKeptAsync("the start");
 
             foreach (var typed in new[] { null, "", "delete", "DELETE ", "Delete" })
             {
@@ -483,6 +581,7 @@ internal static partial class Program
                 await ThrowsAsync<ArgumentException>(() => host.Storage.ResetSettingsAsync(typed), "settings need DELETE");
             }
             Equal((2, 2L, 90), (Stored(), host.Runs.Count(), host.Settings.Get<RunHistorySettings>().RetentionDays!.Value), "nothing changed without DELETE");
+            await UnnamedKeptAsync("an action without DELETE");
 
             var credentials = await host.Storage.DeleteCredentialsAsync("DELETE");
             Equal(2, credentials.Count, "both stored credentials");
@@ -492,6 +591,7 @@ internal static partial class Program
             Equal((2L, 90), (host.Runs.Count(), host.Settings.Get<RunHistorySettings>().RetentionDays!.Value), "history and settings kept");
             Check(host.Custom.Current.Find("gateway") is not null, "custom providers kept");
             Equal(keyFiles, Directory.GetFiles(host.Options.KeysDirectory).Length, "the key ring kept");
+            await UnnamedKeptAsync("Delete credentials");
 
             var again = Planted("sk-ant-");
             await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", again));
@@ -500,6 +600,7 @@ internal static partial class Program
             Equal(0L, host.Runs.Count(), "runs.db is empty");
             Equal((1, 90), (Stored(), host.Settings.Get<RunHistorySettings>().RetentionDays!.Value), "credentials and settings kept");
             Equal(0L, ReadDb(host.Runs.Db.Path, "SELECT COUNT(*) FROM run_raw;", reader => reader.GetInt64(0))[0], "raw payloads gone");
+            await UnnamedKeptAsync("Clear history");
 
             DataRun(host.Runs, "r3", DateTimeOffset.UtcNow);
             var reset = await host.Storage.ResetSettingsAsync("DELETE");
@@ -508,6 +609,7 @@ internal static partial class Program
             Equal(0, host.Custom.Current.Providers.Count + host.Custom.Current.Overrides.Count, "custom providers reset");
             Check(File.Exists(host.Custom.Store.BackupPath), "models.json kept as models.json.bak");
             Equal((1, 1L), (Stored(), host.Runs.Count()), "credentials and history kept");
+            await UnnamedKeptAsync("Reset settings");
             var backup = host.Storage.Backups().Single();
             Check(reset.Message.Contains(Path.GetFileName(backup), StringComparison.Ordinal), "the result names the copy");
             var copy = JsonNode.Parse(File.ReadAllText(backup));
@@ -659,9 +761,32 @@ internal static partial class Program
             var id = await chat.CreateAsync("Remember the data page", "req-data-1");
             await WaitUntilAsync(async () => (await chat.App.Get("/api/chats/" + id)).Body?["running"]?.GetValue<bool>() == false, "the chat is idle", TimeSpan.FromSeconds(30));
             var runs = Path.Join(chat.Data, RunsDb.FileName);
-            var before = File.Exists(runs) ? ReadDb(runs, "SELECT COUNT(*) FROM runs;", reader => reader.GetInt64(0))[0] : 0;
+            long RunRows() => ReadDb(runs, "SELECT COUNT(*) FROM runs;", reader => reader.GetInt64(0))[0];
+            Check(File.Exists(runs), "runs.db exists");
+            var before = RunRows();
+            Check(before >= 1, "the chat's model call is recorded in run history, so keeping it means something: " + before);
             var page = (await chat.App.Get(DataController.Route)).Text;
             Check(page.Contains("1 chat", StringComparison.Ordinal), "the page counts the chat");
+
+            // What Delete chats does not name: a setting, a stored credential and a preset.
+            var key = Planted("sk-ant-");
+            Equal(200, (await chat.PostAsync("/api/data/history", new JsonObject { ["retentionDays"] = 90 })).Status, "a setting saved");
+            var account = await chat.PostAsync("/api/credentials/accounts", new JsonObject { ["provider"] = "anthropic", ["apiKey"] = key, ["label"] = "Kept key" });
+            Equal(200, account.Status, "a credential stored: " + Cut(account.Text));
+            var preset = await chat.PostAsync("/api/presets", new JsonObject
+            {
+                ["page"] = "presets", ["capture"] = new JsonObject { ["provider"] = "faux", ["model"] = "echo", ["systemPrompt"] = "Be kind." }, ["name"] = "Kept preset",
+            });
+            Equal(200, preset.Status, "a preset saved: " + Cut(preset.Text));
+            async Task UnnamedKeptAsync(string when)
+            {
+                var facts = (await chat.App.Get("/api/data/facts")).Body!;
+                Equal(90, facts["runs"]!["settings"]!["retentionDays"]!.GetValue<int>(), when + ": the setting is kept");
+                Equal(1, facts["credentials"]!["stored"]!.GetValue<int>(), when + ": the credential is kept");
+                var presets = (await chat.App.Get("/api/presets")).Body!["presets"]!.AsArray();
+                Equal("Kept preset", string.Join(",", presets.Select(item => item!["name"]!.GetValue<string>())), when + ": the preset is kept");
+            }
+            await UnnamedKeptAsync("before");
 
             var zip = await chat.App.Http.GetAsync(new Uri(chat.App.Base, "/api/data/export/chats"));
             Equal(System.Net.HttpStatusCode.OK, zip.StatusCode, "the zip");
@@ -682,8 +807,9 @@ internal static partial class Program
             var archive = Path.Join(chat.Data, "device", "archive");
             Equal(1, Directory.GetDirectories(archive).Length, "its session is in the archive");
             Check(ChatArchiveJanitor.ArchivedAt(Path.GetFileName(Directory.GetDirectories(archive)[0])) is not null, "named so the purge can date it");
-            var after = File.Exists(runs) ? ReadDb(runs, "SELECT COUNT(*) FROM runs;", reader => reader.GetInt64(0))[0] : 0;
-            Equal(before, after, "run history is kept");
+            Equal(before, RunRows(), "run history is kept");
+            await UnnamedKeptAsync("Delete chats");
+            Check(!(await chat.App.Get("/api/data/facts")).Text.Contains(key, StringComparison.Ordinal), "the facts never hold the key");
             page = (await chat.App.Get(DataController.Route)).Text;
             Check(page.Contains("0 chats", StringComparison.Ordinal) && page.Contains("1 archived", StringComparison.Ordinal), "the page shows the archive");
         }),

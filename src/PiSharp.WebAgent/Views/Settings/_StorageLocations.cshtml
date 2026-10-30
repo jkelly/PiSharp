@@ -1,6 +1,7 @@
 @* Decision 0011 (run W4, unit R9): the mockups' Locations section and its _StorageLocations card: the usage panel (_DataUsage), then one row
    per location with its size and an Open folder button: the data folder (and what set it: the default, PISHARP_WEBAGENT_DATA or --data),
-   the chats (the durable device folder, with how many run now), run history (runs.db, with its raw payloads and stream events), the Data
+   the chats (the durable device folder, with how many run now), run history (runs.db: its runs counted as History counts them, the
+   records apart when an agent compare run keeps one per model and call, its raw payloads and stream events), the Data
    Protection key ring (its keys and when the active one expires, and what losing the folder means) and credentials.json (what it holds, by
    provider; never a value). Model: DataPage. *@
 @using PiSharp.WebAgent.DataStorage
@@ -72,13 +73,13 @@
           {
             <text>Run history is not part of this app.</text>
           }
-          else if (runs.Count == 0)
+          else if (runs.Records == 0)
           {
             <text>SQLite, @DataFolders.Size(runs.Bytes) on disk. No runs recorded yet.</text>
           }
           else
           {
-            <text>SQLite, @DataFolders.Size(runs.Bytes) on disk. Raw payloads take about @DataFolders.Size(runs.RawBytes)@(runs.RawRuns > 0 ? " (" + DataStorageService.Plural(runs.RawRuns, "run") + ")" : "") and stream events about @DataFolders.Size(runs.EventBytes).</text>
+            <text>SQLite, @DataFolders.Size(runs.Bytes) on disk@(runs.RecordsText is { } records ? " in " + records + " (an agent compare run keeps one for each model and call)" : ""). Raw payloads take about @DataFolders.Size(runs.RawBytes)@(runs.RawRuns > 0 ? " (" + DataStorageService.Plural(runs.RawRuns, "run") + ")" : "") and stream events about @DataFolders.Size(runs.EventBytes).</text>
           }
         </div>
       </div>

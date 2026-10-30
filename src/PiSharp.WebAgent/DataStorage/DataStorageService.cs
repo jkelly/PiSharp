@@ -193,21 +193,24 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return 0; }
     }
 
-    /// <summary>runs.db's facts, with what each retention the page offers would delete now.</summary>
+    /// <summary>runs.db's facts, with what each retention the page offers would delete now. Runs are counted as History › Runs counts them
+    /// (top-level runs: an agent compare run with its models and their calls is one), so both pages show the same number; the rows runs.db
+    /// holds are <see cref="DataRunFacts.Records"/>.</summary>
     public DataRunFacts RunFacts()
     {
         var history = settings.Get<RunHistorySettings>();
         var display = DataFolders.Display(RunsPath, folder: false);
         if (Runs is not { } store) return new DataRunFacts(false, display, 0, 0, 0, 0, 0, 0, history, new Dictionary<int, long>());
-        var count = store.Count();
+        var count = store.CountRoots();
+        var records = store.Count();
         var db = store.Db.Db;
-        var pinned = Long(db.Scalar("SELECT COUNT(*) FROM runs WHERE pinned = 1;"));
+        var pinned = store.CountRoots(pinned: true);
         var raw = db.Query("SELECT COALESCE(SUM(LENGTH(CAST(data AS BLOB))), 0), COUNT(DISTINCT run_id) FROM run_raw;",
             reader => (reader.GetInt64(0), reader.GetInt64(1)))[0];
         var events = Long(db.Scalar("SELECT COALESCE(SUM(LENGTH(CAST(event AS BLOB))), 0) FROM run_events;"));
         var now = clock.GetUtcNow();
         var older = DataRunFacts.Choices.OfType<int>().ToDictionary(days => days, days => PastRetention(store, now, days));
-        return new DataRunFacts(true, display, count, pinned, store.SizeBytes(), raw.Item1, raw.Item2, events, history, older);
+        return new DataRunFacts(true, display, count, pinned, store.SizeBytes(), raw.Item1, raw.Item2, events, history, older) { Records = records };
     }
 
     // Runs a retention of `days` would delete now: RunStore.Cleanup's own rule (unpinned, not running, not in a pinned run's tree).
@@ -505,13 +508,16 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
             $"Deleted {Plural(removed, "stored credential")}." + (left > 0 ? $" {Plural(left, "environment variable")} still provide{(left == 1 ? "s" : "")} keys." : ""), failed);
     }
 
-    /// <summary>Deletes every run (pinned ones too) with its events and raw payloads, and compacts runs.db.</summary>
+    /// <summary>Deletes every run (pinned ones too) with its events and raw payloads, and compacts runs.db. The result counts runs as the
+    /// page and History count them (top-level runs), so it says the number the confirmation named.</summary>
     public Task<DataDangerResult> ClearHistoryAsync(string? confirm, CancellationToken cancellationToken = default)
     {
         RequireConfirm(confirm);
         var store = Runs ?? throw new InvalidOperationException("Run history is not part of this app.");
         var before = store.SizeBytes();
-        var deleted = store.Clear(keepPinned: false);
+        var runs = store.CountRoots();
+        var rows = store.Clear(keepPinned: false);
+        var deleted = (int)Math.Min(runs, rows); // Never more than were deleted (a retention cleanup may have run in between).
         var failed = new List<string>();
         try
         {
@@ -524,8 +530,9 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
             failed.Add("runs.db could not be compacted now (it is in use); it shrinks after the app restarts.");
         }
         var freed = Math.Max(0, before - store.SizeBytes());
-        log?.LogInformation("Settings › Data: run history cleared ({Count} runs, {Bytes} bytes freed).", deleted, freed);
-        return Task.FromResult(new DataDangerResult("history", deleted, $"Deleted {Plural(deleted, "run")} and freed {DataFolders.Size(freed)}.", failed));
+        log?.LogInformation("Settings › Data: run history cleared ({Count} runs, {Rows} records, {Bytes} bytes freed).", deleted, rows, freed);
+        var records = rows > deleted ? $" ({Plural(rows, "record")})" : "";
+        return Task.FromResult(new DataDangerResult("history", deleted, $"Deleted {Plural(deleted, "run")}{records} and freed {DataFolders.Size(freed)}.", failed));
     }
 
     /// <summary>Stops and archives every chat (they stay in the archive for 30 days).</summary>

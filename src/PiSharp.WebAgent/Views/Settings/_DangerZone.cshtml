@@ -11,6 +11,8 @@
     var chats = Model.Chats;
     var credentials = Model.Credentials;
     var reset = Model.Reset;
+    // Runs as History counts them; the records runs.db holds beside them when an agent compare run keeps more than one.
+    var records = runs.RecordsText is { } text ? " (" + text + ")" : "";
     string Join(IReadOnlyList<string> names) => names.Count <= 1 ? string.Join("", names) : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
     var environment = credentials.Environment.Count == 0 ? null
         : credentials.Environment.Count == 1 ? credentials.Environment[0] + " from the environment keeps working."
@@ -32,12 +34,12 @@
     <div class="setting-row" data-danger-row="history">
       <div>
         <div class="setting-label">Clear run history</div>
-        <div class="setting-desc">Deletes all @DataStorageService.Plural(runs.Count, "run"), their payloads and events from <span class="ps-mono">runs.db</span> (@DataFolders.Size(runs.Bytes)). Chats are kept.</div>
+        <div class="setting-desc">Deletes all @DataStorageService.Plural(runs.Count, "run")@records, their payloads and events from <span class="ps-mono">runs.db</span> (@DataFolders.Size(runs.Bytes)). Chats are kept.</div>
       </div>
       <div class="setting-control">
-        <button class="btn btn-sm btn-outline-danger" type="button" data-danger="history" disabled="@(!runs.Available || runs.Count == 0)"
+        <button class="btn btn-sm btn-outline-danger" type="button" data-danger="history" disabled="@(!runs.Available || runs.Records == 0)"
                 data-confirm-title="Clear all run history?"
-                data-confirm-body="All @DataStorageService.Plural(runs.Count, "run"), with their raw payloads and SSE events, are deleted from runs.db, pinned ones too. Chats and presets are kept."
+                data-confirm-body="All @DataStorageService.Plural(runs.Count, "run")@records, with their raw payloads and SSE events, are deleted from runs.db, pinned ones too. Chats and presets are kept."
                 data-confirm-detail="runs.db · @DataFolders.Size(runs.Bytes) · compacted afterwards (VACUUM)"
                 data-confirm-ok="Clear history">Clear history…</button>
       </div>
