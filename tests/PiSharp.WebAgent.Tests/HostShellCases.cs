@@ -72,20 +72,13 @@ internal static partial class Program
             Equal("/chat/new", ShellNav.Primary[0].Href, "New chat");
             foreach (var (route, feature) in LaterFeature.Pages)
                 Equal(feature.Id, ShellNav.Primary.Single(item => item.Href == route).Id, "the later page of " + route);
-            foreach (var (id, feature) in LaterFeature.SettingsPages)
-            {
-                var item = ShellNav.SettingsItem(id) ?? throw new InvalidOperationException("No settings item " + id);
-                Equal(item.Label, feature.Title, "the later settings page " + id);
-                Equal(item.Icon, feature.Icon, "its icon");
-                Check(feature.Settings, id + " is a settings page");
-            }
             Equal(null, ShellNav.SettingsItem("nope"), "an unknown settings id");
 
             var later = typeof(ShellController).GetMethod(nameof(ShellController.Later))!.GetCustomAttributes<HttpGetAttribute>().Select(a => a.Template).Order().ToList();
             Equal(string.Join(",", LaterFeature.Pages.Keys.Order()), string.Join(",", later), "every later sidebar page has a route");
-            var template = typeof(ShellController).GetMethod(nameof(ShellController.SettingsLater))!.GetCustomAttribute<HttpGetAttribute>()!.Template!;
-            var ids = Regex.Match(template, @"\^\(([^)]+)\)\$").Groups[1].Value.Split('|').Order();
-            Equal(string.Join(",", LaterFeature.SettingsPages.Keys.Order()), string.Join(",", ids), "every later settings page has a route, and no other");
+            // W4 T4: every settings page is built, so the settings placeholder (its route and view) is gone.
+            Equal("Later", string.Join(",", typeof(ShellController).GetMethods().Where(method => method.GetCustomAttributes<HttpGetAttribute>().Any()).Select(method => method.Name)),
+                "the shell keeps one placeholder route, the sidebar's");
         }),
 
         Case("host.faux-catalog-and-fallback-registrations", () =>

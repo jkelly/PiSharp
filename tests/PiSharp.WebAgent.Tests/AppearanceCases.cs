@@ -1,7 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using PiSharp.WebAgent.Appearance;
-using PiSharp.WebAgent.Shell;
 
 // Decision 0011 (run W3, unit AP): Settings › Appearance. The preference catalogue (AppearancePrefs) is the one appearance.js and
 // appearance.css implement (keys, values, defaults, <html> attributes, storage keys, event name); the page renders every control, the theme
@@ -74,7 +73,7 @@ internal static partial class Program
             Equal(1, Regex.Matches(shell, @"closest\('\[data-theme-toggle\]'\)").Count, "one toggle handler");
             Check(shell.Contains("'pisharp:appearance'", StringComparison.Ordinal), "the icons follow a change made elsewhere");
             Check(Regex.IsMatch(shell, @"key === 'l'\) \{[^}]*toggleTheme\(\);"), "Ctrl+Shift+L toggles through it");
-            Check(!LaterFeature.SettingsPages.ContainsKey("appearance") && !LaterFeature.SettingsPages.ContainsKey("about"), "no placeholder for Appearance or About");
+            Check(typeof(PiSharp.WebAgent.Controllers.ShellController).GetMethod("SettingsLater") is null, "no settings placeholder, for Appearance, About or any other");
         }),
 
         Case("appearance.page-renders-every-control-and-the-preview", async () =>

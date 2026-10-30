@@ -11,7 +11,6 @@ using System.Text.RegularExpressions;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Data;
-using PiSharp.WebAgent.Shell;
 using PiSharp.WebAgent.Spend;
 
 internal static partial class Program
@@ -20,10 +19,7 @@ internal static partial class Program
     [
         Case("spend.pages.placeholder-is-gone", () =>
         {
-            Check(!LaterFeature.SettingsPages.ContainsKey("spend"), "Settings › Spend is no longer a later-milestone page");
-            var route = typeof(PiSharp.WebAgent.Controllers.ShellController).GetMethod("SettingsLater")!
-                .GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.HttpGetAttribute), false).Cast<Microsoft.AspNetCore.Mvc.HttpGetAttribute>().Single().Template!;
-            Check(!route.Contains("spend", StringComparison.Ordinal), "the placeholder route leaves spend out: " + route);
+            Check(typeof(PiSharp.WebAgent.Controllers.ShellController).GetMethod("SettingsLater") is null, "Settings › Spend is no later-milestone page: no settings placeholder is left (W4 T4)");
             Check(typeof(PiSharp.WebAgent.Controllers.SpendController).GetMethod("Settings") is not null, "SpendController serves it");
         }),
 
