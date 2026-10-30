@@ -32,7 +32,7 @@ internal static partial class NativeExtensionSessionCommandTests
         var arguments = new { name, opaque = new { ordered = new object?[] { 2, null, "\u6587" }, future = (object?)null } };
         var rawArguments = JsonSerializer.Serialize(arguments); var greeting = "Hello, " + name + "!";
         var turn = JsonSerializer.SerializeToNode(Tool(api, "hello", callId, arguments, user))!;
-        turn["expectedRequest"] = HelloInitialRequest(api, user);
+        turn["expectedRequest"] = HelloInitialRequest(api, user, initial.Header!.Id);
         await Script(files, turn, Text(api, "Hello final", [greeting]));
         var script = await File.ReadAllBytesAsync(files.Script);
         var report = HelloSuccess(await HelloRun(files, "prompt", api, user), api + ":prompt");
@@ -85,7 +85,8 @@ internal static partial class NativeExtensionSessionCommandTests
             _ = HelloSuccess(await HelloRun(files, "create", api, enabled: enabled), api + ":" + variant + ":create"); var initial = await Complete(files);
             HelloLoadout(initial, enabled);
             var target = files.In("hello-must-not-write.txt");
-            object arguments = variant == "initial-schema" ? new { name = (object)7 } :
+            // Pi's validateToolArguments coerces a number to a string, so the invalid initial name is an array.
+            object arguments = variant == "initial-schema" ? new { name = (object)new[] { "Ada" } } :
                 variant == "native-write" ? new { path = target, content = "no write grant" } :
                 new { name = variant == "final-schema" ? "fixture-invalid-replacement" : "Ada" };
             var toolName = variant == "native-write" ? "write" : "hello";
@@ -110,7 +111,7 @@ internal static partial class NativeExtensionSessionCommandTests
         }
     }
 
-    private static JsonNode HelloInitialRequest(string api, string user)
+    private static JsonNode HelloInitialRequest(string api, string user, string sessionId)
     {
         // Authored expected HTTP body, independent of the production request projectors.
         var anthropic = JsonSerializer.SerializeToNode(SessionCommandTests.AnthropicInitialRequest(user))!.AsObject();
@@ -127,16 +128,18 @@ internal static partial class NativeExtensionSessionCommandTests
             var declaration = source ?? throw new InvalidOperationException("Authored declaration is absent.");
             var parameters = declaration["input_schema"]!.DeepClone();
             // Pi's read/write TypeBox schemas have no additionalProperties; non-strict projections send them as declared.
+            // The offline model declares no compat.supportsStrictMode, so its Responses tools carry no strict field.
             var function = new JsonObject { ["name"] = declaration["name"]!.DeepClone(), ["description"] = declaration["description"]!.DeepClone(), ["parameters"] = parameters };
             if (api == "openai-completions") tools.Add(new JsonObject { ["type"] = "function", ["function"] = function });
-            else { function["type"] = "function"; function["strict"] = false; tools.Add(function); }
+            else { function["type"] = "function"; tools.Add(function); }
         }
         if (api == "openai-completions") return new JsonObject { ["model"] = "pisharp-offline-completions-session", ["stream"] = true, ["store"] = false,
             ["max_completion_tokens"] = 8192, ["stream_options"] = new JsonObject { ["include_usage"] = true }, ["tools"] = tools,
             // Registered input admission commits text blocks, which this provider preserves as an array.
             ["messages"] = new JsonArray(new JsonObject { ["role"] = "system", ["content"] = "Explicit offline session file tools." },
                 new JsonObject { ["role"] = "user", ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = user }) }) };
-        return new JsonObject { ["model"] = "pisharp-offline-session", ["stream"] = true, ["store"] = false, ["tools"] = tools,
+        // Responses requests carry the session id as prompt_cache_key.
+        return new JsonObject { ["model"] = "pisharp-offline-session", ["stream"] = true, ["store"] = false, ["prompt_cache_key"] = sessionId, ["tools"] = tools,
             ["input"] = new JsonArray(new JsonObject { ["role"] = "system", ["content"] = "Explicit offline session file tools." },
                 new JsonObject { ["role"] = "user", ["content"] = new JsonArray(new JsonObject { ["type"] = "input_text", ["text"] = user }) }) };
     }
