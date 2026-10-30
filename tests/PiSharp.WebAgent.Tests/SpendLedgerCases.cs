@@ -15,7 +15,9 @@ using PiSharp.WebAgent.Spend;
 // or pass as the setting says); recovery marks reservations a previous run left reserved as uncertain, never settled, in process and in
 // the built app; Resolve settles at the estimate, at an entered amount, or releases. Also: caps round-trip and refuse a second cap on one
 // target; the decision's causes, panes, fit and 80% warnings; the first ending wins; the ledger page's SQL agrees with
-// SpendLedgerQuery.Matches and SpendTotal.Of; the cache meter's saved and wasted, its miss rule checked against CacheStats.
+// SpendLedgerQuery.Matches and SpendTotal.Of; the cache meter's saved and wasted, its miss rule checked against CacheStats. W3 fix 2: recovery
+// needs the data folder's lock (WebAgentDataLock), so a second app on a folder in use is refused with one line, in process whichever hosted
+// service asks for the ledger first and as a real second process while a slow answer streams, and the live reservation stays reserved.
 internal static partial class Program
 {
     internal static IEnumerable<(string, Func<Task>)> SpendLedgerCases() =>
@@ -455,6 +457,109 @@ internal static partial class Program
                 Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
                 DeleteTemp(root);
             }
+        }),
+
+        Case("spend.ledger.recovery-needs-the-data-folder-lock", async () =>
+        {
+            // W3 fix 2: startup recovery is safe because the app holds its data folder's lock, not because the chat area's hosted service
+            // (whose device lock refused a second app) happens to start before the spend area's. Here the ledger is the first thing a second
+            // app asks for, as if SpendRecovery started first.
+            var root = Temp("spend-ledger-lock");
+            try
+            {
+                var data = Path.Join(root, "data");
+                var options = new WebAgentOptions { DataDirectory = data, Faux = true, FauxMetered = true };
+                options.EnsureDirectories();
+                var db = new WebAgentDb(options.DatabasePath, LedgerMigrations);
+                db.Migrate();
+                Check((await new SpendLedger(db, new SettingsStore(db)).ReserveAsync(LedgerRequest("op-live", LedgerEstimate(380_000)))).Reserved, "a live reservation");
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                string State() => ReadDb(options.DatabasePath, "SELECT state FROM spend_reservations WHERE op = 'op-live';", reader => reader.GetString(0)).Single();
+                ServiceProvider Compose()
+                {
+                    var services = new ServiceCollection().AddLogging();
+                    services.AddWebAgentCore(options);
+                    services.AddWebAgentFallbacks(options);
+                    services.AddSpendArea(options);
+                    return services.BuildServiceProvider();
+                }
+
+                // The app that made the reservation still runs: it holds the folder's lock.
+                using (var running = WebAgentDataLock.Acquire(data))
+                {
+                    Check(running.Held && File.Exists(WebAgentDataLock.PathIn(data)), "the running app's lock file");
+                    Check(WebAgentDataLock.TryAcquire(data) is null, "a folder is locked once, in this process too");
+                    var refused = Throws<DataFolderLockedException>(() => WebAgentHost.CreateBuilder(options, ["--urls", "http://127.0.0.1:5199"]), "a second app's builder");
+                    Check(refused is InvalidOperationException && refused.Message.Contains(data, StringComparison.Ordinal) &&
+                        refused.Message.Contains(WebAgentDataLock.FileName, StringComparison.Ordinal),
+                        "an InvalidOperationException, which Program.cs prints as one line, naming the folder and the lock: " + refused.Message);
+                    await using (var second = Compose())
+                    {
+                        Throws<DataFolderLockedException>(() => second.GetRequiredService<SpendRecovery>(), "the second app's startup recovery, whatever starts first");
+                        Throws<DataFolderLockedException>(() => second.GetRequiredService<ISpendLedger>(), "or any other use of its ledger");
+                    }
+                    Equal("reserved", State(), "the running app's reservation stays reserved");
+                }
+
+                // Once that app is gone (the operating system lets its lock go), the next start recovers what it left reserved, and holds the
+                // folder until it is disposed.
+                _ = WebAgentHost.CreateBuilder(options, ["--urls", "http://127.0.0.1:5199"]);
+                await using (var next = Compose())
+                {
+                    var recovery = next.GetRequiredService<SpendRecovery>();
+                    await recovery.StartAsync(CancellationToken.None);
+                    Equal((1, "uncertain"), (recovery.Recovered, State()), "the reservation of an app that is gone becomes uncertain");
+                    Check(next.GetRequiredService<WebAgentDataLock>().Held && WebAgentDataLock.TryAcquire(data) is null, "the ledger's app holds the folder");
+                }
+                using (var free = WebAgentDataLock.TryAcquire(data)) Check(free is not null, "and lets it go when it is disposed");
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
+        }),
+
+        Case("spend.ledger.a-second-app-on-the-folder-leaves-live-reservations-reserved", async () =>
+        {
+            // The built app with priced faux while a slow answer streams (its reservation live), and a second app started on the same --data
+            // with another port: the second is refused with one line and exit code 2 before it opens anything, and the first app's row stays
+            // reserved, then settles at the reported cost when its answer ends.
+            await using var app = await MeteredRecoveryApp.StartAsync("spend-ledger-second-app");
+            var data = Path.Join(app.Root, "data");
+            // 300 words, one every 40 ms: about 12 s, far longer than the second app takes to be refused.
+            var id = await app.CreateAsync("slow: " + string.Join(' ', Enumerable.Range(1, 300).Select(index => $"w{index:000}")), "r1");
+            JsonObject live = null!;
+            await WaitUntilAsync(async () => (await app.RowsAsync(id)) is [var only] && LedgerText(live = only, "state") == "reserved",
+                "the request's worst case is reserved while it streams", TimeSpan.FromSeconds(30));
+            var op = LedgerText(live, "op")!;
+
+            var (exitCode, output) = await WebAgentApp.RunToExitAsync(new AppStart { DataDirectory = data, Arguments = ["--faux-metered"] },
+                ["--urls", $"http://127.0.0.1:{FreePort()}"]);
+            Equal(2, exitCode, "the second app refuses to start: " + output);
+            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            Equal(1, lines.Length, "one line: " + output);
+            Check(lines[0].StartsWith("PiSharp Web Agent: The data folder " + data + " is in use", StringComparison.Ordinal) &&
+                lines[0].Contains(WebAgentDataLock.FileName, StringComparison.Ordinal), "it says why: " + output);
+            Check(!output.Contains("Exception", StringComparison.Ordinal), "without a stack trace: " + output);
+
+            var still = (await app.RowsAsync(id)).Single();
+            Equal((op, "reserved", (string?)null), (LedgerText(still, "op"), LedgerText(still, "state"), LedgerText(still, "reason")),
+                "the first app's live reservation is untouched: " + still.ToJsonString());
+
+            // The first app goes on: its answer ends once and the row settles at the cost the answer reported, never uncertain.
+            var page = await app.WaitIdleAsync(id, html => AssistantArticles(html).Any(answer => answer.Contains("w300", StringComparison.Ordinal)), "the whole answer");
+            Equal(1, AssistantArticles(page).Count, "one answer, never cut off");
+            Equal(300, SlowWords(page), "all of it");
+            var settled = (await app.RowsAsync(id)).Single();
+            Equal((op, "settled", "actual"), (LedgerText(settled, "op"), LedgerText(settled, "state"), LedgerText(settled, "settlement")),
+                "settled at the reported cost: " + settled.ToJsonString());
+            Check(!app.App.Log.Contains("Exception", StringComparison.Ordinal), "the first app logged no error: " + app.App.Log);
+
+            // The lock goes with the process, even a killed one: nothing stale is left for the next start.
+            Check(WebAgentDataLock.TryAcquire(data) is null, "the running app holds its folder");
+            await app.App.StopAsync();
+            using (var free = WebAgentDataLock.TryAcquire(data)) Check(free is not null, "a killed app leaves no stale lock");
         }),
 
         Case("spend.ledger.queries-and-totals-match-the-reference-rules", async () =>

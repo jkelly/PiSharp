@@ -14,7 +14,9 @@
 // Startup recovery: rows a previous process left reserved can never be settled (that process's streams are gone), so the first call of a
 // new ledger, or SpendRecovery at start if it comes first, marks every row still reserved as uncertain ("stream dropped, no usage
 // reported") before anything else runs, never settled. Because it runs before this process's first reservation, a recovered durable
-// request that reuses its op finds the uncertain row, and the hosted services' start order does not matter.
+// request that reuses its op finds the uncertain row, and the hosted services' start order does not matter. Every row still reserved belongs
+// to a process that is gone because the app registers this ledger only behind its data folder's lock (WebAgentDataLock, W3 fix 2): no
+// other live app can share the folder.
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;

@@ -3,7 +3,10 @@
 // have charged it, so it becomes uncertain with the reason "stream dropped, no usage reported" and keeps counting toward the caps until
 // the user resolves it in History › Spend. It is never settled automatically. The ledger runs this once, before its first other call, so
 // the order in which the app's hosted services start does not matter; this service makes it happen at start even when nothing else
-// touches the ledger.
+// touches the ledger. W3 fix 2 (spend-core): "left by a previous process" is guaranteed by the data folder's lock, not by the hosted
+// services' order: the app holds <data>\webagent.lock (WebAgentDataLock) for as long as it runs and the ledger is made only once this process
+// holds it, so a second app started on a folder in use is refused before it can recover anything, and the first app's live reservations
+// stay reserved.
 using Microsoft.Extensions.Hosting;
 
 namespace PiSharp.WebAgent.Spend;

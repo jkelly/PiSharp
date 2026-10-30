@@ -4,6 +4,10 @@
 // Content-Security-Policy the hub sends. There are no login pages: the single user is whoever can reach loopback. The Data Protection key
 // ring lives in keys\, protected with DPAPI on Windows as in the hub, and is created at start. Fallback registrations (faux models, the faux
 // catalog, no recent chats) apply only where an area module registered nothing; --faux replaces the models and catalog whatever was registered.
+// Run W3 (fix 2, spend-core): one app per data folder. CreateBuilder refuses a folder whose webagent.lock another process holds, so a second
+// start on it ends with Program.cs's one-line message (exit 2) before it opens anything; UseWebAgentCore takes the lock for the app's life
+// before it prepares the folder (WebAgentDataLock), so nothing single-process (the Spend Guard's startup recovery) depends on the order the
+// hosted services start in.
 using System.Net;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -30,8 +34,11 @@ public static class WebAgentHost
 
     /// <summary>A builder whose content root is the output folder (so appsettings.json is found from any working directory), bound to
     /// <see cref="DefaultUrls"/> unless the configuration's <c>urls</c> names loopback addresses, and serving static web assets from a build
-    /// output.</summary>
-    /// <exception cref="InvalidOperationException">The configured <c>urls</c> name an address other than 127.0.0.1, localhost or [::1].</exception>
+    /// output. The data folder must not be locked by another app (<see cref="WebAgentDataLock"/>); the lock is only checked here, and taken
+    /// for good by <see cref="UseWebAgentCore"/>.</summary>
+    /// <exception cref="InvalidOperationException">The configured <c>urls</c> name an address other than 127.0.0.1, localhost or [::1], or
+    /// the data folder cannot be created.</exception>
+    /// <exception cref="DataFolderLockedException">Another Web Agent runs on the data folder.</exception>
     public static WebApplicationBuilder CreateBuilder(WebAgentOptions options, string[] args)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -39,6 +46,9 @@ public static class WebAgentHost
         var urls = builder.Configuration["urls"];
         if (string.IsNullOrWhiteSpace(urls)) builder.WebHost.UseUrls(DefaultUrls);
         else CheckLoopbackUrls(urls);
+        // After the address check (a refused --urls writes nothing) and before anything opens the folder: a second app on a folder in use is
+        // refused here, where Program.cs turns the refusal into one line, rather than by whichever hosted service first trips over a lock.
+        WebAgentDataLock.ThrowIfLocked(options.DataDirectory);
         // A build output serves wwwroot and PiSharp.Web.Common's _content through its static web assets manifest, a publish output from wwwroot.
         builder.WebHost.UseStaticWebAssets();
         return builder;
@@ -61,13 +71,15 @@ public static class WebAgentHost
         }
     }
 
-    /// <summary>Registers the core: <see cref="WebAgentOptions"/>, Data Protection (keys\, DPAPI on Windows), <see cref="WebAgentDb"/> with the
-    /// core and settings migrations, <see cref="ISettingsStore"/>, PiSharp.Web.Common's renderers, HostGuard with the default
-    /// Content-Security-Policy, and MVC.</summary>
+    /// <summary>Registers the core: <see cref="WebAgentOptions"/>, the data folder's <see cref="WebAgentDataLock"/> (taken when first resolved,
+    /// let go when the app is disposed), Data Protection (keys\, DPAPI on Windows), <see cref="WebAgentDb"/> with the core and settings
+    /// migrations, <see cref="ISettingsStore"/>, PiSharp.Web.Common's renderers, HostGuard with the default Content-Security-Policy, and
+    /// MVC.</summary>
     public static IServiceCollection AddWebAgentCore(this IServiceCollection services, WebAgentOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         services.AddSingleton(options);
+        services.AddSingleton(provider => WebAgentDataLock.Acquire(provider.GetRequiredService<WebAgentOptions>().DataDirectory));
         var protection = services.AddDataProtection().SetApplicationName(DataProtectionApplicationName)
             .PersistKeysToFileSystem(new DirectoryInfo(options.KeysDirectory));
         if (OperatingSystem.IsWindows()) protection.ProtectKeysWithDpapi();
@@ -104,12 +116,15 @@ public static class WebAgentHost
         return services;
     }
 
-    /// <summary>Prepares the data folder (folders, webagent.db migrations, the Data Protection key ring) and adds HostGuard first, then the
-    /// static files.</summary>
+    /// <summary>Takes the data folder's <see cref="WebAgentDataLock"/> for the app's life, prepares the folder (folders, webagent.db
+    /// migrations, the Data Protection key ring) and adds HostGuard first, then the static files.</summary>
+    /// <exception cref="DataFolderLockedException">Another Web Agent took the folder since <see cref="CreateBuilder"/> checked it.</exception>
     public static WebApplication UseWebAgentCore(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
         var options = app.Services.GetRequiredService<WebAgentOptions>();
+        // Before anything in the folder is touched, and before any hosted service starts (app.Run starts them).
+        app.Services.GetRequiredService<WebAgentDataLock>();
         options.EnsureDirectories();
         app.Services.GetRequiredService<WebAgentDb>().Migrate();
         // Data Protection creates its key lazily; protecting a probe creates (or loads) it now, so a broken key ring or DPAPI fails the start
