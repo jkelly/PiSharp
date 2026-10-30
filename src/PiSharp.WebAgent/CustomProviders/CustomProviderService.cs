@@ -4,8 +4,10 @@
 // (or replaces) the provider's API key account in the credential vault, labelled "<name> key"; an environment key is written as its
 // reference; a provider with no key has neither. Switching a provider away from a stored key, renaming it or removing it moves or removes
 // its vault accounts, after the file is written. Import moves a literal key into the vault, drops a !command key or header (the web app
-// does not run commands) and a key of a built-in provider (those are accounts), and says so in its warnings. Nothing returned here holds
-// a secret.
+// does not run commands) and every field of a built-in provider but its modelOverrides (its key is an account's, sent where that account
+// says), and says so in its warnings. A stored key only follows a provider to a server its saved entry already uses: a save or a test that
+// points it elsewhere needs the key typed again, and an import that does removes it (before the write, so no request pairs the new URL
+// with the old key). Nothing returned here holds a secret.
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -42,6 +44,15 @@ public sealed class CustomProviderService(CustomProviderStore store, IAccountSto
         ArgumentNullException.ThrowIfNull(provider);
         return provider.FileKey == CustomKeySource.None && StoredKey(provider.Id) is not null ? CustomKeySource.Stored : provider.FileKey;
     }
+
+    /// <summary>Why a stored key is not sent to a base URL on another server than the saved one (a save or a test without the key typed).</summary>
+    public const string StoredKeyElsewhere =
+        "The base URL now points to another server than the saved one, so the stored key is not sent there. Paste the API key again to use it with this server, or choose another key source.";
+
+    /// <summary>Whether the stored key of the provider the editor opened (<paramref name="originalId"/>) may be sent to
+    /// <paramref name="baseUrl"/>: only when that is a server its saved entry already uses.</summary>
+    public bool StoredKeyMayGo(string? originalId, string baseUrl) =>
+        CustomProviderJson.SameServers(originalId is { Length: > 0 } ? Entry(Current.Document, originalId) : null, new JsonObject { ["baseUrl"] = baseUrl });
 
     /// <summary>Whether the environment variable <paramref name="name"/> is set on the web host (never its value).</summary>
     public bool IsSet(string? name) => CustomProviderJson.IsVariable(name) && !string.IsNullOrEmpty(credentials.Environment(name!));
@@ -143,6 +154,9 @@ public sealed class CustomProviderService(CustomProviderStore store, IAccountSto
         var oldId = draft.OriginalId is { Length: > 0 } previous ? previous : null;
         var keep = source == "stored" ? StoredKey(id) ?? (oldId is null ? null : StoredKey(oldId)) : null;
         if (source == "stored" && typedKey is null && keep is null) throw new ArgumentException("Paste the API key to store, or choose another key source.");
+        // A stored key follows an edit only to the servers the saved entry already uses; another server gets it only when it is typed again.
+        if (source == "stored" && typedKey is null && !CustomProviderJson.SameServers(oldId is null ? null : Entry(before.Document, oldId), entry))
+            throw new ArgumentException(StoredKeyElsewhere);
         var name = Text(entry, "name") ?? id;
         var snapshot = await Store.UpdateAsync(document => Place(document, oldId, id, entry), async () =>
         {
@@ -204,7 +218,9 @@ public sealed class CustomProviderService(CustomProviderStore store, IAccountSto
     }
 
     /// <summary>Merges a models.json text into the file: its custom providers replace ones with the same id, its built-in entries'
-    /// overrides are merged by model. Literal keys move into the vault; what was left out is listed in the result's warnings.</summary>
+    /// overrides are merged by model (their other fields are not imported: a built-in provider's requests go where its account says).
+    /// Literal keys move into the vault; a replaced provider's stored key is removed when the import points it at another server (the key
+    /// is entered again in its editor). What was left out or removed is listed in the result's warnings.</summary>
     public async Task<CustomProviderImport> ImportAsync(string text, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -212,6 +228,7 @@ public sealed class CustomProviderService(CustomProviderStore store, IAccountSto
         var secrets = CustomProviderJson.ApiKeysIn(text).ToArray();
         if (ModelsJsonConfig.Parse(text, "the imported file").Error is { } schemaError) throw new ArgumentException(SecretText.Scrub(Flatten(schemaError), secrets));
         var imported = CustomProviderJson.ParseObject(text, out var parseError) ?? throw new ArgumentException(SecretText.Scrub(parseError, secrets));
+        if (CustomProviderJson.Providers(imported).Count == 0) throw new ArgumentException("The file has no providers to import.");
         var warnings = new List<string>();
         var keys = new List<(string Id, string Key, string Name)>();
         var entries = new List<(string Id, JsonObject Entry)>();
@@ -222,8 +239,17 @@ public sealed class CustomProviderService(CustomProviderStore store, IAccountSto
             var entry = (JsonObject)source.DeepClone();
             if (CustomProviderJson.IsBuiltin(id))
             {
-                if (entry.Remove("apiKey")) warnings.Add($"The apiKey of {id} was not imported: built-in providers use their accounts (Settings › Providers).");
-                overrides += (entry["modelOverrides"] as JsonObject)?.Count ?? 0;
+                // Only the model overrides of a built-in provider are imported: a baseUrl, headers, compat, models, api, authHeader or oauth
+                // would send the key of the provider's account somewhere its account does not say.
+                foreach (var field in CustomProviderJson.BuiltinIgnoredFields(entry))
+                {
+                    entry.Remove(field);
+                    warnings.Add(field == "apiKey"
+                        ? $"The apiKey of {id} was not imported: built-in providers use their accounts (Settings › Providers)."
+                        : $"The {field} of {id} {(field is "headers" or "models" ? "were" : "was")} not imported: built-in providers use their accounts' settings (Settings › Providers).");
+                }
+                if (entry[CustomProviderJson.BuiltinRoutedField] is not JsonObject { Count: > 0 } builtinOverrides) continue;
+                overrides += builtinOverrides.Count;
             }
             else
             {
@@ -242,31 +268,43 @@ public sealed class CustomProviderService(CustomProviderStore store, IAccountSto
             DropUnsafeHeaders(id, entry, warnings);
             entries.Add((id, entry));
         }
-        if (entries.Count == 0) throw new ArgumentException("The file has no providers to import.");
-        await Store.UpdateAsync(document =>
+        if (entries.Count > 0)
         {
-            var target = CustomProviderJson.Providers(document);
-            foreach (var (id, entry) in entries)
+            // The custom providers whose stored key goes: replaced by an entry that brings no literal key and points at another server.
+            var unkeyed = new List<string>();
+            await Store.UpdateAsync(document =>
             {
-                if (CustomProviderJson.IsBuiltin(id) && target[id] is JsonObject existing)
+                var target = CustomProviderJson.Providers(document);
+                unkeyed.Clear();
+                foreach (var (id, entry) in entries)
                 {
-                    foreach (var (field, value) in entry)
+                    if (CustomProviderJson.IsBuiltin(id))
                     {
-                        if (field == "modelOverrides" && value is JsonObject incoming && existing["modelOverrides"] is JsonObject current)
-                            foreach (var (model, fields) in incoming) current[model] = fields?.DeepClone();
-                        else existing[field] = value?.DeepClone();
+                        // Only modelOverrides is left: merged by model into the file's entry (whose other fields stay the user's).
+                        var incoming = (JsonObject)entry[CustomProviderJson.BuiltinRoutedField]!;
+                        if (target[id] is not JsonObject existing) target[id] = entry.DeepClone();
+                        else if (existing[CustomProviderJson.BuiltinRoutedField] is not JsonObject current) existing[CustomProviderJson.BuiltinRoutedField] = incoming.DeepClone();
+                        else foreach (var (model, fields) in incoming) current[model] = fields?.DeepClone();
+                        continue;
                     }
+                    if (!keys.Any(key => key.Id == id) && accounts.List(id).Any(account => account.Kind == AccountKind.ApiKey) &&
+                        !CustomProviderJson.SameServers(target[id] as JsonObject, entry))
+                        unkeyed.Add(id);
+                    target[id] = entry.DeepClone();
                 }
-                else target[id] = entry.DeepClone();
-            }
-        }, async () =>
-        {
-            foreach (var (id, key, name) in keys)
+            }, async () =>
             {
-                if (StoredKey(id) is { } current) await accounts.ReplaceApiKeyAsync(current.Id, key, null, cancellationToken).ConfigureAwait(false);
-                else await accounts.AddApiKeyAsync(new ApiKeyAccountRequest(id, key) { Label = name + " key" }, cancellationToken).ConfigureAwait(false);
-            }
-        }, cancellationToken).ConfigureAwait(false);
+                foreach (var (id, key, name) in keys)
+                {
+                    if (StoredKey(id) is { } current) await accounts.ReplaceApiKeyAsync(current.Id, key, null, cancellationToken).ConfigureAwait(false);
+                    else await accounts.AddApiKeyAsync(new ApiKeyAccountRequest(id, key) { Label = name + " key" }, cancellationToken).ConfigureAwait(false);
+                }
+                // Before the write, so no request finds the new base URL with the old key.
+                foreach (var id in unkeyed) await RemoveKeysAsync(id).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
+            foreach (var id in unkeyed)
+                warnings.Add($"The stored key of {id} was removed because its base URL changed; enter it again in its editor.");
+        }
         if (keys.Count > 0) warnings.Insert(0, $"{keys.Count} literal key{(keys.Count == 1 ? " was" : "s were")} moved into the encrypted vault and left out of models.json.");
         return new CustomProviderImport(providers, overrides, keys.Count, warnings);
     }

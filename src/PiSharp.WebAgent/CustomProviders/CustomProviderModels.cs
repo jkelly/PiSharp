@@ -50,6 +50,10 @@ public sealed record CustomProviderSnapshot
     /// <summary>The model overrides of built-in providers (<c>providers.&lt;id&gt;.modelOverrides</c>), in file order.</summary>
     public IReadOnlyList<ModelOverrideInfo> Overrides { get; init; } = [];
 
+    /// <summary>The built-in provider entries that set more than <c>modelOverrides</c> (a file edited by hand), with the fields that are
+    /// not used, in file order: a built-in provider's requests go where its account says, with its key.</summary>
+    public IReadOnlyList<BuiltinIgnoredInfo> Ignored { get; init; } = [];
+
     /// <summary>When the file was last written, or null when it does not exist.</summary>
     public DateTimeOffset? Saved { get; init; }
 
@@ -138,6 +142,11 @@ public sealed record CustomModelInfo(string Id, string Name)
 /// <param name="Model">The model id.</param>
 /// <param name="Fields">The override's fields, in file order (a clone; never a secret: secret-like literal headers are dropped).</param>
 public sealed record ModelOverrideInfo(string Provider, string Model, JsonObject Fields);
+
+/// <summary>A built-in provider's entry whose fields other than <c>modelOverrides</c> are not used (names only, never values).</summary>
+/// <param name="Provider">The built-in provider id.</param>
+/// <param name="Fields">The fields that are not used (<c>baseUrl</c>, <c>headers</c>, ...), in file order.</param>
+public sealed record BuiltinIgnoredInfo(string Provider, IReadOnlyList<string> Fields);
 
 /// <summary>A custom provider as the editor shows and sends it. On a save, fields the editor does not manage (other compat fields,
 /// <c>inputLimits</c>, <c>promptCache</c>, ...) are kept from the file.</summary>

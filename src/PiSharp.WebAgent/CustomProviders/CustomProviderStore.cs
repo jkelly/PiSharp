@@ -167,10 +167,12 @@ public sealed class CustomProviderStore : ICustomProviderSource, IDisposable
         }
         var providers = new List<CustomProviderInfo>();
         var overrides = new List<ModelOverrideInfo>();
+        var ignored = new List<BuiltinIgnoredInfo>();
         foreach (var (id, node) in CustomProviderJson.Providers(root))
         {
             if (node is not JsonObject entry) continue;
             if (!CustomProviderJson.IsBuiltin(id)) { providers.Add(CustomProviderJson.Info(id, entry)); continue; }
+            if (CustomProviderJson.BuiltinIgnoredFields(entry) is { Count: > 0 } unused) ignored.Add(new BuiltinIgnoredInfo(id, unused));
             if (entry["modelOverrides"] is not JsonObject models) continue;
             foreach (var (model, value) in models)
             {
@@ -183,7 +185,8 @@ public sealed class CustomProviderStore : ICustomProviderSource, IDisposable
         var routes = WriteRoutes(CustomProviderJson.RouteCopy(root));
         return new CustomProviderSnapshot
         {
-            Version = next, Path = Path, Exists = true, Saved = saved, Size = size, Providers = providers, Overrides = overrides, RoutesPath = routes, Document = root,
+            Version = next, Path = Path, Exists = true, Saved = saved, Size = size, Providers = providers, Overrides = overrides, Ignored = ignored,
+            RoutesPath = routes, Document = root,
         };
     }
 

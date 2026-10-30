@@ -6,6 +6,9 @@
 // keys and header references resolved at request time; the placeholder key; hand-written literal and !command keys not used; loopback
 // Free, unpriced Unknown and priced Metered; the catalog and GetModel; model overrides; import and export; an invalid file; the
 // connection test only on a click (offline with --faux); --faux routes none; and the page and API in the app (default and empty states).
+// W3 fixes: a built-in provider's entry only overrides models (its baseUrl, headers or models never move the account's key, and an import
+// leaves them out with a warning); a stored key never follows a custom provider to another server (an import removes it, a save or a test
+// needs it typed again).
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
@@ -643,6 +646,148 @@ internal static partial class Program
             Check(FilesHolding(host.Data, key).Count == 0, "the key is not on disk in plain text");
         }),
 
+        // W3 fix: a built-in provider's entry in models.json only overrides its models. A baseUrl, headers or models written for it by hand
+        // is listed as not used and never changes where the account's key is sent (before the fix, the routes copy kept them, and every
+        // Anthropic request carried the account's key to the file's baseUrl).
+        Case("custom-providers.routes.a-built-in-entry-never-moves-an-account-key", async () =>
+        {
+            await using var host = new CustomHost("cp-builtin-entry");
+            var key = Planted("sk-ant-");
+            var account = (await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", key))).Account.Id;
+            var model = ModelOf(host.Catalog, "anthropic", "anthropic-messages", "claude-sonnet-4-5");
+            var catalogUrl = host.Models.GetModel("anthropic", model)!.BaseUrl;
+            await File.WriteAllTextAsync(host.Store.Path, $$"""
+                {
+                  "providers": {
+                    "anthropic": {
+                      "baseUrl": "https://collector.example.test/v1",
+                      "headers": { "X-Collect": "yes" },
+                      "models": [{ "id": "collector-model" }],
+                      "modelOverrides": { "{{model}}": { "contextWindow": 123456 } }
+                    },
+                    "openai": { "baseUrl": "https://collector.example.test/openai" },
+                    "lmstudio": { "baseUrl": "http://localhost:1234/v1", "api": "openai-completions", "models": [{ "id": "m1" }] }
+                  }
+                }
+                """);
+            var snapshot = host.Store.Refresh();
+            Check(snapshot.Valid, "the hand-written file is valid models.json: " + snapshot.Error);
+            Equal("anthropic: baseUrl, headers, models | openai: baseUrl", string.Join(" | ", snapshot.Ignored.Select(item => item.Provider + ": " + string.Join(", ", item.Fields))),
+                "the fields that are not used are listed");
+            Equal(1, snapshot.Overrides.Count, "the model override is read");
+
+            var routes = File.ReadAllText(host.Store.RoutesFile);
+            NoSecret(routes, "the routes copy", "collector", "X-Collect");
+            Check(routes.Contains("123456", StringComparison.Ordinal) && routes.Contains("lmstudio", StringComparison.Ordinal), "with the override and the custom provider");
+            Check(JsonNode.Parse(routes)!["providers"]!["openai"] is null, "an entry with nothing routed is left out");
+
+            Equal(123456, host.Catalog.FindModel("anthropic", model)!.ContextWindow, "the override applies");
+            Equal(null, host.Catalog.FindModel("anthropic", "collector-model"), "a model written for a built-in provider is not added");
+            Equal(catalogUrl, host.Models.GetModel("anthropic", model)!.BaseUrl, "the catalog's base URL is kept");
+            Check(host.Catalog.FindProvider("lmstudio") is not null, "the custom provider is routed");
+
+            var sent = await host.SendAsync("anthropic", model, "builtin-1", account);
+            Check(sent.Terminal is StreamDone, "answered: " + sent.Error);
+            var request = host.RequestWith("builtin-1");
+            Equal(new Uri(catalogUrl).Host, request.Url.Host, "sent where the catalog says");
+            Equal(key, request.Header("x-api-key"), "with the account's key");
+            Equal(null, request.Header("x-collect"), "without the file's provider headers");
+            Check(host.Provider.Requests.All(item => !item.Url.Host.Contains("collector", StringComparison.Ordinal)), "nothing went to the file's baseUrl");
+            NoSecret(host.LogText + host.Service.PreviewFile(), "the log or the preview", key);
+        }),
+
+        Case("custom-providers.import-keeps-only-model-overrides-of-built-in-providers", async () =>
+        {
+            await using var host = new CustomHost("cp-import-builtin");
+            var only = await host.Service.ImportAsync("""{ "providers": { "anthropic": { "baseUrl": "https://collector.example.test/v1" } } }""");
+            Check(only is { Providers: 0, Overrides: 0, Keys: 0 }, "nothing imported");
+            Check(only.Warnings.SingleOrDefault() is { } warning && warning.Contains("baseUrl of anthropic", StringComparison.Ordinal) &&
+                warning.Contains("Settings › Providers", StringComparison.Ordinal), "and it says why: " + string.Join(" | ", only.Warnings));
+            Check(!File.Exists(host.Store.Path), "nothing was written");
+
+            var model = ModelOf(host.Catalog, "openai", "openai-responses", "gpt-4.1");
+            var mixed = await host.Service.ImportAsync($$"""
+                {
+                  "providers": {
+                    "openai": {
+                      "baseUrl": "https://collector.example.test/v1", "api": "openai-completions", "authHeader": true,
+                      "headers": { "X-Collect": "yes" }, "compat": { "supportsStrictMode": false }, "models": [{ "id": "collector-model" }],
+                      "modelOverrides": { "{{model}}": { "contextWindow": 300000 } }
+                    }
+                  }
+                }
+                """);
+            Check(mixed is { Providers: 0, Overrides: 1, Keys: 0 }, "the override is imported");
+            foreach (var field in new[] { "baseUrl", "api", "authHeader", "headers", "compat", "models" })
+                Check(mixed.Warnings.Any(item => item.StartsWith($"The {field} of openai ", StringComparison.Ordinal)), $"a warning for {field}: " + string.Join(" | ", mixed.Warnings));
+            Equal("modelOverrides", string.Join(",", host.FileJson["providers"]!["openai"]!.AsObject().Select(pair => pair.Key)), "only the overrides are written");
+            Equal(300000, host.Catalog.FindModel("openai", model)!.ContextWindow, "and applied");
+            Equal(0, host.Service.Current.Ignored.Count, "nothing is left unused");
+            NoSecret(host.FileText + File.ReadAllText(host.Store.RoutesFile), "the file or the routes copy", "collector");
+        }),
+
+        // W3 fix: an import that replaces a custom provider and points it at another server removes its stored key (before the fix, the
+        // stored key was kept and sent to the imported baseUrl). A save or a test needs the key typed again for another server.
+        Case("custom-providers.keys.a-stored-key-never-follows-a-provider-to-another-server", async () =>
+        {
+            await using var host = new CustomHost("cp-key-servers");
+            var key = Planted("sk-gw-");
+            var same = Planted("sk-same-");
+            var orphan = Planted("sk-orphan-");
+            await host.Service.SaveAsync(ProviderDraft("gateway", "https://gw.example.test/v1", new CustomProviderKeyDraft { Source = "stored", ApiKey = key }, models: [new() { Id = "g1" }]));
+            await host.Service.SaveAsync(ProviderDraft("samehost", "https://same.example.test/v1", new CustomProviderKeyDraft { Source = "stored", ApiKey = same }, models: [new() { Id = "s1" }]));
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("leftover", orphan));
+
+            var result = await host.Service.ImportAsync("""
+                {
+                  "providers": {
+                    "gateway": { "baseUrl": "https://collector.example.test/v1", "api": "openai-completions", "models": [{ "id": "g1" }] },
+                    "samehost": { "baseUrl": "https://same.example.test/v2", "api": "openai-completions", "models": [{ "id": "s1" }] },
+                    "leftover": { "baseUrl": "https://collector.example.test/v1", "api": "openai-completions", "models": [{ "id": "l1" }] }
+                  }
+                }
+                """);
+            Equal(3, result.Providers, "three providers imported");
+            Check(result.Warnings.Any(item => item == "The stored key of gateway was removed because its base URL changed; enter it again in its editor."),
+                "the removed key is said: " + string.Join(" | ", result.Warnings));
+            Check(result.Warnings.Any(item => item.StartsWith("The stored key of leftover ", StringComparison.Ordinal)), "a key with no saved entry goes too");
+            Check(!result.Warnings.Any(item => item.Contains("samehost", StringComparison.Ordinal)), "the same server keeps its key");
+            Equal(0, host.Accounts.List("gateway").Count + host.Accounts.List("leftover").Count, "the moved providers' keys are removed from the vault");
+            Equal(CustomKeySource.None, host.Service.KeySource(host.Service.Current.Find("gateway")!), "gateway has no key now");
+            Equal(CustomKeySource.Stored, host.Service.KeySource(host.Service.Current.Find("samehost")!), "samehost keeps its stored key");
+
+            await host.SendAsync("gateway", "g1", "moved-1");
+            var moved = host.RequestWith("moved-1");
+            Equal("collector.example.test", moved.Url.Host, "the request goes to the imported URL");
+            Equal("Bearer " + CustomProviderJson.PlaceholderKey, moved.Header("authorization"), "with the placeholder, not the old key");
+            await host.SendAsync("samehost", "s1", "same-1");
+            Equal("https://same.example.test/v2/chat/completions", host.RequestWith("same-1").Url.ToString(), "the same server");
+            Equal("Bearer " + same, host.RequestWith("same-1").Header("authorization"), "with its stored key");
+
+            // A save that points a stored key at another server needs the key typed again; a new path on the same server does not.
+            var draft = host.Service.Draft("samehost")!;
+            var refused = await ThrowsAsync<ArgumentException>(() => host.Service.SaveAsync(draft with { BaseUrl = "https://elsewhere.example.test/v1" }),
+                "a stored key kept for another server");
+            Equal(CustomProviderService.StoredKeyElsewhere, refused.Message, "says to paste the key again");
+            Equal("https://same.example.test/v2", host.FileJson["providers"]!["samehost"]!["baseUrl"]!.GetValue<string>(), "nothing was saved");
+            await ThrowsAsync<ArgumentException>(() => host.Service.SaveAsync(draft with { BaseUrl = "https://same.example.test:8443/v2" }), "another port is another server");
+            await host.Service.SaveAsync(draft with { BaseUrl = "https://same.example.test/v3" });
+            Equal(SecretText.Mask(same), host.Service.Draft("samehost")!.Key!.Hint, "the same server keeps the stored key");
+            var retyped = Planted("sk-new-");
+            await host.Service.SaveAsync(host.Service.Draft("samehost")! with { BaseUrl = "https://elsewhere.example.test/v1",
+                Key = new CustomProviderKeyDraft { Source = "stored", ApiKey = retyped } });
+            Equal(SecretText.Mask(retyped), host.Service.Draft("samehost")!.Key!.Hint, "a typed key goes to the new server");
+
+            // A test sends the stored key only to the saved server.
+            var tests = host.Http.Requests.Count;
+            var test = await host.Tester.TestAsync(host.Service.Draft("samehost")! with { BaseUrl = "https://collector.example.test/v1" });
+            Check(!test.Ok && test.Message == CustomProviderService.StoredKeyElsewhere, "not tested elsewhere: " + test.Message);
+            Equal(tests, host.Http.Requests.Count, "nothing was sent");
+
+            NoSecret(string.Join("\n", result.Warnings) + host.LogText + host.Provider.Text + host.FileText, "a warning, the log, a request or the file", key, orphan);
+            NoSecret(host.LogText + host.FileText, "the log or the file", same, retyped);
+        }),
+
         // The real Program with --faux: the page in its empty and default states, and the API through the HTTP guard.
         Case("custom-providers.app.page-and-api-in-faux-with-no-secret-in-any-answer", async () =>
         {
@@ -738,6 +883,10 @@ internal static partial class Program
             var root = Temp("cp-app-real");
             try
             {
+                // A hand-written file that sets a built-in provider's baseUrl: the page lists it as not used.
+                Directory.CreateDirectory(Path.Join(root, "data"));
+                await File.WriteAllTextAsync(Path.Join(root, "data", CustomProviderStore.FileName),
+                    """{ "providers": { "anthropic": { "baseUrl": "https://collector.example.test/v1" } } }""");
                 await using var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = Path.Join(root, "data"), Faux = false });
                 var saved = await app.SendAsync(HttpMethod.Post, "/api/custom-providers", new JsonObject
                 {
@@ -753,6 +902,9 @@ internal static partial class Program
                     "the custom provider and its model are offered");
                 var settings = await app.Get("/settings/custom-providers");
                 Check(settings.Status == 200 && settings.Text.Contains("data-offline=\"false\"", StringComparison.Ordinal), "the page, online");
+                var listed = WebUtility.HtmlDecode(settings.Text);
+                Check(listed.Contains("data-cp-ignored", StringComparison.Ordinal) && listed.Contains("data-cp-ignored-provider=\"anthropic\"", StringComparison.Ordinal) &&
+                    listed.Contains("<span class=\"ps-mono\">baseUrl</span>", StringComparison.Ordinal), "the built-in baseUrl is listed as not used");
                 Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
             }
             finally

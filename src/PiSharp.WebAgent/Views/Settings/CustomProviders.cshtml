@@ -3,7 +3,9 @@
    state with its starting points (LM Studio, Ollama, vLLM, an OpenAI-compatible URL), the provider list (_CustomProviderRow), Model
    overrides (_CustomProviderOverrides, the mockups' _ModelOverrideList) and the file's preview (_CustomProviderPreview); the editor is
    _CustomProviderModal. Every change goes through /api/custom-providers (custom-providers.js). Reachability is shown only after a test the
-   user clicked, never checked when the page loads. Left out: the mockups' "Fast or UltraFast" pointer (Defaults has no request speed yet).
+   user clicked, never checked when the page loads. Fields a hand-edited file sets on a built-in provider besides modelOverrides (a baseUrl,
+   headers, ...) are listed as not used (data-cp-ignored): its requests go where its account says. Left out: the mockups' "Fast or
+   UltraFast" pointer (Defaults has no request speed yet).
    Model: CustomProvidersPage. *@
 @using PiSharp.WebAgent.CustomProviders
 @model CustomProvidersPage
@@ -56,6 +58,21 @@
   <div class="alert alert-danger d-flex gap-2 align-items-start mb-3" role="alert" data-cp-invalid>
     <i class="bi bi-x-circle mt-1" aria-hidden="true"></i>
     <div><strong>models.json has an error, so no custom provider or override is used.</strong> Fix the file in your editor (the change is picked up on the next request), or import a valid one.<div class="ps-mono fs-8 mt-1 text-break">@snapshot.Error</div></div>
+  </div>
+}
+@if (snapshot.Ignored.Count > 0)
+{
+  <div class="alert alert-warning d-flex gap-2 align-items-start fs-7 mb-3" role="status" data-cp-ignored>
+    <i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i>
+    <div>
+      <strong>Some built-in provider settings in models.json are not used.</strong> A built-in provider's requests go where its account says, with its key (<a href="/settings/providers">Settings › Providers</a>), so only its model overrides are read from the file. Remove these fields, or add a custom provider with its own id for another endpoint.
+      <ul class="mb-0 mt-1 ps-3">
+        @foreach (var item in snapshot.Ignored)
+        {
+          <li data-cp-ignored-provider="@item.Provider"><span class="ps-mono">@item.Provider</span>: <span class="ps-mono">@string.Join(", ", item.Fields)</span></li>
+        }
+      </ul>
+    </div>
   </div>
 }
 

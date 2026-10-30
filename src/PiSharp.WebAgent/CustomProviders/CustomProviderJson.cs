@@ -4,6 +4,10 @@
 // a vault account, never written into the file; a literal or !command key written by hand is left in the file but not used (running a
 // command from a web form is out of scope), and the routes read a sanitized copy (RouteCopy) without it. Header values that look like
 // secrets (Authorization, *key*, *token*, *secret*, *password*, cookies) must be references too, and a header value never runs a command.
+// A built-in provider's entry contributes only its modelOverrides to that copy: its requests go where its account says (Settings ›
+// Providers) with the account's key, so a baseUrl, headers, compat, models, api, authHeader or oauth written for it is listed on the page
+// as not used (BuiltinIgnoredFields) and never changes where that key is sent. A stored key follows a custom provider only to the servers
+// its saved entry already uses (SameServers): an edit or an import that points it elsewhere needs the key entered again.
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
@@ -217,9 +221,45 @@ public static partial class CustomProviderJson
         };
     }
 
+    /// <summary>The one field of a built-in provider's entry the routes read: <c>modelOverrides</c>.</summary>
+    public const string BuiltinRoutedField = "modelOverrides";
+
+    /// <summary>The fields of the built-in provider entry <paramref name="entry"/> that are not used (every field but
+    /// <see cref="BuiltinRoutedField"/>), in file order: a built-in provider's requests go where its account says, with its key.</summary>
+    public static IReadOnlyList<string> BuiltinIgnoredFields(JsonObject entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return [.. entry.Select(pair => pair.Key).Where(field => field != BuiltinRoutedField)];
+    }
+
+    /// <summary>The servers <paramref name="entry"/> sends requests to: the scheme and authority (<c>https://host:port</c>) of its
+    /// <c>baseUrl</c> and of every model's <c>baseUrl</c>.</summary>
+    internal static HashSet<string> Servers(JsonObject entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        var servers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Add(string? url)
+        {
+            if (url?.Trim() is not { Length: > 0 } text) return;
+            servers.Add(Uri.TryCreate(text, UriKind.Absolute, out var uri) ? uri.GetLeftPart(UriPartial.Authority) : text);
+        }
+        Add(Text(entry, "baseUrl"));
+        if (entry["models"] is JsonArray models) foreach (var model in models.OfType<JsonObject>()) Add(Text(model, "baseUrl"));
+        return servers;
+    }
+
+    /// <summary>Whether every server <paramref name="next"/> sends requests to is one the saved entry <paramref name="saved"/> already sends
+    /// to (false when nothing is saved): a stored key may follow an edit or an import of a custom provider only then.</summary>
+    internal static bool SameServers(JsonObject? saved, JsonObject next)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        return saved is not null && Servers(next).IsSubsetOf(Servers(saved));
+    }
+
     /// <summary>The sanitized copy of <paramref name="root"/> the catalog and the routes read, or null when it routes nothing: custom
-    /// providers whose key is not usable here are left out, an <c>apiKey</c> of a built-in provider is dropped (their keys are accounts),
-    /// and header values that run a command are dropped everywhere.</summary>
+    /// providers whose key is not usable here are left out, a built-in provider's entry keeps only its <c>modelOverrides</c> (left out
+    /// when it has none: its key is an account's, sent only where that account says), and header values that run a command are dropped
+    /// everywhere.</summary>
     internal static JsonObject? RouteCopy(JsonObject root)
     {
         ArgumentNullException.ThrowIfNull(root);
@@ -228,9 +268,17 @@ public static partial class CustomProviderJson
         foreach (var (id, node) in providers)
         {
             if (node is not JsonObject entry) continue;
-            var clone = (JsonObject)entry.DeepClone();
-            if (IsBuiltin(id)) clone.Remove("apiKey");
-            else if (KeyOf(clone).Source == CustomKeySource.Unsupported) continue;
+            JsonObject clone;
+            if (IsBuiltin(id))
+            {
+                if (entry[BuiltinRoutedField] is not JsonObject { Count: > 0 } builtinOverrides) continue;
+                clone = new JsonObject { [BuiltinRoutedField] = builtinOverrides.DeepClone() };
+            }
+            else
+            {
+                clone = (JsonObject)entry.DeepClone();
+                if (KeyOf(clone).Source == CustomKeySource.Unsupported) continue;
+            }
             DropCommandHeaders(clone);
             if (clone["models"] is JsonArray models) foreach (var model in models.OfType<JsonObject>()) DropCommandHeaders(model);
             if (clone["modelOverrides"] is JsonObject overrides) foreach (var (_, value) in overrides) if (value is JsonObject entryOverride) DropCommandHeaders(entryOverride);
