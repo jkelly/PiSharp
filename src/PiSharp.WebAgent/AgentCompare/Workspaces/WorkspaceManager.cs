@@ -7,6 +7,9 @@
 //  - Diff (WorkspaceManager.Diff.cs), Apply and Keep the branch (WorkspaceManager.Keep.cs), Discard and the cleanup (here): leftovers of an
 //    unfinished run are removed at start, and every workspace older than the retention (7 days) is removed at start and once a day
 //    (WorkspaceJanitor).
+//  - The root is the app's only when it carries MarkerFile, and the marker is written only into a root the manager creates or finds
+//    empty. A <data>\workspaces that already holds other files (--data pointed at an existing folder) is refused with RootInUse, so
+//    the cleanup, which removes every unknown folder of a marked root, never deletes the user's own folders.
 // Workspaces are copies, not sandboxes: agents run tools with the user's rights. Nothing here commits to the user's branches or pushes;
 // Keep the branch makes one commit on a new branch without switching to it. Git always runs with an argument list (GitCommand), and every
 // path is checked to stay inside its root (the workspaces root, or the project for Apply).
@@ -25,7 +28,8 @@ public sealed partial class WorkspaceManager
     /// <summary>The base copy's folder name inside a copy run's folder (never a slot name).</summary>
     public const string BaseFolder = "base";
 
-    /// <summary>The file that marks the workspaces root as this app's; the cleanup removes nothing from a root without it.</summary>
+    /// <summary>The file that marks the workspaces root as this app's; the cleanup removes nothing from a root without it. It is written
+    /// only into a root the manager creates or finds empty, never into a folder that already holds other files.</summary>
     public const string MarkerFile = ".pisharp-workspaces";
 
     /// <summary>The prefix of kept branches: <c>pisharp/compare/&lt;run&gt;-&lt;slot&gt;</c>.</summary>
@@ -37,6 +41,7 @@ public sealed partial class WorkspaceManager
     private readonly ILogger log;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> runs = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim projects = new(1, 1);
+    private readonly Lock rootGate = new();
 
     /// <summary>Creates the manager.</summary>
     /// <param name="options">The root and limits.</param>
@@ -56,6 +61,35 @@ public sealed partial class WorkspaceManager
 
     /// <summary>The workspaces root (<c>&lt;data&gt;\workspaces</c>).</summary>
     public string Root { get; }
+
+    /// <summary>Whether the root is this app's: it carries <see cref="MarkerFile"/>. Only then does the cleanup remove anything from it.</summary>
+    public bool OwnsRoot => File.Exists(Path.Join(Root, MarkerFile));
+
+    /// <summary>Why no workspace can be made under the root, or null when one can: the root exists without <see cref="MarkerFile"/> and
+    /// already holds other files (it was not made by this app), or it is a file.</summary>
+    public string? RootProblem()
+    {
+        lock (rootGate) return UnlockedRootProblem();
+    }
+
+    // RootProblem without the root lock (EnsureRoot holds it).
+    private string? UnlockedRootProblem()
+    {
+        try
+        {
+            if (File.Exists(Root))
+                return $"{Root} is a file, so agent compare can't keep its workspaces there. Move it, or start the app with another data folder (--data).";
+            if (!Directory.Exists(Root) || OwnsRoot || !Directory.EnumerateFileSystemEntries(Root).Any()) return null;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { /* unreadable: not ours either */ }
+        return $"{Root} already holds other files, and agent compare keeps its workspaces only in a folder of its own (it removes what it "
+            + "doesn't recognise there). Move those files elsewhere, or start the app with another data folder (--data).";
+    }
+
+    private void RequireUsableRoot()
+    {
+        if (RootProblem() is { } problem) throw new WorkspaceException(WorkspaceException.RootInUse, problem);
+    }
 
     /// <summary>The fixed settings.</summary>
     public WorkspaceManagerOptions Options => options;
@@ -89,11 +123,13 @@ public sealed partial class WorkspaceManager
 
     /// <summary>Looks at a project folder for agent compare's setup: whether it is a git repo, its branch, HEAD and local branches, its
     /// uncommitted changes, the size of a worktree and of a copy, and which isolation <paramref name="inspect"/>'s choice comes to.</summary>
-    /// <exception cref="WorkspaceException"><see cref="WorkspaceException.ProjectMissing"/> or <see cref="WorkspaceException.Invalid"/>.</exception>
+    /// <exception cref="WorkspaceException"><see cref="WorkspaceException.ProjectMissing"/>, <see cref="WorkspaceException.Invalid"/>, or
+    /// <see cref="WorkspaceException.RootInUse"/> when the workspaces folder already holds other files (so a run would be refused).</exception>
     public async Task<ProjectInspection> InspectAsync(string projectPath, WorkspaceInspectOptions? inspect = null, CancellationToken cancellationToken = default)
     {
         inspect ??= new WorkspaceInspectOptions();
         var project = Project(projectPath);
+        RequireUsableRoot();
         var excludes = ExcludeList(inspect.ExtraExcludes);
         var facts = await GitFactsAsync(project, withDetails: true, cancellationToken).ConfigureAwait(false);
         var kind = inspect.Isolation switch
@@ -139,7 +175,8 @@ public sealed partial class WorkspaceManager
     /// <exception cref="WorkspaceException">An invalid request (<see cref="WorkspaceException.Invalid"/>), a missing project, worktrees
     /// asked for outside a git repo (<see cref="WorkspaceException.NotGit"/>), a copy too large without
     /// <see cref="WorkspaceRequest.ConfirmLargeCopy"/> (<see cref="WorkspaceException.TooLarge"/>), the run existing with other
-    /// workspaces (<see cref="WorkspaceException.Exists"/>), or a git failure.</exception>
+    /// workspaces (<see cref="WorkspaceException.Exists"/>), a workspaces folder that already holds other files
+    /// (<see cref="WorkspaceException.RootInUse"/>: nothing is written or removed there), or a git failure.</exception>
     public async Task<WorkspaceRun> CreateAsync(WorkspaceRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -160,6 +197,7 @@ public sealed partial class WorkspaceManager
                     return ToRun(existing, folder, measure: false, CancellationToken.None);
                 throw new WorkspaceException(WorkspaceException.Exists, $"Run {request.Run} already has workspaces for another project or other models.");
             }
+            RequireUsableRoot(); // before anything in the root is removed: a folder of the user's own named like the run stays
             if (existing is not null || Directory.Exists(folder) || WorkspaceTree.IsLink(folder))
                 await RemoveRunFolderAsync(folder, existing, cancellationToken).ConfigureAwait(false);
 
@@ -287,7 +325,8 @@ public sealed partial class WorkspaceManager
         }
     }
 
-    /// <summary>Removes all of a run's workspaces and its folder.</summary>
+    /// <summary>Removes all of a run's workspaces and its folder. In a root that isn't this app's (no <see cref="MarkerFile"/>), only a
+    /// folder with a run manifest is removed: a folder of the user's own named like the run stays.</summary>
     /// <returns>Whether there was anything to remove.</returns>
     public async Task<bool> DiscardRunAsync(string run, CancellationToken cancellationToken = default)
     {
@@ -297,7 +336,9 @@ public sealed partial class WorkspaceManager
         try
         {
             if (!Directory.Exists(folder) && !WorkspaceTree.IsLink(folder)) return false;
-            await RemoveRunFolderAsync(folder, WorkspaceManifest.Read(folder), cancellationToken).ConfigureAwait(false);
+            var manifest = WorkspaceManifest.Read(folder);
+            if (manifest is null && !OwnsRoot) return false;
+            await RemoveRunFolderAsync(folder, manifest, cancellationToken).ConfigureAwait(false);
             return true;
         }
         finally
@@ -578,13 +619,21 @@ public sealed partial class WorkspaceManager
 
     private SemaphoreSlim Gate(string run) => runs.GetOrAdd(run, _ => new SemaphoreSlim(1, 1));
 
+    // Claims the root for this app: creates it with the marker, or writes the marker into a root that exists but is empty. A root that
+    // exists without the marker and already holds anything is someone else's folder, so the run is refused (RootInUse) and the marker is
+    // never written there: otherwise the cleanup would remove the user's folders in it as leftovers.
     private void EnsureRoot()
     {
-        Directory.CreateDirectory(Root);
-        var marker = Path.Join(Root, MarkerFile);
-        if (!File.Exists(marker))
-            File.WriteAllText(marker, "PiSharp Web Agent: agent compare workspaces. Each folder is one run; the app removes them on Discard and after "
-                + options.Retention.TotalDays.ToString("0", CultureInfo.InvariantCulture) + " days.\n");
+        lock (rootGate)
+        {
+            if (UnlockedRootProblem() is { } problem) throw new WorkspaceException(WorkspaceException.RootInUse, problem);
+            if (OwnsRoot) return;
+            Directory.CreateDirectory(Root);
+            using var marker = new FileStream(Path.Join(Root, MarkerFile), FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            marker.Write(System.Text.Encoding.UTF8.GetBytes("PiSharp Web Agent: agent compare workspaces. Each folder is one run. The app removes "
+                + "a run's folder on Discard and after " + options.Retention.TotalDays.ToString("0", CultureInfo.InvariantCulture)
+                + " days, and any other folder here when it starts, so keep nothing else in this folder.\n"));
+        }
     }
 
     private string Project(string projectPath)

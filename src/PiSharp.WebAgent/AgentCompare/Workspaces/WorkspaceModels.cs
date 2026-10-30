@@ -533,6 +533,10 @@ public sealed class WorkspaceException(string code, string message, Exception? i
     /// <summary>A git command ran past its time limit.</summary>
     public const string GitTimeout = "git-timeout";
 
+    /// <summary>The workspaces folder is not this app's: it existed without <see cref="WorkspaceManager.MarkerFile"/> and already held
+    /// other files (or it is a file), so no workspace is made there and nothing in it is ever removed.</summary>
+    public const string RootInUse = "root-in-use";
+
     /// <summary>The code.</summary>
     public string Code { get; } = code;
 }
