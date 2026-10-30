@@ -32,7 +32,5 @@ public sealed record LaterFeature(string Id, string Title, string Icon, string S
     /// <summary>The settings pages, by settings id.</summary>
     public static IReadOnlyDictionary<string, LaterFeature> SettingsPages { get; } = new Dictionary<string, LaterFeature>(StringComparer.OrdinalIgnoreCase)
     {
-        ["data"] = new("data", "Data & storage", "bi-database",
-            "Everything the web agent keeps, in one folder on this machine, with retention and clean-up.", Settings: true),
     };
 }

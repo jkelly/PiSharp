@@ -20,7 +20,7 @@ public sealed class ShellController : Controller
         LaterFeature.Pages.TryGetValue((Request.Path.Value ?? "").TrimEnd('/'), out var feature) ? View("Later", feature) : NotFound();
 
     /// <summary>A settings page a later milestone builds.</summary>
-    [HttpGet("/settings/{section:regex(^(data)$)}")]
+    [HttpGet("/settings/{section:regex(^()$)}")]
     public IActionResult SettingsLater(string section) =>
         LaterFeature.SettingsPages.TryGetValue(section, out var feature) ? View("SettingsLater", feature) : NotFound();
 }
