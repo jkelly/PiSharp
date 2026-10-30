@@ -1,6 +1,7 @@
 @* Decision 0011 (run W4, R3): the mockups' "Clear all run history?" confirm (#modal-clear-history, after the shared _ConfirmModal's
    markup): how many runs and how much runs.db holds, where it is, and "Keep pinned runs". Clearing posts {keepPinned} to
-   /api/history/clear; chats keep their own transcripts (only their run records go), and presets and the Spend ledger are not touched.
+   /api/history/clear; chats keep their own transcripts (only their run records go), agent compare runs go with their sessions and
+   workspaces (AgentCompareRunner follows runs.db's deletes, W4 fix 2), and presets and the Spend ledger are not touched.
    history.js runs it. Model: RunHistoryPage. *@
 @using System.Globalization
 @model RunHistoryPage
@@ -12,7 +13,7 @@
           <span class="provider-logo lg" style="background:var(--ps-danger-bg);color:var(--ps-danger);border-color:transparent"><i class="bi bi-trash3" aria-hidden="true"></i></span>
           <div>
             <h2 class="modal-title mb-1" id="modal-clear-history-title">Clear all run history?</h2>
-            <p class="text-secondary fs-7 mb-2">All @Model.TotalAll.ToString("#,0", CultureInfo.InvariantCulture) runs and their stream events and raw request and response payloads will be permanently deleted from <span class="ps-mono">runs.db</span>. Chats keep their transcripts, and presets and the Spend ledger are kept. This can't be undone.</p>
+            <p class="text-secondary fs-7 mb-2">All @Model.TotalAll.ToString("#,0", CultureInfo.InvariantCulture) runs and their stream events and raw request and response payloads will be permanently deleted from <span class="ps-mono">runs.db</span>. Agent compare runs go too, with their models' sessions and workspaces (a model continued as a chat keeps its own). Chats keep their transcripts, and presets and the Spend ledger are kept. This can't be undone.</p>
             <div class="ps-mono fs-8 text-ps-faint mb-3 text-break">@Model.DbPath · @RunHistoryText.Bytes(Model.SizeBytes)</div>
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="clearKeepPinned" checked data-clear-keep-pinned>

@@ -7,6 +7,8 @@ using System.Text.RegularExpressions;
 // "W4's browser cases leave out" names the page hooks (data attributes and ids of the app's views and scripts) a browser case would use to
 // cover it, and a part stays listed exactly while no browser case uses any of its hooks. Every hook must still be in the app, so a renamed
 // one cannot keep a part listed for ever. A fix in another area that closes one of these gaps fails here until its line is revised.
+// W4 retest 2: revised after fix 2's merges, which closed most of the gaps the docs fix listed (agent compare's Stop, time limit, delete
+// and memory; the group preflight; the bench's strict note; the settings rows and the footer padding; most of the browser coverage).
 internal static partial class Program
 {
     /// <summary>A W4 gap that decision 0011's "Not done" lists until <paramref name="Closed"/> says why it no longer holds.</summary>
@@ -26,50 +28,28 @@ internal static partial class Program
 
     private static readonly W4Gap[] W4Gaps =
     [
-        // Agent compare (R5): Stop passes over a model whose check runs, and the check runs on the run's token, not one Stop can cancel.
-        new("Stop does not end a running check command", "Stop does not end a running check command",
-            root => SourceHas(root, "src/PiSharp.WebAgent/AgentCompare/Runner/AgentCompareRunner.Actions.cs",
-                    "or AgentModelPhase.Checking || model.Outcome is not null) continue;")
-                && SourceHas(root, "src/PiSharp.WebAgent/AgentCompare/Runner/AgentCompareRunner.cs",
-                    "AgentCheckCommand.RunAsync(command, cwd, TimeSpan.FromSeconds(run.Spec.CheckTimeoutSeconds), token)")
-                ? null : "AgentCompareRunner's StopAsync no longer passes over a model being checked, or CheckAsync no longer runs the check on the run's token"),
-        new("the per-model time limit has no case", "The per-model time limit has no case",
-            root => TestFilesMatching(root, @"\btime[- ]?limit", RegexOptions.IgnoreCase) is { Count: > 0 } files
-                ? "a test now names the time limit (" + string.Join(", ", files) + ")" : null),
-        new("agent compare's records are never removed", "are never removed",
-            root => AppFilesMatching(root, "*.cs", @"DELETE\s+FROM\s+agent_compare_(runs|turns)", RegexOptions.IgnoreCase) is { Count: > 0 } files
-                ? "agent compare's records are now deleted (" + string.Join(", ", files) + ")" : null),
-        new("AgentCompareStore keeps every run in memory", "reads every run into memory and never lets one go",
-            root => Regex.IsMatch(Source(root, "src/PiSharp.WebAgent/AgentCompare/Runner/AgentCompareStore.cs"), @"\bruns\.(TryRemove|Remove|Clear)\(")
-                ? "AgentCompareStore now lets runs go from memory" : null),
-        // Compare (R2): the estimate by Run all sums each column's own preflight; the Spend Guard has no group preflight.
-        new("Compare's Run all estimate has no group preflight", "there is no group preflight",
-            root => !SourceHas(root, "src/PiSharp.WebAgent/Compare/CompareEstimate.cs",
-                    "each column on its own: the group's sum against a run, daily or monthly cap is checked when Run all reserves the group")
-                ? "CompareEstimate no longer says it checks each column on its own and leaves the group's sum to Run all's reservation"
-                : AppFilesMatching(root, "*.cs", @"PreflightGroup|GroupPreflight", RegexOptions.IgnoreCase) is { Count: > 0 } files
-                    ? "a group preflight is in " + string.Join(", ", files) : null),
-        // Presets (R8): presets-host.js writes Compare's draft into its page itself.
-        new("compare-request.js has no draft-apply API", "`compare-request.js` has no draft-apply API",
-            root =>
-            {
-                var exports = ScriptExports(Source(root, "src/PiSharp.WebAgent/wwwroot/js/compare-request.js"));
-                return exports.SetEquals(["initCompareRequest"]) ? null : "compare-request.js now exports " + string.Join(", ", exports.Order(StringComparer.Ordinal));
-            }),
-        // Tool Bench (R7): the note under the schema preview, where the mockup has a Strict arguments switch.
-        new("the Tool Bench's strict note", "strict arguments (`constrainedSampling`) are not sent yet",
-            root => SourceHas(root, "src/PiSharp.WebAgent/Views/Bench/_BenchToolList.cshtml", "are not sent yet")
-                ? null : "_BenchToolList's schema preview no longer says strict arguments are not sent yet"),
         // Run engine (R0): the owner has not chosen between the body patch and extending PiSharp.AI's request types.
         new("the owner decision on R0's body patch", "An owner decision is open",
             root => SourceHas(root, "src/PiSharp.WebAgent/Runs/RunModelOptions.cs", "SendPatch(")
                 ? null : "the run's extra options no longer travel as a body patch (RunModelOptions.SendPatch is gone): say what the owner chose instead"),
-        // Shared web library: .setting-row's control column stays up to 320 px wide until the row stacks below 992 px.
-        new("the .setting-row squeeze", "the shared `.setting-row`",
-            root => SettingRowSqueezes(root)),
-        // Shared web library: Bootstrap's footer padding is calc(var(--bs-modal-padding) - …), invalid with the theme's two values.
-        new("the modal footer's missing side padding", "the shared modal footer has no side padding",
-            root => ModalFooterUnpadded(root)),
+        // Playground (R1): RunSpec carries these since fix 2 (runs-core), but the Playground still lists them as not sent.
+        new("the Playground's controls for the options the run engine carries", "the Playground has no control wired for them yet",
+            root => new[] { "thinkingBudgets", "cacheRetention", "maxRetries", "maxRetryDelayMs" }
+                    .All(name => SourceHas(root, "src/PiSharp.WebAgent/Playground/RequestViews.cs", $"[\"{name}\"] = new(\"{name}\""))
+                ? null : "RequestConfigView.Unsent no longer lists every one of thinkingBudgets, cacheRetention, maxRetries and maxRetryDelayMs"),
+        // Presets (R8): a preset keeps the options it knew before fix 2 (playground) wired more of them.
+        new("presets drop the Playground's newer options", "Presets keep neither the options the Playground wired",
+            root => !Source(root, "src/PiSharp.WebAgent/Presets/PresetModels.cs").Contains("TextVerbosity", StringComparison.Ordinal)
+                    && !Source(root, "src/PiSharp.WebAgent/wwwroot/js/presets-host.js").Contains("'textVerbosity'", StringComparison.Ordinal)
+                ? null : "a preset now keeps the text verbosity (PresetOptions or presets-host.js)"),
+        // Agent compare (R6): the delete API (fix 2, agent-runner) has no button on the run page.
+        new("agent compare's run page has no Delete button", "its run page has no Delete button",
+            root => AppFilesMatching(root, "compare-agent*.js", @"/delete\b") is { Count: > 0 } files
+                ? "an agent compare page script now deletes a run (" + string.Join(", ", files) + ")" : null),
+        // Shared web library: Bootstrap's footer padding is calc(var(--bs-modal-padding) - …), invalid with the theme's two values; the
+        // Web Agent pads its own footers (site.css), Durable.Web does not.
+        new("Durable.Web's dialogs lose their footer padding", "still lose their footer padding",
+            root => HubModalFooterUnpadded(root)),
         // Settings › Data & storage keeps its own typed-DELETE dialog because the shared confirm dialog has no such variant.
         new("_ConfirmModal has no typed-DELETE variant", "`_ConfirmModal` has no typed-DELETE variant",
             root =>
@@ -84,28 +64,13 @@ internal static partial class Program
 
     private static readonly W4CoverageGap[] W4CoverageGaps =
     [
-        // Covered by PiSharp.WebAgent.Tests only.
-        new("stored raw payloads in the inspector", "stored raw payloads in the inspector", ["data-raw-request", "data-raw-response"]),
-        new("the inspector's HAR and JSON downloads", "the HAR and JSON downloads", ["data-run-download"]),
-        new("pins", "pins", ["data-run-pin"]),
-        new("re-runs", "re-runs", ["data-run-rerun"]),
-        new("Clear history's deletion", "Clear history's deletion", ["data-clear-confirm"]),
-        new("preset import and export", "preset import and export", ["data-preset-import", "data-preset-export"]),
-        new("Keep branch", "Keep branch", ["acKeepBranch"]),
-        new("a refused Apply", "a refused Apply", ["data-ac-refused-files", "data-ac-refused-message"]),
-        new("the danger zone", "the danger zone", ["data-danger"]),
-        new("run-history retention", "run-history retention", ["data-history-form", "#retention"]),
-        new("agent compare's command grants", "command grants for every column", ["data-ac-approve-command"]),
-        new("agent compare's Allow-list and Auto modes", "its Allow-list and Auto modes", ["acApprovalList", "acApprovalAuto"]),
-        new("agent compare's turn and budget limits", "its turn and budget limits", ["acMaxTurns", "acCap", "data-ac-continue", "data-ac-budget"]),
-        new("agent compare's Stop", "and its Stop", ["data-ac-stop"]),
+        // Covered by PiSharp.WebAgent.Tests only: a faux run stores no raw payloads (W4InspectorCases checks the "not stored" panes, and
+        // that the Raw SSE tools are absent without them).
+        new("stored raw payloads in the inspector", "stored raw payloads in the inspector", ["data-raw-request", "data-raw-response", "data-sse-group", "data-sse-wrap"]),
+        new("agent compare's budget limit", "agent compare's budget limit", ["acCap", "data-ac-continue", "data-ac-budget"]),
         // Run in no case at all.
-        new("the Tool Bench's scripts beyond a manual result", "the Tool Bench's scripts beyond a manual result",
-            ["data-bench-rule", "data-bench-mocks", "data-bench-stop", "data-bench-reset", "data-bench-remove", "data-bench-export"]),
-        new("History's saved filters dialogs", "History's saved filters dialogs", ["data-rsf-name", "data-rmf-name", "data-rmf-remove", "data-rmf-undo"]),
-        new("the inspector's Raw SSE tools", "the inspector's Raw SSE filter", ["data-sse-filter", "data-sse-group", "data-sse-wrap"]),
-        new("Settings › Tools' folder browser", "Settings › Tools' folder browser", ["folderBrowser", "data-folder-browser"]),
-        new("Data & storage's dirty state", "Data & storage's dirty state", ["data-history-form", "data-history-reset", "data-retention-note", "#retention"]),
+        new("the Tool Bench's Reset, removing a message and Export as JSON", "the Tool Bench's Reset, removing a message and Export as JSON",
+            ["data-bench-reset", "data-bench-remove", "data-bench-export"]),
     ];
 
     private static IEnumerable<(string, Func<Task>)> W4DocsCases() =>
@@ -159,42 +124,22 @@ internal static partial class Program
         }),
     ];
 
-    /// <summary>Null while the shared <c>.setting-row</c> keeps its control column up to 320 px wide and stacks only below 992 px, with no
-    /// Web Agent stylesheet laying it out otherwise; else what changed.</summary>
-    private static string? SettingRowSqueezes(string root)
-    {
-        var shell = Source(root, "src/PiSharp.Web.Common/wwwroot/css/shell.css");
-        if (!shell.Contains("grid-template-columns: minmax(0, 1fr) minmax(0, 320px)", StringComparison.Ordinal))
-            return "shell.css's .setting-row no longer keeps its control column at up to 320 px";
-        if (!Regex.IsMatch(shell, @"max-width:\s*991\.98px\)\s*\{\s*\.setting-row\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\);"))
-            return "shell.css's .setting-row no longer stacks at the 991.98 px breakpoint";
-        var laidOut = CssRules(AppStylesheets(root, includeShared: false))
-            .Where(rule => rule.Selectors.Any(selector => selector.Contains(".setting-row", StringComparison.Ordinal))
-                && rule.Body.Contains("grid", StringComparison.Ordinal))
-            .Select(rule => string.Join(", ", rule.Selectors)).ToList();
-        return laidOut.Count > 0 ? "a Web Agent stylesheet now lays out .setting-row (" + string.Join("; ", laidOut) + ")" : null;
-    }
-
     /// <summary>Null while the theme's <c>--bs-modal-padding</c> has two values (so Bootstrap's footer padding, a <c>calc</c> of it, is
-    /// invalid) and no stylesheet gives <c>.modal-footer</c> side padding; else what changed.</summary>
-    private static string? ModalFooterUnpadded(string root)
+    /// invalid) and neither PiSharp.Web.Common nor Durable.Web gives <c>.modal-footer</c> side padding; else what changed. (The Web Agent
+    /// pads its own footers in site.css.)</summary>
+    private static string? HubModalFooterUnpadded(string root)
     {
         var theme = Source(root, "src/PiSharp.Web.Common/wwwroot/css/pisharp-theme.css");
         if (!Regex.IsMatch(theme, @"--bs-modal-padding:\s*[^;\s]+\s+[^;\s]+\s*;"))
             return "the theme's --bs-modal-padding no longer has two values";
-        var padded = CssRules(AppStylesheets(root, includeShared: true))
+        var sheets = new[] { "PiSharp.Web.Common", "PiSharp.Durable.Web" }
+            .SelectMany(project => Directory.EnumerateFiles(Path.Join(root, "src", project, "wwwroot", "css"), "*.css", SearchOption.TopDirectoryOnly))
+            .Select(File.ReadAllText);
+        var padded = CssRules(sheets)
             .Where(rule => rule.Selectors.Any(selector => selector.EndsWith(".modal-footer", StringComparison.Ordinal))
                 && Regex.IsMatch(rule.Body, @"(^|[;\s])padding(-(inline(-start|-end)?|left|right))?\s*:"))
             .Select(rule => string.Join(", ", rule.Selectors)).ToList();
-        return padded.Count > 0 ? "a stylesheet now pads .modal-footer (" + string.Join("; ", padded) + ")" : null;
-    }
-
-    /// <summary>The Web Agent's stylesheets (and, with <paramref name="includeShared"/>, PiSharp.Web.Common's), not the vendored ones.</summary>
-    private static IEnumerable<string> AppStylesheets(string root, bool includeShared)
-    {
-        var folders = new List<string> { Path.Join(root, "src", "PiSharp.WebAgent", "wwwroot", "css") };
-        if (includeShared) folders.Add(Path.Join(root, "src", "PiSharp.Web.Common", "wwwroot", "css"));
-        return folders.SelectMany(folder => Directory.EnumerateFiles(folder, "*.css", SearchOption.TopDirectoryOnly)).Select(File.ReadAllText);
+        return padded.Count > 0 ? "a shared or hub stylesheet now pads .modal-footer (" + string.Join("; ", padded) + ")" : null;
     }
 
     /// <summary>The innermost rules of <paramref name="sheets"/> (inside an at-rule too): each selector of the list, trimmed, and the body.</summary>
@@ -202,17 +147,6 @@ internal static partial class Program
         sheets.Select(sheet => Regex.Replace(sheet, @"/\*.*?\*/", " ", RegexOptions.Singleline))
             .SelectMany(sheet => Regex.Matches(sheet, @"([^{}]+)\{([^{}]*)\}").Select(match =>
                 (match.Groups[1].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries), match.Groups[2].Value)));
-
-    /// <summary>The names a page script exports (<c>export function</c>, <c>const</c>, <c>class</c>, … and <c>export { … }</c>).</summary>
-    private static HashSet<string> ScriptExports(string script)
-    {
-        var names = Regex.Matches(script, @"^\s*export\s+(?:default\s+)?(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)", RegexOptions.Multiline)
-            .Select(match => match.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
-        foreach (Match list in Regex.Matches(script, @"^\s*export\s*\{([^}]*)\}", RegexOptions.Multiline))
-            foreach (var item in list.Groups[1].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-                names.Add(item.Split(" as ", StringSplitOptions.TrimEntries)[^1]);
-        return names;
-    }
 
     /// <summary>The Web Agent's files (<paramref name="pattern"/>, under <c>src/PiSharp.WebAgent</c>, build output aside) whose text matches
     /// <paramref name="regex"/>, relative to the project.</summary>
@@ -223,15 +157,6 @@ internal static partial class Program
             .Where(path => !InBuildOutput(project, path) && Regex.IsMatch(File.ReadAllText(path), regex, options))
             .Select(path => Path.GetRelativePath(project, path).Replace('\\', '/')).Order(StringComparer.Ordinal)];
     }
-
-    /// <summary>The Web Agent's two test suites' sources (decision 0011's docs cases aside) whose text matches <paramref name="regex"/>.</summary>
-    private static List<string> TestFilesMatching(string root, string regex, RegexOptions options = RegexOptions.None) =>
-    [
-        .. new[] { "PiSharp.WebAgent.Tests", "PiSharp.WebAgent.BrowserTests" }
-            .SelectMany(suite => Directory.EnumerateFiles(Path.Join(root, "tests", suite), "*.cs", SearchOption.TopDirectoryOnly))
-            .Where(path => !Path.GetFileName(path).EndsWith("DocsCases.cs", StringComparison.Ordinal) && Regex.IsMatch(File.ReadAllText(path), regex, options))
-            .Select(path => Path.GetFileName(path)).Order(StringComparer.Ordinal),
-    ];
 
     /// <summary>The browser cases' sources (decision 0011's docs cases aside), by file name.</summary>
     private static Dictionary<string, string> BrowserCaseTexts(string root) =>

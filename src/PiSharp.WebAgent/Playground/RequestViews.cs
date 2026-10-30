@@ -314,9 +314,9 @@ public sealed record RequestConfigView
     /// has a live control).</summary>
     public static IReadOnlyDictionary<string, RequestUnsentOption> Unsent { get; } = new Dictionary<string, RequestUnsentOption>(StringComparer.Ordinal)
     {
-        ["baseUrl"] = new("baseUrl", "Runs use the provider's base URL from Settings › Providers; a per-run override is not sent yet."),
+        ["baseUrl"] = new("baseUrl", "Runs use the provider's base URL from Settings › Providers; a per-run override is refused, because it would send the account's credential to a host typed here."),
         ["apiKey"] = new("apiKey", "The Playground never takes a key from the page: runs use the account below, whose credential stays on the server."),
-        ["thinkingBudgets"] = new("thinkingBudgets", "The run engine sends the thinking level only; per-level token budgets are not sent yet."),
+        ["thinkingBudgets"] = new("thinkingBudgets", "The Playground sends the thinking level only; per-level token budgets are not sent from this page yet."),
         ["cacheRetention"] = new("cacheRetention", "Runs use PiSharp's prompt-cache defaults; a per-run value is not sent yet."),
         ["maxRetries"] = new("maxRetries", "Runs use PiSharp's transport defaults; per-run retries are not sent yet."),
         ["maxRetryDelayMs"] = new("maxRetryDelayMs", "Runs use PiSharp's transport defaults; a per-run retry delay is not sent yet."),

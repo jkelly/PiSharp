@@ -39,7 +39,7 @@
       <div class="setting-control">
         <button class="btn btn-sm btn-outline-danger" type="button" data-danger="history" disabled="@(!runs.Available || runs.Records == 0)"
                 data-confirm-title="Clear all run history?"
-                data-confirm-body="All @DataStorageService.Plural(runs.Count, "run")@records, with their raw payloads and SSE events, are deleted from runs.db, pinned ones too. Chats and presets are kept."
+                data-confirm-body="All @DataStorageService.Plural(runs.Count, "run")@records, with their raw payloads and SSE events, are deleted from runs.db, pinned ones too. Agent compare runs go with their sessions and workspaces (a model continued as a chat keeps its own). Chats and presets are kept."
                 data-confirm-detail="runs.db · @DataFolders.Size(runs.Bytes) · compacted afterwards (VACUUM)"
                 data-confirm-ok="Clear history">Clear history…</button>
       </div>
