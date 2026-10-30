@@ -62,8 +62,8 @@
 .sse-row .ev { color: var(--ps-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sse-row .data { color: var(--ps-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* "Collapse deltas": the first delta of a run and its "N more" row show; expanded, every delta shows and the summary row hides. */
-.pg-events[data-collapsed="true"] .sse-row[data-extra] { display: none; }
-.pg-events[data-collapsed="false"] .sse-row[data-summary] { display: none; }
+.pg-events[data-collapsed="true"] .sse-row[data-extra="true"] { display: none; }
+.pg-events[data-collapsed="false"] .sse-row[data-summary="true"] { display: none; }
 .pg-events[data-filter="thinking"] .sse-row:not([data-group="thinking"]),
 .pg-events[data-filter="text"] .sse-row:not([data-group="text"]),
 .pg-events[data-filter="toolcall"] .sse-row:not([data-group="toolcall"]) { display: none; }
