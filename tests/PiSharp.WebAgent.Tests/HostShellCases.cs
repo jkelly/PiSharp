@@ -76,9 +76,10 @@ internal static partial class Program
 
             var later = typeof(ShellController).GetMethod(nameof(ShellController.Later))!.GetCustomAttributes<HttpGetAttribute>().Select(a => a.Template).Order().ToList();
             Equal(string.Join(",", LaterFeature.Pages.Keys.Order()), string.Join(",", later), "every later sidebar page has a route");
-            // W4 T4: every settings page is built, so the settings placeholder (its route and view) is gone.
-            Equal("Later", string.Join(",", typeof(ShellController).GetMethods().Where(method => method.GetCustomAttributes<HttpGetAttribute>().Any()).Select(method => method.Name)),
-                "the shell keeps one placeholder route, the sidebar's");
+            // W4 T4: every settings page is built, so the settings placeholder (its route and view) is gone. W5 E6: Evals is built, so the
+            // sidebar placeholder has no route left either.
+            Equal("", string.Join(",", typeof(ShellController).GetMethods().Where(method => method.GetCustomAttributes<HttpGetAttribute>().Any()).Select(method => method.Name)),
+                "the shell keeps no placeholder route");
         }),
 
         Case("host.faux-catalog-and-fallback-registrations", () =>

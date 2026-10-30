@@ -1,7 +1,7 @@
 // Decision 0011 (run W2, WU4): the shell's navigation, exactly as the mockups' sidebar and settings nav (_Sidebar, _SettingsNav): New chat ·
 // Playground · Compare · Tool Bench · History · Evals · Presets · recent chats · Settings; and Settings' Connections, Agent and App groups.
-// Evals' leaderboard, which W5 builds, still goes to the neutral "Coming in a later milestone" page (ShellController, LaterFeature). A page names its
-// sidebar item, settings item and chat through ShellViewData.
+// Every sidebar item opens a built page (W5 E6 built Evals, the last one). A page names its sidebar item, settings item and chat through
+// ShellViewData.
 namespace PiSharp.WebAgent.Shell;
 
 /// <summary>A link in the sidebar or the settings nav.</summary>
