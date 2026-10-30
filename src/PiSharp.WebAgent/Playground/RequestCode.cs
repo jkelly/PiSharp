@@ -7,6 +7,7 @@
 //   - JSON: run.json (the body of POST /api/runs), then the provider part (API, base URL, patch, headers).
 // No secret is ever in it: a run names its account by id only, the spec refuses credential-named headers and provider options, and the
 // provider's credential is shown as a placeholder (••••): the key stays on the server (W2 rule 3; brief rule 6). Image data is abbreviated.
+// Every tab has LF line endings whatever the host's newline, so the cURL tab's "\" continuations hold when it is saved as run.sh.
 using System.Text;
 using System.Text.Json.Nodes;
 using PiSharp.WebAgent.Runs;
@@ -41,11 +42,17 @@ public static class RequestCode
         notes.AddRange(plan.Notes);
         if (spec.Messages.Any(message => message.Images is { Count: > 0 })) notes.Add("Image data is abbreviated here; the run sends it whole.");
         var subtitle = $"This request as code · {model.Provider}/{model.Id} · {model.Api}" + (offline ? " · offline" : "");
-        return new ViewCodeView(subtitle, CSharp(plan), Curl(plan, origin.TrimEnd('/'), baseUrl), json, provider is null ? null : RequestJson.Indented(provider))
+        return new ViewCodeView(subtitle, Lf(CSharp(plan)), Lf(Curl(plan, origin.TrimEnd('/'), baseUrl)), Lf(json), provider is null ? null : Lf(RequestJson.Indented(provider)))
         {
             Notes = notes,
         };
     }
+
+    /// <summary><paramref name="text"/> with LF line endings only. StringBuilder.AppendLine and indented JSON write Environment.NewLine (CRLF
+    /// on Windows), and some lines are joined with "\n": copied as run.sh, a "\" before CRLF escapes the CR, not the newline, and breaks
+    /// the cURL continuations. Only CRLF is replaced: a raw CR appears nowhere else (JSON escapes it, header values refuse it), and other
+    /// Unicode line separators inside JSON strings stay as they are.</summary>
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     /// <summary>The body of <c>POST /api/runs</c> for <paramref name="spec"/>: the spec without nulls, image data abbreviated.</summary>
     public static JsonObject RunJson(RunSpec spec)

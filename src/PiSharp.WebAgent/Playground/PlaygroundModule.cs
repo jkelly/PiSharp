@@ -3,7 +3,8 @@
 // through R0's /api/runs (the run engine: guarded by the Spend Guard, recorded in runs.db). The JSON endpoints here only read:
 //   POST /api/playground/estimate   a RunSpec -> {valid, message, html, verdict, chip, over, pane, tokens, parts, refused}: the estimate by
 //                                   Run (the Spend Guard's preflight; nothing reserved) and the request's input tokens.
-//   POST /api/playground/code       a RunSpec -> View code {subtitle, csharp, curl, json, provider, notes} (no secret: placeholders).
+//   POST /api/playground/code       a RunSpec -> View code {subtitle, csharp, curl, json, provider, notes} (no secret: placeholders);
+//                                   ?run= the run the page shows adds inspectorUrl ("Open last run in inspector") when runs.db has it.
 //   GET  /api/playground/model      ?provider=&model=&account= -> {capabilities, auth: {providerName, accountLabel, billing, source, tone,
 //                                   offline}} for Model & auth (the account by its label only).
 // Writes are JSON POSTs (HostGuard: same origin, JSON only); every answer is no-store; errors are {error: {code, message}} as /api/runs's.
@@ -48,8 +49,8 @@ public static class PlaygroundModule
         });
         api.MapPost("/estimate", (JsonObject? body, PlaygroundPages pages, IServiceProvider services, CancellationToken token) =>
             Answer(async () => Json(await EstimateJsonAsync(pages, Spec(body), services, token).ConfigureAwait(false))));
-        api.MapPost("/code", (JsonObject? body, HttpRequest request, PlaygroundPages pages) =>
-            Answer(() => Task.FromResult(Json(pages.Code(Spec(body), $"{request.Scheme}://{request.Host}")))));
+        api.MapPost("/code", (JsonObject? body, string? run, HttpRequest request, PlaygroundPages pages) =>
+            Answer(() => Task.FromResult(Json(pages.Code(Spec(body), $"{request.Scheme}://{request.Host}", run)))));
         api.MapGet("/model", (string? provider, string? model, string? account, PlaygroundPages pages, CancellationToken token) => Answer(async () =>
         {
             if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(model)) throw new ArgumentException("Name the provider and the model (?provider=&model=).");

@@ -5,7 +5,8 @@ using static Microsoft.Playwright.Assertions;
 // Decision 0011 (run W4, T4): the request pages in a browser, on priced faux (--faux-metered: offline, but each call is reserved and settled
 // at a list price, so the cost metrics and the ledger hold real numbers), failing on any page or console error. A Playground run streams
 // into the output pane (the stream text grows while the run's state is streaming) and then shows its metrics (TTFT, total, tokens per
-// second, input and output tokens, the settled cost and the stop reason); a second run keeps going when its tab closes, and a new tab on
+// second, input and output tokens, the settled cost and the stop reason), and View code's footer then links "Open last run in inspector"
+// (hidden before the first run); a second run keeps going when its tab closes, and a new tab on
 // its ?run= address shows it whole. Compare adds a third column through the model picker, runs all three in one group (one ledger row per
 // column, all under the group's run) and shows each answer with the metrics table. The Tool Bench adds a tool from a template, pauses on
 // the model's call (no saved mock matches), takes a manual result and continues to the model's answer; the call log names the result
@@ -22,6 +23,13 @@ internal static partial class Program
             var output = page.Locator("[data-run-output]");
             var user = page.Locator("[data-msg][data-role='user'] [data-msg-text]").First;
             await user.FillAsync("slow: " + Words(60));
+
+            // View code before any run: the code is there, "Open last run in inspector" is not.
+            var code = await page.OpenModalAsync(page.Locator("[data-view-code] >> visible=true").First, "modal-view-code");
+            await Expect(code.Locator("[data-code='curl']")).ToContainTextAsync("/api/runs");
+            await Expect(code.Locator("[data-code-inspector]")).ToBeHiddenAsync();
+            await page.DismissModalAsync("modal-view-code");
+
             await page.Locator("[data-run]").ClickAsync();
             await Expect(output).ToHaveAttributeAsync("data-state", "streaming");
             var stream = output.Locator("[data-stream-text]");
@@ -47,6 +55,14 @@ internal static partial class Program
             Equal(id, Reservation(row, "run"), "under the run's id");
             Equal("settled", Reservation(row, "state"), "and settled");
             await Expect(page.Locator("[data-open-inspector]")).ToHaveAttributeAsync("href", "/runs/" + id);
+
+            // After the run, View code's footer has the mockup's "Open last run in inspector", to this run.
+            await page.OpenModalAsync(page.Locator("[data-view-code] >> visible=true").First, "modal-view-code");
+            var last = code.Locator("[data-code-inspector]");
+            await Expect(last).ToBeVisibleAsync();
+            await Expect(last).ToHaveAttributeAsync("href", "/runs/" + Uri.EscapeDataString(id));
+            await Expect(last).ToHaveTextAsync("Open last run in inspector");
+            await page.DismissModalAsync("modal-view-code");
 
             // A second run keeps going after its tab closes; a new tab on its address shows the whole answer.
             await user.FillAsync("slow: " + Words(100));
