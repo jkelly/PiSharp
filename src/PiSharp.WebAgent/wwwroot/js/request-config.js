@@ -1,0 +1,324 @@
+// Decision 0011 (run W4, R1): _RequestConfig's behaviour. Touching an option sets it ([data-set="true"]: it is sent); Clear puts it back
+// to its default (not sent). Each row is enabled only when the chosen model takes the option with the chosen thinking level
+// (applyCapabilities, from the run engine's RunCapabilities: data-capabilities, or GET /api/playground/model after a model change). A set
+// option the model does not take keeps its value and its row says the run will be refused until it is cleared (brief rule 4: never
+// dropped silently); "Clear them" clears every such option at once. Rows marked [data-unsent] are never enabled. The modified count and the
+// accordions' dots follow what is set.
+
+const COUNTED = ['thinking', 'maxTokens', 'temperature', 'topP', 'topK', 'stop', 'seed', 'presencePenalty', 'frequencyPenalty',
+  'responseFormat', 'toolChoice', 'serviceTier', 'headers', 'providerOptions'];
+const SECTIONS = {
+  sampling: ['temperature', 'topP', 'topK', 'presencePenalty', 'frequencyPenalty', 'stop', 'seed'],
+  output: ['maxTokens', 'responseFormat'],
+  reasoning: ['thinking'],
+  tier: ['serviceTier'],
+  headers: ['headers'],
+  provider: ['providerOptions'],
+};
+const SEND_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+
+function changed(config) {
+  config.dispatchEvent(new CustomEvent('request-change', { bubbles: true }));
+}
+
+/** The capabilities the config was last given (RunCapabilities as JSON), or null. */
+export function capabilities(config) {
+  if (config._capabilities !== undefined) return config._capabilities;
+  try { config._capabilities = config.dataset.capabilities ? JSON.parse(config.dataset.capabilities) : null; } catch { config._capabilities = null; }
+  return config._capabilities;
+}
+
+/** The thinking level the control shows. */
+export function thinkingLevel(config) {
+  return config.querySelector('[data-opt="thinking"]:checked')?.value ?? 'off';
+}
+
+function support(caps, option) {
+  return caps?.options?.find((entry) => entry.option === option) ?? null;
+}
+
+/** Whether the model takes `option` with the shown thinking level. */
+export function takes(config, option, caps = capabilities(config)) {
+  const entry = support(caps, option);
+  if (!entry) return false;
+  return thinkingLevel(config) !== 'off' ? (entry.withThinking ?? entry.supported) : entry.supported;
+}
+
+function why(config, option, caps) {
+  if (!caps) return 'Choose a model PiSharp knows.';
+  const entry = support(caps, option);
+  if (!entry) return '';
+  if (!takes(config, option, caps) && !entry.reason) return thinkingLevel(config) !== 'off' && entry.supported ? 'not while the model thinks' : 'this model does not take it';
+  return entry.reason ?? '';
+}
+
+function displayValue(row) {
+  const input = row.querySelector('[data-opt]');
+  const shown = row.querySelector('[data-option-value]');
+  if (!shown || !input) return;
+  if (input.dataset.kind === 'level') shown.textContent = thinkingLevel(row.closest('[data-request-config]'));
+  else shown.textContent = row.dataset.set === 'true' ? input.value : 'default';
+}
+
+function markSet(row, set) {
+  row.dataset.set = set ? 'true' : 'false';
+  const clear = row.querySelector('[data-option-clear]');
+  if (clear) clear.hidden = !set;
+  displayValue(row);
+}
+
+function resetRow(row) {
+  const option = row.dataset.option;
+  row.querySelectorAll('[data-opt]').forEach((input) => {
+    if (input.type === 'radio') input.checked = input.value === 'off';
+    else if (input.tagName === 'SELECT') input.value = '';
+    else input.value = input.dataset.default ?? '';
+  });
+  if (option === 'headers') row.querySelector('[data-header-rows]')?.replaceChildren();
+  if (option === 'responseFormat') {
+    row.querySelector('[data-format-schema]').hidden = true;
+  }
+  if (option === 'toolChoice') row.querySelectorAll('[data-choice-note]').forEach((note) => { note.hidden = note.dataset.choiceNote !== 'auto'; });
+  markSet(row, false);
+}
+
+/** Clears every option back to its default (Reset parameters). */
+export function resetOptions(config) {
+  config.querySelectorAll('[data-option]').forEach((row) => { if (row.dataset.option !== 'tools') resetRow(row); });
+  refresh(config);
+  changed(config);
+}
+
+/** Recomputes rows (enabled, notes, conflicts), the modified count and the section dots. */
+export function refresh(config) {
+  const caps = capabilities(config);
+  let conflicts = 0;
+  config.querySelectorAll('[data-option]').forEach((row) => {
+    const option = row.dataset.option;
+    const set = row.dataset.set === 'true';
+    const ok = option === 'tools' ? true : takes(config, option, caps);
+    const conflict = set && (option === 'thinking' ? !levelTaken(caps, thinkingLevel(config)) : option === 'tools' ? !takes(config, 'tools', caps) : !ok);
+    if (conflict) conflicts++;
+    row.classList.toggle('param-disabled', !ok && !set);
+    if (conflict) row.dataset.conflict = 'true';
+    else delete row.dataset.conflict;
+    if (option !== 'thinking' && option !== 'tools') {
+      // A set option the model does not take stays editable so it can be cleared or fixed; an unset one is disabled.
+      row.querySelectorAll('[data-opt], [data-header-name], [data-header-value], [data-header-add], [data-format-name], [data-format-schema-text], [data-format-strict], [data-choice-tool]')
+        .forEach((input) => { input.disabled = !ok && !set; });
+    }
+    const note = row.querySelector('[data-option-note]');
+    if (note && option !== 'thinking') {
+      const reason = why(config, option, caps);
+      note.textContent = conflict ? `${reason ? reason + '. ' : ''}Set: the run will be refused until you clear it.` : (ok ? (option === 'tools' ? '' : reason) : reason);
+      note.classList.toggle('text-ps-warn', conflict);
+    }
+    if (option === 'temperature') {
+      const alert = row.querySelector('[data-option-alert]');
+      if (alert) {
+        alert.hidden = ok;
+        const reasonText = alert.querySelector('[data-option-reason]');
+        if (reasonText) reasonText.textContent = ok ? '' : `doesn't take temperature: ${why(config, option, caps)}.`;
+        const ref = alert.querySelector('[data-model-ref]');
+        if (ref && caps) ref.textContent = `${caps.provider}/${caps.model}`;
+      }
+      row.dataset.tempPane = ok ? 'temp-supported' : 'temp-unsupported';
+    }
+  });
+  applyLevels(config, caps);
+  const modified = COUNTED.filter((option) => config.querySelector(`[data-option="${option}"]`)?.dataset.set === 'true').length;
+  const chip = config.querySelector('[data-modified-chip]');
+  if (chip) {
+    chip.hidden = modified === 0;
+    chip.querySelector('[data-modified-count]').textContent = String(modified);
+  }
+  config.querySelectorAll('[data-section]').forEach((section) => {
+    const options = SECTIONS[section.dataset.section];
+    if (!options) return;
+    const count = options.filter((option) => config.querySelector(`[data-option="${option}"]`)?.dataset.set === 'true').length;
+    const dot = section.closest('.accordion-item')?.querySelector('[data-section-dot]');
+    if (dot) {
+      dot.hidden = count === 0;
+      dot.title = `${count} modified`;
+    }
+  });
+  const banner = config.querySelector('[data-config-conflicts]');
+  if (banner) {
+    banner.hidden = conflicts === 0;
+    banner.querySelector('[data-config-conflicts-text]').textContent = conflicts === 0 ? ''
+      : `${conflicts === 1 ? 'An option you set isn\'t' : `${conflicts} options you set aren't`} taken by this model, so Run will refuse the request until you clear ${conflicts === 1 ? 'it' : 'them'}.`;
+  }
+  config.dataset.conflicts = String(conflicts);
+  return conflicts;
+}
+
+function levelTaken(caps, level) {
+  if (level === 'off') return true;
+  return SEND_LEVELS.includes(level) && (caps?.thinkingLevels ?? ['off']).includes(level);
+}
+
+function applyLevels(config, caps) {
+  const row = config.querySelector('[data-option="thinking"]');
+  if (!row) return;
+  const levels = caps?.thinkingLevels ?? ['off'];
+  row.querySelectorAll('[data-opt="thinking"]').forEach((radio) => {
+    const ok = levelTaken(caps, radio.value);
+    radio.disabled = !ok && !radio.checked;
+    const label = row.querySelector(`label[for="${radio.id}"]`);
+    if (label) label.title = ok ? '' : !SEND_LEVELS.includes(radio.value) ? 'PiSharp\'s run engine does not send it yet.'
+      : levels.length <= 1 ? 'This model does not think.' : `This model thinks at ${levels.slice(1).join(', ')}.`;
+  });
+  const note = row.querySelector('[data-option-note]');
+  const level = thinkingLevel(config);
+  const conflict = !levelTaken(caps, level);
+  if (note) {
+    note.textContent = conflict ? `${caps ? (levels.length <= 1 ? 'This model does not think' : `This model thinks at ${levels.slice(1).join(', ')}`) : 'Choose a model'}; ${level} is set, so the run will be refused until you change it.`
+      : levels.length > 1 ? `This model thinks at ${levels.slice(1).join(', ')}. Default: off. max isn't sent by the run engine yet.` : 'This model does not think. max isn\'t sent by the run engine yet.';
+    note.classList.toggle('text-ps-warn', conflict);
+  }
+  displayValue(row);
+}
+
+/** Applies a newly chosen model's capabilities ({ capabilities, auth } of GET /api/playground/model): rows, chips, API, account. */
+export function applyModel(config, answer) {
+  const caps = answer?.capabilities ?? null;
+  config._capabilities = caps;
+  config.dataset.api = caps?.api ?? '';
+  config.dataset.provider = caps?.provider ?? '';
+  config.dataset.model = caps?.model ?? '';
+  const api = config.querySelector('[data-model-api]');
+  if (api) api.value = caps?.api ?? '';
+  const chips = config.querySelector('[data-cap-chips]');
+  if (chips) {
+    const items = [];
+    const chip = (text, kind, icon) => {
+      const span = document.createElement('span');
+      span.className = 'cap' + (kind ? ' ' + kind : '');
+      if (icon) {
+        const i = document.createElement('i');
+        i.className = 'bi ' + icon;
+        span.append(i);
+      }
+      span.append(text);
+      items.push(span);
+    };
+    const tokens = (value) => (value >= 1_000_000 ? `${+(value / 1_000_000).toFixed(1)}M` : value >= 1000 ? `${Math.round(value / 1000)}K` : String(value));
+    if (caps?.thinkingLevels?.length > 1) chip('reasoning', 'cap-reasoning', 'bi-lightbulb');
+    if (caps?.images) chip('image', 'cap-image', 'bi-image');
+    if (caps?.contextWindow) chip(`${tokens(caps.contextWindow)} ctx`);
+    if (caps?.maxTokens) chip(`${tokens(caps.maxTokens)} out`);
+    if (caps?.offline) chip('offline', null, 'bi-plug');
+    chips.replaceChildren(...items);
+  }
+  config.querySelector('[data-model-unknown]')?.remove();
+  const max = config.querySelector('[data-opt="maxTokens"]');
+  if (max) {
+    if (caps?.maxTokens) max.max = String(caps.maxTokens);
+    else max.removeAttribute('max');
+  }
+  const auth = answer?.auth;
+  const source = config.querySelector('[data-auth-source]');
+  if (source) {
+    source.textContent = auth?.source ?? 'Choose a model';
+    source.dataset.tone = auth?.tone ?? 'warn';
+  }
+  const accountRow = config.querySelector('[data-auth-account-row]');
+  if (accountRow) {
+    accountRow.hidden = !auth?.accountLabel;
+    accountRow.querySelector('[data-auth-account]').textContent = auth?.accountLabel ?? '';
+  }
+  const billing = config.querySelector('[data-auth-billing]');
+  if (billing) billing.textContent = auth?.billing ?? 'unknown';
+  const manage = config.querySelector('[data-auth-manage]');
+  if (manage && caps) manage.href = '/settings/providers/' + encodeURIComponent(caps.provider);
+  const paneApi = config.querySelector('[data-pane-api]');
+  if (paneApi) paneApi.textContent = `${caps?.api || 'This model'} (active)`;
+  refresh(config);
+}
+
+function onInput(config, event) {
+  const target = event.target;
+  const row = target.closest('[data-option]');
+  if (!row || target.closest('[data-unsent]')) return;
+  if (target.matches('[data-opt="thinking"]')) {
+    markSet(row, target.value !== 'off');
+    refresh(config);
+    changed(config);
+    return;
+  }
+  if (target.matches('[data-opt="responseFormat"]')) {
+    row.querySelector('[data-format-schema]').hidden = target.value !== 'json_schema';
+  }
+  if (target.matches('[data-opt="toolChoice"]')) {
+    row.querySelectorAll('[data-choice-note]').forEach((note) => { note.hidden = note.dataset.choiceNote !== (target.value || 'auto'); });
+  }
+  if (target.matches('[data-tool-on]')) return;
+  const empty = row.dataset.option === 'headers'
+    ? ![...row.querySelectorAll('[data-header-name]')].some((input) => input.value.trim() !== '')
+    : target.matches('[data-opt]') && target.dataset.kind !== 'range' && target.value.trim() === '';
+  markSet(row, !empty);
+  refresh(config);
+  changed(config);
+}
+
+/** Wires one config pane. */
+export function initConfig(config) {
+  if (!config || config.dataset.wired === 'true') return;
+  config.dataset.wired = 'true';
+  config.addEventListener('input', (event) => onInput(config, event));
+  config.addEventListener('change', (event) => {
+    if (event.target.matches('[data-provider-pane-select]')) {
+      config.querySelectorAll('[data-provider-pane]').forEach((pane) => { pane.hidden = pane.dataset.providerPane !== event.target.value; });
+      return;
+    }
+    // Selects, radios and checkboxes report through change only.
+    if (event.target.matches('select[data-opt], [data-opt][type="radio"], [data-format-strict], [data-choice-tool]')) onInput(config, event);
+  });
+  config.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    if (button.matches('[data-option-clear]')) {
+      resetRow(button.closest('[data-option]'));
+      refresh(config);
+      changed(config);
+    } else if (button.matches('[data-config-clear-conflicts]')) {
+      config.querySelectorAll('[data-option][data-conflict="true"]').forEach((row) => {
+        if (row.dataset.option === 'tools') {
+          row.querySelector('[data-tool-list]')?.replaceChildren();
+          row.dataset.set = 'false';
+        } else resetRow(row);
+      });
+      refresh(config);
+      changed(config);
+    } else if (button.matches('[data-header-add]')) {
+      const row = button.closest('[data-option]');
+      const line = row.querySelector('[data-header-template]').content.firstElementChild.cloneNode(true);
+      row.querySelector('[data-header-rows]').append(line);
+      line.querySelector('[data-header-name]').focus();
+    } else if (button.matches('[data-header-remove]')) {
+      const row = button.closest('[data-option]');
+      button.closest('[data-header-row]').remove();
+      markSet(row, [...row.querySelectorAll('[data-header-name]')].some((input) => input.value.trim() !== ''));
+      refresh(config);
+      changed(config);
+    }
+  });
+  config.addEventListener('request-options-applied', () => refresh(config));
+  refresh(config);
+}
+
+/** Marks the rows of options a run refused ([{ option, reason }] from POST /api/runs) and opens their sections. */
+export function markRefused(config, refused) {
+  for (const entry of refused ?? []) {
+    const row = config.querySelector(`[data-option="${entry.option}"]`);
+    if (!row) continue;
+    row.dataset.conflict = 'true';
+    const note = row.querySelector('[data-option-note]');
+    if (note) {
+      note.textContent = `${entry.reason ? entry.reason + '. ' : ''}The run was refused: clear it or choose another model.`;
+      note.classList.add('text-ps-warn');
+    }
+    const collapse = row.closest('.accordion-collapse');
+    if (collapse && window.bootstrap && !collapse.classList.contains('show')) window.bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false }).show();
+  }
+}

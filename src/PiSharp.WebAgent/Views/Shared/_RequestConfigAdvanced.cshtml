@@ -1,0 +1,203 @@
+@* Decision 0011 (run W4, R1): _RequestConfig's last sections: Caching & session and Transport (shown, not sent yet: runs use PiSharp's
+   defaults), Speed / service tier (sent only where the model takes it: the OpenAI Responses API of provider OpenAI, never Azure; Fast and
+   UltraFast listed, not sent yet), Custom headers (name/value rows; a credential-like name is refused by the run engine, and the effective
+   headers table masks every value whose name could carry a credential) and Provider-specific (raw providerOptions merged into the request
+   body of a patched API; the Azure and Bedrock panes show their options, set on the provider, not per run). Model: RequestConfigView. *@
+@using PiSharp.WebAgent.Playground
+@using PiSharp.WebAgent.Runs
+@model RequestConfigView
+@{
+    var p = Model.IdPrefix;
+    string Row(string option) => "param-row" + (Model.Off(option) ? " param-disabled" : "");
+    string Set(string option) => Model.IsSet(option) ? "true" : "false";
+    string? Conflict(string option) => Model.Conflict(option) ? "true" : null;
+    var headers = Model.Draft.Headers?.ToList() ?? [];
+    var headerDot = Model.ModifiedOf(RunModelOptions.Headers);
+    var tierDot = Model.ModifiedOf(RunModelOptions.ServiceTier);
+    var providerDot = Model.ModifiedOf(RunModelOptions.ProviderOptions);
+}
+<!-- Caching & session -->
+<div class="accordion-item">
+  <h3 class="accordion-header">
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-cache" aria-expanded="false" aria-controls="@(p)-cfg-cache"><i class="bi bi-lightning-charge me-2 text-ps-faint"></i><span class="flex-grow-1">Caching &amp; session</span></button>
+  </h3>
+  <div id="@(p)-cfg-cache" class="accordion-collapse collapse" data-section="cache">
+    <div class="accordion-body">
+      <div class="param-row param-disabled" data-unsent="cacheRetention">
+        <div class="param-head">
+          <span class="param-name" id="@(p)-lbl-cache">cacheRetention <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Prompt-cache hint. Anthropic: short = 300 s, long = 3600 s. Codex: none drops prompt_cache_key and the session headers."></i></span>
+        </div>
+        <div class="btn-group btn-group-sm w-100 pg-seg" role="group" aria-labelledby="@(p)-lbl-cache">
+          @foreach (var retention in new[] { "none", "short", "long" })
+          {
+            <input type="radio" class="btn-check" name="@(p)-cache" id="@(p)-cr-@retention" disabled><label class="btn btn-outline-secondary" for="@(p)-cr-@retention">@retention</label>
+          }
+        </div>
+        <div class="form-text mt-1">@RequestConfigView.Unsent["cacheRetention"].Reason</div>
+      </div>
+      <div class="param-row param-disabled" data-unsent="sessionId">
+        <div class="param-head">
+          <label class="param-name" for="@(p)-session">sessionId <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Codex: prompt_cache_key plus the session-id and x-client-request-id headers (up to 64 characters)."></i></label>
+        </div>
+        <input class="form-control form-control-sm ps-mono" id="@(p)-session" placeholder="—" disabled>
+        <div class="form-text mt-1">@RequestConfigView.Unsent["sessionId"].Reason</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Speed / service tier -->
+<div class="accordion-item">
+  <h3 class="accordion-header">
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-tier" aria-expanded="false" aria-controls="@(p)-cfg-tier"><i class="bi bi-speedometer2 me-2 text-ps-faint"></i><span class="flex-grow-1">Speed / service tier</span><span class="status-dot info me-2" title="@tierDot modified" data-section-dot hidden="@(tierDot == 0)"></span></button>
+  </h3>
+  <div id="@(p)-cfg-tier" class="accordion-collapse collapse" data-section="tier">
+    <div class="accordion-body">
+      <div class="@Row(RunModelOptions.ServiceTier)" data-option="serviceTier" data-set="@Set(RunModelOptions.ServiceTier)" data-conflict="@Conflict(RunModelOptions.ServiceTier)">
+        <div class="param-head">
+          <label class="param-name" for="@(p)-tier">serviceTier <span class="status-dot info ms-1" data-option-dot title="Modified · default not sent"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="OpenAI Responses: service_tier. Availability depends on the model and account."></i></label>
+        </div>
+        <select class="form-select form-select-sm" id="@(p)-tier" aria-label="Speed / service tier" data-opt="serviceTier" data-kind="tier" disabled="@Model.Off(RunModelOptions.ServiceTier)">
+          @foreach (var tier in RequestConfigView.Tiers)
+          {
+            <option value="@tier.Value" selected="@((Model.Draft.ServiceTier ?? "") == tier.Value)" disabled="@(!tier.Sent)">@tier.Label@(tier.Sent ? "" : " · not sent yet")</option>
+          }
+        </select>
+        <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note>@(Model.Why(RunModelOptions.ServiceTier) ?? "Uses the configured default. Availability depends on the model and account.") Fast and UltraFast: @RequestConfigView.NotSentYet</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ServiceTier))">Clear</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Transport -->
+<div class="accordion-item">
+  <h3 class="accordion-header">
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-transport" aria-expanded="false" aria-controls="@(p)-cfg-transport"><i class="bi bi-hdd-network me-2 text-ps-faint"></i><span class="flex-grow-1">Transport</span></button>
+  </h3>
+  <div id="@(p)-cfg-transport" class="accordion-collapse collapse" data-section="transport">
+    <div class="accordion-body">
+      @foreach (var (name, help, placeholder) in new[]
+      {
+          ("timeoutMs", "Per-attempt timeout for the response headers. Empty waits indefinitely.", "none"),
+          ("maxRetries", "Client-side retries for 429 and 5xx responses.", "default"),
+          ("maxRetryDelayMs", "Longest server-requested retry delay that is honoured; a longer retry-after fails at once. 0 disables the cap.", "60000"),
+      })
+      {
+        <div class="param-row param-disabled" data-unsent="@name">
+          <div class="param-head">
+            <label class="param-name" for="@(p)-@name">@name <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="@help"></i></label>
+            <input type="number" class="form-control form-control-sm param-value input" id="@(p)-@name" placeholder="@placeholder" disabled>
+          </div>
+          <div class="form-text mt-0">@RequestConfigView.Unsent[name].Reason</div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Custom headers -->
+<div class="accordion-item">
+  <h3 class="accordion-header">
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-headers" aria-expanded="false" aria-controls="@(p)-cfg-headers"><i class="bi bi-card-heading me-2 text-ps-faint"></i><span class="flex-grow-1">Custom headers</span><span class="status-dot info me-2" title="@headerDot modified" data-section-dot hidden="@(headerDot == 0)"></span></button>
+  </h3>
+  <div id="@(p)-cfg-headers" class="accordion-collapse collapse" data-section="headers">
+    <div class="accordion-body">
+      <div class="@Row(RunModelOptions.Headers)" data-option="headers" data-set="@Set(RunModelOptions.Headers)" data-conflict="@Conflict(RunModelOptions.Headers)">
+        <div class="form-text mt-0 mb-2">Added to the provider's request, over its own headers. Authorization, keys and cookies are refused: the account supplies its own credentials. At most @RunSpec.MaxHeaders.</div>
+        <div class="d-flex gap-1 mb-1 ps-label pg-header-labels"><span class="pg-header-cell">Name</span><span class="pg-header-cell">Value</span><span class="pg-header-action"></span></div>
+        <div data-header-rows>
+          @for (var index = 0; index < headers.Count; index++)
+          {
+            var (name, value) = (headers[index].Key, headers[index].Value);
+            <div class="d-flex align-items-center gap-1 mb-1" data-header-row>
+              <input class="form-control form-control-sm ps-mono pg-header-cell" value="@name" aria-label="Header @(index + 1) name" data-header-name disabled="@Model.Off(RunModelOptions.Headers)">
+              <input class="form-control form-control-sm ps-mono pg-header-cell" value="@value" aria-label="Header @(index + 1) value" data-header-value disabled="@Model.Off(RunModelOptions.Headers)">
+              <button class="btn btn-icon pg-header-action" type="button" data-header-remove title="Remove header" aria-label="Remove header @(index + 1)"><i class="bi bi-x fs-8"></i></button>
+            </div>
+          }
+        </div>
+        <template data-header-template>
+          <div class="d-flex align-items-center gap-1 mb-1" data-header-row>
+            <input class="form-control form-control-sm ps-mono pg-header-cell" placeholder="x-request-tag" aria-label="Header name" data-header-name>
+            <input class="form-control form-control-sm ps-mono pg-header-cell" placeholder="value" aria-label="Header value" data-header-value>
+            <button class="btn btn-icon pg-header-action" type="button" data-header-remove title="Remove header" aria-label="Remove header"><i class="bi bi-x fs-8"></i></button>
+          </div>
+        </template>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-header-add disabled="@Model.Off(RunModelOptions.Headers)"><i class="bi bi-plus-lg me-1"></i>Add header</button>
+        <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note>@Model.Why(RunModelOptions.Headers)</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.Headers))">Clear</button></div>
+        <details class="mt-3" data-effective-headers>
+          <summary class="fs-8 text-secondary">Headers this request adds</summary>
+          <table class="table table-sm header-table mt-2 mb-0">
+            <tbody data-effective-rows>
+              @foreach (var (name, value) in headers)
+              {
+                <tr><td>@name</td><td>@if (RunSpec.SecretName(name)){<span class="redacted">••••</span>}else{@value}</td></tr>
+              }
+              <tr data-effective-auth><td>credential</td><td>from the account <span class="redacted">••••</span></td></tr>
+            </tbody>
+          </table>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Provider-specific -->
+<div class="accordion-item">
+  <h3 class="accordion-header">
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#@(p)-cfg-provider" aria-expanded="false" aria-controls="@(p)-cfg-provider"><i class="bi bi-plug me-2 text-ps-faint"></i><span class="flex-grow-1">Provider-specific</span><span class="status-dot info me-2" title="@providerDot modified" data-section-dot hidden="@(providerDot == 0)"></span></button>
+  </h3>
+  <div id="@(p)-cfg-provider" class="accordion-collapse collapse" data-section="provider">
+    <div class="accordion-body" data-provider-panes>
+      <label class="ps-label mb-1" for="@(p)-provider-pane">Options for</label>
+      <select class="form-select form-select-sm mb-2" id="@(p)-provider-pane" data-provider-pane-select>
+        <option value="current" selected="@(Model.ProviderPane == "current")" data-pane-api>@(string.IsNullOrEmpty(Model.Api) ? "This model" : Model.Api) (active)</option>
+        <option value="azure" selected="@(Model.ProviderPane == "azure")">Azure OpenAI Responses@(Model.OnAzure ? " (active)" : "")</option>
+        <option value="bedrock" selected="@(Model.ProviderPane == "bedrock")">Amazon Bedrock@(Model.OnBedrock ? " (active)" : "")</option>
+      </select>
+
+      <div data-provider-pane="current" hidden="@(Model.ProviderPane != "current")">
+        <div class="@Row(RunModelOptions.ProviderOptions)" data-option="providerOptions" data-set="@Set(RunModelOptions.ProviderOptions)" data-conflict="@Conflict(RunModelOptions.ProviderOptions)">
+          <div class="param-head">
+            <label class="param-name" for="@(p)-provider-options">providerOptions <span class="status-dot info ms-1" data-option-dot title="Modified"></span> <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="A JSON object merged into the provider's request body. It cannot set the model, messages, tools or a credential, nor an option the run already sets."></i></label>
+          </div>
+          <textarea class="form-control form-control-sm font-monospace" id="@(p)-provider-options" rows="4" spellcheck="false" placeholder='{ "parallel_tool_calls": false }' data-opt="providerOptions" data-kind="json" disabled="@Model.Off(RunModelOptions.ProviderOptions)">@Model.ProviderOptionsText</textarea>
+          <div class="d-flex align-items-start gap-2"><div class="form-text mt-1 flex-grow-1" data-option-note>@(Model.Why(RunModelOptions.ProviderOptions) ?? (Model.Patched ? "Merged into the request body of " + Model.Api + "." : ""))</div><button class="btn btn-link btn-sm p-0 fs-8" type="button" data-option-clear hidden="@(!Model.IsSet(RunModelOptions.ProviderOptions))">Clear</button></div>
+        </div>
+      </div>
+
+      <div data-provider-pane="azure" hidden="@(Model.ProviderPane != "azure")">
+        <div class="form-text mt-0 mb-2"><i class="bi bi-info-circle me-1"></i>Used only by <span class="ps-mono">azure-openai-responses</span> models@(Model.OnAzure ? "" : ", so not sent for the current model"). Set them on the provider in Settings › Providers; a per-run value is not sent yet. Azure takes no service tier.</div>
+        @foreach (var (name, placeholder, help) in RequestConfigView.AzureOptions)
+        {
+          <div class="param-row param-disabled" data-unsent="@name">
+            <div class="param-head"><label class="param-name" for="@(p)-@name">@name <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="@help"></i></label></div>
+            <input class="form-control form-control-sm ps-mono" id="@(p)-@name" placeholder="@placeholder" disabled>
+          </div>
+        }
+      </div>
+
+      <div data-provider-pane="bedrock" hidden="@(Model.ProviderPane != "bedrock")">
+        <div class="form-text mt-0 mb-2"><i class="bi bi-info-circle me-1"></i>Used only by <span class="ps-mono">amazon-bedrock</span> models@(Model.OnBedrock ? "" : ", so not sent for the current model"). They come from the AWS profile; a per-run value is not sent yet.</div>
+        <div class="param-row param-disabled" data-unsent="region">
+          <div class="param-head"><label class="param-name" for="@(p)-br-region">region <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="AWS region for the Converse API. Defaults to the profile's region."></i></label></div>
+          <select class="form-select form-select-sm ps-mono" id="@(p)-br-region" disabled><option selected>(from profile)</option></select>
+        </div>
+        <div class="param-row param-disabled" data-unsent="profile">
+          <div class="param-head"><label class="param-name" for="@(p)-br-profile">profile <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Named AWS profile. Empty uses the default credential chain."></i></label></div>
+          <input class="form-control form-control-sm ps-mono" id="@(p)-br-profile" placeholder="default" disabled>
+        </div>
+        <div class="param-row param-disabled" data-unsent="thinkingDisplay">
+          <div class="param-head"><label class="param-name" for="@(p)-br-display">thinkingDisplay <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Whether Claude on Bedrock returns summarized thinking or omits it. Default summarized."></i></label></div>
+          <select class="form-select form-select-sm ps-mono" id="@(p)-br-display" disabled><option selected>summarized</option><option>omitted</option></select>
+        </div>
+        <div class="param-row param-disabled" data-unsent="interleavedThinking">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="@(p)-br-interleaved" checked disabled>
+            <label class="form-check-label param-name" for="@(p)-br-interleaved">interleavedThinking <i class="bi bi-question-circle param-help" tabindex="0" data-bs-toggle="tooltip" title="Lets Claude think between tool calls (non-adaptive models). Default on."></i></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

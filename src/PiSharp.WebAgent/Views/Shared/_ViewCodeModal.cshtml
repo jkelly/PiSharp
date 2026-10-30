@@ -1,0 +1,64 @@
+@* Decision 0011 (run W4, R1): the mockups' _ViewCodeModal (#modal-view-code): the current request as C# (PiSharp's durable client), cURL
+   (POST /api/runs on this app) and the run's JSON with what the run adds to the provider's request. The server builds it from the run
+   engine's own plan (POST /api/playground/code, RequestCode), so it shows what Run would send; a credential is never in it, only "••••".
+   A null model renders the shell request-code.js fills ([data-code-*] targets, text only). Model: ViewCodeView (nullable). *@
+@using PiSharp.WebAgent.Playground
+@model ViewCodeView?
+<div class="modal fade" id="modal-view-code" tabindex="-1" aria-labelledby="modal-view-code-title" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="min-w-0">
+          <h2 class="modal-title" id="modal-view-code-title">View code</h2>
+          <div class="modal-subtitle text-truncate" data-code-subtitle>@(Model?.Subtitle ?? "This request as code")</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning py-2 px-2 fs-8" role="alert" data-code-error hidden></div>
+        <ul class="nav nav-tabs mb-3" role="tablist">
+          <li class="nav-item" role="presentation"><button class="nav-link active" id="vc-tab-cs" data-bs-toggle="tab" data-bs-target="#vc-cs" type="button" role="tab" aria-controls="vc-cs" aria-selected="true"><i class="bi bi-filetype-cs me-1"></i>C# (PiSharp)</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" id="vc-tab-curl" data-bs-toggle="tab" data-bs-target="#vc-curl" type="button" role="tab" aria-controls="vc-curl" aria-selected="false"><i class="bi bi-terminal me-1"></i>cURL</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" id="vc-tab-json" data-bs-toggle="tab" data-bs-target="#vc-json" type="button" role="tab" aria-controls="vc-json" aria-selected="false"><i class="bi bi-filetype-json me-1"></i>Raw JSON</button></li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="vc-cs" role="tabpanel" aria-labelledby="vc-tab-cs" tabindex="0">
+            <div class="ps-term">
+              <div class="ps-term-bar"><span class="dot"></span>PlaygroundRequest.cs<button class="btn btn-icon ms-auto" type="button" data-copy-code="cs" title="Copy C#" aria-label="Copy C#"><i class="bi bi-copy"></i></button></div>
+              <pre><code class="language-csharp" data-code="cs">@Model?.CSharp</code></pre>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="vc-curl" role="tabpanel" aria-labelledby="vc-tab-curl" tabindex="0">
+            <div class="ps-term">
+              <div class="ps-term-bar"><span class="dot"></span>run.sh<button class="btn btn-icon ms-auto" type="button" data-copy-code="curl" title="Copy cURL" aria-label="Copy cURL"><i class="bi bi-copy"></i></button></div>
+              <pre><code class="language-bash" data-code="curl">@Model?.Curl</code></pre>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="vc-json" role="tabpanel" aria-labelledby="vc-tab-json" tabindex="0">
+            <div class="ps-term mb-3">
+              <div class="ps-term-bar"><span class="dot"></span>run.json<button class="btn btn-icon ms-auto" type="button" data-copy-code="json" title="Copy JSON" aria-label="Copy JSON"><i class="bi bi-copy"></i></button></div>
+              <pre><code class="language-json" data-code="json">@Model?.Json</code></pre>
+            </div>
+            <div data-code-provider-wrap hidden="@(Model?.Provider is null)">
+              <div class="ps-label mb-1">What the run adds to the provider's request</div>
+              <div class="ps-term">
+                <div class="ps-term-bar"><span class="dot"></span>provider-request.json<button class="btn btn-icon ms-auto" type="button" data-copy-code="provider" title="Copy" aria-label="Copy the provider request"><i class="bi bi-copy"></i></button></div>
+                <pre><code class="language-json" data-code="provider">@Model?.Provider</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+        <ul class="fs-8 text-ps-faint mt-2 mb-0 ps-3" data-code-notes>
+          @foreach (var note in Model?.Notes ?? [])
+          {
+            <li>@note</li>
+          }
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-secondary me-auto" href="@(Model?.InspectorUrl ?? "#")" data-code-inspector hidden="@(Model?.InspectorUrl is null)"><i class="bi bi-braces me-1"></i>Open last run in inspector</a>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>

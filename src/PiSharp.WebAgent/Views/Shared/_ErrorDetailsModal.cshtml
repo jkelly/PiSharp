@@ -1,0 +1,58 @@
+@* Decision 0011 (run W4, R1): the mockups' _ErrorDetailsModal (#modal-error-details; shared: Playground, Compare, Chat): a failed run's
+   kind, HTTP status and stop reason, the message, and the provider's raw response when the run stored it (redacted by the recorder: no
+   Authorization, no key-bearing field); otherwise it says why there is none. The Playground fetches it per run
+   (GET /playground/runs/{id}/error) and swaps it in; a null model renders the empty shell. Model: ErrorDetailsView (nullable). *@
+@using PiSharp.WebAgent.Playground
+@model ErrorDetailsView?
+<div class="modal fade" id="modal-error-details" tabindex="-1" aria-labelledby="modal-error-details-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" data-error-details>
+      <div class="modal-header">
+        <div class="min-w-0">
+          <h2 class="modal-title" id="modal-error-details-title"><i class="bi bi-x-octagon text-ps-danger me-2"></i>@(Model?.Title ?? "Request failed")</h2>
+          @if (Model?.Subtitle is { } subtitle)
+          {
+            <div class="modal-subtitle text-truncate">@subtitle</div>
+          }
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" data-error-body>
+        @if (Model is null)
+        {
+          <p class="fs-7 text-ps-faint mb-0">No failed run is selected.</p>
+        }
+        else
+        {
+          <div class="row g-2 mb-3">
+            <div class="col-sm-4"><div class="ps-panel p-2 h-100"><div class="ps-label">Failure kind</div><div class="ps-mono">@Model.Kind</div></div></div>
+            <div class="col-sm-4"><div class="ps-panel p-2 h-100"><div class="ps-label">HTTP status</div><div class="ps-mono">@(Model.HttpStatus ?? "—")</div></div></div>
+            <div class="col-sm-4"><div class="ps-panel p-2 h-100"><div class="ps-label">Stop reason</div><div class="ps-mono">@(Model.StopReason ?? "—")</div></div></div>
+          </div>
+          <div class="ps-label mb-1">Message</div>
+          <p class="fs-7 text-break">@Model.Message</p>
+          <div class="ps-label mb-1">Raw response body</div>
+          @if (Model.RawBody is { } raw)
+          {
+            <div class="ps-term"><pre><code class="language-json">@raw</code></pre></div>
+          }
+          else
+          {
+            <p class="fs-8 text-ps-faint mb-0">@(Model.RawNote ?? "No raw response was stored for this run.")</p>
+          }
+        }
+      </div>
+      <div class="modal-footer">
+        @if (Model?.InspectorUrl is { } inspector)
+        {
+          <a class="btn btn-outline-secondary me-auto" href="@inspector"><i class="bi bi-braces me-1"></i>Open in inspector</a>
+        }
+        <button type="button" class="btn btn-outline-secondary" data-copy-error disabled="@(Model is null)"><i class="bi bi-copy me-1"></i>Copy details</button>
+        @if (Model?.CanRetry == true)
+        {
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal" data-run-retry><i class="bi bi-arrow-repeat me-1"></i>Retry</button>
+        }
+      </div>
+    </div>
+  </div>
+</div>

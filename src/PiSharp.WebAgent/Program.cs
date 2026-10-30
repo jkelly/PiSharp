@@ -42,6 +42,8 @@ builder.Services.AddSpendArea(options);
 PiSharp.WebAgent.AgentCompare.Workspaces.WorkspacesModule.AddAgentCompareWorkspaces(builder.Services, options);
 // Run engine and history (run W4, R0): after the Spend Guard, so the recorder wraps the guarded models; runs.db, /api/runs.
 builder.Services.AddRunsArea(options);
+// Playground (run W4, R1): GET /playground and /api/playground (the estimate by Run, View code, a model's options and account).
+PiSharp.WebAgent.Playground.PlaygroundModule.AddPlaygroundArea(builder.Services, options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -54,6 +56,7 @@ app.MapSetupArea();
 app.MapAboutArea();
 app.MapCustomProvidersArea();
 app.MapRunsArea();
+PiSharp.WebAgent.Playground.PlaygroundModule.MapPlaygroundArea(app);
 app.MapWebAgentCore();
 app.Run();
 return 0;

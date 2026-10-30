@@ -1,0 +1,45 @@
+@* Decision 0011 (run W4, R1): the Playground (GET /playground), after the mockups' playground.html: the toolbar (_PlaygroundToolbar), then
+   three panes: the request's options (_RequestConfig, every option in accordions, enabled only where the chosen model takes it), the
+   messages (_MessageListEditor) and the output (_RunOutput: empty, streaming, completed, stopped or error, with the Rendered, Text, JSON and
+   Events tabs and the metrics). Run sends the draft to POST /api/runs (the run engine: Spend Guard, history, events), never to a provider
+   from the page; a run the guard would ask about opens modal-spend-confirm. ?run={id} reopens a run (live while it runs), ?provider=&model=
+   opens a model. Modals: _ModelPickerModal, _ViewCodeModal, _ToolEditorModal, _ErrorDetailsModal and _SpendConfirmModal (the layout hosts
+   _ShortcutsModal). "Pin as test" waits for W5. Model: PlaygroundPage. *@
+@model PlaygroundPage
+@{
+    ViewData["Title"] = "Playground";
+    ViewData[ShellViewData.Nav] = ShellNav.Playground;
+    ViewData[ShellViewData.ContentClass] = "no-scroll pg-scroll";
+    ViewData[ShellViewData.Page] = "playground";
+    var draft = Model.Config.Draft;
+    var picker = new ModelPickerView(new ProviderModelSelect("mp") { Provider = draft.Provider, Model = draft.Model })
+    {
+        Note = Model.Known ? "The request keeps its messages and options; options the new model does not take are marked." : "Choose a model PiSharp knows to run the request.",
+    };
+}
+@section Styles {
+  <link href="~/css/playground.css" rel="stylesheet" asp-append-version="true">
+}
+<partial name="_PlaygroundToolbar" model="Model" />
+@if (Model.Notice is { } notice)
+{
+  <div class="alert alert-warning alert-dismissible fade show py-2 px-3 mx-3 mt-2 mb-0 fs-7 flex-shrink-0" role="status" data-playground-notice>
+    <i class="bi bi-info-circle me-1"></i>@notice
+    <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+}
+<div class="pg-layout flex-grow-1" data-playground data-source="playground">
+  <partial name="_RequestConfig" model="Model.Config" />
+  <partial name="_MessageListEditor" model="Model.Messages" />
+  <partial name="_RunOutput" model="Model.Output" />
+</div>
+@section Modals {
+  <partial name="_ModelPickerModal" model="picker" />
+  <partial name="_ViewCodeModal" model="null" />
+  <partial name="_ToolEditorModal" model="Model.Tools" />
+  <partial name="_ErrorDetailsModal" model="Model.Error" />
+  <partial name="_SpendConfirmModal" model="null" />
+}
+@section Scripts {
+  <script type="module" src="~/js/playground.js" asp-append-version="true"></script>
+}

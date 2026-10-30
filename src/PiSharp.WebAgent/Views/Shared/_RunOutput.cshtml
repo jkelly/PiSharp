@@ -1,0 +1,224 @@
+@* Decision 0011 (run W4, R1): the mockups' _RunOutput (the Playground's right pane; shared: Compare, the Tool Bench and the Run inspector can
+   render it for any run of runs.db). States: empty ("Nothing run yet"), streaming (the text and thinking so far as plain text with the
+   cursor; request-output.js appends the live deltas with textContent), completed (thinking, the answer as Markdown through the sanitizing
+   MarkdownRenderer, tool calls awaiting a result), stopped (cancelled) and error (the message, Retry, Switch model, Details). The metric
+   strip is the run row's own figures; the tabs are Rendered, Text, JSON (the final AssistantMessage) and Events (the normalized events,
+   deltas collapsed, filters all/thinking/text/toolcall). "Pin as test" waits for W5. Element ids carry IdPrefix. Model: RunOutputView. *@
+@using PiSharp.WebAgent.Playground
+@using PiSharp.WebAgent.Runs
+@model RunOutputView
+@inject MarkdownRenderer Markdown
+@{
+    var p = Model.IdPrefix;
+    var state = Model.State;
+    var run = Model.Run;
+    var chip = Model.Chip;
+    var blocks = Model.Blocks;
+    var streaming = state == "streaming";
+    var thinking = blocks.Where(block => block.Kind == "thinking" && block.Text.Length > 0).ToList();
+    var texts = blocks.Where(block => block.Kind == "text").ToList();
+    var calls = Model.ToolCalls;
+    var rows = Model.EventRows;
+}
+<section class="pane pg-output" aria-label="Output" data-run-output data-state="@state" data-run-id="@run?.Id" data-last-seq="@Model.LastSeq" data-tool-calls="@(calls.Count > 0 ? Model.ToolCallsJson : null)" data-status-line="@Model.StatusLine">
+  <div class="pane-header">
+    <h2 class="pane-title">Output</h2>
+    <span class="ps-chip" data-tone="@chip.Tone" data-output-chip>@if (streaming) {<span class="status-dot live"></span>} else if (chip.Icon is { } icon) {<i class="bi @icon"></i>}@chip.Text</span>
+    @if (run is not null)
+    {
+      <a class="ms-auto fs-8 ps-mono text-ps-faint text-truncate" href="@Model.InspectorUrl" title="Open run in inspector" data-output-run>@run.Id</a>
+      <button class="btn btn-icon" type="button" title="Copy text output" aria-label="Copy text output" data-copy-output="text" hidden="@(Model.Text.Length == 0)"><i class="bi bi-copy fs-8"></i></button>
+    }
+  </div>
+
+  <div class="metric-strip" data-metrics>
+    @foreach (var metric in Model.Metrics)
+    {
+      <div class="metric" title="@metric.Title" data-metric="@metric.Label"><div class="metric-label">@metric.Label</div><div class="metric-value @metric.Tone">@metric.Value@if (metric.Unit is { } unit) {<text> </text><small>@unit</small>}</div></div>
+    }
+  </div>
+
+  @if (run is not null)
+  {
+    <div class="px-2 border-bottom flex-shrink-0">
+      <ul class="nav nav-tabs border-0" role="tablist">
+        <li class="nav-item" role="presentation"><button class="nav-link active" id="@(p)-tab-rendered" data-bs-toggle="tab" data-bs-target="#@(p)-out-rendered" type="button" role="tab" aria-controls="@(p)-out-rendered" aria-selected="true">Rendered</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="@(p)-tab-text" data-bs-toggle="tab" data-bs-target="#@(p)-out-text" type="button" role="tab" aria-controls="@(p)-out-text" aria-selected="false">Text</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="@(p)-tab-json" data-bs-toggle="tab" data-bs-target="#@(p)-out-json" type="button" role="tab" aria-controls="@(p)-out-json" aria-selected="false">JSON</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="@(p)-tab-events" data-bs-toggle="tab" data-bs-target="#@(p)-out-events" type="button" role="tab" aria-controls="@(p)-out-events" aria-selected="false">Events <span class="ps-chip ms-1" data-event-count>@Model.EventCount.ToString("N0")@(streaming ? "…" : "")</span></button></li>
+      </ul>
+    </div>
+  }
+
+  <div class="pane-body">
+    @if (run is null)
+    {
+      <div class="empty-state" data-output-empty>
+        <div class="empty-icon"><i class="bi bi-play-circle"></i></div>
+        <h3 class="ps-heading fs-2 mb-2">Nothing run <em>yet</em></h3>
+        <p class="fs-7 mb-3 mx-auto pg-empty-text">Set up the request on the left and the messages in the middle, then press <kbd class="ps-kbd">Ctrl</kbd> <kbd class="ps-kbd">Enter</kbd>. The answer streams here with timing, tokens and cost.</p>
+        <div class="d-flex flex-wrap justify-content-center gap-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button" title="Presets are not available yet" data-preset-load disabled><i class="bi bi-folder2-open me-1"></i>Load a preset</button>
+          <a class="btn btn-sm btn-ghost" href="@Model.HistoryUrl"><i class="bi bi-clock-history me-1"></i>Re-run from history</a>
+        </div>
+      </div>
+    }
+    else
+    {
+      <div class="tab-content">
+        <div class="tab-pane fade show active p-3" id="@(p)-out-rendered" role="tabpanel" aria-labelledby="@(p)-tab-rendered" tabindex="0">
+          <div class="msg-role">PiSharp <span class="msg-model">@Model.ModelLine</span>@if (streaming) {<span class="ms-1"><span class="status-dot live"></span></span>}</div>
+
+          <details class="thinking" data-detail="@(p)-thinking" hidden="@(thinking.Count == 0)" data-output-thinking>
+            <summary><i class="bi bi-chevron-right"></i><i class="bi bi-lightbulb"></i> Thinking</summary>
+            <div class="thinking-body pg-pre" data-stream-thinking>@string.Join("\n\n", thinking.Select(block => block.Text))</div>
+          </details>
+
+          @if (streaming)
+          {
+            <div class="msg-content pg-pre stream-cursor" data-stream-text>@string.Concat(texts.Select(block => block.Text))</div>
+          }
+          else
+          {
+            foreach (var text in texts.Where(block => block.Text.Length > 0))
+            {
+              <div class="msg-content">@Html.Raw(Markdown.Render(text.Text))</div>
+            }
+            if (state == "stopped" && texts.Count == 0 && run.OutputText is { Length: > 0 } partial)
+            {
+              <div class="msg-content">@Html.Raw(Markdown.Render(partial))</div>
+            }
+          }
+
+          @foreach (var call in calls)
+          {
+            <details class="tool-card" open data-detail="@($"{p}-call-{call.Id}")">
+              <summary>
+                <span class="tool-icon"><i class="bi bi-tools"></i></span>
+                <span class="tool-name">@call.Name</span>
+                <span class="tool-args-summary">@call.Summary</span>
+                <span class="ps-chip" data-tone="warn">awaiting result</span>
+              </summary>
+              <div class="tool-body">
+                <div class="ps-label mb-1">Arguments · @call.Id</div>
+                <div class="ps-term mb-2"><pre><code class="language-json">@call.Text</code></pre></div>
+                <div class="fs-8 text-ps-faint mb-2">The Playground doesn't run tools. Add a toolResult to continue the conversation.</div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-sm btn-outline-primary" type="button" data-add-tool-result data-call-id="@call.Id" data-tool-name="@call.Name"><i class="bi bi-reply me-1"></i>Add toolResult &amp; continue</button>
+                  <button class="btn btn-sm btn-outline-secondary" type="button" data-append-reply><i class="bi bi-arrow-down-square me-1"></i>Append reply to messages</button>
+                </div>
+              </div>
+            </details>
+          }
+
+          @if (state == "error")
+          {
+            <div class="msg-error" data-output-error>
+              <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-x-octagon mt-1"></i>
+                <div class="flex-grow-1 min-w-0">
+                  <div class="fw-semibold">@Model.ErrorTitle</div>
+                  <div class="small text-break">@(Model.SpendError?.Text ?? Model.ErrorMessage ?? "The run ended without an answer.")</div>
+                  <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button class="btn btn-sm btn-outline-danger" type="button" data-run-retry><i class="bi bi-arrow-repeat me-1"></i>Retry</button>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modal-model-picker"><i class="bi bi-arrow-left-right me-1"></i>Switch model</button>
+                    <button class="btn btn-sm btn-ghost" type="button" data-error-details="@run.Id">Details</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+          else if (state == "stopped")
+          {
+            <div class="fs-8 text-ps-faint mt-2" data-output-stopped><i class="bi bi-stop-fill me-1"></i>Stopped before the answer finished@(run.OutputText is { Length: > 0 } ? "; the text above is what had streamed." : ".")</div>
+          }
+
+          @if (streaming)
+          {
+            <div class="msg-footer" data-output-footer>
+              <span class="text-ps-blue" data-stream-status>streaming</span>
+            </div>
+          }
+          else if (state != "error")
+          {
+            var cost = Model.Cost;
+            <div class="msg-footer" data-output-footer>
+              <span title="Input tokens"><i class="bi bi-arrow-up"></i>@run.Usage.Input.ToString("N0")</span>
+              <span title="Output tokens"><i class="bi bi-arrow-down"></i>@run.Usage.Output.ToString("N0")</span>
+              @if (run.Usage.CacheRead > 0)
+              {
+                <span title="Cache read tokens"><i class="bi bi-lightning-charge"></i>@run.Usage.CacheRead.ToString("N0") cached</span>
+              }
+              @if (cost.Text != "—")
+              {
+                <span title="@cost.Title">@cost.Text@(cost.Unit is { } unit ? " " + unit : "")</span>
+              }
+              @if (Model.DurationText is { } duration)
+              {
+                <span title="Duration"><i class="bi bi-stopwatch"></i>@duration</span>
+              }
+              @if (run.StopReason is { } stop)
+              {
+                <span class="ps-chip" data-tone="outline">@stop</span>
+              }
+            </div>
+          }
+          @if (Model.Notes is { } notes)
+          {
+            <div class="fs-8 text-ps-faint mt-2" data-output-notes><i class="bi bi-info-circle me-1"></i>@notes</div>
+          }
+        </div>
+
+        <div class="tab-pane fade p-3" id="@(p)-out-text" role="tabpanel" aria-labelledby="@(p)-tab-text" tabindex="0">
+          @if (Model.Text.Length > 0 || streaming)
+          {
+            <div class="ps-term"><pre class="wrap@(streaming ? " stream-cursor" : "")" data-output-plain>@Model.Text</pre></div>
+          }
+          else
+          {
+            <div class="empty-state py-4"><div class="empty-icon"><i class="bi bi-file-earmark-x"></i></div><div class="fs-7">@(state == "error" ? "No text: the request failed before any content arrived." : "No text in this answer.")</div></div>
+          }
+        </div>
+
+        <div class="tab-pane fade p-3" id="@(p)-out-json" role="tabpanel" aria-labelledby="@(p)-tab-json" tabindex="0">
+          @if (Model.Json is { } json)
+          {
+            <div class="ps-term">
+              <div class="ps-term-bar"><span class="dot"></span>AssistantMessage@(state == "error" ? " · error" : "")<button class="btn btn-icon ms-auto" type="button" data-copy-output="json" title="Copy JSON" aria-label="Copy JSON"><i class="bi bi-copy"></i></button></div>
+              <pre data-output-json><code class="language-json">@json</code></pre>
+            </div>
+          }
+          else
+          {
+            <div class="empty-state py-4"><div class="empty-icon"><i class="bi bi-hourglass-split"></i></div><div class="fs-7">@(streaming ? "The final AssistantMessage appears when the stream ends with done or error." : "This run ended without a final AssistantMessage.")</div></div>
+          }
+        </div>
+
+        <div class="tab-pane fade" id="@(p)-out-events" role="tabpanel" aria-labelledby="@(p)-tab-events" tabindex="0">
+          <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom" role="group" aria-label="Event filters">
+            <button class="ps-chip" type="button" data-event-filter="all" data-tone="accent" aria-pressed="true">all</button>
+            <button class="ps-chip" type="button" data-event-filter="thinking" aria-pressed="false">thinking</button>
+            <button class="ps-chip" type="button" data-event-filter="text" aria-pressed="false">text</button>
+            <button class="ps-chip" type="button" data-event-filter="toolcall" aria-pressed="false">toolcall</button>
+            <div class="form-check form-switch mb-0 ms-auto"><input class="form-check-input" type="checkbox" role="switch" id="@(p)-ev-collapse" checked data-events-collapse><label class="form-check-label fs-8" for="@(p)-ev-collapse">Collapse deltas</label></div>
+          </div>
+          <div class="pg-events" data-event-rows data-collapsed="true">
+            @foreach (var row in rows)
+            {
+              <div class="sse-row" data-group="@row.Group" data-extra="@(row.Extra ? "true" : null)" data-summary="@(row.Collapsed > 0 ? "true" : null)"><span class="t">@row.Time</span><span class="ev @row.Tone@(row.Collapsed > 0 ? " text-ps-faint" : "")">@row.Event</span><span class="data@(row.Collapsed > 0 ? " text-ps-faint" : "")">@row.Data</span></div>
+            }
+          </div>
+          @if (rows.Count == 0 && !Model.EventsKept)
+          {
+            <div class="empty-state py-4" data-events-none><div class="empty-icon"><i class="bi bi-list-ul"></i></div><div class="fs-7">Events weren't stored for this run. Turn on "Store SSE events" in Settings › Data to keep them.</div></div>
+          }
+          @if (Model.EventsCut)
+          {
+            <div class="px-3 py-2 fs-8 text-ps-faint">The first @RunOutputView.MaxEventRows.ToString("N0") rows are shown; the inspector has them all.</div>
+          }
+          <div class="px-3 py-2 fs-8"><a href="@Model.InspectorUrl" class="text-ps-faint">Raw SSE frames in the inspector →</a></div>
+        </div>
+      </div>
+    }
+  </div>
+</section>
