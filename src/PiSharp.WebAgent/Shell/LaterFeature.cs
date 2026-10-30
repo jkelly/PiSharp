@@ -19,8 +19,6 @@ public sealed record LaterFeature(string Id, string Title, string Icon, string S
             "Run the same request on several models side by side, or blind, and vote."),
         ["/bench"] = new(ShellNav.Bench, "Tool Bench", "bi-tools",
             "Test how models call your tools, one step at a time."),
-        ["/history"] = new(ShellNav.History, "History", "bi-clock-history",
-            "Every model call from Chat, Playground, Compare and Tool Bench, with tokens, cost, latency and the raw request and response."),
         ["/evals/leaderboard"] = new(ShellNav.Evals, "Evals", "bi-clipboard-check",
             "Your own leaderboard from blind votes in Compare, and test suites that catch silent changes in quality, speed and price."),
         ["/presets"] = new(ShellNav.Presets, "Presets", "bi-bookmark",

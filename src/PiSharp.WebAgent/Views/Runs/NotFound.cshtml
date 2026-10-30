@@ -1,0 +1,26 @@
+@* Decision 0011 (run W4, R3): GET /runs/{id} for an id runs.db doesn't have (deleted, cleared, or never there): a 404 page that says so
+   and goes back to History. Model: the id asked for. *@
+@model string
+@{
+    ViewData["Title"] = "Run not found";
+    ViewData[ShellViewData.Nav] = ShellNav.History;
+    ViewData[ShellViewData.Page] = "inspector";
+}
+@section TopbarStart
+{
+  <nav class="app-breadcrumb" aria-label="Breadcrumb">
+    <a href="/history">History</a>
+    <span aria-hidden="true">›</span>
+    <h1 class="app-title current fs-7 mb-0">Run not found</h1>
+  </nav>
+}
+<div class="page">
+  <div class="ps-card">
+    <div class="empty-state py-5" data-run-not-found>
+      <div class="empty-icon"><i class="bi bi-question-circle" aria-hidden="true"></i></div>
+      <h2 class="h5 mb-1">There is no run <span class="ps-mono text-break">@Model</span></h2>
+      <p class="fs-7 text-ps-faint mb-3">It may have been deleted, cleared with the history, or removed by retention.</p>
+      <a class="btn btn-sm btn-primary" href="/history"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Back to History</a>
+    </div>
+  </div>
+</div>

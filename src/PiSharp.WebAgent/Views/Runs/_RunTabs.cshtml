@@ -1,0 +1,362 @@
+@* Decision 0011 (run W4, R3): the mockups' _RunTabs of the Run inspector: Request (the raw request of the last attempt: method, URL,
+   headers with every credential shown redacted, the body; then the request as runs.db stored it), Response (status, headers, the body
+   when it was not a stream, the attempts; then the final message as stored), Raw SSE (the stored data lines with a filter, the event
+   family toggles and Wrap), Normalized events (PiSharp's stream events; Collapse deltas), Timing (the waterfall from the stored timing
+   marks and events) and Usage & cost. A raw tab whose payloads were not stored says "not stored" (or "expired") and why, never anything
+   made up. inspector.js runs the filters and the copy buttons. Model: RunInspectorView. *@
+@using System.Globalization
+@model RunInspectorView
+@{
+    var request = Model.Requests.Count > 0 ? Model.Requests[^1] : null;
+    var response = Model.Responses.Count > 0 ? Model.Responses[^1] : null;
+    var rawWord = Model.RawState == RunRawState.Expired ? "expired" : "not stored";
+    var attempts = Math.Max(Model.Requests.Count, Model.Responses.Count);
+    string Inv(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    string Kb(long bytes) => RunHistoryText.Bytes(bytes);
+}
+<section class="ps-card" id="runTabs" aria-label="Run details" data-run-tabs>
+  <ul class="nav nav-tabs flex-nowrap overflow-x-auto overflow-y-hidden px-2 px-md-3 pt-1" role="tablist" aria-label="Run detail tabs">
+    <li class="nav-item" role="presentation"><button class="nav-link text-nowrap active" id="run-tab-request" data-bs-toggle="tab" data-bs-target="#run-pane-request" type="button" role="tab" aria-controls="run-pane-request" aria-selected="true" data-run-tab="request">Request</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" id="run-tab-response" data-bs-toggle="tab" data-bs-target="#run-pane-response" type="button" role="tab" aria-controls="run-pane-response" aria-selected="false" data-run-tab="response">Response</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" id="run-tab-sse" data-bs-toggle="tab" data-bs-target="#run-pane-sse" type="button" role="tab" aria-controls="run-pane-sse" aria-selected="false" data-run-tab="sse">Raw SSE@if (Model.SseCount > 0) {<span class="ps-chip ms-1">@Model.SseCount.ToString("N0", CultureInfo.InvariantCulture)</span>}</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" id="run-tab-events" data-bs-toggle="tab" data-bs-target="#run-pane-events" type="button" role="tab" aria-controls="run-pane-events" aria-selected="false" data-run-tab="events">Normalized events@if (Model.EventCount > 0) {<span class="ps-chip ms-1">@Model.EventCount.ToString("N0", CultureInfo.InvariantCulture)</span>}</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" id="run-tab-timing" data-bs-toggle="tab" data-bs-target="#run-pane-timing" type="button" role="tab" aria-controls="run-pane-timing" aria-selected="false" data-run-tab="timing">Timing</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link text-nowrap" id="run-tab-usage" data-bs-toggle="tab" data-bs-target="#run-pane-usage" type="button" role="tab" aria-controls="run-pane-usage" aria-selected="false" data-run-tab="usage">Usage &amp; cost</button></li>
+  </ul>
+  <div class="tab-content">
+
+    @* ============ Request ============ *@
+    <div class="tab-pane fade show active p-3 p-md-4" id="run-pane-request" role="tabpanel" aria-labelledby="run-tab-request" tabindex="0" data-run-pane="request">
+      @if (request is not null)
+      {
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3" data-raw-request>
+          <span class="ps-chip" data-tone="accent">@request.Method</span>
+          <code class="ps-mono fs-7 text-break" id="reqUrl">@(request.Url ?? "—")</code>
+          @if (request.Url is not null)
+          {
+            <button class="btn btn-icon" type="button" data-copy="#reqUrl" title="Copy URL" aria-label="Copy URL"><i class="bi bi-copy fs-8" aria-hidden="true"></i></button>
+          }
+          <span class="ms-md-auto fs-8 ps-mono text-ps-faint">@string.Join(" · ", new[] { request.Version is { Length: > 0 } v ? "HTTP/" + v : null, request.BodyBytes is { } size ? "body " + Kb(size) : null, attempts > 1 ? $"attempt {request.Attempt} of {attempts}" : null }.Where(part => part is not null))</span>
+        </div>
+        <h3 class="ps-label mb-2">Request headers · @request.Headers.Count</h3>
+        <div class="ps-table-wrap mb-2">
+          <table class="table table-sm header-table mb-0">
+            <tbody>
+              @foreach (var header in request.Headers)
+              {
+                <tr data-header="@header.Name"><td>@header.Name</td><td>@if (header.Redacted) {<span class="redacted" title="Redacted: runs.db never stores credentials">••••••••</span>} else {@header.Value}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="fs-8 text-ps-faint mb-4"><i class="bi bi-shield-lock me-1" aria-hidden="true"></i>Credentials are redacted before a request is stored, and a header that carries one always shows redacted here. There is no reveal.</div>
+        @if (request.Body is not null)
+        {
+          <div class="ps-term run-term mb-4">
+            <div class="ps-term-bar"><span class="dot"></span>request body · @(request.ContentType ?? "unknown type")@if (request.BodyCut) {<text> · first @RunInspectorPages.MaxBodyChars.ToString("N0", CultureInfo.InvariantCulture) characters (the Run JSON download has it all)</text>}<button class="btn btn-icon ms-auto" type="button" data-copy="#reqBody" title="Copy body" aria-label="Copy request body"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+            <pre id="reqBody"><code>@request.Body</code></pre>
+          </div>
+        }
+        else
+        {
+          <p class="fs-7 text-ps-faint mb-4">No request body was stored.</p>
+        }
+      }
+      else
+      {
+        <div class="empty-state py-4 mb-3" data-raw-none="request">
+          <div class="empty-icon"><i class="bi bi-arrow-up-right-square" aria-hidden="true"></i></div>
+          <div class="fs-7">Raw request @rawWord</div>
+          <div class="fs-8 text-ps-faint">@Model.RawNote</div>
+        </div>
+      }
+
+      <h3 class="ps-label mb-2">Request as runs.db stored it</h3>
+      @if (Model.OptionsJson is not null)
+      {
+        <div class="ps-term run-term mb-3">
+          <div class="ps-term-bar"><span class="dot"></span>options<button class="btn btn-icon ms-auto" type="button" data-copy="#runOptions" title="Copy options" aria-label="Copy options"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+          <pre id="runOptions"><code>@Model.OptionsJson</code></pre>
+        </div>
+      }
+      @if (Model.MessagesJson is not null)
+      {
+        <div class="ps-term run-term mb-0">
+          <div class="ps-term-bar"><span class="dot"></span>system prompt, tools and messages<button class="btn btn-icon ms-auto" type="button" data-copy="#runMessages" title="Copy messages" aria-label="Copy messages"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+          <pre id="runMessages"><code>@Model.MessagesJson</code></pre>
+        </div>
+      }
+      else if (Model.MessagesRef is not null)
+      {
+        <p class="fs-7 text-secondary mb-0">The messages are the chat's transcript (<span class="ps-mono">@Model.MessagesRef</span>), not copied into runs.db.@if (Model.SessionHref is not null) {<text> </text><a href="@Model.SessionHref">Open the chat</a>}</p>
+      }
+      else if (Model.OptionsJson is null)
+      {
+        <p class="fs-7 text-ps-faint mb-0">This run has no stored request.</p>
+      }
+    </div>
+
+    @* ============ Response ============ *@
+    <div class="tab-pane fade p-3 p-md-4" id="run-pane-response" role="tabpanel" aria-labelledby="run-tab-response" tabindex="0" data-run-pane="response">
+      @if (response is not null)
+      {
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3" data-raw-response>
+          <span class="ps-chip" data-tone="@(response.Ok ? "ok" : "danger")">@response.Status@if (response.Reason is { Length: > 0 }) {<text> @response.Reason</text>}</span>
+          <span class="fs-7 ps-mono text-secondary">@string.Join(" · ", new[] { response.Version is { Length: > 0 } v ? "HTTP/" + v : null, response.ContentType, attempts > 1 ? $"attempt {response.Attempt} of {attempts}" : null }.Where(part => part is not null))</span>
+          @if (response.Stream && Model.SseCount > 0)
+          {
+            <span class="ms-md-auto fs-8 ps-mono text-ps-faint">@Model.SseCount.ToString("N0", CultureInfo.InvariantCulture) events · @Kb(Model.SseBytes) streamed</span>
+          }
+        </div>
+        <h3 class="ps-label mb-2">Response headers · @response.Headers.Count</h3>
+        <div class="ps-table-wrap mb-3">
+          <table class="table table-sm header-table mb-0">
+            <tbody>
+              @foreach (var header in response.Headers)
+              {
+                <tr data-header="@header.Name"><td>@header.Name</td><td>@if (header.Redacted) {<span class="redacted" title="Redacted: runs.db never stores credentials">••••••••</span>} else {@header.Value}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (response.Body is not null)
+        {
+          <div class="ps-label mb-1">Response body</div>
+          <div class="ps-term run-term mb-3">
+            <div class="ps-term-bar"><span class="dot" style="@(response.Ok ? null : "background:#ef4444")"></span>@(response.Ok ? "body" : "error") · @(response.ContentType ?? "unknown type")<button class="btn btn-icon ms-auto" type="button" data-copy="#respBody" title="Copy body" aria-label="Copy response body"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+            <pre id="respBody"><code>@response.Body</code></pre>
+          </div>
+        }
+        else if (response.Stream)
+        {
+          <div class="ps-panel p-3 fs-7 mb-3">
+            <div class="ps-label mb-2">Body</div>
+            <p class="text-secondary mb-2">Streamed as server-sent events. Each data line is stored with its arrival time.</p>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-show-tab="sse">Open Raw SSE <i class="bi bi-arrow-right" aria-hidden="true"></i></button>
+          </div>
+        }
+      }
+      else if (request is not null)
+      {
+        <div class="empty-state py-4 mb-3" data-raw-none="response">
+          <div class="empty-icon"><i class="bi bi-arrow-down-left-square" aria-hidden="true"></i></div>
+          <div class="fs-7">No response arrived</div>
+          <div class="fs-8 text-ps-faint">The request was sent, but no response headers were received.</div>
+        </div>
+      }
+      else
+      {
+        <div class="empty-state py-4 mb-3" data-raw-none="response">
+          <div class="empty-icon"><i class="bi bi-arrow-down-left-square" aria-hidden="true"></i></div>
+          <div class="fs-7">Raw response @rawWord</div>
+          <div class="fs-8 text-ps-faint">@Model.RawNote</div>
+        </div>
+      }
+      @if (attempts > 1)
+      {
+        <div class="ps-label mb-1">Attempts</div>
+        <div class="ps-panel p-2 fs-8 ps-mono mb-3" data-run-attempts>
+          @for (var i = 1; i <= attempts; i++)
+          {
+            var sent = Model.Requests.FirstOrDefault(item => item.Attempt == i);
+            var answer = Model.Responses.FirstOrDefault(item => item.Attempt == i);
+            <div>attempt @i@if (sent is not null) {<text> · +@sent.AtMs.ToString("N0", CultureInfo.InvariantCulture) ms</text>} · @(answer is null ? "no response" : answer.Status.ToString(CultureInfo.InvariantCulture) + (answer.Reason is { Length: > 0 } r ? " " + r : ""))</div>
+          }
+        </div>
+      }
+      @if (Model.TransportErrors.Count > 0)
+      {
+        <div class="ps-label mb-1">Transport errors</div>
+        <div class="ps-panel p-2 fs-8 ps-mono mb-3 text-ps-danger">
+          @foreach (var error in Model.TransportErrors)
+          {
+            <div class="text-break">@error</div>
+          }
+        </div>
+      }
+      <h3 class="ps-label mb-2">Final message as runs.db stored it</h3>
+      @if (Model.OutputJson is not null)
+      {
+        <div class="ps-term run-term mb-0">
+          <div class="ps-term-bar"><span class="dot"></span>AssistantMessage<button class="btn btn-icon ms-auto" type="button" data-copy="#runOutput" title="Copy message" aria-label="Copy final message"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+          <pre id="runOutput"><code>@Model.OutputJson</code></pre>
+        </div>
+      }
+      else
+      {
+        <p class="fs-7 text-ps-faint mb-0">@(Model.Running ? "The run is still streaming." : "No final message was recorded.")</p>
+      }
+    </div>
+
+    @* ============ Raw SSE ============ *@
+    <div class="tab-pane fade" id="run-pane-sse" role="tabpanel" aria-labelledby="run-tab-sse" tabindex="0" data-run-pane="sse">
+      @if (Model.Sse.Count > 0)
+      {
+        <div class="d-flex flex-wrap align-items-center gap-2 p-3 border-bottom">
+          <div class="position-relative flex-grow-1 run-sse-filter">
+            <i class="bi bi-funnel position-absolute top-50 translate-middle-y ms-2 text-ps-faint fs-8" aria-hidden="true"></i>
+            <label class="visually-hidden" for="sseFilter">Filter events</label>
+            <input class="form-control form-control-sm ps-4 font-monospace" id="sseFilter" type="search" placeholder="Filter by event or data, e.g. delta" autocomplete="off" data-sse-filter>
+          </div>
+          @if (Model.SseGroups.Count > 1)
+          {
+            <div class="d-flex flex-wrap gap-1" role="group" aria-label="Event types">
+              @for (var i = 0; i < Model.SseGroups.Count; i++)
+              {
+                <input type="checkbox" class="btn-check" id="@("sseGroup" + i)" checked data-sse-group="@Model.SseGroups[i]"><label class="btn btn-sm btn-outline-secondary ps-mono fs-8" for="@("sseGroup" + i)">@Model.SseGroups[i]</label>
+              }
+            </div>
+          }
+          <div class="form-check form-switch mb-0 ms-md-auto">
+            <input class="form-check-input" type="checkbox" role="switch" id="sseWrap" data-sse-wrap>
+            <label class="form-check-label fs-7" for="sseWrap">Wrap</label>
+          </div>
+        </div>
+        <div id="sseList" data-sse-list>
+          <div class="sse-row text-ps-faint run-sse-head"><span>time</span><span>event</span><span class="d-none d-md-inline">data</span></div>
+          @foreach (var row in Model.Sse)
+          {
+            <div class="sse-row" data-group="@row.Group" data-sse-row><span class="t">@row.Time</span><span class="ev" title="@row.Event">@row.Event</span><span class="data">@row.Data</span></div>
+          }
+        </div>
+        <div class="px-3 py-2 fs-8 ps-mono text-ps-faint" data-sse-count>@Model.SseCount.ToString("N0", CultureInfo.InvariantCulture) events · @Kb(Model.SseBytes) · showing <span data-sse-shown>@Model.Sse.Count.ToString("N0", CultureInfo.InvariantCulture)</span>@if (Model.SseCount > Model.Sse.Count) {<text> (the first @Model.Sse.Count.ToString("N0", CultureInfo.InvariantCulture); the HAR and Run JSON downloads have them all)</text>}</div>
+      }
+      else if (Model.RawNote is not null)
+      {
+        <div class="empty-state py-4" data-raw-none="sse">
+          <div class="empty-icon"><i class="bi bi-broadcast" aria-hidden="true"></i></div>
+          <div class="fs-7">Raw SSE @rawWord</div>
+          <div class="fs-8 text-ps-faint">@Model.RawNote</div>
+        </div>
+      }
+      else
+      {
+        <div class="empty-state py-4" data-sse-none>
+          <div class="empty-icon"><i class="bi bi-broadcast" aria-hidden="true"></i></div>
+          <div class="fs-7">No SSE events</div>
+          <div class="fs-8 text-ps-faint">@(response is { Stream: false } ? "The response was not a stream." : "No stream started.") See <button class="btn btn-link btn-sm p-0 align-baseline fs-8" type="button" data-show-tab="response">Response</button>.</div>
+        </div>
+      }
+    </div>
+
+    @* ============ Normalized events ============ *@
+    <div class="tab-pane fade" id="run-pane-events" role="tabpanel" aria-labelledby="run-tab-events" tabindex="0" data-run-pane="events">
+      <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom fs-8 text-secondary">
+        <i class="bi bi-info-circle text-ps-blue" aria-hidden="true"></i><span>PiSharp <span class="ps-mono">StreamEvent</span> records the transport produced from the raw stream. Deltas are merged into the final <span class="ps-mono">AssistantMessage</span>.</span>
+        @if (Model.Events.Count > 0)
+        {
+          <div class="form-check form-switch mb-0 ms-auto"><input class="form-check-input" type="checkbox" role="switch" id="runEvCollapse" checked data-events-collapse><label class="form-check-label fs-8" for="runEvCollapse">Collapse deltas</label></div>
+        }
+      </div>
+      @if (Model.Events.Count > 0)
+      {
+        <div class="run-events" data-run-events data-collapsed="true">
+          <div class="sse-row text-ps-faint run-sse-head"><span>time</span><span>event</span><span class="d-none d-md-inline">payload</span></div>
+          @foreach (var row in Model.Events)
+          {
+            <div class="sse-row" data-group="@row.Group" data-extra="@(row.Extra ? "true" : null)" data-summary="@(row.Collapsed > 0 ? "true" : null)"><span class="t">@row.Time</span><span class="@("ev" + (row.Tone is null ? "" : " " + row.Tone) + (row.Collapsed > 0 ? " text-ps-faint" : ""))">@row.Event</span><span class="@("data" + (row.Collapsed > 0 ? " text-ps-faint" : ""))">@row.Data</span></div>
+          }
+        </div>
+        @if (Model.Events.Count >= RunOutputView.MaxEventRows)
+        {
+          <div class="px-3 py-2 fs-8 text-ps-faint">The first @RunOutputView.MaxEventRows.ToString("N0", CultureInfo.InvariantCulture) rows are shown; the Run JSON download has all @Model.EventCount.ToString("N0", CultureInfo.InvariantCulture) events.</div>
+        }
+      }
+      else if (!Model.EventsKept)
+      {
+        <div class="empty-state py-4" data-events-none>
+          <div class="empty-icon"><i class="bi bi-list-ul" aria-hidden="true"></i></div>
+          <div class="fs-7">Events weren't stored for this run</div>
+          <div class="fs-8 text-ps-faint">Turn on "Store SSE events" in Settings › Data to keep them.</div>
+        </div>
+      }
+      else
+      {
+        <div class="empty-state py-4" data-events-none>
+          <div class="empty-icon"><i class="bi bi-list-ul" aria-hidden="true"></i></div>
+          <div class="fs-7">No events recorded</div>
+          <div class="fs-8 text-ps-faint">@(Model.Running ? "The run hasn't streamed anything yet." : "The run ended before any stream event.")</div>
+        </div>
+      }
+    </div>
+
+    @* ============ Timing ============ *@
+    <div class="tab-pane fade p-3 p-md-4" id="run-pane-timing" role="tabpanel" aria-labelledby="run-tab-timing" tabindex="0" data-run-pane="timing">
+      @if (Model.Waterfall.Count > 0)
+      {
+        <div data-run-waterfall>
+          <div class="waterfall-row pt-0"><span class="ps-label">Phase</span><div class="d-flex justify-content-between fs-8 ps-mono text-ps-faint">@foreach (var tick in Model.Ticks) {<span>@tick</span>}</div><span class="ps-label text-end">at</span></div>
+          @foreach (var row in Model.Waterfall)
+          {
+            <div class="waterfall-row"><span>@row.Label</span><div class="waterfall-track"><div class="waterfall-bar" data-phase="@row.Phase" style="@("left:" + Inv(row.Left) + "%;width:" + Inv(row.Width) + "%")"></div></div><span class="ps-mono fs-8 text-end">@row.At</span></div>
+          }
+        </div>
+        @if (Model.TimingNote is not null)
+        {
+          <div class="fs-8 ps-mono text-ps-faint mt-3">@Model.TimingNote</div>
+        }
+        @if (Model.RawState != RunRawState.Stored)
+        {
+          <div class="fs-8 text-ps-faint mt-2">Request sent and TTFB need raw payloads, which were @rawWord for this run.</div>
+        }
+      }
+      else
+      {
+        <div class="empty-state py-4" data-timing-none>
+          <div class="empty-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></div>
+          <div class="fs-7">No timing recorded</div>
+          <div class="fs-8 text-ps-faint">@(Model.Running ? "The run is still streaming." : "Neither timing marks nor stream events were stored for this run.")</div>
+        </div>
+      }
+    </div>
+
+    @* ============ Usage & cost ============ *@
+    <div class="tab-pane fade p-3 p-md-4" id="run-pane-usage" role="tabpanel" aria-labelledby="run-tab-usage" tabindex="0" data-run-pane="usage">
+      @if (Model.Usage.Recorded)
+      {
+        <div class="ps-table-wrap mb-3">
+          <table class="table table-sm mb-0" data-run-usage>
+            <thead><tr><th>Bucket</th><th class="text-end">Tokens</th><th class="text-end">Price / 1M</th><th class="text-end">Cost</th></tr></thead>
+            <tbody class="ps-mono fs-7">
+              @foreach (var row in Model.Usage.Rows)
+              {
+                <tr><td>@row.Bucket</td><td class="text-end">@row.Tokens</td><td class="text-end">@row.Price</td><td class="text-end">@row.Cost</td></tr>
+              }
+              <tr class="fw-semibold"><td>total</td><td class="text-end">@Model.Usage.TotalTokens</td><td></td><td class="text-end">@Model.Usage.TotalCost</td></tr>
+            </tbody>
+          </table>
+        </div>
+        @if (Model.Usage.CostNote is not null)
+        {
+          <div class="fs-8 text-ps-faint mb-3">@Model.Usage.CostNote</div>
+        }
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="ps-panel p-3 h-100 fs-7">
+              <div class="ps-label mb-2">Pricing tier</div>
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><span class="ps-chip" data-tone="@Model.Usage.Tier.Tone">@Model.Usage.Tier.Text</span>@if (Model.Usage.Rates.Length > 0) {<span class="ps-mono fs-8">@Model.Usage.Rates</span>}</div>
+              <div class="text-secondary">@Model.Usage.TierText</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="ps-panel p-3 h-100 fs-7">
+              <div class="ps-label mb-2">Billing</div>
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><span class="ps-chip" data-tone="@Model.Usage.Billing.Tone">@Model.Usage.Billing.Text</span>@if (Model.Usage.BillingSub.Length > 0) {<span class="ps-mono fs-8">@Model.Usage.BillingSub</span>}</div>
+              <div class="text-secondary">@Model.Usage.BillingText</div>
+            </div>
+          </div>
+        </div>
+        <div class="ps-label mt-4 mb-1">Usage as recorded</div>
+        <div class="ps-term run-term"><pre><code>@Model.Usage.UsageJson</code></pre></div>
+      }
+      else
+      {
+        <div class="empty-state py-4" data-usage-none>
+          <div class="empty-icon"><i class="bi bi-coin" aria-hidden="true"></i></div>
+          <div class="fs-7">No usage recorded</div>
+          <div class="fs-8 text-ps-faint">@Model.Usage.EmptyText</div>
+        </div>
+      }
+    </div>
+  </div>
+</section>
