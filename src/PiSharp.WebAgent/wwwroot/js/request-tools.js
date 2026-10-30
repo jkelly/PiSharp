@@ -2,7 +2,11 @@
 // on or off) and _ToolEditorModal (#modal-tool-editor) that adds or edits one. A definition is checked here before it is added (a name of
 // letters, digits, _ and -, up to 64; a JSON Schema object) and again by the run engine. A tool's mock response and isError stay in the
 // page (data-mock, data-mock-error) and answer the model's calls ("Add toolResult & continue"); nothing runs and nothing is sent for them.
-// The tool choice's names and the tool-call name suggestions follow the list.
+// A tool's strict flag (the editor's Strict switch, where the page sends it) rides in its definition (data-tool: strict: true) and is sent
+// as RunTool.Strict; the switch is off for a model that takes no strict tools (Anthropic, Google) unless the tool is already strict, so it
+// can be cleared, and the editor says why. The tool choice's names and the tool-call name suggestions follow the list.
+
+import { capabilities, optionReason, takes } from './request-config.js';
 
 const NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 let editing = null;
@@ -64,6 +68,7 @@ function refreshNames(config) {
   if (empty) empty.hidden = names.length > 0;
   const row = config.querySelector('[data-option="tools"]');
   if (row) row.dataset.set = on > 0 ? 'true' : 'false';
+  config.dispatchEvent(new CustomEvent('request-tools-changed'));
 }
 
 function iconButton(attribute, icon, label) {
@@ -97,20 +102,29 @@ function makeItem(config, tool) {
   label.className = 'form-check-label ps-mono fs-8 text-truncate';
   label.htmlFor = id;
   check.append(input, label);
+  const strict = document.createElement('span');
+  strict.className = 'ps-chip fs-8';
+  strict.title = 'Sent with strict: true';
+  strict.textContent = 'strict';
+  strict.dataset.toolStrict = '';
   const props = document.createElement('span');
   props.className = 'fs-8 text-ps-faint text-truncate';
   props.dataset.toolProps = '';
   const edit = iconButton('data-tool-edit', 'bi-pencil', 'Edit tool');
   edit.classList.add('ms-auto');
-  item.append(check, props, edit, iconButton('data-tool-remove', 'bi-x', 'Remove tool'));
+  item.append(check, strict, props, edit, iconButton('data-tool-remove', 'bi-x', 'Remove tool'));
   fillItem(item, tool);
   return item;
 }
 
 function fillItem(item, tool) {
-  item.dataset.tool = JSON.stringify({ name: tool.name, description: tool.description ?? '', parameters: tool.parameters ?? null });
+  const definition = { name: tool.name, description: tool.description ?? '', parameters: tool.parameters ?? null };
+  if (tool.strict === true) definition.strict = true;
+  item.dataset.tool = JSON.stringify(definition);
   item.dataset.toolName = tool.name;
   item.querySelector('label').textContent = tool.name;
+  const strict = item.querySelector('[data-tool-strict]');
+  if (strict) strict.hidden = tool.strict !== true;
   const props = item.querySelector('[data-tool-props]');
   if (props) props.textContent = Object.keys(tool.parameters?.properties ?? {}).join(', ');
   item.querySelector('[data-tool-edit]')?.setAttribute('aria-label', `Edit ${tool.name}`);
@@ -124,7 +138,7 @@ function fillItem(item, tool) {
   }
 }
 
-/** Adds or replaces (by name) a tool in `config`'s list: { name, description, parameters, mock?, mockError? }. */
+/** Adds or replaces (by name) a tool in `config`'s list: { name, description, parameters, strict?, mock?, mockError? }. */
 export function upsertTool(config, tool, replacing = null) {
   const list = config.querySelector('[data-tool-list]');
   const existing = replacing ?? toolItems(config).find((item) => item.dataset.toolName === tool.name);
@@ -134,7 +148,7 @@ export function upsertTool(config, tool, replacing = null) {
   changed(config);
 }
 
-/** Replaces `config`'s tools with `tools` ([{ name, description, parameters }]). */
+/** Replaces `config`'s tools with `tools` ([{ name, description, parameters, strict? }]). */
 export function setTools(config, tools) {
   config.querySelector('[data-tool-list]')?.replaceChildren();
   for (const tool of tools ?? []) config.querySelector('[data-tool-list]').append(makeItem(config, tool));
@@ -144,9 +158,26 @@ export function setTools(config, tools) {
 function editorFields(modal) {
   const field = (name) => modal.querySelector(`[data-tool-field="${name}"]`);
   return {
-    name: field('name'), description: field('description'), parameters: field('parameters'),
+    name: field('name'), description: field('description'), parameters: field('parameters'), strict: field('strict'),
     mockOn: field('mockOn'), mock: field('mock'), mockError: field('mockError'),
   };
+}
+
+// The Strict switch for the model of the config being edited: live where the model takes strict tools; otherwise off (and disabled
+// unless it is on, so a strict tool can be cleared), with the model's reason.
+function showStrict(modal) {
+  const strict = editorFields(modal).strict;
+  const warning = modal.querySelector('[data-tool-strict-model]');
+  if (!strict) return;
+  const config = editing?.config;
+  const caps = config ? capabilities(config) : null;
+  const ok = !config || takes(config, 'strict', caps);
+  strict.disabled = !ok && !strict.checked;
+  if (warning) {
+    warning.hidden = ok;
+    warning.textContent = ok ? '' : `${caps ? `${caps.provider}/${caps.model}` : 'This model'} takes no strict tools: ${optionReason(config, 'strict', caps) || 'it does not take them'}.`
+      + (strict.checked ? ' A run with this tool strict is refused: turn Strict off.' : '');
+  }
 }
 
 function showCheck(modal) {
@@ -168,6 +199,7 @@ function showCheck(modal) {
   box.append(icon, text);
   if (fields.mock) fields.mock.disabled = !fields.mockOn?.checked;
   if (fields.mockError) fields.mockError.disabled = !fields.mockOn?.checked;
+  showStrict(modal);
   return result;
 }
 
@@ -176,6 +208,7 @@ function fillEditor(modal, tool) {
   fields.name.value = tool?.name ?? '';
   fields.description.value = tool?.description ?? '';
   fields.parameters.value = JSON.stringify(tool?.parameters ?? { type: 'object', properties: {} }, null, 2);
+  if (fields.strict) fields.strict.checked = tool?.strict === true;
   if (fields.mockOn) fields.mockOn.checked = tool?.mock !== undefined && tool?.mock !== null;
   if (fields.mock) fields.mock.value = tool?.mock ?? '';
   if (fields.mockError) fields.mockError.checked = tool?.mockError === true;
@@ -237,6 +270,7 @@ function wireEditor(modal) {
     }
     const fields = editorFields(modal);
     const tool = { ...result.tool };
+    if (fields.strict?.checked) tool.strict = true;
     if (fields.mockOn?.checked) {
       tool.mock = fields.mock.value;
       tool.mockError = fields.mockError.checked;
@@ -268,6 +302,15 @@ export function initTools(config) {
       refreshNames(config);
       changed(config);
     }
+  });
+  // "Clear them" (request-config.js) when only the strict flags are refused: the tools stay, not strict.
+  config.addEventListener('request-clear-strict', () => {
+    for (const item of toolItems(config)) {
+      const tool = definition(item);
+      if (tool.strict !== true) continue;
+      fillItem(item, { ...tool, strict: false, mock: item.dataset.mock, mockError: item.dataset.mockError === 'true' });
+    }
+    refreshNames(config);
   });
   refreshNames(config);
 }

@@ -4,6 +4,10 @@
 // fragment the page swaps in, and a tool call is answered with a toolResult; options a model rejects are refused before anything is sent
 // (and the config keeps their values, marked); View code, over real routing with a planted key, never carries the key, has LF line
 // endings only (the cURL tab's continuations hold as run.sh), and links "Open last run in inspector" to the run the page names.
+// W4 fix: every option RunSpec takes has a live control the page sends (text verbosity, reasoning summary, session id, timeout, parallel
+// tool calls and a tool's strict flag, checked against the modules the page loads), each enabled only where the model's API takes it; the
+// JSON the page posts reaches the run, History and an OpenAI Responses request body; a model that rejects one is refused before anything
+// is sent, and the config keeps the value, marked. The Speed list and the Reasoning levels are RunSpec's own (Fast, UltraFast and max).
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -12,6 +16,7 @@ using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Data;
 using PiSharp.WebAgent.Playground;
+using PiSharp.WebAgent.Routing;
 using PiSharp.WebAgent.Runs;
 using PiSharp.WebAgent.Shell;
 
@@ -37,20 +42,28 @@ internal static partial class Program
             Check(html.Contains("data-playground-toolbar data-state=\"empty\"", StringComparison.Ordinal) && html.Contains("not run yet", StringComparison.Ordinal), "the toolbar's");
             foreach (var section in PlaygroundSections)
                 Check(html.Contains($"id=\"pg-cfg-{section}\"", StringComparison.Ordinal), "the config accordion has " + section);
-            // The options the run engine took after R1 (parallel tool calls, strict tools, text verbosity, reasoning summary, session id,
-            // timeout) have no control here yet: the last four show as unsent rows (below), the first two have none.
-            string[] notWired = [RunModelOptions.ParallelToolCalls, RunModelOptions.StrictTools, RunModelOptions.TextVerbosity, RunModelOptions.ReasoningSummary,
-                RunModelOptions.SessionId, RunModelOptions.TimeoutMs];
-            foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images, .. notWired]))
+            // Every option RunSpec takes has a live row (a tool's strict flag is the tool editor's switch); none is an unsent row.
+            foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images, RunModelOptions.StrictTools]))
                 Check(html.Contains($"data-option=\"{option}\"", StringComparison.Ordinal), "a row for " + option);
-            foreach (var option in notWired)
-                Check(!html.Contains($"data-option=\"{option}\"", StringComparison.Ordinal), "no control sends " + option + " yet");
-            foreach (var unsent in RequestConfigView.Unsent.Keys.Except(["strict"]))
+            foreach (var option in RunModelOptions.All)
+                Check(!html.Contains($"data-unsent=\"{option}\"", StringComparison.Ordinal), option + " is not shown as unsent");
+            foreach (var unsent in RequestConfigView.Unsent.Keys)
                 Check(Regex.IsMatch(html, $"data-unsent=\"{unsent}\""), "the unsent option " + unsent + " is shown");
+            Check(Regex.IsMatch(html, "id=\"tool-strict\"(?![^>]*disabled)[^>]*data-tool-field=\"strict\""), "the tool editor's Strict switch is live");
             Check(Regex.IsMatch(html, "<input type=\"password\"[^>]*id=\"pg-api-key\"[^>]*disabled"), "the API key field is never usable");
             Check(html.Contains("<option value=\"ultrafast\">UltraFast</option>", StringComparison.Ordinal) && !html.Contains("not sent yet</option>", StringComparison.Ordinal),
                 "UltraFast is listed and sent (the run engine takes every tier PLAN.md lists)");
             Check(Regex.IsMatch(html, "id=\"pg-th-max\" value=\"max\" disabled=\"disabled\""), "max is listed, off for a model that does not think");
+            // The Speed list and the Reasoning levels are the run engine's own: Fast, UltraFast and max are sent where the model takes them.
+            Equal(string.Join(",", RunSpec.ServiceTiers), string.Join(",", RequestConfigView.Tiers.Select(tier => tier.Value).Where(value => value.Length > 0)),
+                "the Speed list is RunSpec.ServiceTiers");
+            Check(RequestConfigView.Tiers.All(tier => tier.Sent), "every listed tier is sent");
+            Equal(string.Join(",", RunSpec.ThinkingLevels), string.Join(",", RequestConfigView.Levels), "the Reasoning levels are RunSpec.ThinkingLevels, max last");
+            foreach (var tier in RunSpec.ServiceTiers)
+                Check(Regex.IsMatch(html, $"<option value=\"{tier}\"[^>]*>[^<]+</option>"), "the Speed list has " + tier);
+            foreach (var level in RunSpec.ThinkingLevels)
+                Check(html.Contains($"id=\"pg-th-{level}\" value=\"{level}\"", StringComparison.Ordinal), "the Reasoning control lists " + level);
+            await PlaygroundWiredAsync(app, html);
             Check(Regex.IsMatch(html, "data-provider-pane=\"azure\"") && Regex.IsMatch(html, "data-unsent=\"azureApiVersion\"") && html.Contains("data-provider-pane=\"bedrock\"", StringComparison.Ordinal),
                 "the Azure and Bedrock panes");
             Check(Regex.IsMatch(html, "data-preset-save>") && Regex.IsMatch(html, "data-preset-load>") && !html.Contains("Presets are not available yet", StringComparison.Ordinal),
@@ -388,7 +401,240 @@ internal static partial class Program
             var none = await app.SendAsync(HttpMethod.Post, "/api/playground/code", request.DeepClone(), origin: app.Origin);
             Check(none.Status == 200 && none.Body?["inspectorUrl"] is null, "no run: no link: " + none.Text);
         }),
+
+        Case("playground.options.new-options-reach-the-request", async () =>
+        {
+            // The JSON the page posts (collectSpec: each set row by RunSpec's name, a strict tool with strict: true).
+            JsonObject Page(string provider, string model, string thinking) => new()
+            {
+                ["provider"] = provider,
+                ["model"] = model,
+                ["source"] = "playground",
+                ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["text"] = "new options run" }),
+                ["tools"] = new JsonArray(new JsonObject
+                {
+                    ["name"] = "lookup",
+                    ["description"] = "Look a word up",
+                    ["parameters"] = JsonNode.Parse("""{"type":"object","properties":{"word":{"type":"string"}},"required":["word"],"additionalProperties":false}"""),
+                    ["strict"] = true,
+                }),
+                ["thinking"] = thinking,
+                ["parallelToolCalls"] = false,
+                ["textVerbosity"] = "low",
+                ["reasoningSummary"] = "detailed",
+                ["timeoutMs"] = 120_000,
+            };
+            string[] added = [RunModelOptions.ParallelToolCalls, RunModelOptions.StrictTools, RunModelOptions.TextVerbosity, RunModelOptions.ReasoningSummary, RunModelOptions.TimeoutMs];
+
+            // Over HTTP on a faux thinking model: the run takes each option, History records it, and ?run= reopens it with every control set.
+            await using (var app = await WebAgentApp.StartAsync("pg-new-options"))
+            {
+                var posted = await app.SendAsync(HttpMethod.Post, "/api/runs", Page("faux", "echo-thinking", "high"), origin: app.Origin);
+                Check(posted.Status == 200 && posted.Body?["posted"]?.GetValue<bool>() == true, "the run is taken: " + posted.Text);
+                var id = posted.Body!["id"]!.GetValue<string>();
+                Equal(RunStatus.Completed, (await RunsSseAsync(app, $"/api/runs/{id}/events"))[^1].Data?["status"]?.GetValue<string>(), "completed");
+                var options = (await app.Get($"/api/runs/{id}")).Body?["run"]?["options"];
+                var applied = options?["applied"]?.AsArray().Select(item => item!.GetValue<string>()).ToList() ?? [];
+                foreach (var option in added) Check(applied.Contains(option), option + " is applied: " + options?.ToJsonString());
+                Equal(("low", "detailed", 120_000, false), (options?["textVerbosity"]?.GetValue<string>(), options?["reasoningSummary"]?.GetValue<string>(),
+                    options?["timeoutMs"]?.GetValue<int>(), options?["parallelToolCalls"]?.GetValue<bool>()), "History records each value");
+
+                var reopened = (await app.Get("/playground?run=" + id)).Text;
+                foreach (var option in added.Except([RunModelOptions.StrictTools]))
+                    Check(Regex.IsMatch(reopened, $"data-option=\"{option}\" data-set=\"true\" data-conflict=\"\""), option + "'s row is set, not refused: "
+                        + Cut(reopened[Math.Max(0, reopened.IndexOf($"data-option=\"{option}\"", StringComparison.Ordinal) - 40)..]));
+                Check(Regex.IsMatch(reopened, "id=\"pg-vb-low\" value=\"low\" checked=\"checked\""), "low verbosity is checked");
+                Check(Regex.IsMatch(reopened, "<option value=\"detailed\" selected=\"selected\">detailed</option>"), "the detailed summary is selected");
+                Check(Regex.IsMatch(reopened, "id=\"pg-timeoutMs\"[^>]*value=\"120000\""), "the timeout");
+                Check(Regex.IsMatch(reopened, "id=\"pg-parallel\"(?![^>]*checked)[^>]*data-opt=\"parallelToolCalls\""), "parallel tool calls off");
+                Check(reopened.Contains("&quot;strict&quot;:true}\" data-tool-name=\"lookup\"", StringComparison.Ordinal)
+                    && Regex.IsMatch(reopened, "<span class=\"ps-chip fs-8\" data-tool-strict title="), "the strict tool keeps its flag, and says so");
+                Check(Regex.IsMatch(reopened, "data-config-conflicts hidden"), "nothing is refused");
+                Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
+            }
+
+            // Over real routing (the fake provider: no request leaves the process): the same JSON reaches an OpenAI Responses reasoning
+            // model's request body, and the session id becomes its prompt cache key.
+            await using var host = RunsHost.Routing("pg-new-options-openai");
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("openai", Planted("sk-proj-")));
+            var catalog = (RuntimeModelCatalog)host.Services.GetRequiredService<IModelCatalog>();
+            var reasoner = catalog.Models("openai").First(model => model.ThinkingLevels.Count > 1 && catalog.Find("openai", model.Id)!.Durable.Api == "openai-responses");
+            var level = reasoner.ThinkingLevels.First(item => item != "off");
+            var json = Page("openai", reasoner.Id, level);
+            json["sessionId"] = "pg-1a2b3c4d";
+            var spec = RunSpec.Parse(json);
+            var start = await host.Engine.StartAsync(spec);
+            var run = await RunsFinishedAsync(host.Store, start.Id!);
+            Equal(RunStatus.Completed, run.Status, "completed: " + run.Error + " " + run.Notes);
+            var body = JsonNode.Parse(host.Provider.Requests.Single(request => request.Body?.Contains("new options run", StringComparison.Ordinal) == true).Body!)!;
+            Equal(("low", "detailed", false, "pg-1a2b3c4d"), (body["text"]?["verbosity"]?.GetValue<string>(), body["reasoning"]?["summary"]?.GetValue<string>(),
+                body["parallel_tool_calls"]?.GetValue<bool>(), body["prompt_cache_key"]?.GetValue<string>()), "verbosity, summary, parallel switch and session id: " + body.ToJsonString());
+            Equal(true, body["tools"]?.AsArray().OfType<JsonObject>().Single(tool => tool["name"]?.GetValue<string>() == "lookup")["strict"]?.GetValue<bool>(), "the tool is strict");
+            Check(run.Options?["applied"]?.AsArray().Select(item => item!.GetValue<string>()).Contains(RunModelOptions.TimeoutMs) == true, "the timeout is applied (the capture hook's)");
+
+            // Each control is live where the model's API takes it (RunModelOptions, as the run engine plans): the Responses, Azure and Codex
+            // APIs for verbosity, summary (while thinking) and session id; any API for the timeout; the parallel switch where the API has one.
+            await using var render = CatalogHost("pg-new-options-render", catalog);
+            // The config of a model on `api` (of `provider` when given; one that thinks, at its first level, when `think`), or "" when the
+            // catalog has none.
+            async Task<string> Config(string api, bool think, string? provider = null)
+            {
+                var found = catalog.Providers.Select(item => item.Id).Where(id => provider is null || id == provider)
+                    .SelectMany(id => catalog.Models(id))
+                    .FirstOrDefault(model => catalog.Find(model.Provider, model.Id)?.Durable.Api == api && (!think || model.ThinkingLevels.Count > 1));
+                if (found is null) return "";
+                var caps = host.Engine.Capabilities(found.Provider, found.Id)!;
+                var draft = new RunSpec { Provider = found.Provider, Model = found.Id, Thinking = think ? caps.ThinkingLevels[1] : null, Messages = [new RunMessage { Text = "x" }] };
+                return await render.RenderAsync("_RequestConfig", new RequestConfigView { Draft = draft, Capabilities = caps, ShowModel = false });
+            }
+            var responses = await Config("openai-responses", think: true, "openai");
+            foreach (var option in new[] { RunModelOptions.TextVerbosity, RunModelOptions.ReasoningSummary, RunModelOptions.SessionId, RunModelOptions.TimeoutMs, RunModelOptions.ParallelToolCalls })
+                Check(PlaygroundLive(responses, option), option + " is live on the Responses API");
+            Check(!PlaygroundLive(await Config("openai-responses", think: false, "openai"), RunModelOptions.ReasoningSummary), "the summary only while the model thinks");
+            var codex = await Config("openai-codex-responses", think: false);
+            Check(codex.Length > 0, "the catalog has a Codex model");
+            foreach (var other in new[] { codex, await Config("azure-openai-responses", think: false) }.Where(html => html.Length > 0))
+                foreach (var option in new[] { RunModelOptions.TextVerbosity, RunModelOptions.SessionId, RunModelOptions.TimeoutMs })
+                    Check(PlaygroundLive(other, option), $"{option} is live on " + Regex.Match(other, "data-api=\"([^\"]*)\"").Groups[1].Value);
+            var anthropic = await Config("anthropic-messages", think: true, "anthropic");
+            foreach (var option in new[] { RunModelOptions.TextVerbosity, RunModelOptions.ReasoningSummary, RunModelOptions.SessionId })
+                Check(!PlaygroundLive(anthropic, option), option + " is off on Anthropic");
+            Check(PlaygroundLive(anthropic, RunModelOptions.TimeoutMs) && PlaygroundLive(anthropic, RunModelOptions.ParallelToolCalls), "the timeout and the parallel switch are live on Anthropic");
+            if (await Config("google-generative-ai", think: false, "google") is { Length: > 0 } google)
+                Check(!PlaygroundLive(google, RunModelOptions.ParallelToolCalls) && PlaygroundLive(google, RunModelOptions.TimeoutMs), "Gemini: no parallel switch, a timeout");
+            PlaygroundNoInline("_RequestConfig", responses + anthropic);
+        }),
+
+        Case("playground.options.a-model-that-rejects-a-new-option-is-refused", async () =>
+        {
+            // Over HTTP on the faux models: a refused option is named with its reason and nothing runs.
+            await using (var app = await WebAgentApp.StartAsync("pg-new-refused"))
+            {
+                JsonObject Spec(string model, params (string Key, JsonNode Value)[] options)
+                {
+                    var spec = new JsonObject { ["provider"] = "faux", ["model"] = model, ["messages"] = new JsonArray(new JsonObject { ["text"] = "hi" }) };
+                    foreach (var (key, value) in options) spec[key] = value;
+                    return spec;
+                }
+                async Task RefusedHttp(JsonObject spec, string option, string reason)
+                {
+                    var answer = await app.SendAsync(HttpMethod.Post, "/api/runs", spec, origin: app.Origin);
+                    Equal(400, answer.Status, option + ": " + answer.Text);
+                    Check(answer.Body?["error"]?["refused"]?.AsArray().Any(item => item?["option"]?.GetValue<string>() == option
+                        && item["reason"]?.GetValue<string>().Contains(reason, StringComparison.Ordinal) == true) == true, $"{option} is refused ({reason}): " + answer.Text);
+                }
+                async Task Invalid(JsonObject spec, string message)
+                {
+                    var answer = await app.SendAsync(HttpMethod.Post, "/api/runs", spec, origin: app.Origin);
+                    Equal(400, answer.Status, message + ": " + answer.Text);
+                    Check(answer.Body?["error"]?["message"]?.GetValue<string>().Contains(message, StringComparison.Ordinal) == true, "says " + message + ": " + answer.Text);
+                }
+                await RefusedHttp(Spec("echo", ("sessionId", "pg-1")), RunModelOptions.SessionId, "sends no HTTP request");
+                await RefusedHttp(Spec("echo-thinking", ("reasoningSummary", "concise")), RunModelOptions.ReasoningSummary, "only while the model thinks");
+                await Invalid(Spec("echo", ("parallelToolCalls", true)), "Parallel tool calls need at least one tool.");
+                await Invalid(Spec("echo", ("timeoutMs", 500)), "The timeout is ");
+                await Invalid(Spec("echo", ("textVerbosity", "loud")), "Text verbosity is low, medium, high");
+                Equal(0, (await app.Get("/api/runs")).Body?["total"]?.GetValue<int>(), "nothing ran");
+            }
+
+            // Over real routing: Anthropic and Gemini refuse what their APIs do not have, before anything is sent, and the Playground's
+            // estimate says so before Run; the config keeps the values, marked (the tools row names the strict tool).
+            await using var host = RunsHost.Routing("pg-new-refused-routing");
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", Planted("sk-ant-")));
+            var catalog = (RuntimeModelCatalog)host.Services.GetRequiredService<IModelCatalog>();
+            var pages = new PlaygroundPages(host.Services);
+            var strictTool = new RunTool("lookup", "Look a word up", new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }, Strict: true);
+            var sent = host.Provider.Requests.Count;
+            var claude = catalog.Models("anthropic").First(model => model.ThinkingLevels.Count > 1 && catalog.Find("anthropic", model.Id)!.Durable.Api == "anthropic-messages");
+            var plain = new RunSpec { Provider = "anthropic", Model = claude.Id, Messages = [new RunMessage { Text = "x" }] };
+            async Task Refused(RunSpec spec, string option, string reason)
+            {
+                var error = await ThrowsAsync<RunOptionException>(() => host.Engine.StartAsync(spec), option);
+                Check(error.Plan.Refused.Any(item => item.Option == option && item.Reason?.Contains(reason, StringComparison.Ordinal) == true), $"{option} refused ({reason}): " + error.Message);
+                var draft = await pages.DraftAsync(spec);
+                Check(!draft.Valid && draft.Refused.Any(item => item.Option == option), option + ": the estimate says Run will be refused: " + draft.Message);
+            }
+            await Refused(plain with { TextVerbosity = "high" }, RunModelOptions.TextVerbosity, "only the OpenAI Responses and Codex APIs");
+            await Refused(plain with { Thinking = claude.ThinkingLevels[1], ReasoningSummary = "auto" }, RunModelOptions.ReasoningSummary, "only the OpenAI Responses and Codex APIs");
+            await Refused(plain with { SessionId = "pg-1" }, RunModelOptions.SessionId, "only the OpenAI Responses and Codex APIs");
+            await Refused(plain with { Tools = [strictTool] }, RunModelOptions.StrictTools, "strict tools");
+            if (catalog.Models("google").FirstOrDefault(model => catalog.Find("google", model.Id)!.Durable.Api == "google-generative-ai") is { } gemini)
+            {
+                var googleSpec = new RunSpec { Provider = "google", Model = gemini.Id, Messages = [new RunMessage { Text = "x" }], Tools = [strictTool with { Strict = null }] };
+                await Refused(googleSpec with { ParallelToolCalls = false }, RunModelOptions.ParallelToolCalls, "no parallel tool call switch");
+                await Refused(googleSpec with { Tools = [strictTool] }, RunModelOptions.StrictTools, "no strict tools");
+            }
+            Equal(sent, host.Provider.Requests.Count, "nothing was sent");
+
+            var caps = host.Engine.Capabilities("anthropic", claude.Id)!;
+            var view = new RequestConfigView { Draft = plain with { TextVerbosity = "high", SessionId = "pg-1", Tools = [strictTool] }, Capabilities = caps, ShowModel = false };
+            Check(view.Conflict(RunModelOptions.TextVerbosity) && view.Conflict(RunModelOptions.SessionId) && view.ToolsConflict && view.Off(RunModelOptions.ReasoningSummary),
+                "the view's verdicts");
+            await using var render = CatalogHost("pg-new-refused-render", catalog);
+            var html = await render.RenderAsync("_RequestConfig", view);
+            Check(Regex.IsMatch(html, "data-option=\"textVerbosity\" data-set=\"true\" data-conflict=\"true\"") && Regex.IsMatch(html, "id=\"pg-vb-high\" value=\"high\" checked=\"checked\"(?![^>]*disabled)"),
+                "the verbosity is kept, marked and can be cleared");
+            Check(Regex.IsMatch(html, "data-option=\"sessionId\" data-set=\"true\" data-conflict=\"true\"") && Regex.IsMatch(html, "id=\"pg-session\"[^>]*value=\"pg-1\"(?![^>]*disabled)"),
+                "the session id is kept, marked and can be cleared");
+            var tools = Regex.Match(html, "data-option=\"tools\" data-set=\"true\" data-conflict=\"true\">.*?data-option-note>([^<]*)</div>", RegexOptions.Singleline);
+            Check(tools.Success && tools.Groups[1].Value.Contains("1 strict tool:", StringComparison.Ordinal), "the tools row names the strict tool: " + Cut(tools.Value));
+            Check(Regex.IsMatch(html, "data-config-conflicts(?![^>]*hidden)"), "the banner says Run will refuse the request");
+            PlaygroundNoInline("_RequestConfig", html);
+        }),
     ];
+
+    /// <summary>The page's controls reach the request: request-spec.js sends every option that has a row (and a tool's strict flag), reads
+    /// every control kind the page renders, and request-config.js counts what the server counts and offers the levels the run engine takes.
+    /// Static checks of the modules the page loads, so a control whose value is never sent fails here.</summary>
+    private static async Task PlaygroundWiredAsync(WebAgentApp app, string html)
+    {
+        var spec = (await app.Get("/js/request-spec.js")).Text;
+        var config = (await app.Get("/js/request-config.js")).Text;
+        var tools = (await app.Get("/js/request-tools.js")).Text;
+        var sent = PlaygroundJsList(spec, "SENT_OPTIONS");
+        foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images, RunModelOptions.Tools, RunModelOptions.StrictTools]))
+            Check(sent.Contains(option), "request-spec.js sends " + option + ": " + string.Join(",", sent));
+        Check(spec.Contains("for (const option of SENT_OPTIONS)", StringComparison.Ordinal), "collectSpec reads SENT_OPTIONS");
+        Check(spec.Contains("if (tool.strict === true) sent.strict = true;", StringComparison.Ordinal), "collectTools sends a tool's strict flag");
+        Check(tools.Contains("if (fields.strict?.checked) tool.strict = true;", StringComparison.Ordinal), "the tool editor keeps the Strict switch on the tool");
+        // Each control the generic reader handles has a kind it knows (a kind it does not know reads as null: never sent).
+        var kinds = Regex.Match(spec, @"const KINDS = \{(.*?)\n\};", RegexOptions.Singleline).Groups[1].Value;
+        string[] ownReaders = ["thinking", "responseFormat", "toolChoice", "serviceTier", "headers", "providerOptions"];
+        var controls = Regex.Matches(html, "data-opt=\"([A-Za-z]+)\" data-kind=\"([a-z]+)\"").Select(match => (Option: match.Groups[1].Value, Kind: match.Groups[2].Value)).Distinct().ToList();
+        foreach (var option in sent.Except(ownReaders))
+            Check(controls.Any(control => control.Option == option), "a control for " + option);
+        foreach (var (option, kind) in controls.Where(control => !ownReaders.Contains(control.Option)))
+            Check(Regex.IsMatch(kinds, $"\\n  {kind}: "), $"request-spec.js reads {option}'s kind {kind}");
+        Equal(string.Join(",", RequestConfigView.Counted), string.Join(",", PlaygroundJsList(config, "COUNTED")), "request-config.js counts the server's options");
+        Equal(string.Join(",", RunSpec.ThinkingLevels), string.Join(",", PlaygroundJsList(config, "SEND_LEVELS")), "the levels the page sends are RunSpec's, max included");
+    }
+
+    /// <summary>The strings of the JS array constant <paramref name="name"/> in <paramref name="script"/>.</summary>
+    private static List<string> PlaygroundJsList(string script, string name)
+    {
+        var list = Regex.Match(script, $@"const {name} = \[([^\]]*)\]");
+        Check(list.Success, "the module has " + name);
+        return [.. Regex.Matches(list.Groups[1].Value, "'([^']+)'").Select(match => match.Groups[1].Value)];
+    }
+
+    /// <summary>The class of the row of <paramref name="option"/> in rendered <c>_RequestConfig</c> markup.</summary>
+    private static string PlaygroundRow(string html, string option)
+    {
+        var row = Regex.Match(html, $"<div class=\"([^\"]*)\" data-option=\"{option}\"");
+        Check(row.Success, "a row for " + option);
+        return row.Groups[1].Value;
+    }
+
+    /// <summary>Whether <paramref name="option"/>'s row and every control of it are enabled in rendered <c>_RequestConfig</c> markup.</summary>
+    private static bool PlaygroundLive(string html, string option)
+    {
+        var controls = Regex.Matches(html, $"<(?:input|select)\\b[^>]*data-opt=\"{option}\"[^>]*>").Select(match => match.Value).ToList();
+        Check(controls.Count > 0, "a control for " + option);
+        var rowOn = !PlaygroundRow(html, option).Contains("param-disabled", StringComparison.Ordinal);
+        var controlsOn = controls.All(control => !Regex.IsMatch(control, "\\sdisabled"));
+        Check(rowOn == controlsOn, $"{option}'s row and controls agree ({rowOn}, {controlsOn})");
+        return rowOn && controlsOn;
+    }
 
     /// <summary><paramref name="text"/> has no carriage return: LF line endings only.</summary>
     private static void PlaygroundLfOnly(string text, string what)

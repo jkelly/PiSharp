@@ -1,8 +1,11 @@
 @* Decision 0011 (run W4, R1): the mockups' _ToolEditorModal (#modal-tool-editor; shared: Playground, Compare, Tool Bench): a tool
    definition { name, description, parameters } from a template (PiSharp's own read and grep declarations, or a common example) or by hand,
    checked in the page (the name pattern, a JSON Schema object) before it is added; the run engine checks it again. The mock response and
-   isError answer the model's calls in the Playground (never sent to a provider; a tool never runs here). Strict is shown, not sent yet.
-   request-tools.js opens it for a new tool ([data-tool-add]) or to edit one ([data-tool-edit]). Model: ToolEditorView. *@
+   isError answer the model's calls in the Playground (never sent to a provider; a tool never runs here). Strict sends the tool's strict
+   flag (RunTool.Strict) where the page sends it (ToolEditorView.Strict); request-tools.js keeps the switch off for a model that takes no
+   strict tools (Anthropic, Google) unless the tool is already strict, so it can be cleared, and says why. A page that does not send the
+   flag shows the switch disabled. request-tools.js opens it for a new tool ([data-tool-add]) or to edit one ([data-tool-edit]).
+   Model: ToolEditorView. *@
 @using PiSharp.WebAgent.Playground
 @model ToolEditorView
 <div class="modal fade" id="modal-tool-editor" tabindex="-1" aria-labelledby="modal-tool-editor-title" aria-hidden="true">
@@ -46,10 +49,18 @@
         <div class="row g-3 mt-1">
           <div class="col-md-6">
             <div class="form-check form-switch mt-2">
-              <input class="form-check-input" type="checkbox" role="switch" id="tool-strict" disabled>
+              @if (Model.Strict)
+              {
+                <input class="form-check-input" type="checkbox" role="switch" id="tool-strict" data-tool-field="strict">
+              }
+              else
+              {
+                <input class="form-check-input" type="checkbox" role="switch" id="tool-strict" disabled>
+              }
               <label class="form-check-label" for="tool-strict">Strict <span class="ps-mono fs-8 text-ps-faint">constrainedSampling</span></label>
             </div>
-            <div class="form-text">@RequestConfigView.Unsent["strict"].Reason</div>
+            <div class="form-text" data-tool-strict-note>@Model.StrictNote</div>
+            <div class="form-text text-ps-warn" data-tool-strict-model hidden></div>
           </div>
           @if (Model.Mock)
           {
