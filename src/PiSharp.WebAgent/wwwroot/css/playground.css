@@ -1,0 +1,94 @@
+/* Decision 0011 (run W4, R1): the Playground and the shared request partials (_RequestConfig, _MessageListEditor, _RunOutput), after the
+   mockups' app.css "Playground" rules. Three panes on wide screens (options 340px, messages, output), two below 1200px (options beside
+   messages over output), one column below 992px where the page scrolls instead of the panes. Colours come from the theme's tokens only, so
+   dark (the default) and light both work. Nothing here scrolls sideways at 375px. */
+
+/* ---------- Layout ---------- */
+.pg-layout { display: grid; grid-template-columns: 340px minmax(0, 1fr) minmax(0, 1fr); flex: 1 1 0; min-height: 0; }
+.pg-toolbar {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  padding: .5rem 1rem; border-bottom: 1px solid var(--ps-border); background: var(--ps-bg); flex: none;
+}
+.pg-toolbar > .vr { align-self: stretch; }
+.pg-spinner { width: .7rem; height: .7rem; border-width: .12em; }
+
+/* The options pane is narrow: the Provider → Model dropdowns stack. */
+.pg-config [data-provider-model] > [class*="col-"] { flex: 0 0 auto; width: 100%; }
+.pg-config .accordion-button { font-size: .8125rem; padding: .6rem .9rem; }
+.pg-config .accordion-body { padding: .25rem .9rem .75rem; }
+
+/* ---------- Option rows ---------- */
+.param-row { padding: .5rem 0; }
+.param-row + .param-row { border-top: 1px dashed var(--ps-border); }
+.param-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .3rem; min-width: 0; }
+.param-name { font-family: var(--ps-font-mono); font-size: .78rem; color: var(--ps-text-2); min-width: 0; overflow-wrap: anywhere; }
+.param-name .param-help { color: var(--ps-faint); margin-left: .25rem; cursor: help; font-family: var(--ps-font-sans); }
+.param-value { font-size: .78rem; color: var(--ps-text); min-width: 2.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+.param-value.input { width: 5.5rem; flex: none; padding: .1rem .35rem; font-size: .78rem; }
+.param-disabled { opacity: .45; }
+.param-row [data-option-dot] { display: none; }
+.param-row[data-set="true"] [data-option-dot] { display: inline-block; }
+.param-row[data-conflict="true"] { opacity: 1; }
+.param-row[data-conflict="true"] .param-name { color: var(--ps-warn, var(--bs-warning)); }
+.pg-seg { flex-wrap: wrap; }
+.pg-seg > .btn { flex: 1 1 auto; padding-left: .35rem; padding-right: .35rem; font-size: .75rem; font-family: var(--ps-font-mono); }
+.pg-header-cell { flex: 1 1 0; min-width: 0; }
+.pg-header-action { width: 30px; flex: none; }
+.header-table td:first-child { font-family: var(--ps-font-mono); font-size: .78rem; color: var(--ps-muted); white-space: nowrap; width: 1%; }
+.header-table td:last-child { font-family: var(--ps-font-mono); font-size: .78rem; word-break: break-all; }
+.redacted { background: var(--ps-surface-3); color: var(--ps-faint); border-radius: 4px; padding: 0 .35rem; letter-spacing: .1em; }
+
+/* ---------- Message editors ---------- */
+.msg-editor { border: 1px solid var(--ps-border); border-radius: 12px; background: var(--ps-surface); margin-bottom: .75rem; overflow: hidden; }
+.msg-editor-head { display: flex; align-items: center; gap: .4rem; padding: .3rem .5rem; border-bottom: 1px solid var(--ps-border); min-width: 0; }
+.msg-editor-head .form-select { width: auto; flex: none; font-size: .78rem; font-weight: 500; padding: .1rem 1.8rem .1rem .55rem; border-color: transparent; background-color: transparent; }
+.msg-editor textarea { border: 0; border-radius: 0; background: transparent; font-size: .9rem; resize: vertical; min-height: 64px; }
+.msg-editor textarea:focus { box-shadow: none; }
+.msg-editor.is-dragging { opacity: .5; }
+.drag-handle { cursor: grab; color: var(--ps-faint); }
+
+/* ---------- Output ---------- */
+.metric-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 0; background: transparent; border-bottom: 1px solid var(--ps-border); flex: none; }
+.metric { background: transparent; padding: .55rem .8rem; min-width: 0; }
+.metric .metric-label { font-size: .72rem; color: var(--ps-faint); }
+.metric .metric-value { font-size: .95rem; font-weight: 500; color: var(--ps-text); white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+.metric .metric-value small { font-size: .72rem; color: var(--ps-faint); font-weight: 400; }
+.pg-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pg-empty-text { max-width: 34ch; }
+.pg-output .ps-term pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.sse-row { display: grid; grid-template-columns: 82px 170px minmax(0, 1fr); gap: .75rem; padding: .3rem .9rem; font-family: var(--ps-font-mono); font-size: .76rem; border-bottom: 1px solid var(--ps-border); align-items: baseline; }
+.sse-row:hover { background: var(--ps-hover); }
+.sse-row .t { color: var(--ps-faint); }
+.sse-row .ev { color: var(--ps-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sse-row .data { color: var(--ps-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* "Collapse deltas": the first delta of a run and its "N more" row show; expanded, every delta shows and the summary row hides. */
+.pg-events[data-collapsed="true"] .sse-row[data-extra] { display: none; }
+.pg-events[data-collapsed="false"] .sse-row[data-summary] { display: none; }
+.pg-events[data-filter="thinking"] .sse-row:not([data-group="thinking"]),
+.pg-events[data-filter="text"] .sse-row:not([data-group="text"]),
+.pg-events[data-filter="toolcall"] .sse-row:not([data-group="toolcall"]) { display: none; }
+
+/* ---------- Estimate by Run (chat.css has the composer's copy) ---------- */
+.run-estimate { cursor: help; }
+.ps-tip-left .tooltip-inner { text-align: left; max-width: 20rem; }
+.composer-estimate { background: transparent; border: 0; border-radius: 999px; padding: .2rem .45rem; font-size: .8125rem; color: var(--ps-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.composer-estimate:hover, .composer-estimate:focus-visible { background: var(--ps-hover); color: var(--ps-text); }
+
+/* ---------- Narrower screens ---------- */
+@media (max-width: 1199.98px) {
+  .pg-layout { grid-template-columns: 300px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  .pg-layout > .pg-output { grid-column: 2; border-left: 0; border-top: 1px solid var(--ps-border); }
+  .pg-layout > .pg-config { grid-row: 1 / span 2; }
+}
+@media (max-width: 991.98px) {
+  .pg-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; flex: none; }
+  .pg-layout > .pane { grid-row: auto !important; grid-column: auto !important; border-left: 0; border-bottom: 1px solid var(--ps-border); }
+  .pg-layout .pane-body { overflow: visible; }
+  .app-content.pg-scroll { overflow-y: auto; display: block; }
+  .pg-layout > .pg-output { min-height: 50vh; }
+}
+@media (max-width: 767.98px) {
+  .pg-toolbar { padding: .5rem; gap: .35rem; }
+  .sse-row { grid-template-columns: 64px minmax(0, 1fr); }
+  .sse-row .data { grid-column: 1 / -1; }
+}
