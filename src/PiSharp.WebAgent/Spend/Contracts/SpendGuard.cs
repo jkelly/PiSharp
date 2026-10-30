@@ -157,6 +157,14 @@ public interface ISpendGuard
     /// <summary>What would happen if <paramref name="call"/> were sent now: its estimate, the decision and its causes. Reserves nothing.</summary>
     Task<SpendDecision> PreflightAsync(SpendCall call, CancellationToken cancellationToken = default);
 
+    /// <summary>What would happen if <paramref name="calls"/> (one run's, such as a Compare run's columns) were reserved now as one group, all
+    /// or none: each call's estimate and decision, checked with the group's earlier calls counted, so a run, day or month cap that only the
+    /// group's total crosses shows before anything is sent. A waiting approval of the run answers the group once, as it would when the group
+    /// is reserved. Reserves nothing.</summary>
+    /// <exception cref="ArgumentException">The group is empty, two calls share an op, the calls are of different runs, or a value is not
+    /// allowed.</exception>
+    Task<SpendGroupDecision> PreflightGroupAsync(IReadOnlyList<SpendCall> calls, CancellationToken cancellationToken = default);
+
     /// <summary>Estimates <paramref name="call"/>, consumes a matching approval (<see cref="ApproveAsync"/>) when it needs one, and reserves
     /// it under its op; an op already reserved returns that reservation (a recovered request never reserves twice).</summary>
     Task<SpendReservation> ReserveAsync(SpendCall call, CancellationToken cancellationToken = default);

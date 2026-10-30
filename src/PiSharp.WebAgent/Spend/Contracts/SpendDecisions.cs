@@ -116,8 +116,16 @@ public sealed record SpendCause
     /// <summary>The cap it does not fit, for <see cref="SpendCauseKind.Cap"/>; null for an unknown price.</summary>
     public SpendCap? Cap { get; init; }
 
-    /// <summary>What already counts toward the cap in its window, in micro-USD (0 for a request cap and for an unknown price).</summary>
+    /// <summary>What already counts toward the cap in its window, in micro-USD (0 for a request cap and for an unknown price). In a group
+    /// (a Compare run's columns), it includes the group's earlier requests that fit (<see cref="GroupMicros"/>).</summary>
     public long SpentMicros { get; init; }
+
+    /// <summary>The part of <see cref="SpentMicros"/> that the group's earlier requests add, which are not reserved yet (a group's
+    /// reservation or preflight: <see cref="ISpendLedger.ReserveGroupAsync"/>, <see cref="ISpendLedger.CheckGroupAsync"/>), in micro-USD;
+    /// null outside a group and when they add nothing to this cap. A request whose own worst case fits what is left without them
+    /// (<see cref="SpentMicros"/> - this + the worst case &lt;= the limit) is refused only because of the group's total.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? GroupMicros { get; init; }
 
     /// <summary>What is left in the cap (never below 0), in micro-USD; null for an unknown price.</summary>
     public long? LeftMicros { get; init; }
@@ -229,4 +237,20 @@ public sealed record SpendGroupReservation(IReadOnlyList<SpendReservation> Items
     /// <summary>The first decision that refused the group, or null.</summary>
     [JsonIgnore]
     public SpendDecision? Refused => Items.Select(item => item.Decision).FirstOrDefault(decision => !decision.Allowed);
+}
+
+/// <summary>What the guard would decide about a group of requests (a Compare run's columns) if it were reserved now, all or none
+/// (<see cref="ISpendLedger.CheckGroupAsync"/>, <see cref="ISpendGuard.PreflightGroupAsync"/>): nothing is reserved. Each request is checked
+/// as the group reservation checks it, with the group's earlier requests that fit counted, so a run, day or month cap that only the group's
+/// total crosses refuses the request that crosses it (its cause's <see cref="SpendCause.GroupMicros"/> says how much the others add).</summary>
+/// <param name="Items">One decision per request, in order.</param>
+public sealed record SpendGroupDecision(IReadOnlyList<SpendDecision> Items)
+{
+    /// <summary>Whether the group would be reserved: every request fits.</summary>
+    [JsonIgnore]
+    public bool Allowed => Items.Count > 0 && Items.All(item => item.Allowed);
+
+    /// <summary>The decision that would refuse the group: the first that blocks, else the first that asks; null when it fits.</summary>
+    [JsonIgnore]
+    public SpendDecision? Refused => Items.FirstOrDefault(item => item.Verdict == SpendVerdict.Block) ?? Items.FirstOrDefault(item => !item.Allowed);
 }

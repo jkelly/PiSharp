@@ -386,6 +386,20 @@ public interface ISpendLedger
     /// <exception cref="ArgumentException">A request is not allowed, or two share an op.</exception>
     Task<SpendGroupReservation> ReserveGroupAsync(IReadOnlyList<SpendRequest> requests, CancellationToken cancellationToken = default);
 
+    /// <summary>What <see cref="ReserveGroupAsync"/> would decide now, without reserving anything (a group's preflight): each request checked
+    /// with the group's earlier requests that fit counted, so a run, day or month cap that only the group's total crosses refuses the request
+    /// that crosses it. Ops already reserved count as fitting. A ledger that does not count a group (this default, for test fakes) checks each
+    /// request alone, as <see cref="CheckAsync"/>.</summary>
+    /// <exception cref="ArgumentException">A request is not allowed, or two share an op.</exception>
+    async Task<SpendGroupDecision> CheckGroupAsync(IReadOnlyList<SpendRequest> requests, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        if (requests.Count == 0) throw new ArgumentException("A group needs at least one request.", nameof(requests));
+        var decisions = new List<SpendDecision>();
+        foreach (var request in requests) decisions.Add(await CheckAsync(request, cancellationToken).ConfigureAwait(false));
+        return new SpendGroupDecision(decisions);
+    }
+
     /// <summary>The row of <paramref name="op"/>, or null.</summary>
     Task<Reservation?> GetAsync(string op, CancellationToken cancellationToken = default);
 

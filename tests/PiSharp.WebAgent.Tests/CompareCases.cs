@@ -8,11 +8,17 @@
 // provider's key (never the other's), and neither key reaches runs.db, its WAL, the log or the data folder. The columns and the Metrics tab
 // render each state with model text through the sanitizing MarkdownRenderer; end to end, the built app serves GET /compare (and the agent
 // stub) with nothing the CSP would block, and a Run all goes round trip through /api/compare, the runs' SSE and the fragments the page swaps in.
+// W4 fix (compare): the estimate by Run all is the Spend Guard's group preflight, so a run or daily cap only the columns' total crosses is
+// named before Run (in process and over HTTP), the ledger's group check is the reservation's rule and reserves nothing, a waiting approval
+// answers the group's preflight without being used up, and a cap near its limit shows one amber chip at the group's total.
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.Net;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Compare;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Credentials;
@@ -537,6 +543,152 @@ internal static partial class Program
                 Check(sent.Body?["posted"]?.GetValue<bool>() == true && sent.Body["groupId"]?.GetValue<string>() == group, "the user's choice sends the whole group: " + sent.Text);
                 foreach (var id in sent.Body!["ids"]!.AsArray().Select(id => id!.GetValue<string>()))
                     Equal(RunStatus.Completed, (await RunsSseAsync(app, $"/api/runs/{id}/events"))[^1].Data?["status"]?.GetValue<string>(), "each column ran");
+                Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
+            }
+            finally
+            {
+                SqliteClearPools();
+                DeleteTemp(root);
+            }
+        }),
+
+        // W4 fix (compare): the estimate by Run all checks the columns as one group (the Spend Guard's group preflight), so a run, daily or
+        // monthly cap that only the group's total crosses shows before Run; it used to check each column alone and say nothing until Run
+        // all's all-or-nothing reservation refused the group.
+        Case("compare.estimate.a-cap-only-the-group-crosses-shows-before-run", async () =>
+        {
+            await using var host = CompareHost.Faux("cmp-group-preflight");
+            var column = new CompareColumnDraft { Provider = "faux", Model = "echo" };
+            var draft = new CompareDraft { Prompt = "group preflight", MaxTokens = 4_000, Columns = [column, column, column] };
+            var plan = ComparePlanner.Plan(draft, host.Engine).Columns[0].Plan!;
+            var executor = host.Services.GetRequiredService<GuardedRunExecutor>();
+            var guard = executor.Guard;
+            var ledger = host.Services.GetRequiredService<ISpendLedger>();
+            SpendCall Call(string run, string op = "") => new()
+            {
+                Provider = "faux",
+                Model = "echo",
+                Source = SpendSource.Compare,
+                Run = run,
+                Op = op,
+                InputBytes = CostEstimator.InputBytes(plan.Messages),
+                MaxTokens = plan.Spec.MaxTokens,
+            };
+            static string Verdicts(IEnumerable<SpendDecision> decisions) => string.Join("|", decisions.Select(decision => decision.Verdict.ToString().ToLowerInvariant()));
+            int Reservations() => ReadDb(host.Database, "SELECT COUNT(*) FROM spend_reservations", reader => reader.GetInt32(0)).Single();
+            async Task ClearCapsAsync()
+            {
+                foreach (var cap in await ledger.CapsAsync()) await ledger.RemoveCapAsync(cap.Id);
+            }
+            var alone = await guard.PreflightAsync(Call("probe"), withApprovals: false);
+            var worst = alone.Estimate.WorstMicros ?? throw new InvalidOperationException("the faux model is priced");
+            Check(worst > 0, "one column's worst case: " + worst);
+
+            // A run cap two columns fit and three do not: each column alone fits it; only the group's total crosses it.
+            await ledger.SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Run, worst * 5 / 2, CapAction.Block));
+            Equal(SpendVerdict.Allow, (await guard.PreflightAsync(Call("g-alone"), withApprovals: false)).Verdict, "one column alone fits the run cap");
+            SpendCall[] calls = [Call("g-1", "c1"), Call("g-1", "c2"), Call("g-1", "c3")];
+            var group = await guard.PreflightGroupAsync(calls, withApprovals: false);
+            Equal("allow|allow|block", Verdicts(group.Items), "the third column crosses the run cap with the two before it counted");
+            Check(!group.Allowed && group.Refused?.Verdict == SpendVerdict.Block, "the group would be refused");
+            var cause = group.Items[2].Causes.Single();
+            Check(cause is { Kind: SpendCauseKind.Cap, Cap.Period: CapPeriod.Run } && cause.GroupMicros == worst * 2 && cause.SpentMicros == worst * 2,
+                $"the cause says what the columns before it add: {cause.GroupMicros} of {cause.SpentMicros}");
+            Equal(null, group.Items[0].Causes.FirstOrDefault()?.GroupMicros, "a column that fits has no cause");
+            Equal(0, Reservations(), "a group preflight reserves nothing");
+            var requests = calls.Select(call => new SpendRequest { Op = call.Op, Source = call.Source, Run = call.Run, Estimate = alone.Estimate }).ToList();
+            Equal("allow|allow|block", Verdicts((await ledger.CheckGroupAsync(requests)).Items), "the ledger's group check is the reservation's rule");
+            Equal(0, Reservations(), "nor does the ledger's");
+            await ThrowsAsync<ArgumentException>(() => guard.PreflightGroupAsync([Call("g-1", "c1"), Call("g-1", "c1")]), "two calls of a group never share an op");
+            await ThrowsAsync<ArgumentException>(() => guard.PreflightGroupAsync([Call("g-1"), Call("g-2")]), "a group is one run");
+            await ThrowsAsync<ArgumentException>(() => guard.PreflightGroupAsync([]), "a group has a call");
+
+            // The estimate by Run all names the cap before Run, worded as the group's rather than the third column's.
+            var view = CompareEstimate.Build([.. group.Items.Select(decision => new CompareColumnEstimate("Echo", "Faux", decision))]);
+            Check(view is { Verdict: "block", Over: "Over run cap", Pane: "sc-chat", Chip: null }, $"the over-cap chip: {view.Verdict} {view.Over} {view.Pane}");
+            Check(view.Label.StartsWith("The columns together are over the ", StringComparison.Ordinal), "worded as the group's: " + view.Label);
+            Check(view.Tooltip.Contains(WebUtility.HtmlEncode($"Together they need up to {ChatSpendText.Money(worst * 3)}"), StringComparison.Ordinal) &&
+                view.Tooltip.Contains("can&#39;t send the group as it is", StringComparison.Ordinal), "what they need and what Run all does: " + view.Tooltip);
+            var planned = await host.Pages.EstimateAsync(draft);
+            Check(planned is { Verdict: "block", Over: "Over run cap", Pane: "sc-chat" } && planned.Label.StartsWith("The columns together", StringComparison.Ordinal),
+                $"the page's estimate says so before Run: {planned.Verdict} {planned.Over} {planned.Label}");
+            Equal(0, Reservations(), "and reserves nothing");
+            var refused = await host.Pages.RunAsync(draft);
+            Check(refused.Start is { Posted: false, Refusal.Code: SpendErrors.Blocked }, "Run all's reservation agrees: " + refused.Start.Refusal?.Code);
+            var two = await host.Pages.EstimateAsync(draft with { Columns = [column, column] });
+            Check(two is { Verdict: "allow", Over: null, Chip: not null }, $"two columns fit: {two.Verdict} {two.Chip}");
+
+            // A daily Ask cap only the group crosses: the chip asks first. A waiting approval of the run answers the group's preflight (unless
+            // left out), and the preflight never uses it up: the group's reservation still finds it.
+            await ClearCapsAsync();
+            await ledger.SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Day, worst * 5 / 2, CapAction.Ask));
+            var daily = await host.Pages.EstimateAsync(draft);
+            Check(daily is { Verdict: "ask", Over: "Over daily cap", Pane: "sc-period" } && daily.Tooltip.Contains("already used today", StringComparison.Ordinal) &&
+                daily.Tooltip.Contains("asks you first", StringComparison.Ordinal), $"a daily cap the group crosses asks before Run: {daily.Verdict} {daily.Over} {daily.Tooltip}");
+            Equal("allow|allow|ask", Verdicts((await guard.PreflightGroupAsync(calls)).Items), "no approval waits yet");
+            await guard.ApproveAsync(new SpendApproval("g-1", SpendChoice.ProceedOnce));
+            Check((await guard.PreflightGroupAsync(calls)).Allowed, "the run's waiting approval answers the group once");
+            Check(!(await guard.PreflightGroupAsync(calls, withApprovals: false)).Allowed, "not when approvals are left out (the estimate's check)");
+            await using (var leases = await executor.ReserveGroupAsync(calls))
+                Check(leases.Reserved, "the approval was still there for the group's reservation");
+            Equal("released|released|released", string.Join("|", ReadDb(host.Database, "SELECT state FROM spend_reservations WHERE run = 'g-1' ORDER BY op",
+                reader => reader.GetString(0))), "the leases never sent were released");
+
+            // A cap near its limit: one amber chip, at the group's total, not one per column that passes the threshold.
+            await ClearCapsAsync();
+            await ledger.SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Day, worst * 11, CapAction.Block));
+            for (var index = 0; index < 7; index++)
+                Check((await ledger.ReserveAsync(new SpendRequest { Op = $"earlier-{index}", Source = SpendSource.Compare, Run = "earlier", Estimate = alone.Estimate })).Reserved,
+                    "spent earlier today");
+            var near = await guard.PreflightGroupAsync([Call("g-3"), Call("g-3"), Call("g-3")], withApprovals: false);
+            Check(near.Allowed && near.Items[0].Warnings.Count == 0 && near.Items[1].Warnings.Count == 1 && near.Items[2].Warnings.Count == 1,
+                "the second and third columns pass 80% of the daily cap: " + string.Join("|", near.Items.Select(item => item.Warnings.Count)));
+            var amber = CompareEstimate.Build([.. near.Items.Select(decision => new CompareColumnEstimate("Echo", "Faux", decision))]);
+            Equal(1, amber.Warnings.Count, "one chip for the cap: " + string.Join(" | ", amber.Warnings.Select(warning => warning.Text)));
+            Check(amber.Warnings[0].Text.StartsWith($"{near.Items[2].Warnings[0].PercentShown}% of ", StringComparison.Ordinal) && amber is { Verdict: "allow", Over: null },
+                "at the whole group's share: " + amber.Warnings[0].Text);
+        }),
+
+        Case("compare.estimate.http-a-run-cap-only-the-group-crosses-asks-before-run", async () =>
+        {
+            var echo = new JsonObject { ["provider"] = "faux", ["model"] = "echo" };
+            var draft = new JsonObject { ["prompt"] = "the group's cap", ["maxTokens"] = 4096, ["columns"] = new JsonArray(echo.DeepClone(), echo.DeepClone(), echo.DeepClone()) };
+            long worst;
+            await using (var probe = CompareHost.Faux("cmp-group-http-probe"))
+            {
+                var plan = ComparePlanner.Plan(CompareDraft.Parse(draft), probe.Engine).Columns[0].Plan!;
+                worst = (await probe.Services.GetRequiredService<GuardedRunExecutor>().Guard.PreflightAsync(new SpendCall
+                {
+                    Provider = "faux",
+                    Model = "echo",
+                    Source = SpendSource.Compare,
+                    Run = "probe",
+                    InputBytes = CostEstimator.InputBytes(plan.Messages),
+                    MaxTokens = plan.Spec.MaxTokens,
+                }, withApprovals: false)).Estimate.WorstMicros ?? throw new InvalidOperationException("the faux model is priced");
+            }
+            var root = Temp("cmp-group-http");
+            try
+            {
+                await using var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = Path.Join(root, "data"), Arguments = ["--faux-metered"] });
+                var limit = (worst * 5 / 2 / 1_000_000m).ToString("0.######", CultureInfo.InvariantCulture);
+                var cap = await app.SendAsync(HttpMethod.Post, "/api/spend/caps",
+                    new JsonObject { ["scope"] = "everything", ["period"] = "run", ["limit"] = limit, ["action"] = "ask" }, origin: app.Origin);
+                Check(cap.Status == 200, "a per-run Ask cap two columns fit: " + cap.Text);
+                var plan = await app.SendAsync(HttpMethod.Post, "/api/compare/plan", draft.DeepClone(), origin: app.Origin);
+                var estimate = plan.Body?["estimate"];
+                Check(estimate?["verdict"]?.GetValue<string>() == "ask" && estimate["over"]?.GetValue<string>() == "Over run cap" && estimate["pane"]?.GetValue<string>() == "sc-chat",
+                    "the estimate by Run all asks before Run: " + plan.Text);
+                var html = estimate!["html"]?.GetValue<string>() ?? "";
+                Check(html.Contains("data-spend-over", StringComparison.Ordinal) && html.Contains("The columns together are over the", StringComparison.Ordinal),
+                    "the over-cap chip, worded as the group's: " + html);
+                var two = draft.DeepClone().AsObject();
+                two["columns"]!.AsArray().RemoveAt(2);
+                Equal("allow", (await app.SendAsync(HttpMethod.Post, "/api/compare/plan", two, origin: app.Origin)).Body?["estimate"]?["verdict"]?.GetValue<string>(),
+                    "two columns fit");
+                var asked = await app.SendAsync(HttpMethod.Post, "/api/compare/run", draft.DeepClone(), origin: app.Origin);
+                Check(asked.Status == 200 && asked.Body?["posted"]?.GetValue<bool>() == false && asked.Body["code"]?.GetValue<string>() == SpendErrors.Ask,
+                    "Run all's reservation agrees: asked, nothing sent: " + asked.Text);
                 Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
             }
             finally
