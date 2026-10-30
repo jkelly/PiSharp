@@ -4,6 +4,10 @@
 // inherited GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE family is cleared so the user's shell cannot redirect a command, prompts are off
 // (GIT_TERMINAL_PROMPT=0) and optional locks are skipped (GIT_OPTIONAL_LOCKS=0, so `git status` never takes the user's index lock).
 // No secret ever reaches a git command line: the arguments are paths, commit ids and fixed options.
+// Run W4 (fix): git runs no program of a repository's choosing either: every command gets core.fsmonitor=false (no fsmonitor hook) and
+// core.hooksPath=<workspaces root>\.no-hooks, a folder that is never created, so no hook runs (post-checkout on `worktree add`,
+// reference-transaction on `update-ref`). Command-line config wins over every config file. A worktree slot's commands also name its
+// repository explicitly (GIT_DIR and GIT_WORK_TREE, WorkspaceManager.Diff.cs), so the slot's own .git file is never read.
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
@@ -29,6 +33,19 @@ internal sealed record GitResult(int ExitCode, byte[] Output, string Error)
 /// <summary>Runs git commands.</summary>
 internal sealed class GitCommand(WorkspaceManagerOptions options)
 {
+    /// <summary>The name of the hooks folder every command points <c>core.hooksPath</c> at, under the workspaces root. It is never created,
+    /// so git finds no hook in it.</summary>
+    public const string NoHooksFolder = ".no-hooks";
+
+    /// <summary>The <c>-c</c> options every command starts with: UTF-8 paths, no fsmonitor, no hooks (and long paths on Windows).</summary>
+    public IReadOnlyList<string> GlobalOptions { get; } =
+    [
+        "-c", "core.quotepath=false",
+        "-c", "core.fsmonitor=false",
+        "-c", "core.hooksPath=" + Path.Join(options.Root, NoHooksFolder),
+        .. OperatingSystem.IsWindows() ? (string[])["-c", "core.longpaths=true"] : [],
+    ];
+
     // Variables that would point a command at another repository, index or object store.
     private static readonly string[] Cleared =
     [
@@ -58,13 +75,7 @@ internal sealed class GitCommand(WorkspaceManagerOptions options)
             CreateNoWindow = true,
             StandardErrorEncoding = Encoding.UTF8,
         };
-        info.ArgumentList.Add("-c");
-        info.ArgumentList.Add("core.quotepath=false");
-        if (OperatingSystem.IsWindows())
-        {
-            info.ArgumentList.Add("-c");
-            info.ArgumentList.Add("core.longpaths=true");
-        }
+        foreach (var argument in GlobalOptions) info.ArgumentList.Add(argument);
         foreach (var argument in arguments) info.ArgumentList.Add(argument);
         foreach (var name in Cleared) info.Environment.Remove(name);
         info.Environment["GIT_TERMINAL_PROMPT"] = "0";

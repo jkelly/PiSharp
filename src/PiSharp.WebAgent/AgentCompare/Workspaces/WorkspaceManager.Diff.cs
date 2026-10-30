@@ -8,6 +8,9 @@
 //    does not hide its changes); a file is changed when its size, or its time and bytes, differ. Each changed file gets `git diff
 //    --no-index` against the base (or /dev/null), with its header rewritten to name the relative path.
 // Every diff is made with --no-renames and --no-ext-diff/--no-textconv, so the user's diff drivers can't change what is shown or applied.
+// Run W4 (fix): a worktree slot's git commands name its repository folder and work tree (GIT_DIR, GIT_WORK_TREE; SlotGitAsync), recorded
+// when the worktree was made, and refuse to run when the slot's .git file no longer names that folder: an agent that rewrites .git can't
+// make git load a repository (and a config with filters or an fsmonitor command) of its own.
 using System.Text;
 
 namespace PiSharp.WebAgent.AgentCompare.Workspaces;
@@ -63,12 +66,66 @@ public sealed partial class WorkspaceManager
     private Task<byte[]> PatchAsync(WorkspaceManifest manifest, string folder, ManifestSlot entry, CancellationToken cancellationToken) =>
         manifest.Kind == WorkspaceKind.Worktree ? WorktreePatchAsync(manifest, folder, entry, cancellationToken) : CopyPatchAsync(manifest, folder, entry, cancellationToken);
 
+    // The variables of every git command in a worktree slot: its own repository folder (recorded when the worktree was made) and work
+    // tree, so git never finds a repository through <slot>\.git, which the agent could rewrite to plant a config (a filter, an fsmonitor
+    // command); and its private index. A .git file that no longer names that folder is refused: git does not run there at all.
+    private async Task<Dictionary<string, string?>> SlotGitAsync(WorkspaceManifest manifest, string folder, ManifestSlot entry, CancellationToken cancellationToken)
+    {
+        var path = SlotDirectory(manifest.Run, entry.Slot);
+        var admin = entry.GitDir ?? await FindGitDirAsync(manifest, folder, entry, path, cancellationToken).ConfigureAwait(false);
+        if (!NamesGitDir(path, admin))
+            throw new WorkspaceException(WorkspaceException.Tampered,
+                $"Workspace {entry.Slot.ToUpperInvariant()}'s .git file was changed and no longer names its own repository, so git won't run there. Discard this workspace.");
+        return new Dictionary<string, string?> { ["GIT_DIR"] = admin, ["GIT_WORK_TREE"] = path, ["GIT_INDEX_FILE"] = IndexFile(folder, entry.Slot) };
+    }
+
+    // Whether <slot>\.git is a plain file (not a link or a folder) whose gitdir line names <paramref name="admin"/>.
+    private static bool NamesGitDir(string path, string admin)
+    {
+        var dotGit = Path.Join(path, ".git");
+        try
+        {
+            var info = new FileInfo(dotGit);
+            if (!info.Exists || (info.Attributes & FileAttributes.ReparsePoint) != 0 || info.Length > 4096) return false;
+            var line = File.ReadLines(dotGit).FirstOrDefault()?.Trim();
+            return line is not null && line.StartsWith("gitdir:", StringComparison.Ordinal) &&
+                WorkspaceTree.SamePath(Path.GetFullPath(line["gitdir:".Length..].Trim(), path), admin);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    // A worktree made before its repository folder was recorded: the project's repository names it (the registration whose gitdir file
+    // points back at <slot>\.git, as git keeps it). Recorded from then on.
+    private async Task<string> FindGitDirAsync(WorkspaceManifest manifest, string folder, ManifestSlot entry, string path, CancellationToken cancellationToken)
+    {
+        if (manifest.RepoRoot is { } repo && Directory.Exists(repo))
+        {
+            var common = await git.RunAsync(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"], cancellationToken: cancellationToken).ConfigureAwait(false);
+            var registrations = common.Ok ? Path.Join(Path.GetFullPath(common.Line), "worktrees") : null;
+            if (registrations is not null && Directory.Exists(registrations))
+                foreach (var candidate in Directory.EnumerateDirectories(registrations))
+                {
+                    var back = Path.Join(candidate, "gitdir");
+                    var target = File.Exists(back) ? File.ReadLines(back).FirstOrDefault()?.Trim() : null;
+                    if (target is not { Length: > 0 } || !WorkspaceTree.SamePath(Path.GetFullPath(target, candidate), Path.Join(path, ".git"))) continue;
+                    entry.GitDir = Path.GetFullPath(candidate);
+                    manifest.Write(folder);
+                    return entry.GitDir;
+                }
+        }
+        throw new WorkspaceException(WorkspaceException.Tampered,
+            $"The project's repository no longer knows workspace {entry.Slot.ToUpperInvariant()} as a worktree, so git won't run there. Discard this workspace.");
+    }
+
     // Brings the slot's private index up to date with its worktree (tracked changes, plus the untracked files the rules allow).
     private async Task<Dictionary<string, string?>> StageAsync(WorkspaceManifest manifest, string folder, ManifestSlot entry, CancellationToken cancellationToken)
     {
         var path = SlotDirectory(manifest.Run, entry.Slot);
         var index = IndexFile(folder, entry.Slot);
-        var environment = new Dictionary<string, string?> { ["GIT_INDEX_FILE"] = index };
+        var environment = await SlotGitAsync(manifest, folder, entry, cancellationToken).ConfigureAwait(false);
         if (!File.Exists(index))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(index)!);

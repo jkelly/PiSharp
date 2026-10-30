@@ -309,6 +309,15 @@ internal static partial class Program
             Check(html.Contains("data-ac-approve-command", StringComparison.Ordinal) && html.Contains("Allow this command in all 2 workspaces", StringComparison.Ordinal)
                 && html.Contains("id=\"acAllowAllWarn\"", StringComparison.Ordinal), "Allow this command in all workspaces, with its warning");
             Check(html.Contains("data-ac-approve-all=\"allow\"", StringComparison.Ordinal) && html.Contains("data-ac-approve-all=\"deny\"", StringComparison.Ordinal), "Allow all and Deny all");
+            // Allow all and Deny all name the calls they answer (slot:taskId), the ones the banner counted, so a later call is never answered.
+            var shown = waiting.Models().SelectMany(model => model["approvals"]!.AsArray()
+                .Select(call => model.Str("slot") + ":" + call!["taskId"]!.GetValue<long>().ToString(System.Globalization.CultureInfo.InvariantCulture))).Order(StringComparer.Ordinal).ToList();
+            foreach (var decision in new[] { "allow", "deny" })
+            {
+                var listed = Regex.Match(html, $"data-ac-approve-all=\"{decision}\" data-ac-items=\"([^\"]*)\"").Groups[1].Value;
+                Check(listed.Split(' ', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal).SequenceEqual(shown),
+                    $"{decision} all lists the waiting calls ({string.Join(' ', shown)}): '{listed}'");
+            }
             Check(html.Contains("data-ac-stop-all", StringComparison.Ordinal) && !html.Contains("data-ac-sandbox>", StringComparison.Ordinal), "Stop all; Ask has no not-a-sandbox line");
 
             var fragment = await app.App.Get("/compare/agent/runs/" + id);

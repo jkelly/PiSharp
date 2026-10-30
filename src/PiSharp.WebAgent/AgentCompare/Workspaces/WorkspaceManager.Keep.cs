@@ -139,8 +139,9 @@ public sealed partial class WorkspaceManager
             if (files.Count == 0) return Refused(manifest, entry, KeepResult.Refusals.NothingToKeep, "This workspace has no changes to keep.", paths) with { Branch = branch };
             await git.RequireAsync(repo, ["check-ref-format", "--branch", branch], cancellationToken: cancellationToken).ConfigureAwait(false);
 
-            // The private index holds exactly what the diff showed: write it as a tree.
-            var index = new Dictionary<string, string?> { ["GIT_INDEX_FILE"] = IndexFile(folder, entry.Slot) };
+            // The private index holds exactly what the diff showed: write it as a tree (in the slot's own repository, never one its .git
+            // file names).
+            var index = await SlotGitAsync(manifest, folder, entry, cancellationToken).ConfigureAwait(false);
             var tree = (await git.RequireAsync(path, ["write-tree"], environment: index, cancellationToken: cancellationToken).ConfigureAwait(false)).Line;
             var reference = "refs/heads/" + branch;
             if (await ExistingKeepAsync(repo, reference, tree, manifest.BaseCommit!, cancellationToken).ConfigureAwait(false) is { } existing)

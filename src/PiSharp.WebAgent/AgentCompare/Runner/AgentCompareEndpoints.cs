@@ -13,7 +13,10 @@
 //                                              workspace, limits, approval, check, order, grants, spend, waiting, models: [model status]}.
 //   GET  /api/compare/agent/{run}/events       SSE: one "status" frame (the status JSON) now and after every change (coalesced), ": ping"
 //                                              every 15 s; it ends when the run is finished.
-//   POST /api/compare/agent/{run}/approve      {slot?, taskId?, decision: allow|deny, reason?, scope: call|command|all} -> {answers, status}.
+//   POST /api/compare/agent/{run}/approve      {slot?, taskId?, decision: allow|deny, reason?, scope: call|command|all, items?} -> {answers,
+//                                              status}. call: slot and taskId. command: allows exactly that call's command in every
+//                                              workspace. all: items [{slot, taskId}] (required) are the calls the page showed; only those
+//                                              still waiting are answered, and a call that started waiting since keeps waiting.
 //   POST /api/compare/agent/{run}/stop         {slot?} (none: every model) -> status.
 //   POST /api/compare/agent/{run}/continue     {slot, scope?: turn|run} -> status (a budget Ask: one more turn, or the rest of the run).
 //   GET  /api/compare/agent/{run}/diff         ?slot= -> R4's WorkspaceDiff (files, hunks, patch).
@@ -27,6 +30,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading.Channels;
 using PiSharp.WebAgent.AgentCompare.Workspaces;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
@@ -95,7 +99,8 @@ public static class AgentCompareEndpoints
             };
             var reason = Text(json, "reason");
             if (reason is { Length: > 2000 }) throw AgentCompareException.BadRequest("A reason is at most 2,000 characters.");
-            var answers = await runner.ApproveAsync(run, scope, Text(json, "slot"), Long(json, "taskId"), decision == "allow", reason, token).ConfigureAwait(false);
+            var answers = await runner.ApproveAsync(run, scope, Text(json, "slot"), Long(json, "taskId"), decision == "allow", reason, Items(json), token)
+                .ConfigureAwait(false);
             return Json(new JsonObject
             {
                 ["answers"] = JsonSerializer.SerializeToNode(answers, SettingsStore.JsonOptions),
@@ -214,12 +219,12 @@ public static class AgentCompareEndpoints
         }
         context.Response.Headers.ContentType = "text/event-stream";
         context.Response.Headers.CacheControl = "no-cache, no-transform";
-        var changed = new SemaphoreSlim(0, 1);
+        // The store raises Changed from a snapshot of its handlers, so OnChanged can still run after the stream ended: the signal is safe to
+        // set then (nothing is disposed), and OnChanged never throws into the store's caller (a model request or a state change).
+        var changed = new ChangeSignal();
         void OnChanged(string run)
         {
-            if (run != id) return;
-            try { if (changed.CurrentCount == 0) changed.Release(); }
-            catch (SemaphoreFullException) { /* Already signalled. */ }
+            if (run == id) changed.Set();
         }
         runner.Store.Changed += OnChanged;
         try
@@ -248,11 +253,22 @@ public static class AgentCompareEndpoints
         finally
         {
             runner.Store.Changed -= OnChanged;
-            changed.Dispose();
+            changed.Close();
         }
     }
 
     private static JsonObject Required(JsonObject? body) => body ?? throw AgentCompareException.BadRequest("Send a JSON body.");
+
+    // The calls an approve-all names: [{slot, taskId}], at most 200; null when the body has none.
+    private static List<AgentApprovalItem>? Items(JsonObject json) => json["items"] switch
+    {
+        null => null,
+        JsonArray items when items.Count > 200 => throw AgentCompareException.BadRequest("Answer at most 200 calls at once."),
+        JsonArray items => [.. items.Select(item => item is JsonObject call && Text(call, "slot") is { } slot && Long(call, "taskId") is { } task
+            ? new AgentApprovalItem(slot, task)
+            : throw AgentCompareException.BadRequest("Each item names a call: {slot, taskId}."))],
+        _ => throw AgentCompareException.BadRequest("items is a list of calls: [{slot, taskId}]."),
+    };
 
     private static string? Text(JsonObject? json, string name) =>
         json?[name] is JsonValue value && value.GetValueKind() == JsonValueKind.String && value.GetValue<string>() is { } text && text.Trim().Length > 0 ? text.Trim() : null;
@@ -321,6 +337,46 @@ public static class AgentCompareEndpoints
         catch (ArgumentException error)
         {
             return Error(StatusCodes.Status400BadRequest, AgentCompareException.Invalid, error.Message);
+        }
+    }
+}
+
+/// <summary>The wake-up of one event stream: a bounded channel of one that drops further writes, so any number of changes between two
+/// frames are one wake-up. <see cref="Set"/> is safe from any thread at any time, also after <see cref="Close"/> (it is then ignored), and
+/// never throws; nothing needs disposing.</summary>
+internal sealed class ChangeSignal
+{
+    private readonly Channel<bool> channel = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
+    {
+        FullMode = BoundedChannelFullMode.DropWrite,
+        SingleReader = true,
+    });
+
+    /// <summary>Marks a change (a no-op when one is already marked, or after <see cref="Close"/>).</summary>
+    public void Set() => channel.Writer.TryWrite(true);
+
+    /// <summary>Ends the signal: later <see cref="Set"/> calls are ignored and waits return false.</summary>
+    public void Close() => channel.Writer.TryComplete();
+
+    /// <summary>Waits up to <paramref name="timeout"/> for a change marked since the last wait.</summary>
+    /// <returns>True for a change; false after the timeout, or when the signal is closed.</returns>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+    public async Task<bool> WaitAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(timeout);
+        try
+        {
+            await channel.Reader.ReadAsync(limit.Token).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (ChannelClosedException)
+        {
+            return false;
         }
     }
 }

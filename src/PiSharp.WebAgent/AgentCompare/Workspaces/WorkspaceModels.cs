@@ -533,6 +533,9 @@ public sealed class WorkspaceException(string code, string message, Exception? i
     /// <summary>A git command ran past its time limit.</summary>
     public const string GitTimeout = "git-timeout";
 
+    /// <summary>A worktree's <c>.git</c> file no longer names its own repository (an agent rewrote it), so git is not run there.</summary>
+    public const string Tampered = "tampered";
+
     /// <summary>The code.</summary>
     public string Code { get; } = code;
 }

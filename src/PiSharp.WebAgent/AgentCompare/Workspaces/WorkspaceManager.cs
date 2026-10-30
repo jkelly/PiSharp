@@ -400,6 +400,9 @@ public sealed partial class WorkspaceManager
                 var path = SlotDirectory(manifest.Run, slot.Slot);
                 await git.RequireAsync(repo, ["worktree", "add", "--detach", "--quiet", path, baseCommit], timeout: options.CheckoutTimeout,
                     cancellationToken: cancellationToken).ConfigureAwait(false);
+                // The worktree's own repository folder, read now (before any agent can change its .git file) and used from then on.
+                slot.GitDir = Path.GetFullPath((await git.RequireAsync(path, ["rev-parse", "--absolute-git-dir"], cancellationToken: cancellationToken)
+                    .ConfigureAwait(false)).Line);
                 await SeedIndexAsync(folder, slot.Slot, path, cancellationToken).ConfigureAwait(false);
                 if (!Directory.Exists(WorkingDirectory(manifest, path)))
                     throw new WorkspaceException(WorkspaceException.Invalid,
@@ -451,8 +454,8 @@ public sealed partial class WorkspaceManager
     private async Task RemoveSlotAsync(WorkspaceManifest manifest, string folder, ManifestSlot slot, CancellationToken cancellationToken)
     {
         var path = SlotDirectory(manifest.Run, slot.Slot);
-        if (File.Exists(Path.Join(path, ".git")) && !WorkspaceTree.IsLink(path))
-            await RemoveWorktreeAsync(manifest.RepoRoot, path, cancellationToken).ConfigureAwait(false);
+        if ((File.Exists(Path.Join(path, ".git")) || slot.GitDir is not null) && !WorkspaceTree.IsLink(path))
+            await RemoveWorktreeAsync(manifest.RepoRoot, path, cancellationToken, slot.GitDir).ConfigureAwait(false);
         else await Task.Run(() => WorkspaceTree.Delete(path), cancellationToken).ConfigureAwait(false);
         foreach (var file in new[] { IndexFile(folder, slot.Slot), IndexFile(folder, slot.Slot) + ".lock" })
             if (File.Exists(file)) File.Delete(file);
@@ -469,25 +472,31 @@ public sealed partial class WorkspaceManager
         if (Directory.Exists(folder))
         {
             foreach (var child in Directory.EnumerateDirectories(folder).ToList())
-                if (!WorkspaceTree.IsLink(child) && File.Exists(Path.Join(child, ".git")))
-                    await RemoveWorktreeAsync(manifest?.RepoRoot, child, cancellationToken).ConfigureAwait(false);
+            {
+                var recorded = manifest?.Find(Path.GetFileName(child))?.GitDir;
+                if (!WorkspaceTree.IsLink(child) && (File.Exists(Path.Join(child, ".git")) || recorded is not null))
+                    await RemoveWorktreeAsync(manifest?.RepoRoot, child, cancellationToken, recorded).ConfigureAwait(false);
+            }
         }
         await Task.Run(() => WorkspaceTree.Delete(folder), cancellationToken).ConfigureAwait(false);
     }
 
     // Deletes the worktree's files ourselves (never following a link), then lets git remove what is left and the worktree's registration
     // (`git worktree remove --force`). Git is only asked when the repository's registration really points at this folder; if git can't do
-    // it (the repository moved, a file is locked), the folder is deleted and that one registration is removed directly.
-    private async Task RemoveWorktreeAsync(string? repoRoot, string path, CancellationToken cancellationToken)
+    // it (the repository moved, a file is locked), the folder is deleted and that one registration is removed directly. The registration
+    // is the one recorded when the worktree was made (an agent may have rewritten .git), else the one .git names; either way only when
+    // it points back at this worktree.
+    private async Task RemoveWorktreeAsync(string? repoRoot, string path, CancellationToken cancellationToken, string? recorded = null)
     {
         WorkspaceTree.Inside(Root, path);
         var dotGit = Path.Join(path, ".git");
-        var admin = Registration(dotGit);
+        var admin = Registration(dotGit, recorded);
         await Task.Run(() => WorkspaceTree.Delete(path, keepTopLevel: ".git"), cancellationToken).ConfigureAwait(false);
         if (admin is not null)
         {
             var cwd = repoRoot is not null && Directory.Exists(repoRoot) ? repoRoot : Path.GetDirectoryName(Path.GetDirectoryName(admin));
-            if (cwd is not null && Directory.Exists(cwd))
+            // Never from inside the workspaces (a registration an agent planted in its workspace would make git read its config).
+            if (cwd is not null && Directory.Exists(cwd) && !WorkspaceTree.IsWithin(Root, cwd))
             {
                 await projects.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
@@ -509,15 +518,21 @@ public sealed partial class WorkspaceManager
         if (admin is not null && Directory.Exists(admin)) await Task.Run(() => WorkspaceTree.Delete(admin), cancellationToken).ConfigureAwait(false);
     }
 
-    // The worktree's registration folder (<repo>\.git\worktrees\<name>), only when its gitdir file points back at this worktree's .git.
-    private static string? Registration(string dotGit)
+    // The worktree's registration folder (<repo>\.git\worktrees\<name>): the recorded one, else the one .git names; only when its gitdir
+    // file points back at this worktree's .git.
+    private static string? Registration(string dotGit, string? recorded = null)
     {
         try
         {
-            if (!File.Exists(dotGit)) return null;
-            var line = File.ReadLines(dotGit).FirstOrDefault()?.Trim();
-            if (line is null || !line.StartsWith("gitdir:", StringComparison.Ordinal)) return null;
-            var admin = Path.GetFullPath(line["gitdir:".Length..].Trim(), Path.GetDirectoryName(dotGit)!);
+            string admin;
+            if (recorded is not null) admin = Path.GetFullPath(recorded);
+            else
+            {
+                if (!File.Exists(dotGit)) return null;
+                var line = File.ReadLines(dotGit).FirstOrDefault()?.Trim();
+                if (line is null || !line.StartsWith("gitdir:", StringComparison.Ordinal)) return null;
+                admin = Path.GetFullPath(line["gitdir:".Length..].Trim(), Path.GetDirectoryName(dotGit)!);
+            }
             if (!string.Equals(Path.GetFileName(Path.GetDirectoryName(admin)), "worktrees", StringComparison.OrdinalIgnoreCase)) return null;
             var back = Path.Join(admin, "gitdir");
             if (!File.Exists(back)) return null;
