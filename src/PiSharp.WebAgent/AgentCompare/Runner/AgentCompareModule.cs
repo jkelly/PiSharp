@@ -1,6 +1,7 @@
 // Decision 0011 (run W4, R5): registers the agent compare runner. Program.cs calls AddAgentCompareRunner after AddRunsArea (so the models the
 // device gets are the runs.db recorder over the Spend Guard) and MapAgentCompareRunner before the core's endpoints:
-//   - webagent.db migration 580 (agent_compare_runs, agent_compare_turns) and AgentCompareStore, AgentCompareGate, AgentCompareRunner;
+//   - webagent.db migrations 580 (agent_compare_runs, agent_compare_turns) and 585 (agent_compare_patches, W4 fix 2) and AgentCompareStore,
+//     AgentCompareGate, AgentCompareRunner;
 //   - the runner is a hosted lifecycle service (registered after DeviceHostService, so it is started after the device and stopped before
 //     it; its StartingAsync attaches the approval override before the device opens) and the janitor's IWorkspaceActivity;
 //   - DeviceHostService's registration is replaced by the same service built over AgentCompareModels (the gate over the app's
@@ -26,6 +27,7 @@ public static class AgentCompareModule
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
         services.AddWebAgentMigration(AgentCompareStore.Migration);
+        services.AddWebAgentMigration(AgentCompareStore.PatchMigration);
         services.TryAddSingleton(provider => new AgentCompareStore(provider.GetRequiredService<WebAgentDb>(), provider.GetService<ILogger<AgentCompareStore>>()));
         services.TryAddSingleton(provider => new AgentCompareGate(provider.GetRequiredService<AgentCompareStore>(), provider,
             provider.GetService<ILogger<AgentCompareGate>>()));

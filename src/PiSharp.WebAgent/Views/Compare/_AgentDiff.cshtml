@@ -2,8 +2,9 @@
    are against and which workspace, the A/B/C switch, then the file list (left) and the unified diff of each file (right; stacked below
    768px). Lines stay neutral: + and − lines differ by background, weight and the marker, never by status colour. The diff is R4's
    (WorkspaceDiff) and every line is text (encoded). At most AgentDiffView.MaxLines lines are drawn; Copy patch copies the whole patch. A
-   discarded workspace has no diff any more: the files it changed (kept with the run) are listed instead. Footer: Copy patch, Open as chat
-   and Keep x while the model's workspace is there. Model: AgentDiffView. *@
+   discarded workspace (or one the cleanup removed) shows the diff kept with the run instead (W4 fix 2), with a note; a kept patch cut at
+   1 MB lists the files it has no room for, and Copy patch is not offered then. With no kept patch, the files it changed (kept with the run)
+   are listed. Footer: Copy patch, Open as chat and Keep x while the model's workspace is there. Model: AgentDiffView. *@
 @using PiSharp.WebAgent.AgentCompare.Pages
 @using PiSharp.WebAgent.AgentCompare.Workspaces
 @model AgentDiffView
@@ -34,6 +35,10 @@
     @if (Model.Error is { } error)
     {
       <div class="alert alert-secondary py-2 px-3 fs-7" role="status">@error</div>
+    }
+    @if (Model.StoredNote is { } storedNote)
+    {
+      <div class="alert alert-secondary py-2 px-3 fs-7" role="status" data-ac-diff-stored>@storedNote</div>
     }
     @if (diff is not null)
     {
@@ -95,6 +100,16 @@
           </div>
         </div>
       }
+      if (Model.OmittedFiles.Count > 0)
+      {
+        <div class="ps-label mt-3 mb-1">Not in the kept patch</div>
+        <ul class="ac-files" data-ac-diff-omitted>
+          @foreach (var file in Model.OmittedFiles)
+          {
+            <li><span class="ac-path">@file.Path</span><span class="ac-delta">@AgentColumnView.Delta(file)</span></li>
+          }
+        </ul>
+      }
     }
     else if (column.State.Diff is { } stored)
     {
@@ -109,7 +124,7 @@
   </div>
   <div class="modal-footer">
     <div class="d-flex flex-wrap gap-2 me-auto">
-      @if (diff is { Patch.Length: > 0 })
+      @if (Model.CanCopyPatch)
       {
         <button type="button" class="btn btn-ghost" data-ac-copy-patch="@slot"><i class="bi bi-copy me-1" aria-hidden="true"></i>Copy patch</button>
       }

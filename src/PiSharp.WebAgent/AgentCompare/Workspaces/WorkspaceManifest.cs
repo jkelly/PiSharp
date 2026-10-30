@@ -1,8 +1,8 @@
 // Decision 0011 (run W4, unit R4): a run's manifest, <root>\<run>\.meta\run.json. It is written with state "creating" before anything is
 // made and "ready" once every workspace exists, so a run folder without a manifest, or one still "creating", is a leftover of a crash and
 // the startup cleanup removes it. It records what the workspaces were made from (project, repository, base commit, excludes, the
-// uncommitted changes left out, the copy rules from above the project) and each slot's state, so diffs, Apply and Keep work after a
-// restart. Writes go to a temporary file first and then replace the manifest.
+// uncommitted changes left out, the copy rules from above the project and whether the copies honour .gitignore) and each slot's state, so
+// diffs, Apply and Keep work after a restart. Writes go to a temporary file first and then replace the manifest.
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -106,8 +106,11 @@ internal sealed class WorkspaceManifest
     /// <summary>The exclude patterns (default and extra).</summary>
     public List<string> Excludes { get; set; } = [];
 
-    /// <summary>Gitignore sources above the project (copies), outermost first.</summary>
+    /// <summary>Gitignore sources above the project (copies), outermost first; empty when <see cref="UseGitignore"/> is off.</summary>
     public List<ManifestIgnore> OuterIgnores { get; set; } = [];
+
+    /// <summary>Whether the copies skip what .gitignore lists (a manifest written before the switch existed has none, and did).</summary>
+    public bool UseGitignore { get; set; } = true;
 
     /// <summary>The uncommitted changes the worktrees do not have.</summary>
     public List<UncommittedChange> NotCopied { get; set; } = [];

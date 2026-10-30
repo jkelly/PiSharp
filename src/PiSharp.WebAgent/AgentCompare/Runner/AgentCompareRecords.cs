@@ -143,6 +143,10 @@ public sealed record AgentCompareSpec
     /// <summary>Extra excludes of a copy.</summary>
     public IReadOnlyList<string> ExtraExcludes { get; init; } = [];
 
+    /// <summary>Whether a copy also skips what .gitignore lists (the agent compare defaults' <c>useGitignore</c> unless the create request
+    /// names it; a run stored before the switch existed has none, and did).</summary>
+    public bool UseGitignore { get; init; } = true;
+
     /// <summary>A copy larger than this needs <see cref="ConfirmLargeCopy"/>.</summary>
     public long WarnAboveBytes { get; init; } = WorkspaceManagerOptions.DefaultWarnAboveBytes;
 
@@ -437,6 +441,9 @@ public sealed record AgentCompareCreateRequest
 
     /// <summary>Extra excludes (on top of the defaults' and the settings').</summary>
     public IReadOnlyList<string>? ExtraExcludes { get; init; }
+
+    /// <summary>Whether a copy also skips what .gitignore lists, or null for the agent compare defaults' setting.</summary>
+    public bool? UseGitignore { get; init; }
 
     /// <summary>Confirms a copy larger than the warning size.</summary>
     public bool ConfirmLargeCopy { get; init; }

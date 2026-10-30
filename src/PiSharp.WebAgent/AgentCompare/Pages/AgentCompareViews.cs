@@ -312,6 +312,9 @@ public sealed record AgentWorkspaceView
     /// <summary>A copy above this asks first.</summary>
     public long WarnAboveBytes { get; init; } = (long)(AgentCompareSettings.DefaultCopyWarnGb * AgentCompareSettings.BytesPerGb);
 
+    /// <summary>Whether a copy also skips what .gitignore lists (Settings › Tools, or what the run was made with).</summary>
+    public bool UseGitignore { get; init; } = true;
+
     /// <summary>Where the run's workspaces are (read-only), or the workspaces root (setup).</summary>
     public required string Directory { get; init; }
 
@@ -820,7 +823,8 @@ public sealed record AgentDiffView
     /// <summary>The column.</summary>
     public required AgentColumnView Column { get; init; }
 
-    /// <summary>R4's diff, or null (discarded, or not available: <see cref="Error"/>).</summary>
+    /// <summary>R4's diff: the workspace's own, or once it is gone the one kept with the run (<see cref="Stored"/>); null when neither is
+    /// there (<see cref="Error"/>).</summary>
     public WorkspaceDiff? Diff { get; init; }
 
     /// <summary>Why the diff is not shown, or null.</summary>
@@ -832,17 +836,52 @@ public sealed record AgentDiffView
     /// <summary>What the diff is against.</summary>
     public string BaseLabel => Diff?.BaseLabel ?? Run.Workspace?.BaseLabel ?? "the base";
 
+    /// <summary>Whether <see cref="Diff"/> is the one kept with the run, because the workspace is gone (W4 fix 2).</summary>
+    public bool Stored => Diff?.StoredAt is not null;
+
+    /// <summary>For a kept diff: what it is ("This workspace was discarded; …"), and what the kept patch left out; else null.</summary>
+    public string? StoredNote
+    {
+        get
+        {
+            if (Diff is not { StoredAt: not null } diff) return null;
+            var note = Column.State.Discarded
+                ? "This workspace was discarded; this is its diff as kept with the run."
+                : "This workspace isn't there any more (the cleanup removes workspaces after a while); this is its diff as kept with the run.";
+            if (diff.OmittedFiles > 0)
+                note += $" The kept patch was cut at {WorkspaceText.Size(AgentCompareStore.MaxPatchBytes)}, so {AgentText.Count(diff.OmittedFiles, "more changed file")} "
+                    + (diff.OmittedFiles == 1 ? "is" : "are") + " listed below without lines.";
+            return note;
+        }
+    }
+
+    /// <summary>For a kept diff cut at the size limit: the changed files (as the run lists them) whose lines it has no room for.</summary>
+    public IReadOnlyList<AgentDiffFile> OmittedFiles
+    {
+        get
+        {
+            if (Diff is not { StoredAt: not null, OmittedFiles: > 0 } diff || Column.State.Diff is not { } listed) return [];
+            var kept = diff.Files.Select(file => file.Path).ToHashSet(StringComparer.Ordinal);
+            return [.. listed.Items.Where(file => !kept.Contains(file.Path))];
+        }
+    }
+
+    /// <summary>Whether Copy patch is offered: a diff with a patch that holds every changed file.</summary>
+    public bool CanCopyPatch => Diff is { Patch.Length: > 0, OmittedFiles: 0 };
+
     /// <summary>The subtitle: "3 files · +31 −9 · against main @ 4f9c2e1 · workspace b".</summary>
     public string Subtitle
     {
         get
         {
-            var summary = Diff?.Summary ?? Column.State.Diff?.Summary;
+            // A kept patch cut at the size limit counts only its own files; the run's list counts them all.
+            var summary = Diff is { OmittedFiles: > 0 } ? Column.State.Diff?.Summary ?? Diff.Summary : Diff?.Summary ?? Column.State.Diff?.Summary;
             var parts = new List<string>();
             if (summary is not null) parts.Add(summary);
             parts.Add("against " + BaseLabel);
             var workspace = "workspace " + Column.Slot;
             if (Column.State.Discarded) workspace += " (discarded)";
+            else if (Stored) workspace += " (removed)";
             else if (Column.State.Kept?.Outcome == KeepOutcome.Applied) workspace += " · applied to your project";
             else if (Column.State.Kept?.Outcome == KeepOutcome.BranchCreated) workspace += " · kept as branch " + Column.State.Kept.Branch;
             else if (Column.State.Phase != AgentModelPhase.Done) workspace += " · still running: the changes so far";

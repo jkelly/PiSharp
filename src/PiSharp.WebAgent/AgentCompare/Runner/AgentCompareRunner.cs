@@ -5,7 +5,8 @@
 // the models are started in a shuffled order (stored). Each session is bound to its model's account (chosen when the run was created and never
 // switched), and AgentCompareGate gives it its own Spend Guard run key (<run>-<slot>) and an equal share of the run cap among the metered
 // models; turn, time and budget limits stop only that model. When a model stops, the check command runs in its working directory with a
-// timeout (default 10 minutes; exit code and output tail kept), then its changes are summarized (R4's diff) and the model is done; a model the
+// timeout (default 10 minutes; exit code and output tail kept), then its changes are summarized (R4's diff; the patch itself is kept with the
+// run, AgentCompareStore.SavePatch, so the diff outlives its workspace: W4 fix 2) and the model is done; a model the
 // user stopped is not checked. The run's approval mode replaces Settings › Tools for its sessions (WebApproval's override, attached before the
 // device opens); approvals queue per model and can be answered for all models at once (AgentCompareRunner.Actions).
 //
@@ -149,6 +150,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         IReadOnlyList<string> excludes;
         try { excludes = AgentCompareSettings.NormalizeExcludes([.. defaults.ExtraExcludes ?? [], .. request.ExtraExcludes ?? []]); }
         catch (ArgumentException error) { throw AgentCompareException.BadRequest(error.Message); }
+        var useGitignore = request.UseGitignore ?? defaults.UseGitignore;
         var maxTurns = request.MaxTurns ?? defaults.MaxTurns;
         if (maxTurns is < 1 or > AgentCompareSettings.MaxTurnsLimit) throw AgentCompareException.BadRequest($"Give each model 1 to {AgentCompareSettings.MaxTurnsLimit} turns.");
         var maxMinutes = request.MaxMinutes ?? defaults.MaxMinutes;
@@ -172,6 +174,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
             {
                 Isolation = isolation,
                 ExtraExcludes = excludes,
+                UseGitignore = useGitignore,
                 Slots = request.Models.Count,
                 WarnAboveBytes = defaults.CopyWarnBytes,
                 EstimateCopy = false,
@@ -213,6 +216,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 Isolation = isolation,
                 BaseRef = string.IsNullOrWhiteSpace(request.BaseRef) ? null : request.BaseRef.Trim(),
                 ExtraExcludes = excludes,
+                UseGitignore = useGitignore,
                 WarnAboveBytes = defaults.CopyWarnBytes,
                 ConfirmLargeCopy = request.ConfirmLargeCopy,
                 CheckCommand = check,
@@ -345,6 +349,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 Isolation = run.Spec.Isolation,
                 BaseRef = run.Spec.BaseRef,
                 ExtraExcludes = run.Spec.ExtraExcludes,
+                UseGitignore = run.Spec.UseGitignore,
                 WarnAboveBytes = run.Spec.WarnAboveBytes,
                 ConfirmLargeCopy = run.Spec.ConfirmLargeCopy,
             }, token).ConfigureAwait(false);
@@ -544,14 +549,9 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
             try
             {
                 var diff = await workspaces.DiffAsync(id, slot, token).ConfigureAwait(false);
-                summary = new AgentDiffSummary
-                {
-                    Files = diff.Files.Count,
-                    Added = diff.Added,
-                    Removed = diff.Removed,
-                    Summary = diff.Summary,
-                    Items = [.. diff.Files.Take(200).Select(file => new AgentDiffFile(file.Path, file.Change, file.Added, file.Removed, file.Binary))],
-                };
+                summary = Summarize(diff);
+                // Kept with the run now too, so the diff outlives a workspace the cleanup removes after 7 days (Discard keeps it again).
+                KeepPatch(id, slot, diff);
             }
             catch (Exception error) when (error is WorkspaceException or IOException or InvalidOperationException && !token.IsCancellationRequested)
             {
@@ -560,6 +560,26 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         }
         store.UpdateModel(id, slot, state => state with { Diff = summary ?? state.Diff, Phase = AgentModelPhase.Done, EndedAt = state.EndedAt ?? DateTimeOffset.UtcNow });
         FinishChildRow(id, slot);
+    }
+
+    /// <summary>What a model changed, as the run keeps it: the counts and the first 200 files.</summary>
+    private static AgentDiffSummary Summarize(WorkspaceDiff diff) => new()
+    {
+        Files = diff.Files.Count,
+        Added = diff.Added,
+        Removed = diff.Removed,
+        Summary = diff.Summary,
+        Items = [.. diff.Files.Take(200).Select(file => new AgentDiffFile(file.Path, file.Change, file.Added, file.Removed, file.Binary))],
+    };
+
+    // Keeps the slot's patch with the run (AgentCompareStore.SavePatch); a failure is logged, never thrown (the run goes on without it).
+    private void KeepPatch(string id, string slot, WorkspaceDiff diff)
+    {
+        try { store.SavePatch(id, slot, diff.Patch); }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            log.LogWarning(error, "Agent compare run {Run}: the patch of model {Slot} could not be kept with the run.", id, slot);
+        }
     }
 
     private void FinishRun(string id)
@@ -815,6 +835,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         ["checkCommand"] = run.Spec.CheckCommand,
         ["checkTimeoutSeconds"] = run.Spec.CheckTimeoutSeconds,
         ["isolation"] = JsonSerializer.SerializeToNode(run.Spec.Isolation, SettingsStore.JsonOptions),
+        ["useGitignore"] = run.Spec.UseGitignore,
         ["projectPath"] = run.Spec.ProjectPath,
     };
 

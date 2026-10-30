@@ -3,7 +3,8 @@
 //    so --data moves it). The project's uncommitted changes are listed (ProjectInspection.Uncommitted, WorkspaceRun.NotCopied) and are not
 //    copied: every model starts from the same commit.
 //  - Other folders (or Isolation = Copy): a pristine base copy (<run>\base) plus one working copy per model, skipping bin, obj,
-//    node_modules, .vs, .git, anything .gitignore ignores and the extra excludes; a copy above 1 GB needs the user's go-ahead.
+//    node_modules, .vs, .git, the extra excludes and (unless the run turns UseGitignore off, W4 fix 2) anything .gitignore ignores; a copy
+//    above 1 GB needs the user's go-ahead. The run's manifest records the switch, so its diffs and Apply walk the copies the same way.
 //  - Diff (WorkspaceManager.Diff.cs), Apply and Keep the branch (WorkspaceManager.Keep.cs), Discard and the cleanup (here): leftovers of an
 //    unfinished run are removed at start, and every workspace older than the retention (7 days) is removed at start and once a day
 //    (WorkspaceJanitor).
@@ -142,7 +143,7 @@ public sealed partial class WorkspaceManager
         TreeListing? listing = null;
         if (inspect.EstimateCopy || kind == WorkspaceKind.Copy)
         {
-            var rules = CopyRules(excludes, OuterIgnores(facts.RepoRoot, facts.Subpath), rulesRoot: null);
+            var rules = CopyRules(excludes, inspect.UseGitignore ? OuterIgnores(facts.RepoRoot, facts.Subpath) : [], rulesRoot: null, inspect.UseGitignore);
             listing = await Task.Run(() => WorkspaceTree.Walk(project, rules, options.EstimateFileLimit, cancellationToken), cancellationToken).ConfigureAwait(false);
         }
         return new ProjectInspection
@@ -166,6 +167,7 @@ public sealed partial class WorkspaceManager
             SkippedLinks = listing?.Links ?? [],
             Unreadable = listing?.Unreadable ?? [],
             Excludes = excludes,
+            UseGitignore = inspect.UseGitignore,
             WarnAboveBytes = inspect.WarnAboveBytes ?? options.WarnAboveBytes,
             WorkspacesRoot = Root,
         };
@@ -222,6 +224,7 @@ public sealed partial class WorkspaceManager
                 CreatedAt = now,
                 ExpiresAt = now + options.Retention,
                 Excludes = [.. excludes],
+                UseGitignore = request.UseGitignore,
                 Slots = [.. slots.Select(slot => new ManifestSlot { Slot = slot.Slot, Label = slot.Label })],
             };
 
@@ -229,8 +232,8 @@ public sealed partial class WorkspaceManager
             TreeListing? listing = null;
             if (kind == WorkspaceKind.Copy)
             {
-                manifest.OuterIgnores = OuterIgnores(facts.RepoRoot, facts.Subpath);
-                var rules = CopyRules(excludes, manifest.OuterIgnores, rulesRoot: null);
+                manifest.OuterIgnores = request.UseGitignore ? OuterIgnores(facts.RepoRoot, facts.Subpath) : [];
+                var rules = CopyRules(excludes, manifest.OuterIgnores, rulesRoot: null, manifest.UseGitignore);
                 listing = await Task.Run(() => WorkspaceTree.Walk(project, rules, null, cancellationToken), cancellationToken).ConfigureAwait(false);
                 var limit = request.WarnAboveBytes ?? options.WarnAboveBytes;
                 if (listing.Bytes > limit && !request.ConfirmLargeCopy)
@@ -300,8 +303,9 @@ public sealed partial class WorkspaceManager
         Task.Run(() => WorkspaceTree.Measure(Root, cancellationToken), cancellationToken);
 
     /// <summary>Removes one workspace (<c>git worktree remove</c>, or a folder delete for a copy); when it was the run's last, the run
-    /// folder goes too. Never follows a link out of the workspace. The workspace's diff is not kept: read it with
-    /// <see cref="DiffAsync"/> first if the run should keep it.</summary>
+    /// folder goes too. Never follows a link out of the workspace. The workspace's diff is not kept here: read it with
+    /// <see cref="DiffAsync"/> first and keep its patch with the run (the agent compare runner does, and <see cref="WorkspacePatch.Read"/>
+    /// reads it back).</summary>
     /// <returns>Whether there was a workspace to remove.</returns>
     public async Task<bool> DiscardAsync(string run, string slot, CancellationToken cancellationToken = default)
     {
@@ -620,6 +624,7 @@ public sealed partial class WorkspaceManager
             ExpiresAt = manifest.ExpiresAt,
             Directory = folder,
             Excludes = manifest.Excludes,
+            UseGitignore = manifest.UseGitignore,
             NotCopied = manifest.NotCopied,
             SkippedLinks = manifest.SkippedLinks,
             Unreadable = manifest.Unreadable,
@@ -733,11 +738,14 @@ public sealed partial class WorkspaceManager
     private static IgnoreList ExcludePatterns(IEnumerable<string> excludes) => IgnoreList.Parse(excludes.Select(pattern =>
         WorkspaceManagerOptions.DefaultExcludes.Contains(pattern, StringComparer.Ordinal) && pattern != ".git" ? pattern + "/" : pattern));
 
-    private TreeRules CopyRules(IEnumerable<string> excludes, IEnumerable<ManifestIgnore> outer, string? rulesRoot)
+    // The rules a copy is walked with: the excludes always; with useGitignore, the gitignore sources above the project (outer) and the
+    // walked tree's own .gitignore files too.
+    private TreeRules CopyRules(IEnumerable<string> excludes, IEnumerable<ManifestIgnore> outer, string? rulesRoot, bool useGitignore)
     {
         var stack = IgnoreStack.Empty;
-        foreach (var source in outer) stack = stack.Push(IgnoreList.Parse(source.Lines, "", source.Prefix));
-        return new TreeRules(ExcludePatterns(excludes), stack, rulesRoot, [Root]);
+        if (useGitignore)
+            foreach (var source in outer) stack = stack.Push(IgnoreList.Parse(source.Lines, "", source.Prefix));
+        return new TreeRules(ExcludePatterns(excludes), stack, rulesRoot, [Root], useGitignore);
     }
 
     // The gitignore sources above the project inside its repository, outermost first: info/exclude, then each parent's .gitignore.

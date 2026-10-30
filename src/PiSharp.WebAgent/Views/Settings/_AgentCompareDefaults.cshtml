@@ -1,8 +1,8 @@
 @* Decision 0011 (run W4, R6): settings-tools.html's _AgentCompareDefaults (section "agentCompare", R5's AgentCompareSettings): the defaults
    of Compare's agent mode, which each run may change for itself under Limits. Isolation (Automatic, or Always a temporary copy; Git
    worktree only shows when it is the stored value), the folders a copy skips on top of bin, obj, node_modules, .vs and .git, whether a
-   copy also skips .gitignore patterns (shown disabled with its stored value: R4 always honours .gitignore today, so the switch is not
-   applied yet), the copy size that asks first, the turn and time limits, the check timeout, and the tool approval for agent runs (Ask,
+   copy also skips .gitignore patterns (W4 fix 2: a switch the runner passes to the workspace manager for new runs), the copy size that
+   asks first, the turn and time limits, the check timeout, and the tool approval for agent runs (Ask,
    Allow-list, Auto in workspaces), whose description swaps with the choice: Allow-list and Auto say in plain text that workspaces are
    copies, not sandboxes. Its own form (not a [data-settings-form]: compare-agent-defaults.js saves it through POST
    /api/settings/agent-compare and Reset to defaults through POST /api/settings/agent-compare/reset) with its own save bar.
@@ -50,9 +50,9 @@
         <label class="visually-hidden" for="acDefExcludes">Folders to skip in temporary copies</label>
         <input class="form-control form-control-sm font-monospace" id="acDefExcludes" name="extraExcludes" value="@string.Join(", ", settings.ExtraExcludes ?? [])" placeholder="e.g. artifacts, *.log" spellcheck="false" maxlength="4000" data-ac-default="extraExcludes">
         <div class="form-check form-switch mt-2 mb-0">
-          <input class="form-check-input" type="checkbox" role="switch" id="acDefGitignore" checked="@settings.UseGitignore" disabled aria-describedby="acDefGitignoreNote">
+          <input class="form-check-input" type="checkbox" role="switch" id="acDefGitignore" name="useGitignore" checked="@settings.UseGitignore" aria-describedby="acDefGitignoreNote" data-ac-default="useGitignore">
           <label class="form-check-label fs-7" for="acDefGitignore">Also skip <span class="ps-mono">.gitignore</span> patterns</label>
-          <div class="form-text" id="acDefGitignoreNote">Copies always skip what .gitignore lists for now, so this can't be turned off yet.</div>
+          <div class="form-text" id="acDefGitignoreNote">On, a copy leaves out what the project's .gitignore lists (build output, logs, local settings). Off, those files are copied too, so each copy is larger; the folders above are skipped either way.</div>
         </div>
       </div>
     </div>

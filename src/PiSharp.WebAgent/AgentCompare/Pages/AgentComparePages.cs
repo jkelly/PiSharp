@@ -185,6 +185,7 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
             Directory = Workspaces?.Options.Root ?? WorkspaceManagerOptions.FolderName,
             Slots = slots,
             WarnAboveBytes = defaults.CopyWarnBytes,
+            UseGitignore = defaults.UseGitignore,
             RetentionDays = Retention(),
             Note = note,
         };
@@ -204,6 +205,7 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
             {
                 Isolation = requested,
                 ExtraExcludes = AgentCompareSettings.NormalizeExcludes([.. settingsExcludes, .. extra]),
+                UseGitignore = defaults.UseGitignore,
                 Slots = slots.Count,
                 WarnAboveBytes = defaults.CopyWarnBytes,
             }, cancellationToken).ConfigureAwait(false);
@@ -234,6 +236,7 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
                 ExtraExcludes = extra,
                 SkippedLinks = inspection.SkippedLinks,
                 WarnAboveBytes = inspection.WarnAboveBytes,
+                UseGitignore = inspection.UseGitignore,
                 Directory = inspection.WorkspacesRoot,
                 Slots = slots,
                 RetentionDays = Retention(),
@@ -281,6 +284,7 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
             ExtraExcludes = info is { Excludes.Count: > 0 } ? [] : run.Spec.ExtraExcludes,
             SkippedLinks = info?.SkippedLinks ?? [],
             WarnAboveBytes = run.Spec.WarnAboveBytes,
+            UseGitignore = run.Spec.UseGitignore,
             Directory = info?.Directory ?? Path.Join(Workspaces?.Options.Root ?? WorkspaceManagerOptions.FolderName, run.Id),
             Slots = [.. run.Models.Select(model => model.Slot)],
             RetentionDays = Retention(),
@@ -298,8 +302,9 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
         if (view.Columns.FirstOrDefault(column => column.Slot == slot.Trim().ToLowerInvariant()) is not { } column) return null;
         WorkspaceDiff? diff = null;
         string? error = null;
-        if (column.State.Discarded) error = "This workspace was discarded, so its line-by-line diff is gone. The files it changed are kept with the run.";
-        else if (column.State.WorkspacePath is null) error = view.Run.State == AgentRunState.Failed ? "This model never ran: its workspace was not made." : "Its workspace is still being made.";
+        // A discarded workspace (or one the cleanup removed) shows the diff kept with the run (W4 fix 2); without one, its file list.
+        if (column.State.WorkspacePath is null)
+            error = view.Run.State == AgentRunState.Failed ? "This model never ran: its workspace was not made." : "Its workspace is still being made.";
         else
         {
             try { diff = await Runner!.DiffAsync(view.Id, column.Slot, cancellationToken).ConfigureAwait(false); }

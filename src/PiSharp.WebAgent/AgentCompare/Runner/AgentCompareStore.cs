@@ -7,12 +7,28 @@
 // Changed is raised from Add, Update and Touch, which the gate (every admitted model request) and the runner (every state change) call, so
 // each handler is invoked on its own and a handler that throws is logged and skipped: a subscriber (such as an event stream whose tab just
 // closed) can never fail a model's request or a state change.
+// W4 fix 2 (workspaces): agent_compare_patches (migration 585) keeps each model's patch with its run (the runner saves it when the model is
+// done and again just before its workspace is discarded), so the diff modal can still show a model's lines once its workspace is gone. It is
+// a table of its own, read only when a diff is asked for, so a large patch never rides along in the run's JSON, in memory or in the status
+// frames. A patch above MaxPatchBytes is cut at whole files (WorkspacePatch.Cut) and records how many files it left out.
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
+using PiSharp.WebAgent.AgentCompare.Workspaces;
 using PiSharp.WebAgent.Data;
 
 namespace PiSharp.WebAgent.AgentCompare.Runner;
+
+/// <summary>A model's patch as kept with its run (<see cref="AgentCompareStore.SavePatch"/>).</summary>
+/// <param name="Patch">The patch text (whole files only; cut at <see cref="AgentCompareStore.MaxPatchBytes"/>).</param>
+/// <param name="Files">How many changed files the patch had.</param>
+/// <param name="KeptFiles">How many of them <paramref name="Patch"/> holds.</param>
+/// <param name="Saved">When it was kept.</param>
+public sealed record AgentKeptPatch(string Patch, int Files, int KeptFiles, DateTimeOffset Saved)
+{
+    /// <summary>Changed files the kept patch has no room for.</summary>
+    public int OmittedFiles => Math.Max(0, Files - KeptFiles);
+}
 
 /// <summary>Agent compare runs in webagent.db. A singleton; safe to call from many threads.</summary>
 public sealed class AgentCompareStore
@@ -36,6 +52,22 @@ public sealed class AgentCompareStore
             PRIMARY KEY (model_key, op)
         );
         """);
+
+    /// <summary>The kept patches (W4 fix 2): one row per model, replaced when it is kept again.</summary>
+    public static SqlMigration PatchMigration { get; } = new(585, "agent compare: kept patches", """
+        CREATE TABLE agent_compare_patches (
+            run_id TEXT NOT NULL,
+            slot TEXT NOT NULL,
+            patch TEXT NOT NULL,
+            files INTEGER NOT NULL,
+            kept_files INTEGER NOT NULL,
+            saved INTEGER NOT NULL,
+            PRIMARY KEY (run_id, slot)
+        );
+        """);
+
+    /// <summary>The most UTF-8 bytes of one model's patch kept with its run: 1 MiB; a larger patch keeps its first whole files.</summary>
+    public const int MaxPatchBytes = 1 << 20;
 
     private readonly WebAgentDb db;
     private readonly ILogger log;
@@ -173,6 +205,33 @@ public sealed class AgentCompareStore
     public void AddTurn(string modelKey, string op) =>
         db.Execute("INSERT OR IGNORE INTO agent_compare_turns (model_key, op, at) VALUES ($key, $op, $at);",
             ("$key", modelKey), ("$op", op), ("$at", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+
+    /// <summary>Keeps <paramref name="patch"/> as the patch of <paramref name="slot"/> in run <paramref name="run"/>, replacing one kept
+    /// before; above <see cref="MaxPatchBytes"/> only its first whole files are kept.</summary>
+    /// <returns>What was kept.</returns>
+    public AgentKeptPatch SavePatch(string run, string slot, string patch)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        ArgumentNullException.ThrowIfNull(slot);
+        ArgumentNullException.ThrowIfNull(patch);
+        var (text, files, kept) = WorkspacePatch.Cut(patch, MaxPatchBytes);
+        var saved = DateTimeOffset.UtcNow;
+        db.Execute("""
+            INSERT OR REPLACE INTO agent_compare_patches (run_id, slot, patch, files, kept_files, saved)
+            VALUES ($run, $slot, $patch, $files, $kept, $saved);
+            """, ("$run", run), ("$slot", slot), ("$patch", text), ("$files", files), ("$kept", kept), ("$saved", saved.ToUnixTimeMilliseconds()));
+        return new AgentKeptPatch(text, files, kept, DateTimeOffset.FromUnixTimeMilliseconds(saved.ToUnixTimeMilliseconds()));
+    }
+
+    /// <summary>The patch kept for <paramref name="slot"/> of run <paramref name="run"/>, or null when none was.</summary>
+    public AgentKeptPatch? KeptPatch(string run, string slot)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        ArgumentNullException.ThrowIfNull(slot);
+        return db.Query("SELECT patch, files, kept_files, saved FROM agent_compare_patches WHERE run_id = $run AND slot = $slot;",
+            reader => new AgentKeptPatch(reader.GetString(0), reader.GetInt32(1), reader.GetInt32(2), DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(3))),
+            ("$run", run), ("$slot", slot)).FirstOrDefault();
+    }
 
     // Calls each Changed handler on its own: a handler that throws is logged, never passed to the caller (a model request, a state change).
     private void Raise(string id)

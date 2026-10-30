@@ -2,8 +2,9 @@
 // answer approvals (one call; the waiting calls of every model the page listed, at once; or "allow this command in all workspaces", which
 // becomes an exact run grant that answers the same command now and later), look at a model's diff, keep its changes (apply them to the
 // project as uncommitted changes, or keep a branch; both through R4, which refuses on a conflict and never commits to the user's branches
-// or pushes), discard workspaces, and open a model as a chat (a chat binding for its session: from then on it is a plain chat with
-// Settings › Tools approvals, working in its workspace). Every action is idempotent: repeating it answers what the first one did.
+// or pushes), discard workspaces (each one's patch is kept with the run first, so its diff can still be shown: W4 fix 2), and open a
+// model as a chat (a chat binding for its session: from then on it is a plain chat with Settings › Tools approvals, working in its
+// workspace). Every action is idempotent: repeating it answers what the first one did.
 using PiSharp.Durable.Hosting;
 using PiSharp.WebAgent.AgentCompare.Workspaces;
 using PiSharp.WebAgent.Chat;
@@ -162,13 +163,33 @@ public sealed partial class AgentCompareRunner
             ?? throw AgentCompareException.Conflict(AgentCompareException.NotPending, $"Call {taskId} of model {slot.ToUpperInvariant()} no longer waits for an answer.");
     }
 
-    /// <summary>The changes of <paramref name="slot"/>'s workspace against its base (also while it runs: the files changed so far).</summary>
+    /// <summary>The changes of <paramref name="slot"/>'s workspace against its base (also while it runs: the files changed so far). Once
+    /// the workspace is gone (discarded, or removed after 7 days), the diff kept with the run (<see cref="StoredDiff"/>; its
+    /// <see cref="WorkspaceDiff.StoredAt"/> is set).</summary>
+    /// <exception cref="AgentCompareException">No such run or model (404), its workspace is still being made (409), or it was discarded with
+    /// no patch kept (409 discarded).</exception>
     public async Task<WorkspaceDiff> DiffAsync(string id, string slot, CancellationToken cancellationToken = default)
     {
         var run = Require(id);
-        var model = RequireWorkspace(run, slot);
+        var model = RequireSlot(run, slot);
+        if (model.Discarded)
+            return StoredDiff(run, model.Slot) ?? throw AgentCompareException.Conflict(AgentCompareException.Discarded,
+                $"The workspace of model {model.Slot.ToUpperInvariant()} was discarded, so its line-by-line diff is gone. The files it changed are kept with the run.");
+        model = RequireWorkspace(run, slot);
         try { return await workspaces.DiffAsync(id, model.Slot, cancellationToken).ConfigureAwait(false); }
+        catch (WorkspaceException error) when (error.Code == WorkspaceException.NotFound && StoredDiff(run, model.Slot) is { } stored) { return stored; }
         catch (WorkspaceException error) { throw Translate(error); }
+    }
+
+    /// <summary>The diff kept with run <paramref name="run"/> for <paramref name="slot"/> (when its model was done, and again just before
+    /// its workspace was discarded), or null when none was kept.</summary>
+    public WorkspaceDiff? StoredDiff(AgentCompareRun run, string slot)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        if (store.KeptPatch(run.Id, slot) is not { } kept) return null;
+        var kind = run.Workspace?.Kind ?? WorkspaceKind.Copy;
+        var baseLabel = run.Workspace?.BaseLabel ?? (kind == WorkspaceKind.Worktree ? "the base commit" : "the base copy");
+        return WorkspacePatch.Read(run.Id, slot, kind, baseLabel, kept.Patch, kept.Saved, kept.OmittedFiles);
     }
 
     /// <summary>What Keep would do for <paramref name="slot"/> (the Keep modal).</summary>
@@ -249,11 +270,28 @@ public sealed partial class AgentCompareRunner
         return discarded;
     }
 
+    // Discards one workspace. Its patch is read first and kept with the run (W4 fix 2), with the changed files it lists, so the diff modal
+    // still shows the lines afterwards (a model continued as a chat may have changed more since it was done). When the diff can't be read
+    // (the folder is already gone, or git refuses a tampered workspace) the patch kept when the model was done stays, and the discard goes on.
     private async Task DiscardSlotAsync(string id, string slot, CancellationToken cancellationToken)
     {
+        AgentDiffSummary? summary = null;
+        if (Require(id).Model(slot) is { Discarded: false, WorkspacePath: not null })
+        {
+            try
+            {
+                var diff = await workspaces.DiffAsync(id, slot, cancellationToken).ConfigureAwait(false);
+                KeepPatch(id, slot, diff);
+                summary = Summarize(diff);
+            }
+            catch (Exception error) when (error is WorkspaceException or IOException or InvalidOperationException && !cancellationToken.IsCancellationRequested)
+            {
+                log.LogInformation(error, "Agent compare run {Run}: the changes of model {Slot} could not be read before its discard; the patch kept when it was done stays.", id, slot);
+            }
+        }
         try { await workspaces.DiscardAsync(id, slot, cancellationToken).ConfigureAwait(false); }
         catch (WorkspaceException error) when (error.Code == WorkspaceException.NotFound) { /* Already gone. */ }
-        store.UpdateModel(id, slot, state => state.Discarded ? state : state with { Discarded = true });
+        store.UpdateModel(id, slot, state => state.Discarded ? state : state with { Discarded = true, Diff = summary ?? state.Diff });
     }
 
     /// <summary>Continues <paramref name="slot"/>'s model as a chat: its session gets a chat binding (its provider, model, account and thinking
