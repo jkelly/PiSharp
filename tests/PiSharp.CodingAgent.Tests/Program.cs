@@ -29,6 +29,11 @@ if (commandTerminalPackage ? packageOptions.Count != packageKeys.Length : packag
     throw new ArgumentException("All absolute Node package paths require the explicit --command-terminal-package option.");
 if (commandTerminalPackage && (!OperatingSystem.IsWindows() || report is null || File.Exists(report)))
     throw new ArgumentException("Command terminal qualification requires Windows and a fresh explicit report path.");
+// The CLI reads mcp.json, settings.json and auth.json from the agent directory, in process and in every child.
+// An owned empty one keeps the user's ~/.pi/agent (a configured MCP server adds codemode to each request) out of the cases.
+var agentDirectory = Path.Combine(Path.GetTempPath(), "pisharp-codingagent-tests-agent-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(agentDirectory);
+Environment.SetEnvironmentVariable("PI_CODING_AGENT_DIR", agentDirectory);
 OfflineDemoTests.Configure(dotnetHost, cliDll);
 var tests = PersistentAgentSessionTests.Cases().Concat(OfflineDemoTests.Cases())
     .Concat(StartupSettingsTests.Cases())
@@ -311,6 +316,7 @@ foreach (var test in tests)
 }
 Console.WriteLine($"CodingAgent tests: {tests.Length - failed - skipped} passed, {failed} failed, {skipped} skipped.");
 await WriteReportAsync(completed: true);
+try { Directory.Delete(agentDirectory, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
 return failed == 0 && progressCaptureFailures == 0 ? 0 : 1;
 
 async Task WriteReportAsync(bool completed)
