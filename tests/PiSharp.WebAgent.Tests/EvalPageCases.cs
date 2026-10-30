@@ -246,8 +246,13 @@ internal static partial class Program
                 Equal(2, Regex.Matches(suite, "data-no-baseline>no baseline</span>").Count, "no target has a baseline yet");
                 Equal(2, Regex.Matches(suite, "data-case-row=").Count, "two cases");
                 Check(suite.Contains($"data-edit-check data-case-id=\"{caseIds[0]}\" data-check-id=\"k1\"", StringComparison.Ordinal), "the first case's check opens the editor");
-                foreach (var shell in new[] { "modal-suite-schedule", "modal-baseline", "modal-check-editor", "modal-spend-confirm" })
+                foreach (var shell in new[] { "modal-suite-schedule", "modal-baseline", "modal-check-editor", "modal-spend-confirm", "modal-test-case" })
                     Check(suite.Contains($"id=\"{shell}\"", StringComparison.Ordinal), "the " + shell + " shell");
+                // W5 integration: Add case and Edit case open E7's _TestCaseModal in its suite modes.
+                Check(suite.Contains("/js/pin.js", StringComparison.Ordinal) &&
+                    suite.Contains($"data-bs-target=\"#modal-test-case\" data-pin-source=\"suite\" data-pin-suite=\"{suiteId}\"", StringComparison.Ordinal), "Add case opens the test case modal");
+                Check(caseIds.All(id => suite.Contains($"data-bs-target=\"#modal-test-case\" data-pin-source=\"suite\" data-pin-case=\"{id}\"", StringComparison.Ordinal)),
+                    "each case's Edit case opens the test case modal");
                 Check(suite.Contains("data-no-runs", StringComparison.Ordinal) && suite.Contains("None yet", StringComparison.Ordinal), "no run and no baseline yet");
                 Check(suite.Contains($"data-open-baseline=\"{suiteId}\" disabled=\"disabled\"", StringComparison.Ordinal), "Set baseline waits for a run");
                 Check(!suite.Contains("data-suite-running", StringComparison.Ordinal), "not running");

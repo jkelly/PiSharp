@@ -758,6 +758,7 @@ internal static partial class Program
                 if (index > 0) Check(blocks[index].First > blocks[index - 1].Last, "blocks do not overlap: " + blocks[index]);
             }
             Equal("/evals/suites/su1|/evals/runs/sr%201|/evals/leaderboard?tag=c%23", $"{EvalRoutes.Suite("su1")}|{EvalRoutes.Run("sr 1")}|{EvalRoutes.LeaderboardOf("c#")}", "routes");
+            Equal("/evals/leaderboard?mode=agent&tag=c%23", EvalRoutes.LeaderboardOf(ArenaMode.Agent, "c#"), "a leaderboard names its mode");
 
             var root = Temp("evals-app");
             try

@@ -1,7 +1,8 @@
 @* Decision 0011 (run W5, E6): the mockups' _SuiteCases: a row per case: its name, tags and maxTokens; its checks, each a link that opens
    _CheckEditorModal on that check (and "add check" for a new one); how many answers passed every check in the newest run that asked it
-   ("9/9", or queued / running while that run goes); and its actions: Run this case, Open reference run (the run it was pinned from, in the
-   inspector) and Remove from suite (asks first). Cases are added by pinning a run (E7's Pin as test case), so Add case goes to History.
+   ("9/9", or queued / running while that run goes); and its actions: Run this case, Edit case, Open reference run (the run it was pinned
+   from, in the inspector) and Remove from suite (asks first). Add case and Edit case open E7's _TestCaseModal (#modal-test-case, hosted by
+   Suite.cshtml) in its suite modes (data-pin-suite, data-pin-case); a run can also be pinned into the suite from anywhere it ran.
    Model: SuitePage. *@
 @model SuitePage
 @{
@@ -11,11 +12,11 @@
   <div class="d-flex align-items-center gap-2 mb-2">
     <h3 class="fs-6 fw-semibold mb-0" id="casesTitle">Test cases</h3>
     <span class="fs-8 text-ps-faint">@Model.Cases.Count.ToString(CultureInfo.InvariantCulture)</span>
-    <a class="btn btn-sm btn-outline-secondary ms-auto" href="/history" title="Pin a run as a test case from History, Chat, Playground, Compare or the Run inspector, and choose this suite"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add case</a>
+    <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-source="suite" data-pin-suite="@suite.Id" title="Write a test case for this suite, or pin a run from History, Chat, Playground, Compare or the Run inspector"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add case</button>
   </div>
   @if (Model.Cases.Count == 0)
   {
-    <div class="ps-panel p-3 fs-7 text-secondary" data-no-cases>No test case yet. Pin a run from History, Chat, Playground, Compare or the Run inspector and choose this suite.</div>
+    <div class="ps-panel p-3 fs-7 text-secondary" data-no-cases>No test case yet. Add one here, or pin a run from History, Chat, Playground, Compare or the Run inspector and choose this suite.</div>
   }
   else
   {
@@ -75,6 +76,7 @@
                   <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for @testCase.Name"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
                   <ul class="dropdown-menu dropdown-menu-end">
                     <li><button class="dropdown-item" type="button" data-run-suite="@suite.Id" data-case-id="@testCase.Id" disabled="@(Model.Active is not null || suite.Targets.Count == 0)"><i class="bi bi-play me-2" aria-hidden="true"></i>Run this case</button></li>
+                    <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-source="suite" data-pin-case="@testCase.Id"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit case</button></li>
                     @if (row.ReferenceUrl is { } reference)
                     {
                       <li><a class="dropdown-item" href="@reference"><i class="bi bi-braces me-2" aria-hidden="true"></i>Open reference run</a></li>

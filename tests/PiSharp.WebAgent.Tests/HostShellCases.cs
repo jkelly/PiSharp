@@ -70,16 +70,14 @@ internal static partial class Program
             Equal("Connections: Providers, Accounts & sign-ins, Models, Custom providers | Agent: Defaults, Tools & workspace, Spend | App: Appearance, Data & storage, About",
                 string.Join(" | ", ShellNav.SettingsGroups.Select(group => group.Label + ": " + string.Join(", ", group.Items.Select(item => item.Label)))), "the settings nav");
             Equal("/chat/new", ShellNav.Primary[0].Href, "New chat");
-            foreach (var (route, feature) in LaterFeature.Pages)
-                Equal(feature.Id, ShellNav.Primary.Single(item => item.Href == route).Id, "the later page of " + route);
             Equal(null, ShellNav.SettingsItem("nope"), "an unknown settings id");
 
-            var later = typeof(ShellController).GetMethod(nameof(ShellController.Later))!.GetCustomAttributes<HttpGetAttribute>().Select(a => a.Template).Order().ToList();
-            Equal(string.Join(",", LaterFeature.Pages.Keys.Order()), string.Join(",", later), "every later sidebar page has a route");
             // W4 T4: every settings page is built, so the settings placeholder (its route and view) is gone. W5 E6: Evals is built, so the
-            // sidebar placeholder has no route left either.
-            Equal("", string.Join(",", typeof(ShellController).GetMethods().Where(method => method.GetCustomAttributes<HttpGetAttribute>().Any()).Select(method => method.Name)),
-                "the shell keeps no placeholder route");
+            // sidebar placeholder lost its route; the W5 integration then removed its parts (ShellController, LaterFeature, Views/Shell/Later).
+            var app = typeof(ShellNav).Assembly;
+            Check(app.GetType("PiSharp.WebAgent.Controllers.ShellController") is null, "the shell keeps no placeholder controller");
+            Check(app.GetType("PiSharp.WebAgent.Shell.LaterFeature") is null, "no later-milestone page list");
+            Check(app.GetTypes().All(type => type.FullName?.Contains("Views_Shell_Later", StringComparison.Ordinal) != true), "no later-milestone view");
         }),
 
         Case("host.faux-catalog-and-fallback-registrations", () =>

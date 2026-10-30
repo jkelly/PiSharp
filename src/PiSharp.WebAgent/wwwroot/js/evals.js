@@ -10,6 +10,7 @@
 //     family and cost (POST /api/evals/checks/judge-preview: nothing is sent to a model), Try (POST /api/evals/checks/try), and Save or
 //     Remove: the check is validated (POST /api/evals/checks/validate), then the case's checks are saved (POST /api/evals/cases/{id}).
 //   Add and remove a target, rename and delete the suite, remove a case: POST the Suites unit's APIs.
+//   Add case and Edit case: E7's _TestCaseModal and pin.js; when it saves a case of this suite (pisharp:pin-saved), the page reloads.
 //   A running run: its page polls GET /evals/runs/{id}/live and swaps the fragment in until the run ends; the suite page polls
 //     GET /api/evals/runs/{id} for its progress and reloads when the run ends.
 // Text is set with textContent only. A change that reloads the page keeps its toast with flashAndReload (sessionStorage, guarded).
@@ -832,6 +833,12 @@ document.addEventListener('submit', (event) => {
     event.preventDefault();
     rename(form);
   }
+});
+
+document.addEventListener('pisharp:pin-saved', (event) => {
+  const detail = event instanceof CustomEvent ? event.detail : null;
+  if (page?.dataset.evals !== 'suite' || !detail?.suiteId || detail.suiteId !== page.dataset.suiteId) return;
+  flashAndReload({ title: detail.created ? 'Test case added' : 'Test case saved', body: '', tone: 'ok' });
 });
 
 document.addEventListener('visibilitychange', () => {

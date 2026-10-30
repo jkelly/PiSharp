@@ -124,6 +124,9 @@ public sealed partial record RunSpec
     /// <summary>The longest server-requested retry delay a run may wait for, in milliseconds (one hour; 0 is "no cap" up to this).</summary>
     public const int MaxRetryDelayLimitMs = 3_600_000;
 
+    /// <summary>The longest Azure API version a run takes (sent as <c>?api-version=</c>).</summary>
+    public const int MaxAzureApiVersion = 40;
+
     /// <summary>The levels a thinking budget names (Pi's <c>ThinkingBudgets</c>: xhigh and max use high's).</summary>
     public static IReadOnlyList<string> BudgetLevels { get; } = ["minimal", "low", "medium", "high"];
 
@@ -388,7 +391,7 @@ public sealed partial record RunSpec
         if (MaxRetryDelayMs is { } delay && (delay < 0 || delay > MaxRetryDelayLimitMs))
             throw new ArgumentException($"The longest retry delay is 0 to {MaxRetryDelayLimitMs:N0} ms.");
         var budgets = ThinkingBudgets is null ? null : CheckBudgets(ThinkingBudgets);
-        var apiVersion = Optional(AzureApiVersion, "The Azure API version", 40);
+        var apiVersion = Optional(AzureApiVersion, "The Azure API version", MaxAzureApiVersion);
         if (apiVersion is not null && !AzureNamePattern().IsMatch(apiVersion)) throw new ArgumentException("The Azure API version is letters, digits, '.', '_' and '-'.");
         if (Bedrock is { } bedrock)
             foreach (var key in bedrock.Select(pair => pair.Key))

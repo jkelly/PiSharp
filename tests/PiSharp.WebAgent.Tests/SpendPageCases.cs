@@ -19,7 +19,7 @@ internal static partial class Program
     [
         Case("spend.pages.placeholder-is-gone", () =>
         {
-            Check(typeof(PiSharp.WebAgent.Controllers.ShellController).GetMethod("SettingsLater") is null, "Settings › Spend is no later-milestone page: no settings placeholder is left (W4 T4)");
+            Check(typeof(PiSharp.WebAgent.Shell.ShellNav).Assembly.GetType("PiSharp.WebAgent.Controllers.ShellController") is null, "Settings › Spend is no later-milestone page: no settings placeholder is left (W4 T4; the shell controller went in W5)");
             Check(typeof(PiSharp.WebAgent.Controllers.SpendController).GetMethod("Settings") is not null, "SpendController serves it");
         }),
 

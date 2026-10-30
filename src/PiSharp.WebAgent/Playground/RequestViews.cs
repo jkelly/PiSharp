@@ -398,8 +398,8 @@ public sealed record RequestConfigView
     /// always sets it).</summary>
     public RequestSamplingView? Sampling { get; init; }
 
-    /// <summary>The longest Azure API version a run takes (RunSpec's limit).</summary>
-    public const int MaxAzureApiVersion = 40;
+    /// <summary>The longest Azure API version a run takes (<see cref="RunSpec.MaxAzureApiVersion"/>).</summary>
+    public const int MaxAzureApiVersion = RunSpec.MaxAzureApiVersion;
 
     /// <summary>The retry delay's range as the Transport row says it (0 to 3,600,000 ms).</summary>
     public static string RetryDelayRange { get; } =

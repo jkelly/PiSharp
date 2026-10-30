@@ -25,8 +25,11 @@ public static class EvalRoutes
     /// <summary>A suite run's page (<c>evals-run</c>).</summary>
     public static string Run(string runId) => $"/evals/runs/{Uri.EscapeDataString(runId)}";
 
-    /// <summary>The leaderboard of one tag.</summary>
+    /// <summary>The leaderboard of one tag (the page's default mode, request).</summary>
     public static string LeaderboardOf(string tag) => $"{Leaderboard}?tag={Uri.EscapeDataString(tag)}";
+
+    /// <summary>The leaderboard of one tag in one mode: request and agent votes are separate leaderboards, even under the same tag.</summary>
+    public static string LeaderboardOf(ArenaMode mode, string tag) => $"{Leaderboard}?mode={EvalJson.Wire(mode)}&tag={Uri.EscapeDataString(tag)}";
 
     /// <summary>Suites: list, create, change, delete, schedule, run now, accept a baseline (E4).</summary>
     public const string ApiSuites = "/api/evals/suites";

@@ -1,6 +1,6 @@
 // Decision 0011 (run W5, E5): starting a blind round from Compare's setup. The Blind switch ([data-arena-blind]: request in
 // _ComparePrompt, agent in _AgentSetup) is remembered in this browser only (a per-viewer convenience; it reads back off when storage is
-// unavailable). With it on, Run all (or Run agents) posts the round to POST /api/evals/arena instead of Compare's own endpoints: the server
+// unavailable); ?blind=1 (the leaderboard's Blind vote links) turns it on for that visit without remembering it. With it on, Run all (or Run agents) posts the round to POST /api/evals/arena instead of Compare's own endpoints: the server
 // shuffles the models into columns A to D and the page opens the battle (GET /compare/arena/{id}), which names no model before the vote. A
 // request round the Spend Guard refuses shows modal-spend-confirm (the server's markup) and is started again with the user's choice
 // (POST /api/evals/arena/{id}/start); Cancel discards the round that never started.
@@ -25,10 +25,11 @@ export function blindOn() {
 export function initBlindSwitch(onChange) {
   const input = blindSwitch();
   if (!input) return;
+  const asked = new URLSearchParams(window.location.search).get('blind') === '1';
   try {
-    input.checked = window.localStorage.getItem(STORAGE_KEY) === '1';
+    input.checked = asked || window.localStorage.getItem(STORAGE_KEY) === '1';
   } catch {
-    input.checked = false;
+    input.checked = asked;
   }
   input.addEventListener('change', () => {
     try { window.localStorage.setItem(STORAGE_KEY, input.checked ? '1' : '0'); } catch { /* Not kept: storage is unavailable. */ }

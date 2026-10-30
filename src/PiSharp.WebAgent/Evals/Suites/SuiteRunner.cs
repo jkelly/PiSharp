@@ -295,10 +295,13 @@ public sealed class SuiteRunner : IAsyncDisposable
 
     /// <summary>Analyses the complete run <paramref name="runId"/> against each target's current baseline and stores the signals (what the
     /// runner does after every complete run of all its suite's cases; analysing a run again changes nothing).</summary>
-    public IReadOnlyList<DriftAnalysis> AnalyzeDrift(string runId)
+    public IReadOnlyList<DriftAnalysis> AnalyzeDrift(string runId) =>
+        store.Run(runId) is { Status: SuiteRunStatus.Complete } run ? AnalyzeDrift(run) : [];
+
+    /// <summary>Analyses <paramref name="run"/>, complete with its results stored, and stores the signals. The runner calls it before it
+    /// stores the run as complete, so a page that sees the run end sees its signals too.</summary>
+    private List<DriftAnalysis> AnalyzeDrift(SuiteRun run)
     {
-        var run = store.Run(runId);
-        if (run is not { Status: SuiteRunStatus.Complete }) return [];
         var results = store.Results(run.Id);
         var names = store.Cases(run.SuiteId).ToDictionary(testCase => testCase.Id, testCase => testCase.Name, StringComparer.Ordinal);
         var analyses = new List<DriftAnalysis>();
@@ -355,7 +358,6 @@ public sealed class SuiteRunner : IAsyncDisposable
         {
             await execution.Group.DisposeAsync().ConfigureAwait(false);
             finished = Finish(execution);
-            if (finished.Status == SuiteRunStatus.Complete && execution.Full) AnalyzeDrift(finished.Id);
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
@@ -514,6 +516,13 @@ public sealed class SuiteRunner : IAsyncDisposable
             _ => (SuiteRunStatus.Complete, null),
         };
         var done = run with { Status = end.Status, Problem = end.Problem, Finished = now };
+        // Drift first (W5 integration): the signals are stored before the run reads as complete, so the run and suite pages never show a
+        // finished run without them. A failed analysis is logged and the run still ends.
+        if (done.Status == SuiteRunStatus.Complete && execution.Full)
+        {
+            try { AnalyzeDrift(done); }
+            catch (Exception error) when (error is not OutOfMemoryException) { log.LogError(error, "Suite run {Run}'s drift analysis failed.", done.Id); }
+        }
         store.UpdateRun(done);
         log.LogInformation("Suite run {Run} (#{Number}) ended {Status}.", done.Id, done.Number, EvalJson.Wire(done.Status));
         return done;

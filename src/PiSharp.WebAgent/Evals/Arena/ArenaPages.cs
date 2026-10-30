@@ -378,7 +378,7 @@ public sealed class ArenaPages(ArenaService arena, IServiceProvider services)
             Vote = vote,
             Summary = summary,
             Added = added,
-            LeaderboardUrl = EvalRoutes.Leaderboard + "?mode=" + EvalJson.Wire(battle.Mode) + "&tag=" + Uri.EscapeDataString(vote.Tag),
+            LeaderboardUrl = EvalRoutes.LeaderboardOf(battle.Mode, vote.Tag),
             PinRunId = pin,
             KeepUrl = battle.Mode == ArenaMode.Agent && battle.GroupId is { } run ? "/compare?mode=agent&run=" + Uri.EscapeDataString(run) : null,
             KeepLetter = battle.Mode == ArenaMode.Agent ? vote.Best : null,

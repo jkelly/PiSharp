@@ -220,21 +220,14 @@ internal static partial class Program
             {
                 var page = await app.Get(href);
                 Check(page.Status < 500, $"{href}: {page.Status} {Cut(page.Text)}");
-                var later = LaterFeature.Pages.GetValueOrDefault(href);
-                if (later is not null)
-                {
-                    Equal(200, page.Status, href);
-                    Check(page.Text.Contains("Coming in a later milestone", StringComparison.Ordinal), href + " is the neutral page");
-                    Check(page.Text.Contains($"<title>{Html(later.Title)}", StringComparison.Ordinal), href + " title");
-                    Check(page.Text.Contains(Html(later.Summary), StringComparison.Ordinal), href + " says what it will do");
-                }
-                else Check(page.Status is 200 or 404, $"{href}: a page of another unit renders or is not there yet ({page.Status})");
-                if (page.Status != 200) continue;
+                // W5 (integration): every sidebar and settings page is built, and the "Coming in a later milestone" page is gone.
+                Equal(200, page.Status, href);
+                Check(!page.Text.Contains("<h3 class=\"mb-2\">Coming in a later milestone</h3>", StringComparison.Ordinal), href + " is not the placeholder page");
                 rendered++;
                 CheckShell(href, page.Text);
                 Equal(HostGuardOptions.DefaultContentSecurityPolicy, string.Join("", page.Response.Headers.GetValues("Content-Security-Policy")), href + " CSP");
             }
-            Check(rendered >= LaterFeature.Pages.Count, "every later-milestone page rendered");
+            Equal(links.Count, rendered, "every shell page rendered");
 
             var playground = (await app.Get("/playground")).Text;
             Check(Regex.IsMatch(playground, "<a class=\"nav-link active\" aria-current=\"page\" href=\"/playground\" data-nav=\"playground\">"), "Playground is the active item");

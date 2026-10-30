@@ -10,13 +10,6 @@ internal static partial class Program
 
     private static readonly W4Gap[] W5Gaps =
     [
-        // The shell (W2's placeholder): E6 removed the Evals route and LaterFeature's last entry, not the action, the type or the view.
-        new("the Evals placeholder's leftover parts", "`Views/Shell/Later.cshtml`",
-            root => File.Exists(Path.Join(root, "src", "PiSharp.WebAgent", "Views", "Shell", "Later.cshtml")) ||
-                File.Exists(Path.Join(root, "src", "PiSharp.WebAgent", "Shell", "LaterFeature.cs")) ||
-                (File.Exists(Path.Join(root, "src", "PiSharp.WebAgent", "Controllers", "ShellController.cs")) &&
-                    SourceHas(root, "src/PiSharp.WebAgent/Controllers/ShellController.cs", "IActionResult Later("))
-                ? null : "the Later view, LaterFeature and ShellController.Later are gone"),
         // Settings (W2): sections shown as "Coming in a later milestone" notes, which no planned milestone builds.
         new("Settings' later-milestone notes", "Settings still shows",
             root => AppFilesMatching(root, "*.cshtml", "Coming in a later milestone").Where(path => path.StartsWith("Views/Settings/", StringComparison.Ordinal)).ToList()

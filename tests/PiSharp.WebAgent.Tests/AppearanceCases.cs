@@ -73,7 +73,7 @@ internal static partial class Program
             Equal(1, Regex.Matches(shell, @"closest\('\[data-theme-toggle\]'\)").Count, "one toggle handler");
             Check(shell.Contains("'pisharp:appearance'", StringComparison.Ordinal), "the icons follow a change made elsewhere");
             Check(Regex.IsMatch(shell, @"key === 'l'\) \{[^}]*toggleTheme\(\);"), "Ctrl+Shift+L toggles through it");
-            Check(typeof(PiSharp.WebAgent.Controllers.ShellController).GetMethod("SettingsLater") is null, "no settings placeholder, for Appearance, About or any other");
+            Check(typeof(PiSharp.WebAgent.Shell.ShellNav).Assembly.GetType("PiSharp.WebAgent.Controllers.ShellController") is null, "no settings placeholder, for Appearance, About or any other");
         }),
 
         Case("appearance.page-renders-every-control-and-the-preview", async () =>
