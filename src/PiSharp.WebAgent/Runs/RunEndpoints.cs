@@ -147,7 +147,12 @@ public static class RunEndpoints
             ["patch"] = plan.Patch?.DeepClone(),
             ["patchPath"] = plan.PatchPath,
             ["headers"] = plan.Headers is null ? null : JsonSerializer.SerializeToNode(plan.Headers, SettingsStore.JsonOptions),
-            ["messages"] = JsonNode.Parse("[" + string.Join(",", plan.Messages.Select(message => message.ToJson())) + "]"),
+            ["cache"] = plan.Cache is null ? null : JsonSerializer.SerializeToNode(plan.Cache, SettingsStore.JsonOptions),
+            ["cappedCache"] = plan.CappedCache is null ? null : JsonSerializer.SerializeToNode(plan.CappedCache, SettingsStore.JsonOptions),
+            ["thinkingBudget"] = plan.ThinkingBudget,
+            ["maxRetries"] = plan.Allowed ? plan.Spec.MaxRetries : null,
+            ["apiVersion"] = plan.Allowed ? plan.Spec.AzureApiVersion : null,
+            ["messages"] =JsonNode.Parse("[" + string.Join(",", plan.Messages.Select(message => message.ToJson())) + "]"),
         };
     }
 

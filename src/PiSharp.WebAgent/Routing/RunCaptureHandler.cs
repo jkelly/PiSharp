@@ -6,8 +6,15 @@
 //     top P, stop, seed, response format, tool choice, parallel tool calls, strict tools, service tier, text verbosity, reasoning summary,
 //     session id, provider options) reach the provider; a model request it cannot patch (another encoding, a non-JSON body, a strict
 //     tool missing from it) fails before it is sent, so an option the user set is never silently dropped;
+//   - W4 fix 2: edits the model request's prompt caching (the run's cache retention, or a capped send's breakpoints put back:
+//     RunModelOptions.ApplyCache) and sets an Azure request's api-version query to the run's (azureApiVersion);
 //   - adds the run's extra headers (never a credential: RunSpec refuses those);
 //   - stops a request whose response headers do not arrive within the run's timeout (timeoutMs; the body that follows is not timed);
+//   - W4 fix 2: sends the model request again, up to the run's max retries, after a network error, a timeout, or an answer the provider
+//     marks retryable (x-should-retry) or that is 408, 409, 429 or 5xx, as upstream Pi's provider-retry does: it waits the server's
+//     retry-after-ms or retry-after, else 500 ms doubling to at most 8 s, less up to a quarter; a server delay longer than the run's
+//     maxRetryDelayMs (60 s by default; 0 is an hour) ends the retries with the provider's answer. A retry happens before any output (the
+//     answer's headers decide it), and every attempt is recorded when raw payloads are on;
 //   - only when the user turned raw payloads on (a RunCapture), keeps the redacted request, the response headers, each raw SSE line with
 //     its arrival time (the body is teed as the transport reads it, unchanged), a small non-SSE body, transport errors and timing marks.
 // WebSocket upgrades (101) are not teed. Keyed by op: the run (or chat call) it records into is the scope's.
@@ -52,8 +59,15 @@ public sealed class RunCaptureHandler : DelegatingHandler
         var context = RunHttpScope.Current;
         if (context is null) return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         context.CountRequest();
-        if ((context.Patch is not null || context.StrictTools is { Count: > 0 }) && IsModelRequest(request, context.PatchPath))
-            await PatchAsync(request, context).ConfigureAwait(false);
+        // The model request: the patched path, else the API's own (a run that only retries or records still knows it).
+        var model = IsModelRequest(request, context.PatchPath ?? (context.Api is { } api ? RunModelOptions.ModelRequestPath(api) : null));
+        var edits = context.Patch is not null || context.StrictTools is { Count: > 0 } || context.Cache is not null;
+        if (model && (edits || context.ApiVersion is not null))
+        {
+            if (edits) await PatchAsync(request, context).ConfigureAwait(false);
+            if (context.ApiVersion is { } version) request.RequestUri = WithApiVersion(request.RequestUri!, version);
+            context.CountPatched();
+        }
         if (context.Headers is { } headers)
             foreach (var (name, value) in headers)
             {
@@ -61,6 +75,110 @@ public sealed class RunCaptureHandler : DelegatingHandler
                 catch (InvalidOperationException) { /* A content header's name: TryAddWithoutValidation refuses it too. */ }
                 request.Headers.TryAddWithoutValidation(name, value);
             }
+        if (!model || context.MaxRetries is not > 0) return await SendOnceAsync(request, context, cancellationToken).ConfigureAwait(false);
+
+        // Each attempt sends a copy of the request: a request message is sent once, and its body is read once.
+        var body = request.Content is null ? null : await request.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        var limit = context.MaxRetryDelayMs is { } most ? most == 0 ? RunSpec.MaxRetryDelayLimitMs : most : DefaultMaxRetryDelayMs;
+        for (var attempt = 0; ; attempt++)
+        {
+            var sending = Copy(request, body);
+            HttpResponseMessage response;
+            try
+            {
+                response = await SendOnceAsync(sending, context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception error) when (attempt < context.MaxRetries && !cancellationToken.IsCancellationRequested &&
+                error is (HttpRequestException and not RunPatchException) or TimeoutException or IOException)
+            {
+                sending.Dispose();
+                await RetryAsync(context, attempt, Backoff(attempt), error.GetType().Name, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+            if (attempt >= context.MaxRetries || !Retryable(response)) return response;
+            var asked = ServerDelay(response);
+            if (asked > limit)
+            {
+                context.Capture?.Mark("retry-refused", new JsonObject { ["status"] = (int)response.StatusCode, ["delayMs"] = asked, ["maxRetryDelayMs"] = limit });
+                return response;
+            }
+            var status = (int)response.StatusCode;
+            response.Dispose();
+            sending.Dispose();
+            await RetryAsync(context, attempt, asked ?? Backoff(attempt), status.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The longest server-requested retry delay waited for when the run sets none (upstream Pi's default).</summary>
+    public const int DefaultMaxRetryDelayMs = 60_000;
+
+    private static async Task RetryAsync(RunHttpContext context, int attempt, long delayMs, string reason, CancellationToken cancellationToken)
+    {
+        context.Capture?.Mark("retry", new JsonObject { ["attempt"] = attempt + 1, ["after"] = reason, ["delayMs"] = delayMs });
+        if (delayMs > 0) await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken).ConfigureAwait(false);
+        context.CountRetry();
+    }
+
+    /// <summary>Whether the provider's answer may be retried: its <c>x-should-retry</c> header when it sends one, else 408, 409, 429 or 5xx.</summary>
+    internal static bool Retryable(HttpResponseMessage response)
+    {
+        if (response.Headers.TryGetValues("x-should-retry", out var values))
+        {
+            var value = values.FirstOrDefault();
+            if (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(value, "false", StringComparison.OrdinalIgnoreCase)) return false;
+        }
+        var status = (int)response.StatusCode;
+        return status is 408 or 409 or 429 || status >= 500;
+    }
+
+    /// <summary>The delay the server asks for (<c>retry-after-ms</c>, else <c>retry-after</c> in seconds or as a date), in milliseconds, or null.</summary>
+    internal static long? ServerDelay(HttpResponseMessage response)
+    {
+        if (response.Headers.TryGetValues("retry-after-ms", out var ms) &&
+            double.TryParse(ms.FirstOrDefault(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var milliseconds) &&
+            double.IsFinite(milliseconds) && milliseconds >= 0)
+            return (long)Math.Ceiling(Math.Min(milliseconds, long.MaxValue / 2));
+        if (response.Headers.RetryAfter is { } after)
+        {
+            if (after.Delta is { } delta) return (long)Math.Max(0, delta.TotalMilliseconds);
+            if (after.Date is { } date) return (long)Math.Max(0, (date - DateTimeOffset.UtcNow).TotalMilliseconds);
+        }
+        return null;
+    }
+
+    /// <summary>500 ms doubling per attempt, at most 8 s, less up to a quarter (upstream Pi's provider-retry).</summary>
+    private static long Backoff(int attempt) => (long)(Math.Min(500 * Math.Pow(2, attempt), 8000) * (1 - Random.Shared.NextDouble() * 0.25));
+
+    /// <summary>A copy of <paramref name="request"/> with <paramref name="body"/> as its body (the original's content headers kept).</summary>
+    private static HttpRequestMessage Copy(HttpRequestMessage request, byte[]? body)
+    {
+        var copy = new HttpRequestMessage(request.Method, request.RequestUri) { Version = request.Version, VersionPolicy = request.VersionPolicy };
+        foreach (var header in request.Headers) copy.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        foreach (var option in request.Options) ((IDictionary<string, object?>)copy.Options)[option.Key] = option.Value;
+        if (body is not null)
+        {
+            copy.Content = new ByteArrayContent(body);
+            foreach (var header in request.Content!.Headers)
+                if (!header.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)) copy.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+        return copy;
+    }
+
+    /// <summary><paramref name="uri"/> with its <c>api-version</c> query set to <paramref name="version"/> (letters, digits, '.', '_', '-').</summary>
+    internal static Uri WithApiVersion(Uri uri, string version)
+    {
+        var builder = new UriBuilder(uri);
+        var kept = builder.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Where(part => !part.StartsWith("api-version=", StringComparison.OrdinalIgnoreCase) && !part.Equals("api-version", StringComparison.OrdinalIgnoreCase));
+        builder.Query = string.Join('&', kept.Append("api-version=" + Uri.EscapeDataString(version)));
+        return builder.Uri;
+    }
+
+    /// <summary>Sends one attempt: through the run's timeout, recording it when raw payloads are on.</summary>
+    private async Task<HttpResponseMessage> SendOnceAsync(HttpRequestMessage request, RunHttpContext context, CancellationToken cancellationToken)
+    {
         var capture = context.Capture;
         if (capture is null) return await TimedAsync(request, context, cancellationToken).ConfigureAwait(false);
 
@@ -144,7 +262,7 @@ public sealed class RunCaptureHandler : DelegatingHandler
         {
             throw new RunPatchException($"PiSharp could not apply this run's options to the {api} request (its body is not {(zstd ? "a zstd frame of " : "")}JSON), so it was not sent.");
         }
-        var missing = RunModelOptions.ApplyToBody(body, context.Patch, context.StrictTools, context.Api);
+        var missing = RunModelOptions.ApplyToBody(body, context.Patch, context.StrictTools, context.Api, context.Cache);
         if (missing.Count > 0)
             throw new RunPatchException($"PiSharp could not mark {string.Join(", ", missing)} strict in the {api} request (not among its tools), so it was not sent.");
         var patched = Encoding.UTF8.GetBytes(body.ToJsonString());
@@ -156,7 +274,6 @@ public sealed class RunCaptureHandler : DelegatingHandler
                 replaced.Headers.TryAddWithoutValidation(header.Key, header.Value);
         request.Content = replaced;
         content.Dispose();
-        context.CountPatched();
     }
 
     /// <summary>A response body read through a <see cref="TeeStream"/>: the transport reads it unchanged while the capture keeps its lines.</summary>
