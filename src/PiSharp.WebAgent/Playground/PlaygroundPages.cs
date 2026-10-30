@@ -165,13 +165,17 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         return new PlaygroundDraftAnswer(plan.Allowed, plan.RefusalMessage, estimate, CostEstimator.InputTokens(bytes), parts, plan.Refused);
     }
 
-    /// <summary>View code of <paramref name="spec"/>.</summary>
+    /// <summary>View code of <paramref name="spec"/>, with "Open last run in inspector" when <paramref name="lastRun"/> names a run runs.db
+    /// has (the run the Playground shows); the inspector's own View code passes none, so the link stays hidden there.</summary>
     /// <exception cref="ArgumentException">The spec is not valid, or the model is unknown.</exception>
-    public ViewCodeView Code(RunSpec spec, string origin)
+    public ViewCodeView Code(RunSpec spec, string origin, string? lastRun = null)
     {
         ArgumentNullException.ThrowIfNull(spec);
         var plan = Engine.Plan(spec);
-        return RequestCode.Generate(plan, origin, BaseUrl(plan));
+        var code = RequestCode.Generate(plan, origin, BaseUrl(plan));
+        return !string.IsNullOrWhiteSpace(lastRun) && services.GetService<RunStore>()?.Get(lastRun.Trim()) is { } run
+            ? code with { InspectorUrl = "/runs/" + Uri.EscapeDataString(run.Id) }
+            : code;
     }
 
     /// <summary>What Model &amp; auth shows for <paramref name="provider"/>/<paramref name="model"/>: its capabilities and account, or null.</summary>

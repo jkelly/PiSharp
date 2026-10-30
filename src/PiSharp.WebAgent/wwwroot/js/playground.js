@@ -415,7 +415,10 @@ function start() {
   wirePicker();
   wireOutput();
   wireToolbar();
-  initViewCode(() => collectSpec(host), { onCopied: (ok) => showToast({ title: ok ? 'Copied' : 'Copy failed', tone: ok ? 'ok' : 'danger' }) });
+  initViewCode(() => collectSpec(host), {
+    onCopied: (ok) => showToast({ title: ok ? 'Copied' : 'Copy failed', tone: ok ? 'ok' : 'danger' }),
+    lastRun: () => output()?.dataset.runId,
+  });
   host.addEventListener('request-change', scheduleEstimate);
   host.addEventListener('request-error', (event) => toast(event.detail?.title ?? 'Error', event.detail?.message ?? ''));
   const section = output();

@@ -2,7 +2,8 @@
 // would block; the output pane renders each state (empty, streaming, completed, stopped, error) from real runs of the priced faux models,
 // with model text through the sanitizing MarkdownRenderer; a faux run goes round trip through POST /api/runs, its SSE events and the output
 // fragment the page swaps in, and a tool call is answered with a toolResult; options a model rejects are refused before anything is sent
-// (and the config keeps their values, marked); View code, over real routing with a planted key, never carries the key.
+// (and the config keeps their values, marked); View code, over real routing with a planted key, never carries the key, has LF line
+// endings only (the cURL tab's continuations hold as run.sh), and links "Open last run in inspector" to the run the page names.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -327,7 +328,67 @@ internal static partial class Program
             Check(answer.Body?["curl"]?.GetValue<string>().Contains(app.Origin + "/api/runs", StringComparison.Ordinal) == true, "for this app's origin");
             Equal(400, (await app.SendAsync(HttpMethod.Post, "/api/playground/code", new JsonObject { ["provider"] = "faux" }, origin: app.Origin)).Status, "an invalid request");
         }),
+
+        Case("playground.code.view-code-is-lf-only-and-links-the-last-run", async () =>
+        {
+            // Every tab has LF endings only (AppendLine and indented JSON write CRLF on Windows; "\" + CRLF breaks run.sh's continuations).
+            // The openai plan has every part: Pi wire messages, options, the body patch, headers and the provider JSON.
+            await using (var host = RunsHost.Routing("pg-code-lf"))
+            {
+                var model = ModelOf(host.Services.GetRequiredService<IModelCatalog>(), "openai", "openai-responses", "gpt-4.1");
+                var pages = new PlaygroundPages(host.Services);
+                var spec = new RunSpec
+                {
+                    Provider = "openai",
+                    Model = model,
+                    SystemPrompt = "Be brief.\r\nAnswer in English.",
+                    MaxTokens = 300,
+                    ServiceTier = "flex",
+                    Headers = new Dictionary<string, string> { ["x-request-tag"] = "playground" },
+                    Tools = [new RunTool("get_weather", "Weather", new JsonObject { ["type"] = "object" })],
+                    Messages = [new RunMessage { Text = "hello\r\nthere" }],
+                };
+                var code = pages.Code(spec, "http://127.0.0.1:5180");
+                PlaygroundLfOnly(code.CSharp, "C#");
+                PlaygroundLfOnly(code.Curl, "cURL");
+                PlaygroundLfOnly(code.Json, "JSON");
+                PlaygroundLfOnly(code.Provider ?? "", "the provider request");
+                Check(code.Provider is not null && code.CSharp.Contains("JsonValue.Parse(\"\"\"\n", StringComparison.Ordinal), "the parts that were joined with \"\\n\" are there too");
+                Equal(2, code.Curl.Split('\n').Count(line => line.EndsWith('\\')), "two continuation lines, each \"\\\" right before its LF: " + code.Curl);
+                Check(code.Curl.Contains("/api/runs \\\n  -H \"content-type: application/json\" \\\n  --data-binary @run.json", StringComparison.Ordinal), "one curl command over three lines: " + code.Curl);
+                Check(code.InspectorUrl is null, "no run named: no \"Open last run in inspector\"");
+                Check(pages.Code(spec, "http://127.0.0.1:5180", "no-such-run").InspectorUrl is null, "a run runs.db does not have: no link");
+            }
+
+            // Over HTTP after a faux run: ?run= names the run the page shows, and the answer links its inspector page.
+            await using var app = await WebAgentApp.StartAsync("pg-code-link");
+            var request = new JsonObject
+            {
+                ["provider"] = "faux", ["model"] = "echo", ["source"] = "playground",
+                ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["text"] = "hi" }),
+            };
+            var posted = await app.SendAsync(HttpMethod.Post, "/api/runs", request.DeepClone(), origin: app.Origin);
+            Check(posted.Status == 200 && posted.Body?["posted"]?.GetValue<bool>() == true, "a faux run: " + posted.Text);
+            var id = posted.Body!["id"]!.GetValue<string>();
+            await RunsSseAsync(app, $"/api/runs/{id}/events");
+            var linked = await app.SendAsync(HttpMethod.Post, "/api/playground/code?run=" + Uri.EscapeDataString(id), request.DeepClone(), origin: app.Origin);
+            Equal(200, linked.Status, "POST /api/playground/code?run=: " + linked.Text);
+            Equal("/runs/" + Uri.EscapeDataString(id), linked.Body?["inspectorUrl"]?.GetValue<string>(), "\"Open last run in inspector\" goes to the run's inspector page");
+            foreach (var tab in new[] { "cSharp", "curl", "json" })
+                PlaygroundLfOnly(linked.Body?[tab]?.GetValue<string>() ?? throw new InvalidOperationException("no " + tab + ": " + linked.Text), tab + " over HTTP");
+            var unknown = await app.SendAsync(HttpMethod.Post, "/api/playground/code?run=no-such-run", request.DeepClone(), origin: app.Origin);
+            Check(unknown.Status == 200 && unknown.Body?["inspectorUrl"] is null, "an unknown run: no link: " + unknown.Text);
+            var none = await app.SendAsync(HttpMethod.Post, "/api/playground/code", request.DeepClone(), origin: app.Origin);
+            Check(none.Status == 200 && none.Body?["inspectorUrl"] is null, "no run: no link: " + none.Text);
+        }),
     ];
+
+    /// <summary><paramref name="text"/> has no carriage return: LF line endings only.</summary>
+    private static void PlaygroundLfOnly(string text, string what)
+    {
+        var at = text.IndexOf('\r', StringComparison.Ordinal);
+        Check(at < 0, $"{what} has LF line endings only (a CR at {at}: {(at < 0 ? "" : text.Substring(Math.Max(0, at - 60), Math.Min(120, text.Length - Math.Max(0, at - 60))).Replace("\r", "<CR>", StringComparison.Ordinal))})");
+    }
 
     /// <summary>Nothing the Content-Security-Policy (script-src 'self') would block: no inline script, no inline event handler.</summary>
     private static void PlaygroundNoInline(string where, string html)
