@@ -163,7 +163,7 @@ internal static partial class Program
                 var ids = first.Select(row => row.Item1).ToList();
                 Equal("1,100,200,300", string.Join(",", ids.Take(4)), "core, accounts, chats and settings migrations first");
                 Check(PiSharp.WebAgent.Spend.SpendLedgerMigrations.All.All(migration => ids.Contains(migration.Id)), "the spend ledger's migrations: " + string.Join(",", ids));
-                Equal(ids.Order().ToList(), ids, "applied in id order");
+                Equal(string.Join(",", ids.Order()), string.Join(",", ids), "applied in id order");
                 Equal((long)ids.Max(), ReadDb(options.DatabasePath, "PRAGMA user_version;", r => r.GetInt64(0)).Single(), "user_version is the highest id");
                 Equal("wal", ReadDb(options.DatabasePath, "PRAGMA journal_mode;", r => r.GetString(0)).Single(), "WAL");
                 var keys = Directory.GetFiles(options.KeysDirectory, "key-*.xml");

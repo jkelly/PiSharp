@@ -446,7 +446,7 @@ internal static partial class Program
             services.AddSpendArea(options);
             Check(services.All(descriptor => descriptor.ServiceType != typeof(MeteredFauxDurableModels)), "without the priced switch, the Spend area adds no metered faux models");
             using var provider = services.BuildServiceProvider();
-            Check(provider.GetRequiredService<IDurableModels>() is FauxDurableModels, "the faux models answer as they are");
+            Check(provider.GetRequiredService<IDurableModels>() is GuardedDurableModels { Inner: FauxDurableModels }, "the faux models answer as they are");
             Equal(BillingKind.Free, provider.GetRequiredService<IModelCatalog>().Providers.Single().Billing, "and the catalog stays free");
         }),
 
@@ -497,7 +497,7 @@ internal static partial class Program
 
             var options = new WebAgentOptions { DataDirectory = Path.Join(Path.GetTempPath(), "pisharp-webagent", "never-created"), Faux = true, FauxMetered = true };
             using var provider = new ServiceCollection().AddSingleton(options).AddWebAgentFallbacks(options).AddSpendArea(options).BuildServiceProvider();
-            var registered = provider.GetRequiredService<IDurableModels>() as MeteredFauxDurableModels;
+            var registered = (provider.GetRequiredService<IDurableModels>() as GuardedDurableModels)?.Inner as MeteredFauxDurableModels;
             Check(registered is not null && ReferenceEquals(registered.Inner, provider.GetRequiredService<FauxDurableModels>()), "--faux-metered registers the priced models over the faux ones");
             Equal(1, provider.GetServices<IDurableModels>().Count(), "and only them");
             var priced = provider.GetRequiredService<IModelCatalog>();
