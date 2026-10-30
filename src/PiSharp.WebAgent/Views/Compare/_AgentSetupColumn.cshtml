@@ -1,0 +1,61 @@
+@* Decision 0011 (run W4, R6): compare.html's _AgentColumn (setup): one model of a run being set up. Head: the column letter, the model chip
+   (opens #modal-model-picker; a new model keeps the thinking override, or keeps it aside when the model does not take it), the overrides
+   of this agent (thinking: inherit or one of the model's own levels the host takes) and Remove. Chips: how the shared thinking level
+   applies to this model ("thinking xhigh → high", "thinking n/a"), and subscription. Body: the workspace it will work in, the account and
+   billing the run would bind now, and its limits. Letters are positions (a to d, in order); compare-agent-setup.js re-letters the columns
+   after a removal. Model: AgentSetupColumnView. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@model AgentSetupColumnView
+@{
+    var slot = Model.Slot;
+    var chip = Model.Chip;
+    var billing = Model.Billing switch { BillingKind.Metered => "metered", BillingKind.Subscription => "subscription", BillingKind.Free => "free", _ => "unknown" };
+}
+<section class="compare-col" aria-label="@Model.Letter: @Model.Provider/@Model.Model" data-ac-setup-col data-slot="@slot" data-provider="@Model.Provider" data-model="@Model.Model" data-name="@Model.Name" data-billing="@billing" data-known="@(Model.Known ? "true" : "false")" data-kept-thinking="@Model.KeptThinking" data-effective="@Model.Effective">
+  <div class="compare-col-head">
+    <span class="ac-letter" aria-hidden="true" data-ac-letter>@Model.Letter</span>
+    <button class="model-chip" type="button" title="Change model" aria-label="Change the model of @Model.Name" data-ac-col-model>
+      <span class="model-chip-provider">@Model.Provider</span>
+      <span class="model-chip-name">@Model.Name</span>
+      <i class="bi bi-chevron-down" aria-hidden="true"></i>
+    </button>
+    <div class="ms-auto d-flex align-items-center">
+      <div class="dropdown">
+        <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Overrides for this agent" aria-label="Overrides for @Model.Name" disabled="@(!Model.Known)"><i class="bi bi-sliders" aria-hidden="true"></i></button>
+        <div class="dropdown-menu dropdown-menu-end p-3 cmp-overrides">
+          <div class="ps-label mb-2">Overrides · this agent</div>
+          <label class="form-label fs-8 ps-mono mb-1" for="ac-@(slot)-thinking" data-ac-for="thinking">thinking</label>
+          <select class="form-select form-select-sm ps-mono" id="ac-@(slot)-thinking" data-ac-override="thinking">
+            <option value="" selected="@(Model.Thinking is null)" data-inherit>inherit (@Model.SharedThinking)</option>
+            @foreach (var level in Model.Levels)
+            {
+              <option value="@level" selected="@(level == Model.Thinking)">@level</option>
+            }
+          </select>
+          <div class="form-text">@Model.OverrideNote</div>
+        </div>
+      </div>
+      <button class="btn btn-icon" type="button" title="Remove column" aria-label="Remove @Model.Name" data-ac-col-remove disabled="@(!Model.CanRemove)"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+    </div>
+    <div class="w-100 d-flex flex-wrap gap-1 ac-chips" data-ac-col-chips>
+      @if (chip is not null)
+      {
+        <span class="ps-chip" data-tone="@chip.Tone" title="@chip.Title" data-chip="thinking">@chip.Text</span>
+      }
+      @if (Model.Billing == BillingKind.Subscription)
+      {
+        <span class="ps-chip" data-tone="accent" title="List price only: a subscription is never counted toward money caps">subscription</span>
+      }
+    </div>
+  </div>
+  <div class="compare-col-body">
+    <div class="ac-held h-100">
+      <div>
+        <i class="bi bi-folder2 fs-4 d-block mb-2" aria-hidden="true"></i>
+        <span class="d-block text-body">Works in workspace <span data-ac-workspace-name>@slot</span></span>
+        <span class="d-block fs-8 mt-1">@Model.BillingLine</span>
+        <span class="d-block fs-8">@Model.LimitsLine</span>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,131 @@
+@* Decision 0011 (run W4, R6): modal-keep-result's content (compare.html's _KeepResultModal), from R4's keep preview. Panes:
+   - options: Apply to project as uncommitted changes (refused when the project has uncommitted changes in the same files), or Keep the
+     branch pisharp/compare/<run>-<slot> (one commit on a new branch, not switched to; worktrees only); which of the project's
+     uncommitted files are left alone; Discard the other workspaces (off unless chosen: their answers and file lists stay with the run,
+     their line-by-line diffs go with them);
+   - conflict: the preview found uncommitted changes in files this model also changed, so Apply would mix them: Try again, or Keep the
+     branch instead (which only selects it: Keep stays the user's click);
+   - refused: what a Keep answered when R4 refused it (filled in by compare-agent-run.js with textContent);
+   - error: why there is nothing to keep (discarded, still running).
+   Nothing is committed to the user's existing branches and nothing is pushed. Model: AgentKeepView. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Workspaces
+@model AgentKeepView
+@{
+    var column = Model.Column;
+    var letter = column.Letter;
+    var slot = column.Slot;
+    var preview = Model.Preview;
+    var pane = preview is null ? "error" : Model.Pane;
+    var applyBlocked = Model.ApplyBlocked;
+    var branchBlocked = Model.BranchBlocked;
+    var others = Model.Others;
+    var applyChecked = applyBlocked is null;
+    var branchChecked = !applyChecked && branchBlocked is null;
+    const int Shown = 8;
+}
+<div class="modal-content" data-ac-keep-content data-run="@Model.Run.Id" data-slot="@slot" data-pane="@pane">
+  <div class="modal-header">
+    <div class="ac-modal-heading">
+      <h2 class="modal-title" id="modal-keep-result-title">
+        <span data-ac-keep-only="options error" hidden="@(pane is "conflict" or "refused")">Keep @letter</span>
+        <span data-ac-keep-only="conflict refused" hidden="@(pane is not ("conflict" or "refused"))">Can't apply @letter</span>
+      </h2>
+      <div class="modal-subtitle">@Model.Subtitle</div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  </div>
+  <div class="modal-body">
+    <div data-ac-keep-pane="error" hidden="@(pane != "error")">
+      <div class="alert alert-secondary py-2 px-3 fs-7 mb-0" role="status">@(Model.Error ?? "There is nothing to keep.")</div>
+    </div>
+
+    <div data-ac-keep-pane="options" hidden="@(pane != "options")">
+      @if (preview is not null)
+      {
+        <fieldset class="mb-3">
+          <legend class="visually-hidden">How to keep @letter's changes</legend>
+          <input type="radio" class="btn-check" name="acKeep" id="acKeepApply" value="apply" autocomplete="off" checked="@applyChecked" disabled="@(applyBlocked is not null)" data-ac-keep-how>
+          <label class="choice-card mb-2" for="acKeepApply">
+            <span class="choice-title d-block">Apply to project as uncommitted changes</span>
+            <span class="choice-desc d-block">Copies @letter's diff into <span class="ac-path">@Model.Run.Spec.ProjectPath</span>. Your branch and commits stay as they are; review and commit when you're ready.</span>
+            @if (applyBlocked is not null)
+            {
+              <span class="choice-desc d-block text-ps-warn">@applyBlocked</span>
+            }
+          </label>
+          <input type="radio" class="btn-check" name="acKeep" id="acKeepBranch" value="branch" autocomplete="off" checked="@branchChecked" disabled="@(branchBlocked is not null)" data-ac-keep-how>
+          <label class="choice-card" for="acKeepBranch">
+            <span class="choice-title d-block">Keep the branch <span class="ac-path">@Model.Branch</span></span>
+            <span class="choice-desc d-block">Commits @letter's changes as one commit on this new branch, without switching to it. Your current branch and its commits aren't touched, and nothing is pushed.</span>
+            @if (branchBlocked is not null)
+            {
+              <span class="choice-desc d-block text-ps-warn">@branchBlocked</span>
+            }
+          </label>
+        </fieldset>
+        <div class="ps-panel px-3 py-2 mb-3">
+          <div class="kv"><span class="k">@letter's files with uncommitted changes in your project</span><span class="v">@(preview.Conflicts.Count == 0 ? "none" : preview.Conflicts.Count.ToString())</span></div>
+          @if (preview.OtherUncommitted.Count > 0)
+          {
+            <div class="fs-8 text-ps-faint pb-1">Your uncommitted <span class="ac-path">@string.Join(", ", preview.OtherUncommitted.Take(Shown).Select(change => change.Path))</span>@(preview.OtherUncommitted.Count > Shown ? $" and {preview.OtherUncommitted.Count - Shown} more" : "") @(preview.OtherUncommitted.Count == 1 ? "isn't one of " + letter + "'s files, so it's" : "aren't " + letter + "'s files, so they're") left alone.</div>
+          }
+          <div class="fs-8 text-ps-faint pb-1">@AgentText.Count(preview.Files.Count, "file") to keep.</div>
+        </div>
+        @if (others.Count > 0)
+        {
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="acKeepDiscard" disabled="@(!Model.OthersDone)" data-ac-keep-discard>
+            <label class="form-check-label fs-7" for="acKeepDiscard">Discard the other @(others.Count == 1 ? "workspace" : "workspaces") (@AgentText.Join(others))<span class="d-block fs-8 text-ps-faint">@(Model.OthersDone ? "Their answers, checks and file lists stay with the run; their line-by-line diffs go with them." : "Not while other models are still running.") Workspace @slot is kept until you discard it or @Model.RetentionDays days pass.</span></label>
+          </div>
+        }
+        <div class="d-flex gap-2 align-items-start fs-8 text-ps-faint">
+          <i class="bi bi-shield-check mt-1" aria-hidden="true"></i>
+          <span>Nothing is committed to your existing branches, and nothing is pushed.</span>
+        </div>
+      }
+    </div>
+
+    <div data-ac-keep-pane="conflict" hidden="@(pane != "conflict")">
+      @if (preview is { Conflicts.Count: > 0 })
+      {
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <span class="ps-chip" data-tone="danger">Not applied</span>
+          <span class="fs-7">Your project has uncommitted changes in @(preview.Conflicts.Count == 1 ? "a file" : "files") @letter also changed.</span>
+        </div>
+        <div class="ps-panel px-3 py-2 mb-3">
+          @foreach (var change in preview.Conflicts)
+          {
+            <div class="kv"><span class="k ac-path">@change.Path</span><span class="v text-nowrap">changed in both</span></div>
+          }
+        </div>
+        <p class="fs-7 text-secondary mb-3">Applying would mix the two, so nothing in your project was changed. Commit or stash your change and try again@(branchBlocked is null ? ", or keep " + letter + "'s changes on the branch " : ".")@if (branchBlocked is null) {<span class="ac-path">@Model.Branch</span><text> instead.</text>}</p>
+        <div class="d-flex gap-2 align-items-start fs-8 text-ps-faint">
+          <i class="bi bi-shield-check mt-1" aria-hidden="true"></i>
+          <span>Nothing is committed to your existing branches, and nothing is pushed. All workspaces are kept for now.</span>
+        </div>
+      }
+    </div>
+
+    <div data-ac-keep-pane="refused" hidden>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <span class="ps-chip" data-tone="danger">Not kept</span>
+        <span class="fs-7" data-ac-refused-message></span>
+      </div>
+      <div class="ps-panel px-3 py-2 mb-3" data-ac-refused-files hidden></div>
+      <div class="d-flex gap-2 align-items-start fs-8 text-ps-faint">
+        <i class="bi bi-shield-check mt-1" aria-hidden="true"></i>
+        <span>Nothing in your project changed, nothing is committed to your existing branches, and nothing is pushed. All workspaces are kept.</span>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="button" class="btn btn-primary" data-ac-keep-only="options" data-ac-keep-submit="@slot" hidden="@(pane != "options")" disabled="@(applyBlocked is not null && branchBlocked is not null)">Keep @letter</button>
+    <button type="button" class="btn btn-outline-secondary" data-ac-keep-only="conflict refused" data-ac-keep-retry="@slot" title="Checks your project again" hidden="@(pane is not ("conflict" or "refused"))">Try again</button>
+    @if (branchBlocked is null)
+    {
+      <button type="button" class="btn btn-primary" data-ac-keep-only="conflict refused" data-ac-keep-branch-instead hidden="@(pane is not ("conflict" or "refused"))">Keep the branch instead</button>
+    }
+  </div>
+</div>

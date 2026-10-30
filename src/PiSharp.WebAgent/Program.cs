@@ -48,6 +48,8 @@ PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.AddAgentCompareRunner(bu
 PiSharp.WebAgent.Playground.PlaygroundModule.AddPlaygroundArea(builder.Services, options);
 // Compare (run W4, R2): GET /compare and /api/compare (request mode: a group of 2 to 4 columns, reserved all or none).
 PiSharp.WebAgent.Compare.CompareModule.AddCompareArea(builder.Services, options);
+// Agent compare views (run W4, R6): GET /compare?mode=agent's setup and run views, and their fragments under /compare/agent.
+PiSharp.WebAgent.AgentCompare.Pages.AgentComparePagesModule.AddAgentComparePages(builder.Services, options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -63,6 +65,7 @@ app.MapRunsArea();
 PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.MapAgentCompareRunner(app);
 PiSharp.WebAgent.Playground.PlaygroundModule.MapPlaygroundArea(app);
 PiSharp.WebAgent.Compare.CompareModule.MapCompareArea(app);
+PiSharp.WebAgent.AgentCompare.Pages.AgentComparePagesModule.MapAgentComparePages(app);
 app.MapWebAgentCore();
 app.Run();
 return 0;

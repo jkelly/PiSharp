@@ -4,6 +4,8 @@
 // folder browser. Writes are POSTs with JSON bodies, so HostGuard's cross-origin (403) and JSON-only (415) rules cover them; every answer is
 // Cache-Control: no-store; errors are {error} with 400 (invalid input), 404 (no such provider) or 409 (not possible now), as in WU5. A
 // section is answered in SettingsStore.JsonOptions (camelCase, enums as camelCase strings). No answer holds a secret.
+using PiSharp.WebAgent.AgentCompare;
+using PiSharp.WebAgent.AgentCompare.Workspaces;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Data;
@@ -47,6 +49,17 @@ public static class SettingsEndpoints
             RunAsync(async () => Json(await store.SaveAsync(CheckTools(Required(body)), token).ConfigureAwait(false))));
         api.MapPost("/tools/reset", (ISettingsStore store, CancellationToken token) =>
             RunAsync(async () => Json(await store.ResetAsync<ToolsSettings>(token).ConfigureAwait(false))));
+
+        // Run W4, R6: agent compare's defaults (Settings › Tools, _AgentCompareDefaults). A field the body leaves out keeps its stored value.
+        api.MapGet("/agent-compare", (ISettingsStore store) => Json(store.Get<AgentCompareSettings>()));
+        api.MapPost("/agent-compare", (AgentCompareBody? body, ISettingsStore store, CancellationToken token) =>
+            RunAsync(async () =>
+            {
+                var request = Required(body);
+                return Json(await store.UpdateAsync<AgentCompareSettings>(current => CheckAgentCompare(request, current), token).ConfigureAwait(false));
+            }));
+        api.MapPost("/agent-compare/reset", (ISettingsStore store, CancellationToken token) =>
+            RunAsync(async () => Json(await store.ResetAsync<AgentCompareSettings>(token).ConfigureAwait(false))));
 
         api.MapGet("/models", (ISettingsStore store) => Json(store.Get<ModelsSettings>()));
         api.MapPost("/models/visibility", (VisibilityBody? body, ISettingsStore store, IModelCatalog catalog, CancellationToken token) =>
@@ -125,6 +138,36 @@ public static class SettingsEndpoints
             checkedRules.Add(new ToolAllowRule(tool, command));
         }
         return new ToolsSettings(directory, mode, checkedRules).Normalize();
+    }
+
+    /// <summary>The agent compare defaults <paramref name="body"/> asks for, on top of <paramref name="current"/> (run W4, R6): a field it leaves
+    /// out keeps its value; the result is normalized (AgentCompareSettings.Normalize checks the ranges and the excludes).</summary>
+    /// <exception cref="ArgumentException">An unknown isolation or approval mode, or a value out of range.</exception>
+    public static AgentCompareSettings CheckAgentCompare(AgentCompareBody body, AgentCompareSettings current)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(current);
+        var isolation = body.Isolation is null ? current.Isolation : body.Isolation.Trim().ToLowerInvariant() switch
+        {
+            "automatic" or "auto" => WorkspaceIsolation.Automatic,
+            "copy" => WorkspaceIsolation.Copy,
+            "worktree" => WorkspaceIsolation.Worktree,
+            _ => throw new ArgumentException("Choose an isolation: automatic or copy."),
+        };
+        if (body.CopyWarnGb is { } gb && (!double.IsFinite(gb) || gb < 0.1 || gb > 1000)) throw new ArgumentException("Warn above 0.1 to 1,000 GB.");
+        var excludes = body.ExtraExcludes is null ? current.ExtraExcludes
+            : AgentCompareSettings.NormalizeExcludes(body.ExtraExcludes.SelectMany(item => (item ?? "").Split([',', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)));
+        return (current with
+        {
+            Isolation = isolation,
+            ExtraExcludes = excludes,
+            UseGitignore = body.UseGitignore ?? current.UseGitignore,
+            CopyWarnGb = body.CopyWarnGb ?? current.CopyWarnGb,
+            MaxTurns = body.MaxTurns ?? current.MaxTurns,
+            MaxMinutes = body.MaxMinutes ?? current.MaxMinutes,
+            Approval = body.Approval is null ? current.Approval : ParseMode(body.Approval),
+            CheckTimeoutMinutes = body.CheckTimeoutMinutes ?? current.CheckTimeoutMinutes,
+        }).Normalize();
     }
 
     /// <summary><c>ask</c>, <c>allowList</c> (or <c>allow-list</c>), <c>auto</c> as <see cref="ToolApprovalMode"/>; blank is
@@ -218,3 +261,15 @@ public sealed record AllowRuleBody(string? Tool, string? Command);
 
 /// <summary>POST /api/settings/models/visibility: hide or show <c>models</c> (<c>provider/model</c> keys) or every model of <c>provider</c>.</summary>
 public sealed record VisibilityBody(List<string?>? Models, string? Provider, bool Hidden);
+
+/// <summary>POST /api/settings/agent-compare (run W4, R6): agent compare's defaults; a field left out (null) keeps its stored value.</summary>
+/// <param name="Isolation"><c>automatic</c> or <c>copy</c> (<c>worktree</c> is accepted too).</param>
+/// <param name="ExtraExcludes">Folders or patterns a copy also skips (each entry may hold several, comma-separated).</param>
+/// <param name="UseGitignore">Whether a copy also skips .gitignore patterns.</param>
+/// <param name="CopyWarnGb">A copy larger than this many GB asks first (0.1 to 1,000).</param>
+/// <param name="MaxTurns">Turns per model (1 to 200).</param>
+/// <param name="MaxMinutes">Minutes per model (1 to 240).</param>
+/// <param name="Approval"><c>ask</c>, <c>allowList</c> or <c>auto</c>.</param>
+/// <param name="CheckTimeoutMinutes">The check command's timeout in minutes (1 to 240).</param>
+public sealed record AgentCompareBody(string? Isolation = null, List<string?>? ExtraExcludes = null, bool? UseGitignore = null, double? CopyWarnGb = null,
+    int? MaxTurns = null, int? MaxMinutes = null, string? Approval = null, int? CheckTimeoutMinutes = null);

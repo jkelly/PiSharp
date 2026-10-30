@@ -1,0 +1,131 @@
+@* Decision 0011 (run W4, R6): modal-agent-diff's content (compare.html's _AgentDiffModal): "Changes in B · Claude Sonnet 5.5", what they
+   are against and which workspace, the A/B/C switch, then the file list (left) and the unified diff of each file (right; stacked below
+   768px). Lines stay neutral: + and − lines differ by background, weight and the marker, never by status colour. The diff is R4's
+   (WorkspaceDiff) and every line is text (encoded). At most AgentDiffView.MaxLines lines are drawn; Copy patch copies the whole patch. A
+   discarded workspace has no diff any more: the files it changed (kept with the run) are listed instead. Footer: Copy patch, Open as chat
+   and Keep x while the model's workspace is there. Model: AgentDiffView. *@
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Workspaces
+@model AgentDiffView
+@{
+    var column = Model.Column;
+    var slot = column.Slot;
+    var diff = Model.Diff;
+    var budget = AgentDiffView.MaxLines;
+    var cut = false;
+}
+<div class="modal-content" data-ac-diff-content data-run="@Model.Run.Id" data-slot="@slot">
+  <div class="modal-header gap-2 ac-diff-header">
+    <div class="ac-diff-heading">
+      <h2 class="modal-title" id="modal-agent-diff-title">Changes in @column.Letter · @column.Name</h2>
+      <div class="modal-subtitle">@Model.Subtitle</div>
+    </div>
+    <div class="ac-diff-switch">
+      <div class="ac-mode" role="group" aria-label="Column">
+        @foreach (var other in Model.Slots)
+        {
+          <button class="btn btn-sm btn-ghost@(other == slot ? " active" : "")" type="button" aria-pressed="@(other == slot ? "true" : "false")" aria-label="Show @other.ToUpperInvariant()'s changes" data-ac-diff="@other">@other.ToUpperInvariant()</button>
+        }
+      </div>
+    </div>
+    <button type="button" class="btn-close m-0 flex-shrink-0" data-bs-dismiss="modal" aria-label="Close"></button>
+  </div>
+  <div class="modal-body">
+    @if (Model.Error is { } error)
+    {
+      <div class="alert alert-secondary py-2 px-3 fs-7" role="status">@error</div>
+    }
+    @if (diff is not null)
+    {
+      if (diff.Files.Count == 0)
+      {
+        <div class="empty-state py-4">
+          <div class="empty-icon"><i class="bi bi-check2-circle" aria-hidden="true"></i></div>
+          <p class="fs-7 mb-0">No changes in workspace @slot against @Model.BaseLabel.</p>
+        </div>
+      }
+      else
+      {
+        <div class="ac-diff-layout">
+          <nav class="ac-diff-files" aria-label="Files changed in @column.Letter">
+            @for (var index = 0; index < diff.Files.Count; index++)
+            {
+              var file = diff.Files[index];
+              <a class="ac-diff-file-link" href="#acd-@slot-@index"><span class="ac-path">@file.Path</span><span class="ac-delta">@AgentColumnView.Delta(file)</span></a>
+            }
+          </nav>
+          <div>
+            @for (var index = 0; index < diff.Files.Count; index++)
+            {
+              var file = diff.Files[index];
+              <section class="ac-diff" id="acd-@slot-@index" aria-label="@file.Path, @file.Added lines added, @file.Removed removed">
+                <div class="ac-diff-head"><span class="ac-path">@file.Path</span><span class="ac-delta ms-auto">@AgentColumnView.Delta(file)</span></div>
+                @if (file.Binary)
+                {
+                  <div class="ac-diff-code"><div class="ac-diff-lines"><div class="ln hunk"><span class="m"> </span>Binary file, not shown.</div></div></div>
+                }
+                else if (cut)
+                {
+                  <div class="ac-diff-code"><div class="ac-diff-lines"><div class="ln hunk"><span class="m"> </span>Not drawn: the diff is longer than @budget.ToString("N0") lines. Copy patch has all of it.</div></div></div>
+                }
+                else
+                {
+                  <div class="ac-diff-code"><div class="ac-diff-lines">
+                    @foreach (var hunk in file.Hunks)
+                    {
+                      if (cut) { break; }
+                      <div class="ln hunk">@hunk.Header</div>
+                      @foreach (var line in hunk.Lines)
+                      {
+                        if (--budget < 0)
+                        {
+                          cut = true;
+                          <div class="ln hunk"><span class="m"> </span>Cut here: the diff is longer than @AgentDiffView.MaxLines.ToString("N0") lines. Copy patch has all of it.</div>
+                          break;
+                        }
+                        var css = line.Kind switch { WorkspaceDiffLineKind.Added => "ln add", WorkspaceDiffLineKind.Removed => "ln del", WorkspaceDiffLineKind.Note => "ln hunk", _ => "ln" };
+                        var mark = line.Kind switch { WorkspaceDiffLineKind.Added => "+", WorkspaceDiffLineKind.Removed => "-", _ => " " };
+                        <div class="@css"><span class="m">@mark</span>@line.Text</div>
+                      }
+                    }
+                  </div></div>
+                }
+              </section>
+            }
+          </div>
+        </div>
+      }
+    }
+    else if (column.State.Diff is { } stored)
+    {
+      <div class="ps-label mb-1">@(stored.Files == 0 ? "No files changed" : AgentText.Count(stored.Files, "file") + " changed") @if (stored.Files > 0) {<span class="fw-normal text-ps-faint">· +@stored.Added −@stored.Removed</span>}</div>
+      <ul class="ac-files">
+        @foreach (var file in stored.Items)
+        {
+          <li><span class="ac-path">@file.Path</span><span class="ac-delta">@AgentColumnView.Delta(file)</span></li>
+        }
+      </ul>
+    }
+  </div>
+  <div class="modal-footer">
+    <div class="d-flex flex-wrap gap-2 me-auto">
+      @if (diff is { Patch.Length: > 0 })
+      {
+        <button type="button" class="btn btn-ghost" data-ac-copy-patch="@slot"><i class="bi bi-copy me-1" aria-hidden="true"></i>Copy patch</button>
+      }
+      @if (column.ChatUrl is { } chat)
+      {
+        <a class="btn btn-ghost" href="@chat">Open chat</a>
+      }
+      else if (column.CanOpenChat)
+      {
+        <button type="button" class="btn btn-ghost" data-ac-open-chat="@slot">Open as chat</button>
+      }
+      @if (column.CanKeep)
+      {
+        <button type="button" class="btn btn-outline-secondary" data-ac-keep="@slot">Keep @column.Letter</button>
+      }
+    </div>
+    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+  </div>
+</div>

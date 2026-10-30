@@ -1,0 +1,177 @@
+@* Decision 0011 (run W4, R6): compare.html's agent-setup and agent-dirty: the task, the project folder (Change: recent folders or another
+   one; the default is the Settings › Tools working directory) with its isolation chip, which opens modal-agent-workspace, the optional
+   check command, "Limits and approvals" (turns, minutes, the run cap shared by the metered models with Ask or Block, the check timeout,
+   and this run's tool approval: Ask, Allow-list or Auto in workspaces, the last two with the not-a-sandbox warning in plain text), the
+   Request · Agent switch, the shared thinking level, Run agents (Ctrl+Enter) and the run cap chip. Below, one _AgentSetupColumn per model
+   (1 to 4, picked with Provider → Model) and the Add model column. The project row's chip and banners (agent-dirty: uncommitted changes
+   worktrees leave out; a copy over the size warning) come from GET /compare/agent/project after the page loads, because a copy's size
+   can take a while to count. Run agents posts to R5's POST /api/compare/agent; nothing runs before. Model: AgentSetupView. *@
+@using PiSharp.WebAgent.AgentCompare
+@using PiSharp.WebAgent.AgentCompare.Pages
+@using PiSharp.WebAgent.AgentCompare.Runner
+@using PiSharp.WebAgent.Spend
+@model AgentSetupView
+@{
+    var count = Model.Columns.Count;
+    var slots = AgentCompareRunner.MaxModels - count;
+    var approval = Model.Approval;
+    var excludes = string.Join(", ", Model.ExtraExcludes);
+    var capTitle = Model.Cap.Length > 0 ? "" : "<strong>No run cap</strong><br>Turns and time limit each model. Each turn still reserves its worst case first, and your Spend Guard caps still apply.";
+}
+<div class="cmp-page ac-page" data-agent-mode data-agent-compare="setup" data-max-columns="@AgentCompareRunner.MaxModels" data-min-columns="1" data-from="@Model.FromRun"
+     data-isolation="@AgentText.IsolationValue(Model.Isolation)" data-base-ref="@Model.BaseRef" data-subtitle="Agent · one task, several models">
+  <section class="compare-prompt" aria-label="Task" data-ac-setup>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span class="ps-label">Task</span>
+      @if (Model.FromRun is { } from)
+      {
+        <span class="ms-auto fs-8 text-ps-faint">Copied from run <a class="font-monospace" href="/compare?mode=agent&amp;run=@Uri.EscapeDataString(from)">@from</a></span>
+      }
+    </div>
+    @if (Model.Notice is { } notice)
+    {
+      <div class="alert alert-warning py-2 px-3 mb-2 fs-7" role="status" data-ac-notice><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@notice</div>
+    }
+    <label class="visually-hidden" for="acTask">Task</label>
+    <textarea class="form-control mb-2" id="acTask" rows="2" maxlength="100000" placeholder="Describe the task every model works on, for example: Fix the failing ModelRegistry test." data-ac-task>@Model.Task</textarea>
+
+    <div class="ac-project mb-2" data-ac-project>
+      <i class="bi bi-folder2 text-ps-faint" aria-hidden="true"></i>
+      <span class="visually-hidden">Project folder:</span>
+      <span class="ac-path" data-ac-path>@Model.ProjectPath</span>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-ghost py-0 px-1 fs-8" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Change project folder">Change</button>
+        <div class="dropdown-menu p-2 ac-folder-menu" data-ac-folder-menu>
+          <h6 class="dropdown-header px-2">Recent</h6>
+          @foreach (var recent in Model.RecentProjects)
+          {
+            var current = string.Equals(recent.Path, Model.ProjectPath, StringComparison.OrdinalIgnoreCase);
+            <button class="dropdown-item d-flex align-items-center gap-2" type="button" aria-current="@(current ? "true" : null)" data-ac-folder="@recent.Path">
+              <i class="bi bi-check2@(current ? "" : " invisible")" aria-hidden="true"></i><span class="ac-path">@recent.Path</span><span class="fs-8 text-ps-faint ms-auto text-nowrap">@recent.Note</span>
+            </button>
+          }
+          <div class="px-2 pt-2">
+            <label class="form-label fs-8 mb-1" for="acFolder">Another folder</label>
+            <div class="input-group input-group-sm">
+              <input class="form-control font-monospace" id="acFolder" placeholder="C:\path\to\project" spellcheck="false" maxlength="1024" data-ac-folder-input>
+              <button class="btn btn-outline-secondary" type="button" data-ac-folder-use>Use</button>
+            </div>
+            <div class="form-text">The default is your working directory in <a href="/settings/tools">Settings › Tools</a>.</div>
+          </div>
+        </div>
+      </div>
+      <span class="ac-iso-host" data-ac-iso-host><span class="ps-chip" data-tone="outline"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Checking the folder…</span></span>
+    </div>
+    <div data-ac-banners role="status"></div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <div class="input-group input-group-sm ac-check">
+        <label class="input-group-text" for="acCheck">Check</label>
+        <input class="form-control font-monospace" id="acCheck" value="@Model.CheckCommand" placeholder="Optional, e.g. dotnet test" aria-describedby="acCheckHelp" spellcheck="false" maxlength="@AgentCheckCommand.MaxCommandLength" data-ac-check>
+        <span class="input-group-text" data-bs-toggle="tooltip" title="Optional. Runs in each workspace when its agent finishes, with a @Model.Defaults.CheckTimeoutMinutes-minute timeout. Each column shows pass or fail."><i class="bi bi-info-circle" aria-hidden="true"></i></span>
+        <span class="visually-hidden" id="acCheckHelp">Optional. Runs in each workspace when its agent finishes. Each column shows pass or fail.</span>
+      </div>
+      <button class="btn btn-sm btn-ghost py-0 px-1 d-inline-flex align-items-center gap-1 fs-8 ac-limits-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#acLimits" aria-expanded="@(approval == ToolApprovalMode.Ask ? "false" : "true")" aria-controls="acLimits">
+        <i class="bi bi-chevron-right" aria-hidden="true"></i><span>Limits and approvals</span><span class="text-ps-faint text-truncate d-none d-md-inline" data-ac-limits-summary>· @Model.LimitsSummary</span>
+      </button>
+    </div>
+    <div class="collapse@(approval == ToolApprovalMode.Ask ? "" : " show")" id="acLimits">
+      <div class="ps-panel ac-limits p-3 mb-2">
+        <div class="row g-3">
+          <div class="col-6 col-md-3">
+            <label class="form-label fs-7" for="acMaxTurns">Max turns</label>
+            <div class="input-group input-group-sm"><input class="form-control" id="acMaxTurns" type="number" min="1" max="@AgentCompareSettings.MaxTurnsLimit" value="@Model.MaxTurns" data-ac-max-turns><span class="input-group-text">per model</span></div>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label fs-7" for="acMaxTime">Max time</label>
+            <div class="input-group input-group-sm"><input class="form-control" id="acMaxTime" type="number" min="1" max="@AgentCompareSettings.MaxMinutesLimit" value="@Model.MaxMinutes" data-ac-max-minutes><span class="input-group-text">min each</span></div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fs-7" for="acCap">Run cap</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input class="form-control ac-cap-input" id="acCap" type="text" inputmode="decimal" value="@Model.Cap" placeholder="none" aria-describedby="acCapHelp" data-ac-cap>
+              <select class="form-select ac-cap-mode" id="acCapMode" aria-label="When an agent reaches its share" data-ac-cap-action>
+                <option value="ask" selected="@(Model.CapAction == CapAction.Ask)">Ask</option>
+                <option value="block" selected="@(Model.CapAction == CapAction.Block)">Block</option>
+              </select>
+            </div>
+            <div class="form-text" id="acCapHelp" data-ac-cap-help>Shared equally by the metered models. A subscription model is limited by turns and time, and its list cost isn't counted. Leave it empty for no cap.</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label fs-7" for="acCheckTimeout">Check timeout</label>
+            <div class="input-group input-group-sm"><input class="form-control" id="acCheckTimeout" type="number" min="1" max="@AgentCompareSettings.MaxMinutesLimit" value="@Model.Defaults.CheckTimeoutMinutes" data-ac-check-timeout><span class="input-group-text">min</span></div>
+          </div>
+        </div>
+        <fieldset class="mt-3">
+          <legend class="form-label fs-7 mb-2">Tool approval for this run</legend>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <div class="form-check mb-0">
+                <input class="form-check-input" type="radio" name="acApproval" id="acApprovalAsk" value="ask" checked="@(approval == ToolApprovalMode.Ask)" data-ac-approval>
+                <label class="form-check-label fs-7" for="acApprovalAsk">Ask<span class="text-ps-faint">@(Model.Defaults.Approval == ToolApprovalMode.Ask ? " · default" : "")</span><span class="d-block fs-8 text-ps-faint">Asks before each bash command; reads and edits inside the workspace don't ask. Answer per column or for all at once.</span></label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check mb-0">
+                <input class="form-check-input" type="radio" name="acApproval" id="acApprovalList" value="allowList" checked="@(approval == ToolApprovalMode.AllowList)" aria-describedby="acAllowWarn" data-ac-approval>
+                <label class="form-check-label fs-7" for="acApprovalList">Allow-list<span class="text-ps-faint">@(Model.Defaults.Approval == ToolApprovalMode.AllowList ? " · default" : "")</span><span class="d-block fs-8 text-ps-faint" id="acAllowWarn">Like Ask, but bash commands on your allow-list in <a href="/settings/tools#approvals">Settings › Tools</a> (@AgentText.Count(Model.AllowRules, "rule")) run without asking too. Anything else asks, per column. <span class="ps-chip me-1" data-tone="warn">not a sandbox</span>Workspaces are copies, not sandboxes: allowed commands run with your rights.</span></label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-check mb-0">
+                <input class="form-check-input" type="radio" name="acApproval" id="acApprovalAuto" value="auto" checked="@(approval == ToolApprovalMode.Auto)" aria-describedby="acAutoWarn" data-ac-approval>
+                <label class="form-check-label fs-7" for="acApprovalAuto">Auto in workspaces<span class="text-ps-faint">@(Model.Defaults.Approval == ToolApprovalMode.Auto ? " · default" : "")</span><span class="d-block fs-8 text-ps-faint" id="acAutoWarn"><span class="ps-chip me-1" data-tone="warn">not a sandbox</span>Runs every tool without asking. Workspaces are copies, not sandboxes: commands run with your rights and can reach other folders, the network and your credentials.</span></label>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+        <div class="fs-8 text-ps-faint mt-2">Defaults for new runs are in <a href="/settings/tools#agent-compare">Settings › Tools</a>.</div>
+      </div>
+    </div>
+    <input type="hidden" value="@excludes" data-ac-excludes>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <partial name="/Views/Compare/_CompareModeSwitch.cshtml" model='new ComparePage { Mode = ComparePage.AgentModeName }' />
+      <div class="input-group input-group-sm w-auto">
+        <label class="input-group-text ps-mono" for="acThinking">thinking</label>
+        <select class="form-select ps-mono" id="acThinking" data-ac-thinking>
+          @foreach (var level in Model.ThinkingLevels)
+          {
+            <option value="@level" selected="@(level == Model.Thinking)">@level</option>
+          }
+        </select>
+      </div>
+      <span class="fs-8 text-ps-faint d-none d-xxl-inline">Levels are clamped per model</span>
+      <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+        <button class="btn btn-sm btn-primary btn-ps" type="button" title="Run agents (Ctrl+Enter)" data-ac-run><i class="bi bi-play-fill me-1" aria-hidden="true"></i>Run agents</button>
+        <button class="composer-estimate run-estimate" type="button" aria-label="@(Model.Cap.Length > 0 ? "Run cap: $" + Model.Cap : "No run cap")" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="ps-tip-left" title="@capTitle" data-ac-cap-chip>@(Model.Cap.Length > 0 ? "Cap $" + Model.Cap : "No run cap")</button>
+      </div>
+    </div>
+    <div class="alert alert-danger py-2 px-3 mt-2 mb-0 fs-7" role="alert" data-ac-error hidden></div>
+  </section>
+
+  <div class="cmp-views">
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 border-bottom flex-shrink-0">
+      <ul class="nav nav-tabs border-0" aria-label="Compare views">
+        <li class="nav-item"><span class="nav-link active" aria-current="page"><i class="bi bi-layout-three-columns me-1" aria-hidden="true"></i>Agents</span></li>
+      </ul>
+      <span class="ms-auto fs-8 text-ps-faint text-truncate d-none d-sm-inline" data-ac-setup-status>@AgentText.Count(count, "agent") · each in its own workspace</span>
+    </div>
+    <div class="cmp-tab-content">
+      <div class="cmp-pane active">
+        <div class="compare-grid@(slots > 0 ? " has-add" : "")" style="--cmp-cols:@count" data-ac-grid>
+          @foreach (var column in Model.Columns)
+          {
+            <partial name="/Views/Compare/_AgentSetupColumn.cshtml" model="column" />
+          }
+          <div class="compare-col cmp-add-col" aria-label="Add a model" data-ac-add hidden="@(slots <= 0)">
+            <button class="compare-add flex-grow-1 bg-transparent" type="button" data-ac-add-model>
+              <span><i class="bi bi-plus-circle fs-3 d-block mb-2" aria-hidden="true"></i><span class="fw-semibold d-block text-body">Add model</span><span class="fs-8 d-block" data-ac-slots>Up to @AgentCompareRunner.MaxModels agents · @slots @(slots == 1 ? "slot" : "slots") left</span></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
