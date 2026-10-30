@@ -53,15 +53,15 @@ internal static partial class Program
         Case("host.migrations-refuse-ids-outside-areas-and-duplicates", () =>
         {
             var path = Path.Join(Path.GetTempPath(), "pisharp-webagent", "never-created.db");
-            foreach (var id in new[] { 0, -1, 400, 999, 3000 })
+            foreach (var id in new[] { 0, -1, 600, 999, 3000 })
                 Throws<ArgumentException>(() => new WebAgentDb(path, [TestTable(id)]), "id " + id);
             var duplicate = Throws<ArgumentException>(() => new WebAgentDb(path, [TestTable(301), new SqlMigration(301, "other", "SELECT 1;")]), "a duplicate id");
             Check(duplicate.Message.Contains("301", StringComparison.Ordinal), "the message names the id");
             Check(!File.Exists(path), "nothing is created by a refused set");
-            Equal("core,accounts,chats,settings,spend,evals", string.Join(",", MigrationArea.All.Select(area => area.Name)), "the areas");
-            Equal("1-99,100-199,200-299,300-399,1000-1999,2000-2999", string.Join(",", MigrationArea.All.Select(area => $"{area.First}-{area.Last}")), "their ranges");
+            Equal("core,accounts,chats,settings,presets,compare,spend,evals", string.Join(",", MigrationArea.All.Select(area => area.Name)), "the areas");
+            Equal("1-99,100-199,200-299,300-399,400-499,500-599,1000-1999,2000-2999", string.Join(",", MigrationArea.All.Select(area => $"{area.First}-{area.Last}")), "their ranges");
             Equal(MigrationArea.Chats, MigrationArea.Of(250), "Of");
-            Equal(null, MigrationArea.Of(500), "a gap");
+            Equal(null, MigrationArea.Of(700), "a gap");
         }),
 
         Case("host.migrations-a-failed-migration-leaves-nothing", () =>

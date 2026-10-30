@@ -1,6 +1,7 @@
 // Decision 0011 (run W2, WU4): how an area adds tables to webagent.db. Each area registers its migrations in DI with ids from its own range,
 // so units never edit a shared list and never collide: core 1-99, accounts 100-199, chats 200-299, settings 300-399, spend 1000-1999 (W3),
-// evals 2000-2999 (W5). WebAgentDb applies every registered id it has not recorded yet, lowest first, each in its own transaction.
+// evals 2000-2999 (W5); W4 adds presets 400-499 and compare 500-599 (runs.db has its own schema_migrations and uses the core range).
+// WebAgentDb applies every registered id it has not recorded yet, lowest first, each in its own transaction.
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -54,6 +55,12 @@ public sealed record MigrationArea(string Name, int First, int Last)
     /// <summary>Settings sections (<see cref="Contracts.ISettingsStore"/>, Settings).</summary>
     public static MigrationArea Settings { get; } = new("settings", 300, 399);
 
+    /// <summary>Playground presets and saved prompts (W4).</summary>
+    public static MigrationArea Presets { get; } = new("presets", 400, 499);
+
+    /// <summary>Compare sessions, Bench suites and agent comparisons (W4).</summary>
+    public static MigrationArea Compare { get; } = new("compare", 500, 599);
+
     /// <summary>The Spend Guard ledger and caps (W3).</summary>
     public static MigrationArea Spend { get; } = new("spend", 1000, 1999);
 
@@ -61,7 +68,7 @@ public sealed record MigrationArea(string Name, int First, int Last)
     public static MigrationArea Evals { get; } = new("evals", 2000, 2999);
 
     /// <summary>Every area, in id order.</summary>
-    public static IReadOnlyList<MigrationArea> All { get; } = [Core, Accounts, Chats, Settings, Spend, Evals];
+    public static IReadOnlyList<MigrationArea> All { get; } = [Core, Accounts, Chats, Settings, Presets, Compare, Spend, Evals];
 
     /// <summary>The area <paramref name="id"/> belongs to, or null when it is in none.</summary>
     public static MigrationArea? Of(int id) => All.FirstOrDefault(area => id >= area.First && id <= area.Last);

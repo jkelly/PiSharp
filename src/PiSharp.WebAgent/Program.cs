@@ -11,6 +11,7 @@ using PiSharp.WebAgent.Spend;
 using PiSharp.WebAgent.Setup;
 using PiSharp.WebAgent.About;
 using PiSharp.WebAgent.CustomProviders;
+using PiSharp.WebAgent.Runs;
 
 WebAgentOptions options;
 WebApplicationBuilder builder;
@@ -39,6 +40,8 @@ builder.Services.AddWebAgentFallbacks(options);
 builder.Services.AddSpendArea(options);
 // Agent compare workspaces (run W4, R4): a git worktree or a copy per model under <data>\workspaces, cleaned at start and daily.
 PiSharp.WebAgent.AgentCompare.Workspaces.WorkspacesModule.AddAgentCompareWorkspaces(builder.Services, options);
+// Run engine and history (run W4, R0): after the Spend Guard, so the recorder wraps the guarded models; runs.db, /api/runs.
+builder.Services.AddRunsArea(options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -50,6 +53,7 @@ app.MapSpendArea();
 app.MapSetupArea();
 app.MapAboutArea();
 app.MapCustomProvidersArea();
+app.MapRunsArea();
 app.MapWebAgentCore();
 app.Run();
 return 0;
