@@ -237,6 +237,11 @@ tr.is-modified > td:first-child { box-shadow: inset 3px 0 0 var(--ps-warn); }
 }
 
 /* ---------- Shell: modals, toasts, later-milestone pages ---------- */
+/* W4 fix 2: Bootstrap pads .modal-footer with calc(var(--bs-modal-padding) - var(--bs-modal-footer-gap) * .5), and the theme's two-value
+   --bs-modal-padding (1rem 1.25rem) makes that calc invalid, so every dialog's footer lost its side and bottom padding: its last button sat
+   5 px from the dialog's right edge at any width. A 16 px gutter (and 12 px below) plus each button's .25rem margin lines the footer's
+   buttons up with the body's 20 px again. */
+.modal-footer { padding: .25rem calc(1.25rem - var(--bs-modal-footer-gap) * .5) calc(1rem - var(--bs-modal-footer-gap) * .5); }
 .confirm-text { min-width: 0; }
 .confirm-icon.is-danger { background: var(--ps-danger-bg); color: var(--ps-danger); border-color: transparent; }
 .confirm-icon.is-primary { background: var(--ps-surface-3); color: var(--ps-text); }

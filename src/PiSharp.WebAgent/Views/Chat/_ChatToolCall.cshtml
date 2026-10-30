@@ -3,7 +3,7 @@
    when it never started) and the stored duration; inside, the input, live output (committed about every 150 ms), the result and nested
    calls. The restart chip comes from the stored result's diagnostic (interrupted or abandoned), not from its text. A call that waits for
    the user's approval shows the inline approval card (_ChatApproval) under it; questions and plan reviews wait in the "Waiting for you"
-   panel. *@
+   panel. W4 fix 2: a read-only context has no approval cards and no Fork button. *@
 @model ChatToolView
 @{
     var call = Model.Call;
@@ -64,7 +64,7 @@
     @if (result is not null)
     {
       <div class="result-head @(nestedCount > 0 ? "mt-2" : "")"><span class="ps-label">@(restarted ? "Output up to the restart" : "Result")</span>
-        @if (call.ResultEntryId is { } entry && !Model.Nested)
+        @if (call.ResultEntryId is { } entry && !Model.Nested && !Model.Context.ReadOnly)
         {
           <button class="btn btn-icon ms-auto" type="button" title="Fork after this result" aria-label="Fork at entry @entry" data-action="fork" data-entry="@entry"><i class="bi bi-signpost-split"></i></button>
         }

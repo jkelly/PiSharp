@@ -7,6 +7,8 @@
 // (committed text only). No default model: a session whose model the device no longer knows is never moved to another one. The web agent
 // defines no durable jobs and runs no schedules. The service also keeps each chat's running flag for the sidebar, refreshed from the
 // device's coalesced changes.
+// W4 fix 2: the host streams through Models: the app's IDurableModels under every registered IDeviceModelsDecorator (DeviceModels), so an
+// area wraps the device's models (agent compare's gate) without replacing this service's registration.
 using System.Collections.Concurrent;
 using PiSharp.Durable;
 using PiSharp.Durable.Hosting;
@@ -18,7 +20,7 @@ namespace PiSharp.WebAgent.Chat;
 
 /// <summary>Hosts the app's durable sessions. A singleton and hosted service.</summary>
 public sealed class DeviceHostService(WebAgentOptions options, IDurableModels models, ISettingsStore settings, ChatBindings bindings,
-    ApprovalBroker broker, ILogger<DeviceHostService> logger) : IHostedService, IAsyncDisposable
+    ApprovalBroker broker, ILogger<DeviceHostService> logger, IEnumerable<IDeviceModelsDecorator> decorators) : IHostedService, IAsyncDisposable
 {
     /// <summary>How often model progress (partial messages and tool output) is committed, and so streamed, in milliseconds.</summary>
     public const double ProgressIntervalMs = 150;
@@ -29,6 +31,10 @@ public sealed class DeviceHostService(WebAgentOptions options, IDurableModels mo
     private DurableDeviceHost? host;
     private Task? watching;
     private int disposed;
+
+    /// <summary>The models the device streams through: the app's <see cref="IDurableModels"/> under every registered
+    /// <see cref="IDeviceModelsDecorator"/>, the first registered innermost.</summary>
+    public IDurableModels Models { get; } = DeviceModels.Apply(models, decorators);
 
     /// <summary>Raised after the running flag of some chats changed (coalesced), outside any lock.</summary>
     public event Action? ActivityChanged;
@@ -76,7 +82,7 @@ public sealed class DeviceHostService(WebAgentOptions options, IDurableModels mo
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         var tools = settings.Get<ToolsSettings>();
-        var device = await DurableDeviceHost.OpenAsync(CreateOptions(options.DeviceDirectory, tools.EffectiveWorkingDirectory, models, settings, bindings, broker,
+        var device = await DurableDeviceHost.OpenAsync(CreateOptions(options.DeviceDirectory, tools.EffectiveWorkingDirectory, Models, settings, bindings, broker,
             (session, error) => logger.LogWarning(error, "Durable session {Session}: {Message}", session ?? "-", error.Message)), cancellationToken).ConfigureAwait(false);
         Volatile.Write(ref host, device);
         opened.TrySetResult(device);

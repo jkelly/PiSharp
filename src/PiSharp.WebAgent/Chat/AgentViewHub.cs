@@ -14,6 +14,10 @@
 // W3 fix: a chat's feeds also render again when one of its ledger rows changes (ChatSpend.RunChanged), so a reservation resolved on History
 // › Spend, or settled after the answer was committed, shows in an open chat at once. W3 fix 2: the render context and the banners carry
 // the messages queued behind a spend stop that ended the run (ChatSpendStopView.Queued), and the stop's fingerprint includes them.
+// W4 fix 2: read-only feeds (Subscribe with readOnly) of a session SessionViews knows, with or without a chat binding (an agent compare
+// model's session before it is opened as a chat): the same items rendered with a read-only context (no actions, no approval cards), only the
+// notices panel, no spend marks unless the session is a chat, and a state that says readOnly. A read-only feed and a chat page's feed of
+// the same agent are separate feeds.
 using System.Globalization;
 using System.Text.Json.Nodes;
 using PiSharp.Durable.Client;
@@ -32,21 +36,23 @@ public sealed class AgentViewHub : IAsyncDisposable
     private readonly DeviceHostService device;
     private readonly ChatService chats;
     private readonly ChatBindings bindings;
+    private readonly SessionViews views;
     private readonly ApprovalBroker broker;
     private readonly ChatSpend? spending;
     private readonly FragmentRenderer renderer;
     private readonly ILogger<AgentViewHub> logger;
     private readonly Lock gate = new();
-    private readonly Dictionary<(string Session, long Agent), Feed> feeds = [];
+    private readonly Dictionary<(string Session, long Agent, bool ReadOnly), Feed> feeds = [];
     private int started;
 
     /// <summary>The hub over the device's sessions.</summary>
-    public AgentViewHub(DeviceHostService device, ChatService chats, ChatBindings bindings, ApprovalBroker broker, FragmentRenderer renderer,
-        ILogger<AgentViewHub> logger)
+    public AgentViewHub(DeviceHostService device, ChatService chats, ChatBindings bindings, SessionViews views, ApprovalBroker broker,
+        FragmentRenderer renderer, ILogger<AgentViewHub> logger)
     {
         this.device = device;
         this.chats = chats;
         this.bindings = bindings;
+        this.views = views;
         this.broker = broker;
         this.renderer = renderer;
         this.logger = logger;
@@ -67,8 +73,9 @@ public sealed class AgentViewHub : IAsyncDisposable
     public int FeedsStarted => Volatile.Read(ref started);
 
     /// <summary>Subscribes <paramref name="send"/> to the view of agent <paramref name="agentId"/> of chat <paramref name="sessionId"/>:
-    /// the whole view first, then changes. Dispose to leave; the last subscriber stops the watch (never the agent's work).</summary>
-    public IDisposable Subscribe(string sessionId, long agentId, Action<JsonObject> send)
+    /// the whole view first, then changes. Dispose to leave; the last subscriber stops the watch (never the agent's work). A
+    /// <paramref name="readOnly"/> view is of any session <see cref="SessionViews"/> knows, chat or not, and renders no actions.</summary>
+    public IDisposable Subscribe(string sessionId, long agentId, Action<JsonObject> send, bool readOnly = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(sessionId);
         ArgumentNullException.ThrowIfNull(send);
@@ -77,10 +84,10 @@ public sealed class AgentViewHub : IAsyncDisposable
         var created = false;
         lock (gate)
         {
-            if (!feeds.TryGetValue((sessionId, agentId), out var existing))
+            if (!feeds.TryGetValue((sessionId, agentId, readOnly), out var existing))
             {
-                existing = new Feed(this, sessionId, agentId);
-                feeds[(sessionId, agentId)] = existing;
+                existing = new Feed(this, sessionId, agentId, readOnly);
+                feeds[(sessionId, agentId, readOnly)] = existing;
                 created = true;
                 Interlocked.Increment(ref started);
             }
@@ -177,7 +184,7 @@ public sealed class AgentViewHub : IAsyncDisposable
     }
 
     /// <summary>One agent's watch, model and rendered view.</summary>
-    private sealed class Feed(AgentViewHub hub, string sessionId, long agentId)
+    private sealed class Feed(AgentViewHub hub, string sessionId, long agentId, bool readOnly)
     {
         private readonly CancellationTokenSource stop = new();
         private readonly SemaphoreSlim gate = new(1, 1);
@@ -196,7 +203,7 @@ public sealed class AgentViewHub : IAsyncDisposable
         private bool rendered;
         private long sequence;
 
-        public (string Session, long Agent) Key => (sessionId, agentId);
+        public (string Session, long Agent, bool ReadOnly) Key => (sessionId, agentId, readOnly);
 
         public void Add(Viewer viewer)
         {
@@ -312,7 +319,8 @@ public sealed class AgentViewHub : IAsyncDisposable
             await gate.WaitAsync(stop.Token).ConfigureAwait(false);
             try
             {
-                if (!model.Ready || hub.bindings.Get(sessionId) is not { } binding) return;
+                var chat = hub.bindings.Get(sessionId);
+                if (!model.Ready || (readOnly ? hub.views.Find(sessionId) : chat) is not { } binding) return;
                 if (!accountRead || accountFor != binding.Provider + "/" + binding.AccountId)
                 {
                     accountLabel = await hub.chats.AccountLabelAsync(binding, stop.Token).ConfigureAwait(false);
@@ -323,10 +331,12 @@ public sealed class AgentViewHub : IAsyncDisposable
                 var entries = model.Entries;
                 var run = new ChatRunState(model.Running || model.Generating, model.Generating,
                     approvals.Any(approval => approval.Request.AgentId == agentId), model.Pending.Count > 0);
-                var spend = await hub.chats.SpendFactsAsync(binding, entries, run.Running, accountLabel, stop.Token).ConfigureAwait(false);
+                // The ledger keys a chat's rows by its id; a session that is not a chat (an agent compare model's) has none under it.
+                var spend = chat is null ? ChatSpendFacts.Empty
+                    : await hub.chats.SpendFactsAsync(binding, entries, run.Running, accountLabel, stop.Token).ConfigureAwait(false);
                 // Messages queued behind a spend stop wait for the user (the engine starts them only after an answer): its card and banner say so.
                 var queued = ChatSpendStopView.Waiting(model.Inbox);
-                var context = hub.chats.RenderContext(binding, agentId, accountLabel, entries, model.Items, run, spend, queued);
+                var context = hub.chats.RenderContext(binding, agentId, accountLabel, entries, model.Items, run, spend, queued, readOnly);
                 var upsert = new JsonArray();
                 var keys = new HashSet<string>(StringComparer.Ordinal);
                 var inline = new HashSet<string>(StringComparer.Ordinal);
@@ -354,13 +364,17 @@ public sealed class AgentViewHub : IAsyncDisposable
                     inline.Contains(approval.Request.CallId))).ToList();
                 var usage = Transcript.Sum(DurableWire.Read<UsageTotals>(model.Usage));
                 var changedPanels = new JsonObject();
-                await PanelAsync(changedPanels, "pending", "~/Views/Chat/_ChatPending.cshtml", new ChatPendingView(model.Pending, outside, agentId)).ConfigureAwait(false);
-                await PanelAsync(changedPanels, "queue", "~/Views/Chat/_ChatQueue.cshtml", model.Inbox).ConfigureAwait(false);
                 await PanelAsync(changedPanels, "notices", "~/Views/Chat/_ChatNotices.cshtml", new ChatNoticesView(model.Compactions.Count > 0,
                     model.CompactionFailure, model.Retry?.At, model.Retry?.Error)).ConfigureAwait(false);
-                await PanelAsync(changedPanels, "banners", "~/Views/Chat/_ChatBanners.cshtml", hub.chats.Banners(binding, accountLabel, entries, queued)).ConfigureAwait(false);
-                await PanelAsync(changedPanels, "info", "~/Views/Chat/_ChatInfo.cshtml",
-                    await hub.chats.InfoAsync(binding, agentId, entries, model.ContextTokens, usage, accountLabel, stop.Token).ConfigureAwait(false)).ConfigureAwait(false);
+                if (!readOnly)
+                {
+                    // The interactive panels: questions and approvals, the queue, the banners' actions and the session details.
+                    await PanelAsync(changedPanels, "pending", "~/Views/Chat/_ChatPending.cshtml", new ChatPendingView(model.Pending, outside, agentId)).ConfigureAwait(false);
+                    await PanelAsync(changedPanels, "queue", "~/Views/Chat/_ChatQueue.cshtml", model.Inbox).ConfigureAwait(false);
+                    await PanelAsync(changedPanels, "banners", "~/Views/Chat/_ChatBanners.cshtml", hub.chats.Banners(binding, accountLabel, entries, queued)).ConfigureAwait(false);
+                    await PanelAsync(changedPanels, "info", "~/Views/Chat/_ChatInfo.cshtml",
+                        await hub.chats.InfoAsync(binding, agentId, entries, model.ContextTokens, usage, accountLabel, stop.Token).ConfigureAwait(false)).ConfigureAwait(false);
+                }
 
                 var waiting = model.Pending.Count + approvals.Count;
                 var nextState = new JsonObject
@@ -383,6 +397,7 @@ public sealed class AgentViewHub : IAsyncDisposable
                     ["tier"] = binding.Tier,
                     ["account"] = accountLabel,
                     ["usage"] = new JsonObject { ["input"] = usage.Input, ["output"] = usage.Output, ["cacheRead"] = usage.CacheRead, ["cost"] = usage.Cost },
+                    ["readOnly"] = readOnly,
                 };
                 var stateChanged = !JsonNode.DeepEquals(nextState, state);
                 state = nextState;

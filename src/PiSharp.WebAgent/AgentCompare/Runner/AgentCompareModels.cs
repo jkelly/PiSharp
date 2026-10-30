@@ -1,8 +1,9 @@
 // Decision 0011 (run W4, R5): the models the app's durable device streams through. AgentCompareModule gives DeviceHostService this
-// decorator over the app's IDurableModels (the runs.db recorder over the Spend Guard over the faux, priced faux or routed models); the DI
-// registration itself is not changed, so the run engine and everything else keep theirs. A request of an agent compare model's session goes
-// through AgentCompareGate (rewritten to the model's run key and account, admitted against its limits, and observed for its tool calls); every
-// other request (every chat's, and a model's once it was opened as a chat) passes through unchanged.
+// decorator over the app's IDurableModels (the runs.db recorder over the Spend Guard over the faux, priced faux or routed models) through
+// the chat area's device models hook (AddDeviceModelsDecorator, W4 fix 2); the DI registration itself is not changed, so the run engine and
+// everything else keep theirs. A request of an agent compare model's session goes through AgentCompareGate (rewritten to the model's run
+// key and account, admitted against its limits, and observed for its tool calls); every other request (every chat's, and a model's once it
+// was opened as a chat) passes through unchanged.
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text.Json;

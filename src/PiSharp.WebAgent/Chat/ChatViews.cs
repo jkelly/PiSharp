@@ -5,7 +5,8 @@
 // raw. The stream also renders panels: the "Waiting for you" panel, the queue, the session details (_ChatInfo), the banners (_ChatBanners)
 // and the run notices (_ChatNotices). ChatDisplay holds the small formatting helpers the partials share. W3 (S5) adds the Spend Guard's
 // parts: the answers' cost marks from the ledger (ChatRenderContext.Spend), the composer's send estimate (ChatComposerView.Estimate), the
-// chat's spend in the session panel (ChatInfoView.Spend) and the banner of a call stopped at a cap (ChatBannersView.Spend).
+// chat's spend in the session panel (ChatInfoView.Spend) and the banner of a call stopped at a cap (ChatBannersView.Spend). W4 fix 2:
+// ChatRenderContext.ReadOnly renders the items without their actions, for a read-only view (SessionViews).
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -55,6 +56,10 @@ public sealed class ChatRenderContext
     /// <summary>The call the Spend Guard stopped that ended the branch's run, with the messages queued behind it
     /// (<see cref="ChatSpendStopView.Newest"/>); null otherwise.</summary>
     public ChatSpendStopView? Stop { get; init; }
+
+    /// <summary>Whether the items render read-only (W4 fix 2: SessionViews' views, such as an agent compare column's live transcript): no
+    /// action buttons (copy, edit, fork, retry, regenerate, switch model, review, details) and no approval cards.</summary>
+    public bool ReadOnly { get; init; }
 
     /// <summary>The messages queued behind answer <paramref name="entryId"/> when it is the stop that ended the run (its stop card says
     /// they wait); 0 otherwise.</summary>

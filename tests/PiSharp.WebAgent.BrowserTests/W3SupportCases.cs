@@ -11,6 +11,7 @@ using static Microsoft.Playwright.Assertions;
 // W4 L3: two waits the flaky cases lacked. ModalShownAsync waits until a Bootstrap modal has finished opening before a case presses Escape
 // (Bootstrap ignores hide() while the show transition runs, so an early Escape left the dialog open), and SettledLedgerAsync waits until the
 // ledger rows a case reads have ended (the guard settles a call as its stream closes, which can come a moment after the answer is stored).
+// W4 fix 2: FitsPhoneAsync also checks that no open dialog's footer button comes within 16 px of the dialog's sides (FooterEdgeGapAsync).
 internal static partial class Program
 {
     // ─── Page helpers ────────────────────────────────────────────────────────
@@ -79,7 +80,35 @@ internal static partial class Program
             }
             """);
         Check(dialog is null, $"{what} ({theme}): the open dialog or menu does not fit the screen: {dialog}");
+        var footer = await page.FooterEdgeGapAsync();
+        Check(footer is null, $"{what} ({theme}): a dialog's footer button sits too close to the dialog's edge: {footer}");
     }
+
+    /// <summary>The smallest gap allowed between a dialog footer's buttons and the dialog's sides (W4 fix 2: the footer lost its padding and
+    /// its last button sat 5 px from the edge; with the 16 px gutter and the buttons' .25rem margin it is 20 px, as the body's).</summary>
+    internal const int FooterEdgeGap = 16;
+
+    /// <summary>The first open dialog whose footer has a visible control closer than <see cref="FooterEdgeGap"/> px to the dialog's left or
+    /// right edge, described; null when every open dialog's footer keeps its gutter.</summary>
+    internal static Task<string?> FooterEdgeGapAsync(this IPage page) => page.EvaluateAsync<string?>("""
+        (min) => {
+          for (const content of document.querySelectorAll('.modal.show .modal-content')) {
+            const box = content.getBoundingClientRect();
+            for (const footer of content.querySelectorAll('.modal-footer')) {
+              for (const control of footer.querySelectorAll('button, a, .btn')) {
+                const r = control.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0 || getComputedStyle(control).visibility === 'hidden') continue;
+                const left = Math.round(r.left - box.left), right = Math.round(box.right - r.right);
+                if (left < min || right < min) {
+                  const name = content.closest('.modal')?.id ?? '?';
+                  return `#${name} "${(control.textContent || '').trim()}" left ${left} px, right ${right} px`;
+                }
+              }
+            }
+          }
+          return null;
+        }
+        """, FooterEdgeGap);
 
     /// <summary>Whether any file under <paramref name="folder"/> holds <paramref name="secret"/> in plain text (UTF-8 or UTF-16), read while
     /// the app may still have them open.</summary>

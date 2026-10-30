@@ -4,12 +4,14 @@
 //     AgentCompareGate, AgentCompareRunner;
 //   - the runner is a hosted lifecycle service (registered after DeviceHostService, so it is started after the device and stopped before
 //     it; its StartingAsync attaches the approval override before the device opens) and the janitor's IWorkspaceActivity;
-//   - DeviceHostService's registration is replaced by the same service built over AgentCompareModels (the gate over the app's
-//     IDurableModels); the IDurableModels registration itself is unchanged, so the run engine and the rest keep the plain models.
+//   - the device's models are wrapped by AgentCompareModels (the gate over the app's IDurableModels) through the chat area's device models
+//     hook (AddDeviceModelsDecorator; W4 fix 2: DeviceHostService's registration is no longer replaced); the IDurableModels registration
+//     itself is unchanged, so the run engine and the rest keep the plain models;
+//   - AgentCompareSessionViews tells the chat stream (ChatStreamMux's session/{session}/{agent} keys) what a model's session is before it is
+//     opened as a chat, so a column can show its live transcript, read-only (W4 fix 2).
 // MapAgentCompareRunner maps /api/compare/agent (AgentCompareEndpoints).
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using PiSharp.Durable;
 using PiSharp.WebAgent.AgentCompare.Workspaces;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Data;
@@ -32,9 +34,8 @@ public static class AgentCompareModule
         services.TryAddSingleton(provider => new AgentCompareGate(provider.GetRequiredService<AgentCompareStore>(), provider,
             provider.GetService<ILogger<AgentCompareGate>>()));
         services.TryAddSingleton(provider => ActivatorUtilities.CreateInstance<AgentCompareRunner>(provider));
-        services.RemoveAll<DeviceHostService>();
-        services.AddSingleton(provider => ActivatorUtilities.CreateInstance<DeviceHostService>(provider,
-            new AgentCompareModels(provider.GetRequiredService<IDurableModels>(), provider.GetRequiredService<AgentCompareGate>())));
+        services.AddDeviceModelsDecorator((provider, models) => new AgentCompareModels(models, provider.GetRequiredService<AgentCompareGate>()));
+        services.AddSingleton<ISessionViewSource>(provider => new AgentCompareSessionViews(provider.GetRequiredService<AgentCompareStore>()));
         services.AddHostedService(provider => provider.GetRequiredService<AgentCompareRunner>());
         services.AddSingleton<IWorkspaceActivity>(provider => provider.GetRequiredService<AgentCompareRunner>());
         return services;
