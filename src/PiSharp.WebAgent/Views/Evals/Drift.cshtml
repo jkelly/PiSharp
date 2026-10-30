@@ -1,0 +1,42 @@
+@* Decision 0011 (run W5, E6): Evals › Drift (GET /evals/drift), after the mockups' evals-drift.html, states default (a _DriftSuite per suite
+   Drift Watch follows: one with a baseline, an open signal or a schedule), paused (a suite's schedule is paused: its notice, and its
+   suspect rows say nothing confirms them until a run) and empty (_DriftEmpty). _PriceChanges lists the catalog price changes Price Watch
+   recorded in the last 30 days and what each does to the suites that use the model. Accept as baseline opens _BaselineModal on the target;
+   Raise cap opens the suite's schedule modal. Model: DriftPage. *@
+@model DriftPage
+@{
+    ViewData["Title"] = "Drift · Evals";
+    ViewData[ShellViewData.Nav] = ShellNav.Evals;
+    ViewData[ShellViewData.Page] = "evals-drift";
+}
+@section Styles { <link href="~/css/evals.css" rel="stylesheet" asp-append-version="true" /> }
+@section TopbarStart { <h1 class="app-title">Evals</h1> }
+@section Modals
+{
+  <partial name="_SuiteScheduleModal" model="null" />
+  <partial name="_BaselineModal" model="null" />
+  <partial name="/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
+}
+@section Scripts { <script type="module" src="~/js/evals.js" asp-append-version="true"></script> }
+<div class="page" data-evals="drift" data-state="@Model.State">
+  <div class="page-header">
+    <partial name="_EvalsHeader" />
+  </div>
+  <partial name="_EvalsTabs" model="EvalsTab.Drift" />
+  @if (Model.Empty)
+  {
+    <partial name="_DriftEmpty" />
+  }
+  else
+  {
+    <p class="fs-7 text-secondary mb-3">After every run, each target is compared with its accepted baseline. A changed response model is drift at once; any other suspect result becomes drift only when the next run confirms it.</p>
+    @foreach (var suite in Model.Suites)
+    {
+      <partial name="_DriftSuite" model="suite" />
+    }
+  }
+  @if (!Model.Empty || Model.Prices.Count > 0)
+  {
+    <partial name="_PriceChanges" model="Model.Prices" />
+  }
+</div>

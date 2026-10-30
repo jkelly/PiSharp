@@ -15,7 +15,5 @@ public sealed record LaterFeature(string Id, string Title, string Icon, string S
     /// <summary>The sidebar pages, by route.</summary>
     public static IReadOnlyDictionary<string, LaterFeature> Pages { get; } = new Dictionary<string, LaterFeature>(StringComparer.OrdinalIgnoreCase)
     {
-        ["/evals/leaderboard"] = new(ShellNav.Evals, "Evals", "bi-clipboard-check",
-            "Your own leaderboard from blind votes in Compare, and test suites that catch silent changes in quality, speed and price."),
     };
 }
