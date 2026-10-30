@@ -5872,8 +5872,8 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "9a2024c52280f4d1e0fc20163ed91987fb32c977ed7cdadd07f9749ddfbf86ff",
-      "currentBytes": 6520,
+      "currentSha256": "efd18d159c10191f097b742e98bb0f84b369bc9c46489ebdc1df85b8890ef8be",
+      "currentBytes": 6779,
       "originalBytes": 3622,
       "path": "README.md",
       "originalSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"
@@ -7755,8 +7755,8 @@
       "originalSha256": "fc3bfcf60b150474c45293de116667d0dd42cc15ff1f6cd7c0a039a6e99d3fa5"
     },
     {
-      "currentSha256": "0f29df9caca330628c6567e66b1826d55a75400957bf516f99305493985a3e1e",
-      "currentBytes": 8301,
+      "currentSha256": "30b201e947ef63d0b55211ba4c910519074572186ee8509ceb7382754f07e47f",
+      "currentBytes": 8494,
       "originalBytes": 1872,
       "path": "src/PiSharp.Cli/PiSharp.Cli.csproj",
       "originalSha256": "ff5f7bf5249eaf0bd903d8e86390c3d5673a39c33c0513bc77ac16f867116e5d"

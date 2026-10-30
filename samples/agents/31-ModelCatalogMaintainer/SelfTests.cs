@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -31,6 +32,8 @@ public static class SelfTests
             ("failed commit and failed API never report success", PublicationFailure),
             ("live GitHub adapter deduplicates linked issues and PRs", GitHubDeduplication),
             ("closed unmerged catalog PR is not duplicated", GitHubClosedPullRequest),
+            ("unchanged scans retire stale proposals and later changes reuse them", GitHubNoChangeReconciliation),
+            ("unchanged and resumed scans preserve PR ownership and closure guards", GitHubReconciliationGuards),
             ("ready PR is converted to draft before branch writes", GitHubDraftConversion),
             ("failed draft conversion stops branch publication", GitHubDraftConversionFailure),
             ("orphan owned branch is reused to recover PR creation", OrphanBranchRecovery),
@@ -38,6 +41,7 @@ public static class SelfTests
             ("GitHub duplicate search follows pagination", GitHubPagination),
             ("overlay target cannot overwrite pinned sources", TargetBoundary),
             ("first refresh seeds pinned prices and preserves existing routes", SeedPinned),
+            ("shared pinned ids prefer chat and preserve alternate typed definitions", SeedPinnedMultiType),
             ("disabled and excluded providers skip all pinned shard reads", SkipPinnedProviders),
             ("bundled workflow performs real fixture changes", BundledFixture)
         };
@@ -265,6 +269,57 @@ public static class SelfTests
         await Throws(() => remote.EnsurePullRequestAsync("body", default));
         Check(handler.Pulls.Count == 1, "Closed unmerged PR was duplicated.");
     }
+    private static async Task GitHubNoChangeReconciliation()
+    {
+        var handler = new GitHubHandler(); using var client = new HttpClient(handler);
+        var config = new GitHubConfig { Repository = "owner/repo" };
+        var remote = new GitHubRemote(client, config, "fake"); var checkout = new FakeCheckout();
+        var baseline = await Scan(CatalogJson.EmptyOverlay(), Row(amount: 1m));
+        var unchanged = await Scan(baseline.Overlay, Row(amount: 1m));
+        var first = await CatalogPublisher.PublishAsync(unchanged, config, checkout, remote, true);
+        Check(!first.Published && handler.Writes == 0 && checkout.Calls == 0, "Unchanged first run performed a write.");
+        var proposal = await Scan(baseline.Overlay, Row(amount: 2m));
+        await CatalogPublisher.PublishAsync(proposal, config, checkout, remote, true);
+        var issueBody = handler.Issues.Single()["body"]!.GetValue<string>();
+        handler.Pulls.Single()["draft"] = false;
+        var beforeIncomplete = handler.Writes;
+        await Throws(() => CatalogPublisher.PublishAsync(unchanged with { Complete = false }, config, checkout, remote, true));
+        Check(handler.Writes == beforeIncomplete && handler.Pulls.Single()["state"]!.GetValue<string>() == "open", "Incomplete scan changed the proposal.");
+        await CatalogPublisher.PublishAsync(unchanged, config, checkout, remote, true);
+        var retired = handler.Pulls.Single();
+        Check(retired["state"]!.GetValue<string>() == "closed" && retired["draft"]!.GetValue<bool>() &&
+            retired["body"]!.GetValue<string>().Contains("pisharp-model-catalog-superseded:v1", StringComparison.Ordinal), "Stale proposal was not retired as a draft.");
+        Check(checkout.Calls == 1 && handler.Issues.Single()["body"]!.GetValue<string>() == issueBody, "Retirement wrote a commit or changed historical price evidence.");
+        var afterRetirement = handler.Writes;
+        await CatalogPublisher.PublishAsync(unchanged, config, checkout, remote, true);
+        Check(handler.Writes == afterRetirement, "Repeated retirement wrote again.");
+        var next = await Scan(baseline.Overlay, Row(amount: 3m));
+        await CatalogPublisher.PublishAsync(next, config, checkout, remote, true);
+        Check(handler.Pulls.Count == 1 && retired["state"]!.GetValue<string>() == "open" && retired["draft"]!.GetValue<bool>() &&
+            !retired["body"]!.GetValue<string>().Contains("pisharp-model-catalog-superseded:v1", StringComparison.Ordinal), "Later change did not reuse the retired draft.");
+        Check(checkout.Calls == 2 && handler.Issues[0]["body"]!.GetValue<string>() == issueBody, "Resumption changed historical price evidence.");
+    }
+    private static async Task GitHubReconciliationGuards()
+    {
+        var handler = new GitHubHandler(); using var client = new HttpClient(handler);
+        var config = new GitHubConfig { Repository = "owner/repo" };
+        var remote = new GitHubRemote(client, config, "fake"); var checkout = new FakeCheckout();
+        var baseline = await Scan(CatalogJson.EmptyOverlay(), Row());
+        var unchanged = await Scan(baseline.Overlay, Row());
+        var changed = await Scan(baseline.Overlay, Row(amount: 2m));
+        await remote.EnsurePullRequestAsync("body", default);
+        var markedBody = handler.Pulls.Single()["body"]!.GetValue<string>();
+        handler.Pulls.Single()["body"] = "An unmarked human proposal";
+        var writes = handler.Writes;
+        await Throws(() => CatalogPublisher.PublishAsync(unchanged, config, checkout, remote, true));
+        await Throws(() => CatalogPublisher.PublishAsync(changed, config, checkout, remote, true));
+        Check(handler.Writes == writes && checkout.Calls == 0 && handler.Pulls.Single()["state"]!.GetValue<string>() == "open", "Unmarked PR was modified.");
+        handler.Pulls.Single()["body"] = markedBody;
+        handler.Pulls.Single()["state"] = "closed";
+        await Throws(() => CatalogPublisher.PublishAsync(changed, config, checkout, remote, true));
+        await CatalogPublisher.PublishAsync(unchanged, config, checkout, remote, true);
+        Check(handler.Writes == writes && checkout.Calls == 0 && handler.Pulls.Single()["state"]!.GetValue<string>() == "closed", "Human-closed PR was reopened or changed.");
+    }
     private static async Task GitHubDraftConversion()
     {
         var handler = new GitHubHandler(); using var client = new HttpClient(handler); var config = new GitHubConfig { Repository = "owner/repo" };
@@ -414,6 +469,35 @@ public static class SelfTests
         }
         finally { File.Delete(path); Directory.Delete(directory); Directory.Delete(root); }
     }
+    private static async Task SeedPinnedMultiType()
+    {
+        // These chat/image definitions share an id in the repository's real OpenRouter shard.
+        var bytes = await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory, "fixtures", "pinned-multi-type.json"));
+        var catalog = PiSharp.AI.Catalogs.FrozenModelCatalog.ReadProviderJson("openrouter", bytes);
+        var notes = new List<string>();
+        var projected = PinnedBaseline.Project(OpenRouterConfig(), catalog, "shards/openrouter.json", notes: notes);
+        var model = projected["google/gemini-3-pro-image"]!.AsObject();
+        var metadata = model["metadata"]!.AsObject();
+        Check(projected.Count == 1 && metadata["type"]!.GetValue<string>() == "chat" &&
+            metadata["api"]!.GetValue<string>() == "openai-completions" && metadata["runtimeCandidate"]!.GetValue<bool>(),
+            "Shared id did not retain the chat route.");
+        Check(metadata["pinnedAlternates"] is JsonArray { Count: 1 } alternates &&
+            JsonNode.DeepEquals(alternates[0], JsonNode.Parse(bytes)!["openrouter-images"]!["image:google/gemini-3-pro-image"]),
+            "Alternate image definition was not preserved exactly.");
+        Check(notes.Count == 1 && notes[0].Contains("metadata.pinnedAlternates", StringComparison.Ordinal), "Missing collision review note.");
+        var reordered = JsonNode.Parse(bytes)!.AsObject();
+        var image = reordered["openrouter-images"]!.DeepClone(); reordered.Remove("openrouter-images"); reordered["openrouter-images"] = image;
+        var reorderedCatalog = PiSharp.AI.Catalogs.FrozenModelCatalog.ReadProviderJson("openrouter", System.Text.Encoding.UTF8.GetBytes(reordered.ToJsonString()));
+        Check(CatalogJson.Canonical(projected["google/gemini-3-pro-image"]!["metadata"]) ==
+            CatalogJson.Canonical(PinnedBaseline.Project(OpenRouterConfig(), reorderedCatalog, "shards/openrouter.json")["google/gemini-3-pro-image"]!["metadata"]),
+            "Source group order changed the chosen route or retained evidence.");
+        var row = OpenRouterRow(); row["id"] = "google/gemini-3-pro-image";
+        var baseline = CatalogJson.EmptyOverlay(); baseline["providers"]!["openrouter"] = projected;
+        var scan = await CatalogEngine.ScanAsync(Config(OpenRouterConfig()), baseline,
+            new FixtureFetcher(new Dictionary<string, string> { ["openrouter"] = Data(row) }));
+        Check(scan.Complete && JsonNode.DeepEquals(Model(scan, "google/gemini-3-pro-image", "openrouter")["metadata"]!["pinnedAlternates"], metadata["pinnedAlternates"]),
+            "Refreshing a shared id lost its alternate pinned evidence.");
+    }
     private static async Task SkipPinnedProviders()
     {
         var root = Path.Combine(Path.GetTempPath(), "pisharp-catalog-skipped-test-" + Guid.NewGuid().ToString("N"));
@@ -449,6 +533,7 @@ public static class SelfTests
     private sealed class GitHubHandler : HttpMessageHandler
     {
         public List<JsonObject> Issues { get; } = []; public List<JsonObject> Pulls { get; } = [];
+        public int Writes { get; private set; }
         public bool FailDraftConversion { get; init; } public int DraftConversions { get; private set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -462,6 +547,7 @@ public static class SelfTests
                 var page = int.Parse(pageText, System.Globalization.CultureInfo.InvariantCulture);
                 return Reply(new JsonArray(list.Skip((page - 1) * 100).Take(100).Select(x => x.DeepClone()).ToArray()).ToJsonString());
             }
+            Writes++;
             var body = JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!.AsObject();
             if (path == "/graphql")
             {

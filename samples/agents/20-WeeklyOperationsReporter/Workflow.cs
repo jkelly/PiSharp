@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -17,6 +18,7 @@ public static class Workflow
 
     static async Task<JsonNode?> FirstAsync(SampleContext c, JsonObject a, CancellationToken t)
 {
+    c.State.Remove("weekly_metrics");
     var week = J.Items(c.Input["weeks"]).FirstOrDefault(x => J.Str(x,"label") == J.Str(a,"week"));
     if (week is null) return J.Json(new { found = false });
     var salesTask = Task.Run(() => J.Items(week["sales"]).Sum(x => decimal.Parse(x!.ToString(),CultureInfo.InvariantCulture)),t);
@@ -30,6 +32,7 @@ public static class Workflow
     {
 var metrics = c.State["weekly_metrics"];
 if (metrics?["found"]?.GetValue<bool>() != true) return J.Json(new { found = false, reason = "Fetch weekly metrics first" });
+if (J.Str(metrics,"week") != J.Str(a,"week")) return J.Json(new { found = false, reason = "Fetch metrics for the requested week first" });
 var tickets = J.Int(metrics["support"],"tickets"); var resolved = J.Int(metrics["support"],"resolved");
 var shipped = J.Int(metrics["fulfillment"],"shipped"); var onTime = J.Int(metrics["fulfillment"],"onTime");
 return J.Json(new { found = true, week = J.Str(metrics,"week"), revenue = J.Num(metrics,"sales"), resolutionRate = tickets == 0 ? 0m : Math.Round((decimal)resolved/tickets,4), onTimeRate = shipped == 0 ? 0m : Math.Round((decimal)onTime/shipped,4), unresolvedTickets = tickets-resolved });
@@ -56,6 +59,17 @@ public static class SelfTests
         var second = await w.Tools[1].Execute(w.DemoCalls[1].Arguments, CancellationToken.None);
         if (first is null || second is null) throw new Exception("Tool returned null.");
         if (J.Num(second,"revenue") != 515m || J.Num(second,"resolutionRate") != 0.9062m) throw new Exception("Weekly metric calculation failed.");
+        var other = SampleJson.Object("""{"week":"2026-W42"}""");
+        var mismatched = await w.Tools[1].Execute(other, CancellationToken.None);
+        if (mismatched?["found"]?.GetValue<bool>() != false) throw new Exception("Report reused another week's metrics.");
+        await w.Tools[0].Execute(other, CancellationToken.None);
+        var otherReport = await w.Tools[1].Execute(other, CancellationToken.None);
+        if (J.Str(otherReport,"week") != "2026-W42" || J.Num(otherReport,"revenue") != 450m) throw new Exception("Second week report was not isolated.");
+        var missing = SampleJson.Object("""{"week":"missing"}""");
+        await w.Tools[0].Execute(missing, CancellationToken.None);
+        var missingReport = await w.Tools[1].Execute(missing, CancellationToken.None);
+        var afterMissing = await w.Tools[1].Execute(other, CancellationToken.None);
+        if (missingReport?["found"]?.GetValue<bool>() != false || afterMissing?["found"]?.GetValue<bool>() != false) throw new Exception("Missing week retained previous metrics.");
         Console.WriteLine("PASS 20-WeeklyOperationsReporter");
         return 0;
     }

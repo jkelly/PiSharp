@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;

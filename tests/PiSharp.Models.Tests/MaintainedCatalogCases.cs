@@ -1,5 +1,8 @@
+// PiSharp-only (no upstream Pi source): authored tests for the optional maintained model catalog.
 using System.Text.Json.Nodes;
+using PiSharp.AI.Catalogs;
 using PiSharp.Cli.Models;
+using PiSharp.Contracts;
 
 internal static partial class Program
 {
@@ -28,11 +31,38 @@ internal static partial class Program
         })),
         ("maintained.invalid-overlay-does-not-destroy-baseline", () => WithTemp("maintained-invalid", async root =>
         {
-            var path = Path.Combine(root, "bad.json"); await File.WriteAllTextAsync(path, "{broken");
+            var path = Path.Combine(root, "bad.json");
             var baseline = ModelRegistry.Create(new() { MaintainedCatalogPath = Path.Combine(root, "absent") });
-            var registry = ModelRegistry.Create(new() { MaintainedCatalogPath = path });
-            Equal(baseline.GetAll().Count, registry.GetAll().Count, "baseline retained");
-            Check(registry.GetError() is not null, "malformed maintained catalog must be reported");
+            foreach (var content in new[] { "{broken", "null", "[]", "{\"schemaVersion\":1,\"providers\":{\"openai\":[]}}" })
+            {
+                await File.WriteAllTextAsync(path, content);
+                var registry = ModelRegistry.Create(new() { MaintainedCatalogPath = path });
+                Equal(baseline.GetAll().Count, registry.GetAll().Count, "baseline retained for " + content);
+                Check(registry.GetError() is not null, "malformed maintained catalog must be reported: " + content);
+            }
+        })),
+        ("maintained.flat-price-update-cannot-preserve-stale-tiers", () => WithTemp("maintained-tiers", root =>
+        {
+            var registry = ModelRegistry.Create(new() { MaintainedCatalogPath = Path.Combine(root, "absent") });
+            var original = registry.GetAll().First(m => m.Provider == "openai" && m.CloneJson()["type"]?.GetValue<string>() == "chat").CloneJson();
+            original["cost"] = new JsonObject
+            {
+                ["input"] = 1, ["output"] = 2, ["cacheRead"] = 0, ["cacheWrite"] = 0,
+                ["tiers"] = new JsonArray(new JsonObject { ["inputTokensAbove"] = 1000, ["input"] = 2, ["output"] = 4, ["cacheRead"] = 0, ["cacheWrite"] = 0 })
+            };
+            var metadata = (JsonObject)original.DeepClone(); metadata.Remove("cost");
+            var price = new JsonObject { ["kind"] = "input", ["currency"] = "USD", ["unit"] = "million-tokens", ["amount"] = 5,
+                ["tier"] = "catalog-default", ["region"] = "unspecified", ["conditions"] = new JsonObject() };
+            var overlay = new JsonObject { ["schemaVersion"] = 1, ["providers"] = new JsonObject { ["openai"] = new JsonObject
+                { [original["id"]!.GetValue<string>()] = new JsonObject { ["metadata"] = metadata, ["prices"] = new JsonArray(price) } } } };
+            var baseline = JsonData.Parse(original.ToJsonString());
+            var result = MaintainedCatalogOverlay.Apply("openai", [baseline], JsonData.Parse(overlay.ToJsonString()), [original["api"]!.GetValue<string>()]);
+            Equal(baseline.ToString(), result.Models.Single().ToString(), "unmapped tiered rates retain full pinned model");
+            Check(result.Warnings.Any(w => w.Contains("tier", StringComparison.Ordinal)), "tier mapping warning required");
+            price["amount"] = 1;
+            var unchanged = MaintainedCatalogOverlay.Apply("openai", [baseline], JsonData.Parse(overlay.ToJsonString()), [original["api"]!.GetValue<string>()]);
+            Check(unchanged.Warnings.IsEmpty, "identical base price does not require a new tier mapping");
+            return Task.CompletedTask;
         }))
     ];
 }

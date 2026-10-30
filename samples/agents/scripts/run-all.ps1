@@ -13,7 +13,13 @@ if (-not $Dotnet) {
     else { $Dotnet = (Get-Command dotnet -ErrorAction Stop).Source }
 }
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-$catalog = Get-Content -LiteralPath (Join-Path $sampleRoot 'catalog.json') -Raw | ConvertFrom-Json
+$catalog = @(Get-Content -LiteralPath (Join-Path $sampleRoot 'catalog.json') -Raw | ConvertFrom-Json)
+if ($Examples.Count -gt 0) {
+    $unknown = @($Examples | Where-Object { $_ -notin $catalog.number } | Sort-Object -Unique)
+    if ($unknown.Count -gt 0) { throw "Unknown sample numbers: $($unknown -join ', ')." }
+    $catalog = @($catalog | Where-Object { $_.number -in $Examples })
+}
+if ($catalog.Count -eq 0) { throw 'No selected samples.' }
 $outputRoot = Join-Path $repoRoot ('artifacts/sample-validation/' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 Push-Location $repoRoot
@@ -26,7 +32,6 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Shared runtime tests failed.' }
     $results = @()
     foreach ($sample in $catalog) {
-        if ($Examples.Count -gt 0 -and $sample.number -notin $Examples) { continue }
         $project = Join-Path $sampleRoot $sample.project
         if (-not $SkipSelfTests) {
             $selfOutput = & $Dotnet run --project $project --no-build -- --self-test 2>&1

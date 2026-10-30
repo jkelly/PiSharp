@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Text.Json.Nodes;
 using PiSharp.AI.Catalogs;
 
@@ -30,23 +31,33 @@ public static class PinnedBaseline
             FrozenModelCatalog catalog;
             try { catalog = FrozenModelCatalog.ReadProviderJson(provider.Id, bytes); }
             catch (CatalogReadException ex) { throw new InvalidDataException($"Invalid pinned catalog {relative} ({ex.Failure}); no maintenance performed.", ex); }
-            providers[provider.Id] = Project(provider, catalog, relative, config.GitHub);
-            notes.Add($"{provider.Id}: seeded {catalog.Models.Length} models from validated read-only pinned shard {relative} ({catalog.ProviderJsonSha256}).");
+            providers[provider.Id] = Project(provider, catalog, relative, config.GitHub, notes);
+            notes.Add($"{provider.Id}: seeded {providers[provider.Id]!.AsObject().Count} maintained identities from {catalog.Models.Length} validated read-only pinned definitions at {relative} ({catalog.ProviderJsonSha256}).");
         }
         return seeded;
     }
 
-    public static JsonObject Project(ProviderConfig provider, FrozenModelCatalog catalog, string relativePath, GitHubConfig? github = null)
+    public static JsonObject Project(ProviderConfig provider, FrozenModelCatalog catalog, string relativePath, GitHubConfig? github = null,
+        IList<string>? notes = null)
     {
         var models = new JsonObject();
-        foreach (var model in catalog.Models.OrderBy(m => m.Id, StringComparer.Ordinal))
+        foreach (var group in catalog.Models.GroupBy(m => m.Id, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal))
         {
-            if (models.ContainsKey(model.Id)) throw new InvalidDataException("Pinned shard reuses an id across model types; explicit overlay migration is required.");
+            // The maintained schema has one identity per provider/id, while pinned shards can expose that id
+            // through multiple model types. Prefer the chat route supported by the runtime consumer.
+            var definitions = group.OrderBy(m => m.Type == CatalogModelType.Chat ? 0 : 1)
+                .ThenBy(m => m.Type).ThenBy(m => m.DeclaredApi, StringComparer.Ordinal).ToArray();
+            var model = definitions[0];
             var raw = JsonNode.Parse(model.Raw.ToString())!.AsObject();
             var cost = raw["cost"]!.AsObject(); raw.Remove("cost");
             raw["runtimeCandidate"] = model.Type == CatalogModelType.Chat && model.DeclaredApi is "openai-completions" or "openai-responses" or "anthropic-messages" or "google-generative-ai";
             // Preserve extra pinned costing contracts as evidence; only understood dimensions become maintained rates.
             raw["pinnedCost"] = cost.DeepClone();
+            if (definitions.Length > 1)
+            {
+                raw["pinnedAlternates"] = new JsonArray(definitions.Skip(1).Select(m => JsonNode.Parse(m.Raw.ToString())).ToArray());
+                notes?.Add($"{provider.Id}/{model.Id}: selected pinned {model.Type.ToString().ToLowerInvariant()} route {model.DeclaredApi}; retained {definitions.Length - 1} alternate typed definition(s) in metadata.pinnedAlternates.");
+            }
             var provenance = new JsonObject
             {
                 ["url"] = github is null ? "repository:" + relativePath : $"https://github.com/{github.Repository}/blob/{github.BaseBranch}/{relativePath}",

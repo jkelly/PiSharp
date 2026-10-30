@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -108,11 +109,14 @@ public static class SampleHost
             { ".png" => "image/png", ".jpg" or ".jpeg" => "image/jpeg", ".webp" => "image/webp", _ => throw new ArgumentException("Use a PNG, JPEG, or WebP input image.") };
             content.Add(new JsonObject { ["type"] = "image", ["mimeType"] = mime, ["data"] = Convert.ToBase64String(await File.ReadAllBytesAsync(imageInfo.FullName, token)) });
         }
-        await agent.PromptAsync(new TranscriptEntry("user", JsonData.Parse(new JsonObject { ["role"] = "user", ["content"] = content, ["timestamp"] = 0 }.ToJsonString())), token);
+        var run = await agent.PromptAsync(new TranscriptEntry("user", JsonData.Parse(new JsonObject { ["role"] = "user", ["content"] = content, ["timestamp"] = 0 }.ToJsonString())), token);
         var snapshot = agent.Snapshot;
         var transcript = new JsonArray(snapshot.Messages.Select(m => JsonNode.Parse(m.WireBody.ToString())).ToArray());
-        var success = snapshot.Failure is null && !token.IsCancellationRequested && outputs.Count > 0 && outputs.All(o => o?["error"]?.GetValue<bool>() == false);
+        var assistantStopReason = run.Turns.LastOrDefault()?.Result.Chat.Message.StopReason;
+        var success = run.Reason == AgentLoopStopReason.Completed && assistantStopReason == StopReason.Stop &&
+            snapshot.Failure is null && !token.IsCancellationRequested && outputs.Count > 0 && outputs.All(o => o?["error"]?.GetValue<bool>() == false);
         var report = new JsonObject { ["sample"] = spec.Id, ["title"] = spec.Title, ["mode"] = context.Live ? "live" : "fixture", ["success"] = success,
+            ["loopStopReason"] = run.Reason.ToString(), ["assistantStopReason"] = assistantStopReason?.ToString(),
             ["workspace"] = context.Workspace, ["outputs"] = outputs, ["events"] = events,
             ["usage"] = new JsonArray(snapshot.Messages.Where(m => m.Role == "assistant").Select(m => JsonNode.Parse(m.WireBody.ToString())?["usage"]?.DeepClone()).ToArray()) };
         var output = context.OutputDirectory is null ? context : new SampleContext(context.OutputDirectory, new());

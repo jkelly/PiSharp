@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using PiSharp.Samples;
 using PiSharp.Samples.PersistentTaskManager;
 using System.Text.Json.Nodes;

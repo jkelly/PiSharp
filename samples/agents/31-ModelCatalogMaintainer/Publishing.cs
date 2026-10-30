@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
@@ -10,6 +11,7 @@ public sealed record PublishResult(bool Published, string? PullRequestUrl, strin
 public interface ICatalogRemote
 {
     Task PrepareAsync(CancellationToken token) => Task.CompletedTask;
+    Task RetireObsoletePullRequestAsync(string body, CancellationToken token) => Task.CompletedTask;
     Task<RemoteItem> EnsurePriceIssueAsync(string identity, string body, CancellationToken token);
     Task<RemoteItem> EnsurePullRequestAsync(string body, CancellationToken token);
     Task LinkIssueAsync(RemoteItem issue, string body, CancellationToken token);
@@ -26,7 +28,11 @@ public static class CatalogPublisher
     {
         if (!approved) throw new InvalidOperationException("Live publication requires --approve.");
         if (!scan.Complete) throw new InvalidOperationException("An incomplete scan cannot be published.");
-        if (!scan.Changed) return new PublishResult(false, null, null, null);
+        if (!scan.Changed)
+        {
+            await remote.RetireObsoletePullRequestAsync(ChangeReport.Markdown(scan), token);
+            return new PublishResult(false, null, null, null);
+        }
         var markdown = ChangeReport.Markdown(scan);
         var reportUrl = $"https://github.com/{config.Repository}/blob/{config.Branch}/catalog-maintained/model-catalog-report.md";
         var details = $"Model catalog refresh: {scan.Changes.Count} model changes, {scan.PriceChanges.Count} price observations.\n\n[Full changes, old/new amounts, absolute/percentage differences, and source evidence]({reportUrl}).\n\n";
@@ -47,6 +53,8 @@ public static class CatalogPublisher
 
 public sealed class GitHubRemote : ICatalogRemote
 {
+    private const string Marker = "<!-- pisharp-model-catalog-maintainer:v1 -->";
+    private const string SupersededMarker = "<!-- pisharp-model-catalog-superseded:v1 -->";
     private readonly HttpClient client;
     private readonly GitHubConfig config;
     public GitHubRemote(HttpClient client, GitHubConfig config, string token)
@@ -78,24 +86,26 @@ public sealed class GitHubRemote : ICatalogRemote
     }
     public async Task<RemoteItem> EnsurePullRequestAsync(string body, CancellationToken token)
     {
-        const string marker = "<!-- pisharp-model-catalog-maintainer:v1 -->";
-        body = marker + "\n" + body;
+        body = Marker + "\n" + body;
         var history = await PullRequestHistoryAsync(token);
         var candidates = history.Where(pr => pr["state"]?.GetValue<string>() == "open").ToList();
         if (candidates.Count > 1) throw new InvalidOperationException("Multiple open PRs use the stable catalog branch.");
         if (candidates.Count == 1)
         {
             var existing = candidates[0];
-            if (existing["body"]?.GetValue<string>().Contains(marker, StringComparison.Ordinal) != true)
+            if (existing["body"]?.GetValue<string>().Contains(Marker, StringComparison.Ordinal) != true)
                 throw new InvalidOperationException("Stable branch has an unmarked PR; refusing to take ownership.");
             await EnsureDraftAsync(existing, token);
             if (existing["body"]?.GetValue<string>() != body)
                 await SendAsync(HttpMethod.Patch, $"repos/{config.Repository}/pulls/{existing["number"]}", new JsonObject { ["body"] = body }, token);
             return Item(existing);
         }
-        if (history.Any(pr => pr["state"]?.GetValue<string>() == "closed" && pr["merged_at"] is null &&
-            pr["body"]?.GetValue<string>().Contains(marker, StringComparison.Ordinal) == true))
-            throw new InvalidOperationException("The marked catalog PR was closed without merging. Review/reopen it or choose a new explicitly configured branch; no duplicate PR created.");
+        if (ReusableSupersededPullRequest(history) is { } retired)
+        {
+            RequireRetiredDraft(retired);
+            return Item(await SendAsync(HttpMethod.Patch, $"repos/{config.Repository}/pulls/{retired["number"]}",
+                new JsonObject { ["body"] = body, ["state"] = "open" }, token));
+        }
         return Item(await SendAsync(HttpMethod.Post, $"repos/{config.Repository}/pulls", new JsonObject
         {
             ["title"] = "Maintain model catalog and pricing", ["body"] = body, ["head"] = config.Branch,
@@ -104,19 +114,45 @@ public sealed class GitHubRemote : ICatalogRemote
     }
     public async Task PrepareAsync(CancellationToken token)
     {
-        const string marker = "<!-- pisharp-model-catalog-maintainer:v1 -->";
         var history = await PullRequestHistoryAsync(token);
         var open = history.Where(pr => pr["state"]?.GetValue<string>() == "open").ToArray();
         if (open.Length > 1) throw new InvalidOperationException("Multiple open PRs use the stable catalog branch.");
         if (open.Length == 1)
         {
-            if (open[0]["body"]?.GetValue<string>().Contains(marker, StringComparison.Ordinal) != true)
+            if (open[0]["body"]?.GetValue<string>().Contains(Marker, StringComparison.Ordinal) != true)
                 throw new InvalidOperationException("Stable branch has an unmarked PR; refusing to take ownership.");
             await EnsureDraftAsync(open[0], token);
         }
-        else if (history.Any(pr => pr["state"]?.GetValue<string>() == "closed" && pr["merged_at"] is null &&
-            pr["body"]?.GetValue<string>().Contains(marker, StringComparison.Ordinal) == true))
-            throw new InvalidOperationException("The marked catalog PR was closed without merging; review it before publishing another proposal.");
+        else if (ReusableSupersededPullRequest(history) is { } retired) RequireRetiredDraft(retired);
+    }
+    public async Task RetireObsoletePullRequestAsync(string body, CancellationToken token)
+    {
+        var history = await PullRequestHistoryAsync(token);
+        var open = history.Where(pr => pr["state"]?.GetValue<string>() == "open").ToArray();
+        if (open.Length > 1) throw new InvalidOperationException("Multiple open PRs use the stable catalog branch.");
+        if (open.Length == 0) return;
+        var existing = open[0];
+        if (existing["body"]?.GetValue<string>().Contains(Marker, StringComparison.Ordinal) != true)
+            throw new InvalidOperationException("Stable branch has an unmarked PR; refusing to take ownership.");
+        await EnsureDraftAsync(existing, token);
+        await SendAsync(HttpMethod.Patch, $"repos/{config.Repository}/pulls/{existing["number"]}", new JsonObject
+        {
+            ["state"] = "closed",
+            ["body"] = Marker + "\n" + SupersededMarker + "\nThis proposal is superseded: the latest complete scan has no changes from the base catalog. Historical price review issues remain available. A later catalog change may reopen this draft.\n\n" + body
+        }, token);
+    }
+    private static JsonObject? ReusableSupersededPullRequest(IEnumerable<JsonObject> history)
+    {
+        var closed = history.Where(pr => pr["state"]?.GetValue<string>() == "closed" && pr["merged_at"] is null &&
+            pr["body"]?.GetValue<string>().Contains(Marker, StringComparison.Ordinal) == true).ToArray();
+        if (closed.Any(pr => pr["body"]?.GetValue<string>().Contains(SupersededMarker, StringComparison.Ordinal) != true))
+            throw new InvalidOperationException("The marked catalog PR was closed without merging. Review/reopen it or choose a new explicitly configured branch; no duplicate PR created.");
+        return closed.OrderByDescending(pr => pr["number"]!.GetValue<int>()).FirstOrDefault();
+    }
+    private static void RequireRetiredDraft(JsonObject retired)
+    {
+        if (retired["draft"]?.GetValue<bool>() != true)
+            throw new InvalidOperationException("The superseded catalog PR is no longer a draft; manual review is required before publication.");
     }
     private Task<List<JsonObject>> PullRequestHistoryAsync(CancellationToken token)
     {

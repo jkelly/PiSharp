@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): optional maintained model catalog support.
 using PiSharp.AI.Catalogs;
 using PiSharp.Contracts;
 

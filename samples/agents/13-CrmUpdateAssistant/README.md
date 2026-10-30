@@ -12,4 +12,4 @@ The default demo uses the local fixture and calls `find_contact` then `preview_u
 
 Expected fixture behavior: `preview_update` derives a result from the fixture after `find_contact` examines source data. Replace the fixture using `--input` to test other records.
 
-The fixture preview changes contact `C-17` from stage `lead` to `qualified`. A third tool, `save_update`, requires `--approve` and saves an updated JSON copy under the sample workspace. It does not connect to or modify a CRM service. Only `email`, `stage`, and `owner` can be changed; email and stage values are validated.
+The fixture preview changes contact `C-17` from stage `lead` to `qualified`. A third tool, `save_update`, requires `--approve` and saves an updated JSON copy under the sample workspace. Later lookups, previews, and saves in the same workspace use that copy, so changes accumulate and survive reopening. It does not connect to or modify a CRM service. Only `email`, `stage`, and `owner` can be changed; email and stage values are validated.

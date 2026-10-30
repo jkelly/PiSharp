@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;

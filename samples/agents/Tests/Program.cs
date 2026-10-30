@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -11,6 +12,8 @@ var tests = new (string Name, Func<Task> Test)[]
     ("approval denial prevents side effects", Approval),
     ("invalid schema prevents side effects", InvalidArguments),
     ("tool failures remain incomplete", ToolFailure),
+    ("turn-limited runs remain incomplete", TurnLimit),
+    ("truncated final responses remain incomplete", TruncatedResponse),
     ("cancellation prevents tool admission", Cancellation),
     ("workspace escapes rejected", Paths),
     ("provider protocol defaults support modern OpenAI tool calling", ProtocolDefaults),
@@ -65,6 +68,33 @@ static async Task ToolFailure()
 {
     var result = await SampleHost.ExecuteAsync(Workflow((_, _) => throw new IOException("Authored source unavailable")), Context());
     Check(!result.Success, "Tool failure claimed success.");
+}
+static async Task TurnLimit()
+{
+    var calls = 0;
+    var spec = Workflow((_, _) => { calls++; return Task.FromResult<JsonNode?>(new JsonObject()); });
+    spec = spec with { DemoCalls = Enumerable.Range(0, 25).Select(i => new PlannedCall("lookup", new() { ["id"] = i.ToString() })).ToArray() };
+    var result = await SampleHost.ExecuteAsync(spec, Context());
+    Check(calls == 24, "The fixture did not reach the host's turn cap.");
+    Check(!result.Success, "A turn-limited workflow claimed success while a tool step remained unexecuted.");
+    Check(result.Report["loopStopReason"]?.GetValue<string>() == "TurnLimit", "The report lost the turn-limit reason.");
+}
+static async Task TruncatedResponse()
+{
+    const string keyName = "PISHARP_SAMPLES_TRUNCATION_TEST_KEY";
+    Environment.SetEnvironmentVariable(keyName, "fixture-truncation-intercepted-http");
+    try
+    {
+        var handler = new FakeProvider { TruncateFinalResponse = true };
+        var context = new SampleContext(Context().Workspace, new(), live: true)
+        { Model = "fixture-model", Provider = "openai", Api = "openai-completions", KeyEnvironment = keyName, HttpHandler = handler };
+        var result = await SampleHost.ExecuteAsync(Workflow((_, _) => Task.FromResult<JsonNode?>(new JsonObject())), context);
+        Check(handler.Requests == 2 && result.Report["outputs"]!.AsArray().Count == 1, "The fixture did not complete its tool before truncation.");
+        Check(!result.Success, "A truncated final response claimed success.");
+        Check(result.Report["loopStopReason"]?.GetValue<string>() == "Completed" &&
+            result.Report["assistantStopReason"]?.GetValue<string>() == "Length", "The report lost the final-response truncation reason.");
+    }
+    finally { Environment.SetEnvironmentVariable(keyName, null); }
 }
 static async Task Cancellation()
 {
@@ -150,6 +180,7 @@ static Task UnknownMaintainedPrice()
 }
 sealed class FakeProvider : HttpMessageHandler
 {
+    public bool TruncateFinalResponse { get; init; }
     public int Requests { get; private set; }
     public bool SawToolDeclaration { get; private set; }
     public bool SawToolResult { get; private set; }
@@ -167,6 +198,7 @@ sealed class FakeProvider : HttpMessageHandler
         var chunk = ++Requests == 1
             ? "{\"id\":\"fixture\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"call-fixture\",\"type\":\"function\",\"function\":{\"name\":\"lookup\",\"arguments\":\"{\\\"id\\\":\\\"17\\\"}\"}}]},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}"
             : "{\"id\":\"fixture\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Done\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}";
+        if (TruncateFinalResponse && Requests > 1) chunk = chunk.Replace("\"finish_reason\":\"stop\"", "\"finish_reason\":\"length\"", StringComparison.Ordinal);
         return new(HttpStatusCode.OK) { Content = new StringContent("data: " + chunk + "\n\ndata: [DONE]\n\n", Encoding.UTF8, "text/event-stream") };
     }
 }

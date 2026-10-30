@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Text.Json.Nodes;
 namespace PiSharp.Samples.ProjectDeliveryCoordinator;
 public static class Workflow {

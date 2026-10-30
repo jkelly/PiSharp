@@ -52,11 +52,13 @@ Each maintainer includes an **inactive** GitHub Actions template and example con
 
 `catalog-maintained/models.overlay.json` is a separate source-controlled catalog layer, initially empty. PiSharp copies it beside its CLI. Set `PISHARP_MAINTAINED_CATALOG` to an explicit alternative file if needed. Model composition is: pinned catalog, remote catalog, maintained catalog, user configuration, extension configuration. `/reload`/registry rebuild reads the maintained file again.
 
-The native consumer admits complete supported chat entries and unambiguous USD-per-million-token base prices. It preserves existing transport routes and compatibility metadata. Unsupported billing dimensions, ambiguous conditions, incomplete fields and unavailable transport types remain in the maintained evidence file and produce diagnostics instead of guessed runtime prices. The original pinned files, hashes and upstream parity checks remain unchanged.
+The native consumer admits complete supported chat entries and unambiguous USD-per-million-token base prices. It preserves existing transport routes and compatibility metadata. Unsupported billing dimensions, ambiguous conditions, incomplete fields and unavailable transport types remain in the maintained evidence file and produce diagnostics instead of guessed runtime prices. Updating a model with existing price tiers requires a reviewed tier mapping; a flat rate cannot silently replace only part of that table. The original pinned files, hashes and upstream parity checks remain unchanged.
 
 ## Validation
 
 See the [live test report](validation/live-gpt-6.1-sol.md) and [machine-readable results](validation/live-gpt-6.1-sol.json) for the verified GPT-6.1 Sol runs, fixes discovered during testing, and current-main revalidation. Raw transcripts and build artifacts are not committed.
+
+The `Agent samples` GitHub Actions workflow builds this solution and runs every self-test and fixture demo on Windows, Linux, and macOS. It uses no provider credentials or live service writes. The shared host treats turn limits and truncated final answers as incomplete runs.
 
 ## Catalog
 

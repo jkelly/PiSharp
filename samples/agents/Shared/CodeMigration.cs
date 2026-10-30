@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;

@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): optional maintained model catalog support.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -16,10 +17,11 @@ public static class MaintainedCatalogOverlay
         var models = baseline.Select(b => JsonNode.Parse(b.ToString())!.AsObject()).ToList();
         var warnings = ImmutableArray.CreateBuilder<string>();
         var apis = supportedApis.ToHashSet(StringComparer.Ordinal);
-        var root = JsonNode.Parse(overlay.ToString())!.AsObject();
-        if (root["schemaVersion"]?.GetValue<int>() != 1 || root["providers"] is not JsonObject providers)
+        if (JsonNode.Parse(overlay.ToString()) is not JsonObject root ||
+            root["schemaVersion"]?.GetValue<int>() != 1 || root["providers"] is not JsonObject providers)
             throw new FormatException("Invalid maintained catalog schema.");
-        if (providers[provider] is not JsonObject entries) return Result();
+        if (!providers.TryGetPropertyValue(provider, out var providerEntries)) return Result();
+        if (providerEntries is not JsonObject entries) throw new FormatException("Invalid maintained provider catalog.");
         foreach (var (id, node) in entries)
         {
             try
@@ -58,7 +60,12 @@ public static class MaintainedCatalogOverlay
                         Text(p, "tier", "unspecified") is "unspecified" or "catalog-default" &&
                         p["conditions"] is not JsonObject { Count: > 0 }).ToList();
                     if (candidates.Count > 1) throw new FormatException("ambiguous base pricing");
-                    if (candidates.Count == 1 && Number(candidates[0]["amount"]) is decimal amount && amount >= 0) cost[field] = amount;
+                    if (candidates.Count == 1 && Number(candidates[0]["amount"]) is decimal amount && amount >= 0)
+                    {
+                        if (cost["tiers"] is JsonArray { Count: > 0 } && Number(cost[field]) != amount)
+                            throw new FormatException("updating a tiered model needs a reviewed native tier mapping");
+                        cost[field] = amount;
+                    }
                 }
                 if (map.Keys.Any(field => Number(cost[field]) is null or < 0)) throw new FormatException("pricing is incomplete");
                 // A tiered source must remain separately represented; never apply just its base rate to an old tier table.

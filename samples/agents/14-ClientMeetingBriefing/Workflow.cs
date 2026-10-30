@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -17,6 +18,7 @@ public static class Workflow
 
     static async Task<JsonNode?> FirstAsync(SampleContext c, JsonObject a, CancellationToken t)
 {
+    c.State.Remove("meeting_context");
     var id = J.Str(a,"accountId");
     var accountTask = Task.Run(() => J.Items(c.Input["accounts"]).FirstOrDefault(x => J.Str(x,"id") == id)?.DeepClone(),t);
     var opportunityTask = Task.Run(() => J.Items(c.Input["opportunities"]).Where(x => J.Str(x,"account_id") == id).Select(x => x!.DeepClone()).ToArray(),t);
@@ -31,6 +33,7 @@ public static class Workflow
 var source = c.State["meeting_context"] ?? J.Json(new { found = false });
 var account = source?["account"];
 if (account is null) return J.Json(new { found = false });
+if (J.Str(account,"id") != J.Str(a,"accountId")) return J.Json(new { found = false, reason = "Fetch context for the requested account first" });
 var opportunities = J.Items(source?["opportunities"]);
 var activities = J.Items(source?["activities"]);
 return J.Json(new { found = true, account = J.Str(account,"name"), owner = J.Str(account,"owner"), pipelineValue = opportunities.Sum(x => J.Num(x,"amount")), openOpportunities = opportunities.Count, latestActivity = activities.OrderBy(x => J.Str(x,"date")).LastOrDefault()?["note"]?.ToString(), discussionTopics = opportunities.Select(x => J.Str(x,"name")).ToArray() });
@@ -57,6 +60,19 @@ public static class SelfTests
         var second = await w.Tools[1].Execute(w.DemoCalls[1].Arguments, CancellationToken.None);
         if (first is null || second is null) throw new Exception("Tool returned null.");
         if (J.Num(second,"pipelineValue") != 57000m || J.Str(second,"latestActivity") != "Demo completed") throw new Exception("Meeting aggregation failed.");
+        c.Input["accounts"]!.AsArray().Add(SampleJson.Object("""{"id":"A-5","name":"Second account","owner":"Lee"}"""));
+        c.Input["opportunities"]!.AsArray().Add(SampleJson.Object("""{"account_id":"A-5","name":"New deal","amount":1000}"""));
+        var other = SampleJson.Object("""{"accountId":"A-5"}""");
+        var mismatched = await w.Tools[1].Execute(other, CancellationToken.None);
+        if (mismatched?["found"]?.GetValue<bool>() != false) throw new Exception("Brief reused another account's context.");
+        await w.Tools[0].Execute(other, CancellationToken.None);
+        var otherBrief = await w.Tools[1].Execute(other, CancellationToken.None);
+        if (J.Str(otherBrief,"account") != "Second account" || J.Num(otherBrief,"pipelineValue") != 1000m) throw new Exception("Second account brief was not isolated.");
+        var missing = SampleJson.Object("""{"accountId":"missing"}""");
+        await w.Tools[0].Execute(missing, CancellationToken.None);
+        var missingBrief = await w.Tools[1].Execute(missing, CancellationToken.None);
+        var afterMissing = await w.Tools[1].Execute(other, CancellationToken.None);
+        if (missingBrief?["found"]?.GetValue<bool>() != false || afterMissing?["found"]?.GetValue<bool>() != false) throw new Exception("Missing account retained a previous context.");
         Console.WriteLine("PASS 14-ClientMeetingBriefing");
         return 0;
     }

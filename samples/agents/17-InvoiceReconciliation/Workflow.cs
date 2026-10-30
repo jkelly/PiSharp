@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -25,12 +26,12 @@ if (po is null) return J.Json(new { found = true, matched = false, reason = "Pur
 var rows = J.Items(invoice["lines"]).Select(line => { var sku = J.Str(line,"sku"); var ordered = J.Items(po["lines"]).FirstOrDefault(x => J.Str(x,"sku") == sku); var received = J.Items(c.Input["receipts"]).Where(x => J.Str(x,"po_id") == J.Str(po,"id") && J.Str(x,"sku") == sku).Sum(x => J.Int(x,"quantity")); return new { sku, invoiced = J.Int(line,"quantity"), ordered = J.Int(ordered,"quantity"), received, invoiceUnitPrice = J.Num(line,"unit_price"), orderUnitPrice = J.Num(ordered,"unit_price") }; }).ToArray();
 var matched = J.Str(invoice,"vendor") == J.Str(po,"vendor") && rows.All(x => x.invoiced <= x.ordered && x.invoiceUnitPrice == x.orderUnitPrice);
 var result = J.Json(new { found = true, matched, vendorMatches = J.Str(invoice,"vendor") == J.Str(po,"vendor"), lines = rows });
-c.State["invoice_match"] = result?.DeepClone();
 return result;
 }
     static JsonNode? Second(SampleContext c, JsonObject a)
     {
-var match = c.State["invoice_match"] ?? First(c,a);
+// A payable belongs to the requested invoice, never the last invoice inspected.
+var match = First(c,a);
 if (match?["found"]?.GetValue<bool>() != true || match?["matched"]?.GetValue<bool>() != true) return J.Json(new { ready = false, reason = "Invoice or purchase order mismatch" });
 var lines = J.Items(match["lines"]);
 var invoiced = lines.Sum(x => J.Int(x,"invoiced") * J.Num(x,"invoiceUnitPrice"));
@@ -59,6 +60,17 @@ public static class SelfTests
         var second = await w.Tools[1].Execute(w.DemoCalls[1].Arguments, CancellationToken.None);
         if (first is null || second is null) throw new Exception("Tool returned null.");
         if (J.Num(second,"payable") != 255m || J.Num(second,"held") != 15m || second?["ready"]?.GetValue<bool>() != false) throw new Exception("Three-way match failed.");
+        c.Input["invoices"]!.AsArray().Add(SampleJson.Object("""{"id":"INV-10","po_id":"PO-7","vendor":"SupplyCo","lines":[{"sku":"PEN","quantity":1,"unit_price":1.5}]}"""));
+        await w.Tools[0].Execute(SampleJson.Object("""{"invoiceId":"INV-9"}"""), CancellationToken.None);
+        var otherInvoice = await w.Tools[1].Execute(SampleJson.Object("""{"invoiceId":"INV-10"}"""), CancellationToken.None);
+        if (J.Num(otherInvoice,"payable") != 1.5m || otherInvoice?["ready"]?.GetValue<bool>() != true)
+            throw new Exception("Payable calculation reused a different invoice.");
+        await w.Tools[0].Execute(SampleJson.Object("""{"invoiceId":"missing"}"""), CancellationToken.None);
+        var missingInvoice = await w.Tools[1].Execute(SampleJson.Object("""{"invoiceId":"missing"}"""), CancellationToken.None);
+        if (missingInvoice?["ready"]?.GetValue<bool>() != false || missingInvoice?["payable"] is not null)
+            throw new Exception("A missing invoice reused a previous successful match.");
+        var firstAgain = await w.Tools[1].Execute(SampleJson.Object("""{"invoiceId":"INV-9"}"""), CancellationToken.None);
+        if (J.Num(firstAgain,"payable") != 255m) throw new Exception("Payable depended on the previous lookup.");
         Console.WriteLine("PASS 17-InvoiceReconciliation");
         return 0;
     }

@@ -1,3 +1,4 @@
+// PiSharp-only (no upstream Pi source): agent sample implementation and authored offline verification.
 using System.Runtime.CompilerServices;
 using PiSharp.AI;
 using PiSharp.Contracts;
