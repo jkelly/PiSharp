@@ -159,6 +159,8 @@ if (filter is not null)
 }
 var evidence = new List<object>();
 var failed = 0;
+var skipped = 0;
+var hungCaseCeiling = TimeSpan.FromMinutes(10);
 var progressCaptureFailures = 0;
 void EmitProgress(string phase, int ordinal, string testId, string caseName, string? status, object? diagnostics = null)
 {
@@ -264,11 +266,32 @@ foreach (var test in tests)
                 "RPC retained output fault preserves original phase and genuine late cleanup cause order" or
                 "RPC Anthropic HTTP gate preserves queue/abort/EOF, output-fault authority and caller cancellation barriers" or
                 "RPC Completions preserves held HTTP queues, abort/EOF, output faults and strict startup admission" or
-                "RPC actual caller cancellation returns Canceled only after aborted durable work and lease closure") await test.Run();
+                "RPC actual caller cancellation returns Canceled only after aborted durable work and lease closure")
+        {
+            // A case awaited directly that never settles would hold the run forever. Past this ceiling the run
+            // reports it as hung and exits; its cleanup is not detached because the process ends with it.
+            var running = test.Run();
+            if (await Task.WhenAny(running, Task.Delay(hungCaseCeiling)) != running)
+            {
+                failed++;
+                Console.Error.WriteLine($"HUNG {test.Name}: still running after {hungCaseCeiling.TotalMinutes} minutes; the remaining cases did not run.");
+                evidence.Add(new { testId, name = test.Name, status = "hung" });
+                await WriteReportAsync(completed: false);
+                return 1;
+            }
+            await running;
+        }
         else await test.Run().WaitAsync(TimeSpan.FromSeconds(30));
         if (safeCaseProgress) EmitProgress("END", ordinal, testId, test.Name, "passed");
         else Console.WriteLine($"PASS {test.Name}");
         evidence.Add(new { testId, name = test.Name, status = "passed" });
+    }
+    catch (TestSkippedException skip)
+    {
+        skipped++;
+        if (safeCaseProgress) EmitProgress("END", ordinal, testId, test.Name, "skipped");
+        else Console.WriteLine($"SKIP {test.Name}: {skip.Message}");
+        evidence.Add(new { testId, name = test.Name, status = "skipped", reason = skip.Message });
     }
     catch (Exception error)
     {
@@ -286,9 +309,13 @@ foreach (var test in tests)
         }
     }
 }
-Console.WriteLine($"CodingAgent tests: {tests.Length - failed} passed, {failed} failed.");
-if (report is not null)
+Console.WriteLine($"CodingAgent tests: {tests.Length - failed - skipped} passed, {failed} failed, {skipped} skipped.");
+await WriteReportAsync(completed: true);
+return failed == 0 && progressCaptureFailures == 0 ? 0 : 1;
+
+async Task WriteReportAsync(bool completed)
 {
+    if (report is null) return;
     Directory.CreateDirectory(Path.GetDirectoryName(report)!);
     await File.WriteAllTextAsync(report, JsonSerializer.Serialize(new
     {
@@ -296,7 +323,7 @@ if (report is not null)
         scope = commandTerminalPackage ? "explicit-opt-in-original-command-input-real-conpty-durable-session-processes" :
             "authored-native-durable-session-agent-and-offline-cli-composition", tests = evidence,
         commandTerminalPackage, nodeWorkerExecutionRequested = commandTerminalPackage,
-        filter, exactName, availableTests, completeSuite = filter is null && exactName is null,
+        filter, exactName, availableTests, completeSuite = completed && filter is null && exactName is null,
         safeCaseProgress, progressCaptureFailures,
         terminalDefaultSourceEvidence = TerminalDefaultSourceReplayTests.Evidence,
         offlineCliEvidence = OfflineDemoTests.Evidence,
@@ -304,7 +331,6 @@ if (report is not null)
         terminalSessionEvidence = new { platform = WindowsConPtyTerminalSessionFixture.PlatformEvidence,
             workerReceipts = WindowsConPtyTerminalSessionFixture.WorkerReceipts,
             parentWitnesses = WindowsConPtyTerminalSessionFixture.ParentWitnesses },
-        passed = tests.Length - failed, failed, upstreamDifferential = false, phaseAcceptanceClaimed = false
+        passed = evidence.Count - failed - skipped, failed, skipped, upstreamDifferential = false, phaseAcceptanceClaimed = false
     }, new JsonSerializerOptions { WriteIndented = true }) + "\n");
 }
-return failed == 0 && progressCaptureFailures == 0 ? 0 : 1;

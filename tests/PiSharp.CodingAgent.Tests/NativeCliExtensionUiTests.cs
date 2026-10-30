@@ -437,7 +437,7 @@ internal static class NativeCliExtensionUiTests
             var files = new Files();
             try
             {
-                Check(File.Exists(Path.Combine(published, "PublishedFixture.CliUi.dll")), "Root must publish PluginCliUi before native execution.");
+                PublishedFixtures.Require(published, "PublishedFixture.CliUi.dll");
                 foreach (var path in new[] { files.Root, files.Package, files.Snapshots, files.Markers }) Directory.CreateDirectory(path);
                 foreach (var source in Directory.GetFiles(published, "*", SearchOption.AllDirectories))
                 { var target = Path.Combine(files.Package, Path.GetRelativePath(published, source)); Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(source, target); }
