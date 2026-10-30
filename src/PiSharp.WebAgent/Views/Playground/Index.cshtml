@@ -43,6 +43,8 @@
   @* Presets (R8): Save preset (Ctrl+S) and Load preset; presets-host.js wires [data-preset-save] / [data-preset-load]. *@
   <partial name="_SavePresetModal" model='PiSharp.WebAgent.Presets.SavePresetView.Host("playground")' />
   <partial name="_LoadPresetModal" model='PiSharp.WebAgent.Presets.LoadPresetView.Host("playground")' />
+  @* W5 (E7): Pin as test case, from the output pane. *@
+  <partial name="_TestCaseModal" model="null" />
 }
 @section Scripts {
   <script type="module" src="~/js/playground.js" asp-append-version="true"></script>

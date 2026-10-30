@@ -20,6 +20,8 @@
   <partial name="/Views/Runs/_SaveRunFilterModal.cshtml" model="Model" />
   <partial name="/Views/Runs/_ManageRunFiltersModal.cshtml" model="Model" />
   <partial name="/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
+  @* W5 (E7): Pin as test case, from a row's menu. *@
+  <partial name="/Views/Shared/_TestCaseModal.cshtml" model="null" />
 }
 @section Scripts { <script type="module" src="~/js/history.js" asp-append-version="true"></script> }
 <div class="page" data-run-history data-state="@(Model.Empty ? "empty" : Model.Filter.Active ? "filtered" : "default")">

@@ -3,7 +3,7 @@
    Cost (≈ list for a subscription), Latency (TTFT / total), Stop (the stop reason, or error with the HTTP status) and the actions: Inspect,
    then Re-run, Load into playground (runs that stored their request), Open chat (a chat's call), Pin, Delete run. An agent compare run is
    one row ("3 models ▾") whose collapse row lists each model with its outcome; its Open run goes to the inspector, Workspaces to Settings ›
-   Data. "Pin as test" waits for W5. Model: RunHistoryPage. *@
+   Data. W5 (E7): Pin as test… opens _TestCaseModal for a call that completed (PinRules; not an agent compare run). Model: RunHistoryPage. *@
 @model RunHistoryPage
 <div class="ps-table-wrap" data-run-table>
   <table class="table table-hover align-middle runs-table mb-0">
@@ -83,6 +83,10 @@
                 @if (row.IsGroup)
                 {
                   <li><a class="dropdown-item" href="/settings/data#compare-workspaces"><i class="bi bi-folder2-open me-2" aria-hidden="true"></i>Workspaces</a></li>
+                }
+                @if (PiSharp.WebAgent.Evals.Pins.PinRules.Offered(run))
+                {
+                  <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-run="@run.Id" data-pin-source="history"><i class="bi bi-pin-angle me-2" aria-hidden="true"></i>Pin as test…</button></li>
                 }
                 <li><button class="dropdown-item" type="button" data-run-pin="@run.Id" data-pinned="@(run.Pinned ? "true" : "false")"><i class="@("bi me-2 " + (run.Pinned ? "bi-pin-angle-fill" : "bi-pin-angle"))" aria-hidden="true"></i>@(run.Pinned ? "Unpin (expires with retention)" : "Pin (never expires)")</button></li>
                 <li><hr class="dropdown-divider"></li>

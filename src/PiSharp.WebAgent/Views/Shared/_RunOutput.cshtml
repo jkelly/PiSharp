@@ -3,7 +3,8 @@
    cursor; request-output.js appends the live deltas with textContent), completed (thinking, the answer as Markdown through the sanitizing
    MarkdownRenderer, tool calls awaiting a result), stopped (cancelled) and error (the message, Retry, Switch model, Details). The metric
    strip is the run row's own figures; the tabs are Rendered, Text, JSON (the final AssistantMessage) and Events (the normalized events,
-   deltas collapsed, filters all/thinking/text/toolcall). "Pin as test" waits for W5. Element ids carry IdPrefix. Model: RunOutputView. *@
+   deltas collapsed, filters all/thinking/text/toolcall). W5 (E7): a completed run's Pin as test opens _TestCaseModal (the host renders
+   it; data-pin-run, data-pin-source). Element ids carry IdPrefix. Model: RunOutputView. *@
 @using PiSharp.WebAgent.Playground
 @using PiSharp.WebAgent.Runs
 @model RunOutputView
@@ -28,6 +29,10 @@
     {
       <a class="ms-auto fs-8 ps-mono text-ps-faint text-truncate" href="@Model.InspectorUrl" title="Open run in inspector" data-output-run>@run.Id</a>
       <button class="btn btn-icon" type="button" title="Copy text output" aria-label="Copy text output" data-copy-output="text" hidden="@(Model.Text.Length == 0)"><i class="bi bi-copy fs-8"></i></button>
+      @if (state == "completed" && PiSharp.WebAgent.Evals.Pins.PinRules.Offered(run))
+      {
+        <button class="btn btn-sm btn-ghost" type="button" title="Pin as test case: saves the full request and this output as the reference" aria-label="Pin this run as a test case" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-run="@run.Id" data-pin-source="@(run.Source == "compare" ? "compare" : "playground")"><i class="bi bi-pin-angle"></i><span class="d-none d-sm-inline ms-1">Pin as test</span></button>
+      }
     }
   </div>
 

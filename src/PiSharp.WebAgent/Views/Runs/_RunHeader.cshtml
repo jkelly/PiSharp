@@ -1,12 +1,13 @@
 @* Decision 0011 (run W4, R3): the mockups' _RunHeader: the run id with Copy, chips for the stop reason (or outcome), the source,
    provider/model and the billing with the account (named as the Spend pages name it, never a key); Re-run (the stored request through
    /api/runs; the Spend Guard asks when it would), Load into playground, Download (HAR when raw payloads were stored, Run JSON), Delete (a
-   confirm), and ⋯ View code. A chat's call has no stored request: Open chat instead. Then Started, API, Thinking and Session, and the user
-   prompt. Model: RunInspectorView. *@
+   confirm), and ⋯ View code and (W5, E7) Pin as test… for a call that completed. A chat's call has no stored request: Open chat instead.
+   Then Started, API, Thinking and Session, and the user prompt. Model: RunInspectorView. *@
 @model RunInspectorView
 @{
     var run = Model.Run;
     var dot = run.Status switch { RunStatus.Running => "live", RunStatus.Completed => "ok", RunStatus.Error => "err", _ => "idle" };
+    var pin = PiSharp.WebAgent.Evals.Pins.PinRules.Offered(run);
 }
 <section class="ps-card p-3 p-md-4 mb-3" aria-label="Run summary" data-run-header>
   <div class="d-flex flex-wrap align-items-start gap-3">
@@ -66,12 +67,19 @@
         </ul>
       </div>
       <button class="btn btn-sm btn-outline-danger" type="button" data-run-delete="@run.Id" data-run-label="@(Model.SourceLabel + (run.Provider.Length > 0 ? " · " + run.Provider + "/" + run.Model : ""))" data-run-after-delete="/history"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete</button>
-      @if (Model.Code is not null)
+      @if (Model.Code is not null || pin)
       {
         <div class="dropdown">
           <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More run actions" title="More"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
           <ul class="dropdown-menu dropdown-menu-end">
-            <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-view-code"><i class="bi bi-code-slash me-2" aria-hidden="true"></i>View code</button></li>
+            @if (Model.Code is not null)
+            {
+              <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-view-code"><i class="bi bi-code-slash me-2" aria-hidden="true"></i>View code</button></li>
+            }
+            @if (pin)
+            {
+              <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-test-case" title="Save this request and its response as a test case" data-pin-run="@run.Id" data-pin-source="inspector"><i class="bi bi-pin-angle me-2" aria-hidden="true"></i>Pin as test…</button></li>
+            }
           </ul>
         </div>
       }

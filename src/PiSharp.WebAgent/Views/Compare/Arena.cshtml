@@ -68,6 +68,9 @@
   else
   {
     <partial name="_SpendConfirmModal" model="null" />
+    @* W5 (E7): Pin as test case, offered by the reveal (_ArenaVoteBar's data-arena-pin, which arena.js shows when this modal is here). Its
+       shell names nothing, and the server refuses to pin an answer before the vote. *@
+    <partial name="_TestCaseModal" model="null" />
   }
 }
 @section Scripts {

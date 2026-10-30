@@ -88,7 +88,8 @@ internal static partial class Program
                 && html.Contains("data-provider-pane=\"bedrock\" data-unsent=\"bedrock\"", StringComparison.Ordinal), "the Azure and Bedrock panes");
             Check(Regex.IsMatch(html, "data-preset-save>") && Regex.IsMatch(html, "data-preset-load>") && !html.Contains("Presets are not available yet", StringComparison.Ordinal),
                 "Save and Load preset: enabled, for presets-host.js to wire");
-            Check(!html.Contains("Pin as test", StringComparison.Ordinal), "no Pin as test (W5)");
+            Check(html.Contains("id=\"modal-test-case\"", StringComparison.Ordinal) && !html.Contains("data-pin-run=", StringComparison.Ordinal),
+                "W5 (E7): the Pin as test case modal is hosted; nothing to pin before a run");
             Check(html.Contains("data-msg-prompt=\"true\"", StringComparison.Ordinal) && html.Contains("<template data-msg-template>", StringComparison.Ordinal), "the system prompt editor and the template");
             Check(html.Contains("data-provider-model=\"pg\"", StringComparison.Ordinal) && html.Contains("data-provider-model=\"mp\"", StringComparison.Ordinal), "Provider → Model in the config and the picker");
             foreach (var modal in new[] { "modal-model-picker", "modal-view-code", "modal-tool-editor", "modal-error-details", "modal-spend-confirm", "modal-shortcuts" })

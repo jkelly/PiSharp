@@ -7,8 +7,8 @@
    as Markdown through the sanitizing MarkdownRenderer, or the error card (Fix for an account error, Retry, the stored response body). Foot:
    the run row's own figures. Element ids carry the column's key. W4 fix 2: the overrides offer the column's account (the provider's active
    account, or one of its accounts by id and label; shown when the provider has two accounts or more, or the column names one), the section
-   carries it (data-account) and a chip names a chosen one, so a preset's account loads here instead of being ignored. Model:
-   CompareColumnView. *@
+   carries it (data-account) and a chip names a chosen one, so a preset's account loads here instead of being ignored. W5 (E7): a
+   completed column's Pin as test opens _TestCaseModal (data-pin-run, data-pin-source="compare"). Model: CompareColumnView. *@
 @model CompareColumnView
 @inject MarkdownRenderer Markdown
 @{
@@ -70,6 +70,10 @@
       else
       {
         <button class="btn btn-icon" type="button" title="Re-run this column with the comparison's prompt" aria-label="Re-run @Model.Name" data-col-rerun disabled="@(Model.GroupId is null || !Model.Known)"><i class="bi bi-arrow-repeat"></i></button>
+      }
+      @if (state == "completed" && PiSharp.WebAgent.Evals.Pins.PinRules.Offered(run))
+      {
+        <button class="btn btn-icon" type="button" title="Pin as test case: saves the full request and this answer as the reference" aria-label="Pin @Model.Name's answer as a test case" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-run="@run!.Id" data-pin-source="compare"><i class="bi bi-pin-angle"></i></button>
       }
       <button class="btn btn-icon" type="button" title="Remove column" aria-label="Remove @Model.Name" data-col-remove disabled="@(!Model.CanRemove || streaming)"><i class="bi bi-x-lg"></i></button>
     </div>

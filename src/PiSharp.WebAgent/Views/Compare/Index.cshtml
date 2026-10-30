@@ -78,6 +78,8 @@ else
     @* Presets (R8): Save as preset and Load preset; presets-host.js wires [data-preset-save] / [data-preset-load] (request mode only). *@
     <partial name="_SavePresetModal" model='PiSharp.WebAgent.Presets.SavePresetView.Host("compare")' />
     <partial name="_LoadPresetModal" model='PiSharp.WebAgent.Presets.LoadPresetView.Host("compare")' />
+    @* W5 (E7): Pin as test case, from a completed column. *@
+    <partial name="_TestCaseModal" model="null" />
   }
 }
 @section Scripts {

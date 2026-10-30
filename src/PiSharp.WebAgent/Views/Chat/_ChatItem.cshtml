@@ -305,6 +305,11 @@
                         {
                           <button class="btn btn-icon" type="button" title="Fork from here" aria-label="Fork at entry @entryId" data-action="fork" data-entry="@entryId"><i class="bi bi-signpost-split"></i></button>
                         }
+                        @if (actions && failure == ChatFailureKind.None)
+                        {
+                          @* W5 (E7): Pin as test opens _TestCaseModal with this answer and the chat's request up to it. *@
+                          <button class="btn btn-icon" type="button" title="Pin as test" aria-label="Pin answer @entryId as a test case" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-source="chat" data-pin-chat="@context.SessionId" data-pin-agent="@context.AgentId" data-pin-entry="@entryId"><i class="bi bi-pin-angle"></i></button>
+                        }
                         <span class="entry-id">#@entryId</span>
                         @if (account is not null)
                         {

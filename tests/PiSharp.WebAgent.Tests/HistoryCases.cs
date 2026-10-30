@@ -43,7 +43,8 @@ internal static partial class Program
                 Check(html.Contains("data-run-totals", StringComparison.Ordinal), "the totals strip");
                 Check(!html.Contains("data-run-table", StringComparison.Ordinal) && !html.Contains("data-run-filters", StringComparison.Ordinal), "no table or filters while empty");
                 Check(Regex.IsMatch(html, "<script type=\"module\" src=\"/js/history\\.js\\?v=") && Regex.IsMatch(html, "<link href=\"/css/history\\.css\\?v="), "its module and stylesheet");
-                Check(!html.Contains("Pin as test", StringComparison.Ordinal), "no Pin as test (W5)");
+                Check(html.Contains("id=\"modal-test-case\"", StringComparison.Ordinal) && !html.Contains("data-pin-run=", StringComparison.Ordinal),
+                    "W5 (E7): the Pin as test case modal is hosted, with nothing to pin yet");
                 foreach (var asset in new[] { "/js/history.js", "/js/history-actions.js", "/js/inspector.js", "/css/history.css" })
                 {
                     var file = await app.Get(asset);
@@ -83,7 +84,7 @@ internal static partial class Program
                     && page.Contains($"href=\"/playground?run={answer}\"", StringComparison.Ordinal) && page.Contains($"data-run-delete=\"{answer}\"", StringComparison.Ordinal),
                     "Inspect, Re-run, Load into playground and Delete");
                 Check(page.Contains("data-metric=\"Runs\"", StringComparison.Ordinal), "the totals");
-                Check(!page.Contains("Pin as test", StringComparison.Ordinal), "no Pin as test (W5)");
+                Check(page.Contains($"data-pin-run=\"{answer}\" data-pin-source=\"history\"", StringComparison.Ordinal), "W5 (E7): Pin as test… on a completed run's menu");
 
                 // Filtered.
                 var tools = (await app.Get("/history?status=toolUse")).Text;
@@ -123,7 +124,8 @@ internal static partial class Program
                     "Re-run, Load into playground and Delete (back to History)");
                 Check(inspector.Contains($"/api/history/runs/{answer}/json", StringComparison.Ordinal) && !inspector.Contains($"/api/history/runs/{answer}/har", StringComparison.Ordinal),
                     "Run JSON, and no HAR without raw payloads");
-                Check(!inspector.Contains("Pin as test", StringComparison.Ordinal), "no Pin as test (W5)");
+                Check(inspector.Contains($"data-pin-run=\"{answer}\" data-pin-source=\"inspector\"", StringComparison.Ordinal) && inspector.Contains("id=\"modal-test-case\"", StringComparison.Ordinal),
+                    "W5 (E7): ⋯ Pin as test… and its modal");
                 Check(Regex.IsMatch(inspector, "<script type=\"module\" src=\"/js/inspector\\.js\\?v="), "its module");
 
                 var toolPage = (await app.Get("/runs/" + tool)).Text;

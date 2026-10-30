@@ -1,0 +1,240 @@
+@* Decision 0011 (run W5, E7): the mockups' _TestCaseModal (modal-test-case; shared: chat, Playground, Compare, History, the inspector and
+   evals-suite). A host page renders it with a null model: the empty shell (#modal-test-case, a loading body that names nothing, so the
+   Arena's battle page stays blind) and pin.js. A Pin as test button opens it with data-bs-toggle="modal" data-bs-target="#modal-test-case"
+   and says what to pin in data attributes (data-pin-source and data-pin-run; or data-pin-chat, data-pin-agent and data-pin-entry; or a
+   suite page's data-pin-suite for Add case and data-pin-case for Edit case); pin.js then swaps in this partial rendered with a model from
+   GET /api/evals/pins/modal: Name and Tags, the Suite select with one pane per suite (data-pin-over-cap on a pane whose worst case would go
+   above its cap: "The schedule pauses until you raise the cap.") and New suite…, the Request panel, the Reference output (Show all) and
+   the Checks (each with what it makes of the reference output; the quick Add check panel), or the refused content (data-pin-refused) that
+   only says why. Model text is encoded, never rendered as Markdown. Save posts to /api/evals/pins; pin.js shows the "Test case saved"
+   toast with Open suite and fires pisharp:pin-saved on document. No inline script (CSP script-src 'self'). Model: TestCaseModalView? *@
+@using PiSharp.WebAgent.Evals.Pins
+@model TestCaseModalView?
+@if (Model is null)
+{
+  <div class="modal fade" id="modal-test-case" tabindex="-1" aria-labelledby="modal-test-case-title" aria-hidden="true" data-pin-modal>
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+      <div class="modal-content" data-pin-content data-pin-state="loading">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title" id="modal-test-case-title">Pin as test case</h2>
+            <div class="modal-subtitle">Saves the full request, with this answer as the reference output.</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex align-items-center gap-2 fs-7 text-secondary" role="status" data-pin-loading><span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span data-pin-loading-text>Reading the request…</span></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" disabled><i class="bi bi-pin-angle me-1" aria-hidden="true"></i>Save test case</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="~/js/pin.js" asp-append-version="true"></script>
+  return;
+}
+@{
+    var view = Model;
+}
+@if (view.Refusal is { } refusal)
+{
+  <div class="modal-content" data-pin-content data-pin-state="refused">
+    <div class="modal-header">
+      <div>
+        <h2 class="modal-title" id="modal-test-case-title">@view.Title</h2>
+        <div class="modal-subtitle">@view.Subtitle</div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+      <p class="fs-7 mb-0" role="alert" data-pin-refused><i class="bi bi-info-circle me-2 text-ps-faint" aria-hidden="true"></i>@refusal</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+    </div>
+  </div>
+  return;
+}
+@{
+    var mode = view.Mode.ToString().ToLowerInvariant();
+    var selected = view.Suites.FirstOrDefault(option => option.Selected)?.Id;
+    var newSelected = view.NewSuiteSelected || selected is null;
+}
+<div class="modal-content" data-pin-content data-pin-state="ready" data-pin-mode="@mode" data-pin-target="@view.Target" data-pin-case="@view.CaseId" data-pin-new-suite="@view.NewSuiteId" data-pin-reference="@(view.HasReference ? "true" : "false")">
+  <div class="modal-header">
+    <div>
+      <h2 class="modal-title" id="modal-test-case-title">@view.Title</h2>
+      <div class="modal-subtitle">@view.Subtitle</div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  </div>
+  <div class="modal-body">
+    <div class="row g-3 mb-3">
+      <div class="col-md-7">
+        <label class="form-label" for="tcaseName">Name</label>
+        <input class="form-control" id="tcaseName" maxlength="80" value="@view.Name" autocomplete="off" data-pin-name>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label" for="tcaseTags">Tags</label>
+        <input class="form-control" id="tcaseTags" value="@view.Tags" placeholder="Comma-separated" autocomplete="off" data-pin-tags>
+      </div>
+    </div>
+
+    <div class="mb-3" id="tcaseSuitePanes" data-pin-panes>
+      <label class="form-label" for="tcaseSuite">Suite</label>
+      <select class="form-select" id="tcaseSuite" data-pin-suite disabled="@view.SuiteFixed">
+        @foreach (var option in view.Suites)
+        {
+          <option value="@option.Id" selected="@(!newSelected && option.Id == selected)">@option.Label</option>
+        }
+        @if (view.NewSuiteOffered)
+        {
+          <option value="new" selected="@newSelected">New suite…</option>
+        }
+      </select>
+      @foreach (var option in view.Suites)
+      {
+        <div data-pin-pane="@option.Id" data-pin-over-cap="@(option.OverCap ? "true" : "false")" data-pin-pauses="@(option.Pauses ? "true" : "false")" hidden="@(newSelected || option.Id != selected)">
+          <div class="form-text@(option.OverCap ? " text-warning-emphasis" : "")">@option.Pane</div>
+        </div>
+      }
+      @if (view.NewSuiteOffered)
+      {
+        <div data-pin-pane="new" hidden="@(!newSelected)">
+          <label class="form-label fs-7 mt-2" for="tcaseNewSuite">New suite name</label>
+          <input class="form-control form-control-sm" id="tcaseNewSuite" maxlength="80" placeholder="e.g. SQL generation" autocomplete="off" data-pin-new-suite-name>
+          <div class="form-text">It starts with this request's model as its only target. Add targets and a schedule on the suite page.</div>
+        </div>
+      }
+    </div>
+
+    <div class="ps-label mb-2">Request</div>
+    @if (view.Mode == PinMode.Add)
+    {
+      <div class="ps-panel p-3 mb-3" data-pin-request="add">
+        <div class="fs-8 text-ps-faint mb-2">It starts on <span class="ps-mono">@view.AddTarget</span>; each suite target answers it with its own provider, model, account and settings.</div>
+        <label class="form-label fs-7" for="tcaseSystem">System prompt <span class="fw-normal text-ps-faint">· optional</span></label>
+        <textarea class="form-control form-control-sm mb-2" id="tcaseSystem" rows="2" data-pin-system></textarea>
+        <label class="form-label fs-7" for="tcasePrompt">User message</label>
+        <textarea class="form-control form-control-sm mb-2" id="tcasePrompt" rows="4" data-pin-prompt></textarea>
+        <label class="form-label fs-7" for="tcaseMaxTokens">maxTokens <span class="fw-normal text-ps-faint">· optional</span></label>
+        <input class="form-control form-control-sm ps-mono" id="tcaseMaxTokens" type="number" min="1" step="1" inputmode="numeric" style="max-width:10rem" data-pin-max-tokens>
+        <div class="fs-8 text-ps-faint mt-2">API keys and tokens are never stored.</div>
+      </div>
+    }
+    else if (view.Provider is not null)
+    {
+      <div class="ps-panel p-3 mb-3" data-pin-request>
+        <div class="d-flex align-items-center gap-2">
+          <partial name="/Views/Settings/_ProviderLogo.cshtml" model="new PiSharp.WebAgent.Settings.LogoModel(view.ProviderName, view.LogoUrl)" />
+          <div style="min-width:0">
+            <div class="ps-mono fs-7"><span class="text-ps-faint text-nowrap">@(view.Provider)/</span><wbr><span class="text-nowrap">@view.Model</span></div>
+            <div class="fs-8 text-ps-faint">@view.OptionsLine</div>
+          </div>
+        </div>
+        @if (view.Prompt is { } prompt)
+        {
+          <div class="fs-7 mt-2 text-break" style="white-space:pre-wrap" data-pin-prompt-text>@prompt</div>
+        }
+        <div class="fs-8 text-ps-faint mt-1">@view.MessagesLine@if (view.RunId is { } runId) {<text> · run </text><span class="ps-mono">@runId</span>}</div>
+        <div class="fs-8 text-ps-faint mt-1" data-pin-account>@view.AccountLine</div>
+      </div>
+    }
+
+    @if (view.HasReference)
+    {
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <span class="ps-label">Reference output</span>
+        <span class="fs-8 text-ps-faint" data-pin-reference-line>@view.ReferenceLine</span>
+        @if (view.ReferenceMore is not null)
+        {
+          <button class="btn btn-sm btn-ghost ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#tcaseRefMore" aria-expanded="false" aria-controls="tcaseRefMore">Show all</button>
+        }
+      </div>
+      @if (view.ReferenceText.Length > 0)
+      {
+        <div class="ps-term mb-2"><pre class="wrap"><code data-pin-reference-text>@view.ReferenceText</code></pre></div>
+      }
+      @if (view.ReferenceMore is { } more)
+      {
+        <div class="collapse" id="tcaseRefMore"><div class="ps-term mb-2"><pre class="wrap"><code>@more</code></pre></div></div>
+      }
+      @if (view.ReferenceCalls.Count > 0)
+      {
+        <ul class="fs-8 text-secondary mb-2 ps-3" data-pin-reference-calls>
+          @foreach (var call in view.ReferenceCalls)
+          {
+            <li><span class="text-ps-faint">calls</span> <span class="ps-mono text-break">@call</span></li>
+          }
+        </ul>
+      }
+    }
+    else
+    {
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><span class="ps-label">Reference output</span></div>
+      <p class="fs-7 text-secondary mb-2" data-pin-no-reference>None. Accepting one of the suite's runs as its baseline can set one.</p>
+    }
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-3 mb-2">
+      <span class="ps-label">Checks</span>
+      <span class="fs-8 text-ps-faint" data-pin-checks-line>@view.ChecksLine</span>
+      <button class="btn btn-sm btn-ghost ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#tcaseAddCheck" aria-expanded="false" aria-controls="tcaseAddCheck"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add check</button>
+    </div>
+    <ul class="list-group mb-2" data-pin-checks>
+      @foreach (var row in view.Checks)
+      {
+        <li class="list-group-item d-flex align-items-center gap-2" data-pin-check="@row.Json" data-verdict="@row.Verdict" title="@row.Detail">
+          <span class="fs-7 text-nowrap">@row.Label</span>
+          @if (row.Code is { } code)
+          {
+            <code class="fs-8 text-truncate" style="min-width:0">@code</code>
+          }
+          else
+          {
+            <span class="fs-8 text-ps-faint text-truncate" style="min-width:0">@row.Summary</span>
+          }
+          @if (row.Limit is { } limit)
+          {
+            <span class="fs-8 text-ps-faint text-nowrap d-none d-sm-inline">@limit</span>
+          }
+          @if (row.Fails)
+          {
+            <span class="ps-chip text-nowrap" data-tone="warn">fails on the reference</span>
+          }
+          <button class="btn btn-icon ms-auto" type="button" aria-label="@("Remove the " + row.Label.ToLowerInvariant() + " check")" data-pin-remove><i class="bi bi-x-lg fs-8" aria-hidden="true"></i></button>
+        </li>
+      }
+    </ul>
+    <div class="collapse" id="tcaseAddCheck">
+      <div class="ps-panel p-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-4">
+            <label class="form-label fs-7" for="tcaseCheckKind">Check</label>
+            <select class="form-select form-select-sm" id="tcaseCheckKind" data-pin-check-kind>
+              <option value="contains" data-placeholder="Text the answer must contain" selected>Contains text</option>
+              <option value="regex" data-placeholder="A regex the answer must match">Matches regex</option>
+              <option value="json-schema" data-placeholder="A JSON schema, or empty for any JSON object">Valid JSON (schema)</option>
+              <option value="tool" data-placeholder="The tool's name, e.g. get_weather">Calls a tool</option>
+              <option value="limits" data-placeholder="e.g. $0.03 30 s">Max cost and latency</option>
+              <option value="judge" disabled>LLM judge (opt-in)</option>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fs-7" for="tcaseCheckValue">Value</label>
+            <input class="form-control form-control-sm font-monospace" id="tcaseCheckValue" placeholder="Text the answer must contain" autocomplete="off" data-pin-check-value>
+          </div>
+          <div class="col-sm-2"><button class="btn btn-sm btn-outline-secondary w-100" type="button" data-pin-check-add>Add</button></div>
+        </div>
+        <div class="form-text text-danger" role="alert" data-pin-check-error hidden></div>
+        <div class="form-text">Schemas, tool arguments and judge rubrics open in the full check editor on the suite page after you save.</div>
+      </div>
+    </div>
+    <div class="alert alert-danger fs-7 py-2 px-3 mt-3 mb-0" role="alert" data-pin-error hidden></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="button" class="btn btn-primary" data-pin-save><i class="bi bi-pin-angle me-1" aria-hidden="true"></i>@view.SaveText</button>
+  </div>
+</div>
