@@ -3,6 +3,9 @@
 // would replace the request), a tool through BenchSchema (names, JSON Schema, mocks), a Tool Bench preset through BenchSetup.Normalize and a
 // Compare preset's columns through CompareDraft. On top of that, a preset never holds a secret: no provider option, at any depth, whose name
 // looks like a credential, and no header or provider-option value that looks like a key or a bearer token (PresetRules.LooksSecret).
+// W5 L4: a Playground preset keeps every option the Playground sends (text verbosity, the reasoning summary, the session id, the timeout,
+// parallel tool calls, cache retention, retries, the retry delay, thinking budgets, the Azure API version) and a tool's strict flag, each
+// through the same RunSpec checks.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -122,7 +125,7 @@ public static partial class PresetRules
         return preset with
         {
             Tools = tools,
-            Options = preset.Options is null ? null : OptionsOf(probe),
+            Options = preset.Options is null ? null : OptionsOf(probe) with { ParallelToolCalls = preset.Options.ParallelToolCalls },
             Headers = probe.Headers,
         };
     }
@@ -204,7 +207,7 @@ public static partial class PresetRules
         var messages = (preset.Messages ?? []).ToList();
         if (!messages.Any(message => message?.Role is "user" or "toolResult")) messages.Add(new RunMessage { Role = "user", Text = "." });
         var choice = preset.ToolChoice is "any" ? "required" : preset.ToolChoice;
-        var enabled = tools?.Where(tool => tool.Enabled).Select(tool => new RunTool(tool.Name, tool.Description, tool.Parameters)).ToList();
+        var enabled = tools?.Where(tool => tool.Enabled).Select(tool => new RunTool(tool.Name, tool.Description, tool.Parameters, Strict: tool.Strict ? true : null)).ToList();
         if (choice is not (null or "auto" or "none" or "required") && tools is not null && tools.Any(tool => tool.Name == choice) && enabled?.Any(tool => tool.Name == choice) != true)
             throw new ArgumentException($"The tool choice \"{choice}\" names a tool that is switched off.");
         if (choice is "required" && enabled is not { Count: > 0 }) choice = tools is { Count: > 0 } ? null : choice;
@@ -228,6 +231,18 @@ public static partial class PresetRules
             ServiceTier = options.ServiceTier,
             Headers = preset.Headers,
             ProviderOptions = options.ProviderOptions,
+            TextVerbosity = options.TextVerbosity,
+            ReasoningSummary = options.ReasoningSummary,
+            SessionId = options.SessionId,
+            TimeoutMs = options.TimeoutMs,
+            // RunSpec takes the switch only with a tool on; CheckPlayground keeps it either way (a preset saved without its tools, or with
+            // them switched off, still has it: a page with tools uses it, and a run without one says it needs one, never a silent drop).
+            ParallelToolCalls = enabled is { Count: > 0 } ? options.ParallelToolCalls : null,
+            CacheRetention = options.CacheRetention,
+            MaxRetries = options.MaxRetries,
+            MaxRetryDelayMs = options.MaxRetryDelayMs,
+            ThinkingBudgets = options.ThinkingBudgets,
+            AzureApiVersion = options.AzureApiVersion,
         };
         return spec.Normalize();
     }
@@ -246,6 +261,16 @@ public static partial class PresetRules
         ResponseFormat = spec.ResponseFormat,
         ServiceTier = spec.ServiceTier,
         ProviderOptions = spec.ProviderOptions,
+        TextVerbosity = spec.TextVerbosity,
+        ReasoningSummary = spec.ReasoningSummary,
+        SessionId = spec.SessionId,
+        TimeoutMs = spec.TimeoutMs,
+        ParallelToolCalls = spec.ParallelToolCalls,
+        CacheRetention = spec.CacheRetention,
+        MaxRetries = spec.MaxRetries,
+        MaxRetryDelayMs = spec.MaxRetryDelayMs,
+        ThinkingBudgets = spec.ThinkingBudgets,
+        AzureApiVersion = spec.AzureApiVersion,
     };
 
     private static void CheckSecrets(Preset preset)

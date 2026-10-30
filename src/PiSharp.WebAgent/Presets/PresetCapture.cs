@@ -1,6 +1,7 @@
 // Decision 0011 (run W4, R8): a preset from what a page posts when the user saves one. presets-host.js reads the page with the page's own
 // readers and posts it as "capture":
-//   playground  {spec: RunSpec (collectSpec), tools: [{name, description, parameters, enabled, mock?, mockError?}], parallel: bool}
+//   playground  {spec: RunSpec (collectSpec), tools: [{name, description, parameters, enabled, strict?, mock?, mockError?}], parallel: bool}
+//               (W5 L4: every option the spec carries is kept, and a tool's strict flag)
 //   compare     {draft: CompareDraft (prompt, systemPrompt, thinking, maxTokens, temperature, columns)}
 //   bench       {setup: BenchSetup (readSetup), messages: [user message texts]}
 //   presets     {provider, model, systemPrompt?}  (the Presets page's New preset: a model and a system prompt)
@@ -56,6 +57,7 @@ public static class PresetCapture
                     Description = Str(tool, "description"),
                     Parameters = tool["parameters"] as JsonObject is { } parameters ? (JsonObject)parameters.DeepClone() : null,
                     Enabled = tool["enabled"] is not JsonValue enabled || !enabled.TryGetValue<bool>(out var on) || on,
+                    Strict = tool["strict"] is JsonValue strict && strict.TryGetValue<bool>(out var isStrict) && isStrict,
                     Mocks = mock is null ? [] : [new BenchMock { Name = "Mock 1", Text = mock, IsError = tool["mockError"] is JsonValue error && error.TryGetValue<bool>(out var isError) && isError }],
                 });
             }
@@ -82,6 +84,16 @@ public static class PresetCapture
                 ResponseFormat = spec.ResponseFormat,
                 ServiceTier = spec.ServiceTier,
                 ProviderOptions = spec.ProviderOptions,
+                TextVerbosity = spec.TextVerbosity,
+                ReasoningSummary = spec.ReasoningSummary,
+                SessionId = spec.SessionId,
+                TimeoutMs = spec.TimeoutMs,
+                ParallelToolCalls = spec.ParallelToolCalls,
+                CacheRetention = spec.CacheRetention,
+                MaxRetries = spec.MaxRetries,
+                MaxRetryDelayMs = spec.MaxRetryDelayMs,
+                ThinkingBudgets = spec.ThinkingBudgets is { Count: > 0 } budgets ? budgets : null,
+                AzureApiVersion = spec.AzureApiVersion,
             },
             Headers = spec.Headers,
             SystemPrompt = spec.SystemPrompt,

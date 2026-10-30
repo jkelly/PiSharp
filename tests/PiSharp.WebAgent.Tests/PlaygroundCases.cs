@@ -8,6 +8,10 @@
 // tool calls and a tool's strict flag, checked against the modules the page loads), each enabled only where the model's API takes it; the
 // JSON the page posts reaches the run, History and an OpenAI Responses request body; a model that rejects one is refused before anything
 // is sent, and the config keeps the value, marked. The Speed list and the Reasoning levels are RunSpec's own (Fast, UltraFast and max).
+// W5 L4: the options the run engine carries (cache retention, retries, the retry delay, thinking budgets, the Azure API version) have live
+// rows the page sends and restores, reach the run, History and the provider's request (an Anthropic thinking budget, Azure's api-version),
+// and are enabled where the model's API takes them; the options a run refuses by design say so and where they are set; Sampling's
+// read-only samplingParams row shows the model's catalog sampling values.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -23,6 +27,10 @@ using PiSharp.WebAgent.Shell;
 internal static partial class Program
 {
     private static readonly string[] PlaygroundSections = ["model", "sampling", "output", "reasoning", "tools", "cache", "tier", "transport", "headers", "provider"];
+
+    // The options the run engine carries that a run takes (W5 L4: live rows); RunModelOptions.Carried's others are refused by design.
+    private static readonly string[] PlaygroundCarried =
+        [RunModelOptions.CacheRetention, RunModelOptions.MaxRetries, RunModelOptions.MaxRetryDelayMs, RunModelOptions.ThinkingBudgets, RunModelOptions.AzureApiVersion];
 
     private static readonly string[] PlaygroundScripts =
         ["playground.js", "request-api.js", "request-spec.js", "request-config.js", "request-messages.js", "request-tools.js", "request-output.js", "request-code.js"];
@@ -42,13 +50,25 @@ internal static partial class Program
             Check(html.Contains("data-playground-toolbar data-state=\"empty\"", StringComparison.Ordinal) && html.Contains("not run yet", StringComparison.Ordinal), "the toolbar's");
             foreach (var section in PlaygroundSections)
                 Check(html.Contains($"id=\"pg-cfg-{section}\"", StringComparison.Ordinal), "the config accordion has " + section);
-            // Every option RunSpec takes has a live row (a tool's strict flag is the tool editor's switch); none is an unsent row.
-            foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images, RunModelOptions.StrictTools]))
+            // Every option RunSpec takes has a live row (a tool's strict flag is the tool editor's switch); none is an unsent row. W5 L4: so do
+            // the options the run engine carries (cache retention, retries, the retry delay, thinking budgets, the Azure API version); the
+            // ones a run refuses by design are the unsent rows, and no row says an option is "not sent yet".
+            foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images, RunModelOptions.StrictTools]).Concat(PlaygroundCarried))
                 Check(html.Contains($"data-option=\"{option}\"", StringComparison.Ordinal), "a row for " + option);
-            foreach (var option in RunModelOptions.All)
+            foreach (var option in RunModelOptions.All.Concat(PlaygroundCarried))
                 Check(!html.Contains($"data-unsent=\"{option}\"", StringComparison.Ordinal), option + " is not shown as unsent");
             foreach (var unsent in RequestConfigView.Unsent.Keys)
                 Check(Regex.IsMatch(html, $"data-unsent=\"{unsent}\""), "the unsent option " + unsent + " is shown");
+            foreach (var option in RunModelOptions.Carried.Except(PlaygroundCarried))
+                Check(RequestConfigView.Unsent.ContainsKey(option) && !html.Contains($"data-option=\"{option}\"", StringComparison.Ordinal), option + " is refused by design: an unsent row");
+            Check(!html.Contains("not sent yet", StringComparison.Ordinal) && !html.Contains("not sent from this page yet", StringComparison.Ordinal), "no row says an option is not sent yet");
+            Check(RequestConfigView.Unsent.Where(pair => pair.Key != "apiKey").All(pair => pair.Value.Reason.Contains("refused per run by design", StringComparison.OrdinalIgnoreCase)
+                && pair.Value.Reason.Contains("Settings › Providers", StringComparison.Ordinal)), "each refused-by-design row says so, and where it is set");
+            var sampling = Regex.Match(html, "data-sampling-params data-applied=\"false\">.*?data-sampling-chip>([^<]*)</span>.*?data-sampling-note>([^<]*)</div>", RegexOptions.Singleline);
+            Check(sampling.Success && sampling.Groups[1].Value == "not applied by this api" && sampling.Groups[2].Value.EndsWith(" has none.", StringComparison.Ordinal),
+                "Sampling's samplingParams row: the faux model has none and its API applies none: " + Cut(sampling.Value));
+            Check(html.IndexOf("data-sampling-params", StringComparison.Ordinal) > html.IndexOf("data-option=\"temperature\"", StringComparison.Ordinal)
+                && html.IndexOf("data-sampling-params", StringComparison.Ordinal) < html.IndexOf("data-option=\"topP\"", StringComparison.Ordinal), "the row follows temperature");
             Check(Regex.IsMatch(html, "id=\"tool-strict\"(?![^>]*disabled)[^>]*data-tool-field=\"strict\""), "the tool editor's Strict switch is live");
             Check(Regex.IsMatch(html, "<input type=\"password\"[^>]*id=\"pg-api-key\"[^>]*disabled"), "the API key field is never usable");
             Check(html.Contains("<option value=\"ultrafast\">UltraFast</option>", StringComparison.Ordinal) && !html.Contains("not sent yet</option>", StringComparison.Ordinal),
@@ -64,8 +84,8 @@ internal static partial class Program
             foreach (var level in RunSpec.ThinkingLevels)
                 Check(html.Contains($"id=\"pg-th-{level}\" value=\"{level}\"", StringComparison.Ordinal), "the Reasoning control lists " + level);
             await PlaygroundWiredAsync(app, html);
-            Check(Regex.IsMatch(html, "data-provider-pane=\"azure\"") && Regex.IsMatch(html, "data-unsent=\"azureApiVersion\"") && html.Contains("data-provider-pane=\"bedrock\"", StringComparison.Ordinal),
-                "the Azure and Bedrock panes");
+            Check(Regex.IsMatch(html, "data-provider-pane=\"azure\"") && Regex.IsMatch(html, "data-option=\"azureApiVersion\"") && Regex.IsMatch(html, "data-unsent=\"azureBaseUrl\"")
+                && html.Contains("data-provider-pane=\"bedrock\" data-unsent=\"bedrock\"", StringComparison.Ordinal), "the Azure and Bedrock panes");
             Check(Regex.IsMatch(html, "data-preset-save>") && Regex.IsMatch(html, "data-preset-load>") && !html.Contains("Presets are not available yet", StringComparison.Ordinal),
                 "Save and Load preset: enabled, for presets-host.js to wire");
             Check(!html.Contains("Pin as test", StringComparison.Ordinal), "no Pin as test (W5)");
@@ -581,6 +601,169 @@ internal static partial class Program
             Check(Regex.IsMatch(html, "data-config-conflicts(?![^>]*hidden)"), "the banner says Run will refuse the request");
             PlaygroundNoInline("_RequestConfig", html);
         }),
+
+        Case("playground.options.carried-options-reach-the-request", async () =>
+        {
+            // W5 L4: the JSON the page posts for the options the run engine carries (collectSpec: cacheRetention by its checked radio,
+            // maxRetries and maxRetryDelayMs as numbers, thinkingBudgets as { level: tokens } of the levels filled in, azureApiVersion as text).
+            JsonObject Page(string provider, string model, string text) => new()
+            {
+                ["provider"] = provider,
+                ["model"] = model,
+                ["source"] = "playground",
+                ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["text"] = text }),
+                ["maxRetries"] = 2,
+                ["maxRetryDelayMs"] = 5000,
+            };
+            string[] faux = [RunModelOptions.CacheRetention, RunModelOptions.MaxRetries, RunModelOptions.MaxRetryDelayMs, RunModelOptions.ThinkingBudgets];
+
+            // Over HTTP on a faux thinking model (it takes each, and ignores it): the run applies each, History records it, and ?run= reopens
+            // it with every control set and nothing refused.
+            await using (var app = await WebAgentApp.StartAsync("pg-carried"))
+            {
+                var json = Page("faux", "echo-thinking", "carried options run");
+                json["thinking"] = "high";
+                json["cacheRetention"] = "long";
+                json["thinkingBudgets"] = new JsonObject { ["low"] = 2048, ["high"] = 8192 };
+                var posted = await app.SendAsync(HttpMethod.Post, "/api/runs", json, origin: app.Origin);
+                Check(posted.Status == 200 && posted.Body?["posted"]?.GetValue<bool>() == true, "the run is taken: " + posted.Text);
+                var id = posted.Body!["id"]!.GetValue<string>();
+                Equal(RunStatus.Completed, (await RunsSseAsync(app, $"/api/runs/{id}/events"))[^1].Data?["status"]?.GetValue<string>(), "completed");
+                var options = (await app.Get($"/api/runs/{id}")).Body?["run"]?["options"];
+                var applied = options?["applied"]?.AsArray().Select(item => item!.GetValue<string>()).ToList() ?? [];
+                foreach (var option in faux) Check(applied.Contains(option), option + " is applied: " + options?.ToJsonString());
+                Equal(("long", 2, 5000, 2048, 8192), (options?["cacheRetention"]?.GetValue<string>(), options?["maxRetries"]?.GetValue<int>(), options?["maxRetryDelayMs"]?.GetValue<int>(),
+                    options?["thinkingBudgets"]?["low"]?.GetValue<int>(), options?["thinkingBudgets"]?["high"]?.GetValue<int>()), "History records each value");
+
+                var reopened = (await app.Get("/playground?run=" + id)).Text;
+                foreach (var option in faux)
+                    Check(Regex.IsMatch(reopened, $"data-option=\"{option}\" data-set=\"true\" data-conflict=\"\""), option + "'s row is set, not refused: "
+                        + Cut(reopened[Math.Max(0, reopened.IndexOf($"data-option=\"{option}\"", StringComparison.Ordinal) - 40)..]));
+                Check(Regex.IsMatch(reopened, "id=\"pg-cr-long\" value=\"long\" checked=\"checked\"") && !Regex.IsMatch(reopened, "id=\"pg-cr-short\" value=\"short\" checked"), "long retention is checked");
+                Check(Regex.IsMatch(reopened, "id=\"pg-maxRetries\"[^>]*value=\"2\"") && Regex.IsMatch(reopened, "id=\"pg-maxRetryDelayMs\"[^>]*value=\"5000\""), "the retries and the delay");
+                Check(Regex.IsMatch(reopened, "id=\"pg-budget-low\"[^>]*value=\"2048\"") && Regex.IsMatch(reopened, "id=\"pg-budget-high\"[^>]*value=\"8192\"")
+                    && Regex.IsMatch(reopened, "id=\"pg-budget-medium\"[^>]*value=\"\""), "the budgets set, and a level left empty");
+                Check(Regex.IsMatch(reopened, "data-config-conflicts hidden"), "nothing is refused");
+                Check(reopened.Contains("<span data-modified-count>5</span>", StringComparison.Ordinal),
+                    "the modified count counts them (thinking and the four)");
+
+                // A model that does not take one refuses it with its reason, and nothing runs: an Azure API version off Azure, a retry delay
+                // without retries.
+                async Task RefusedHttp(JsonObject spec, string option, string reason)
+                {
+                    var answer = await app.SendAsync(HttpMethod.Post, "/api/runs", spec, origin: app.Origin);
+                    Equal(400, answer.Status, option + ": " + answer.Text);
+                    Check(answer.Body?["error"]?["refused"]?.AsArray().Any(item => item?["option"]?.GetValue<string>() == option
+                        && item["reason"]?.GetValue<string>().Contains(reason, StringComparison.Ordinal) == true) == true, $"{option} is refused ({reason}): " + answer.Text);
+                }
+                var azureOff = Page("faux", "echo", "refused");
+                azureOff["azureApiVersion"] = "2025-04-01-preview";
+                await RefusedHttp(azureOff, RunModelOptions.AzureApiVersion, "only Azure OpenAI takes it");
+                var delayOnly = Page("faux", "echo", "refused");
+                delayOnly.Remove("maxRetries");
+                await RefusedHttp(delayOnly, RunModelOptions.MaxRetryDelayMs, "needs max retries of 1 or more");
+                Equal(1, (await app.Get("/api/runs")).Body?["total"]?.GetValue<int>(), "only the first ran");
+
+                // Model & auth's answer carries the model's catalog sampling values for Sampling's read-only row.
+                var model = await app.Get("/api/playground/model?provider=faux&model=echo");
+                Check(model.Body?["samplingParams"] is JsonObject sampling && sampling["applied"]?.GetValue<bool>() == false && sampling["values"] is null
+                    && sampling["chip"]?.GetValue<string>() == "not applied by this api" && sampling["note"]?.GetValue<string>() == "echo has none.", "samplingParams: " + model.Text);
+                Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
+            }
+
+            // Over real routing (the fake provider: no request leaves the process): the same JSON reaches an Anthropic budget-thinking model's
+            // body as its thinking budget, and an Azure model's request as its api-version.
+            await using var host = RunsHost.Routing("pg-carried-routing");
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("anthropic", Planted("sk-ant-")));
+            await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("azure", Planted("az-")) { Settings = new Dictionary<string, string> { ["AZURE_OPENAI_RESOURCE_NAME"] = "pg-carried" } });
+            var catalog = (RuntimeModelCatalog)host.Services.GetRequiredService<IModelCatalog>();
+            async Task<FakeRequest> SentAsync(JsonObject json, string text)
+            {
+                var start = await host.Engine.StartAsync(RunSpec.Parse(json));
+                Check(start.Posted, "posted: " + start.Refusal?.Message);
+                var run = await RunsFinishedAsync(host.Store, start.Id!);
+                Equal(RunStatus.Completed, run.Status, "completed: " + run.Error + " " + run.Notes);
+                return host.Provider.Requests.Single(request => request.Body?.Contains(text, StringComparison.Ordinal) == true);
+            }
+            var budgetModel = catalog.Models("anthropic").FirstOrDefault(model =>
+                host.Engine.Capabilities("anthropic", model.Id)?.Find(RunModelOptions.ThinkingBudgets) is { Supported: false, WithThinking: true });
+            Check(budgetModel is not null, "the catalog has an Anthropic model that thinks by budget");
+            var level = budgetModel!.ThinkingLevels.First(item => item != "off");
+            var budgets = new JsonObject { ["minimal"] = 1536, ["low"] = 2048, ["medium"] = 3072, ["high"] = 4096 };
+            var anthropicJson = Page("anthropic", budgetModel.Id, "carried budget run");
+            anthropicJson["thinking"] = level;
+            anthropicJson["thinkingBudgets"] = budgets;
+            var anthropicBody = JsonNode.Parse((await SentAsync(anthropicJson, "carried budget run")).Body!)!;
+            Equal(budgets[level is "xhigh" or "max" ? "high" : level]!.GetValue<int>(), anthropicBody["thinking"]?["budget_tokens"]?.GetValue<int>(), "the level's budget: " + anthropicBody["thinking"]?.ToJsonString());
+            var azureModel = ModelOf(catalog, "azure", "azure-openai-responses", "gpt-4.1");
+            var azureJson = Page("azure", azureModel, "carried azure run");
+            azureJson["azureApiVersion"] = "2025-04-01-preview";
+            Equal("?api-version=2025-04-01-preview", (await SentAsync(azureJson, "carried azure run")).Url.Query, "the run's API version");
+
+            // Each row is live where the model's API takes it (RunModelOptions, as the run engine plans), and a set option the model does not
+            // take is kept, marked, and its Provider-specific pane shown.
+            await using var render = CatalogHost("pg-carried-render", catalog);
+            async Task<string> Config(RunSpec draft) =>
+                await render.RenderAsync("_RequestConfig", new RequestConfigView { Draft = draft, Capabilities = host.Engine.Capabilities(draft.Provider, draft.Model), ShowModel = false });
+            RunSpec Draft(string provider, string model, string? thinking = null) => new() { Provider = provider, Model = model, Thinking = thinking, Messages = [new RunMessage { Text = "x" }] };
+            var thinkingHtml = await Config(Draft("anthropic", budgetModel.Id, level));
+            Check(PlaygroundLive(thinkingHtml, RunModelOptions.ThinkingBudgets), "budgets are live while the Anthropic model thinks");
+            Check(!PlaygroundLive(await Config(Draft("anthropic", budgetModel.Id)), RunModelOptions.ThinkingBudgets), "and off while it does not");
+            foreach (var option in new[] { RunModelOptions.CacheRetention, RunModelOptions.MaxRetries, RunModelOptions.MaxRetryDelayMs })
+                Check(PlaygroundLive(thinkingHtml, option), option + " is live on Anthropic");
+            Check(!PlaygroundLive(thinkingHtml, RunModelOptions.AzureApiVersion), "no Azure API version on Anthropic");
+            var openai = catalog.Models("openai").First(model => model.ThinkingLevels.Count > 1 && catalog.Find("openai", model.Id)!.Durable.Api == "openai-responses");
+            var responsesHtml = await Config(Draft("openai", openai.Id, openai.ThinkingLevels[1]));
+            Check(!PlaygroundLive(responsesHtml, RunModelOptions.ThinkingBudgets) && PlaygroundLive(responsesHtml, RunModelOptions.CacheRetention)
+                && PlaygroundLive(responsesHtml, RunModelOptions.MaxRetries), "OpenAI Responses: cache retention and retries, no budget (it takes an effort)");
+            var azureHtml = await Config(Draft("azure", azureModel));
+            Check(PlaygroundLive(azureHtml, RunModelOptions.AzureApiVersion) && Regex.IsMatch(azureHtml, "data-provider-pane=\"azure\">"), "Azure: the API version is live, in the pane shown first");
+            var view = new RequestConfigView
+            {
+                Draft = Draft("openai", openai.Id) with { AzureApiVersion = "v1", ThinkingBudgets = new Dictionary<string, int> { ["low"] = 2048 } },
+                Capabilities = host.Engine.Capabilities("openai", openai.Id),
+                ShowModel = false,
+            };
+            Check(view.Conflict(RunModelOptions.AzureApiVersion) && view.Conflict(RunModelOptions.ThinkingBudgets) && view.ProviderPane == "azure", "the view's verdicts");
+            var marked = await render.RenderAsync("_RequestConfig", view);
+            Check(Regex.IsMatch(marked, "data-option=\"azureApiVersion\" data-set=\"true\" data-conflict=\"true\"") && Regex.IsMatch(marked, "id=\"pg-azureApiVersion\"[^>]*value=\"v1\"(?![^>]*disabled)")
+                && Regex.IsMatch(marked, "data-provider-pane=\"azure\">"), "the Azure API version is kept, marked, can be cleared, and its pane shows");
+            Check(Regex.IsMatch(marked, "data-option=\"thinkingBudgets\" data-set=\"true\" data-conflict=\"true\"") && Regex.IsMatch(marked, "id=\"pg-budget-low\"[^>]*value=\"2048\"(?![^>]*disabled)"),
+                "the budget is kept, marked and can be cleared");
+            Check(Regex.IsMatch(marked, "data-config-conflicts(?![^>]*hidden)"), "the banner says Run will refuse the request");
+            PlaygroundNoInline("_RequestConfig", thinkingHtml + marked);
+        }),
+
+        Case("playground.sampling.the-catalog-values-show-read-only", async () =>
+        {
+            // Sampling's samplingParams row (the mockup's): the model's catalog values and by-level values, and whether its API applies them.
+            // A model whose catalog sets none says so; nothing on the row is a control the page sends.
+            var wire = (PiSharp.Durable.Chord.JsonObjectValue)PiSharp.Durable.Chord.JsonValue.Parse(
+                """{"id":"local-qwen","samplingParams":{"top_p":0.8,"top_k":20},"samplingParamsByThinkingLevel":{"high":{"temperature":0.6}}}""");
+            PiSharp.Durable.DurableModel Model(string api) => new() { Id = "local-qwen", Name = "Local Qwen", Api = api, Provider = "lmstudio", Wire = wire };
+            var completions = RequestSamplingView.Of(Model("openai-completions"));
+            Equal(("{\"top_p\":0.8,\"top_k\":20}", "{\"high\":{\"temperature\":0.6}}", true, "applied by this api"),
+                (completions.ValuesText, completions.ByLevelText, completions.Applied, completions.Chip), "Chat Completions merges them");
+            foreach (var api in new[] { "openai-responses", "azure-openai-responses" }) Check(RequestSamplingView.Of(Model(api)).Applied, api + " merges them");
+            var anthropic = RequestSamplingView.Of(Model("anthropic-messages"));
+            Check(!anthropic.Applied && anthropic.Chip == "not applied by this api" && anthropic.Note.Contains("never sent", StringComparison.Ordinal), "Anthropic does not: " + anthropic.Note);
+            var none = RequestSamplingView.Of(new PiSharp.Durable.DurableModel { Id = "plain", Name = "Plain", Api = "openai-completions", Provider = "x" });
+            Check(!none.Any && none.Note == "plain has none." && none.ValuesText.Length == 0, "a model with none says so");
+            Equal("Choose a model PiSharp knows.", RequestSamplingView.Of(null).Note, "no model");
+
+            await using var runs = RunsHost.Faux("pg-sampling");
+            await using var render = RenderHost.Create("pg-sampling-render", (_, _) => { });
+            var draft = new RunSpec { Provider = "faux", Model = "echo", Messages = [new RunMessage { Text = "x" }] };
+            var html = await render.RenderAsync("_RequestConfig", new RequestConfigView { Draft = draft, Capabilities = runs.Engine.Capabilities("faux", "echo"), ShowModel = false, Sampling = completions });
+            var row = Regex.Match(html, "<div class=\"param-row\" data-sampling-params data-applied=\"true\">(.*?)data-sampling-note>([^<]*)</div>", RegexOptions.Singleline);
+            Check(row.Success && row.Groups[1].Value.Contains("data-sampling-chip>applied by this api</span>", StringComparison.Ordinal)
+                && row.Groups[1].Value.Contains("{&quot;top_p&quot;:0.8,&quot;top_k&quot;:20}", StringComparison.Ordinal)
+                && row.Groups[1].Value.Contains("data-sampling-by-level-text>{&quot;high&quot;:{&quot;temperature&quot;:0.6}}</span>", StringComparison.Ordinal), "the row shows the values: " + Cut(row.Value));
+            Check(!Regex.IsMatch(row.Value, "data-opt=|data-option="), "nothing on the row is sent");
+            var plain = await render.RenderAsync("_RequestConfig", new RequestConfigView { Draft = draft, Capabilities = runs.Engine.Capabilities("faux", "echo"), ShowModel = false });
+            Check(!plain.Contains("data-sampling-params", StringComparison.Ordinal), "a page that does not set it leaves the row out");
+            PlaygroundNoInline("_RequestConfig", html);
+        }),
     ];
 
     /// <summary>The page's controls reach the request: request-spec.js sends every option that has a row (and a tool's strict flag), reads
@@ -592,9 +775,13 @@ internal static partial class Program
         var config = (await app.Get("/js/request-config.js")).Text;
         var tools = (await app.Get("/js/request-tools.js")).Text;
         var sent = PlaygroundJsList(spec, "SENT_OPTIONS");
-        foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images, RunModelOptions.Tools, RunModelOptions.StrictTools]))
+        foreach (var option in RunModelOptions.All.Except([RunModelOptions.Images, RunModelOptions.Tools, RunModelOptions.StrictTools]).Concat(PlaygroundCarried))
             Check(sent.Contains(option), "request-spec.js sends " + option + ": " + string.Join(",", sent));
         Check(spec.Contains("for (const option of SENT_OPTIONS)", StringComparison.Ordinal), "collectSpec reads SENT_OPTIONS");
+        // applySpec restores every option it sends (Presets, Compare columns, History's "Open in Playground" in place).
+        var apply = Regex.Match(spec, @"export function applyOptions\(config, spec\) \{(.*?)\n\}", RegexOptions.Singleline).Groups[1].Value;
+        foreach (var option in sent)
+            Check(apply.Contains($"'{option}'", StringComparison.Ordinal), "applyOptions sets " + option);
         Check(spec.Contains("if (tool.strict === true) sent.strict = true;", StringComparison.Ordinal), "collectTools sends a tool's strict flag");
         Check(tools.Contains("if (fields.strict?.checked) tool.strict = true;", StringComparison.Ordinal), "the tool editor keeps the Strict switch on the tool");
         // Each control the generic reader handles has a kind it knows (a kind it does not know reads as null: never sent).

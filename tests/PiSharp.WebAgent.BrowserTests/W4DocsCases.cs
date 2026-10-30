@@ -9,6 +9,9 @@ using System.Text.RegularExpressions;
 // one cannot keep a part listed for ever. A fix in another area that closes one of these gaps fails here until its line is revised.
 // W4 retest 2: revised after fix 2's merges, which closed most of the gaps the docs fix listed (agent compare's Stop, time limit, delete
 // and memory; the group preflight; the bench's strict note; the settings rows and the footer padding; most of the browser coverage).
+// W5 L4 (W4 leftovers): the Playground's controls for the options the run engine carries, presets that keep the newer options and a tool's
+// strict flag, and the Tool Bench's Reset, removing a message and Export as JSON (W4BenchResetCases) are closed, so their gaps and lines
+// are gone.
 internal static partial class Program
 {
     /// <summary>A W4 gap that decision 0011's "Not done" lists until <paramref name="Closed"/> says why it no longer holds.</summary>
@@ -32,16 +35,6 @@ internal static partial class Program
         new("the owner decision on R0's body patch", "An owner decision is open",
             root => SourceHas(root, "src/PiSharp.WebAgent/Runs/RunModelOptions.cs", "SendPatch(")
                 ? null : "the run's extra options no longer travel as a body patch (RunModelOptions.SendPatch is gone): say what the owner chose instead"),
-        // Playground (R1): RunSpec carries these since fix 2 (runs-core), but the Playground still lists them as not sent.
-        new("the Playground's controls for the options the run engine carries", "the Playground has no control wired for them yet",
-            root => new[] { "thinkingBudgets", "cacheRetention", "maxRetries", "maxRetryDelayMs" }
-                    .All(name => SourceHas(root, "src/PiSharp.WebAgent/Playground/RequestViews.cs", $"[\"{name}\"] = new(\"{name}\""))
-                ? null : "RequestConfigView.Unsent no longer lists every one of thinkingBudgets, cacheRetention, maxRetries and maxRetryDelayMs"),
-        // Presets (R8): a preset keeps the options it knew before fix 2 (playground) wired more of them.
-        new("presets drop the Playground's newer options", "Presets keep neither the options the Playground wired",
-            root => !Source(root, "src/PiSharp.WebAgent/Presets/PresetModels.cs").Contains("TextVerbosity", StringComparison.Ordinal)
-                    && !Source(root, "src/PiSharp.WebAgent/wwwroot/js/presets-host.js").Contains("'textVerbosity'", StringComparison.Ordinal)
-                ? null : "a preset now keeps the text verbosity (PresetOptions or presets-host.js)"),
         // Agent compare (R6): the delete API (fix 2, agent-runner) has no button on the run page.
         new("agent compare's run page has no Delete button", "its run page has no Delete button",
             root => AppFilesMatching(root, "compare-agent*.js", @"/delete\b") is { Count: > 0 } files
@@ -68,9 +61,6 @@ internal static partial class Program
         // that the Raw SSE tools are absent without them).
         new("stored raw payloads in the inspector", "stored raw payloads in the inspector", ["data-raw-request", "data-raw-response", "data-sse-group", "data-sse-wrap"]),
         new("agent compare's budget limit", "agent compare's budget limit", ["acCap", "data-ac-continue", "data-ac-budget"]),
-        // Run in no case at all.
-        new("the Tool Bench's Reset, removing a message and Export as JSON", "the Tool Bench's Reset, removing a message and Export as JSON",
-            ["data-bench-reset", "data-bench-remove", "data-bench-export"]),
     ];
 
     private static IEnumerable<(string, Func<Task>)> W4DocsCases() =>

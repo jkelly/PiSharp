@@ -22,8 +22,11 @@ import { initSaveModal, initLoadModal, openSaveModal, modalOf } from './presets-
 
 const page = document.body?.dataset.page;
 const STASH = 'pisharp:preset-loaded';
+// Every option the Playground sends (request-spec.js SENT_OPTIONS but the tool choice and headers, which are their own parts; W5 L4: the
+// newer options and a tool's strict flag are kept too).
 const OPTIONS = ['thinking', 'maxTokens', 'temperature', 'topP', 'topK', 'stop', 'seed', 'presencePenalty', 'frequencyPenalty',
-  'responseFormat', 'serviceTier', 'providerOptions'];
+  'responseFormat', 'serviceTier', 'providerOptions', 'textVerbosity', 'reasoningSummary', 'sessionId', 'timeoutMs', 'parallelToolCalls',
+  'cacheRetention', 'maxRetries', 'maxRetryDelayMs', 'thinkingBudgets', 'azureApiVersion'];
 let origin = null;
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -75,6 +78,7 @@ const playground = {
         parameters: definition.parameters ?? undefined,
         enabled: item.querySelector('[data-tool-on]')?.checked !== false,
       };
+      if (definition.strict === true) tool.strict = true;
       if (item.dataset.mock !== undefined) {
         tool.mock = item.dataset.mock;
         tool.mockError = item.dataset.mockError === 'true';
@@ -141,6 +145,7 @@ const playground = {
     if (choice) spec.toolChoice = choice;
     spec.tools = tools.map((tool) => {
       const item = { name: tool.name, description: tool.description ?? '', parameters: tool.parameters ?? null };
+      if (tool.strict === true) item.strict = true;
       if (tool.mock !== undefined && tool.mock !== null) {
         item.mock = tool.mock;
         item.mockError = tool.mockError === true;

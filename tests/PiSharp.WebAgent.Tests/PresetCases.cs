@@ -7,6 +7,8 @@
 // all (attachments with no secret), import (refused, skipped, renamed) and delete; the three pages host the shared modals and presets-host.js.
 // W4 fix 2: a preset's account goes with its model into every page; over real routing (a fake provider), the Playground's and Compare's
 // payloads run on the account the preset names, not the active one, and Model & auth and a Compare column offer it by label only.
+// W5 L4: a Playground preset keeps every option the Playground sends and a tool's strict flag, through its JSON and back into the page,
+// each through RunSpec's checks; Compare and the Tool Bench name each one they leave out.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -109,6 +111,69 @@ internal static partial class Program
             bare["tools"] = new JsonArray();
             bare["spec"]!.AsObject().Remove("toolChoice");
             Check(!PresetRules.Normalize(PresetCapture.From(PresetPages.Playground, bare) with { Name = "bare" }).Has(PresetParts.Tools), "no tools, no tools part");
+        }),
+
+        Case("preset.capture.keeps-every-playground-option", () =>
+        {
+            // W5 L4: a Playground preset keeps every option the Playground sends (RequestConfigView.Counted, which request-spec.js sends and
+            // request-config.js counts; the tool choice and headers are parts of their own) and a tool's strict flag, through the store's
+            // JSON and back into the Playground; Compare and the Tool Bench name each one they leave out.
+            var capture = PresetPlaygroundCapture();
+            var spec = capture["spec"]!.AsObject();
+            foreach (var (key, value) in PresetEveryOption()) spec[key] = value.DeepClone();
+            capture["tools"]![0]!["strict"] = true;
+            var preset = PresetRules.Normalize(PresetCapture.From(PresetPages.Playground, capture) with { Name = "Every option" });
+            var options = preset.Options!;
+            Check(options is { TextVerbosity: "low", ReasoningSummary: "concise", SessionId: "pg-1a2b3c4d", TimeoutMs: 120_000, ParallelToolCalls: false, CacheRetention: "long",
+                MaxRetries: 2, MaxRetryDelayMs: 5000, AzureApiVersion: "2025-04-01-preview" } && options.ThinkingBudgets?["low"] == 2048 && options.ThinkingBudgets?["high"] == 8192,
+                "the preset keeps each: " + JsonSerializer.Serialize(options, SettingsStore.JsonOptions));
+            Check(preset.Tools![0].Strict && !preset.Tools[1].Strict, "the strict flag stays on its tool");
+            var read = PresetJson.Read(JsonNode.Parse(PresetJson.Export(preset)));
+            Check(PresetJson.Same(preset, read), "the file reads back the same preset: " + PresetJson.Export(read));
+            Check(read.Options?.ThinkingBudgets?["high"] == 8192 && read.Options.AzureApiVersion == "2025-04-01-preview" && read.Tools![0].Strict, "with the budgets, the API version and the strict flag");
+
+            var plan = PresetLoad.For(preset, PresetPages.Playground);
+            Equal(0, plan.Notes.Count, "nothing left out: " + string.Join(" | ", plan.Notes));
+            var loaded = plan.Payload["spec"]!;
+            foreach (var option in PiSharp.WebAgent.Playground.RequestConfigView.Counted.Except([RunModelOptions.ToolChoice, RunModelOptions.Headers, RunModelOptions.ResponseFormat,
+                         RunModelOptions.TopK, RunModelOptions.Stop, RunModelOptions.Seed, RunModelOptions.PresencePenalty, RunModelOptions.FrequencyPenalty, RunModelOptions.ServiceTier, RunModelOptions.ProviderOptions]))
+                Check(loaded[option] is not null, option + " loads into the Playground: " + loaded.ToJsonString());
+            foreach (var (key, value) in PresetEveryOption())
+                Check(JsonNode.DeepEquals(loaded[key], value), $"{key} loads as saved: {loaded[key]?.ToJsonString()}");
+            Equal(true, plan.Payload["tools"]![0]!["strict"]?.GetValue<bool>(), "the strict tool loads strict");
+            Check(plan.Payload["tools"]![1]!["strict"] is null, "the other does not");
+            // What the page applies is a run spec the run engine takes (RunSpec's own checks).
+            var applied = (JsonObject)loaded.DeepClone();
+            applied["tools"] = new JsonArray([.. plan.Payload["tools"]!.AsArray().Where(tool => tool!["enabled"]!.GetValue<bool>()).Select(tool =>
+                (JsonNode)new JsonObject { ["name"] = tool!["name"]!.DeepClone(), ["parameters"] = tool["parameters"]?.DeepClone(), ["strict"] = tool["strict"]?.DeepClone() })]);
+            var parsed = RunSpec.Parse(applied).Normalize();
+            Check(parsed is { CacheRetention: "long", MaxRetries: 2, AzureApiVersion: "2025-04-01-preview", ParallelToolCalls: false } && parsed.Tools![0].Strict == true, "a spec the run engine takes");
+
+            var leftOut = new[] { "textVerbosity", "reasoningSummary", "sessionId", "timeoutMs", "parallelToolCalls", "cacheRetention", "maxRetries", "maxRetryDelayMs", "thinkingBudgets", "azureApiVersion" };
+            var compareNotes = string.Join(" | ", PresetLoad.For(preset, PresetPages.Compare).Notes);
+            var benchNotes = string.Join(" | ", PresetLoad.For(preset, PresetPages.Bench).Notes);
+            foreach (var option in leftOut)
+            {
+                Check(compareNotes.Contains(option, StringComparison.Ordinal), "Compare names " + option + ": " + compareNotes);
+                Check(benchNotes.Contains(option, StringComparison.Ordinal), "the Tool Bench names " + option + ": " + benchNotes);
+            }
+            Check(PresetLoad.For(preset, PresetPages.Bench).Payload["setup"]!["tools"]![0]!["strict"]?.GetValue<bool>() == true, "the Tool Bench keeps the strict flag");
+
+            // Parallel tool calls stay with the parameters when the tools are left out (a page with tools uses it; a run without one says it
+            // needs one), and an option RunSpec refuses is refused here too.
+            var noTools = PresetRules.Normalize(PresetCapture.From(PresetPages.Playground, capture) with { Name = "No tools" }).Without(PresetParts.Tools);
+            Equal(false, PresetRules.Normalize(noTools).Options?.ParallelToolCalls, "the switch is kept without the tools");
+            foreach (var (key, bad, message) in new (string, JsonNode, string)[]
+                     {
+                         ("cacheRetention", "forever", "Cache retention is"), ("maxRetries", 11, "Max retries is 0 to"), ("maxRetryDelayMs", -1, "retry delay"),
+                         ("thinkingBudgets", new JsonObject { ["xhigh"] = 10 }, "names a level"), ("timeoutMs", 10, "The timeout is"),
+                     })
+            {
+                var wrong = PresetPlaygroundCapture();
+                wrong["spec"]![key] = bad;
+                var error = Throws<ArgumentException>(() => PresetRules.Normalize(PresetCapture.From(PresetPages.Playground, wrong) with { Name = "wrong" }), key + " is checked");
+                Check(error.Message.Contains(message, StringComparison.Ordinal), key + ": " + error.Message);
+            }
         }),
 
         Case("preset.load.converts-for-another-page", () =>
@@ -633,6 +698,14 @@ internal static partial class Program
             ["parallel"] = false,
         };
     }
+
+    /// <summary>The options the Playground sends that a W4 preset dropped (W5 L4), as collectSpec posts them.</summary>
+    private static IEnumerable<(string Key, JsonNode Value)> PresetEveryOption() =>
+    [
+        ("textVerbosity", "low"), ("reasoningSummary", "concise"), ("sessionId", "pg-1a2b3c4d"), ("timeoutMs", 120_000), ("parallelToolCalls", false),
+        ("cacheRetention", "long"), ("maxRetries", 2), ("maxRetryDelayMs", 5000), ("thinkingBudgets", new JsonObject { ["low"] = 2048, ["high"] = 8192 }),
+        ("azureApiVersion", "2025-04-01-preview"),
+    ];
 
     /// <summary>Compare's request as presets-host.js captures it: three faux columns (two with overrides) and the shared options.</summary>
     private static JsonObject PresetCompareCapture() => new()
