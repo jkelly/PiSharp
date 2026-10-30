@@ -6,6 +6,17 @@
 .modal [hidden],
 .settings-savebar[hidden] { display: none !important; }
 
+/* W4 fix 2: setting rows (Web.Common's .setting-row: the label, then a control column of up to 320 px) stack whenever the settings content
+   is narrow, not only below a 992 px window. Between 992 and about 1230 px the app sidebar and the settings nav leave the content 440 to
+   670 px, and the 320 px control column squeezed the label to about 50 px (a 1000 px window on Data & storage); side by side, the label
+   now keeps at least about 285 px. The query measures .settings-content itself (a grid item sized by its track, so containing its inline
+   size changes nothing else). */
+.settings-content { container-type: inline-size; }
+@container (max-width: 42rem) {
+  .setting-row { grid-template-columns: minmax(0, 1fr); }
+  .setting-row .setting-control { justify-content: flex-start; }
+}
+
 /* A provider without a mark shows its initial. */
 .provider-logo-initial { font-weight: 600; line-height: 1; color: var(--ps-muted); }
 .provider-logo.is-warn { background: var(--ps-warn-bg); color: var(--ps-warn); }

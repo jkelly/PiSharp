@@ -798,15 +798,17 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
 
     /// <summary>The render context of an agent of the chat: its pending approvals by call id, the account label, the provider's billing
     /// kind and, with the branch's committed <paramref name="entries"/> and <paramref name="items"/>, the items' facts and the spend stop
-    /// that ended the run, with the <paramref name="queued"/> messages that wait behind it.</summary>
+    /// that ended the run, with the <paramref name="queued"/> messages that wait behind it. A <paramref name="readOnly"/> context (W4 fix 2)
+    /// renders no actions and no approval cards.</summary>
     public ChatRenderContext RenderContext(ChatBinding binding, long agentId, string? accountLabel, IReadOnlyList<JsonObject>? entries = null,
-        IReadOnlyList<TranscriptItem>? items = null, ChatRunState? run = null, ChatSpendFacts? spend = null, int queued = 0)
+        IReadOnlyList<TranscriptItem>? items = null, ChatRunState? run = null, ChatSpendFacts? spend = null, int queued = 0, bool readOnly = false)
     {
         ArgumentNullException.ThrowIfNull(binding);
         var approvals = new Dictionary<string, PendingApproval>(StringComparer.Ordinal);
-        foreach (var approval in broker.Pending(binding.SessionId))
-            if (approval.Request.AgentId == agentId && approval.Request.ParentCallId is null && approval.Request.CallId.Length > 0)
-                approvals[approval.Request.CallId] = approval;
+        if (!readOnly)
+            foreach (var approval in broker.Pending(binding.SessionId))
+                if (approval.Request.AgentId == agentId && approval.Request.ParentCallId is null && approval.Request.CallId.Length > 0)
+                    approvals[approval.Request.CallId] = approval;
         entries ??= [];
         return new ChatRenderContext
         {
@@ -822,6 +824,7 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             Results = ChatFacts.ToolResults(entries),
             Spend = spend ?? ChatSpendFacts.Empty,
             Stop = ChatSpendStopView.Newest(entries, queued),
+            ReadOnly = readOnly,
         };
     }
 

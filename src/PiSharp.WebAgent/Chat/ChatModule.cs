@@ -3,7 +3,8 @@
 // also the sidebar's IRecentChats), the shared agent view feeds and the per-tab stream (GET /api/stream, PUT /api/stream/{streamId}). The
 // pages and the /api/chats commands are ChatController's. W3 (S5) registers ChatSpend, the Spend Guard on the chat pages (it reads the Spend
 // area's services when they are there, and does nothing without them), and the W3 fixes ChatSpendSends (migration 1400), where the sends it
-// admitted are kept across restarts.
+// admitted are kept across restarts. W4 fix 2 registers SessionViews, the read-only views of sessions without a chat binding (an area adds
+// an ISessionViewSource for its sessions; agent compare does).
 using System.Text.Json;
 using PiSharp.Durable.Client;
 using PiSharp.WebAgent.Contracts;
@@ -29,6 +30,7 @@ public static class ChatModule
         services.AddSingleton(provider => new ChatSpendSends(provider.GetRequiredService<WebAgentDb>(), provider.GetService<TimeProvider>()));
         services.AddSingleton<ChatSpend>();
         services.AddSingleton<IRecentChats>(provider => provider.GetRequiredService<ChatService>());
+        services.AddSingleton<SessionViews>();
         services.AddSingleton<AgentViewHub>();
         services.AddSingleton<ChatStreamMux>();
         return services;

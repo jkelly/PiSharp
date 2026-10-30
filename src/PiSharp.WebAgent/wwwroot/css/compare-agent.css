@@ -50,6 +50,26 @@
 .ac-tail .ps-term { margin-top: .4rem; }
 .ac-tail .ps-term pre { font-size: .72rem; max-height: 18rem; overflow-y: auto; }
 .ac-col-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1rem; }
+/* W4 fix 2: a column's live transcript (the chat's own items, read-only), scrolling inside the column. The page does not load chat.css, so
+   the few item rules it needs are here, scoped to the transcript: entry ids, event lines and live output as the chat page shows them; no
+   "kept running" note and no "paused while reconnecting" text (the chat page's tab states). */
+.ac-transcript-body { margin-top: .5rem; max-height: 26rem; overflow-y: auto; overflow-x: hidden; padding-right: .25rem; }
+.ac-transcript-body .msg { margin-bottom: 1rem; }
+.ac-transcript-body .msg-content { font-size: .8125rem; line-height: 1.6; }
+.ac-transcript-body .msg-plain { white-space: pre-wrap; }
+.ac-transcript-body .msg-user .msg-body { max-width: 92%; }
+.ac-transcript-body .msg-user .entry-hover { display: flex; justify-content: flex-end; margin-top: .2rem; }
+.ac-transcript-body .msg-footer { font-size: .7rem; }
+.ac-transcript-body .entry-id { font-size: .7rem; color: var(--ps-faint); font-variant-numeric: tabular-nums; }
+.ac-transcript-body .msg-actions .entry-id { align-self: center; margin-left: .35rem; }
+.ac-transcript-body .event-line { display: flex; align-items: center; gap: .55rem; font-size: .75rem; color: var(--ps-faint); margin: 0 0 1rem; }
+.ac-transcript-body .event-line::before, .ac-transcript-body .event-line::after { content: ""; height: 1px; background: var(--ps-border); flex: 1; min-width: 1rem; }
+.ac-transcript-body .tool-card .tool-status { font-size: .75rem; color: var(--ps-faint); white-space: nowrap; }
+.ac-transcript-body .tool-card .tool-body .result-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
+.ac-transcript-body .nested-calls { margin-top: .6rem; padding-left: .75rem; border-left: 1px solid var(--ps-border-strong); }
+.ac-transcript-body .live-output { max-height: 220px; overflow-y: auto; }
+.ac-transcript-body .msg-partial { color: var(--ps-muted); }
+.ac-transcript-body .run-note[data-run-note], .ac-transcript-body .msg-live-footer [data-live-status="reconnecting"] { display: none; }
 .ac-note code { overflow-wrap: anywhere; }
 .ac-note > :last-child { margin-bottom: 0; }
 .ac-page .awaiting-card .ps-term pre { max-height: 12rem; overflow-y: auto; }

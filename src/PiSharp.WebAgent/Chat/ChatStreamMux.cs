@@ -4,7 +4,9 @@
 // view (AgentViewHub's `view` frames, then `fault` or `disconnected`), shared with every other tab on that agent; `chats` is the sidebar's
 // list (`{type: "chats", items: [{id, title, running, updated}]}`), sent at once and again when a chat starts or stops running, is renamed,
 // created or archived. Frames carry rendered, sanitized HTML and the chat's display state, never a credential. A tab that falls 4 MB behind is
-// cut off and reconnects.
+// cut off and reconnects. W4 fix 2: `session/{session}/{agent}` (SessionKey) is the read-only view of an agent of any session SessionViews
+// knows, with or without a chat binding (an agent compare model's session before it is opened as a chat): the same `view` frames, rendered
+// without actions or interactive panels.
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -16,7 +18,7 @@ using PiSharp.WebAgent.Shell;
 namespace PiSharp.WebAgent.Chat;
 
 /// <summary>The per-tab stream multiplexer of the chat pages. A singleton.</summary>
-public sealed partial class ChatStreamMux(AgentViewHub hub, ChatBindings bindings, DeviceHostService device, ILogger<ChatStreamMux> logger)
+public sealed partial class ChatStreamMux(AgentViewHub hub, ChatBindings bindings, SessionViews views, DeviceHostService device, ILogger<ChatStreamMux> logger)
 {
     /// <summary>The most subscriptions one tab may hold.</summary>
     public const int MaxSubscriptions = 20;
@@ -32,8 +34,15 @@ public sealed partial class ChatStreamMux(AgentViewHub hub, ChatBindings binding
     [GeneratedRegex(@"^chat/([^/?#]{1,200})/([0-9]{1,18})$")]
     private static partial Regex KeyPattern();
 
+    [GeneratedRegex(@"^session/([^/?#]{1,200})/([0-9]{1,18})$")]
+    private static partial Regex SessionKeyPattern();
+
     /// <summary>The key of the view of agent <paramref name="agentId"/> of chat <paramref name="sessionId"/>: <c>chat/{session}/{agent}</c>.</summary>
     public static string AgentKey(string sessionId, long agentId) => $"chat/{Uri.EscapeDataString(sessionId)}/{agentId}";
+
+    /// <summary>The key of the read-only view of agent <paramref name="agentId"/> of session <paramref name="sessionId"/>, which need not be
+    /// a chat: <c>session/{session}/{agent}</c>.</summary>
+    public static string SessionKey(string sessionId, long agentId) => $"session/{Uri.EscapeDataString(sessionId)}/{agentId}";
 
     /// <summary>Open streams.</summary>
     public int Count => streams.Count;
@@ -45,13 +54,15 @@ public sealed partial class ChatStreamMux(AgentViewHub hub, ChatBindings binding
     private ILogger Logger => logger;
 
     /// <summary>The session and agent of an agent key, or null when <paramref name="key"/> is not one.</summary>
-    public static (string SessionId, long AgentId)? ParseAgentKey(string key)
-    {
-        var match = KeyPattern().Match(key ?? "");
-        return match.Success && long.TryParse(match.Groups[2].Value, out var agent) && agent > 0
+    public static (string SessionId, long AgentId)? ParseAgentKey(string key) => Parse(KeyPattern().Match(key ?? ""));
+
+    /// <summary>The session and agent of a read-only session key, or null when <paramref name="key"/> is not one.</summary>
+    public static (string SessionId, long AgentId)? ParseSessionKey(string key) => Parse(SessionKeyPattern().Match(key ?? ""));
+
+    private static (string SessionId, long AgentId)? Parse(Match match) =>
+        match.Success && long.TryParse(match.Groups[2].Value, out var agent) && agent > 0
             ? (Uri.UnescapeDataString(match.Groups[1].Value), agent)
             : null;
-    }
 
     /// <summary>Serves one tab's stream until it closes.</summary>
     public async Task OpenAsync(HttpContext http)
@@ -93,6 +104,12 @@ public sealed partial class ChatStreamMux(AgentViewHub hub, ChatBindings binding
             if (key == ChatsKey)
             {
                 wanted[key] = () => new ChatsSubscription(this, stream);
+                continue;
+            }
+            if (ParseSessionKey(key) is { } viewed)
+            {
+                if (!views.Knows(viewed.SessionId)) throw new ArgumentException($"No session {viewed.SessionId} to show.", nameof(keys));
+                wanted[key] = () => hub.Subscribe(viewed.SessionId, viewed.AgentId, frame => stream.Send(key, frame), readOnly: true);
                 continue;
             }
             if (ParseAgentKey(key) is not { } agent) throw new ArgumentException($"Invalid subscription key: {key}", nameof(keys));

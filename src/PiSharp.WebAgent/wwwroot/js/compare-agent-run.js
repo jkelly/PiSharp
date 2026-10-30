@@ -10,6 +10,11 @@
 // - View diff loads modal-agent-diff's content (GET /compare/agent/runs/{run}/diff?slot=); Copy patch copies R4's whole patch.
 // - Keep loads modal-keep-result's content (GET /compare/agent/runs/{run}/keep?slot=); Keep x posts apply or keep-branch with the user's
 //   choices. A refusal shows in the modal (its text set with textContent); nothing is kept without the user's click.
+// - W4 fix 2: a column's Transcript (details[data-ac-transcript], collapsed) follows the chat stream's read-only key session/{session}/1
+//   over the tab's one MuxStream while it is open, and applies the server-rendered items (Web.Common's applyItems); closing it drops the
+//   subscription. A server render of the column keeps the transcript it already shows (the items container moves into the new column).
+import { MuxStream } from '/_content/PiSharp.Web.Common/js/stream.js';
+import { applyItems, keepPinned } from '/_content/PiSharp.Web.Common/js/swap.js';
 import { confirmAction } from './shell.js';
 import { copyText, getFragment, getRequest, postRequest } from './request-api.js';
 import { $, $$, API, PAGES, busy, disposeTooltips, hideModal, modal, startTicking, tick, toast } from './compare-agent-common.js';
@@ -26,6 +31,8 @@ let failed = false;
 let diffSeq = 0;
 let keepSeq = 0;
 const signatures = new Map();
+let transcripts = null;
+const watched = new Set();
 
 const runUrl = (path = '') => `${API}/${encodeURIComponent(runId)}${path}`;
 const pageUrl = (path = '') => `${PAGES}/runs/${encodeURIComponent(runId)}${path}`;
@@ -49,7 +56,58 @@ function swap(live, fresh) {
   disposeTooltips(live);
   const open = new Set($$('details[data-ac-detail][open]', live).map((item) => item.dataset.acDetail));
   for (const item of $$('details[data-ac-detail]', fresh)) if (open.has(item.dataset.acDetail)) item.open = true;
+  // The transcript a column shows is the stream's, not the server render's: keep it.
+  for (const items of $$('[data-ac-transcript-items]', fresh)) {
+    const shown = $(`[data-ac-transcript-items="${CSS.escape(items.dataset.acTranscriptItems)}"]`, live);
+    if (shown) items.replaceWith(shown);
+  }
   live.replaceWith(fresh);
+}
+
+// ---- live transcripts -----------------------------------------------------------------------------------------------------------
+
+function transcriptItems(key) {
+  return $(`details[data-ac-transcript="${CSS.escape(key)}"] [data-ac-transcript-items]`, root);
+}
+
+function onTranscript(key, frame) {
+  const items = transcriptItems(key);
+  if (!items) return;
+  if (frame.type === 'view') {
+    $('[data-ac-transcript-note]', items)?.remove();
+    keepPinned(items, () => applyItems(items, frame.items || {}, frame.reset));
+  } else if (frame.type === 'fault') {
+    const note = document.createElement('p');
+    note.className = 'fs-8 text-ps-faint mb-0';
+    note.setAttribute('data-ac-transcript-note', '');
+    note.textContent = frame.error?.message || 'The transcript is not available.';
+    items.replaceChildren(note);
+  }
+}
+
+function watchTranscripts() {
+  if (!transcripts) {
+    if (watched.size === 0 || !window.EventSource) return;
+    transcripts = new MuxStream();
+    transcripts.start();
+  }
+  transcripts.subscribe([...watched]);
+}
+
+function onToggle(event) {
+  const details = event.target;
+  if (!(details instanceof HTMLDetailsElement) || !details.matches('[data-ac-transcript]') || !root.contains(details)) return;
+  const key = details.dataset.acTranscript;
+  if (!key) return;
+  if (details.open && !watched.has(key)) {
+    watched.add(key);
+    watchTranscripts();
+    transcripts?.on(key, (frame) => onTranscript(key, frame));
+  } else if (!details.open && watched.has(key) && !$$('details[data-ac-transcript][open]', root).some((item) => item.dataset.acTranscript === key)) {
+    watched.delete(key);
+    transcripts?.off(key);
+    watchTranscripts();
+  }
 }
 
 function apply(fresh) {
@@ -421,6 +479,8 @@ export function initAgentRun(page) {
   if (!grid || !runId) return;
   remember(root);
   document.addEventListener('click', onClick);
+  // toggle does not bubble: listen in the capture phase.
+  document.addEventListener('toggle', onToggle, true);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && active()) scheduleRefresh(0);
   });

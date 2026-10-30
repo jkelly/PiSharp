@@ -10,10 +10,13 @@
      answer (Markdown through the sanitizing MarkdownRenderer), the files it changed with their deltas, the check's output tail, and
      View diff, Open as chat and Keep.
    Foot: turns, time and cost (a subscription's list cost, which caps don't count). Elements that tick ([data-ac-elapsed]) are updated by
-   compare-agent-run.js between server renders. Model: AgentColumnView. *@
+   compare-agent-run.js between server renders. W4 fix 2: once its session exists, Transcript (collapsed) shows the agent's live
+   transcript, read-only, before and after Open as chat: compare-agent-run.js follows the chat stream's session/{session}/1 key
+   ([data-ac-transcript]) while it is open, and keeps what it shows across server renders. Model: AgentColumnView. *@
 @using PiSharp.WebAgent.AgentCompare.Pages
 @using PiSharp.WebAgent.AgentCompare.Runner
 @using PiSharp.WebAgent.AgentCompare.Workspaces
+@using PiSharp.WebAgent.Chat
 @inject MarkdownRenderer Markdown
 @model AgentColumnView
 @{
@@ -232,6 +235,13 @@
           </ul>
         }
         break;
+    }
+    @if (view != "pending" && state.SessionId is { Length: > 0 } session)
+    {
+      <details class="ac-tail ac-transcript mt-3" data-ac-detail="transcript-@Model.Slot" data-ac-transcript="@ChatStreamMux.SessionKey(session, 1)">
+        <summary><i class="bi bi-chevron-right" aria-hidden="true"></i>Transcript</summary>
+        <div class="ac-transcript-body" data-ac-transcript-items="@Model.Slot" aria-label="Transcript of @Model.Name"><p class="fs-8 text-ps-faint mb-0" data-ac-transcript-note>Loading the transcript…</p></div>
+      </details>
     }
   </div>
   <div class="compare-col-foot">
