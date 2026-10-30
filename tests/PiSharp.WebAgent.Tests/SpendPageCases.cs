@@ -311,10 +311,11 @@ internal static partial class Program
                 Equal(400, (await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["warnPercent"] = 0 })).Status, "a threshold of 0%");
                 Equal(400, (await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject { ["unknownPrice"] = "maybe" })).Status, "an unknown behaviour");
 
-                // The provider page's account card before any override: the key's provider has no price.
+                // The provider page's account card before any override: offline the key's provider is not in the faux catalog, so it is
+                // never called and Settings › Spend has no Unknown-prices row for it; the card has no spend line pointing there (W3 retest).
                 var provider = await Page("/settings/providers/openai");
-                Check(Regex.IsMatch(provider, "data-account-spend=\"unknown\">Unknown price · <a href=\"/settings/spend#unknown-prices\">not checked against caps</a>"),
-                    "the unknown-price key's spend line: " + Sp4Around(provider, "data-account-spend"));
+                Check(!provider.Contains("data-account-spend", StringComparison.Ordinal) && !provider.Contains("#unknown-prices", StringComparison.Ordinal),
+                    "an account not used offline has no spend line: " + Sp4Around(provider, "data-account-spend"));
 
                 var overridden = await Call(HttpMethod.Post, "/api/spend/settings", new JsonObject
                 {

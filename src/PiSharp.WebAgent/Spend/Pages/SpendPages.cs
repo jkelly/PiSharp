@@ -173,7 +173,8 @@ public sealed partial class SpendPages
     public static string ModeWire(BillingKind mode) => mode.ToString().ToLowerInvariant();
 
     /// <summary>The spend line of an account card on a provider page: today's metered spend against the daily cap, or the subscription
-    /// note; null for a free account, or when the ledger cannot be read (the provider page still renders).</summary>
+    /// note; null for a free account, offline for an Unknown-price account of a provider the faux catalog does not list, or when the ledger
+    /// cannot be read (the provider page still renders).</summary>
     public async Task<SpendAccountLine?> AccountLineAsync(string provider, AccountInfo account, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -184,6 +185,9 @@ public sealed partial class SpendPages
             if (mode == BillingKind.Subscription)
                 return new SpendAccountLine(BillingKind.Subscription, "Subscription · list cost not counted", null, null, null,
                     "Requests show an ≈ list cost for comparison. It never counts toward spend caps.");
+            // Offline (--faux) a provider the faux catalog does not list is never called, and Settings › Spend leaves its accounts and
+            // Unknown-prices row out (BillingModes.Accounts), so its card has no line that would lead nowhere (W3 retest).
+            if (mode == BillingKind.Unknown && billing.Offline && catalog.FindProvider(provider) is null) return null;
             if (mode == BillingKind.Unknown)
                 return new SpendAccountLine(BillingKind.Unknown, "Unknown price · ", "not checked against caps", null, "/settings/spend#unknown-prices",
                     "No price is known for this provider's models, so its requests can't be checked against caps.");
