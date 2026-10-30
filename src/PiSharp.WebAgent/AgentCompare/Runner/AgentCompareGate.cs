@@ -1,7 +1,7 @@
 // Decision 0011 (run W4, R5): what an agent compare model may do, decided on each of its requests and tool calls. The device's sessions all
 // use DeviceHostService's SessionStream, which names a session's requests {source: "chat", run: <session id>}; for a session that belongs to
-// a run's model (and was not opened as a chat) the gate rewrites them to {source: "agent-compare", run: "<run>-<slot>", account: the model's
-// bound account} (the op stays: the Spend Guard and runs.db key on it), so each model has its own Spend Guard run key and its calls are
+// a run's model (and was not opened as a chat) the gate rewrites them to {source: "agent-compare" (an agent battle's: "arena", W5 integration
+// fix 1), run: "<run>-<slot>", account: the model's bound account} (the op stays: the Spend Guard and runs.db key on it), so each model has its own Spend Guard run key and its calls are
 // runs.db children of its model row. Before a request is sent it checks, in order: a stop (by the user or a limit) refuses it; a recovered
 // request (its op was let through before) goes on; the time limit; the turn limit (agent_compare_turns counts let-through ops); the model's
 // share of the run cap (what its run key counts in the ledger plus the request's worst case from the Spend Guard's preflight; metered models
@@ -58,7 +58,7 @@ public sealed class AgentCompareGate(AgentCompareStore store, IServiceProvider s
         var metadata = options?.Metadata ?? JsonObjectValue.Empty;
         var pisharp = (SessionStreamMetadata.Read(metadata) ?? JsonObjectValue.Empty).Remove(SpendMetadata.TierField);
         pisharp = run.ModelSpec(model.Slot)?.Account is { } account ? pisharp.SetItem(SpendMetadata.AccountField, account) : pisharp.Remove(SpendMetadata.AccountField);
-        pisharp = SpendMetadata.With(pisharp, SpendSource.AgentCompare, AgentCompareRun.ModelKey(run.Id, model.Slot));
+        pisharp = SpendMetadata.With(pisharp, run.Spec.Source, AgentCompareRun.ModelKey(run.Id, model.Slot));
         return (options ?? new DurableStreamOptions()) with { Metadata = metadata.SetItem(SessionStreamMetadata.Key, pisharp) };
     }
 

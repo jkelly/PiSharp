@@ -233,8 +233,10 @@ public sealed class RecordingDurableModels : IDurableModels
                 Api = model.Api,
                 Account = fields.Account,
                 Session = run,
-                GroupId = source is SpendSource.Chat or SpendSource.AgentCompare ? null : run,
-                ParentId = source == SpendSource.AgentCompare ? run : null,
+                // A durable session's call of source arena is an agent battle's model (request battles run through RunEngine, which records
+                // its own rows): like agent compare's, it is a child of the model's row (W5 integration fix 1).
+                GroupId = source is SpendSource.Chat or SpendSource.AgentCompare or SpendSource.Arena ? null : run,
+                ParentId = source is SpendSource.AgentCompare or SpendSource.Arena ? run : null,
                 Title = RunText.Title(LastUserText(messages)),
                 Options = request,
                 MessagesRef = run is null ? null : (source == SpendSource.Chat ? "chat" : source.Wire()) + ":" + run,

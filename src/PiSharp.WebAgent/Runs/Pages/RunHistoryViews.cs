@@ -228,7 +228,8 @@ public static class RunHistoryText
     public static string? AgentCompareHref(RunRecord run)
     {
         ArgumentNullException.ThrowIfNull(run);
-        return run.Kind == RunKind.Parent && run.ParentId is null && run.Source == Spend.SpendSources.Wire(Spend.SpendSource.AgentCompare)
+        return run.Kind == RunKind.Parent && run.ParentId is null
+            && (run.Source == Spend.SpendSources.Wire(Spend.SpendSource.AgentCompare) || run.Source == Spend.SpendSources.Wire(Spend.SpendSource.Arena))
             ? "/compare?mode=agent&run=" + Uri.EscapeDataString(run.Id) : null;
     }
 

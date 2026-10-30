@@ -406,9 +406,23 @@ public sealed class SuiteService
                 cleared.AddRange(DriftAnalyzer.Clear(store.Signals(suite.Id, target.Id), run.Id, now));
             }
             if (accepted.Count > 0) store.AcceptBaselines(accepted, cleared);
+            Keep(results, accepted);
             // Only for the targets accepted now: a retry that accepted nothing rewrites no reference output.
             var replaced = replaceReferences && inserted.Count > 0 ? ReplaceReferences(run, inserted, results, now) : 0;
             return new BaselineAccept(accepted, cleared, replaced);
+        }
+    }
+
+    // W5 integration fix 1: a baseline keeps its answers' runs (a pin keeps their judgements too, which are their children) past runs.db's
+    // retention, so the inspector links of the run it compares against keep opening; the results keep their own metrics either way.
+    private void Keep(IEnumerable<SuiteResult> results, IEnumerable<Baseline> accepted)
+    {
+        var targets = accepted.Select(baseline => baseline.TargetId).ToHashSet(StringComparer.Ordinal);
+        foreach (var result in results)
+        {
+            if (!targets.Contains(result.TargetId) || result.CallRunId is not { } id) continue;
+            try { runs.Pin(id, true); }
+            catch (Exception error) when (error is not OutOfMemoryException) { log?.LogWarning(error, "The baseline's run {Run} could not be pinned.", id); }
         }
     }
 

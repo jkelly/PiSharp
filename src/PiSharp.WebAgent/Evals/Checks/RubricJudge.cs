@@ -247,7 +247,10 @@ public sealed class RubricJudge
     /// confident score passes or fails at the check's passing score; an unsure one is a review; a refused, failed or invalid call is an
     /// error.</summary>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled (the judge run is cancelled too).</exception>
-    public async Task<CheckResult> ScoreAsync(Check check, TestCase testCase, EvalAnswer answer, JudgeContext context, CancellationToken cancellationToken = default)
+    /// <param name="hold">The suite run's hold for this judgement, or null: the judgement is sent on it (RunEngine.StartReservedAsync, W5
+    /// integration fix 1) instead of a reservation of its own. A hold the judgement never uses is its caller's to release.</param>
+    public async Task<CheckResult> ScoreAsync(Check check, TestCase testCase, EvalAnswer answer, JudgeContext context, CancellationToken cancellationToken = default,
+        GuardedLease? hold = null)
     {
         ArgumentNullException.ThrowIfNull(check);
         ArgumentNullException.ThrowIfNull(testCase);
@@ -271,7 +274,8 @@ public sealed class RubricJudge
         RunStart start;
         try
         {
-            start = await engine.StartAsync(request.Spec, context.Spend, cancellationToken).ConfigureAwait(false);
+            start = hold is null ? await engine.StartAsync(request.Spec, context.Spend, cancellationToken).ConfigureAwait(false)
+                : await engine.StartReservedAsync(request.Spec, hold, context.Spend, cancellationToken).ConfigureAwait(false);
         }
         catch (ArgumentException error)
         {

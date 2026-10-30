@@ -186,6 +186,13 @@ public sealed record AgentCompareSpec
 
     /// <summary>The models, by slot.</summary>
     public required IReadOnlyList<AgentCompareModelSpec> Models { get; init; }
+
+    /// <summary>The source of the run's Spend Guard calls and runs.db rows (W5 integration fix 1): agent compare, or arena for an agent
+    /// battle (brief rule 4). A run stored before it existed has none, and was agent compare.</summary>
+    public SpendSource Source { get; init; } = SpendSource.AgentCompare;
+
+    /// <summary>The title of the run's top row in runs.db, or null for the task (an agent battle's: the Arena's, which names no model).</summary>
+    public string? Title { get; init; }
 }
 
 /// <summary>The latest tool call of a model ("edit ModelRegistry.cs · src/…").</summary>
@@ -485,4 +492,11 @@ public sealed record AgentCompareCreateRequest
 
     /// <summary>The run's approval mode.</summary>
     public ToolApprovalMode? Approval { get; init; }
+
+    /// <summary>The source of the run's calls and rows: agent compare (the default) or arena (an agent battle; only the Arena sets it, the
+    /// JSON API never reads it).</summary>
+    public SpendSource Source { get; init; } = SpendSource.AgentCompare;
+
+    /// <summary>The title of the run's top row in runs.db, or null for the task.</summary>
+    public string? Title { get; init; }
 }

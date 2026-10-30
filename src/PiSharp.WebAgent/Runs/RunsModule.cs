@@ -29,6 +29,7 @@ public static class RunsModule
         services.TryAddSingleton(provider => new RunStore(provider.GetRequiredService<RunsDb>(), provider.GetService<ILogger<RunStore>>(),
             provider.GetService<TimeProvider>()));
         services.TryAddSingleton<RunLive>();
+        services.TryAddSingleton<RunBlinds>();
         services.TryAddSingleton(provider => new RunEngine(provider.GetRequiredService<RunStore>(), provider.GetRequiredService<RunLive>(), provider,
             provider.GetService<ILogger<RunEngine>>(), provider.GetService<IHostApplicationLifetime>()));
         services.AddHostedService<RunRetention>();

@@ -10,10 +10,11 @@ internal static partial class Program
 
     private static readonly W4Gap[] W5Gaps =
     [
-        // Settings (W2): sections shown as "Coming in a later milestone" notes, which no planned milestone builds.
-        new("Settings' later-milestone notes", "Settings still shows",
-            root => AppFilesMatching(root, "*.cshtml", "Coming in a later milestone").Where(path => path.StartsWith("Views/Settings/", StringComparison.Ordinal)).ToList()
-                is { Count: > 0 } ? null : "no Settings view says \"Coming in a later milestone\" any more"),
+        // Settings (W2): sections no planned milestone builds, marked "Not in this version" (W5 integration fix 1: they said "Coming in a
+        // later milestone", which no Settings view may say again).
+        new("Settings' not-in-this-version notes", "Settings marks the mockup sections no planned milestone builds",
+            root => AppFilesMatching(root, "*.cshtml", "Not in this version").Where(path => path.StartsWith("Views/Settings/", StringComparison.Ordinal)).ToList()
+                is { Count: > 0 } ? null : "no Settings view says \"Not in this version\" any more"),
         // Pins (E7): agent compare runs and agent battles are refused as "agent test cases come later".
         new("agent test cases", "agent test cases",
             root => AppFilesMatching(root, "*.cs", @"\bAgentLater\b") is { Count: > 0 } ? null : "PinRules no longer refuses agent runs (AgentLater is gone)"),
@@ -105,6 +106,10 @@ internal static partial class Program
             var notDone = DecisionSection(root, "Not done");
             foreach (var waiting in new[] { "both W5", "in W5", "later-milestone page" })
                 Check(!notDone.Contains(waiting, StringComparison.Ordinal), $"Not done still waits for W5 (\"{waiting}\")");
+            // W5 integration fix 1: no Settings view promises a later milestone, and Not done no longer says one does.
+            Check(AppFilesMatching(root, "*.cshtml", "Coming in a later milestone").All(path => !path.StartsWith("Views/Settings/", StringComparison.Ordinal)),
+                "a Settings view still says \"Coming in a later milestone\"");
+            Check(!notDone.Contains("Coming in a later milestone", StringComparison.Ordinal), "Not done still quotes \"Coming in a later milestone\"");
             return Task.CompletedTask;
         }),
     ];

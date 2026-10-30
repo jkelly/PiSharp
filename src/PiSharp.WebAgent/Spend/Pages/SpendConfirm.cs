@@ -6,6 +6,9 @@
 // from the estimator and the ledger's own check, which is the same rule without the guard's approvals. Amounts under a dollar show four
 // decimals, as the composer's tooltip and the spend errors do, and the input and output parts are rounded so that they add up to the worst
 // case shown; the footnote speaks of "the models above" only when there are some (W3 fix, spend-ui).
+// W5 integration fix 1: a blind round's refusal (ConfirmView with blind: true) names no provider, model or account, since the round's
+// models must stay unnamed until the vote (brief rule 3): the modal says "one of this round's models", leaves out the per-token rates and
+// the typical cost (a price would tell the model), the scope's owner and the cheaper models, and keeps the amounts, the cap and the choices.
 using PiSharp.WebAgent.Contracts;
 
 namespace PiSharp.WebAgent.Spend;
@@ -36,9 +39,13 @@ public sealed partial class SpendPages
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>The confirm modal of a decision that is not Allow.</summary>
+    /// <summary>What the modal names instead of a blind round's model.</summary>
+    public const string BlindModel = "a blind round's model";
+
+    /// <summary>The confirm modal of a decision that is not Allow; with <paramref name="blind"/> it names no provider, model or account
+    /// (a blind round's refusal).</summary>
     /// <exception cref="ArgumentException"><paramref name="decision"/> allows the request (there is nothing to confirm).</exception>
-    public SpendConfirmView ConfirmView(SpendCall call, SpendDecision decision)
+    public SpendConfirmView ConfirmView(SpendCall call, SpendDecision decision, bool blind = false)
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(decision);
@@ -50,8 +57,8 @@ public sealed partial class SpendPages
         var worst = estimate.WorstMicros ?? 0;
         var places = worst is > 0 and < SpendMoney.MicrosPerDollar ? 4 : 2;
         string Money(long micros) => SpendMoney.Format(micros, places);
-        var provider = catalog.FindProvider(estimate.Provider)?.DisplayName ?? estimate.Provider;
-        var who = estimate.Account is { } account ? AccountText(account) : provider;
+        var provider = blind ? "One of this round's models" : catalog.FindProvider(estimate.Provider)?.DisplayName ?? estimate.Provider;
+        var who = blind ? "blind round" : estimate.Account is { } account ? AccountText(account) : provider;
         var action = cause.Action == CapAction.Block ? "Block" : "Ask";
         var tail = cause.Action == CapAction.Block ? "so the request can't be sent as it is." : "so nothing has been reserved or sent yet.";
         var chat = call.Source == SpendSource.Chat;
@@ -66,11 +73,11 @@ public sealed partial class SpendPages
         var parts = new List<SpendConfirmPart>();
         if (pane == "sc-unknown")
         {
-            title = "No price for this model";
+            title = blind ? "No price for one of the models" : "No price for this model";
             capText = "unknown price, " + action;
-            lead = new SpendConfirmLead(provider + " has no price for ", estimate.Model,
-                ", so this request can't be estimated or checked against your caps. Unknown prices are set to " +
-                (cause.Action == CapAction.Block ? "Block, so it can't be sent." : "Ask."), Mono: true);
+            var after = ", so this request can't be estimated or checked against your caps. Unknown prices are set to " +
+                (cause.Action == CapAction.Block ? "Block, so it can't be sent." : "Ask.");
+            lead = blind ? new SpendConfirmLead(provider + " has ", "no price", after) : new SpendConfirmLead(provider + " has no price for ", estimate.Model, after, Mono: true);
             parts.Add(new SpendConfirmPart($"Input · about {SpendEstimateText.Tokens(estimate.InputTokens)} tokens", "price unknown", Faint: true));
             parts.Add(new SpendConfirmPart($"Output · up to {SpendEstimateText.Tokens(estimate.OutputTokens)} tokens", "price unknown", Faint: true));
             parts.Add(new SpendConfirmPart("Worst case", "unknown", Strong: true));
@@ -96,19 +103,22 @@ public sealed partial class SpendPages
                 default:
                     var owner = cap?.Scope switch
                     {
+                        CapScope.Provider when blind => "One model's provider",
+                        CapScope.Account when blind => "One model's account",
                         CapScope.Provider => catalog.FindProvider(cap.Key ?? "")?.DisplayName ?? cap.Key ?? "",
                         CapScope.Account => cap.Key is { } id ? AccountText(id) : "This account",
                         CapScope.Source => SpendSources.TryParse(cap.Key, out var source) ? source.Label() : cap.Key ?? "",
                         _ => null,
                     };
-                    title = owner is null ? $"Over your {periodWord} cap" : cap!.Scope == CapScope.Source ? $"Over the {owner} {periodWord} cap" : $"Over {owner}'s {periodWord} cap";
+                    title = owner is null ? $"Over your {periodWord} cap" : cap!.Scope == CapScope.Source ? $"Over the {owner} {periodWord} cap"
+                        : blind ? $"Over a {periodWord} cap" : $"Over {owner}'s {periodWord} cap";
                     capText = $"{periodWord} cap {limit}, {action}";
                     lead = new SpendConfirmLead(owner is null ? "You have used " : owner + " has used ", Money(spent),
                         $" of {(owner is null ? "your" : "its")} {limit} {periodWord} cap, so {Money(left)} is left. This request could cost up to {Money(worst)}. " +
                         $"The cap is set to {action}, {tail}");
                     break;
             }
-            if (estimate.Price is { } price)
+            if (estimate.Price is { } price && !blind)
             {
                 var (input, output) = WorstCaseParts(worst, places, price.InputMicros(estimate.InputTokens), price.OutputMicros(estimate.OutputTokens));
                 parts.Add(new SpendConfirmPart($"Input · about {SpendEstimateText.Tokens(estimate.InputTokens)} tokens × {SpendEstimateText.RateAmount(price.WorstInput)} per 1M",
@@ -117,7 +127,7 @@ public sealed partial class SpendPages
                     Money(output)));
             }
             parts.Add(new SpendConfirmPart("Worst case", Money(worst), Strong: true));
-            if (pane == "sc-request" && estimate.TypicalMicros is { } typical) parts.Add(new SpendConfirmPart("Typical for this model", "≈ " + Money(typical)));
+            if (pane == "sc-request" && estimate.TypicalMicros is { } typical && !blind) parts.Add(new SpendConfirmPart("Typical for this model", "≈ " + Money(typical)));
             if (pane == "sc-chat") parts.Add(new SpendConfirmPart($"Left in this {runWord}'s cap", Money(left)));
             if (pane == "sc-period") parts.Add(new SpendConfirmPart(OwnerName(cap) is { } name ? $"Left {window} for {name}" : $"Left {window}", Money(left)));
         }
@@ -150,7 +160,7 @@ public sealed partial class SpendPages
         if (decision.Causes.Count > 1)
         {
             var more = decision.Causes.Skip(1).Select(other => other.Kind == SpendCauseKind.UnknownPrice || other.Cap is null ? "without a known price"
-                : $"over your {SpendMoney.Format(other.Cap.LimitMicros)} {CapName(other.Cap)}, which is set to {(other.Action == CapAction.Block ? "Block" : "Ask")}").ToList();
+                : $"over your {SpendMoney.Format(other.Cap.LimitMicros)} {(blind ? BlindCapName(other.Cap) : CapName(other.Cap))}, which is set to {(other.Action == CapAction.Block ? "Block" : "Ask")}").ToList();
             others = "It's also " + Join(more) + (cause.Action == CapAction.Block && decision.Causes.Skip(1).Any(other => other.Action == CapAction.Ask)
                 ? ", but Block takes priority." : ".");
             if (capOutput is not null && decision.Causes.Skip(1).Any(other => other.Action == CapAction.Ask))
@@ -160,7 +170,7 @@ public sealed partial class SpendPages
         var within = decision.Causes.Where(other => other.Kind == SpendCauseKind.Cap && other.Cap is not null)
             .Select(other => other.LeftMicros ?? other.Cap!.LimitMicros).DefaultIfEmpty().Min();
         IReadOnlyList<SpendEstimate> cheaper;
-        try { cheaper = estimator.Cheaper(call.EstimateInput, decision.Causes.Any(other => other.Kind == SpendCauseKind.Cap) ? within : null); }
+        try { cheaper = blind ? [] : estimator.Cheaper(call.EstimateInput, decision.Causes.Any(other => other.Kind == SpendCauseKind.Cap) ? within : null); }
         catch (ArgumentException) { cheaper = []; }
         var suggestions = cheaper.Select(other => new SpendConfirmSuggestion(other.Provider, other.Model,
             other.Billing == BillingKind.Free || other.Price?.IsFree == true ? "free"
@@ -174,7 +184,7 @@ public sealed partial class SpendPages
             Cause = cause,
             Pane = pane,
             Title = title,
-            Model = estimate.Provider + "/" + estimate.Model,
+            Model = blind ? BlindModel : estimate.Provider + "/" + estimate.Model,
             Subtitle = " · " + who + " · " + capText,
             Lead = lead,
             Parts = parts,
@@ -194,11 +204,28 @@ public sealed partial class SpendPages
 
         string? OwnerName(SpendCap? scoped) => scoped?.Scope switch
         {
+            CapScope.Provider or CapScope.Account when blind => null,
             CapScope.Provider => scoped.Key,
             CapScope.Account or CapScope.Source => ScopeName(scoped),
             _ => null,
         };
     }
+
+    /// <summary>A cap's name in a sentence that names no provider or account (a blind round's): <c>daily cap</c>, <c>provider's monthly
+    /// cap</c>.</summary>
+    private static string BlindCapName(SpendCap cap) => (cap.Scope switch
+    {
+        CapScope.Provider => "provider's ",
+        CapScope.Account => "account's ",
+        CapScope.Source => SpendSources.TryParse(cap.Key, out var source) ? source.Label() + " " : "",
+        _ => "",
+    }) + cap.Period switch
+    {
+        CapPeriod.Request => "per-request cap",
+        CapPeriod.Run => "per-run cap",
+        CapPeriod.Day => "daily cap",
+        _ => "monthly cap",
+    };
 
     /// <summary>The input and output parts of a worst case, in micro-USD, each rounded to <paramref name="places"/> decimals (halves away
     /// from zero, as <see cref="SpendMoney.Format"/> rounds) so that they add up to <paramref name="worst"/> as it is shown. Each part is

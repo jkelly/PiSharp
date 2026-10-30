@@ -349,6 +349,9 @@ public sealed record DefaultsPage(DefaultsSettings Defaults, IReadOnlyCollection
 /// <param name="ContextFiles">The context files in it.</param>
 public sealed record ToolsPage(ToolsSettings Tools, bool DirectoryExists, IReadOnlyList<string> ContextFiles)
 {
+    /// <summary>Every chat's "Always allow in this chat" grants (until the app restarts), by chat title, then tool.</summary>
+    public IReadOnlyList<SessionGrant> Grants { get; init; } = [];
+
     /// <summary>The working directory new chats use.</summary>
     public string Directory => Tools.EffectiveWorkingDirectory;
 
@@ -361,11 +364,18 @@ public sealed record ToolsPage(ToolsSettings Tools, bool DirectoryExists, IReadO
     };
 }
 
-/// <summary>A section a later milestone builds (<c>_LaterMilestone</c>): its title and one sentence on what it will hold.</summary>
+/// <summary>A mockup section this version does not build (<c>_NotInThisVersion</c>): its title and what it would hold (W5 integration fix
+/// 1: it was "Coming in a later milestone", which no planned milestone is).</summary>
 /// <param name="Title">The section's title.</param>
-/// <param name="Text">What it will hold.</param>
+/// <param name="Text">What it would hold, and where the nearest thing is set today.</param>
 /// <param name="Id">The section's anchor id, or null.</param>
-public sealed record LaterMilestone(string Title, string Text, string? Id = null);
+public sealed record NotInThisVersion(string Title, string Text, string? Id = null);
+
+/// <summary>One "Always allow in this chat" grant, for Settings › Tools' "Always allowed this session" (W5 integration fix 1).</summary>
+/// <param name="ChatId">The chat that has it (its route is <c>/chat/{ChatId}</c>).</param>
+/// <param name="ChatTitle">The chat's title.</param>
+/// <param name="Rule">The calls it allows.</param>
+public sealed record SessionGrant(string ChatId, string ChatTitle, ToolAllowRule Rule);
 
 /// <summary>One model's details for <c>_ModelDetailsModal</c>, serialized into the details button's <c>data-model</c> attribute (metadata
 /// only: the catalog's facts, whether it is hidden, and the provider's credential as its chip says it).</summary>

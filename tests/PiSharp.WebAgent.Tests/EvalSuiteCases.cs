@@ -129,13 +129,17 @@ internal static partial class Program
             Check(judged.All(result => host.Runs.Get(result.Checks[1].JudgeRunId!)?.ParentId == result.CallRunId), "a judge call is recorded under its answer");
             Check(calls.Where(call => answerIds.Contains(call.Id)).All(call => call.Title is "Case 1" or "Case 2"), "an answer is titled with its case");
 
+            // W5 integration fix 1: each call is sent on its own hold (RunEngine.StartReservedAsync), so the ledger has one row per call,
+            // the hold's, settled at the call's actual cost: no released hold beside a second reservation of the same call.
             var rows = (await host.Ledger.QueryAsync(new SpendLedgerQuery { Run = runId, Limit = SpendLedgerQuery.MaxLimit })).Items;
             var holds = rows.Where(row => row.Op.StartsWith(SuiteRunner.HoldPrefix + runId + "-", StringComparison.Ordinal)).ToList();
             Equal(12, holds.Count, "one hold per call in the group reservation");
-            Check(holds.All(row => row is { State: ReservationState.Released, Source: SpendSource.Drift }), "every hold released as its call was sent");
-            var spent = rows.Except(holds).ToList();
-            Equal(12, spent.Count, "each call reserved and settled on its own");
-            Check(spent.All(row => row is { State: ReservationState.Settled, Source: SpendSource.Drift }), "settled as drift");
+            Equal(12, rows.Count, "and no other row: every call was sent on its hold: " + string.Join(", ", rows.Select(row => row.Op)));
+            Check(holds.All(row => row is { State: ReservationState.Settled, Source: SpendSource.Drift }), "every hold settled as drift by its call");
+            Check(calls.All(call => call.SpendOp is { } op && op == call.Op && op.StartsWith(SuiteRunner.HoldPrefix + runId + "-", StringComparison.Ordinal)),
+                "every recorded call names its hold as its ledger row");
+            Equal(12, calls.Select(call => call.SpendOp).Distinct(StringComparer.Ordinal).Count(), "a hold per call");
+            var spent = holds;
             Equal(spent.Sum(row => row.ActualMicros ?? 0), run.CostMicros, "the run's cost is what its calls settled");
             Check(run.CostMicros > 0 && run.CostMicros <= run.ReservedMicros && run.ListMicros == 0, $"within its reservation: {run.CostMicros} of {run.ReservedMicros}");
             Equal(run.CostMicros, host.Suites.Estimate(suite, host.Store.Cases(suite.Id)).TypicalMicros, "the typical cost is the median of finished runs");

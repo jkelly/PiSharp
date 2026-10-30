@@ -2,6 +2,7 @@
 // against the values it loaded with, shows _SettingsSaveBar with the changed settings' names, and saves the whole section as JSON (POST
 // /api/settings/defaults or /api/settings/tools); Discard reloads. Defaults marks the thinking levels the chosen model doesn't support.
 // Tools asks before "Never ask", edits the allow list, and runs _FolderBrowser on GET /api/settings/folders. Text is set with textContent.
+// W5 integration fix 1: Tools' "Always allowed this session" revokes a chat's grant at once (POST /api/chats/{id}/grants/revoke).
 import { confirmAction, providerModelValue } from './shell.js';
 import { getJson, postJson, setText, setShown, flashAndReload, showError, busy } from './settings-api.js';
 
@@ -11,6 +12,26 @@ export function initForms() {
   document.querySelector('[data-defaults-reset]')?.addEventListener('click', resetDefaults);
   const browser = document.querySelector('[data-folder-browser]');
   if (browser) setupFolders(browser);
+  document.querySelector('[data-session-grants]')?.addEventListener('click', revokeGrant);
+}
+
+// Revokes one session grant; the row goes once the server says so (a grant already gone, after a restart, goes too).
+async function revokeGrant(event) {
+  const button = event.target.closest('[data-grant-revoke]');
+  const row = button?.closest('[data-session-grant]');
+  if (!row) return;
+  try {
+    await busy(button, () => postJson(`/api/chats/${encodeURIComponent(row.dataset.chat)}/grants/revoke`,
+      { tool: row.dataset.tool, command: row.dataset.command || null }));
+  } catch (error) {
+    if (error?.status !== 404) {
+      showError('Could not revoke the grant', error);
+      return;
+    }
+  }
+  const card = row.closest('[data-session-grants]');
+  row.remove();
+  setShown(card.querySelector('[data-session-grants-empty]'), !card.querySelector('[data-session-grant]'));
 }
 
 const NAMES = {

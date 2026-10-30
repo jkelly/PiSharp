@@ -228,6 +228,9 @@ public sealed record RunQuery
     /// single out one model must not match before the vote), or none when null.</summary>
     public IReadOnlyCollection<string>? ExceptKeys { get; init; }
 
+    /// <summary>Leave out the runs these groups hide (<see cref="RunBlinds.Groups"/>: an unvoted blind round's runs), or null.</summary>
+    public IReadOnlyCollection<string>? HiddenGroups { get; init; }
+
     /// <summary>The page size (1 to <see cref="MaxLimit"/>; default 50).</summary>
     public int Limit { get; init; } = 50;
 

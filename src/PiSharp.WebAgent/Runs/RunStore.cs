@@ -487,6 +487,12 @@ public sealed class RunStore
         Equal("parent_id", "$parent", query.ParentId);
         Equal("stop_reason", "$stop", query.StopReason);
         if (query.TopLevelOnly) clauses.Add("parent_id IS NULL");
+        if (query.HiddenGroups is { Count: > 0 } hidden)
+        {
+            var (visible, names) = RunBlinds.Visible("", hidden);
+            clauses.Add(visible);
+            parameters.AddRange(names);
+        }
         if (query.Pinned is { } pinned)
         {
             clauses.Add("pinned = $pinned");

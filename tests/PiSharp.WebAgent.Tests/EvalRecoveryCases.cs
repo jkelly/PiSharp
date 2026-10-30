@@ -12,8 +12,9 @@ using PiSharp.WebAgent.Runs;
 // ones are cancelled, the holds of the calls it never sent are released). So a crash can only end a run, never repeat or double it:
 //   - killed with four answers done, four streaming a "slow:" answer and four not yet asked, the run is interrupted with 4 done and 8
 //     cancelled results; runs.db keeps its 8 calls (4 completed, 4 interrupted) and gains none; the ledger has one row per call (the 4
-//     answered settled at their actual cost, the 4 cut off uncertain, as the Spend Guard keeps any dropped stream until the user resolves it)
-//     and every hold released, so the run's cost (the done answers' actual costs) is counted once; the next Run now is run #2, complete on
+//     answered settled at their actual cost, the 4 cut off uncertain, as the Spend Guard keeps any dropped stream until the user resolves it;
+//     since W5 integration fix 1 a call is sent on its hold, so a call's row is its hold) and every hold never sent released, so the run's
+//     cost (the done answers' actual costs) is counted once; the next Run now is run #2, complete on
 //     its own rows, and one more crash leaves both runs and every ledger row as they were;
 //   - a schedule whose slots were missed while the app was down (its EnabledAt moved 13 hours back while the app was stopped: an "every
 //     6 hours" schedule turned on earlier) starts one run for its latest slot when the app starts (missed slots collapse into one); killed in the
@@ -56,11 +57,11 @@ internal static partial class Program
             }, "the four long answers stream", TimeSpan.FromSeconds(30));
 
             await app.KillAsync();
+            // W5 integration fix 1: a call is sent on its hold, so the ledger has the run's 12 holds and nothing else.
             var before = app.Ledger(runId);
-            Check(before.Where(row => row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal)).Count(row => row.State == "reserved") == 4,
-                "at the crash, the holds of the four answers never asked are still reserved: " + RecRows(before));
-            Check(before.Count(row => !row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal) && row.State == "reserved") == 4,
-                "and the four streaming calls are reserved: " + RecRows(before));
+            Check(before.Count == 12 && before.All(row => row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal)), "the run's holds alone: " + RecRows(before));
+            Check(before.Count(row => row.State == "reserved") == 8 && before.Count(row => row.State == "settled") == 4,
+                "at the crash, the holds of the four answers never asked and of the four streaming calls are still reserved: " + RecRows(before));
 
             await app.StartAgainAsync();
             await WaitUntilAsync(async () => (await app.RunViewAsync(runId))["run"]?["status"]?.GetValue<string>() == "interrupted",
@@ -86,11 +87,15 @@ internal static partial class Program
             Check(calls.Where(call => answered.Contains(call.Id)).All(call => call.Status == RunStatus.Completed), "the answered calls completed");
             Check(calls.Where(call => streaming.Contains(call.Id)).All(call => call.Status == RunStatus.Interrupted), "the cut-off calls are interrupted, not sent again");
             var ledger = app.Ledger(runId);
-            var holds = ledger.Where(row => row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal)).ToList();
-            var callRows = ledger.Where(row => !row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal)).ToList();
-            Equal(12, holds.Count, "one hold per answer the run planned");
-            Check(holds.All(row => row.State == "released" && row.Counted == 0), "every hold is released and counts nothing: " + RecRows(holds));
-            Equal(8, callRows.Count, "one ledger row per call, none for a call sent again: " + RecRows(callRows));
+            Equal(12, ledger.Count, "one hold per answer the run planned, and no other row: " + RecRows(ledger));
+            Check(ledger.All(row => row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal)), "every row is a hold");
+            Check(calls.All(call => call.Op is not null), "every call names its hold: " + string.Join(", ", calls.Select(call => call.Op)));
+            var sentOps = calls.Select(call => call.Op!).ToHashSet(StringComparer.Ordinal);
+            var holds = ledger.Where(row => !sentOps.Contains(row.Op)).ToList();
+            var callRows = ledger.Where(row => sentOps.Contains(row.Op)).ToList();
+            Equal(4, holds.Count, "the holds of the four answers never asked: " + RecRows(holds));
+            Check(holds.All(row => row.State == "released" && row.Counted == 0), "every hold never sent is released and counts nothing: " + RecRows(holds));
+            Equal(8, callRows.Count, "one ledger row per call (its hold), none for a call sent again: " + RecRows(callRows));
             Check(callRows.All(row => !row.Op.Contains('~', StringComparison.Ordinal)), "no op was reserved a second time");
             var settled = callRows.Where(row => row.State == "settled").ToList();
             var uncertain = callRows.Where(row => row.State == "uncertain").ToList();
@@ -120,9 +125,8 @@ internal static partial class Program
             await app.KillAsync();
             Equal(RecRows(firstRows), RecRows(app.Ledger(runId)), "run #1's ledger rows are as they were");
             Equal(RecRows(secondRows), RecRows(app.Ledger(next)), "run #2's ledger rows are as they were");
-            Check(secondRows.Where(row => !row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal)).All(row => row.State == "settled") &&
-                secondRows.Where(row => row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal)).All(row => row.State == "released"),
-                "run #2's calls settled and its holds released: " + RecRows(secondRows));
+            Check(secondRows.Count == 12 && secondRows.All(row => row.Op.StartsWith(SuiteRunner.HoldPrefix, StringComparison.Ordinal) && row.State == "settled"),
+                "run #2's calls settled their holds, one row each: " + RecRows(secondRows));
             Equal(20, app.Calls(runId).Count + app.Calls(next).Count, "8 calls in run #1 and 12 in run #2, nothing more");
         }),
 
@@ -203,7 +207,7 @@ internal static partial class Program
     }
 
     /// <summary>A call of a suite run (runs.db's runs).</summary>
-    private sealed record RecCall(string Id, string Status);
+    private sealed record RecCall(string Id, string Status, string? Op);
 
     /// <summary>A schedule slot decision (webagent.db's eval_schedule_slots).</summary>
     private sealed record RecSlot(DateTimeOffset Slot, string Outcome, string? Run);
@@ -338,8 +342,8 @@ internal static partial class Program
         public List<RecCall> Calls(string runId)
         {
             Check(app is null, "read while the app is stopped");
-            return ReadDb(Path.Join(Data, RunsDb.FileName), $"SELECT id, status FROM runs WHERE group_id = '{runId}' ORDER BY id",
-                reader => new RecCall(reader.GetString(0), reader.GetString(1)));
+            return ReadDb(Path.Join(Data, RunsDb.FileName), $"SELECT id, status, spend_op FROM runs WHERE group_id = '{runId}' ORDER BY id",
+                reader => new RecCall(reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
         }
 
         public List<RecSlot> Slots(string suiteId)

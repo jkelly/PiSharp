@@ -19,6 +19,7 @@
 // A run started by POST belongs to the app, so it keeps going when the tab that started it closes; a tab reconnects with Last-Event-ID.
 // Every answer is Cache-Control: no-store (the stream: no-cache, no-transform) and written with SettingsStore.JsonOptions. No answer carries
 // a credential: accounts are ids, headers a run sends are never credentials, and raw payloads were redacted before they were stored.
+// W5 integration fix 1: a refusal of a blind round (SpendAsync with blind: true) names no provider, model or account.
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -206,9 +207,13 @@ public static class RunEndpoints
         return Json(new { posted = false, code = refusal.Code, message = refusal.Message, groupId = start.GroupId, spend = await SpendAsync(refusal, services).ConfigureAwait(false) });
     }
 
+    /// <summary>What a blind round's refusal says instead of the Spend Guard's own message (which names the model).</summary>
+    public const string BlindRefusal = "The Spend Guard stopped this blind round before anything was reserved or sent: one of its models is over a cap or has no price.";
+
     /// <summary>The confirm modal's answer for a refused run (the same shape as <c>/api/spend/confirm</c>): the <c>spend</c> of a
-    /// <c>{posted:false}</c> answer. Compare's and the Tool Bench's run endpoints answer with it too.</summary>
-    public static async Task<JsonObject> SpendAsync(RunRefusal refusal, IServiceProvider services)
+    /// <c>{posted:false}</c> answer. Compare's and the Tool Bench's run endpoints answer with it too. With <paramref name="blind"/> (a blind
+    /// round's refusal) the message and the modal name no provider, model or account.</summary>
+    public static async Task<JsonObject> SpendAsync(RunRefusal refusal, IServiceProvider services, bool blind = false)
     {
         ArgumentNullException.ThrowIfNull(refusal);
         ArgumentNullException.ThrowIfNull(services);
@@ -218,7 +223,7 @@ public static class RunEndpoints
         {
             ["verdict"] = JsonSerializer.SerializeToNode(decision.Verdict, SettingsStore.JsonOptions),
             ["code"] = refusal.Code,
-            ["message"] = refusal.Message,
+            ["message"] = blind ? BlindRefusal : refusal.Message,
             ["pane"] = null,
             ["canProceed"] = decision.Verdict == SpendVerdict.Ask,
             ["capOutputTokens"] = null,
@@ -234,13 +239,13 @@ public static class RunEndpoints
         if (services.GetService<SpendPages>() is not { } pages || decision.Causes.Count == 0) return answer;
         try
         {
-            var view = pages.ConfirmView(refusal.Call, decision);
+            var view = pages.ConfirmView(refusal.Call, decision, blind);
             // "Cap the output" is offered only when the run would hold that cap (RunModelOptions.OutputCapRefusal).
             if (view.CapOutputTokens is { } tokens && refusal.CapOutputRefusal?.Invoke(tokens) is { } why)
                 view = view with
                 {
                     CapOutputTokens = null,
-                    Fit = $"Capping the output is not offered for this request: {why}.",
+                    Fit = blind ? "Capping the output is not offered for this round: one of its models can't hold that cap." : $"Capping the output is not offered for this request: {why}.",
                     Others = view.Others?.Replace(" Capping the output also answers that Ask, for this request only.", "", StringComparison.Ordinal),
                 };
             answer["pane"] = view.Pane;
