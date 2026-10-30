@@ -1,0 +1,148 @@
+@* Decision 0011 (run W3, unit AP): the mockups' settings-about page (route GET /settings/about), mapped 1:1. _AboutBrandHeader; Versions
+   (software: the app, PiSharp and the Pi release it tracks, the commit, .NET and ASP.NET Core; host: OS, the addresses Kestrel listens on and
+   whether they are loopback only, uptime, data folder); Model catalog (IModelCatalog's providers and models, and with live providers the
+   built-in catalog's SHA-256 verified shards and manifest); Diagnostics (the report, DiagnosticsReport, with Copy and Download, and
+   _AboutConnectivityCheck, which runs only on a click); Links (documentation, source and issues, license, third-party notices). Every value
+   is read from the running app; none is typed in. wwwroot/js/about.js wires copy, download and the check. Model: AboutPage. *@
+@using System.Globalization
+@using PiSharp.WebAgent.About
+@model AboutPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "About";
+    ViewData[ShellViewData.SettingsSection] = "about";
+    var versions = Model.Versions;
+    var host = Model.Host;
+    var catalog = Model.Catalog;
+    var invariant = CultureInfo.InvariantCulture;
+}
+@section Styles { <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true"> }
+@section Scripts { <script type="module" src="~/js/about.js" asp-append-version="true"></script> }
+<partial name="~/Views/Settings/_AboutBrandHeader.cshtml" model="Model" />
+
+<section class="settings-section" id="versions">
+  <h3>Versions</h3>
+  <p class="section-desc">Include these when you report a problem. The diagnostics report below has them too.</p>
+  <div class="row g-2">
+    <div class="col-md-6">
+      <div class="ps-card p-3 h-100 about-kv" data-about-software>
+        <div class="ps-label mb-2">Software</div>
+        <div class="kv"><span class="k">PiSharp Web Agent</span><span class="v ps-mono">@versions.App</span></div>
+        <div class="kv"><span class="k">PiSharp</span><span class="v ps-mono">@versions.PiSharp</span></div>
+        <div class="kv"><span class="k">Tracks Pi</span><span class="v ps-mono">@versions.TracksPi</span></div>
+        @if (versions.Commit is { } commit)
+        {
+          <div class="kv"><span class="k">Commit</span><span class="v ps-mono">@commit</span></div>
+        }
+        <div class="kv"><span class="k">.NET runtime</span><span class="v ps-mono">@versions.Runtime</span></div>
+        <div class="kv"><span class="k">ASP.NET Core</span><span class="v ps-mono">@versions.AspNetCore</span></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="ps-card p-3 h-100 about-kv" data-about-host>
+        <div class="ps-label mb-2">Host</div>
+        <div class="kv"><span class="k">OS</span><span class="v">@host.Os</span></div>
+        <div class="kv"><span class="k">Listening on</span><span class="v ps-mono">@(host.Addresses.Count == 0 ? "unknown" : string.Join(", ", host.Addresses))</span></div>
+        <div class="kv"><span class="k">Binding</span><span class="v">
+          @if (host.LoopbackOnly)
+          {
+            <span class="ps-chip" data-tone="ok"><i class="bi bi-shield-check" aria-hidden="true"></i>loopback only</span>
+          }
+          else if (host.Addresses.Count == 0)
+          {
+            <span class="text-ps-faint">unknown</span>
+          }
+          else
+          {
+            <span class="ps-chip" data-tone="warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>not loopback only</span>
+          }
+        </span></div>
+        <div class="kv"><span class="k">Uptime</span><span class="v" title="Since @TimeZoneInfo.ConvertTime(host.Started, Model.Connectivity.Zone).ToString("yyyy-MM-dd HH:mm:ss", invariant)">@AboutFacts.Duration(host.Uptime)</span></div>
+        <div class="kv"><span class="k">Data folder</span><span class="v ps-mono"><a href="/settings/data">@host.DataDirectory</a></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="settings-section" id="catalog">
+  <h3>Model catalog</h3>
+  <p class="section-desc">What chats can pick from. The built-in catalog ships inside PiSharp; each provider file is SHA-256 verified before it is parsed. Settings › Models hides models from the pickers.</p>
+  <div class="ps-card overflow-hidden" data-about-catalog>
+    <div class="metric-strip">
+      <div class="metric"><div class="metric-label">Providers</div><div class="metric-value" data-metric="providers">@catalog.Providers.ToString("N0", invariant)</div></div>
+      <div class="metric"><div class="metric-label">Chat models</div><div class="metric-value" data-metric="chat">@catalog.ChatModels.ToString("N0", invariant)</div></div>
+      <div class="metric"><div class="metric-label">Reasoning</div><div class="metric-value" data-metric="reasoning">@catalog.Reasoning.ToString("N0", invariant)</div></div>
+      <div class="metric"><div class="metric-label">Read images</div><div class="metric-value" data-metric="image-input">@catalog.ImageInput.ToString("N0", invariant)</div></div>
+      <div class="metric"><div class="metric-label">Hidden</div><div class="metric-value" data-metric="hidden">@catalog.Hidden.ToString("N0", invariant)</div></div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-top fs-8">
+      @if (catalog.Builtin is { } builtin)
+      {
+        <span class="ps-chip" data-tone="ok"><i class="bi bi-patch-check" aria-hidden="true"></i>embedded · hash verified</span>
+        <span class="text-ps-faint" data-about-builtin>Built in: @builtin.Shards.ToString("N0", invariant) provider files · @builtin.Providers.ToString("N0", invariant) providers · @builtin.ChatModels.ToString("N0", invariant) chat · @builtin.ImageModels.ToString("N0", invariant) image · @builtin.Classifiers.ToString("N0", invariant) classifier models</span>
+        <span class="ps-mono text-ps-faint text-break" title="@builtin.ManifestSha256">manifest SHA-256 @builtin.ShortManifest</span>
+      }
+      else
+      {
+        <span class="ps-chip" data-tone="outline"><i class="bi bi-wifi-off" aria-hidden="true"></i>faux catalog</span>
+        <span class="text-ps-faint" data-about-builtin>Offline (--faux): chats use the faux provider, and the built-in catalog is not read.</span>
+      }
+      @if (catalog.Builtin is not null && catalog.NotBuiltin.Count > 0)
+      {
+        <span class="text-ps-faint">+ @catalog.NotBuiltin.Count.ToString(invariant) not built in: <span class="ps-mono">@string.Join(", ", catalog.NotBuiltin)</span></span>
+      }
+      <a class="ms-auto" href="/settings/models">Browse models →</a>
+    </div>
+  </div>
+</section>
+
+<section class="settings-section" id="diagnostics">
+  <h3>Diagnostics</h3>
+  <p class="section-desc">Paste this into a bug report. It never contains API keys, tokens, account names or message content; it does show folder paths.</p>
+  <div class="ps-term mb-3">
+    <div class="ps-term-bar"><span class="dot"></span>diagnostics.txt<button class="btn btn-icon ms-auto" type="button" data-copy="#diagReport" title="Copy diagnostics" aria-label="Copy diagnostics"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+    <pre id="diagReport" class="about-report" tabindex="0" data-diagnostics-report>@Model.Report</pre>
+  </div>
+  <div class="d-flex flex-wrap gap-2 mb-4">
+    <button class="btn btn-outline-secondary" type="button" data-copy="#diagReport"><i class="bi bi-copy me-1" aria-hidden="true"></i>Copy report</button>
+    <a class="btn btn-outline-secondary" href="@AboutModule.Prefix/diagnostics?download=1" download="@DiagnosticsReport.FileName(Model.GeneratedAt)" data-diagnostics-download><i class="bi bi-download me-1" aria-hidden="true"></i>Download .txt</a>
+  </div>
+
+  <partial name="~/Views/Settings/_AboutConnectivityCheck.cshtml" model="Model.Connectivity" />
+</section>
+
+<section class="settings-section" id="links">
+  <h3>Links</h3>
+  <div class="ps-card" data-about-links>
+    <a class="provider-row text-decoration-none text-body" href="@AboutPage.DocsUrl" target="_blank" rel="noopener noreferrer">
+      <span class="provider-logo"><i class="bi bi-book" aria-hidden="true"></i></span>
+      <div class="flex-grow-1" style="min-width:0"><div class="provider-name">Documentation</div><div class="fs-8 text-ps-faint ps-mono">pisharp.ai/docs</div></div>
+      <i class="bi bi-box-arrow-up-right text-ps-faint" aria-hidden="true"></i>
+    </a>
+    <a class="provider-row text-decoration-none text-body" href="@AboutPage.RepositoryUrl" target="_blank" rel="noopener noreferrer">
+      <span class="provider-logo"><i class="bi bi-github" aria-hidden="true"></i></span>
+      <div class="flex-grow-1" style="min-width:0"><div class="provider-name">Source code and issues</div><div class="fs-8 text-ps-faint ps-mono">github.com/jkelly/PiSharp</div></div>
+      <i class="bi bi-box-arrow-up-right text-ps-faint" aria-hidden="true"></i>
+    </a>
+    <a class="provider-row text-decoration-none text-body" href="@AboutPage.LicenseUrl" target="_blank" rel="noopener noreferrer">
+      <span class="provider-logo"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+      <div class="flex-grow-1" style="min-width:0"><div class="provider-name">License</div><div class="fs-8 text-ps-faint">MIT</div></div>
+      <i class="bi bi-box-arrow-up-right text-ps-faint" aria-hidden="true"></i>
+    </a>
+    <div class="provider-row flex-wrap">
+      <span class="provider-logo"><i class="bi bi-boxes" aria-hidden="true"></i></span>
+      <div class="flex-grow-1" style="min-width:0"><div class="provider-name">Third-party notices</div><div class="fs-8 text-ps-faint">Open-source components the web agent ships</div></div>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#notices" aria-expanded="false" aria-controls="notices">Show</button>
+      <div class="collapse w-100" id="notices">
+        <div class="ps-panel p-3 mt-2 fs-7" data-about-notices>
+          @foreach (var component in Model.Components)
+          {
+            var named = component.Version is { } version ? component.Name + " " + version : component.Name;
+            <div class="kv"><span class="k"><a href="@component.Url" target="_blank" rel="noopener noreferrer">@named</a> <span class="text-ps-faint">· @component.Role</span></span><span class="v">@component.License</span></div>
+          }
+          <div class="fs-8 text-ps-faint mt-2">PiSharp's own notices, including Pi's MIT notice: <a href="@AboutPage.NoticesUrl" target="_blank" rel="noopener noreferrer">THIRD-PARTY-NOTICES.md</a>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

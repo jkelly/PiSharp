@@ -35,11 +35,7 @@ public sealed record LaterFeature(string Id, string Title, string Icon, string S
             "Local servers and OpenAI- or Anthropic-compatible endpoints, in the same format as Pi's models.json.", Settings: true),
         ["spend"] = new("spend", "Spend", "bi-wallet2",
             "Limits on what metered providers can cost. Every request reserves its worst case before it is sent, then settles to the actual cost.", Settings: true),
-        ["appearance"] = new("appearance", "Appearance", "bi-palette",
-            "How the web agent looks in this browser. The theme toggle in the top bar already switches dark and light.", Settings: true),
         ["data"] = new("data", "Data & storage", "bi-database",
             "Everything the web agent keeps, in one folder on this machine, with retention and clean-up.", Settings: true),
-        ["about"] = new("about", "About", "bi-info-circle",
-            "Versions, licenses and where PiSharp Web Agent keeps its files.", Settings: true),
     };
 }

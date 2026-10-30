@@ -1,0 +1,64 @@
+@* Decision 0011 (run W3, unit AP): the mockup's _AppearancePreview: a sample exchange in the chat's own message markup (_ChatItem's user
+   bubble, thinking block, tool card, code block and usage footer), so every setting shows as it will in a chat. It is marked as a sample
+   and holds no measured number: the footer names its fields instead. appearance.js sets the form's unsaved values on it (data-density,
+   data-code-theme, data-code-ligatures, data-usage-footer, data-reduce-motion; the font size as a zoom; the thinking and tool cards open or
+   closed); the page's global settings never apply to it (appearance.css and appearance.js skip [data-appearance-preview]). The sample
+   reply names the default model when one is set. Model: AppearancePage. *@
+@using PiSharp.WebAgent.Appearance
+@model AppearancePage
+<div class="ps-card ap-preview" id="livePreview" data-appearance-preview data-density="comfortable" data-code-theme="default" data-code-ligatures="off"
+     data-usage-footer="on" data-reduce-motion="off">
+  <div class="ap-preview-head d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-bottom fs-8 text-ps-faint">
+    <span class="ps-chip" data-tone="outline">sample</span><span>Example text, not a chat of yours.</span>
+  </div>
+  <div class="p-3 ap-preview-scale" data-preview-scale>
+    <article class="msg msg-user">
+      <div class="msg-body">
+        <div class="msg-content msg-plain">Add a **null check** to `CacheStats.Merge` and run the tests.</div>
+      </div>
+    </article>
+
+    <article class="msg msg-assistant mb-0">
+      <div class="msg-body">
+        <div class="msg-role"><span class="msg-model">@(Model.SampleModel ?? "PiSharp")</span></div>
+        <details class="thinking" data-preview-detail="expandThinking">
+          <summary><i class="bi bi-chevron-right"></i><i class="bi bi-lightbulb"></i> Thinking</summary>
+          <div class="thinking-body">Merge reads other.Buckets without a guard. A null other should throw ArgumentNullException, as the other public methods do.</div>
+        </details>
+        <details class="tool-card" data-preview-detail="expandToolCalls">
+          <summary>
+            <span class="tool-icon"><i class="bi bi-pencil-square"></i></span>
+            <span class="tool-name">edit</span>
+            <span class="tool-args-summary">src/PiSharp.AI/CacheStats.cs · 1 edit</span>
+            <span class="ps-chip" data-tone="ok">done</span>
+          </summary>
+          <div class="tool-body"><div class="ps-term"><pre class="wrap"><code>@@@@ -41,6 +41,7 @@@@
+ public CacheStats Merge(CacheStats other)
+ {
++    ArgumentNullException.ThrowIfNull(other);</code></pre></div></div>
+        </details>
+        <div class="msg-content">
+          <p>Added the guard. <code>Merge</code> now throws for a null argument, like the rest of the type:</p>
+          <div class="ps-term">
+            <div class="ps-term-bar"><span class="dot"></span>CacheStats.cs</div>
+            <pre><code>public CacheStats Merge(CacheStats other)
+{
+    ArgumentNullException.ThrowIfNull(other);
+    var hits = Hits + other.Hits;
+    return hits >= 0 &amp;&amp; other != Empty ? new(hits, Misses + other.Misses) : this;
+}
+public bool IsEmpty => Hits == 0;</code></pre>
+          </div>
+          <p class="stream-cursor mb-0">The sample stops here</p>
+        </div>
+        <div class="msg-footer pv-usage">
+          <span><i class="bi bi-arrow-up"></i>input tokens</span>
+          <span><i class="bi bi-arrow-down"></i>output tokens</span>
+          <span><i class="bi bi-lightning-charge"></i>cached</span>
+          <span>cost</span>
+          <span><i class="bi bi-stopwatch"></i>duration</span>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>

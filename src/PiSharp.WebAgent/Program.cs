@@ -9,6 +9,7 @@ using PiSharp.WebAgent.Routing;
 using PiSharp.WebAgent.Settings;
 using PiSharp.WebAgent.Spend;
 using PiSharp.WebAgent.Setup;
+using PiSharp.WebAgent.About;
 
 WebAgentOptions options;
 WebApplicationBuilder builder;
@@ -30,6 +31,7 @@ builder.Services.AddChatArea(options);
 builder.Services.AddRoutingArea(options);
 builder.Services.AddSettingsArea(options);
 builder.Services.AddSetupArea(options);
+builder.Services.AddAboutArea(options);
 builder.Services.AddWebAgentFallbacks(options);
 // Spend Guard (run W3): after the fallbacks, so the guard decorates the app's final IDurableModels (--faux-metered prices the faux ones).
 builder.Services.AddSpendArea(options);
@@ -42,6 +44,7 @@ app.MapRoutingArea();
 app.MapSettingsArea();
 app.MapSpendArea();
 app.MapSetupArea();
+app.MapAboutArea();
 app.MapWebAgentCore();
 app.Run();
 return 0;

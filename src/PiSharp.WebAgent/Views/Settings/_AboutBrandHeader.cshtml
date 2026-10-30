@@ -1,0 +1,24 @@
+@* Decision 0011 (run W3, unit AP): the mockups' "_AboutBrandHeader": the PiSharp mark, the app's name, its version, whether it runs offline
+   (--faux), the build's date and configuration, and what the app is. Every value is read from the running build (AboutFacts). Model:
+   AboutPage. *@
+@using PiSharp.WebAgent.About
+@model AboutPage
+@{
+    var versions = Model.Versions;
+}
+<header class="settings-header ps-card p-4 d-flex flex-wrap align-items-center gap-4 about-brand" data-about-brand>
+  <img src="@WebCommonAssets.Favicon" alt="PiSharp logo" width="88" height="88" class="about-logo">
+  <div class="about-intro">
+    <div class="ps-eyebrow">About</div>
+    <h2 class="ps-heading fs-1 mb-1">PiSharp <em>Web Agent</em></h2>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span class="ps-chip" data-tone="accent" data-about-version>v@(versions.App)</span>
+      @if (Model.Host.Faux)
+      {
+        <span class="ps-chip" data-tone="outline" title="Started with --faux: chats use the faux models and nothing is sent to a provider."><i class="bi bi-wifi-off" aria-hidden="true"></i>offline · faux models</span>
+      }
+      <span class="ps-mono fs-8 text-ps-faint">@(versions.Built is { } built ? "build " + TimeZoneInfo.ConvertTime(built, Model.Connectivity.Zone).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + " · " : "")@versions.Configuration</span>
+    </div>
+    <p class="mb-0">A local workbench for chatting with, testing and comparing models, on this computer only. Built on PiSharp, an independent native .NET port of the Pi coding agent.</p>
+  </div>
+</header>

@@ -2,10 +2,31 @@
 // dialog (_ConfirmModal), the linked Provider -> Model dropdowns (_ProviderModelSelect) and the global keyboard shortcuts (_ShortcutsModal).
 // Page scripts import what they need from here; site.js calls initShell() once. Everything is delegated from document, so markup swapped in
 // later (a modal's body, a stream fragment) works without wiring. Text is always set with textContent, never as HTML.
-import { initTheme, applyTheme, currentTheme } from '/_content/PiSharp.Web.Common/js/theme.js';
+// Run W3, unit AP: the theme is Settings › Appearance's (appearance.js in <head>, window.PiSharpAppearance), which can also follow the
+// system. The toggle and Ctrl+Shift+L switch between dark and light through it, so the choice is the same one the Appearance page shows;
+// the toggle icons follow the theme on the page whatever changed it (the "pisharp:appearance" event). Without appearance.js the toggle
+// falls back to Web.Common's dark/light theme.
+import { applyTheme, currentTheme } from '/_content/PiSharp.Web.Common/js/theme.js';
 
 const TONES = ['ok', 'warn', 'danger', 'info'];
 let started = false;
+
+/** Switches the theme between dark and light (the top bar's moon, Ctrl+Shift+L) and remembers it in this browser; returns the theme shown.
+ * With "System" chosen in Settings › Appearance, it switches away from what the system shows, and the choice becomes that theme. */
+export function toggleTheme() {
+  const appearance = window.PiSharpAppearance;
+  if (appearance) return appearance.toggleTheme();
+  return applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', { store: true });
+}
+
+// The toggle, and its icons kept in step with the theme on the page (applyTheme with the current theme only updates the icons).
+function wireTheme() {
+  applyTheme(currentTheme());
+  document.addEventListener('pisharp:appearance', () => applyTheme(currentTheme()));
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-theme-toggle]')) toggleTheme();
+  });
+}
 
 /** Shows a toast in #toasts. `tone` is 'ok', 'warn', 'danger' or 'info'; danger toasts stay longer. Returns the toast element. */
 export function showToast({ title, body = '', tone = 'ok', delay } = {}) {
@@ -155,7 +176,7 @@ function onKeydown(event) {
     window.location.assign('/chat/new');
   } else if (ctrl && event.shiftKey && !event.altKey && key === 'l') {
     event.preventDefault();
-    applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', { store: true });
+    toggleTheme();
   } else if (event.key === '?' && !ctrl && !event.altKey && !typing(event.target) && !document.querySelector('.modal.show')) {
     if (showModal('modal-shortcuts')) event.preventDefault();
   }
@@ -171,9 +192,9 @@ function revealSettingsItem() {
 
 /** Wires the shell once per page: theme, Provider -> Model dropdowns, confirm forms and global shortcuts. */
 export function initShell() {
-  initTheme();
   if (started) return;
   started = true;
+  wireTheme();
   revealSettingsItem();
   document.addEventListener('change', onChange);
   document.addEventListener('submit', onSubmit);
