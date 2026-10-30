@@ -623,13 +623,18 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
 
     // A command may replace its own idle input reservation, but must never await that callback's settlement.
     // No executable host/plugin work occurs under this reservation's state lock.
-    internal ReplacementReservation ReserveReplacement()
+    internal ReplacementReservation ReserveReplacement() => ReserveReplacementCore(shutdown: false)!;
+    // Shutdown discards queued input and a fault is the faulting operation's: null retires owned
+    // resources without catalog publication authority instead of reporting a second cleanup failure.
+    internal ReplacementReservation? ReserveShutdownRetirement() => ReserveReplacementCore(shutdown: true);
+    private ReplacementReservation? ReserveReplacementCore(bool shutdown)
     {
         lock (_gate)
         {
+            var agent = _agent.Snapshot;
+            if (shutdown && (_fault is not null || agent.SteeringCount != 0 || agent.FollowUpCount != 0 || !agent.PendingInputs.IsEmpty)) return null;
             ThrowAvailable();
             ThrowUserBashMutationLocked();
-            var agent = _agent.Snapshot;
             if (_active is not null || _retrySettingsWrite is not null || _loadoutDrains.Count != 0 || _synchronousLoadoutWork != 0 || agent.IsRunning || agent.SteeringCount != 0 || agent.FollowUpCount != 0 ||
                 _inputSubmission is not null && !IsExecutingInputCallback || !agent.PendingInputs.IsEmpty)
                 throw new InvalidOperationException("Session replacement requires idle execution and empty pending input queues.");
