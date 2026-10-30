@@ -8,7 +8,12 @@ using static Microsoft.Playwright.Assertions;
 // card and the spend banner), a cap, a custom provider, a stored key (a made-up value, so Setup's Default model step shows) and a finished
 // setup (so its Done step shows). The pages: Settings › Spend, History › Spend, Settings › Custom providers, Settings › Appearance,
 // Settings › About, the four Setup steps, a new chat with a draft over the cap, and both chats; the dialogs: Add a spend cap, the custom
-// provider editor and the spend confirmation of a send the cap refused.
+// provider editor and the spend confirmation of a send the cap refused. W3 fix (tests-ci): the states and dialogs it used to leave out. A
+// priced-faux slow: answer is killed mid-stream and the app restarted on the same data (as the History › Spend case does), so History ›
+// Spend shows its uncertain banner and row, ?resolve= opens the Resolve dialog (on each of its choices), and the chat shows its uncertain
+// footer; the cap dialog's one-provider and one-source panes and its Edit pane (a cap row's edit button); About's connectivity check after
+// the click (its results pane); the custom provider's remove confirmation, cancelled; and the API key dialog of Setup's Connect step. Nothing
+// is settled or removed.
 internal static partial class Program
 {
     private static readonly string[] W3PhonePages =
@@ -36,6 +41,18 @@ internal static partial class Program
             Equal(200, provider.Status, "a custom provider: " + provider.Text);
             var answered = await app.CreateChatAsync("slow: " + Words(30), "phone-answered");
             await app.WaitIdleAsync(answered);
+
+            // A request left uncertain: the app dies while a slow: answer streams, and after the restart its reservation is uncertain. The
+            // browser profile opens on the restarted app's address.
+            var dropped = await app.CreateChatAsync("slow: " + Words(150), "phone-dropped");
+            string op = null!;
+            await WaitUntilAsync(async () => (await app.LedgerAsync()).FirstOrDefault(item => Reservation(item, "run") == dropped) is { } row &&
+                Reservation(row, "state") == "reserved" && (op = Reservation(row, "op")!) is not null, "the dropped request's reservation", TimeSpan.FromSeconds(30));
+            await app.KillAndRestartAsync();
+            var phone = await window.ReopenAsync(375, 812);
+            await app.WaitIdleAsync(dropped);
+            Equal("uncertain", Reservation((await app.LedgerAsync()).Single(item => Reservation(item, "op") == op), "state"), "uncertain after the restart");
+
             var stopped = await app.CreateChatAsync("first", "phone-stopped");
             await app.WaitIdleAsync(stopped);
             var cap = await app.PostAsync("/api/spend/caps", new JsonObject { ["scope"] = "everything", ["period"] = "request", ["limit"] = "0.01", ["action"] = "ask" });
@@ -43,9 +60,10 @@ internal static partial class Program
             var past = await app.PostAsync($"/api/chats/{stopped}/messages", new JsonObject { ["requestId"] = "phone-past", ["text"] = "past the cap" });
             Equal(200, past.Status, "posted without a check: " + past.Text);
             await app.WaitIdleAsync(stopped);
-            Check((await app.LedgerAsync()).Count >= 2, "the ledger has rows to show");
+            Check((await app.LedgerAsync()).Count >= 3, "the ledger has rows to show");
+            var capId = (await app.Get("/api/spend/caps")).Body!["caps"]!.AsArray().Single()!["id"]!.GetValue<long>();
 
-            var page = window.Page;
+            var page = phone.Page;
             foreach (var theme in new[] { "dark", "light" })
             {
                 await page.GotoAsync("/settings/spend");
@@ -56,6 +74,15 @@ internal static partial class Program
                     if (path.StartsWith("/setup?step=", StringComparison.Ordinal))
                         await Expect(page.Locator("[data-setup-wizard]")).ToHaveAttributeAsync("data-setup-current", path["/setup?step=".Length..]);
                     await page.FitsPhoneAsync(path, theme);
+                    if (path == "/setup?step=connect")
+                    {
+                        // The Settings area's API key dialog, which the Connect step's "More options" opens.
+                        await page.Locator("[data-setup-key-modal] >> visible=true").First.ClickAsync();
+                        await Expect(page.Locator("#modal-api-key.show")).ToBeVisibleAsync();
+                        await page.FitsPhoneAsync("Setup › Connect › the API key dialog", theme);
+                        await page.Keyboard.PressAsync("Escape");
+                        await Expect(page.Locator("#modal-api-key")).ToBeHiddenAsync();
+                    }
                 }
 
                 await page.OpenChatAsync(answered);
@@ -66,6 +93,29 @@ internal static partial class Program
                 await Expect(page.Locator("[data-spend-stop]")).ToBeVisibleAsync();
                 await Expect(page.Locator("[data-banner='spend']")).ToBeVisibleAsync();
                 await page.FitsPhoneAsync("/chat/" + stopped + " (a stopped call)", theme);
+                await page.OpenChatAsync(dropped);
+                await Expect(page.Locator("[data-spend-mark='uncertain']").First).ToBeVisibleAsync();
+                await Expect(page.Locator("a[data-spend-resolve]").First).ToBeVisibleAsync();
+                await page.FitsPhoneAsync("/chat/" + dropped + " (uncertain spend)", theme);
+
+                // History › Spend with the uncertain request: its banner and row, then the Resolve dialog the address opens, on each choice.
+                await page.GotoAsync("/history/spend");
+                await Expect(page.Locator("[data-uncertain-banner]")).ToBeVisibleAsync();
+                await Expect(page.Locator($"[data-spend-row='{op}']")).ToHaveAttributeAsync("data-status", "uncertain");
+                await page.FitsPhoneAsync("History › Spend (an uncertain request)", theme);
+                await page.GotoAsync("/history/spend?resolve=" + Uri.EscapeDataString(op));
+                var resolve = page.Locator("#modal-resolve-reservation");
+                await Expect(page.Locator("#modal-resolve-reservation.show")).ToBeVisibleAsync();
+                await Expect(resolve).ToContainTextAsync("Resolve uncertain spend");
+                await page.FitsPhoneAsync("Resolve uncertain spend", theme);
+                foreach (var (choice, pane) in new[] { ("rrEstimate", "estimate"), ("rrActual", "amount"), ("rrRelease", "release") })
+                {
+                    await resolve.Locator($"label[for='{choice}']").ClickAsync();
+                    await Expect(resolve.Locator($".modal-footer [data-rr-pane='{pane}']")).ToBeVisibleAsync();
+                    await page.FitsPhoneAsync("Resolve uncertain spend › " + pane, theme);
+                }
+                await resolve.Locator(".modal-footer [data-bs-dismiss='modal']").ClickAsync();
+                await Expect(resolve).ToBeHiddenAsync();
 
                 // A new chat with a draft over the cap: the estimate and its chip, then the confirmation the refused send opens.
                 await page.GotoAsync("/chat/new");
@@ -85,6 +135,18 @@ internal static partial class Program
                 await page.Locator("[data-cap-new] >> visible=true").First.ClickAsync();
                 await Expect(page.Locator("#modal-spend-cap.show")).ToBeVisibleAsync();
                 await page.FitsPhoneAsync("Add a spend cap", theme);
+                foreach (var scope in new[] { "provider", "source" })
+                {
+                    await page.Locator("#modal-spend-cap #capScope").SelectOptionAsync(scope);
+                    await Expect(page.Locator($"#modal-spend-cap [data-cap-scope-pane='{scope}']")).ToBeVisibleAsync();
+                    await page.FitsPhoneAsync("Add a spend cap › one " + scope, theme);
+                }
+                await page.Keyboard.PressAsync("Escape");
+                await Expect(page.Locator("#modal-spend-cap")).ToBeHiddenAsync();
+                await page.Locator($"[data-cap-edit][data-cap-id='{capId}']").ClickAsync();
+                await Expect(page.Locator("#modal-spend-cap.show [data-cap-amount-edit]")).ToBeVisibleAsync();
+                await Expect(page.Locator("#modal-spend-cap [data-cap-amount-edit]")).ToHaveValueAsync("0.01");
+                await page.FitsPhoneAsync("Edit cap", theme);
                 await page.Keyboard.PressAsync("Escape");
                 await Expect(page.Locator("#modal-spend-cap")).ToBeHiddenAsync();
                 await page.GotoAsync("/settings/custom-providers");
@@ -98,16 +160,34 @@ internal static partial class Program
                 }
                 await page.Keyboard.PressAsync("Escape");
                 await Expect(page.Locator("#modal-custom-provider")).ToBeHiddenAsync();
+                await page.Locator("[data-cp-delete='phone-box']").ClickAsync();
+                var remove = page.Locator("#modal-confirm");
+                await Expect(page.Locator("#modal-confirm.show")).ToBeVisibleAsync();
+                await Expect(remove).ToContainTextAsync("Delete custom provider 'phone-box'?");
+                await page.FitsPhoneAsync("the custom provider's remove confirmation", theme);
+                await remove.Locator(".modal-footer [data-bs-dismiss='modal']").ClickAsync();
+                await Expect(remove).ToBeHiddenAsync();
+
+                // About's connectivity check, only on the click: offline it answers its results pane at once.
+                await page.GotoAsync("/settings/about");
+                var check = page.Locator("[data-connectivity]");
+                await page.RunAndWaitForResponseAsync(() => check.Locator("[data-connectivity-run]").ClickAsync(),
+                    response => response.Request.Method == "POST" && new Uri(response.Url).AbsolutePath == "/api/about/connectivity");
+                await Expect(check).ToHaveAttributeAsync("data-state", "results");
+                await Expect(check.Locator("[data-pane='results']")).ToBeVisibleAsync();
+                await page.FitsPhoneAsync("Settings › About › connectivity results", theme);
             }
             await window.RefusedAsync(2, "one refused send per theme");
-            Equal(2, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "the refused sends created no chat");
+            Equal(3, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "the refused sends created no chat");
+            Equal("uncertain", Reservation((await app.LedgerAsync()).Single(item => Reservation(item, "op") == op), "state"), "the Resolve dialog settled nothing");
+            Equal(200, (await app.Get("/api/custom-providers/phone-box")).Status, "the cancelled confirmation removed nothing");
         }, width: 375, height: 812),
 
         // W3 fix (spend-ui): an Accounts row whose billing mode is detected as Unknown price, the longest choice ("Unknown price (detected)"),
         // which a fixed-width select used to clip ("Unknown price (detect" at 1440 px, less at 375). Live, so the catalog lists a custom
         // provider: one on a made-up gateway with no price and no key (nothing is called; the page only reads the catalog). At 375 × 812 in the
         // dark and then the light theme, and at 1440 × 900: the select shows its chosen option in full, inside its row, and nothing scrolls
-        // sideways.
+        // sideways. The provider's Enter price menu (Unknown prices) stays on the screen too (W3 fix, tests-ci).
         Browse("browser.w3.layout.an-unknown-price-account-is-never-clipped", AgentMode.Live, async (app, window) =>
         {
             var provider = await app.PostAsync("/api/custom-providers", new JsonObject
@@ -128,6 +208,14 @@ internal static partial class Program
                 await Expect(select.Locator("option:checked")).ToHaveTextAsync("Unknown price (detected)");
                 await page.FitsPhoneAsync($"Settings › Spend › Accounts at {width}px", theme);
                 await page.ShowsChoiceInFullAsync(select, $"the Unknown-price account's billing mode at {width}px ({theme})");
+
+                // W3 fix (tests-ci): its Unknown prices row's Enter price menu stays on the screen.
+                var enter = page.Locator("[data-setting-row='unknown:work-gateway'] [data-bs-toggle='dropdown']");
+                await enter.ClickAsync();
+                await Expect(page.Locator("[data-price-menu][data-provider='work-gateway']")).ToBeVisibleAsync();
+                await page.FitsPhoneAsync($"Settings › Spend › Enter price at {width}px", theme);
+                await enter.ClickAsync();
+                await Expect(page.Locator("[data-price-menu][data-provider='work-gateway']")).ToBeHiddenAsync();
             }
         }, width: 375, height: 812),
     ];
