@@ -5,11 +5,16 @@
 // "presets" export part plans and imports by id. End to end over the faux app: /presets in its empty and default states with nothing the
 // CSP would block, save from the Playground, Compare and the Tool Bench, edit, duplicate, count a use, load into each page, export one and
 // all (attachments with no secret), import (refused, skipped, renamed) and delete; the three pages host the shared modals and presets-host.js.
+// W4 fix 2: a preset's account goes with its model into every page; over real routing (a fake provider), the Playground's and Compare's
+// payloads run on the account the preset names, not the active one, and Model & auth and a Compare column offer it by label only.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
 using PiSharp.WebAgent.Bench;
 using PiSharp.WebAgent.Compare;
+using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Data;
 using PiSharp.WebAgent.Presets;
 using PiSharp.WebAgent.Runs;
@@ -136,12 +141,108 @@ internal static partial class Program
             var playgroundIntoBench = PresetLoad.For(playground, PresetPages.Bench);
             Check(string.Join(" | ", playgroundIntoBench.Notes).Contains("no extra headers", StringComparison.Ordinal), "the bench too");
 
-            // The account is an id: the bench selects it; the Playground and Compare say they use the active account.
+            // The account is an id, and it goes with the model on every page (W4 fix 2): the bench sets it up, the Playground selects it in
+            // Model & auth, a Compare column runs on it; no page says it is ignored.
             var withAccount = playground with { Account = "acc-1" };
             Equal("acc-1", PresetLoad.For(withAccount, PresetPages.Bench).Payload["setup"]!["account"]!.GetValue<string>(), "the bench's account");
-            Check(PresetLoad.For(withAccount, PresetPages.Playground).Notes.Any(note => note.Contains("active faux account", StringComparison.Ordinal)), "the Playground's note");
-            Check(PresetLoad.For(withAccount, PresetPages.Compare).Notes.Any(note => note.Contains("active faux account", StringComparison.Ordinal)), "Compare's note");
+            Equal("acc-1", PresetLoad.For(withAccount, PresetPages.Playground).Payload["spec"]!["account"]!.GetValue<string>(), "the Playground's account");
+            Equal("acc-1", PresetLoad.For(withAccount, PresetPages.Compare).Payload["draft"]!["columns"]![0]!["account"]!.GetValue<string>(), "the first column's account");
+            var perColumn = compare with { Columns = [compare.Columns![0] with { Account = "acc-2" }, .. compare.Columns.Skip(1)] };
+            Equal("acc-2", PresetLoad.For(perColumn, PresetPages.Compare).Payload["draft"]!["columns"]![0]!["account"]!.GetValue<string>(), "a column keeps its account");
+            Check(PresetLoad.For(perColumn, PresetPages.Compare).Payload["draft"]!["columns"]![1]!["account"] is null, "a column without one runs on the active account");
+            Equal("acc-2", PresetLoad.For(perColumn, PresetPages.Playground).Payload["spec"]!["account"]!.GetValue<string>(), "the first column's account in the Playground");
+            Equal("acc-2", PresetLoad.For(perColumn, PresetPages.Bench).Payload["setup"]!["account"]!.GetValue<string>(), "and in the bench");
+            foreach (var (source, page) in new[] { (withAccount, PresetPages.Playground), (withAccount, PresetPages.Compare), (perColumn, PresetPages.Playground), (perColumn, PresetPages.Compare) })
+            {
+                var notesOf = PresetLoad.For(source, page).Notes;
+                Check(!notesOf.Any(note => note.Contains("account", StringComparison.OrdinalIgnoreCase)), $"no note leaves the account out of {page}: " + string.Join(" | ", notesOf));
+            }
             Throws<ArgumentException>(() => PresetLoad.For(playground, "chat"), "only the three pages");
+        }),
+
+        Case("preset.accounts.the-playground-and-compare-run-on-the-preset-account", async () =>
+        {
+            // W4 fix 2: over real routing (a fake provider answers; nothing leaves the process), with two OpenAI keys. Personal is the active
+            // account; the presets name Work. Each page's payload, posted as the page posts it, runs on Work, and the pages offer the choice.
+            await using var host = CompareHost.Routing("preset-accounts");
+            var personalKey = Planted("sk-proj-");
+            var workKey = Planted("sk-proj-");
+            var personal = (await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("openai", personalKey) { Label = "Personal" })).Account.Id;
+            var work = (await host.Accounts.AddApiKeyAsync(new ApiKeyAccountRequest("openai", workKey) { Label = "Work" })).Account.Id;
+            Equal(personal, host.Accounts.Active("openai")?.Id, "Personal is the active account");
+            var catalog = host.Services.GetRequiredService<IModelCatalog>();
+            var gpt = ModelOf(catalog, "openai", "openai-responses", "gpt-4.1");
+
+            // The Playground: the preset's account is in the spec the page applies, and a run of that spec uses Work's key.
+            var playgroundPreset = new Preset
+            {
+                Name = "Work answers", Kind = PresetPages.Playground, Provider = "openai", Model = gpt, Account = work,
+                Messages = [new RunMessage { Role = "user", Text = "Which account?" }],
+            };
+            var spec = PresetLoad.For(PresetRules.Normalize(playgroundPreset), PresetPages.Playground).Payload["spec"]!.AsObject();
+            Equal(work, spec["account"]!.GetValue<string>(), "the Playground's payload names Work");
+            var started = await host.Engine.StartAsync(RunSpec.Parse(spec));
+            Check(started.Posted, "the run started: " + started.Refusal?.Message);
+            var run = await RunsFinishedAsync(host.Store, started.Id!);
+            Equal((RunStatus.Completed, work), (run.Status, run.Account), "the run used Work, not the active account");
+            var sent = host.Provider.Requests.Single();
+            var sentText = string.Join("\n", sent.Headers.Select(pair => pair.Key + ": " + pair.Value)) + "\n" + sent.Body;
+            Check(sentText.Contains(workKey, StringComparison.Ordinal), "the request carries Work's key");
+            NoSecret(sentText, "the Playground's request", personalKey);
+
+            // Model & auth offers the choice, Work selected, by label only.
+            var pages = new PiSharp.WebAgent.Playground.PlaygroundPages(host.Services);
+            var info = (await pages.ModelAsync("openai", gpt, work))!.Value;
+            Check(info.Auth is { Chosen: not null, AccountChoice: true, AccountLabel: "Work", Source: "The account you chose" } && info.Auth.Accounts.Count == 2,
+                "the account choice: " + info.Auth);
+            Equal("Personal", info.Auth!.ActiveLabel, "the active account's label");
+            var unchosen = (await pages.ModelAsync("openai", gpt, null))!.Value.Auth!;
+            Check(unchosen is { Chosen: null, AccountLabel: "Personal", Source: "The provider's active account", AccountChoice: true }, "two accounts: the choice is offered, on the active one");
+            await using var render = CatalogHost("preset-accounts-render", catalog);
+            var config = await render.RenderAsync("_RequestConfigModel", new PiSharp.WebAgent.Playground.RequestConfigView
+            {
+                Draft = RunSpec.Parse(spec), Capabilities = info.Capabilities, Auth = info.Auth,
+            });
+            Check(Regex.IsMatch(config, "data-account-choice(?![^>]*hidden)") && config.Contains("id=\"pg-account\"", StringComparison.Ordinal), "the choice shows: " + Cut(config));
+            Check(Regex.IsMatch(config, $"<option value=\"{work}\" selected=\"selected\" data-label=\"Work\">Work</option>"), "Work is selected: " + Cut(config));
+            Check(Regex.IsMatch(config, $"<option value=\"\" data-label=\"Personal\">Active account [(]Personal[)]</option>")
+                && Regex.IsMatch(config, $"<option value=\"{personal}\" data-label=\"Personal\">Personal</option>"), "the active account and Personal are offered");
+            Check(config.Contains("The account you chose", StringComparison.Ordinal), "the source says so");
+            NoSecret(config, "Model & auth", personalKey, workKey);
+            NoSecret(config, "Model & auth's hints", personalKey[^4..], workKey[^4..]);
+
+            // Compare: the preset's columns keep their accounts, the column offers the choice with Work selected, and Run all (the draft the
+            // page posts) runs the first column on Work and the second on the active account.
+            var comparePreset = PresetRules.Normalize(new Preset
+            {
+                Name = "Two accounts", Kind = PresetPages.Compare, Messages = [new RunMessage { Role = "user", Text = "Say hi." }],
+                Columns = [new CompareColumnDraft { Provider = "openai", Model = gpt, Account = work }, new CompareColumnDraft { Provider = "openai", Model = gpt, Temperature = 0.3 }],
+            });
+            var plan = PresetLoad.For(comparePreset, PresetPages.Compare);
+            Check(!plan.Notes.Any(note => note.Contains("account", StringComparison.OrdinalIgnoreCase)), "no note about the account: " + string.Join(" | ", plan.Notes));
+            var draft = CompareDraft.Parse(plan.Payload["draft"]);
+            Equal(work, draft.Columns[0].Account, "the first column names Work");
+            var column = host.Pages.DraftColumn(draft, draft.Columns[0], "c1", 2);
+            Check(column is { AccountChoice: true, AccountLabel: "Work" } && column.AccountOptions.Single(option => option.Selected).Value == work, "the column's choice");
+            var html = await render.Renderer.RenderAsync(ComparePages.ColumnPartial, column);
+            Check(html.Contains($"data-account=\"{work}\"", StringComparison.Ordinal) && html.Contains("id=\"cmp-c1-account\"", StringComparison.Ordinal)
+                && Regex.IsMatch(html, $"<option value=\"{work}\" selected=\"selected\" data-label=\"Work\">Work</option>"), "the column carries Work: " + Cut(html));
+            Check(Regex.IsMatch(html, "data-col-account(?![^>]*hidden)") && html.Contains("<span data-col-account-label>Work</span>", StringComparison.Ordinal), "and its chip names it");
+            var other = await render.Renderer.RenderAsync(ComparePages.ColumnPartial, host.Pages.DraftColumn(draft, draft.Columns[1], "c2", 2));
+            Check(other.Contains("data-account=\"\"", StringComparison.Ordinal) && Regex.IsMatch(other, "<option value=\"\" selected=\"selected\" data-label=\"Personal\">Active account [(]Personal[)]</option>")
+                && Regex.IsMatch(other, "data-col-account[^>]*hidden"), "the other column is on the active account: " + Cut(other));
+            NoSecret(html + other, "the columns", personalKey, workKey);
+            var group = await host.Pages.RunAsync(draft with { Prompt = "Say hi." });
+            Check(group.Start is { Posted: true } && group.Start.Ids.Count == 2, "Run all: " + group.Start.Refusal?.Message);
+            var runs = new List<RunRecord>();
+            foreach (var id in group.Start.Ids) runs.Add(await RunsFinishedAsync(host.Store, id));
+            Equal($"{work}|{personal}", string.Join("|", runs.Select(item => item.Account)), "each column ran on its own account");
+            Equal(work, host.Pages.Group(group.Start.GroupId!)!.Columns[0].Column.Account, "the group keeps the column's account (Re-run sends it again)");
+            var before = host.Store.Count();
+            var unknown = await ThrowsAsync<ArgumentException>(() => host.Pages.RunAsync(draft with { Prompt = "Say hi.", Columns = [draft.Columns[0] with { Account = "acc-0000000000000000" }, draft.Columns[1]] }),
+                "an account this machine does not have");
+            Check(unknown.Message.Contains("no openai account", StringComparison.Ordinal), "is refused with a clear message, never switched: " + unknown.Message);
+            Equal(before, host.Store.Count(), "nothing ran");
         }),
 
         Case("preset.json.export-and-parse", () =>

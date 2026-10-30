@@ -3,10 +3,13 @@
 // from one (Presets load, Compare columns, History's "Open in Playground"). An option row is sent only when the user set it
 // ([data-option][data-set="true"]): at its default nothing is sent and the provider's default applies. A set option the model does not
 // take is still sent, so the run engine refuses it with a clear message instead of the page dropping it silently (brief rule 4). Options
-// the run engine has no field for ([data-unsent]) are never read.
+// the run engine has no field for ([data-unsent]) are never read. W4 fix 2: Model & auth's account choice ([data-account-select]) is the
+// RunSpec's account (an id; none for the provider's active account), and applySpec sets it (config.dataset.account is the account wanted,
+// which request-config.js selects again once a newly chosen provider's accounts are listed).
 
 import { editorMessage, setMessages } from './request-messages.js';
 import { setTools } from './request-tools.js';
+import { selectAccount } from './request-config.js';
 
 export { editorMessage };
 
@@ -35,6 +38,11 @@ export function chosenModel(config) {
   const pane = root ? [...root.querySelectorAll('[data-provider]')].find((element) => element.dataset.provider === provider) : null;
   const model = pane?.querySelector('[data-model-select]')?.value ?? config?.dataset.model ?? '';
   return { provider, model };
+}
+
+/** The account id Model & auth's account choice names, or null for the provider's active account. */
+export function chosenAccount(config) {
+  return config?.querySelector('[data-account-select]')?.value || null;
 }
 
 function row(config, option) {
@@ -119,6 +127,8 @@ export function collectSpec(root, { source = 'playground' } = {}) {
   const { config, list } = requestParts(root);
   const { provider, model } = chosenModel(config);
   const spec = { provider, model, source };
+  const account = chosenAccount(config);
+  if (account) spec.account = account;
   let systemPrompt = null;
   const messages = [];
   list?.querySelectorAll('[data-msg-list] > [data-msg]').forEach((editor) => {
@@ -209,6 +219,11 @@ export function applyOptions(config, spec) {
  *  modules listen for 'request-spec-applied' to refresh what depends on them (capabilities, token counts). */
 export function applySpec(root, spec) {
   const { config, list } = requestParts(root);
+  if (config) {
+    // The account wanted: selected now when the provider's list has it, else once request-config.js lists the new provider's accounts.
+    config.dataset.account = spec?.account ?? '';
+    selectAccount(config);
+  }
   if (config && spec?.provider && spec?.model) {
     const picker = config.querySelector('[data-provider-model]');
     const providerSelect = picker?.querySelector('[data-provider-select]');

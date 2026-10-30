@@ -3,7 +3,9 @@
 // /compare/column fragments; bench-setup.js openSession on the Tool Bench). Only the preset's parts are in the payload ("parts"), and the
 // page keeps what the preset left out. A preset from another page is converted here, never silently: everything the target page cannot take
 // (Compare's other columns in the Playground, tools in Compare, options the Tool Bench does not send, a bench's matching mocks in the
-// Playground) is named in "notes", which the page shows when it loads the preset.
+// Playground) is named in "notes", which the page shows when it loads the preset. The account goes with the model on every page (W4 fix 2):
+// the Playground selects it in Model & auth's account choice, a Compare column in its overrides, the Tool Bench in its setup; an account
+// this machine does not have was already dropped with a note (PresetService), so the provider's active account is used and the page says so.
 //   playground  {spec: {provider, model, account, systemPrompt, messages, options..., headers, toolChoice}, tools: [{name, description,
 //                parameters, enabled, mock?, mockError?}], parallel}
 //   compare     {draft: {systemPrompt, prompt, thinking, maxTokens, temperature, columns: [{provider, model, account, thinking, temperature}]}}
@@ -58,11 +60,7 @@ public static class PresetLoad
                 var first = columns[0];
                 spec["provider"] = first.Provider;
                 spec["model"] = first.Model;
-                if (first.Account is { } account)
-                {
-                    spec["account"] = account;
-                    notes.Add(AccountNote("The Playground", first.Provider));
-                }
+                if (first.Account is { } account) spec["account"] = account;
                 if (columns.Count > 1)
                     notes.Add($"The Playground runs one model: the first column's ({first.Provider}/{first.Model}) is loaded and {Count(columns.Count - 1, "other model")} {Are(columns.Count - 1)} left out.");
                 if (first.Overrides) options = (options ?? new PresetOptions()) with { Thinking = first.Thinking ?? options?.Thinking, Temperature = first.Temperature ?? options?.Temperature };
@@ -71,11 +69,7 @@ public static class PresetLoad
             {
                 spec["provider"] = preset.Provider;
                 spec["model"] = preset.Model;
-                if (preset.Account is { } account)
-                {
-                    spec["account"] = account;
-                    notes.Add(AccountNote("The Playground", preset.Provider!));
-                }
+                if (preset.Account is { } account) spec["account"] = account;
             }
         }
         if (options is { Empty: false })
@@ -148,14 +142,11 @@ public static class PresetLoad
             if (preset.Columns is { Count: > 0 } columns)
             {
                 draft["columns"] = Node(columns);
-                if (columns.FirstOrDefault(column => column.Account is not null) is { } withAccount)
-                    notes.Add(AccountNote("Compare", withAccount.Provider));
             }
             else
             {
                 draft["columns"] = Node(new[] { new CompareColumnDraft { Provider = preset.Provider!, Model = preset.Model!, Account = preset.Account } });
                 notes.Add($"Compare runs two to four models: the preset's model ({preset.Provider}/{preset.Model}) goes in the first column and the other columns stay as they are.");
-                if (preset.Account is not null) notes.Add(AccountNote("Compare", preset.Provider!));
             }
         }
         if (preset.Options is { Empty: false } options)
@@ -271,10 +262,6 @@ public static class PresetLoad
         }
         return new PresetLoadPlan(PresetPages.Bench, parts, notes, payload);
     }
-
-    // The Playground and Compare run on the provider's active account (they have no account selector); only the Tool Bench takes one.
-    private static string AccountNote(string page, string provider) =>
-        $"{page} runs on the active {provider} account: the account the preset names is not selected here.";
 
     private static string Count(int count, string noun) => count == 1 ? "1 " + noun : $"{count} {noun}s";
 

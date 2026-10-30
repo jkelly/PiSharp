@@ -105,6 +105,21 @@ public sealed record CompareColumnView
     /// <summary>A thinking override the model does not list, kept for when the column switches back to a model that does.</summary>
     public string? KeptThinking { get; init; }
 
+    /// <summary>The provider's accounts this column may run on (W4 fix 2: the overrides' account choice; ids and labels only).</summary>
+    public IReadOnlyList<RequestAccount> Accounts { get; init; } = [];
+
+    /// <summary>The label of the provider's active account, or null.</summary>
+    public string? ActiveLabel { get; init; }
+
+    /// <summary>Whether the overrides offer the account choice: the provider has two accounts or more, or the column names one.</summary>
+    public bool AccountChoice => Accounts.Count >= 2 || Column.Account is not null;
+
+    /// <summary>The account choice's options (the active account first).</summary>
+    public IReadOnlyList<RequestAccountOption> AccountOptions => RequestAccounts.Options(Accounts, Column.Account, ActiveLabel);
+
+    /// <summary>The label of the account the column names, or its short id when this machine does not have it; null for the active account.</summary>
+    public string? AccountLabel => Column.Account is { } id ? Accounts.FirstOrDefault(account => account.Id == id)?.Label ?? Settings.SettingsText.ShortId(id) : null;
+
     /// <summary>empty, streaming, completed, stopped or error.</summary>
     public string State => Output.State;
 

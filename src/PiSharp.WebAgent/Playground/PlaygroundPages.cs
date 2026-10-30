@@ -356,7 +356,15 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         var provider = Catalog?.FindProvider(draft.Provider);
         var offline = capabilities?.Offline == true;
         var account = await AccountAsync(draft, offline, cancellationToken).ConfigureAwait(false);
-        return new RequestAuthView(provider?.DisplayName ?? draft.Provider, account?.Label, provider?.Billing ?? BillingKind.Unknown, offline);
+        // W4 fix 2: the provider's accounts, for Model & auth's account choice (ids and labels only); a preset or a run may name one.
+        var accounts = RequestAccounts.List(services, draft.Provider, offline, log);
+        var active = draft.Account is null ? account : await AccountAsync(draft with { Account = null }, offline, cancellationToken).ConfigureAwait(false);
+        return new RequestAuthView(provider?.DisplayName ?? draft.Provider, account?.Label, provider?.Billing ?? BillingKind.Unknown, offline)
+        {
+            Chosen = offline ? null : draft.Account,
+            Accounts = accounts,
+            ActiveLabel = active?.Label,
+        };
     }
 
     private string? BaseUrl(RunRequestPlan plan) => string.IsNullOrWhiteSpace(plan.Model.BaseUrl) ? null : plan.Model.BaseUrl;

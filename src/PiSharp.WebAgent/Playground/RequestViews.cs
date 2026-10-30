@@ -23,8 +23,19 @@ namespace PiSharp.WebAgent.Playground;
 /// <param name="Offline">Whether the model runs offline (the faux provider): no account at all.</param>
 public sealed record RequestAuthView(string ProviderName, string? AccountLabel, BillingKind Billing, bool Offline)
 {
+    /// <summary>The account the draft names (W4 fix 2: a run, a preset or the user chose it), or null for the provider's active account.</summary>
+    public string? Chosen { get; init; }
+
+    /// <summary>The provider's accounts the request may name (empty offline, and for a provider whose accounts PiSharp does not list).</summary>
+    public IReadOnlyList<RequestAccount> Accounts { get; init; } = [];
+
+    /// <summary>The label of the provider's active account, or null when it has none.</summary>
+    public string? ActiveLabel { get; init; }
+
     /// <summary>Where the credential comes from.</summary>
-    public string Source => Offline ? "None · runs offline" : AccountLabel is null ? "No account connected" : "The provider's active account";
+    public string Source => Offline ? "None · runs offline"
+        : Chosen is not null ? AccountLabel is null ? "Account not on this machine" : "The account you chose"
+        : AccountLabel is null ? "No account connected" : "The provider's active account";
 
     /// <summary>The billing line.</summary>
     public string BillingText => Billing switch
@@ -37,6 +48,78 @@ public sealed record RequestAuthView(string ProviderName, string? AccountLabel, 
 
     /// <summary>The chip tone of <see cref="Source"/>.</summary>
     public string Tone => Offline || AccountLabel is not null ? "ok" : "warn";
+
+    /// <summary>Whether Model &amp; auth offers the account choice: online, when the provider has two accounts or more, or the draft names
+    /// one (so it shows, and can go back to the active account). With one account the mockups' read-only Account row is enough.</summary>
+    public bool AccountChoice => !Offline && (Accounts.Count >= 2 || Chosen is not null);
+
+    /// <summary>The choice's options: the active account first (no id), then each account; an account the draft names that the provider does
+    /// not list stays listed (the run engine refuses it with a clear message; never a silent switch to another account).</summary>
+    public IReadOnlyList<RequestAccountOption> AccountOptions => RequestAccounts.Options(Accounts, Chosen, ActiveLabel);
+}
+
+/// <summary>A provider account a request may name (Model &amp; auth's account choice, a Compare column's account override): its id and label,
+/// never a secret.</summary>
+/// <param name="Id">The account id a run spec names.</param>
+/// <param name="Label">The name shown.</param>
+/// <param name="Active">Whether it is the provider's active account.</param>
+/// <param name="Usable">Whether it can be used (connected); an expired or unavailable account is listed, and refused when a run names it.</param>
+/// <param name="Status">Its status' wire name: <c>connected</c>, <c>expired</c> or <c>unavailable</c>.</param>
+public sealed record RequestAccount(string Id, string Label, bool Active, bool Usable, string Status);
+
+/// <summary>One option of an account choice.</summary>
+/// <param name="Value">The account id, or empty for the provider's active account.</param>
+/// <param name="Text">What the option says.</param>
+/// <param name="Label">The account's own label (for the Account row and a column's chip), or null.</param>
+/// <param name="Selected">Whether it is chosen.</param>
+/// <param name="Disabled">Whether it cannot be chosen (an account that is not usable, unless the draft names it).</param>
+public sealed record RequestAccountOption(string Value, string Text, string? Label, bool Selected, bool Disabled);
+
+/// <summary>The accounts a request may name, from the credentials area's account store (ids and labels only).</summary>
+public static class RequestAccounts
+{
+    /// <summary>The accounts of <paramref name="provider"/>, oldest first (the store's order), or none when the model runs offline, the provider
+    /// is a custom one (its requests use its own key) or no account store is registered.</summary>
+    public static IReadOnlyList<RequestAccount> List(IServiceProvider services, string provider, bool offline, ILogger? log = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        if (offline || string.IsNullOrWhiteSpace(provider) || !CustomProviders.CustomProviderJson.IsBuiltin(provider.Trim())) return [];
+        if (services.GetService<Credentials.IAccountStore>() is not { } store) return [];
+        try
+        {
+            var active = store.Active(provider.Trim())?.Id;
+            return [.. store.List(provider.Trim()).Select(account => new RequestAccount(account.Id, account.Label, account.Id == active,
+                account.Status == Credentials.AccountStatus.Connected, Wire(account.Status)))];
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            log?.LogDebug(error, "The accounts of {Provider} could not be listed.", provider);
+            return [];
+        }
+    }
+
+    /// <summary>The options of an account choice over <paramref name="accounts"/>, with <paramref name="chosen"/> selected (none: the active
+    /// account).</summary>
+    public static IReadOnlyList<RequestAccountOption> Options(IReadOnlyList<RequestAccount> accounts, string? chosen, string? activeLabel)
+    {
+        ArgumentNullException.ThrowIfNull(accounts);
+        var listed = chosen is not null && accounts.Any(account => account.Id == chosen);
+        var options = new List<RequestAccountOption>
+        {
+            new("", activeLabel is { Length: > 0 } label ? $"Active account ({label})" : "Active account", activeLabel, chosen is null, false),
+        };
+        options.AddRange(accounts.Select(account => new RequestAccountOption(account.Id, account.Usable ? account.Label : $"{account.Label} · {account.Status}",
+            account.Label, account.Id == chosen, !account.Usable && account.Id != chosen)));
+        if (chosen is not null && !listed) options.Add(new RequestAccountOption(chosen, $"{Settings.SettingsText.ShortId(chosen)} · not on this machine", null, true, false));
+        return options;
+    }
+
+    private static string Wire(Credentials.AccountStatus status) => status switch
+    {
+        Credentials.AccountStatus.Expired => "expired",
+        Credentials.AccountStatus.Unavailable => "unavailable",
+        _ => "connected",
+    };
 }
 
 /// <summary>A service tier the Speed / service tier list shows.</summary>

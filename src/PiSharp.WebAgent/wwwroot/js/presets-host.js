@@ -2,19 +2,22 @@
 // ([data-preset-save]) and Load preset ([data-preset-load]) buttons disabled; this module turns them on (and any a fragment swap brings in
 // later), opens the shared modals (_SavePresetModal, _LoadPresetModal; Ctrl+S saves), and loads a preset with the page's own readers and
 // writers:
-//   Playground  in place: request-spec.js applySpec (model, options, headers, system prompt, messages, tools with their mock and on/off,
-//               execution mode); a model the dropdowns do not list reopens /playground?preset=&provider=&model= so the page lists it.
-//   Compare     /compare?preset={id} (a fresh comparison): the shared prompt, system prompt and options, and the columns from
-//               /compare/column fragments (a single-model preset replaces the first column and keeps the others).
+//   Playground  in place: request-spec.js applySpec (model and its account, options, headers, system prompt, messages, tools with their
+//               mock and on/off, execution mode); a model the dropdowns do not list reopens /playground?preset=&provider=&model= so the page
+//               lists it.
+//   Compare     in place: compare-request.js applyDraft (the shared prompt, system prompt and options, and the columns with their accounts and
+//               overrides from /compare/column fragments; a single-model preset replaces the first column and keeps the others). New
+//               columns start a fresh comparison: one the page showed stays in History. The URL becomes /compare?preset={id}.
 //   Tool Bench  a new session (bench-setup.js openSession) with the preset's setup and user messages; the open session is kept.
 // Only the preset's parts change; the page keeps the rest. GET /api/presets/{id}/load converts a preset from another page and names what
 // was left out, which the page shows; a preset whose model cannot run here is not loaded (never a silent switch). A load counts as a use
 // (POST /api/presets/{id}/used), but not a reload of the page. Nothing here reads or sends a credential.
 import { showToast } from './shell.js';
-import { getRequest, postRequest, getFragment } from './request-api.js';
+import { getRequest, postRequest } from './request-api.js';
 import { collectSpec, applySpec, requestParts, chosenModel } from './request-spec.js';
 import { toolItems } from './request-tools.js';
 import { readSetup, openSession } from './bench-setup.js';
+import { applyDraft, compareDraft } from './compare-request.js';
 import { initSaveModal, initLoadModal, openSaveModal, modalOf } from './presets-modals.js';
 
 const page = document.body?.dataset.page;
@@ -121,6 +124,9 @@ const playground = {
     const chosen = chosenModel(config);
     spec.provider = has('model') ? source.provider : chosen.provider;
     spec.model = has('model') ? source.model : chosen.model;
+    // The account goes with the model: the preset's (none: the provider's active account), else the one the page has.
+    const account = has('model') ? source.account : current.account;
+    if (account) spec.account = account;
     for (const option of OPTIONS) {
       const value = has('parameters') ? source[option] : current[option];
       if (value !== undefined && value !== null) spec[option] = value;
@@ -168,122 +174,19 @@ const playground = {
 const compare = {
   root: () => $('[data-compare]'),
 
-  number(input, integer) {
-    const text = input?.value.trim() ?? '';
-    if (text === '') return null;
-    const value = Number(text);
-    if (!Number.isFinite(value)) throw new Error(`${input.dataset.shared ?? input.dataset.override} is not a number.`);
-    return integer ? Math.trunc(value) : value;
-  },
-
+  // The page's draft as Run all would send it (the columns with their accounts and overrides).
   capture() {
-    const root = compare.root();
-    const prompt = $('[data-compare-prompt]', root);
-    const thinking = $('[data-shared="thinking"]', prompt)?.value ?? 'off';
-    const system = $('[data-compare-system]', prompt)?.value ?? '';
-    const columns = [...root.querySelectorAll('[data-compare-grid] [data-compare-col]')].map((column) => {
-      const temperature = $('[data-override="temperature"]', column);
-      return {
-        provider: column.dataset.provider,
-        model: column.dataset.model,
-        thinking: $('[data-override="thinking"]', column)?.value || null,
-        temperature: temperature && !temperature.disabled ? compare.number(temperature, false) : null,
-      };
-    });
-    return {
-      draft: {
-        systemPrompt: system.trim() === '' ? null : system,
-        prompt: $('[data-compare-text]', prompt)?.value ?? '',
-        thinking: thinking === 'off' ? null : thinking,
-        maxTokens: compare.number($('[data-shared="maxTokens"]', prompt), true),
-        temperature: compare.number($('[data-shared="temperature"]', prompt), false),
-        columns,
-      },
-    };
+    if (!compare.root()) throw new Error('There is no comparison on this page.');
+    return { draft: compareDraft() };
   },
 
-  // The grid's attributes as compare-request.js lays them out (column count, the Add column, the slots and the subtitle).
-  layout(root) {
-    const grid = $('[data-compare-grid]', root);
-    const count = grid.querySelectorAll('[data-compare-col]').length;
-    const max = Number(root.dataset.maxColumns || 4);
-    const min = Number(root.dataset.minColumns || 2);
-    const slots = max - count;
-    grid.style.setProperty('--cmp-cols', String(count));
-    grid.classList.toggle('has-add', slots > 0);
-    const add = $('[data-compare-add]', grid);
-    if (add) {
-      add.hidden = slots <= 0;
-      const text = $('[data-compare-slots]', add);
-      if (text) text.textContent = `Up to ${max} columns · ${slots} ${slots === 1 ? 'slot' : 'slots'} left`;
-    }
-    const subtitle = $('[data-compare-subtitle]');
-    if (subtitle) subtitle.textContent = `${count} ${count === 1 ? 'model' : 'models'} · one shared prompt`;
-    grid.querySelectorAll('[data-compare-col] [data-col-remove]').forEach((button) => { button.disabled = count <= min; });
-  },
-
-  async apply(answer, { fromStart }) {
-    const root = compare.root();
-    if (!root) return false;
-    if (!fromStart || root.dataset.group) {
-      // A preset starts a fresh comparison: the page reopens on it (a comparison that ran stays in History).
-      window.location.assign(`/compare?preset=${encodeURIComponent(answer.id)}`);
-      return 'navigated';
-    }
-    const prompt = $('[data-compare-prompt]', root);
-    const grid = $('[data-compare-grid]', root);
-    const draft = answer.payload?.draft ?? {};
-    const parts = answer.parts ?? [];
-    const has = (part) => parts.includes(part);
-    const notes = [];
-    if (has('systemPrompt')) {
-      const system = $('[data-compare-system]', prompt);
-      system.value = draft.systemPrompt ?? '';
-      const collapse = document.getElementById('cmpSystem');
-      if (system.value && collapse && window.bootstrap) window.bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false }).show();
-    }
-    if (has('messages')) $('[data-compare-text]', prompt).value = draft.prompt ?? '';
-    if (has('parameters')) {
-      const thinking = $('[data-shared="thinking"]', prompt);
-      const level = draft.thinking ?? 'off';
-      if (thinking && [...thinking.options].some((option) => option.value === level)) thinking.value = level;
-      else if (thinking) notes.push(`Compare's shared thinking has no "${level}" level, so it stays ${thinking.value}.`);
-      const max = $('[data-shared="maxTokens"]', prompt);
-      if (max) max.value = draft.maxTokens ?? '';
-      const temperature = $('[data-shared="temperature"]', prompt);
-      if (temperature) temperature.value = draft.temperature ?? '';
-    }
-    if (has('model') && Array.isArray(draft.columns) && draft.columns.length > 0) {
-      const existing = [...grid.querySelectorAll('[data-compare-col]')];
-      const kept = draft.columns.length >= 2 ? [] : existing.slice(1, 4);
-      const total = Math.min(Number(root.dataset.maxColumns || 4), draft.columns.length + kept.length);
-      const used = new Set(kept.map((column) => column.dataset.key));
-      const shared = (() => { try { return compare.capture().draft; } catch { return {}; } })();
-      const fresh = [];
-      for (const column of draft.columns.slice(0, total)) {
-        let index = 1;
-        while (used.has(`c${index}`)) index++;
-        const key = `c${index}`;
-        used.add(key);
-        const query = new URLSearchParams({ provider: column.provider, model: column.model, key, count: String(total) });
-        if (column.thinking) query.set('thinking', column.thinking);
-        if (column.temperature !== null && column.temperature !== undefined) query.set('temperature', String(column.temperature));
-        if (shared.thinking) query.set('sharedThinking', shared.thinking);
-        if (shared.temperature !== null && shared.temperature !== undefined) query.set('sharedTemperature', String(shared.temperature));
-        if (shared.maxTokens) query.set('sharedMaxTokens', String(shared.maxTokens));
-        const element = await getFragment('/compare/column?' + query.toString());
-        if (element) fresh.push(element);
-      }
-      existing.filter((column) => !kept.includes(column)).forEach((column) => column.remove());
-      const before = kept[0] ?? $('[data-compare-add]', grid);
-      for (const element of fresh) grid.insertBefore(element, before);
-      compare.layout(root);
-    }
-    // compare-request.js re-reads the shared options and the columns, and plans the run (estimate and chips).
-    $('[data-compare-system]', prompt)?.dispatchEvent(new Event('input', { bubbles: true }));
-    $('[data-shared="thinking"]', prompt)?.dispatchEvent(new Event('change', { bubbles: true }));
+  async apply(answer) {
+    if (!compare.root()) return false;
+    // In place (W4 fix 2): compare-request.js sets the preset's parts; with its models, the page starts a fresh comparison.
+    const { notes, fresh } = await applyDraft(answer.payload?.draft ?? {}, answer.parts ?? []);
     origin = answer.id;
     answer.notes = [...(answer.notes ?? []), ...notes];
+    if (fresh) window.history.replaceState(null, '', `/compare?preset=${encodeURIComponent(answer.id)}`);
     return true;
   },
 };

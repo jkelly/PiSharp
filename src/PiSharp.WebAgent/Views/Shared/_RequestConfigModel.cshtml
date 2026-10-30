@@ -2,7 +2,10 @@
    the config's prefix), the model's capability chips, its API (read-only), baseUrl and apiKey (shown, never sent: a run uses the provider's
    base URL and the bound account, whose credential stays on the server) and the resolved account as a masked hint at most, with how the
    provider bills. request-config.js refreshes the chips, API and account from GET /api/playground/model when the model changes.
-   Model: RequestConfigView. *@
+   W4 fix 2: the account choice ([data-account-choice], "Run on"): the provider's active account (no id sent) or one of its accounts by id
+   (labels only, never a credential). It shows when the provider has two accounts or more, or the draft names one (a preset, a run), so a
+   preset's account loads here instead of being ignored; request-spec.js sends the chosen id as the RunSpec's account, and the run engine
+   refuses an account the provider does not have (never a silent switch). Model: RequestConfigView. *@
 @using PiSharp.WebAgent.Playground
 @model RequestConfigView
 @{
@@ -54,6 +57,16 @@
         <div class="kv"><span class="k">Source</span><span class="v"><span class="ps-chip" data-tone="@(auth?.Tone ?? "warn")" data-auth-source>@(auth?.Source ?? "Choose a model")</span></span></div>
         <div class="kv" data-auth-account-row hidden="@(auth?.AccountLabel is null)"><span class="k">Account</span><span class="v text-break" data-auth-account>@auth?.AccountLabel</span></div>
         <div class="kv"><span class="k">Billing</span><span class="v" data-auth-billing>@(auth?.BillingText ?? "unknown")</span></div>
+        <div class="mt-2" data-account-choice hidden="@(auth?.AccountChoice != true)">
+          <label class="form-label fs-8 mb-1" for="@(p)-account">Run on</label>
+          <select class="form-select form-select-sm" id="@(p)-account" data-account-select>
+            @foreach (var option in auth?.AccountOptions ?? [])
+            {
+              <option value="@option.Value" selected="@option.Selected" disabled="@option.Disabled" data-label="@option.Label">@option.Text</option>
+            }
+          </select>
+          <div class="form-text mt-1">The active account follows Settings › Accounts; a chosen one stays until you change it here.</div>
+        </div>
         <a class="fs-8" href="@(string.IsNullOrEmpty(Model.Draft.Provider) ? "/settings/providers" : "/settings/providers/" + Uri.EscapeDataString(Model.Draft.Provider))" data-auth-manage>Manage connection →</a>
       </div>
     </div>

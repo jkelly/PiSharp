@@ -3,7 +3,9 @@
 // (applyCapabilities, from the run engine's RunCapabilities: data-capabilities, or GET /api/playground/model after a model change). A set
 // option the model does not take keeps its value and its row says the run will be refused until it is cleared (brief rule 4: never
 // dropped silently); "Clear them" clears every such option at once. Rows marked [data-unsent] are never enabled. The modified count and the
-// accordions' dots follow what is set.
+// accordions' dots follow what is set. W4 fix 2: Model & auth's account choice ([data-account-choice]) lists the provider's accounts (ids and
+// labels from GET /api/playground/model) and keeps the account wanted (config.dataset.account: the user's pick, or one a preset or a run named)
+// across a change of provider, selecting it again when the provider lists it; the Source and Account rows follow the choice.
 
 const COUNTED = ['thinking', 'maxTokens', 'temperature', 'topP', 'topK', 'stop', 'seed', 'presencePenalty', 'frequencyPenalty',
   'responseFormat', 'toolChoice', 'serviceTier', 'headers', 'providerOptions'];
@@ -191,6 +193,63 @@ function applyLevels(config, caps) {
   displayValue(row);
 }
 
+// ---- account ------------------------------------------------------------------------------------------------------------------
+
+function accountParts(config) {
+  const choice = config?.querySelector('[data-account-choice]');
+  return { choice, select: choice?.querySelector('[data-account-select]') ?? null };
+}
+
+// The Source chip and the Account row as the choice stands (only while the choice is offered: otherwise they are the server's).
+function showAccount(config) {
+  const { choice, select } = accountParts(config);
+  if (!choice || !select || choice.hidden) return;
+  const option = select.selectedOptions[0] ?? select.options[0];
+  const chosen = select.value !== '';
+  const label = option?.dataset.label || null;
+  const source = config.querySelector('[data-auth-source]');
+  if (source) {
+    source.textContent = chosen ? (label ? 'The account you chose' : 'Account not on this machine') : (label ? "The provider's active account" : 'No account connected');
+    source.dataset.tone = label ? 'ok' : 'warn';
+  }
+  const row = config.querySelector('[data-auth-account-row]');
+  if (row) {
+    row.hidden = !label;
+    row.querySelector('[data-auth-account]').textContent = label ?? '';
+  }
+}
+
+/** Selects the account the config wants (config.dataset.account) when its choice lists it, else the provider's active account; the choice
+ *  shows once it names an account. */
+export function selectAccount(config) {
+  const { choice, select } = accountParts(config);
+  if (!choice || !select) return;
+  const wanted = config.dataset.account ?? '';
+  const listed = wanted !== '' && [...select.options].some((option) => option.value === wanted);
+  select.value = listed ? wanted : '';
+  if (listed) choice.hidden = false;
+  showAccount(config);
+}
+
+// Lists the provider's accounts ({ accounts, activeLabel, offline } of GET /api/playground/model's auth) and selects the one wanted.
+function setAccounts(config, auth) {
+  const { choice, select } = accountParts(config);
+  if (!choice || !select) return;
+  const accounts = auth && !auth.offline ? auth.accounts ?? [] : [];
+  const wanted = config.dataset.account ?? '';
+  const first = new Option(auth?.activeLabel ? `Active account (${auth.activeLabel})` : 'Active account', '');
+  if (auth?.activeLabel) first.dataset.label = auth.activeLabel;
+  const options = [first, ...accounts.map((account) => {
+    const option = new Option(account.usable ? account.label : `${account.label} · ${account.status}`, account.id);
+    option.dataset.label = account.label;
+    option.disabled = !account.usable && account.id !== wanted;
+    return option;
+  })];
+  select.replaceChildren(...options);
+  choice.hidden = accounts.length < 2;
+  selectAccount(config);
+}
+
 /** Applies a newly chosen model's capabilities ({ capabilities, auth } of GET /api/playground/model): rows, chips, API, account. */
 export function applyModel(config, answer) {
   const caps = answer?.capabilities ?? null;
@@ -241,6 +300,7 @@ export function applyModel(config, answer) {
   }
   const billing = config.querySelector('[data-auth-billing]');
   if (billing) billing.textContent = auth?.billing ?? 'unknown';
+  setAccounts(config, auth);
   const manage = config.querySelector('[data-auth-manage]');
   if (manage && caps) manage.href = '/settings/providers/' + encodeURIComponent(caps.provider);
   const paneApi = config.querySelector('[data-pane-api]');
@@ -279,6 +339,12 @@ export function initConfig(config) {
   config.dataset.wired = 'true';
   config.addEventListener('input', (event) => onInput(config, event));
   config.addEventListener('change', (event) => {
+    if (event.target.matches('[data-account-select]')) {
+      config.dataset.account = event.target.value;
+      showAccount(config);
+      changed(config);
+      return;
+    }
     if (event.target.matches('[data-provider-pane-select]')) {
       config.querySelectorAll('[data-provider-pane]').forEach((pane) => { pane.hidden = pane.dataset.providerPane !== event.target.value; });
       return;
@@ -316,6 +382,7 @@ export function initConfig(config) {
     }
   });
   config.addEventListener('request-options-applied', () => refresh(config));
+  if (config.dataset.account === undefined) config.dataset.account = accountParts(config).select?.value ?? '';
   refresh(config);
 }
 

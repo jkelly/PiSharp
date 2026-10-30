@@ -6,7 +6,8 @@
 //   POST /api/playground/code       a RunSpec -> View code {subtitle, csharp, curl, json, provider, notes} (no secret: placeholders);
 //                                   ?run= the run the page shows adds inspectorUrl ("Open last run in inspector") when runs.db has it.
 //   GET  /api/playground/model      ?provider=&model=&account= -> {capabilities, auth: {providerName, accountLabel, billing, source, tone,
-//                                   offline}} for Model & auth (the account by its label only).
+//                                   offline, activeLabel, chosen, accounts: [{id, label, active, usable, status}]}} for Model & auth (accounts
+//                                   by id and label only; the list fills its account choice, W4 fix 2).
 // Writes are JSON POSTs (HostGuard: same origin, JSON only); every answer is no-store; errors are {error: {code, message}} as /api/runs's.
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -60,7 +61,11 @@ public static class PlaygroundModule
             return Json(new
             {
                 capabilities = info.Capabilities,
-                auth = auth is null ? null : new { auth.ProviderName, auth.AccountLabel, billing = auth.BillingText, auth.Source, auth.Tone, auth.Offline },
+                auth = auth is null ? null : new
+                {
+                    auth.ProviderName, auth.AccountLabel, billing = auth.BillingText, auth.Source, auth.Tone, auth.Offline,
+                    auth.ActiveLabel, auth.Chosen, accounts = auth.Accounts,
+                },
             });
         }));
         return app;
