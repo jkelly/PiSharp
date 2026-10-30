@@ -8,7 +8,8 @@
 // options and the Bedrock options, which RunModelOptions refuses with the reason). A spec is checked here for what
 // is never allowed whatever the model (sizes, ranges, names, credential headers, provider options that would replace the request's own
 // structure); whether the chosen model and its API take each option is RunModelOptions' check. The account is an id: a spec never carries
-// a key, and a header that could carry one is refused.
+// a key, and a header that could carry one is refused, as is a provider or Bedrock option with a credential's name at any depth (W5 fix:
+// extra_body.api_key as well as apiKey).
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -394,16 +395,22 @@ public sealed partial record RunSpec
         var apiVersion = Optional(AzureApiVersion, "The Azure API version", MaxAzureApiVersion);
         if (apiVersion is not null && !AzureNamePattern().IsMatch(apiVersion)) throw new ArgumentException("The Azure API version is letters, digits, '.', '_' and '-'.");
         if (Bedrock is { } bedrock)
-            foreach (var key in bedrock.Select(pair => pair.Key))
+            foreach (var (key, value) in bedrock)
+            {
                 if (!BedrockOptionNames.Contains(key, StringComparer.Ordinal))
                     throw new ArgumentException($"\"{key}\" is not a Bedrock option: {string.Join(", ", BedrockOptionNames)}.");
+                CheckOptionNames(value, key, "Bedrock options");
+            }
         var headers = Headers is null ? null : CheckHeaders(Headers);
         if (ProviderOptions is { } extra)
-            foreach (var key in extra.Select(pair => pair.Key))
+            foreach (var (key, value) in extra)
+            {
                 if (StructuralKeys.Contains(key, StringComparer.OrdinalIgnoreCase))
                     throw new ArgumentException($"Provider options cannot set \"{key}\": the run sets the request's model, messages and tools itself.");
-                else if (SecretName(key) && !RunModelOptions.OutputOptionName(key))
+                if (SecretName(key) && !RunModelOptions.OutputOptionName(key))
                     throw new ArgumentException($"Provider options cannot set \"{key}\": the account supplies its own credentials.");
+                CheckOptionNames(value, key, "Provider options");
+            }
         var normalized = this with
         {
             Provider = provider,
@@ -494,6 +501,28 @@ public sealed partial record RunSpec
             if (!result.TryAdd(name, value)) throw new ArgumentException($"The header {name} is set twice.");
         }
         return result;
+    }
+
+    /// <summary>Refuses a name that looks like it carries a credential (<see cref="SecretName"/>) anywhere inside an option's
+    /// <paramref name="node"/> (objects at any depth, and the objects in arrays), except the names that set the output's length or count,
+    /// which <see cref="RunModelOptions"/> refuses with its own reason. <paramref name="path"/> is the option's dotted name so far.</summary>
+    private static void CheckOptionNames(JsonNode? node, string path, string what)
+    {
+        switch (node)
+        {
+            case JsonObject json:
+                foreach (var (key, value) in json)
+                {
+                    var name = path + "." + key;
+                    if (SecretName(key) && !RunModelOptions.OutputOptionName(key))
+                        throw new ArgumentException($"{what} cannot set \"{name}\": the account supplies its own credentials.");
+                    CheckOptionNames(value, name, what);
+                }
+                break;
+            case JsonArray array:
+                for (var index = 0; index < array.Count; index++) CheckOptionNames(array[index], $"{path}[{index}]", what);
+                break;
+        }
     }
 
     private static Dictionary<string, int> CheckBudgets(IReadOnlyDictionary<string, int> budgets)

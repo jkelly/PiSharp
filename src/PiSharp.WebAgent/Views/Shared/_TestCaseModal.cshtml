@@ -3,11 +3,12 @@
    Arena's battle page stays blind) and pin.js. A Pin as test button opens it with data-bs-toggle="modal" data-bs-target="#modal-test-case"
    and says what to pin in data attributes (data-pin-source and data-pin-run; or data-pin-chat, data-pin-agent and data-pin-entry; or a
    suite page's data-pin-suite for Add case and data-pin-case for Edit case); pin.js then swaps in this partial rendered with a model from
-   GET /api/evals/pins/modal: Name and Tags, the Suite select with one pane per suite (data-pin-over-cap on a pane whose worst case would go
-   above its cap: "The schedule pauses until you raise the cap.") and New suite…, the Request panel, the Reference output (Show all) and
-   the Checks (each with what it makes of the reference output; the quick Add check panel), or the refused content (data-pin-refused) that
-   only says why. Model text is encoded, never rendered as Markdown. Save posts to /api/evals/pins; pin.js shows the "Test case saved"
-   toast with Open suite and fires pisharp:pin-saved on document. No inline script (CSP script-src 'self'). Model: TestCaseModalView? *@
+   GET /api/evals/pins/modal: Name and Tags, the Suite select with one pane per suite (plain text; data-pin-over-cap and an "over its cap"
+   warn chip on a pane whose worst case would go above its cap: "The schedule pauses until you raise the cap.") and New suite…, the
+   Request panel, the Reference output (Show all) and the Checks (each with what it makes of the reference output; the quick Add check
+   panel), or the refused content (data-pin-refused) that only says why. Model text is encoded, never rendered as Markdown. Save posts to
+   /api/evals/pins; pin.js shows the "Test case saved" toast with Open suite and fires pisharp:pin-saved on document. No inline script
+   (CSP script-src 'self'). Model: TestCaseModalView? *@
 @using PiSharp.WebAgent.Evals.Pins
 @model TestCaseModalView?
 @if (Model is null)
@@ -97,7 +98,11 @@
       @foreach (var option in view.Suites)
       {
         <div data-pin-pane="@option.Id" data-pin-over-cap="@(option.OverCap ? "true" : "false")" data-pin-pauses="@(option.Pauses ? "true" : "false")" hidden="@(newSelected || option.Id != selected)">
-          <div class="form-text@(option.OverCap ? " text-warning-emphasis" : "")">@option.Pane</div>
+          <div class="form-text">@option.Pane</div>
+          @if (option.OverCap)
+          {
+            <span class="ps-chip mt-1" data-tone="warn" data-pin-over-cap-chip>over its cap</span>
+          }
         </div>
       }
       @if (view.NewSuiteOffered)
