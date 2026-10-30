@@ -1,8 +1,11 @@
 // Decision 0011 (run W4, R6): a new agent run's setup (_AgentSetup). Nothing runs before Run agents.
-// - The project row: the folder (Change: a recent one or another path) is inspected through GET /compare/agent/project after the page
-//   loads and after every change of folder, isolation, base or excludes; its fragment brings the isolation chip, the banners (uncommitted
-//   changes a worktree leaves out, with Use a temporary copy instead or Continue without them; a copy over the size warning; a worktree
-//   that can't be used) and modal-agent-workspace's content, whose Use git worktrees / Use temporary copies set this run's isolation.
+// - The shared system prompt (collapsed beside the Task label, its start shown on the toggle) goes to every model as the same
+//   instructions; an empty one is not sent.
+// - The project row: the folder (Change: a recent one or another path) is inspected through POST /compare/agent/project (a same-origin
+//   JSON POST, since it runs git in that folder) after the page loads and after every change of folder, isolation, base or excludes; its
+//   fragment brings the isolation chip, the banners (uncommitted changes a worktree leaves out, with Use a temporary copy instead or
+//   Continue without them; a copy over the size warning; a worktree that can't be used) and modal-agent-workspace's content, whose Use
+//   git worktrees / Use temporary copies set this run's isolation.
 // - The columns (1 to 4, positions a to d): Add model and a column's model chip open #modal-model-picker; a choice loads the column from
 //   GET /compare/agent/column. Removing a column re-letters the others. The shared thinking level and the limits reload every column
 //   (each shows how the level applies to its model and its limits).
@@ -11,7 +14,7 @@
 //   too-large) asks first and is sent again only with the user's yes; the page then opens the run (?run={id}).
 import { confirmAction, providerModelValue } from './shell.js';
 import { RequestError, getFragment, postRequest } from './request-api.js';
-import { $, $$, API, PAGES, busy, disposeTooltips, escapeHtml, hideModal, requestId, setTooltip, toast } from './compare-agent-common.js';
+import { $, $$, API, PAGES, busy, disposeTooltips, escapeHtml, hideModal, postFragment, requestId, setTooltip, toast } from './compare-agent-common.js';
 
 const SLOTS = ['a', 'b', 'c', 'd'];
 const APPROVAL_TEXT = { ask: 'Ask', allowList: 'Allow-list', auto: 'Auto in workspaces' };
@@ -35,6 +38,7 @@ const intValue = (selector) => {
   return Number.isFinite(value) && value > 0 ? value : null;
 };
 const sharedThinking = () => $('[data-ac-thinking]', root)?.value || '';
+const systemPrompt = () => ($('[data-ac-system]', root)?.value ?? '').trim();
 const approval = () => $('[data-ac-approval]:checked', root)?.value ?? 'ask';
 const capText = () => ($('[data-ac-cap]', root)?.value ?? '').trim().replace(/^\$/, '');
 const capValid = (text) => text === '' || (/^\d{0,7}(\.\d{0,6})?$/.test(text) && /\d/.test(text) && Number(text) > 0);
@@ -54,13 +58,16 @@ async function loadProject() {
     disposeTooltips(host);
     host.innerHTML = '<span class="ps-chip" data-tone="outline"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Checking the folder…</span>';
   }
-  const query = new URLSearchParams({ path: projectPath(), isolation: root.dataset.isolation || 'automatic', models: String(Math.max(1, columns().length)) });
-  if (root.dataset.baseRef) query.set('baseRef', root.dataset.baseRef);
-  const list = excludes();
-  if (list.length) query.set('excludes', list.join(','));
+  const body = {
+    path: projectPath(),
+    isolation: root.dataset.isolation || 'automatic',
+    baseRef: root.dataset.baseRef || null,
+    excludes: excludes(),
+    models: Math.max(1, columns().length),
+  };
   let fragment;
   try {
-    fragment = await getFragment(`${PAGES}/project?${query}`);
+    fragment = await postFragment(`${PAGES}/project`, body);
   } catch (error) {
     if (seq !== projectSeq) return;
     project = { ok: false, kind: '' };
@@ -323,6 +330,14 @@ function updateLimits() {
   }
 }
 
+/** The System prompt toggle's preview: its first 70 characters, or "none" (as the server renders it). */
+function updateSystemPreview() {
+  const preview = $('[data-ac-system-preview]', root);
+  if (!preview) return;
+  const text = systemPrompt();
+  preview.textContent = text ? `· ${text.length > 70 ? `${text.slice(0, 70)}…` : text}` : '· none';
+}
+
 // ---- run ----------------------------------------------------------------------------------------------------------------------
 
 function showError(message) {
@@ -347,6 +362,7 @@ function createBody() {
   const check = ($('[data-ac-check]', root)?.value ?? '').trim();
   const body = {
     task,
+    systemPrompt: systemPrompt() || null,
     projectPath: path,
     models: list.map((column) => ({ provider: column.dataset.provider, model: column.dataset.model, thinking: column.dataset.effective || null })),
     isolation: root.dataset.isolation || 'automatic',
@@ -438,6 +454,7 @@ function onInput(event) {
     scheduleColumns();
   } else if (target.matches('[data-ac-cap]')) updateLimits();
   else if (target.matches('[data-ac-task]')) showError('');
+  else if (target.matches('[data-ac-system]')) updateSystemPreview();
 }
 
 function onKeydown(event) {

@@ -1,7 +1,7 @@
 // Decision 0011 (run W4, R6): what agent compare's views show (GET /compare?mode=agent, and the fragments of AgentComparePagesModule). A new
 // run opens on the user's own models (the default model of Settings › Defaults and the next model the catalog lists that is not hidden),
 // the Settings › Tools working directory and the Settings › Tools agent compare defaults; New run (?from={run}) copies an earlier run's
-// task, folder, models, check and limits. ?run={id} opens a run: the stored run (R5's AgentCompareStore) with what is live (each model's
+// task, shared system prompt, folder, models, check and limits. ?run={id} opens a run: the stored run (R5's AgentCompareStore) with what is live (each model's
 // turns, the Spend Guard ledger's total of its run key "<run>-<slot>", the tool calls waiting for an answer). The project folder is
 // inspected by R4's WorkspaceManager on its own request, after the page loads, because a copy's size can take a while to count. Every
 // write goes through R5's /api/compare/agent; nothing here starts, answers or keeps anything, and no provider is called.
@@ -88,6 +88,7 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
         return new AgentSetupView
         {
             Task = from?.Spec.Task ?? "",
+            SystemPrompt = from?.Spec.SystemPrompt ?? "",
             ProjectPath = from?.Spec.ProjectPath ?? tools.EffectiveWorkingDirectory,
             RecentProjects = Recent(tools.EffectiveWorkingDirectory),
             Defaults = defaults,
@@ -189,6 +190,8 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
         };
         if (folder.Length == 0) return new AgentProjectView { ProjectPath = folder, Error = "Choose the project folder.", Workspace = Empty(null) };
         if (!Path.IsPathFullyQualified(folder)) return new AgentProjectView { ProjectPath = folder, Error = "The project folder must be a full path.", Workspace = Empty(null) };
+        // Before Directory.Exists: a UNC path would send the user's credentials to the host it names.
+        if (WorkspaceManager.IsNetworkOrDevicePath(folder)) return new AgentProjectView { ProjectPath = folder, Error = WorkspaceManager.NetworkPathMessage, Workspace = Empty(null) };
         if (!Directory.Exists(folder)) return new AgentProjectView { ProjectPath = folder, Error = $"There is no folder {folder}.", Workspace = Empty(null) };
         IReadOnlyList<string> extra;
         try { extra = AgentCompareSettings.NormalizeExcludes(excludes); }

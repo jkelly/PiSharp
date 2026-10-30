@@ -1,6 +1,7 @@
 // Decision 0011 (run W4, R5): the agent compare runner (the plan's AgentCompareRunner). A run gives one task to 1 to 4 models, each in its own
 // workspace (R4: a git worktree or a temporary copy of the same base), as one durable session per model on the app's device (DeviceHostService)
-// with Cwd = the workspace's working directory, the same instructions (identical text), the same default tool registry and the same limits;
+// with Cwd = the workspace's working directory, the same instructions (identical text: the user's shared system prompt, if any, then the
+// workspace rules), the same default tool registry and the same limits;
 // the models are started in a shuffled order (stored). Each session is bound to its model's account (chosen when the run was created and never
 // switched), and AgentCompareGate gives it its own Spend Guard run key (<run>-<slot>) and an equal share of the run cap among the metered
 // models; turn, time and budget limits stop only that model. When a model stops, the check command runs in its working directory with a
@@ -137,6 +138,9 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         var task = request.Task?.Trim() ?? "";
         if (task.Length == 0) throw AgentCompareException.BadRequest("Describe the task the models should do.");
         if (task.Length > HostedSession.MaxMessageLength) throw AgentCompareException.BadRequest($"A task is at most {HostedSession.MaxMessageLength:N0} characters.");
+        var systemPrompt = string.IsNullOrWhiteSpace(request.SystemPrompt) ? null : request.SystemPrompt.Trim();
+        if (systemPrompt is not null && (systemPrompt.Length > MaxSystemPromptLength || systemPrompt.Contains('\0')))
+            throw AgentCompareException.BadRequest($"A system prompt is at most {MaxSystemPromptLength:N0} characters.");
         if (request.Models is not { Count: >= 1 and <= MaxModels }) throw AgentCompareException.BadRequest($"Compare 1 to {MaxModels} models.");
         var defaults = settings.Get<AgentCompareSettings>();
         var project = Project(request.ProjectPath);
@@ -183,7 +187,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
             throw AgentCompareException.Conflict(AgentCompareException.TooLarge,
                 $"A copy of this folder is {WorkspaceText.Size(inspection.CopyBytes ?? 0)} per model, more than {WorkspaceText.Size(inspection.WarnAboveBytes)}. Confirm to copy it anyway, or leave more out.");
 
-        var instructions = Instructions(check);
+        var instructions = Instructions(check, systemPrompt);
         var models = new List<AgentCompareModelSpec>();
         for (var index = 0; index < request.Models.Count; index++)
             models.Add(await ModelAsync(request.Models[index], Slots[index], task, instructions, cancellationToken).ConfigureAwait(false));
@@ -218,6 +222,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 CapMicros = request.CapMicros,
                 CapAction = capAction,
                 Approval = approval,
+                SystemPrompt = systemPrompt,
                 Instructions = instructions,
                 Models = models,
             },
@@ -240,11 +245,17 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
     public AgentCompareRun Require(string id) =>
         (id is not null && store.Get(id) is { } run) ? run : throw AgentCompareException.Missing($"There is no agent compare run {id}.");
 
-    /// <summary>The identical instructions every model of a run gets.</summary>
-    public static string Instructions(string? checkCommand)
+    /// <summary>The longest shared system prompt: with the workspace rules and the longest check command, the instructions stay under the
+    /// durable host's 12,000-character cut.</summary>
+    public const int MaxSystemPromptLength = 8000;
+
+    /// <summary>The identical instructions every model of a run gets: the user's shared system prompt (when there is one), then the
+    /// workspace rules and the check command.</summary>
+    public static string Instructions(string? checkCommand, string? systemPrompt = null)
     {
-        var text = new StringBuilder()
-            .Append("You are one of several AI models given the same task. Each model works in its own workspace: a separate copy of the same project. ")
+        var text = new StringBuilder();
+        if (!string.IsNullOrWhiteSpace(systemPrompt)) text.Append(systemPrompt.Trim()).Append("\n\n");
+        text.Append("You are one of several AI models given the same task. Each model works in its own workspace: a separate copy of the same project. ")
             .Append("Your current working directory is the project in your workspace. Work only inside it: don't read or change files outside it, ")
             .Append("and don't commit, push or switch branches. You can't see the other models' work, and they can't see yours.\n")
             .Append("When you are done, end with a short summary of what you changed and why.");
@@ -635,6 +646,8 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
     private static string Project(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) throw AgentCompareException.BadRequest("Choose the project folder.");
+        // Before Directory.Exists: a UNC path would send the user's credentials to the host it names.
+        if (WorkspaceManager.IsNetworkOrDevicePath(path)) throw AgentCompareException.BadRequest(WorkspaceManager.NetworkPathMessage);
         string full;
         try { full = Path.GetFullPath(path.Trim()); }
         catch (Exception error) when (error is ArgumentException or NotSupportedException or IOException)

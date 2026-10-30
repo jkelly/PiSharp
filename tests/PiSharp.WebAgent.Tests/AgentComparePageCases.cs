@@ -21,6 +21,14 @@ internal static partial class Program
     private static void NoRazorText(string html, string what) =>
         Check(!Regex.IsMatch(html, "@(if|foreach|Model|\\()"), what + " shows no Razor code: " + Regex.Match(html, ".{0,60}@(if|foreach|Model|\\().{0,60}").Value);
 
+    // The setup's project row, as compare-agent-setup.js asks for it: a same-origin JSON POST.
+    private static Task<(int Status, JsonNode? Body, string Text, HttpResponseMessage Response)> ProjectFragmentAsync(CompareApp app, string path,
+        string? isolation = null, int? models = null) =>
+        app.App.SendAsync(HttpMethod.Post, "/compare/agent/project", new JsonObject { ["path"] = path, ["isolation"] = isolation, ["models"] = models });
+
+    // A marker a planted repository command would write: a path the Git for Windows shell (and any POSIX shell) reads.
+    private static string ShellPath(string path) => path.Replace('\\', '/');
+
     private static IEnumerable<(string, Func<Task>)> AgentComparePageCases() =>
     [
         Case("agent-compare-pages.settings-body-is-checked", () =>
@@ -240,29 +248,70 @@ internal static partial class Program
             Check(Regex.IsMatch(html, "id=\"acAllowWarn\">[^<]*<a ") && Regex.Matches(html, "not a sandbox").Count >= 2, "Allow-list and Auto say not a sandbox");
             Check(WebUtility.HtmlDecode(html).Contains(Path.Join(app.Root, "work"), StringComparison.Ordinal), "the default folder is Settings › Tools' working directory");
             Check(html.Contains("value=\"agent\"", StringComparison.Ordinal), "the Request · Agent switch");
+            // agent-setup and agent-dirty (the same page; the dirty banner comes with the project fragment) show the shared System prompt
+            // beside the Task label, collapsed, as request mode's _ComparePrompt does.
+            var toggle = WebUtility.HtmlDecode(Regex.Match(html, "<button[^>]*data-ac-system-toggle[^>]*>.*?</button>", RegexOptions.Singleline).Value);
+            Check(toggle.Contains("aria-expanded=\"false\"", StringComparison.Ordinal) && toggle.Contains("data-bs-target=\"#acSystem\"", StringComparison.Ordinal)
+                && toggle.Contains("System prompt", StringComparison.Ordinal) && toggle.Contains("· none", StringComparison.Ordinal), "the System prompt toggle, collapsed: " + toggle);
+            Check(html.Contains("class=\"collapse\" id=\"acSystem\"", StringComparison.Ordinal) && Regex.IsMatch(html, "<textarea[^>]*id=\"acSystemText\"[^>]*data-ac-system></textarea>"),
+                "its empty textarea, collapsed: " + Regex.Match(html, "id=\"acSystem\".{0,400}", RegexOptions.Singleline).Value);
+            Check(html.IndexOf("data-ac-system-toggle", StringComparison.Ordinal) < html.IndexOf("id=\"acTask\"", StringComparison.Ordinal), "above the task");
 
-            var project = await app.App.Get("/compare/agent/project?models=2&path=" + Uri.EscapeDataString(app.Project));
+            var project = await ProjectFragmentAsync(app, app.Project, models: 2);
             Equal(200, project.Status, "the project fragment");
             Check(project.Text.TrimStart().StartsWith("<div data-ac-project-fragment", StringComparison.Ordinal), "one root: " + Cut(project.Text));
             Check(project.Text.Contains("data-kind=\"copy\"", StringComparison.Ordinal) && project.Text.Contains("data-ok=\"true\"", StringComparison.Ordinal), "a folder outside git is copied");
             Check(project.Text.Contains("data-ac-workspace-content data-pane=\"copy\" data-readonly=\"false\"", StringComparison.Ordinal), "the editable workspace modal");
             Check(Regex.IsMatch(project.Text, "id=\"acIsoWorktree\"[^>]*disabled"), "no worktree for it");
 
-            var missing = await app.App.Get("/compare/agent/project?path=" + Uri.EscapeDataString(Path.Join(app.Root, "missing")));
+            var missing = await ProjectFragmentAsync(app, Path.Join(app.Root, "missing"));
             Check(missing.Text.Contains("data-ok=\"false\"", StringComparison.Ordinal) && WebUtility.HtmlDecode(missing.Text).Contains("Can't use this folder", StringComparison.Ordinal),
                 "a missing folder: " + Cut(missing.Text));
 
             await using var lab = WsLab.Create("acp-dirty");
             var repo = await lab.RepoAsync("repo", ("a.txt", "one\n"));
             File.WriteAllText(Path.Join(repo, "a.txt"), "two\n");
-            var dirty = await app.App.Get("/compare/agent/project?path=" + Uri.EscapeDataString(repo));
+            var dirty = await ProjectFragmentAsync(app, repo);
             Check(dirty.Text.Contains("data-kind=\"worktree\"", StringComparison.Ordinal) && dirty.Text.Contains("data-ac-banner=\"dirty\"", StringComparison.Ordinal),
                 "a git repo with an uncommitted change: " + Cut(dirty.Text));
             Check(dirty.Text.Contains("a.txt", StringComparison.Ordinal) && dirty.Text.Contains("data-ac-use-copy", StringComparison.Ordinal)
                 && dirty.Text.Contains("data-ac-dismiss-banner", StringComparison.Ordinal), "the change, Use a temporary copy, Continue without it");
-            var copied = await app.App.Get("/compare/agent/project?isolation=copy&path=" + Uri.EscapeDataString(repo));
+            var copied = await ProjectFragmentAsync(app, repo, isolation: "copy");
             Check(copied.Text.Contains("data-kind=\"copy\"", StringComparison.Ordinal) && !copied.Text.Contains("data-ac-banner=\"dirty\"", StringComparison.Ordinal),
                 "a copy includes the change, so no banner");
+
+            // Inspecting a folder runs git in it, so another website must not be able to ask for it: the project row is a same-origin
+            // JSON POST, and no fragment answers a request the browser marks as cross-site.
+            Equal(405, (await app.App.Get("/compare/agent/project?path=" + Uri.EscapeDataString(repo))).Status, "no GET inspects a folder (an <img> could send one)");
+            Equal(403, (await app.App.SendAsync(HttpMethod.Post, "/compare/agent/project", new JsonObject { ["path"] = repo }, origin: "https://evil.example")).Status,
+                "a POST from another origin is refused");
+            Equal(415, (await app.App.SendAsync(HttpMethod.Post, "/compare/agent/project", text: "path=" + repo, contentType: "text/plain")).Status,
+                "a body a cross-site form or no-cors fetch can send is refused");
+            async Task<int> FetchSiteAsync(string path, string site)
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(app.App.Base, path));
+                request.Headers.Add("Sec-Fetch-Site", site);
+                using var response = await app.App.Http.SendAsync(request);
+                return (int)response.StatusCode;
+            }
+            var column = "/compare/agent/column?slot=a&provider=faux&model=echo&count=1";
+            Equal(403, await FetchSiteAsync(column, "cross-site"), "a fragment refuses a cross-site request");
+            Equal(403, await FetchSiteAsync(column, "same-site"), "and one from another port of localhost");
+            Equal(200, await FetchSiteAsync(column, "same-origin"), "the app's own pages are answered");
+            Equal(200, await FetchSiteAsync(column, "none"), "and a typed address");
+            if (OperatingSystem.IsWindows())
+            {
+                // A UNC path would reach that host over SMB or WebDAV (offering the user's credentials) before any check of the folder.
+                foreach (var path in new[] { @"\\pisharp-test.invalid\share\project", "//pisharp-test.invalid/share", @"\\?\UNC\pisharp-test.invalid\share", @"\\.\C:\" })
+                {
+                    var unc = await ProjectFragmentAsync(app, path);
+                    Check(unc.Text.Contains("data-ok=\"false\"", StringComparison.Ordinal) && WebUtility.HtmlDecode(unc.Text).Contains("network path", StringComparison.Ordinal),
+                        $"{path} is refused before it is touched: " + Cut(unc.Text));
+                }
+                var inspect = await app.PostAsync("/api/compare/agent/inspect", new JsonObject { ["projectPath"] = @"\\pisharp-test.invalid\share" });
+                Equal(400, inspect.Status, "R5's inspect refuses a UNC path too: " + inspect.Text);
+                Check(inspect.Text.Contains("network path", StringComparison.Ordinal), "and says why");
+            }
 
             var thinker = await app.App.Get("/compare/agent/column?slot=b&provider=faux&model=echo-thinking&sharedThinking=xhigh&count=2&maxTurns=9");
             Equal(200, thinker.Status, "a column");
@@ -420,6 +469,136 @@ internal static partial class Program
             Equal(200, reset.Status, "reset: " + reset.Text);
             Equal(AgentCompareSettings.DefaultMaxTurns, reset.Body!["maxTurns"]!.GetValue<int>(), "the default turns");
             Equal("ask", reset.Body!.Str("approval"), "Ask");
+        }),
+
+        // W4 fix (agent-ui): looking at a folder must not run what its repository names. An extracted download can carry a .git/config
+        // with core.fsmonitor and filter drivers, and hooks; git status, worktree add and update-ref would run them.
+        Case("agent-compare-pages.looking-at-a-folder-runs-none-of-its-repository-commands", async () =>
+        {
+            await using var lab = WsLab.Create("acp-planted");
+            var repo = await lab.RepoAsync("planted", ("a.txt", "one\n"), ("b.md", "bee\n"));
+            var markers = lab.Folder("markers");
+            string Marker(string name) => ShellPath(Path.Join(markers, name));
+            string[] Ran() => [.. Directory.EnumerateFiles(markers).Select(file => Path.GetFileName(file)).Order(StringComparer.Ordinal)];
+            // Planted after the commits above, as a download would bring them.
+            await lab.GitAsync(repo, "config", "core.fsmonitor", $"echo ran > '{Marker("fsmonitor")}'; false");
+            await lab.GitAsync(repo, "config", "filter.evil.clean", $"echo ran > '{Marker("clean")}'; cat");
+            var included = Path.Join(lab.Folder("included"), "filters.cfg");
+            await lab.GitAsync(repo, "config", "--file", included, "filter.inc.clean", $"echo ran > '{Marker("include-clean")}'; cat");
+            await lab.GitAsync(repo, "config", "include.path", ShellPath(included));
+            Directory.CreateDirectory(Path.Join(repo, ".git", "info"));
+            File.WriteAllText(Path.Join(repo, ".git", "info", "attributes"), "*.txt filter=evil\n*.md filter=inc\n");
+            var hooks = Path.Join(repo, ".git", "hooks");
+            Directory.CreateDirectory(hooks);
+            foreach (var hook in new[] { "post-checkout", "reference-transaction", "pre-commit", "post-commit", "post-index-change" })
+            {
+                var file = Path.Join(hooks, hook);
+                File.WriteAllText(file, $"#!/bin/sh\necho ran > '{Marker(hook)}'\n");
+                if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
+            var touched = 0;
+            void StatDirty()
+            {
+                // Same content, a new time: git status must compare the content, which is when a clean filter runs.
+                touched++;
+                foreach (var name in new[] { "a.txt", "b.md" })
+                {
+                    var file = Path.Join(repo, name);
+                    File.WriteAllText(file, File.ReadAllText(file));
+                    File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddMinutes(5 * touched));
+                }
+            }
+
+            // The trap works: a plain git status runs the planted fsmonitor and both filters.
+            StatDirty();
+            await lab.TryGitAsync(repo, "status", "--porcelain");
+            Check(Ran().Contains("fsmonitor") && Ran().Contains("clean") && Ran().Contains("include-clean"), "a plain git status runs them: " + string.Join(", ", Ran()));
+            foreach (var file in Directory.EnumerateFiles(markers)) File.Delete(file);
+            StatDirty();
+
+            var inspection = await lab.Manager.InspectAsync(repo, new WorkspaceInspectOptions { EstimateCopy = true });
+            Equal(WorkspaceKind.Worktree, inspection.Kind, "a git repo");
+            Equal("", string.Join(", ", Ran()), "inspecting it ran none of its commands");
+
+            // Making a worktree (post-checkout) and Keep the branch (update-ref: reference-transaction) run none of its hooks either.
+            var run = await lab.Manager.CreateAsync(new WorkspaceRequest { Run = "cmp_planted", ProjectPath = repo, Slots = WsSlots("a") });
+            File.WriteAllText(Path.Join(run.Slots[0].Path, "new.dat"), "new\n");
+            var kept = await lab.Manager.KeepBranchAsync("cmp_planted", "a");
+            Equal(KeepOutcome.BranchCreated, kept.Outcome, "kept: " + kept.Message);
+            var ran = Ran();
+            Check(!ran.Any(name => name is "fsmonitor" or "post-checkout" or "reference-transaction" or "pre-commit" or "post-commit" or "post-index-change"),
+                "no hook and no fsmonitor ran: " + string.Join(", ", ran));
+
+            // A network or device path is refused before anything touches it (Windows has them; elsewhere they are ordinary paths).
+            Check(!WorkspaceManager.IsNetworkOrDevicePath(repo), "a local folder is fine");
+            if (OperatingSystem.IsWindows())
+            {
+                foreach (var path in new[] { @"\\pisharp-test.invalid\share", "//pisharp-test.invalid/share", @"\\?\UNC\pisharp-test.invalid\share", @"\\.\C:\x", @"\??\C:\x" })
+                {
+                    Check(WorkspaceManager.IsNetworkOrDevicePath(path), path + " is a network or device path");
+                    var refused = await ThrowsAsync<WorkspaceException>(() => lab.Manager.InspectAsync(path), path + " is refused");
+                    Equal(WorkspaceException.Invalid, refused.Code, path + ": " + refused.Message);
+                }
+                var create = await ThrowsAsync<WorkspaceException>(() => lab.Manager.CreateAsync(new WorkspaceRequest
+                    { Run = "cmp_unc", ProjectPath = @"\\pisharp-test.invalid\share", Slots = WsSlots("a") }), "a run on a UNC path");
+                Equal(WorkspaceManager.NetworkPathMessage, create.Message, "says why");
+            }
+        }),
+
+        // W4 fix (agent-ui): the setup's shared System prompt reaches every model as the same instructions, and New run copies it.
+        Case("agent-compare-pages.app.system-prompt-reaches-every-model-and-new-run", async () =>
+        {
+            const string Prompt = "You are a careful <reviewer>. Answer in English.";
+            var instructions = AgentCompareRunner.Instructions("echo checked", Prompt);
+            Check(instructions.StartsWith(Prompt + "\n\n", StringComparison.Ordinal) && instructions.EndsWith(AgentCompareRunner.Instructions("echo checked"), StringComparison.Ordinal),
+                "the system prompt, then the workspace rules: " + instructions);
+            Equal(AgentCompareRunner.Instructions(null), AgentCompareRunner.Instructions(null, "  "), "a blank system prompt adds nothing");
+            Equal(Prompt, AgentCompareEndpoints.CreateRequest(new JsonObject { ["systemPrompt"] = "  " + Prompt + "\n" }).SystemPrompt, "the wire field, trimmed");
+
+            await using var app = await CompareApp.StartAsync("acp-system", ToolApprovalMode.Auto);
+            var tooLong = await app.PostAsync("/api/compare/agent", new JsonObject
+            {
+                ["requestId"] = "acp-system-long", ["task"] = "!echo hi", ["projectPath"] = app.Project, ["models"] = Models("echo"),
+                ["systemPrompt"] = new string('x', AgentCompareRunner.MaxSystemPromptLength + 1),
+            });
+            Equal(400, tooLong.Status, "a system prompt over the limit: " + tooLong.Text);
+
+            var run = await app.CreateAsync(new JsonObject
+            {
+                ["requestId"] = "acp-system-1",
+                ["task"] = "!echo done > result.txt",
+                ["systemPrompt"] = "  " + Prompt + "\n",
+                ["projectPath"] = app.Project,
+                ["models"] = Models("echo", "echo-small"),
+                ["isolation"] = "copy",
+                ["approval"] = "auto",
+                ["checkCommand"] = "echo checked",
+            });
+            var id = run.Id();
+            Equal(Prompt, run.Str("systemPrompt"), "the run keeps the shared system prompt");
+            await app.WaitAsync(id, status => status.Str("state") == "finished", "the run finished");
+
+            // Each model's durable session has the same instructions (its chat's session details show them as the system prompt).
+            foreach (var slot in new[] { "a", "b" })
+            {
+                var opened = await app.PostAsync($"/api/compare/agent/{id}/open-chat", new JsonObject { ["slot"] = slot });
+                Equal(200, opened.Status, $"{slot} opened as a chat: " + opened.Text);
+                var chat = await app.App.Get(opened.Body!.Str("url")!);
+                Equal(200, chat.Status, "its page");
+                var shown = Regex.Match(chat.Text, "<h6>System prompt</h6>\\s*<div[^>]*>(.*?)</div>", RegexOptions.Singleline);
+                Check(shown.Success, $"{slot}'s session details show a system prompt: " + Cut(chat.Text));
+                Equal(instructions, WebUtility.HtmlDecode(shown.Groups[1].Value), $"{slot} got the run's instructions");
+            }
+
+            // New run copies it into the setup, open, with its preview.
+            var again = (await app.App.Get("/compare?mode=agent&from=" + id)).Text;
+            NoRazorText(again, "New run");
+            Check(Regex.IsMatch(again, "<textarea[^>]*id=\"acSystemText\"[^>]*data-ac-system>You are a careful &lt;reviewer&gt;. Answer in English.</textarea>"),
+                "the system prompt is copied, as text: " + Regex.Match(again, "id=\"acSystemText\".{0,300}", RegexOptions.Singleline).Value);
+            Check(again.Contains("class=\"collapse show\" id=\"acSystem\"", StringComparison.Ordinal), "and shown, since it holds text");
+            var toggle = WebUtility.HtmlDecode(Regex.Match(again, "<button[^>]*data-ac-system-toggle[^>]*>.*?</button>", RegexOptions.Singleline).Value);
+            Check(toggle.Contains("aria-expanded=\"true\"", StringComparison.Ordinal) && toggle.Contains("· You are a careful <reviewer>. Answer in English.", StringComparison.Ordinal),
+                "the toggle's preview: " + toggle);
         }),
     ];
 }

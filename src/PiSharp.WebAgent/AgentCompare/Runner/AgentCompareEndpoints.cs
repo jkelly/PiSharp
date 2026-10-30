@@ -1,7 +1,7 @@
 // Decision 0011 (run W4, R5): agent compare's JSON API under /api/compare/agent, for R6's pages. Writes are POSTs with JSON bodies (HostGuard's
 // same-origin and JSON-only rules cover them) and are idempotent (a repeated create answers the run its request id made; a repeated stop,
 // continue, keep, discard or open-chat answers what the first did):
-//   POST /api/compare/agent                    {requestId, task, projectPath, models: [{provider, model, thinking?, account?}] (1-4),
+//   POST /api/compare/agent                    {requestId, task, systemPrompt?, projectPath, models: [{provider, model, thinking?, account?}] (1-4),
 //                                              isolation?, baseRef?, extraExcludes?, confirmLargeCopy?, checkCommand?, checkTimeoutSeconds?,
 //                                              maxTurns?, maxMinutes?, capMicros? | capUsd?, capAction? (ask|block), approval? (ask|allowList|auto)}
 //                                              -> the run's status (below); 400/409 {error: {code, message}} (invalid, project-missing,
@@ -9,7 +9,7 @@
 //   POST /api/compare/agent/inspect            {projectPath, isolation?, extraExcludes?, models? (a count or the list)} -> R4's ProjectInspection (the setup's
 //                                              isolation chip, uncommitted changes, copy size).
 //   GET  /api/compare/agent                    ?limit= -> {items: [summary]} newest first.
-//   GET  /api/compare/agent/{run}              -> the run's status: {id, state, task, projectPath, created, started, finished, error,
+//   GET  /api/compare/agent/{run}              -> the run's status: {id, state, task, systemPrompt, projectPath, created, started, finished, error,
 //                                              workspace, limits, approval, check, order, grants, spend, waiting, models: [model status]}.
 //   GET  /api/compare/agent/{run}/events       SSE: one "status" frame (the status JSON) now and after every change (coalesced), ": ping"
 //                                              every 15 s; it ends when the run is finished.
@@ -64,6 +64,7 @@ public static class AgentCompareEndpoints
             var json = Required(body);
             var defaults = settings.Get<AgentCompareSettings>();
             var path = Text(json, "projectPath") ?? throw AgentCompareException.BadRequest("Choose the project folder.");
+            if (WorkspaceManager.IsNetworkOrDevicePath(path)) throw AgentCompareException.BadRequest(WorkspaceManager.NetworkPathMessage);
             if (!Path.IsPathFullyQualified(path) || !Directory.Exists(path))
                 throw new AgentCompareException(400, AgentCompareException.ProjectMissing, $"There is no folder {path}.");
             var inspection = await workspaces.InspectAsync(path, new WorkspaceInspectOptions
@@ -170,6 +171,7 @@ public static class AgentCompareEndpoints
         {
             RequestId = Text(json, "requestId") ?? "",
             Task = Text(json, "task") ?? "",
+            SystemPrompt = Text(json, "systemPrompt"),
             ProjectPath = Text(json, "projectPath") ?? "",
             Models = models,
             Isolation = Enum<WorkspaceIsolation>(json, "isolation"),

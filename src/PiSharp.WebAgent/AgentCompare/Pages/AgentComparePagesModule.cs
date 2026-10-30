@@ -9,16 +9,30 @@
 //   GET /compare/agent/runs/{run}/keep?slot=    _AgentKeep: modal-keep-result's content (R4's keep preview).
 //   GET /compare/agent/column?slot=&provider=&model=&thinking=&sharedThinking=&maxTurns=&maxMinutes=&count=
 //                                               _AgentSetupColumn: a setup column for a model the picker chose.
-//   GET /compare/agent/project?path=&isolation=&baseRef=&excludes=&models=
+//   POST /compare/agent/project {path, isolation?, baseRef?, excludes?, models?}
 //                                               _AgentProject: the setup's project row (isolation chip, uncommitted changes, copy size)
 //                                               and modal-agent-workspace's content, from R4's inspection.
 // They only read; every write is R5's (/api/compare/agent). 404 for a run or model that is not there, 400 for a bad slot.
+// Cross-site requests (W4 fix, agent-ui): inspecting a folder runs git in it and may walk it, so the project row is a POST with a JSON
+// body: HostGuard refuses a write from another origin (403), and the body binding refuses anything but application/json (415), which a
+// page on another site can't send without a CORS preflight this app never answers. Every fragment also refuses a request the browser
+// marks as coming from another site or origin (Sec-Fetch-Site other than same-origin or none: 403), so an <img> or a no-cors fetch from a
+// website can't make the app read a run's workspaces or diffs either.
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PiSharp.Web.Common;
 using PiSharp.WebAgent.AgentCompare.Runner;
 using PiSharp.WebAgent.Hosting;
 
 namespace PiSharp.WebAgent.AgentCompare.Pages;
+
+/// <summary>The body of <c>POST /compare/agent/project</c>: the folder and this run's choices.</summary>
+/// <param name="Path">The project folder (a full path).</param>
+/// <param name="Isolation"><c>automatic</c>, <c>worktree</c> or <c>copy</c>; null for the settings'.</param>
+/// <param name="BaseRef">The worktrees' base branch or commit, or null (HEAD).</param>
+/// <param name="Excludes">This run's extra excludes.</param>
+/// <param name="Models">How many models (workspaces) the run has.</param>
+public sealed record AgentProjectRequest(string? Path, string? Isolation = null, string? BaseRef = null, IReadOnlyList<string>? Excludes = null,
+    int? Models = null);
 
 /// <summary>Registers and maps agent compare's views.</summary>
 public static class AgentComparePagesModule
@@ -42,7 +56,9 @@ public static class AgentComparePagesModule
         var pages = app.MapGroup(Prefix);
         pages.AddEndpointFilter(async (context, next) =>
         {
-            context.HttpContext.Response.Headers.CacheControl = "no-store";
+            var http = context.HttpContext;
+            http.Response.Headers.CacheControl = "no-store";
+            if (!SameOrigin(http.Request)) return Results.Text("Cross-site requests are refused.", statusCode: StatusCodes.Status403Forbidden);
             return await next(context).ConfigureAwait(false);
         });
 
@@ -83,14 +99,24 @@ public static class AgentComparePagesModule
             return Html(await renderer.RenderAsync(AgentComparePages.SetupColumnPartial, view).ConfigureAwait(false));
         });
 
-        pages.MapGet("/project", async (string? path, string? isolation, string? baseRef, string? excludes, int? models, AgentComparePages views,
-            FragmentRenderer renderer, CancellationToken token) =>
+        pages.MapPost("/project", async (AgentProjectRequest body, AgentComparePages views, FragmentRenderer renderer, CancellationToken token) =>
         {
-            var list = (excludes ?? "").Split([',', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var view = await views.ProjectAsync(path, isolation, baseRef, list, models ?? 2, token).ConfigureAwait(false);
+            var list = (body.Excludes ?? []).SelectMany(item => (item ?? "").Split([',', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .ToList();
+            var view = await views.ProjectAsync(body.Path, body.Isolation, body.BaseRef, list, body.Models ?? 2, token).ConfigureAwait(false);
             return Html(await renderer.RenderAsync(AgentComparePages.ProjectPartial, view).ConfigureAwait(false));
         });
         return app;
+    }
+
+    /// <summary>Whether the browser says the request comes from this app's own pages (<c>Sec-Fetch-Site: same-origin</c>) or from the user
+    /// (<c>none</c>: a typed address or a bookmark). A request without the header (an older browser, a test client) passes; HostGuard's
+    /// Host check still applies to it.</summary>
+    public static bool SameOrigin(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var site = request.Headers["Sec-Fetch-Site"].ToString().Trim();
+        return site.Length == 0 || site.Equals("same-origin", StringComparison.OrdinalIgnoreCase) || site.Equals("none", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool ValidSlot(string? slot) => slot is not null && AgentCompareRunner.Slots.Contains(slot.Trim().ToLowerInvariant());

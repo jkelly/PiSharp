@@ -3,6 +3,11 @@
 // a path list) goes through stdin. Every command gets core.quotepath=false (UTF-8 paths) and, on Windows, core.longpaths=true; the
 // inherited GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE family is cleared so the user's shell cannot redirect a command, prompts are off
 // (GIT_TERMINAL_PROMPT=0) and optional locks are skipped (GIT_OPTIONAL_LOCKS=0, so `git status` never takes the user's index lock).
+// Looking at a folder never runs a command its repository names (W4 fix, agent-ui): every command also gets core.fsmonitor=false (`git
+// status` would run a repo-local fsmonitor command) and core.hooksPath pointed at a folder this app never creates (NoHooksFolder under the
+// workspaces root), so none of the project's hooks runs: not post-checkout on `worktree add`, not reference-transaction on Keep the
+// branch's `update-ref`. The user's hooks still run when they commit themselves. An inspection's `git status` also switches off the filter
+// drivers the repository's own config defines (WorkspaceManager.NeutralFiltersAsync: a clean filter runs during `git status`).
 // No secret ever reaches a git command line: the arguments are paths, commit ids and fixed options.
 using System.ComponentModel;
 using System.Diagnostics;
@@ -37,6 +42,18 @@ internal sealed class GitCommand(WorkspaceManagerOptions options)
         "GIT_ICASE_PATHSPECS", "GIT_EXTERNAL_DIFF", "GIT_DIFF_OPTS",
     ];
 
+    /// <summary>The hooks folder every command names: under the workspaces root, never created, so git finds no hook to run.</summary>
+    public const string NoHooksFolder = ".no-hooks";
+
+    /// <summary>The options every command starts with: UTF-8 paths, long paths on Windows, no fsmonitor and no hooks.</summary>
+    public IReadOnlyList<string> GlobalOptions()
+    {
+        List<string> list = ["-c", "core.quotepath=false"];
+        if (OperatingSystem.IsWindows()) list.AddRange(["-c", "core.longpaths=true"]);
+        list.AddRange(["-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + Path.Join(Path.GetFullPath(options.Root), NoHooksFolder)]);
+        return list;
+    }
+
     /// <summary>Runs <c>git</c> with <paramref name="arguments"/> in <paramref name="workingDirectory"/>.</summary>
     /// <param name="workingDirectory">Where git runs.</param>
     /// <param name="arguments">The arguments after the global options.</param>
@@ -58,13 +75,7 @@ internal sealed class GitCommand(WorkspaceManagerOptions options)
             CreateNoWindow = true,
             StandardErrorEncoding = Encoding.UTF8,
         };
-        info.ArgumentList.Add("-c");
-        info.ArgumentList.Add("core.quotepath=false");
-        if (OperatingSystem.IsWindows())
-        {
-            info.ArgumentList.Add("-c");
-            info.ArgumentList.Add("core.longpaths=true");
-        }
+        foreach (var option in GlobalOptions()) info.ArgumentList.Add(option);
         foreach (var argument in arguments) info.ArgumentList.Add(argument);
         foreach (var name in Cleared) info.Environment.Remove(name);
         info.Environment["GIT_TERMINAL_PROMPT"] = "0";

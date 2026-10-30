@@ -235,7 +235,7 @@ public sealed partial class WorkspaceManager
         if (manifest.Kind == WorkspaceKind.Worktree)
         {
             if (!Directory.Exists(manifest.RepoRoot)) throw new WorkspaceException(WorkspaceException.ProjectMissing, "The project's repository isn't there any more.");
-            var status = await StatusAsync(manifest.RepoRoot!, cancellationToken).ConfigureAwait(false);
+            var status = await StatusAsync(manifest.RepoRoot!, inspecting: false, cancellationToken).ConfigureAwait(false);
             var conflicts = status.Where(change => GitStatus.Paths(change).Any(touched.Contains)).ToList();
             return (conflicts, [.. status.Except(conflicts)]);
         }

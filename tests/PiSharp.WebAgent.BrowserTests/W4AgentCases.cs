@@ -3,7 +3,8 @@ using static Microsoft.Playwright.Assertions;
 
 // Decision 0011 (run W4, T4): agent compare and its workspaces in a browser (faux: the models answer "!command" with a bash call, so each
 // edits its own workspace; failing on any page or console error). End to end on a temporary git repository (BrowseGit: the app's git and
-// the case's see an empty global config and no system config): Compare's agent mode takes the task and the folder (Change › Another folder;
+// the case's see an empty global config and no system config): Compare's agent mode takes the task, a shared system prompt (the run keeps
+// it) and the folder (Change › Another folder;
 // the isolation chip names a worktree from main), keeps Ask as the approval while Limits and approvals shows the not-a-sandbox warning on
 // the choice that runs tools without asking, runs two models that each ask before their command, "Allow all" lets both through, each column ends with its diff (the diff dialog shows the new file), and Keep › Apply puts A's
 // change in the project as an uncommitted file: no commit, HEAD and the branch unchanged, no branch made, B's workspace left alone. History
@@ -40,6 +41,14 @@ internal static partial class Program
             await Expect(page.Locator("#acAutoWarn")).ToBeVisibleAsync();
             await Expect(page.Locator("#acAutoWarn")).ToContainTextAsync("not a sandbox");
 
+            // The shared System prompt (W4 fix, agent-ui): collapsed beside the Task label; its start shows on the toggle, and every model
+            // gets it.
+            await Expect(page.Locator("#acSystem")).ToBeHiddenAsync();
+            await page.Locator("[data-ac-system-toggle]").ClickAsync();
+            await Expect(page.Locator("#acSystemText")).ToBeVisibleAsync();
+            await page.Locator("#acSystemText").FillAsync("Keep the change small.");
+            await Expect(page.Locator("[data-ac-system-preview]")).ToHaveTextAsync("· Keep the change small.");
+
             await page.Locator("#acTask").FillAsync("!echo kept > kept.txt");
             await page.Locator("[data-ac-run]").ClickAsync();
             var run = await page.QueryAsync("run");
@@ -58,6 +67,7 @@ internal static partial class Program
             }
             await Expect(root).ToHaveAttributeAsync("data-state", "finished");
             var status = (await app.Get("/api/compare/agent/" + run)).Body!;
+            Equal("Keep the change small.", status["systemPrompt"]?.GetValue<string>(), "the run got the shared system prompt");
             var workspaceB = status["models"]!.AsArray().Single(model => model!["slot"]!.GetValue<string>() == "b")!["workingDirectory"]!.GetValue<string>();
             Check(File.Exists(Path.Join(workspaceB, "kept.txt")), "B's change is in its own worktree");
             Check(!File.Exists(Path.Join(repo, "kept.txt")), "nothing reached the project before Keep");
