@@ -10,7 +10,6 @@ namespace PiSharp.WebAgent.Controllers;
 public sealed class ShellController : Controller
 {
     /// <summary>A sidebar page a later milestone builds.</summary>
-    [HttpGet("/compare")]
     [HttpGet("/bench")]
     [HttpGet("/history")]
     [HttpGet("/evals/leaderboard")]
