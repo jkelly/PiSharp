@@ -12,7 +12,9 @@
 // W3 (S5): the render context carries the answers' cost marks from the spend ledger (ChatSpend, read at most every second or when the
 // entries or the running state change), and an item's fingerprint includes its mark, so a footer changes when its request settles.
 // W3 fix: a chat's feeds also render again when one of its ledger rows changes (ChatSpend.RunChanged), so a reservation resolved on History
-// › Spend, or settled after the answer was committed, shows in an open chat at once.
+// › Spend, or settled after the answer was committed, shows in an open chat at once. W3 fix 2: the render context and the banners carry
+// the messages queued behind a spend stop that ended the run (ChatSpendStopView.Queued), and the stop's fingerprint includes them.
+using System.Globalization;
 using System.Text.Json.Nodes;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Hosting;
@@ -142,7 +144,8 @@ public sealed class AgentViewHub : IAsyncDisposable
     };
 
     /// <summary>What an item's HTML depends on: its JSON, its facts (time, usage, failure, restarts, the running tail), its calls' stored
-    /// results and waiting approvals, the account label and billing, and its cost mark.</summary>
+    /// results and waiting approvals, the account label and billing, its cost mark and, for the spend stop that ended the run, the messages
+    /// queued behind it.</summary>
     internal static string Print(TranscriptItem item, ChatRenderContext context)
     {
         var json = Transcript.ToJson([item]).ToJsonString() + "|" + context.FactsOf(item);
@@ -151,7 +154,8 @@ public sealed class AgentViewHub : IAsyncDisposable
             if (context.Approval(callId) is { } approval) json += "|approval:" + approval.Request.TaskId;
             if (context.Result(callId) is { } result) json += "|result:" + result;
         }
-        return json + "|" + context.AccountLabel + "|" + context.Billing + "|" + context.Spend.Print(item);
+        var queued = item is AssistantItem answer ? context.QueuedBehind(answer.Id) : 0;
+        return json + "|" + context.AccountLabel + "|" + context.Billing + "|" + context.Spend.Print(item) + "|queued:" + queued.ToString(CultureInfo.InvariantCulture);
     }
 
     private sealed class Viewer(Action<JsonObject> send)
@@ -320,7 +324,9 @@ public sealed class AgentViewHub : IAsyncDisposable
                 var run = new ChatRunState(model.Running || model.Generating, model.Generating,
                     approvals.Any(approval => approval.Request.AgentId == agentId), model.Pending.Count > 0);
                 var spend = await hub.chats.SpendFactsAsync(binding, entries, run.Running, accountLabel, stop.Token).ConfigureAwait(false);
-                var context = hub.chats.RenderContext(binding, agentId, accountLabel, entries, model.Items, run, spend);
+                // Messages queued behind a spend stop wait for the user (the engine starts them only after an answer): its card and banner say so.
+                var queued = ChatSpendStopView.Waiting(model.Inbox);
+                var context = hub.chats.RenderContext(binding, agentId, accountLabel, entries, model.Items, run, spend, queued);
                 var upsert = new JsonArray();
                 var keys = new HashSet<string>(StringComparer.Ordinal);
                 var inline = new HashSet<string>(StringComparer.Ordinal);
@@ -352,7 +358,7 @@ public sealed class AgentViewHub : IAsyncDisposable
                 await PanelAsync(changedPanels, "queue", "~/Views/Chat/_ChatQueue.cshtml", model.Inbox).ConfigureAwait(false);
                 await PanelAsync(changedPanels, "notices", "~/Views/Chat/_ChatNotices.cshtml", new ChatNoticesView(model.Compactions.Count > 0,
                     model.CompactionFailure, model.Retry?.At, model.Retry?.Error)).ConfigureAwait(false);
-                await PanelAsync(changedPanels, "banners", "~/Views/Chat/_ChatBanners.cshtml", hub.chats.Banners(binding, accountLabel, entries)).ConfigureAwait(false);
+                await PanelAsync(changedPanels, "banners", "~/Views/Chat/_ChatBanners.cshtml", hub.chats.Banners(binding, accountLabel, entries, queued)).ConfigureAwait(false);
                 await PanelAsync(changedPanels, "info", "~/Views/Chat/_ChatInfo.cshtml",
                     await hub.chats.InfoAsync(binding, agentId, entries, model.ContextTokens, usage, accountLabel, stop.Token).ConfigureAwait(false)).ConfigureAwait(false);
 

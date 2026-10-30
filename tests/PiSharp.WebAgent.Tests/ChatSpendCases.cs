@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Hosting;
 using PiSharp.Web.Common;
@@ -13,6 +14,7 @@ using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
 using PiSharp.WebAgent.Faux;
+using PiSharp.WebAgent.Hosting;
 using PiSharp.WebAgent.Spend;
 using ChordJson = PiSharp.Durable.Chord.JsonValue;
 
@@ -31,6 +33,10 @@ using ChordJson = PiSharp.Durable.Chord.JsonValue;
 // while that turn's next call is stopped, and withdrawn takes it along; an approval its call did not need is retired, and a send nobody answered is asked about even with
 // an approval waiting for the chat; a send that fails after its approval withdraws it and its retry is checked again. In the built app,
 // parallel copies of one proceed-once POST store one approval and post once.
+//
+// W3 fix 2 (chat spend): a stop that ended the run says, on its card and in the spend banner (page and stream), that the messages queued
+// behind it wait until the user continues or sends another message (the durable engine starts queued messages only after an answer); and
+// what a send notes after its message is posted never fails the send, also on a host whose webagent.db lacks the chat sends table.
 internal static partial class Program
 {
     private static readonly SpendPrice SpendTestPrice = new(3, 15, 0.3);
@@ -71,9 +77,10 @@ internal static partial class Program
         Created = DateTimeOffset.FromUnixTimeMilliseconds((long)time),
     };
 
-    /// <summary>Renders <paramref name="entries"/> (and a live message) with _ChatItem and the spend facts, as the page and the stream do.</summary>
+    /// <summary>Renders <paramref name="entries"/> (and a live message) with _ChatItem and the spend facts, as the page and the stream do, with
+    /// <paramref name="queued"/> messages waiting in the branch's queue.</summary>
     private static async Task<string> SpendRenderAsync(RenderHost host, IReadOnlyList<JsonObject> entries, ChatSpendFacts spend, ChatRunState? run = null,
-        JsonObject? live = null)
+        JsonObject? live = null, int queued = 0)
     {
         var items = Transcript.Build(entries, live);
         var context = new ChatRenderContext
@@ -87,6 +94,7 @@ internal static partial class Program
             Facts = ChatFacts.Build(items, entries, run),
             Results = ChatFacts.ToolResults(entries),
             Spend = spend,
+            Stop = ChatSpendStopView.Newest(entries, queued),
         };
         var html = new StringBuilder();
         foreach (var item in items) html.Append(await host.Renderer.RenderAsync("~/Views/Chat/_ChatItem.cshtml", new ChatItemView(item, context)));
@@ -361,6 +369,35 @@ internal static partial class Program
             var askBanner = await host.Renderer.RenderAsync("~/Views/Chat/_ChatBanners.cshtml", new ChatBannersView(false) { Spend = ChatSpendStopView.From(asked, 2) });
             Has(askBanner, ">Review and continue…</button>", "an Ask cap's banner continues");
             Equal("", (await host.Renderer.RenderAsync("~/Views/Chat/_ChatBanners.cshtml", ChatBannersView.None)).Trim(), "no banner without a stop");
+
+            // W3 fix 2: the durable engine starts queued messages only after an answer, so a stop that ended the run says what waits behind it.
+            Lacks(html + banner, "data-spend-queued", "nothing queued: nothing said about a queue");
+            Has(html, "data-code=\"spend_blocked\" data-queued=\"0\"", "the stop card's count is 0");
+            Has(banner, "data-code=\"spend_blocked\" data-queued=\"0\"", "and the banner's");
+            var waiting = await SpendRenderAsync(host, entries, ChatSpendFacts.Empty, queued: 1);
+            Has(waiting, "data-spend-stop data-op=\"op-9\" data-code=\"spend_blocked\" data-queued=\"1\"", "the stop card counts the queued message");
+            Has(waiting, "<div class=\"small mt-1\" data-spend-queued><i class=\"bi bi-hourglass-split me-1\" aria-hidden=\"true\"></i>" +
+                "The run stopped here, so your queued message waits: it is sent when you continue or send another message.</div>", "and says it waits for the user");
+            Equal(1, ChatSpendStopView.Newest(entries, 1)!.Queued, "the newest answer's stop holds it back");
+            Equal("The run stopped here, so your 2 queued messages wait: they are sent when you continue or send another message.",
+                ChatSpendStopView.Newest(entries, 2)!.QueuedText, "two of them");
+            Check(ChatSpendStopView.Newest(entries, 0)!.QueuedText is null, "none");
+            var queuedBanner = await host.Renderer.RenderAsync("~/Views/Chat/_ChatBanners.cshtml", new ChatBannersView(false) { Spend = ChatSpendStopView.Newest(entries, 2) });
+            Has(queuedBanner, "data-banner=\"spend\" data-code=\"spend_blocked\" data-queued=\"2\"", "the banner counts them");
+            Has(queuedBanner, "Nothing was sent or reserved.<span data-spend-queued> The run stopped here, so your 2 queued messages wait: they are sent when you continue " +
+                "or send another message.</span>", "and says they wait");
+            JsonObject[] later = [.. entries, UiUser(3, "a later message", UiTime + 2_000), UiAnswer(4, "Later.", input: 5, output: 5, time: UiTime + 3_000)];
+            Check(ChatSpendStopView.Newest(later, 1) is null, "a stop with a message after it ended no run that holds the queue back");
+            var laterHtml = await SpendRenderAsync(host, later, ChatSpendFacts.Empty, queued: 1);
+            Has(laterHtml, "data-spend-stop data-op=\"op-9\"", "its card still shows");
+            Lacks(laterHtml, "data-spend-queued", "without a word about the queue");
+            Equal(2, ChatSpendStopView.Waiting([new InboxItem(7, "followUp", "a"), new InboxItem(8, "steer", "b"), new InboxItem(9, "write", "Context update")]),
+                "follow-ups and steers wait; a context update is not a message");
+            var markdown = host.Services.GetRequiredService<MarkdownRenderer>();
+            var stopped = (AssistantItem)Transcript.Build(entries, null).Last();
+            Check(AgentViewHub.Print(stopped, new ChatRenderContext { SessionId = "ui-chat", AgentId = 1, Markdown = markdown, Stop = ChatSpendStopView.Newest(entries, 1) }) !=
+                AgentViewHub.Print(stopped, new ChatRenderContext { SessionId = "ui-chat", AgentId = 1, Markdown = markdown }),
+                "the stream renders the stop card again when its queue changes (it is part of the fingerprint)");
         }),
 
         Case("chat.spend.session-panel", async () =>
@@ -708,9 +745,33 @@ internal static partial class Program
             var still = (await world.Approvals.WaitingAsync(chatId)).Single();
             Equal(GuardedDurableModels.SubmissionKey("queued please"), still.Approval.Submission, "the approval still waits for the queued message");
 
-            // The run ended on the stop, so the follow-up stays queued (the engine starts queued items only after an answer). Withdrawn,
-            // it takes its approval with it: a later copy of the same text is not let through on it.
-            Check(await chat.Chats.WithdrawAsync(chatId, null, queued.SubmissionId), "the queued message is withdrawn");
+            // The run ended on the stop, so the follow-up stays queued (the engine starts queued items only after an answer). The stop card
+            // and the spend banner say so (W3 fix 2), on the page and in the stream.
+            var page = await chat.Chats.OpenAsync(chatId);
+            Equal(((int?)1, (int?)1), (page.Banners.Spend?.Queued, page.Context.Stop?.Queued), "the page's spend banner and stop card count the queued message");
+            var renderer = chat.Services.GetRequiredService<FragmentRenderer>();
+            var stopCard = await renderer.RenderAsync("~/Views/Chat/_ChatItem.cshtml", new ChatItemView(page.Items.OfType<AssistantItem>().Last(), page.Context));
+            Has(stopCard, "data-code=\"spend_ask\" data-queued=\"1\"", "the stop card");
+            Has(stopCard, "so your queued message waits: it is sent when you continue or send another message.", "says the message waits for the user");
+            Has(await renderer.RenderAsync("~/Views/Chat/_ChatBanners.cshtml", page.Banners), "<span data-spend-queued> The run stopped here, so your queued message waits",
+                "and so does the banner");
+            var sink = new FrameSink();
+            using (chat.Hub.Subscribe(chatId, chat.Bindings.Get(chatId)!.AgentId, sink.Add))
+            {
+                var whole = await sink.WaitAsync(frame => IsView(frame, true), "the stream's whole view");
+                Has(whole["panels"]?["banners"]?.GetValue<string>() ?? "", "data-queued=\"1\"", "the stream's banner");
+                Has(Html(whole), "data-spend-stop", "the stream's stop card");
+                Has(Html(whole), "data-queued=\"1\"", "counts it too");
+
+                // Withdrawn, it takes its approval with it: a later copy of the same text is not let through on it.
+                Check(await chat.Chats.WithdrawAsync(chatId, null, queued.SubmissionId), "the queued message is withdrawn");
+                await sink.WaitAsync(frame => IsView(frame, false) && frame["panels"]?["banners"] is JsonValue banners &&
+                    banners.GetValue<string>().Contains("data-banner=\"spend\"", StringComparison.Ordinal) &&
+                    !banners.GetValue<string>().Contains("data-spend-queued", StringComparison.Ordinal), "the banner says nothing waits once the queue is empty");
+                var redrawn = await sink.WaitAsync(frame => IsView(frame, false) && Html(frame).Contains("data-spend-stop", StringComparison.Ordinal) &&
+                    Html(frame).Contains("data-queued=\"0\"", StringComparison.Ordinal), "and the stop card is rendered again with nothing queued");
+                Lacks(Html(redrawn), "data-spend-queued", "saying nothing about a queue");
+            }
             Equal(SpendApprovalStore.Withdrawn, SpendApprovalUsedBy(world.Path, still.Id), "its approval is withdrawn");
             Equal(0, (await world.Approvals.WaitingAsync(chatId)).Count, "nothing waits");
             var again = await ThrowsAsync<ChatSpendException>(() => chat.Chats.SendAsync(chatId, new ChatSendRequest("m3", "queued please") { Spend = ChatSpendAnswer.Check }),
@@ -827,6 +888,38 @@ internal static partial class Program
                 SqliteConnection.ClearAllPools();
                 DeleteTemp(root);
             }
+        }),
+
+        Case("chat.spend.bookkeeping-after-a-post-never-fails-the-send", async () =>
+        {
+            // A host whose webagent.db lacks spend_chat_sends (migration 1400). The app always has it (ChatModule registers it); before
+            // W3 fix 2 a send asked it after its message was posted, and the posted send failed.
+            await using var world = GuardWorld.Create("chat-spend-no-sends-world");
+            await using var chat = await ChatHarness.StartAsync("chat-spend-no-sends", world.Over(FauxModelCatalog.CreateModels()), configure: services =>
+            {
+                services.AddSingleton(world.Guard);
+                services.RemoveAll<WebAgentDb>();
+                services.AddSingleton(provider => new WebAgentDb(provider.GetRequiredService<WebAgentOptions>().DatabasePath,
+                    [CoreMigrations.AppInfo, ChatBindings.Migration, SettingsStore.Migration]));
+            });
+            var spend = chat.Chats.Spending!;
+            Throws<SqliteException>(() => spend.Sends.Count(), "the chat sends table is missing");
+            var chatId = (await chat.CreateAsync("hello", "r1")).SessionId;
+
+            var sent = await chat.Chats.SendAsync(chatId, new ChatSendRequest("m1", "plain please"));
+            Check(sent.SubmissionId > 0, "a send nobody checked is posted and answered, without asking the sends table: " + sent);
+            await WaitUntilAsync(async () => (await chat.TextAsync(chatId)).Contains("Echo: plain please", StringComparison.Ordinal), "the message is answered",
+                TimeSpan.FromSeconds(30));
+            await chat.IdleAsync(chatId);
+            Equal(1, Regex.Matches(await chat.TextAsync(chatId), "Echo: plain please").Count, "posted once");
+
+            // What a send that may hold an approval notes after its post: the read fails, it is logged, and the posted send stands.
+            spend.Posted(chatId, sent.SubmissionId, chatId + "/m1");
+
+            // A checked send asks the table before anything is posted, so it fails without posting.
+            await ThrowsAsync<SqliteException>(() => chat.Chats.SendAsync(chatId, new ChatSendRequest("m2", "checked please") { Spend = ChatSpendAnswer.Check }),
+                "a checked send");
+            Lacks(await chat.TextAsync(chatId), "checked please", "posts nothing");
         }),
     ];
 

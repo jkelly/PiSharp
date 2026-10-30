@@ -12,7 +12,9 @@
 // cost marks, the chat's spend in the details panel and the banner of a stopped call. Billing comes from the Spend area's billing modes when present.
 // W3 fix (chat spend): a checked create, send or continue holds its send key (ChatSpend.EnterAsync) from the check to the send, so two
 // copies of one POST store one approval, which answers only the message it was given for; a send that fails after it was admitted
-// withdraws its approval, and its retry is checked again.
+// withdraws its approval, and its retry is checked again. W3 fix 2 (chat spend): what a send notes after its message is posted
+// (ChatSpend.Posted) is noted only for a send that may hold an approval, and never fails the send; the stop card and the spend banner of
+// a call the guard stopped say when messages queued behind it wait (the durable engine starts queued messages only after an answer).
 using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using PiSharp.Durable;
@@ -198,7 +200,12 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
 
     /// <summary>Sends a message to a branch of the chat (its current one by default). While the agent runs it queues as a follow-up, or
     /// steers the run. The branch becomes the chat's current one.</summary>
-    public async Task<ChatSent> SendAsync(string chatId, ChatSendRequest request, CancellationToken cancellationToken = default)
+    public Task<ChatSent> SendAsync(string chatId, ChatSendRequest request, CancellationToken cancellationToken = default) =>
+        SendCoreAsync(chatId, request, approved: false, cancellationToken);
+
+    /// <summary>Sends a message (<see cref="SendAsync(string, ChatSendRequest, CancellationToken)"/>). <paramref name="approved"/> says that the
+    /// send's key may already hold a one-time approval (one a continue stored before it sends its message).</summary>
+    private async Task<ChatSent> SendCoreAsync(string chatId, ChatSendRequest request, bool approved, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         CheckRequest(request.RequestId, request.Text);
@@ -212,6 +219,9 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         // One copy of a checked send at a time, so two copies of one POST store one approval.
         using var hold = spend is null ? null : await spend.EnterAsync(key, cancellationToken).ConfigureAwait(false);
         var admitting = false;
+        // Whether the send's key may hold a one-time approval: one stored now (or by the continue that sends this message), or by an
+        // earlier copy of this checked send (a retry). A send nobody checked never stored one, so nothing is noted after its post (W3 fix).
+        var noted = approved;
         PiSharp.Durable.Hosting.SendResult result;
         try
         {
@@ -220,7 +230,11 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
                 admitting = true;
                 var call = await spend.CallAsync(binding, agentId, request.Text, cancellationToken).ConfigureAwait(false);
                 var approval = await spend.AdmitAsync(call, key, request.Spend!, chatId, request.Text, cancellationToken).ConfigureAwait(false);
-                if (approval is not null) await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false);
+                if (approval is not null) noted = await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false) is not null;
+            }
+            else if (spend is not null)
+            {
+                noted = true;
             }
             if (!agent.Busy && agent.Kind != AgentKind.Subagent) await AlignAsync(session, agentId, binding, cancellationToken).ConfigureAwait(false);
             result = await session.SendAsync(agentId, new SendRequest(request.Text, request.RequestId) { WhenBusy = request.Steer ? WhenBusy.Steer : null },
@@ -232,8 +246,8 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             await spend!.WithdrawAsync(key).ConfigureAwait(false);
             throw;
         }
-        // A queued message the user withdraws takes its approval with it.
-        Spending?.Posted(chatId, result.SubmissionId.Value, key);
+        // A queued message the user withdraws takes its approval with it. The message is posted: this bookkeeping never fails the send.
+        if (noted) Spending?.Posted(chatId, result.SubmissionId.Value, key);
         bindings.Update(chatId, current => current with
         {
             AgentId = agent.Kind == AgentKind.Subagent ? current.AgentId : agentId,
@@ -258,6 +272,8 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         var key = chatId + "/" + requestId;
         using var hold = await spend.EnterAsync(key, cancellationToken).ConfigureAwait(false);
         var admitting = false;
+        // A retry may find the approval an earlier copy stored.
+        var stored = true;
         try
         {
             if (!spend.WasAdmitted(key))
@@ -267,10 +283,11 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
                     ?? throw ChatException.NotFound($"No request of this chat was stopped as {op}.");
                 var call = ChatSpend.ContinueCall(stop) with { Provider = binding.Provider, Model = binding.Model, Account = binding.AccountId };
                 var approval = await spend.AdmitAsync(call, key, answer, chatId, ChatSpend.ContinueText, cancellationToken).ConfigureAwait(false);
-                if (approval is not null) await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false);
+                stored = approval is not null && await spend.ApproveAsync(approval, key, cancellationToken).ConfigureAwait(false) is not null;
             }
             // Not checked again inside (no spend answer), so the held key is not entered twice.
-            return await SendAsync(chatId, new ChatSendRequest(requestId, ChatSpend.ContinueText) { AgentId = agentId }, cancellationToken).ConfigureAwait(false);
+            return await SendCoreAsync(chatId, new ChatSendRequest(requestId, ChatSpend.ContinueText) { AgentId = agentId }, stored, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch when (admitting)
         {
@@ -550,13 +567,15 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         var waiting = broker.Pending(chatId).Any(approval => approval.Request.AgentId == agent.Id);
         var spend = Spending;
         var facts = spend is null ? ChatSpendFacts.Empty : await spend.FactsAsync(binding, entries, agent.Busy, account?.Label, cancellationToken).ConfigureAwait(false);
+        // The queue is read only when a spend stop ended the run: that is the only place the page says what waits in it.
+        var queued = ChatSpendStopView.Newest(entries) is null ? 0 : await QueuedAsync(session, agent.Id, cancellationToken).ConfigureAwait(false);
         return new ChatPage
         {
             Binding = binding,
             Agent = agent,
             Agents = agents,
             Items = items,
-            Context = RenderContext(binding, agent.Id, account?.Label, entries, items, new ChatRunState(agent.Busy, false, waiting, false), facts),
+            Context = RenderContext(binding, agent.Id, account?.Label, entries, items, new ChatRunState(agent.Busy, false, waiting, false), facts, queued),
             Cwd = session.Cwd,
             Provider = catalog.FindProvider(binding.Provider),
             Model = model,
@@ -565,7 +584,7 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             ApprovalMode = settings.Get<ToolsSettings>().ApprovalMode,
             Busy = agents.Any(item => item.Busy),
             Info = await InfoAsync(binding, agent.Id, entries, ContextTokens(entries), null, account?.Label, cancellationToken).ConfigureAwait(false),
-            Banners = Banners(binding, account?.Label, entries),
+            Banners = Banners(binding, account?.Label, entries, queued),
             Estimate = spend is null ? null : await spend.EstimateAsync(binding, agent.Id, null, cancellationToken).ConfigureAwait(false),
         };
     }
@@ -609,16 +628,15 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
         };
     }
 
-    /// <summary>The banners of a branch: "No providers configured" when the catalog is empty, and the expired sign-in when the branch's
-    /// newest answer failed because the chat's account could not be used.</summary>
-    public ChatBannersView Banners(ChatBinding binding, string? accountLabel, IReadOnlyList<JsonObject> entries)
+    /// <summary>The banners of a branch: "No providers configured" when the catalog is empty, the expired sign-in when the branch's
+    /// newest answer failed because the chat's account could not be used, and the spend banner when the Spend Guard stopped it (saying
+    /// that the <paramref name="queued"/> messages wait, when there are any).</summary>
+    public ChatBannersView Banners(ChatBinding binding, string? accountLabel, IReadOnlyList<JsonObject> entries, int queued = 0)
     {
         ArgumentNullException.ThrowIfNull(binding);
         ArgumentNullException.ThrowIfNull(entries);
         var none = catalog.Providers.Count == 0;
-        var newest = entries.Where(entry => ChatDisplay.Str(entry, "kind") is "pi.user" or "pi.assistant").MaxBy(entry => ChatDisplay.Long(entry, "id") ?? 0);
-        if (ChatDisplay.Str(newest, "kind") == "pi.assistant" && ChatSpendStopView.From(ChatEntryMeta.Of(newest)?.ErrorMessage, ChatDisplay.Long(newest, "id")) is { } stop)
-            return new ChatBannersView(none) { Spend = stop };
+        if (ChatSpendStopView.Newest(entries, queued) is { } stop) return new ChatBannersView(none) { Spend = stop };
         var (kind, meta) = ChatFacts.LastFailure(entries);
         if (kind != ChatFailureKind.Expired) return none ? new ChatBannersView(true) : ChatBannersView.None;
         var provider = meta?.Provider ?? binding.Provider;
@@ -779,9 +797,10 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
     }
 
     /// <summary>The render context of an agent of the chat: its pending approvals by call id, the account label, the provider's billing
-    /// kind and, with the branch's committed <paramref name="entries"/> and <paramref name="items"/>, the items' facts.</summary>
+    /// kind and, with the branch's committed <paramref name="entries"/> and <paramref name="items"/>, the items' facts and the spend stop
+    /// that ended the run, with the <paramref name="queued"/> messages that wait behind it.</summary>
     public ChatRenderContext RenderContext(ChatBinding binding, long agentId, string? accountLabel, IReadOnlyList<JsonObject>? entries = null,
-        IReadOnlyList<TranscriptItem>? items = null, ChatRunState? run = null, ChatSpendFacts? spend = null)
+        IReadOnlyList<TranscriptItem>? items = null, ChatRunState? run = null, ChatSpendFacts? spend = null, int queued = 0)
     {
         ArgumentNullException.ThrowIfNull(binding);
         var approvals = new Dictionary<string, PendingApproval>(StringComparer.Ordinal);
@@ -802,7 +821,21 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
             Facts = items is null ? new Dictionary<string, ChatItemFacts>(StringComparer.Ordinal) : ChatFacts.Build(items, entries, run),
             Results = ChatFacts.ToolResults(entries),
             Spend = spend ?? ChatSpendFacts.Empty,
+            Stop = ChatSpendStopView.Newest(entries, queued),
         };
+    }
+
+    /// <summary>The messages queued on a branch (<see cref="ChatSpendStopView.Waiting"/>), or 0 when its queue can't be read.</summary>
+    private static async Task<int> QueuedAsync(HostedSession session, long agentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return ChatSpendStopView.Waiting(await AgentFrames.InboxAsync(session, agentId, cancellationToken).ConfigureAwait(false));
+        }
+        catch (Exception error) when (ChatErrors.From(error) is not null)
+        {
+            return 0;
+        }
     }
 
     /// <summary>The answers' cost marks of a branch from the spend ledger (empty without the Spend area).</summary>
