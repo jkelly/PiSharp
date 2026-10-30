@@ -10,8 +10,8 @@ using PiSharp.WebAgent.Hosting;
 // repositories or branches). Each git worktree starts from the base commit; the project's uncommitted changes are listed and left out;
 // copies skip the excluded folders and .gitignore; a file written in one workspace never appears in another; diffs include new, deleted and
 // binary files; Apply refuses when the project has uncommitted changes in the same files; Keep the branch creates the branch and leaves the
-// current one; Discard leaves `git worktree list` clean; the cleanup removes leftovers and expired runs; paths stay inside their roots; git
-// runs with argument lists.
+// current one; Discard leaves `git worktree list` clean; the cleanup removes leftovers and expired runs; a root that already holds the
+// user's files is never claimed, so nothing in it is removed; paths stay inside their roots; git runs with argument lists.
 internal static partial class Program
 {
     internal static IEnumerable<(string, Func<Task>)> WorkspaceCases() =>
@@ -478,6 +478,71 @@ internal static partial class Program
             WsWrite(Path.Join(foreign.Root, "junk"), ("x.txt", "someone else's"));
             Equal(0, (await foreign.Manager.CleanupAsync()).Removed.Count, "an unmarked root is left alone");
             Check(File.Exists(Path.Join(foreign.Root, "junk", "x.txt")), "its folder is still there");
+        }),
+
+        Case("workspaces.an-existing-root-with-other-files-is-never-claimed", async () =>
+        {
+            // --data (or PISHARP_WEBAGENT_DATA) pointed at an existing folder whose `workspaces` child holds the user's own files: a folder
+            // with a valid run name (the very run asked for), one with an invalid run name, and a loose file.
+            await using var lab = WsLab.Create("claim");
+            var project = lab.Folder("project");
+            WsWrite(project, ("a.txt", "one\n"));
+            WsWrite(Path.Join(lab.Root, "cmp_mine"), ("keep.txt", "named like a run"));
+            WsWrite(Path.Join(lab.Root, "photos"), ("cat.txt", "the user's photos"));
+            WsWrite(Path.Join(lab.Root, "My Notes"), ("todo.txt", "the user's notes"));
+            WsWrite(lab.Root, ("readme.txt", "the user's file"));
+            string[] mine = ["cmp_mine/keep.txt", "photos/cat.txt", "My Notes/todo.txt", "readme.txt"];
+
+            var refused = await ThrowsAsync<WorkspaceException>(() => lab.Manager.CreateAsync(new WorkspaceRequest
+            { Run = "cmp_mine", ProjectPath = project, Slots = WsSlots("a", "b") }), "a run in a root that holds other files");
+            Equal(WorkspaceException.RootInUse, refused.Code, "the run is refused: the root isn't the app's");
+            Check(refused.Message.StartsWith(lab.Root + " already holds other files", StringComparison.Ordinal), "a clear message: " + refused.Message);
+            Equal(refused.Message, lab.Manager.RootProblem(), "the manager says why");
+            Equal(WorkspaceException.RootInUse, (await ThrowsAsync<WorkspaceException>(() => lab.Manager.InspectAsync(project), "setup's inspection")).Code,
+                "setup says so before a run starts");
+            Check(!lab.Manager.OwnsRoot && !File.Exists(Path.Join(lab.Root, WorkspaceManager.MarkerFile)), "the marker is not written into the user's folder");
+            Equal(0, (await lab.Manager.ListAsync()).Count, "no workspaces are listed");
+
+            Equal(0, (await lab.Manager.CleanupAsync()).Removed.Count, "the cleanup removes nothing");
+            Equal(0, (await lab.Manager.DiscardAllAsync()).Removed.Count, "Clean up removes nothing");
+            Check(!await lab.Manager.DiscardRunAsync("photos") && !await lab.Manager.DiscardRunAsync("cmp_mine"), "a discard by name removes no folder of the user's");
+            var janitor = new WorkspaceJanitor(lab.Manager, [], lab.Clock);
+            await janitor.StartAsync(CancellationToken.None);
+            await janitor.FirstRun.WaitAsync(TimeSpan.FromSeconds(60));
+            await janitor.StopAsync(CancellationToken.None);
+            Equal(0, janitor.LastReport!.Removed.Count, "the janitor removes nothing either");
+            Equal(string.Join(",", mine.Order(StringComparer.Ordinal)), string.Join(",", WsFiles(lab.Root)), "every file of the user's is still there, and nothing was added");
+
+            // A root that exists but is empty is claimed, and so is one the manager makes; the cleanup then works there as usual.
+            await using var empty = WsLab.Create("claim-empty");
+            Directory.CreateDirectory(empty.Root);
+            var emptyProject = empty.Folder("project");
+            WsWrite(emptyProject, ("a.txt", "one\n"));
+            Equal<string?>(null, empty.Manager.RootProblem(), "an empty root can be used");
+            await empty.Manager.CreateAsync(new WorkspaceRequest { Run = "cmp_empty", ProjectPath = emptyProject, Slots = WsSlots("a") });
+            Check(empty.Manager.OwnsRoot, "an empty root is claimed with the marker");
+            await empty.Manager.CreateAsync(new WorkspaceRequest { Run = "cmp_second", ProjectPath = emptyProject, Slots = WsSlots("a") });
+            Equal(2, (await empty.Manager.ListAsync()).Count, "its own runs don't make the root someone else's");
+
+            await using var fresh = WsLab.Create("claim-fresh");
+            var freshProject = fresh.Folder("project");
+            WsWrite(freshProject, ("a.txt", "one\n"));
+            Check(!Directory.Exists(fresh.Root), "no root yet");
+            await fresh.Manager.CreateAsync(new WorkspaceRequest { Run = "cmp_fresh", ProjectPath = freshProject, Slots = WsSlots("a") });
+            Check(fresh.Manager.OwnsRoot, "a root the manager makes is claimed");
+            WsWrite(Path.Join(fresh.Root, "stray"), ("x.txt", "left in the app's own folder"));
+            Equal("stray:leftover", string.Join(",", (await fresh.Manager.CleanupAsync()).Removed.Select(removal => removal.Run + ":" + removal.Reason)),
+                "in the app's own root an unknown folder is a leftover");
+            Equal(1, (await fresh.Manager.ListAsync()).Count, "and its run is kept");
+
+            // A file where the root should be is refused too.
+            await using var file = WsLab.Create("claim-file");
+            var fileProject = file.Folder("project");
+            WsWrite(fileProject, ("a.txt", "one\n"));
+            WsWrite(Path.GetDirectoryName(file.Root)!, (WorkspaceManagerOptions.FolderName, "a file, not a folder"));
+            Equal(WorkspaceException.RootInUse, (await ThrowsAsync<WorkspaceException>(() => file.Manager.CreateAsync(new WorkspaceRequest
+            { Run = "cmp_file", ProjectPath = fileProject, Slots = WsSlots("a") }), "a file as the root")).Code, "a file where the root should be");
+            Equal("a file, not a folder", File.ReadAllText(file.Root), "the file is untouched");
         }),
 
         Case("workspaces.paths-stay-inside-the-workspace-root", async () =>
