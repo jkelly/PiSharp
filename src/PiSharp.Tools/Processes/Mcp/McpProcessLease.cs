@@ -33,6 +33,8 @@ public interface IMcpOwnedDuplexProcess : IAsyncDisposable
     Task StopAsync();
 }
 
+/// <summary>A launch that ends canceled must already have released everything it acquired, as the native launcher only
+/// rethrows cancellation once cleanup is confirmed.</summary>
 public delegate ValueTask<IMcpOwnedDuplexProcess> McpProcessLauncher(McpProcessAdmission admission,
     CancellationToken cancellationToken);
 
@@ -123,7 +125,8 @@ public sealed class McpProcessLease
         var faults = new List<Exception>();
         var cancel = _launchStop.CancelAsync();
         Task? start; lock (_gate) start = _start;
-        if (start is not null) await Join(start).ConfigureAwait(false);
+        // A launch this close (or its caller) canceled acquired nothing, so it is settled, not a close fault.
+        if (start is not null) try { await start.ConfigureAwait(false); } catch (OperationCanceledException) when (start.IsCanceled) { } catch (Exception error) { faults.Add(error); }
         IMcpOwnedDuplexProcess? process; Task? stderr;
         lock (_gate) { process = _process; stderr = _stderr; }
         if (process is not null)

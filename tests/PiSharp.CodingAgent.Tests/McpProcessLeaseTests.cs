@@ -11,6 +11,7 @@ internal static class McpProcessLeaseTests
         ("mcp-process. close joins held start and stop originals", Held),
         ("mcp-process. close preserves stop and disposal faults", Failures),
         ("mcp-process. canceled launch is joined without replacement acquisition", Canceled),
+        ("mcp-process. close during launch settles the canceled launch and keeps a launch fault", CloseDuringLaunch),
         ("mcp-process. launcher lifecycle reentry rejects before mutation", LauncherReentry),
         ("mcp-process. stop lifecycle reentry rejects while independent close joins", StopReentry),
         ("mcp-process. disposal lifecycle reentry preserves repeated original fault", DisposalReentry)
@@ -75,8 +76,29 @@ internal static class McpProcessLeaseTests
         var lease = new McpProcessLease(Request(), (_, token) => { calls++; token.ThrowIfCancellationRequested(); throw new Exception("unexpected"); });
         var start = lease.StartAsync(cancel.Token);
         try { await start; } catch (OperationCanceledException) { }
-        try { await lease.CloseAsync(); } catch (OperationCanceledException) { }
+        await lease.CloseAsync();
         Check(calls == 1);
+    }
+    private static async Task CloseDuringLaunch()
+    {
+        // A launch that close cancels acquired nothing, so close settles; a session that ends while a stdio server
+        // is still launching must not report a cleanup failure.
+        var entered = Gate(); var calls = 0;
+        var lease = new McpProcessLease(Request(), async (_, token) =>
+        {
+            calls++; entered.TrySetResult(); await Task.Delay(Timeout.Infinite, token); throw new Exception("unexpected");
+        });
+        var start = lease.StartAsync(); await entered.Task;
+        await lease.CloseAsync();
+        try { await start; throw new Exception("launch was not canceled"); } catch (OperationCanceledException) { }
+        Check(calls == 1 && start.IsCanceled);
+        // A launch that failed may not have released what it acquired, so close still reports that fault.
+        var original = new IOException("launch-original");
+        var faulted = new McpProcessLease(Request(), (_, _) => ValueTask.FromException<IMcpOwnedDuplexProcess>(original));
+        try { await faulted.StartAsync(); } catch (IOException) { }
+        Exception? closeFault = null;
+        try { await faulted.CloseAsync(); } catch (Exception error) { closeFault = error; }
+        Check(ReferenceEquals(closeFault, original));
     }
     private static void RejectLifecycle(McpProcessLease lease)
     {
