@@ -1,0 +1,20 @@
+{
+  "threads": [
+    {
+      "id": "t-201",
+      "customer": "Ava",
+      "subject": "Invoice question",
+      "messages": [
+        {
+          "from": "Ava",
+          "text": "Does invoice INV-42 include the training session?"
+        }
+      ],
+      "facts": {
+        "invoice": "INV-42",
+        "training_included": true,
+        "total": "$480"
+      }
+    }
+  ]
+}

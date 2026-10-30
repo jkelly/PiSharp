@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "example-model",
+      "name": "Structured model example",
+      "api": "openai-completions",
+      "type": "chat",
+      "baseUrl": "https://api.your-provider.example/v1",
+      "contextWindow": 128000,
+      "maxTokens": 16000,
+      "input": ["text", "image"],
+      "output": ["text"],
+      "supportedParameters": ["tools"],
+      "prices": [
+        { "kind": "input", "currency": "USD", "unit": "token", "amount": "0.000001", "tier": "standard", "region": "us-east", "conditions": { "maximumContextTokens": 128000 } },
+        { "kind": "output", "currency": "USD", "unit": "million-tokens", "amount": null, "tier": "standard", "region": "us-east", "conditions": {} },
+        { "kind": "cache-read", "currency": "EUR", "unit": "thousand-tokens", "amount": "0.0001", "tier": "batch", "region": "eu-west", "conditions": { "ttl": "5m" } }
+      ]
+    }
+  ]
+}

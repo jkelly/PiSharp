@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "overlayPath": "catalog-maintained/models.overlay.json",
+  "baselineCatalogDirectory": "src/PiSharp.Cli/Models",
+  "excludedProviders": [],
+  "providers": [
+    {
+      "id": "openrouter",
+      "enabled": true,
+      "adapter": "openrouter",
+      "endpoint": "https://openrouter.ai/api/v1/models",
+      "officialHosts": ["openrouter.ai"],
+      "apiKeyEnvironmentVariable": "OPENROUTER_API_KEY",
+      "excludedModels": []
+    },
+    {
+      "id": "your-provider",
+      "enabled": false,
+      "adapter": "structured-json",
+      "endpoint": "https://api.your-provider.example/catalog",
+      "officialHosts": ["api.your-provider.example"],
+      "modelsPointer": "/data",
+      "pricesPointer": "/prices"
+    }
+  ],
+  "gitHub": {
+    "repository": "YOUR-OWNER/YOUR-REPOSITORY",
+    "baseBranch": "main",
+    "branch": "automation/model-catalog",
+    "tokenEnvironmentVariable": "GITHUB_TOKEN"
+  }
+}

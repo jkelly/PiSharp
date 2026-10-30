@@ -1,0 +1,49 @@
+# Install deliberately as .github/workflows/model-catalog-maintainer.yml.
+# Configure repository variables CATALOG_CONFIG (repository-relative JSON path),
+# CATALOG_REPOSITORY (owner/repo), and optionally secrets.OPENROUTER_API_KEY.
+# Config must explicitly name the same destination repository. Cross-repository
+# writes need a fine-grained PAT in CATALOG_GITHUB_TOKEN with access to that repo.
+name: Model catalog maintenance
+on:
+  workflow_dispatch:
+  # Opt into a configurable schedule by uncommenting and changing this cron.
+  # schedule:
+  #   - cron: '17 9 * * 1'
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+concurrency:
+  group: model-catalog-${{ vars.CATALOG_REPOSITORY || github.repository }}
+  cancel-in-progress: false
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.401'
+      - name: Validate offline invariants
+        run: dotnet run --project samples/agents/31-ModelCatalogMaintainer -- --self-test
+      - name: Refresh sources and open or update draft PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.CATALOG_GITHUB_TOKEN || github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CATALOG_CONFIG: ${{ vars.CATALOG_CONFIG }}
+        run: >-
+          dotnet run --project samples/agents/31-ModelCatalogMaintainer --no-build --
+          --maintain --live --approve --publish
+          --config "$CATALOG_CONFIG" --workspace "$RUNNER_TEMP/model-catalog"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-catalog-evidence
+          path: |
+            ${{ runner.temp }}/model-catalog/maintenance-report.json
+            ${{ runner.temp }}/model-catalog/model-catalog-review.md
+            ${{ runner.temp }}/model-catalog/publication-result.json
+            ${{ runner.temp }}/model-catalog/evidence/

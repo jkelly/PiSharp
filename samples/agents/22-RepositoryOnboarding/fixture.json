@@ -1,0 +1,10 @@
+{
+  "files": [
+    "README.md",
+    "src/App.cs",
+    "src/App.csproj",
+    "tests/App.Tests.cs",
+    "docs/architecture.md"
+  ],
+  "readme": "Build with dotnet build. Run tests with dotnet test."
+}

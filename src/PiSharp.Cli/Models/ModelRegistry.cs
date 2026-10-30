@@ -16,6 +16,7 @@ namespace PiSharp.Cli.Models;
 internal sealed record ModelRegistryOptions
 {
     internal string? ModelsPath { get; init; }
+    internal string? MaintainedCatalogPath { get; init; }
     internal Func<string, string?> Environment { get; init; } = _ => null;
     internal IReadOnlyDictionary<string, ProviderStoredCredential> StoredCredentials { get; init; } = ImmutableDictionary<string, ProviderStoredCredential>.Empty;
     internal Func<string, string?>? RunCommand { get; init; }
@@ -59,6 +60,7 @@ internal sealed class ModelRegistry
     internal PiSharp.Cli.Llama.LlamaCatalog Llama => llama;
     private ModelsJsonConfig config;
     private List<Composed> providers = [];
+    private readonly List<string> maintainedErrors = [];
     internal ConfigValueResolver Values { get; }
 
     private ModelRegistry(ModelRegistryOptions options)
@@ -136,11 +138,17 @@ internal sealed class ModelRegistry
     private void Rebuild()
     {
         var next = new List<Composed>();
+        maintainedErrors.Clear();
+        var maintainedPath = options.MaintainedCatalogPath ?? options.Environment("PISHARP_MAINTAINED_CATALOG")
+            ?? Path.Combine(AppContext.BaseDirectory, "catalog-maintained", "models.overlay.json");
         var llamaLoaded = LlamaLoaded;
         foreach (var id in ProviderIds())
         {
             IReadOnlyList<RegistryModel> baseModels = id == "radius" && radiusDynamic is { } dynamic ? dynamic : id == LlamaProviderId && llamaLoaded ? llama.AllModels :
                 overlays.TryGetValue(id, out var overlay) ? overlay.Apply(BuiltinModels(id)) : BuiltinModels(id);
+            var maintained = MaintainedModelCatalog.Apply(id, baseModels, maintainedPath);
+            baseModels = maintained.Models;
+            if (maintained.Error is not null) maintainedErrors.Add(maintained.Error);
             var providerConfig = config.GetProvider(id);
             var extension = extensionProviders.GetValueOrDefault(id);
             if (providerConfig is null && extension is null) { next.Add(new(id, [.. baseModels], false, null)); continue; }
@@ -283,6 +291,7 @@ internal sealed class ModelRegistry
     {
         var errors = new List<string>();
         if (config.Error is { } loadError) errors.Add(loadError);
+        errors.AddRange(maintainedErrors.Distinct(StringComparer.Ordinal));
         foreach (var provider in providers) if (provider.Error is { } error) errors.Add($"Provider \"{provider.Id}\": {error}");
         return errors.Count > 0 ? string.Join("\n\n", errors) : null;
     }

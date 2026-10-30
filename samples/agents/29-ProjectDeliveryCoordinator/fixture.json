@@ -1,0 +1,9 @@
+{
+  "project": "Customer portal launch",
+  "tasks": [
+    { "id": "API", "owner": "platform", "done": true },
+    { "id": "UI", "owner": "product", "done": false },
+    { "id": "QA", "owner": "quality", "done": false }
+  ],
+  "risks": ["QA cannot begin until UI is complete", "Launch date depends on signoff"]
+}

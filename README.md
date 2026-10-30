@@ -20,6 +20,8 @@ Two samples run on scripted models or a real provider:
 
 Documentation is at [pisharp.ai](https://pisharp.ai/docs/). The full-parity work is tracked in [full-parity-v1.1.0.md](docs/plans/full-parity-v1.1.0.md) and [full-parity-progress.json](docs/plans/full-parity-progress.json), and the Pi 1.2.0 sync in [decision 0006](docs/decisions/0006-pi-1.2.0-sync.md).
 
+Explore [32 runnable agent samples](samples/agents/README.md): practical workflows, fixture demos, live model integration, and automated model/pricing and NuGet vulnerability maintainers. Each sample includes inputs, documentation, and focused verification.
+
 ## Native validation tooling
 
 Use the .NET SDK version pinned in `global.json`. The retained [native test runner](tools/test-native.ps1) consumes separately prepared, exactly pinned source and build receipts through `SourceManifest`, `SourceManifestSha256`, `PermittedBuildReceipt`, and `PermittedBuildReceiptSha256`. It validates and runs those existing products; it does not restore, rebuild, or publish them. The [preparation tool](tools/prepare-native-products.ps1) separately requires an explicit source manifest, runtime allocation, and finite execution budget.

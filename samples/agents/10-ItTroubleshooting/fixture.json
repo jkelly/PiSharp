@@ -1,0 +1,37 @@
+{
+  "devices": [
+    {
+      "id": "dev-1001",
+      "name": "Laptop-17",
+      "os": "Windows",
+      "observations": {
+        "network_connected": true,
+        "dns_resolves": false,
+        "vpn_connected": false
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "rule-dns",
+      "when": "dns_resolves",
+      "expected": false,
+      "finding": "DNS resolution is failing",
+      "steps": [
+        "Check configured DNS server.",
+        "Run a controlled DNS lookup.",
+        "Escalate if resolution remains unavailable."
+      ]
+    },
+    {
+      "id": "rule-vpn",
+      "when": "vpn_connected",
+      "expected": false,
+      "finding": "VPN is disconnected",
+      "steps": [
+        "Verify VPN credentials.",
+        "Reconnect VPN."
+      ]
+    }
+  ]
+}

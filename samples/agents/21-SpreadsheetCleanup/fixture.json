@@ -1,0 +1,3 @@
+{
+  "csv": "name,email,region\n Ada  Lovelace ,ADA@example.com, West \nAda Lovelace,ada@example.com,West\nGrace Hopper,grace@example.com,East\nBad Row,not-an-email,East\n"
+}

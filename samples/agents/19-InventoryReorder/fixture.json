@@ -1,0 +1,32 @@
+{
+  "budget": 500.0,
+  "products": [
+    {
+      "sku": "INK",
+      "on_hand": 12,
+      "on_order": 5,
+      "daily_demand": 4,
+      "lead_days": 5,
+      "safety_stock": 8,
+      "unit_cost": 12.0
+    },
+    {
+      "sku": "PAPER",
+      "on_hand": 14,
+      "on_order": 0,
+      "daily_demand": 3,
+      "lead_days": 7,
+      "safety_stock": 10,
+      "unit_cost": 5.0
+    },
+    {
+      "sku": "CLIPS",
+      "on_hand": 90,
+      "on_order": 0,
+      "daily_demand": 1,
+      "lead_days": 4,
+      "safety_stock": 10,
+      "unit_cost": 2.0
+    }
+  ]
+}
