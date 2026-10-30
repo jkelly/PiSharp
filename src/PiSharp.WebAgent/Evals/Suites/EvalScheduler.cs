@@ -2,7 +2,8 @@
 // example while this computer was asleep, collapse into one. A run is skipped while the previous one is still going. EvalScheduler follows
 // decision 0009's slot rules: one run per (schedule, slot).").
 //
-// Every 30 seconds (and once when the app starts, after marking runs a crash left behind interrupted) each enabled, unpaused schedule is
+// Every 30 seconds (and once when the app starts), after marking runs a crash left behind interrupted (SuiteRunner.RecoverAsync, retried
+// on each tick until it has marked them all), each enabled, unpaused schedule is
 // looked at once: only its latest slot that counts (SuiteSchedule.Latest: after EnabledAt) is considered, so slots missed while the app was
 // stopped collapse into that one, and a slot already decided is never decided again (one row per suite and slot in eval_schedule_slots;
 // a started slot's row is written with its run, in one transaction). For an undecided slot:
@@ -55,6 +56,13 @@ public sealed class EvalScheduler : BackgroundService
         await tickGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // First, runs a crash left going (a no-op once a pass has marked them all): until they are marked interrupted, their suites'
+            // slots would be skipped as still running.
+            try { await runner.RecoverAsync(cancellationToken).ConfigureAwait(false); }
+            catch (Exception error) when (error is not OperationCanceledException and not OutOfMemoryException)
+            {
+                log?.LogWarning(error, "Suite runs left going by the last session could not be marked interrupted yet; they are tried again at the next tick.");
+            }
             var decisions = new List<ScheduleSlot>();
             foreach (var suite in store.ScheduledSuites())
             {
@@ -102,11 +110,7 @@ public sealed class EvalScheduler : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Yield();
-        try { await runner.RecoverAsync(stoppingToken).ConfigureAwait(false); }
-        catch (Exception error) when (error is not OperationCanceledException and not OutOfMemoryException)
-        {
-            log?.LogWarning(error, "Suite runs left going by the last session could not be marked interrupted.");
-        }
+        // The first tick marks the runs a crash left going interrupted (TickAsync), and later ticks retry it until it succeeds.
         while (!stoppingToken.IsCancellationRequested)
         {
             try { await TickAsync(stoppingToken).ConfigureAwait(false); }

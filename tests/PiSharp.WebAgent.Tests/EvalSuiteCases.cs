@@ -30,7 +30,8 @@ using EvalCheck = PiSharp.WebAgent.Evals.Check;
 // refuses the schedule; a price rise pauses it (Price Watch's change, through the scheduler); a scripted transport that changes
 // responseModel is flagged drift, and the confirming run carries it on. Also: a run is one group reservation whose holds are all released,
 // with every call guarded and recorded as source drift under the run's group; a slot is skipped while the previous run is going; cancel and
-// recovery; a Spend Guard refusal starts nothing, and its Ask answer starts the same run id; responseModel on run records (runs.db
+// recovery (retried on each tick until every crashed run is marked); a Spend Guard refusal starts nothing, and its Ask answer starts the
+// same run id; the typical cost counts full runs only; accepting a baseline twice adds nothing; responseModel on run records (runs.db
 // migration 2); and the JSON API in the built app.
 internal static partial class Program
 {
@@ -241,6 +242,9 @@ internal static partial class Program
             var unknown = host.Suites.SetSchedule(suite.Id, SuHourly, worst);
             Check(unknown is { Saved: false, Refused.Code: ScheduleRefusal.UnknownPrice } && unknown.Refused.Message.StartsWith("faux/echo has no known price", StringComparison.Ordinal),
                 "a model without a price cannot be scheduled: " + unknown.Refused?.Message);
+            var unpriced = host.Store.Suite(suite.Id)!;
+            Equal(ScheduleRefusal.UnknownPrice, SuiteService.Refusal(unpriced, cases.Count, host.Suites.Estimate(unpriced, cases), null)?.Code,
+                "with no cap either, the unknown price is what refuses it: no cap would lift it");
             host.Clock.Advance(TimeSpan.FromHours(1));
             var skipped = (await host.Scheduler.TickAsync()).Single();
             Check(skipped is { Outcome: SlotOutcome.SkippedUnknownPrice } && host.Store.Suite(suite.Id)!.Schedule is { Paused.Code: SchedulePause.UnknownPrice },
@@ -384,6 +388,101 @@ internal static partial class Program
             Check(next is { Status: SuiteRunStatus.Complete, Number: 2 }, "the next run is #2");
         }),
 
+        Case("evals.suites.recovery-is-retried-until-every-crashed-run-is-marked", async () =>
+        {
+            await using var host = SuHost.Create("su-recover-retry");
+            var (stuck, stuckCases) = SuSeed(host, "Stuck");
+            var (other, otherCases) = SuSeed(host, "Other");
+            SuiteRun Crashed(Suite suite, IReadOnlyList<TestCase> cases, DateTimeOffset at)
+            {
+                var draft = SuiteRun.Start(suite, [cases[0].Id], 1, SuiteRunTrigger.Manual, null, at);
+                return host.Store.InsertRun(draft with { Status = SuiteRunStatus.Running, GroupId = draft.Id, Created = at, Started = at },
+                    [new SuiteResult { RunId = draft.Id, CaseId = cases[0].Id, TargetId = suite.Targets.Single().Id, Status = ResultStatus.Running }], at)!;
+            }
+            var failing = Crashed(stuck, stuckCases, SuStart.AddMinutes(-2)); // the oldest: recovered first
+            var fine = Crashed(other, otherCases, SuStart.AddMinutes(-1));
+            // One bad row: the database refuses to save the first run (as a busy or failing write would) until the trigger is dropped.
+            host.Store.Db.Execute($"CREATE TRIGGER su_refuse_recovery BEFORE UPDATE ON eval_runs WHEN OLD.id = '{failing.Id}' BEGIN SELECT RAISE(ABORT, 'database is locked'); END;");
+
+            Equal(1, await host.Runner.RecoverAsync(), "one run's failure does not stop the others");
+            Check(host.Store.Run(fine.Id) is { Status: SuiteRunStatus.Interrupted, Problem: SuiteRunner.InterruptedProblem }, "the other crashed run is interrupted");
+            Equal(SuiteRunStatus.Running, host.Store.Run(failing.Id)!.Status, "the failing run is still marked going");
+            Equal(0, await host.Runner.RecoverAsync(), "the pass did not finish, so the next call tries again (and fails again)");
+            Equal(SuiteRunStatus.Running, host.Store.Run(failing.Id)!.Status, "still going");
+            var refused = await host.Runner.StartAsync(stuck.Id, new SuiteRunRequest());
+            Check(refused is { Posted: false, Refused.Code: SuiteRunRefusal.Running }, "while it is marked going, Run now is refused: " + refused.Refused?.Code);
+
+            Check(host.Suites.SetSchedule(stuck.Id, SuHourly, 1_000_000).Saved, "scheduled");
+            host.Store.Db.Execute("DROP TRIGGER su_refuse_recovery;");
+            host.Clock.Advance(TimeSpan.FromHours(1)); // 10:10
+            var decision = (await host.Scheduler.TickAsync()).Single();
+            Check(decision is { Outcome: SlotOutcome.Started, RunId: not null },
+                "the next tick marked the run interrupted first, so the 10:00 slot ran instead of being skipped as still running: " + EvalJson.Wire(decision.Outcome) + " " + decision.Detail);
+            Check(host.Store.Run(failing.Id) is { Status: SuiteRunStatus.Interrupted, Problem: SuiteRunner.InterruptedProblem, Finished: not null }, "the crashed run is interrupted now");
+            Equal(ResultStatus.Cancelled, host.Store.Results(failing.Id).Single().Status, "its unfinished answer is cancelled");
+            Check(await SuFinished(host, decision.RunId!) is { Status: SuiteRunStatus.Complete, Number: 2 }, "the scheduled run is #2, complete");
+            Equal(0, await host.Runner.RecoverAsync(), "a pass that finished is not run again");
+            Equal(SuiteRunStatus.Interrupted, host.Store.Run(fine.Id)!.Status, "marked once");
+        }),
+
+        Case("evals.suites.typical-cost-counts-full-runs-only", async () =>
+        {
+            await using var host = SuHost.Create("su-typical");
+            var (suite, cases) = SuSeed(host, "Typical", k: 2, cases: 2);
+            var full = await SuRunNow(host, suite.Id);
+            Check(full.CostMicros > 0, "a priced full run");
+            Equal(full.CostMicros, host.Suites.Typical(suite.Id), "one full run: its cost");
+
+            // "Run this case": a subset run costs less than a full run, and is not what a scheduled run costs.
+            var start = await host.Runner.StartAsync(suite.Id, new SuiteRunRequest { CaseIds = [cases[0].Id] });
+            var subset = await SuFinished(host, start.Run!.Id);
+            Check(subset is { Status: SuiteRunStatus.Complete, CaseIds.Count: 1 } && subset.CostMicros > 0 && subset.CostMicros < full.CostMicros,
+                $"a complete subset run, cheaper: {subset.CostMicros} < {full.CostMicros}");
+            Equal(full.CostMicros, host.Suites.Typical(suite.Id), "the subset run is left out of the typical cost");
+            Equal(full.CostMicros, host.Suites.Estimate(suite, host.Store.Cases(suite.Id)).TypicalMicros, "and out of the estimate's");
+            var again = await SuRunNow(host, suite.Id);
+            Equal((long)Math.Round(TargetSummary.Median([full.CostMicros, again.CostMicros])!.Value), host.Suites.Typical(suite.Id), "the median of the two full runs");
+
+            // A run of an older shape is not what a run of the suite as it is now costs either.
+            host.Suites.CreateCase(SuCase(suite.Id, "Case 3", "Write a SemVer 2.0.0 regex, variant 3."));
+            Equal(null, host.Suites.Typical(suite.Id), "a case added: no full run of the suite as it is yet");
+            var bigger = await SuRunNow(host, suite.Id);
+            Check(bigger.CostMicros > full.CostMicros, $"a bigger run: {bigger.CostMicros}");
+            Equal(bigger.CostMicros, host.Suites.Typical(suite.Id), "its cost");
+            host.Suites.UpdateSuite(suite.Id, current => current with { K = 1 });
+            Equal(null, host.Suites.Typical(suite.Id), "k lowered: no full run at k 1 yet");
+        }),
+
+        Case("evals.suites.accepting-a-baseline-twice-adds-nothing", async () =>
+        {
+            await using var host = SuHost.Create("su-accept");
+            var (suite, _) = SuSeed(host, "Accepted", targets: [new SuiteTarget("faux", "echo"), new SuiteTarget("faux", "echo-thinking")], cases: 2);
+            var targets = suite.Targets.Select(target => target.Id).ToList();
+            int Rows() => host.Store.Baselines(suite.Id, currentOnly: false).Count;
+            List<DateTimeOffset> Updated() => [.. host.Store.Cases(suite.Id).Select(testCase => testCase.Updated)];
+
+            var first = await SuRunNow(host, suite.Id);
+            var accepted = host.Suites.AcceptBaseline(suite.Id, first.Id, null, replaceReferences: true);
+            Check(accepted is { Accepted.Count: 2, ReferencesReplaced: 2 } && accepted.Accepted.All(baseline => baseline.ReplacedReferences), "both targets, both cases' references");
+            var references = Updated();
+            host.Clock.Advance(TimeSpan.FromMinutes(1));
+            var retried = host.Suites.AcceptBaseline(suite.Id, first.Id, null, replaceReferences: true);
+            Check(retried is { Accepted.Count: 0, Cleared.Count: 0, ReferencesReplaced: 0 }, "the same accept again (a retried POST): nothing accepted, nothing replaced");
+            Equal(2, Rows(), "one baseline row per target, no duplicate");
+            Check(Updated().SequenceEqual(references), "no reference output rewritten");
+            Equal(0, host.Suites.AcceptBaseline(suite.Id, first.Id, null, replaceReferences: false).Accepted.Count, "without replacing: nothing either");
+
+            // A baseline accepted without its references, then accepted again replacing them: that is a change, made once.
+            var second = await SuRunNow(host, suite.Id);
+            Check(host.Suites.AcceptBaseline(suite.Id, second.Id, [targets[0]], replaceReferences: false) is { Accepted.Count: 1, ReferencesReplaced: 0 }, "the first target, no references");
+            var upgraded = host.Suites.AcceptBaseline(suite.Id, second.Id, null, replaceReferences: true);
+            Check(upgraded is { Accepted.Count: 2, ReferencesReplaced: 2 } && upgraded.Accepted.All(baseline => baseline.RunId == second.Id && baseline.ReplacedReferences),
+                "both targets now replace the references (the first one's baseline did not)");
+            Equal(0, host.Suites.AcceptBaseline(suite.Id, second.Id, null, replaceReferences: true).Accepted.Count, "and again: nothing");
+            Equal(5, Rows(), "2 + 1 + 2 rows, one per change");
+            Check(host.Store.Baselines(suite.Id).Count == 2 && host.Store.Baselines(suite.Id).All(baseline => baseline.RunId == second.Id), "the current baselines are run #2's");
+        }),
+
         Case("evals.suites.spend-guard-refusal-starts-nothing", async () =>
         {
             await using var host = SuHost.Create("su-guard");
@@ -512,9 +611,19 @@ internal static partial class Program
                 Check(view!["run"]?["status"]?.GetValue<string>() == "complete" && view["results"] is JsonArray { Count: 2 } results &&
                     results.All(result => result?["status"]?.GetValue<string>() == "done" && result["verdict"]?.GetValue<string>() == "passed"), "complete: " + view.ToJsonString());
 
-                var baseline = await Post(api + "/baseline", new JsonObject { ["runId"] = runId });
-                Check(baseline["accepted"] is JsonArray { Count: 1 }, "accepted as the baseline");
+                // Writes are idempotent: the same accept sent twice (a retry, a double click), replacing the references, is one baseline row.
+                var accept = new JsonObject { ["runId"] = runId, ["replaceReferences"] = true };
+                var baseline = await Post(api + "/baseline", (JsonObject)accept.DeepClone());
+                Check(baseline["accepted"] is JsonArray { Count: 1 } && baseline["referencesReplaced"]?.GetValue<int>() == 1,
+                    "accepted as the baseline, its answer the case's reference: " + baseline.ToJsonString());
+                var replayed = await Post(api + "/baseline", (JsonObject)accept.DeepClone());
+                Check(replayed["accepted"] is JsonArray { Count: 0 } && replayed["referencesReplaced"]?.GetValue<int>() == 0,
+                    "the same accept sent twice: no new baseline, no reference rewritten: " + replayed.ToJsonString());
+                long BaselineRows() => ReadDb(Path.Join(root, "data", "webagent.db"), "SELECT COUNT(*) FROM eval_baselines WHERE suite_id = '" + suiteId + "'",
+                    reader => reader.GetInt64(0)).Single();
+                Equal(1L, BaselineRows(), "one baseline row");
                 Check((await Post(api + "/baseline", new JsonObject { ["runId"] = runId }))["accepted"] is JsonArray { Count: 0 }, "accepting twice: once");
+                Equal(1L, BaselineRows(), "still one baseline row");
                 var detail = await Get(api);
                 Check(detail["overview"]?["estimate"]?["typicalMicros"]?.GetValue<long>() > 0 && detail["runs"] is JsonArray { Count: 1 } && detail["baselines"] is JsonArray { Count: 1 },
                     "the suite with its typical cost, runs and baseline: " + detail.ToJsonString()[..Math.Min(600, detail.ToJsonString().Length)]);

@@ -5,7 +5,9 @@
    the worst case is worked out (each call: input tokens × input rate + maxTokens × output rate; subscription targets at list price,
    never counted toward caps). The suite-run cap: fits, or refused when the worst case is above it (or a price is unknown, or the suite
    has no case or target), with SuiteService.Refusal's message; Save schedule is disabled while it is refused, and the server refuses it
-   again on save. Changing the cap asks the server again (?cap=). Turn off, Cancel, Save schedule. Model: ScheduleModalView (or null). *@
+   again on save. A suite without a cap opens with the suggested one (SuiteService.SuggestedCap: the worst case rounded up, as the mockup's
+   $2.00 for $1.62) on the fits pane, never with a refusal shown before anything was typed. Changing the cap asks the server again (?cap=).
+   Turn off, Cancel, Save schedule. Model: ScheduleModalView (or null). *@
 @model ScheduleModalView?
 <div class="modal fade" id="modal-suite-schedule" tabindex="-1" aria-labelledby="modal-suite-schedule-title" aria-hidden="true" data-eval-modal="schedule">
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">

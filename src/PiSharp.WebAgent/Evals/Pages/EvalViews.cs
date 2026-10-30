@@ -411,10 +411,12 @@ public sealed record ScheduleModalView
     /// <summary>The schedule the panes start from: the saved one, or daily at 07:00.</summary>
     public required SuiteSchedule Schedule { get; init; }
 
-    /// <summary>The cap the field starts with (the query's, the saved one, or none).</summary>
+    /// <summary>The cap the field starts with (the query's, the saved one, or for a suite without one the suggested cap,
+    /// <see cref="SuiteService.SuggestedCap"/>), or none.</summary>
     public long? CapMicros { get; init; }
 
-    /// <summary>Why a schedule with <see cref="CapMicros"/> would be refused, or null when it fits.</summary>
+    /// <summary>Why a schedule with <see cref="CapMicros"/> would be refused, or null when it fits (or when no cap is in the field yet and
+    /// nothing else refuses it: an empty field is refused only once the user types or saves).</summary>
     public ScheduleRefusal? Refusal { get; init; }
 
     /// <summary>The time zone the times are in (the saved one, or this computer's).</summary>

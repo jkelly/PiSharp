@@ -7,13 +7,17 @@
 //     blocks. An unknown price, a worst case over the cap or a suite that cannot run is refused with the modal's words ("The worst case,
 //     $1.62, is above the $1.50 cap. Raise the cap to at least $1.62, lower k, or set a lower maxTokens on the cases."); nothing is saved
 //     then. Saving it sets EnabledAt to now, so a slot that had already passed never fires; turning it off keeps its settings.
-//   - The typical cost is the median metered cost of the suite's last 20 complete runs (null before there is one).
+//   - The typical cost is the median metered cost of the suite's last 20 complete full runs (null before there is one): runs of every case
+//     on every target k times, as the suite is now (EvalStore.RecentCosts), so a "Run this case" subset run never makes a full run look
+//     cheaper than it is.
 //   - A schedule that stops fitting is paused, never run over its cap: a price change pauses it (EvalScheduler, with Price Watch's words), and
 //     so does an edit (a case or target added, k raised, the cap lowered) here. A paused schedule runs nothing until an edit makes it fit
 //     again, which resumes it from now (missed slots never fire).
 //   - Accepting a baseline makes a complete run the current baseline of the chosen targets (the old one is kept, Replaced set), records
 //     each target's response models in that run, closes their open signals (DriftAnalyzer.Clear), and optionally replaces each case's
-//     reference output with that run's answer (the first chosen target's first repeat).
+//     reference output with that run's answer (the first target accepted now, its first repeat). It is idempotent: a target whose current
+//     baseline already is that run (with its references replaced, when this accept replaces them) is left out, so a retried POST adds no
+//     baseline row and rewrites no reference.
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Evals.Checks;
 using PiSharp.WebAgent.Evals.Drift;
@@ -51,7 +55,8 @@ public sealed record ScheduleRefusal(string Code, string Message, long? WorstMic
 public sealed record ScheduleSave(bool Saved, Suite Suite, SuiteEstimate Estimate, DateTimeOffset? Next, ScheduleRefusal? Refused);
 
 /// <summary>What accepting a baseline did.</summary>
-/// <param name="Accepted">The new current baselines (targets whose baseline already was that run are left out).</param>
+/// <param name="Accepted">The new current baselines (targets whose baseline already was that run, with its references replaced when asked
+/// to replace them, are left out).</param>
 /// <param name="Cleared">The open signals it closed.</param>
 /// <param name="ReferencesReplaced">How many cases got that run's answer as their reference output.</param>
 public sealed record BaselineAccept(IReadOnlyList<Baseline> Accepted, IReadOnlyList<DriftSignal> Cleared, int ReferencesReplaced);
@@ -78,7 +83,7 @@ public sealed record SuiteOverview(Suite Suite, int Cases, SuiteEstimate Estimat
 /// <summary>Suites, cases, schedules and baselines. A singleton; safe from many threads.</summary>
 public sealed class SuiteService
 {
-    /// <summary>How many complete runs the typical cost is the median of.</summary>
+    /// <summary>How many complete full runs the typical cost is the median of.</summary>
     public const int TypicalRuns = 20;
 
     private readonly EvalStore store;
@@ -231,7 +236,8 @@ public sealed class SuiteService
         return estimator.Estimate(suite, cases) with { TypicalMicros = Typical(suite.Id) };
     }
 
-    /// <summary>The median metered cost of the last <see cref="TypicalRuns"/> complete runs of <paramref name="suiteId"/>, or null.</summary>
+    /// <summary>The median metered cost of the last <see cref="TypicalRuns"/> complete full runs of <paramref name="suiteId"/> (every case,
+    /// target and repeat of the suite as it is now; subset runs left out), or null.</summary>
     public long? Typical(string suiteId) =>
         TargetSummary.Median(store.RecentCosts(suiteId, TypicalRuns).Select(cost => (double)cost)) is { } median ? (long)Math.Round(median) : null;
 
@@ -328,21 +334,34 @@ public sealed class SuiteService
     {
         ArgumentNullException.ThrowIfNull(suite);
         ArgumentNullException.ThrowIfNull(estimate);
+        // The refusals no cap can lift come first (no case or target, an unknown price), then the cap's own.
         if (suite.RunProblem(cases) is { } problem) return new ScheduleRefusal(ScheduleRefusal.CannotRun, problem);
-        if (capMicros is not { } cap)
-            return new ScheduleRefusal(ScheduleRefusal.NoCap, "A schedule needs a suite-run cap: scheduled runs can't ask, so the cap blocks.", estimate.WorstMicros);
         if (estimate.HasUnknownPrice)
         {
             var unknown = UnknownModels(estimate);
             return new ScheduleRefusal(ScheduleRefusal.UnknownPrice,
                 $"{DriftText.List(unknown)} {(unknown.Count == 1 ? "has" : "have")} no known price, and a scheduled run cannot ask. Enter a price in Settings › Spend first.",
-                null, cap);
+                null, capMicros);
         }
+        if (capMicros is not { } cap)
+            return new ScheduleRefusal(ScheduleRefusal.NoCap, "A schedule needs a suite-run cap: scheduled runs can't ask, so the cap blocks.", estimate.WorstMicros);
         if (estimate.Fits(cap)) return null;
         var atLeast = (estimate.WorstMicros + 9_999) / 10_000 * 10_000;
         return new ScheduleRefusal(ScheduleRefusal.OverCap,
             $"The worst case, {DriftText.Money(estimate.WorstMicros)}, is above the {DriftText.Money(cap)} cap. Raise the cap to at least {DriftText.Money(atLeast)}, " +
             "lower k, or set a lower maxTokens on the cases.", estimate.WorstMicros, cap);
+    }
+
+    /// <summary>The cap the schedule dialog suggests for a suite that has none: its metered worst case rounded up to one significant figure
+    /// (the mockup's $1.62 worst case gets a $2.00 cap), at least a cent, so the suggestion always fits; null when the worst case is not known
+    /// (an unknown price) or there is nothing to run. Only a suggestion: nothing is saved until the user saves the schedule.</summary>
+    public static long? SuggestedCap(SuiteEstimate estimate)
+    {
+        ArgumentNullException.ThrowIfNull(estimate);
+        if (estimate.HasUnknownPrice || estimate.WorstMicros <= 0) return null;
+        long step = 10_000; // a cent
+        while (estimate.WorstMicros > step * 10 && step <= long.MaxValue / 100) step *= 10;
+        return (estimate.WorstMicros + step - 1) / step * step;
     }
 
     // ----- baselines -----
@@ -367,9 +386,13 @@ public sealed class SuiteService
             var answers = run.CaseIds.Count * run.K;
             var accepted = new List<Baseline>();
             var cleared = new List<DriftSignal>();
+            var inserted = new List<SuiteTarget>();
             foreach (var target in chosen)
             {
-                if (store.CurrentBaseline(suite.Id, target.Id) is { } current && current.RunId == run.Id && !replaceReferences) continue;
+                // Idempotent (a retried POST, a double click): a target whose current baseline is already this run is left as it is, unless
+                // this accept also replaces the references and that baseline did not.
+                if (store.CurrentBaseline(suite.Id, target.Id) is { } current && current.RunId == run.Id && (!replaceReferences || current.ReplacedReferences)) continue;
+                inserted.Add(target);
                 accepted.Add(new Baseline
                 {
                     SuiteId = suite.Id,
@@ -382,8 +405,9 @@ public sealed class SuiteService
                 });
                 cleared.AddRange(DriftAnalyzer.Clear(store.Signals(suite.Id, target.Id), run.Id, now));
             }
-            store.AcceptBaselines(accepted, cleared);
-            var replaced = replaceReferences ? ReplaceReferences(run, chosen, results, now) : 0;
+            if (accepted.Count > 0) store.AcceptBaselines(accepted, cleared);
+            // Only for the targets accepted now: a retry that accepted nothing rewrites no reference output.
+            var replaced = replaceReferences && inserted.Count > 0 ? ReplaceReferences(run, inserted, results, now) : 0;
             return new BaselineAccept(accepted, cleared, replaced);
         }
     }

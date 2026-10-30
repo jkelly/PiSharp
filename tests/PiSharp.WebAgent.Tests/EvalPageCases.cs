@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using PiSharp.Web.Common;
 using PiSharp.WebAgent.Evals;
+using PiSharp.WebAgent.Evals.Suites;
 
 // Decision 0011 (run W5, E6): the Evals pages in the built app (--faux, or --faux-metered where a suite needs a price; a temporary data
 // folder; no provider is called): Leaderboard, Suites, a suite, a suite run and Drift, each in the states the mockups draw (empty, default,
@@ -128,9 +129,14 @@ internal static partial class Program
                 var api = EvalRoutes.ApiSuites + "/" + suiteId;
                 var modal = "/evals/suites/" + suiteId + "/schedule";
 
+                // A suite never scheduled has no cap: the dialog opens as the mockup's default state does, on the fits pane with the worst case
+                // rounded up as the cap, never with a refusal shown before anything was typed.
                 var noCap = await EvFragmentAsync(app, modal, "id=\"modal-suite-schedule\"");
-                Check(noCap.Contains("data-refused=\"no-cap\"", StringComparison.Ordinal) && noCap.Contains("<div data-ss-pane=\"ss-refused\">", StringComparison.Ordinal),
-                    "no cap yet: refused, a schedule needs one");
+                Check(noCap.Contains("data-refused=\"\">", StringComparison.Ordinal) && noCap.Contains("<div data-ss-pane=\"ss-fits\">", StringComparison.Ordinal) &&
+                    noCap.Contains("<div data-ss-pane=\"ss-refused\" hidden=\"hidden\">", StringComparison.Ordinal),
+                    "no cap yet: it opens on fits, not refused: " + Cut(Regex.Match(noCap, "data-ss-cap-status.{0,900}", RegexOptions.Singleline).Value));
+                Check(!noCap.Contains("is-invalid", StringComparison.Ordinal) && noCap.Contains("<span class=\"ps-chip\" data-tone=\"ok\">fits</span>", StringComparison.Ordinal) &&
+                    noCap.Contains("data-ss-save>Save schedule", StringComparison.Ordinal), "the cap field is not marked, the suggested cap fits, Save schedule is enabled");
                 Check(noCap.Contains("<div data-ss-pane=\"ss-daily\">", StringComparison.Ordinal) && noCap.Contains("<div data-ss-pane=\"ss-hours\" hidden=\"hidden\">", StringComparison.Ordinal),
                     "daily first");
 
@@ -150,6 +156,13 @@ internal static partial class Program
                 var worst = refused["estimate"]!["worstMicros"]!.GetValue<long>();
                 Check(worst > 1, "a priced worst case");
                 Check(low.Contains($"data-worst-micros=\"{worst.ToString(CultureInfo.InvariantCulture)}\"", StringComparison.Ordinal), "the modal's worst case is the server's");
+                var suggested = SuiteService.SuggestedCap(new SuiteEstimate(worst, null, 0, []))!.Value;
+                Check(suggested >= worst && noCap.Contains($"value=\"{EvDollars(suggested)}\" aria-describedby=\"ssCapStatus\"", StringComparison.Ordinal),
+                    $"the suggested cap, {EvDollars(suggested)}, is the worst case ({EvDollars(worst)}) rounded up");
+                Equal(2_000_000L, SuiteService.SuggestedCap(new SuiteEstimate(1_620_000, null, 0, [])), "the mockup's $1.62 worst case suggests $2.00");
+                Equal(10_000L, SuiteService.SuggestedCap(new SuiteEstimate(384, null, 0, [])), "at least a cent");
+                Equal(400_000L, SuiteService.SuggestedCap(new SuiteEstimate(310_000, null, 0, [])), "$0.31 suggests $0.40");
+                Equal(null, SuiteService.SuggestedCap(new SuiteEstimate(0, null, 0, [])), "nothing to run: no suggestion");
 
                 var below = await EvFragmentAsync(app, modal + "?cap=" + EvDollars(worst - 1), "id=\"modal-suite-schedule\"");
                 Check(below.Contains("data-refused=\"over-cap\"", StringComparison.Ordinal), "a micro-dollar below the worst case is refused");
