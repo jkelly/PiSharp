@@ -2,7 +2,8 @@
 // stop, with the IDurableModels the app registered (faux, or WU6's routed models). Its start directory is Settings › Tools' working
 // directory; each chat passes its own working directory when it is created. Every session's registry is the durable default (coding tools,
 // user-interaction, plan-mode and the device apps) plus web-approval, which reads Settings › Tools at every call. Its SessionStream answers
-// {account, tier} from the chat binding (the host adds op). Model progress is committed about every 150 ms, which is what the pages stream
+// {account, tier} from the chat binding and, for the Spend Guard (run W3, S0), {source: "chat", run: the chat id} (the host adds op).
+// Model progress is committed about every 150 ms, which is what the pages stream
 // (committed text only). No default model: a session whose model the device no longer knows is never moved to another one. The web agent
 // defines no durable jobs and runs no schedules. The service also keeps each chat's running flag for the sidebar, refreshed from the
 // device's coalesced changes.
@@ -11,6 +12,7 @@ using PiSharp.Durable;
 using PiSharp.Durable.Hosting;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Hosting;
+using PiSharp.WebAgent.Spend;
 
 namespace PiSharp.WebAgent.Chat;
 
@@ -56,7 +58,7 @@ public sealed class DeviceHostService(WebAgentOptions options, IDurableModels mo
             Models = models,
             DeviceName = "PiSharp Web Agent",
             Settings = new HarnessSettings { Progress = new ProgressSettings { PartialIntervalMs = ProgressIntervalMs, OutputIntervalMs = ProgressIntervalMs } },
-            SessionStream = bindings.StreamFields,
+            SessionStream = sessionId => SpendMetadata.Chat(bindings.StreamFields(sessionId), sessionId),
             ToolEffects = effects,
             CreateRegistry = context =>
             {
