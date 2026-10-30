@@ -7,11 +7,53 @@ using static Microsoft.Playwright.Assertions;
 // leaves this computer; the routing's catalog is offline too. Opening / lands on /setup; Welcome leads to Connect, where Continue waits for a
 // provider; a planted OpenAI key (a made-up value) is pasted and saved, which connects OpenAI; Default model saves the defaults; Done sums
 // it up; Start chatting opens a new chat, and / no longer sends the user to setup. The key is posted once, in the body of the save, and is
-// never in the DOM, a field after the save, a URL, the data folder in plain text or the app's log.
+// never in the DOM, a field after the save, a URL, the data folder in plain text or the app's log. W4 L3: the Connect step's "Add server"
+// opens Settings › Custom providers with the editor on the LM Studio template (?add=lmstudio, which custom-providers.js reads once and drops
+// from the address), so neither a reload nor an unknown template opens it; ?add=ollama opens the Ollama template the same way.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> W3SetupCases() =>
     [
+        Browse("browser.w3.setup.add-server-opens-the-custom-provider-editor-once", AgentMode.Faux, async (app, window) =>
+        {
+            var page = window.Page;
+            await page.GotoAsync("/setup?step=connect");
+            await Expect(page.Locator("[data-setup-wizard]")).ToHaveAttributeAsync("data-setup-current", "connect");
+            var add = page.Locator("[data-setup-add-server]");
+            await Expect(add).ToHaveAttributeAsync("href", "/settings/custom-providers?add=lmstudio");
+            await add.ClickAsync();
+
+            // The editor opens on the LM Studio template, and the address no longer asks for it.
+            await page.WaitForURLAsync(url => new Uri(url).AbsolutePath == "/settings/custom-providers");
+            await page.ModalShownAsync("modal-custom-provider");
+            var modal = page.Locator("#modal-custom-provider");
+            await Expect(modal.Locator("[data-cp-field='id']")).ToHaveValueAsync("lmstudio");
+            await Expect(modal.Locator("[data-cp-field='name']")).ToHaveValueAsync("LM Studio (local)");
+            await Expect(modal.Locator("[data-cp-field='baseUrl']")).ToHaveValueAsync("http://localhost:1234/v1");
+            Equal("", new Uri(page.Url).Query, "?add= is dropped from the address");
+            await page.EscapeModalAsync("modal-custom-provider");
+            await Expect(page.Locator("[data-cp-empty]")).ToBeVisibleAsync();
+
+            // Read once: a reload does not open it again, and neither does an unknown template (whose parameter is dropped too).
+            await page.ReloadAsync();
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await Expect(page.Locator("[data-cp-empty]")).ToBeVisibleAsync();
+            await Expect(modal).ToBeHiddenAsync();
+            await page.GotoAsync("/settings/custom-providers?add=no-such-template");
+            await page.WaitForURLAsync(url => new Uri(url).Query.Length == 0);
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await Expect(modal).ToBeHiddenAsync();
+
+            // Another template the same way.
+            await page.GotoAsync("/settings/custom-providers?add=ollama");
+            await page.ModalShownAsync("modal-custom-provider");
+            await Expect(modal.Locator("[data-cp-field='id']")).ToHaveValueAsync("ollama");
+            await Expect(modal.Locator("[data-cp-field='baseUrl']")).ToHaveValueAsync("http://localhost:11434/v1");
+            Equal("", new Uri(page.Url).Query, "?add= is dropped again");
+            await page.EscapeModalAsync("modal-custom-provider");
+            await Expect(page.Locator("[data-cp-empty]")).ToBeVisibleAsync();
+        }),
+
         Browse("browser.w3.setup.runs-end-to-end", AgentMode.Live, async (app, window) =>
         {
             var secret = "sk-proj-PLANTED" + Guid.NewGuid().ToString("N") + "Hk7Wq3";

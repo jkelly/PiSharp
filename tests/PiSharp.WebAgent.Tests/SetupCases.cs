@@ -27,7 +27,8 @@ using ProviderEnvironmentKeys = PiSharp.AI.Catalogs.ProviderEnvironmentKeys;
 // state (default and nothing connected, online and offline, with and without catalog models). End to end (the built app as a child
 // process, a temporary data folder and no provider variable of this machine): a first run sends the front doors to /setup until the
 // wizard is skipped; a stored key ends the redirect and Save and continue stores the default model (no planted key in any answer, page,
-// log or file); with --faux the wizard is reachable but never forced.
+// log or file); with --faux the wizard is reachable but never forced. W4 L3: a custom provider with no key ends the first run only when its
+// server is on this machine.
 internal static partial class Program
 {
     private const string SetupOrigin = "http://127.0.0.1:5180";
@@ -218,6 +219,35 @@ internal static partial class Program
                 SqliteClearPools();
                 DeleteTemp(root);
             }
+        }),
+
+        // W4 L3: a custom provider of models.json with no key ends the first run only when its server is on this machine. One elsewhere is
+        // still routed (and in the model picker), but Settings › Providers lists it as not connected, so it never ends the redirect on its own.
+        Case("setup.state.a-keyless-custom-provider-ends-the-first-run-only-on-this-machine", async () =>
+        {
+            await using var host = new CustomHost("setup-keyless-custom");
+            var directory = new ProviderDirectory(host.Catalog, host.Accounts, host.Services.GetRequiredService<ISignInFlows>(),
+                host.Services.GetRequiredService<CredentialsOptions>(), host.Service);
+            var setup = new SetupState(directory, host.Services.GetRequiredService<ISettingsStore>(), host.Catalog, host.Options);
+            Check(setup.RedirectsToSetup(), "nothing is connected at first");
+
+            await host.Service.SaveAsync(ProviderDraft("remotegw", "https://gw-remote.example.test/v1"));
+            var remote = directory.Find("remotegw") ?? throw new InvalidOperationException("the custom provider is listed");
+            Equal((PiSharp.WebAgent.CustomProviders.CustomKeySource.None, true, false), (remote.Custom!.KeySource, remote.Custom.Routed, remote.Custom.Loopback),
+                "a keyless server elsewhere, routed");
+            Equal((ProviderState.NotConfigured, false, "no key", "outline"), (remote.State, remote.IsConnected, remote.Custom.Chip, remote.Custom.Tone),
+                "is listed with its key source but not as connected");
+            Check(remote.Description.Contains("doesn't count as connected until it has a key", StringComparison.Ordinal), "and says why: " + remote.Description);
+            Check(host.Catalog.FindProvider("remotegw") is not null, "it is still in the model picker");
+            Check(setup.RedirectsToSetup() && !setup.HasConnection() && setup.Connected().Count == 0, "so the first run still goes to the wizard");
+
+            await host.Service.SaveAsync(ProviderDraft("lmstudio", "http://localhost:1234/v1"));
+            var local = directory.Find("lmstudio") ?? throw new InvalidOperationException("the local server is listed");
+            Equal((PiSharp.WebAgent.CustomProviders.CustomKeySource.None, true, ProviderState.Connected, "ok"),
+                (local.Custom!.KeySource, local.Custom.Loopback, local.State, local.Custom.Tone), "a keyless server on this machine is connected");
+            Check(local.Description.Contains("It needs no key", StringComparison.Ordinal), "and needs no key: " + local.Description);
+            Check(setup.HasConnection() && !setup.RedirectsToSetup(), "and ends the first run");
+            Equal("lmstudio", string.Join(",", setup.Connected().Select(entry => entry.Id)), "only the local server counts");
         }),
 
         Case("setup.state.finish-saves-the-default-model-through-the-settings-store", async () =>

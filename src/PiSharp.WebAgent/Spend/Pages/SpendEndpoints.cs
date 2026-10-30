@@ -354,12 +354,19 @@ public static class SpendEndpoints
         });
     }
 
-    /// <summary>Every row matching <paramref name="filter"/>, newest first, as UTF-8 CSV. A cell that a spreadsheet would read as a formula
-    /// starts with an apostrophe.</summary>
+    /// <summary>The CSV's columns. W4 L3: the tokens a reservation assumed for its worst case are named as such (<c>assumed_input_tokens</c>,
+    /// <c>assumed_output_tokens</c>), and the usage the provider reported stands beside them where the ledger has it (<c>reported_*</c>;
+    /// empty for a row with none: still reserved, released before any output, or ended without usage).</summary>
+    public const string CsvHeader = "time_utc,op,source,provider,model,account_id,account,billing,status,reserved_usd,actual_usd,counted_usd,list_usd," +
+        "assumed_input_tokens,assumed_output_tokens,reported_input_tokens,reported_output_tokens,reported_cache_read_tokens,reported_cache_write_tokens," +
+        "run,note,reason";
+
+    /// <summary>Every row matching <paramref name="filter"/>, newest first, as UTF-8 CSV (<see cref="CsvHeader"/>). A cell that a spreadsheet
+    /// would read as a formula starts with an apostrophe.</summary>
     internal static async Task<byte[]> CsvAsync(SpendHistoryFilter filter, SpendPages pages, CancellationToken token)
     {
         var text = new StringBuilder();
-        text.Append("time_utc,op,source,provider,model,account_id,account,billing,status,reserved_usd,actual_usd,counted_usd,list_usd,input_tokens,output_tokens,run,note,reason\r\n");
+        text.Append(CsvHeader).Append("\r\n");
         var query = filter.Query() with { Offset = 0, Limit = CsvBatch };
         while (true)
         {
@@ -370,7 +377,8 @@ public static class SpendEndpoints
                 [
                     row.Created.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", Invariant), row.Op, row.Source.Wire(), row.Provider, row.Model, row.Account,
                     pages.AccountText(row.Account), SpendPages.ModeWire(row.Billing), SpendHistoryFilter.StatusWire(row.Status), Usd(row.ReservedMicros),
-                    Usd(row.ActualMicros), Usd(row.CountedMicros), Usd(row.ListMicros), row.InputTokens.ToString("0", Invariant), row.OutputTokens.ToString(Invariant),
+                    Usd(row.ActualMicros), Usd(row.CountedMicros), Usd(row.ListMicros), Tokens(row.InputTokens), row.OutputTokens.ToString(Invariant),
+                    Tokens(row.Usage?.InputTokens), Tokens(row.Usage?.OutputTokens), Tokens(row.Usage?.CacheReadTokens), Tokens(row.Usage?.CacheWriteTokens),
                     row.Run, row.Note, row.Reason,
                 ];
                 text.Append(string.Join(',', cells.Select(Cell))).Append("\r\n");
@@ -382,6 +390,8 @@ public static class SpendEndpoints
     }
 
     private static string? Usd(long? micros) => micros is { } value ? SpendMoney.ToUsd(value).ToString("0.000000", Invariant) : null;
+
+    private static string? Tokens(double? tokens) => tokens is { } value ? value.ToString("0", Invariant) : null;
 
     /// <summary>One CSV cell: quoted when it holds a comma, quote or line break; a leading <c>= + - @</c>, tab or carriage return is
     /// neutralised with an apostrophe, so a spreadsheet never runs it.</summary>
