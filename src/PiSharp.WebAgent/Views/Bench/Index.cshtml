@@ -1,0 +1,55 @@
+@* Decision 0011 (run W4, R7): the Tool Bench (GET /bench), after the mockups' tool-bench.html: the toolbar (_BenchToolbar), then three
+   panes: the tools (_BenchToolList: definitions as JSON Schema, the tool choice, parallel calls, a schema preview), the conversation
+   (_BenchTimeline: user messages, the model's turns, its tool calls with their schema check, the results, and _AwaitingResultCard for a
+   call the bench paused on) and the call log (_BenchCallLog). States: empty (no tools yet), awaiting (paused on a tool call: the result is
+   supplied by hand) and default. Each model turn is one guarded, recorded run of the run engine (one runs.db group per conversation); the
+   loop and the auto-respond rules run on the server (BenchRunner), so a bench keeps going when the tab closes, and the bench never runs a
+   tool. ?session={id} opens a session. Modals: _ModelPickerModal, _ToolEditorModal (with the bench's mock editor, _BenchMocks) and
+   _SpendConfirmModal; the layout hosts _ShortcutsModal. Model: BenchView. *@
+@model BenchView
+@{
+    ViewData["Title"] = "Tool Bench";
+    ViewData[ShellViewData.Nav] = ShellNav.Bench;
+    ViewData[ShellViewData.ContentClass] = "no-scroll bench-scroll";
+    ViewData[ShellViewData.Page] = "bench";
+    var picker = new ModelPickerView(new ProviderModelSelect("mp") { Provider = Model.Setup.Provider, Model = Model.Setup.Model })
+    {
+        Note = "The bench keeps its tools, rules and conversation; the next turn runs on the model you choose.",
+        Submit = "Use model",
+    };
+    var editor = new ToolEditorView { Templates = BenchTemplates.EditorTemplates, Mock = false, BenchUrl = null, Submit = "Save tool" };
+    var messages = System.Text.Json.JsonSerializer.Serialize(Model.Session.UserMessages);
+}
+@section Styles {
+  <link href="~/css/playground.css" rel="stylesheet" asp-append-version="true" />
+  <link href="~/css/bench.css" rel="stylesheet" asp-append-version="true" />
+}
+@section TopbarStart {
+  <h1 class="app-title">Tool Bench <small class="d-none d-sm-inline">test tool calling with mock results</small></h1>
+}
+<div class="bench-page" data-bench data-session="@Model.Session.Id" data-version="@Model.Session.Version" data-state="@Model.PageState"
+     data-bench-state="@Model.State" data-run-id="@Model.Session.ActiveRun" data-setup="@Model.SetupJson" data-messages="@messages" data-builtins="@BenchView.BuiltinsJson">
+  <partial name="_BenchToolbar" model="Model" />
+  @if (Model.Notice is { } notice)
+  {
+    <div class="alert alert-warning alert-dismissible fade show py-2 px-3 mx-3 mt-2 mb-0 fs-7 flex-shrink-0" role="status" data-bench-notice>
+      <i class="bi bi-info-circle me-1"></i>@notice
+      <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  }
+  <div class="bench-layout">
+    <partial name="_BenchToolList" model="Model" />
+    <partial name="_BenchTimeline" model="Model" />
+    <partial name="_BenchCallLog" model="Model" />
+  </div>
+  <partial name="_BenchMocks" model="Model" />
+</div>
+@section Modals {
+  <partial name="_ModelPickerModal" model="picker" />
+  <partial name="_ToolEditorModal" model="editor" />
+  <partial name="_SpendConfirmModal" model="null" />
+  @* Presets (R8) host the save-preset modal here and wire [data-preset-save] / [data-preset-load] (bench-setup.js reads and applies the setup). *@
+}
+@section Scripts {
+  <script type="module" src="~/js/bench.js" asp-append-version="true"></script>
+}

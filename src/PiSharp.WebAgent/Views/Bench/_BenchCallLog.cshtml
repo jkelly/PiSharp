@@ -1,0 +1,121 @@
+@* Decision 0011 (run W4, R7): the mockups' _BenchCallLog: every tool call of the conversation (time, tool and its first argument, a
+   schema warning, the result's status: mock, manual, no mock, isError, awaiting, skipped; and its wait in ms), Export as JSON
+   (GET /api/bench/sessions/{id}/log.json) and the selected call's detail: its id, tool, turn and place among parallel calls, result,
+   arguments, Pi's schema check and the result text. A row selects its call (bench.js); the first awaiting call is selected, else the last.
+   Hidden below 1400px, as the mockup. Model: BenchView. *@
+@model BenchView
+@{
+    var session = Model.Session;
+    var selected = Model.SelectedCall;
+}
+<aside class="pane pane-alt bench-log" aria-label="Call log" data-bench-part="log">
+  <div class="pane-header">
+    <h2 class="pane-title">Call log</h2>
+    @if (session.Calls.Count > 0)
+    {
+      <span class="ps-chip">@session.Calls.Count @(session.Calls.Count == 1 ? "call" : "calls")</span>
+      <a class="btn btn-sm btn-outline-secondary ms-auto" href="/api/bench/sessions/@Uri.EscapeDataString(session.Id)/log.json" download data-bench-export><i class="bi bi-filetype-json me-1"></i>Export as JSON</a>
+    }
+  </div>
+  <div class="pane-body position-relative">
+    @if (session.Calls.Count == 0)
+    {
+      <div class="empty-state py-5">
+        <div class="empty-icon"><i class="bi bi-list-columns-reverse"></i></div>
+        <div class="fs-7">No tool calls yet</div>
+        <div class="fs-8 text-ps-faint">Calls, results and schema checks show up here.</div>
+      </div>
+    }
+    else
+    {
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0 fs-8">
+          <thead><tr><th class="ps-3">Time</th><th>Tool</th><th>Status</th><th class="text-end pe-3">ms</th></tr></thead>
+          <tbody class="ps-mono">
+            @foreach (var call in session.Calls)
+            {
+              var status = BenchView.LogStatus(call);
+              var active = call.Id == selected;
+              <tr class="@(active ? "table-active" : null)" aria-selected="@(active ? "true" : "false")" tabindex="0" data-bench-log-row="@call.Id">
+                <td class="ps-3 text-ps-faint">@BenchView.TimeMs(call.At)</td>
+                <td>@call.Tool @if (BenchSchema.FirstValue(call.Arguments) is { } first){<span class="text-ps-faint">@first</span>} @if (call.Violations.Count > 0){<i class="bi bi-exclamation-triangle text-ps-warn" title="Schema violation"></i>}</td>
+                <td><span class="ps-chip" data-tone="@status.Tone">@status.Text</span></td>
+                <td class="text-end pe-3">@if (call.Result is { } result){@BenchView.Number(result.Ms)}else{<span class="text-ps-faint">—</span>}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @foreach (var call in session.Calls)
+      {
+        var active = call.Id == selected;
+        <div class="p-3 border-top" data-bench-log-detail="@call.Id" hidden="@(!active)">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="ps-label">Selected call</span>
+            <span class="ps-mono fs-8 text-secondary ms-auto text-break">@call.Id</span>
+            <button class="btn btn-icon p-1" type="button" data-bench-copy-text="@call.Id" title="Copy call id" aria-label="Copy call id"><i class="bi bi-copy fs-8"></i></button>
+          </div>
+          <div class="kv"><span class="k">Tool</span><span class="v">@call.Tool</span></div>
+          <div class="kv"><span class="k">Turn</span><span class="v">@call.Turn@(call.Count > 1 ? $" · parallel {call.Index} of {call.Count}" : "")</span></div>
+          <div class="kv"><span class="k">Result</span><span class="v">
+            @if (call.Result is { } result)
+            {
+              @BenchView.ResultChip(result).Text
+            }
+            else if (call.Skipped)
+            {
+              <span class="text-ps-faint">none (stopped)</span>
+            }
+            else
+            {
+              <span class="text-ps-warn">awaiting</span>
+            }
+          </span></div>
+
+          <div class="ps-label mt-3 mb-1">Arguments</div>
+          <div class="ps-term"><pre class="wrap"><code class="language-json">@(call.Arguments is null ? call.RawArguments ?? "" : BenchSchema.Indented(call.Arguments))</code></pre></div>
+
+          <div class="ps-label mt-3 mb-1">Validation</div>
+          <div class="ps-panel p-2 fs-8">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              @if (call.Violations.Count > 0)
+              {
+                <span class="ps-chip" data-tone="warn"><i class="bi bi-exclamation-triangle"></i>@call.Violations.Count @(call.Violations.Count == 1 ? "violation" : "violations")</span>
+              }
+              else
+              {
+                <span class="ps-chip" data-tone="ok"><i class="bi bi-check2"></i>schema valid</span>
+              }
+              <span class="text-ps-faint">Pi's argument check</span>
+            </div>
+            @foreach (var violation in call.Violations)
+            {
+              <div class="ps-mono text-break"><span class="text-ps-faint">@violation.Path</span> @violation.Message</div>
+            }
+          </div>
+
+          <div class="ps-label mt-3 mb-1">Result</div>
+          @if (call.Result is { } answer)
+          {
+            <div>
+              @if (answer.IsError)
+              {
+                <div class="mb-1"><span class="ps-chip" data-tone="danger">isError</span></div>
+              }
+              <div class="ps-term"><pre class="wrap"><code class="language-json">@BenchSchema.Pretty(answer.Text)</code></pre></div>
+            </div>
+          }
+          else if (call.Skipped)
+          {
+            <div class="ps-panel p-2 fs-8 text-secondary"><i class="bi bi-stop-circle me-1"></i>No result: the run was stopped before this call got one.</div>
+          }
+          else
+          {
+            <div class="ps-panel p-2 fs-8 text-secondary"><i class="bi bi-hourglass-split text-ps-warn me-1"></i>No result yet. Fill in the form in the timeline to continue.</div>
+          }
+        </div>
+      }
+    }
+  </div>
+</aside>
