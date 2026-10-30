@@ -443,9 +443,8 @@ internal static partial class Program
             Check(catalog.Models("faux").All(model => model.Cost == new CatalogCost(0, 0)), "at no cost");
             var options = new WebAgentOptions { DataDirectory = local, Faux = true };
             var services = new ServiceCollection().AddSingleton(options).AddWebAgentFallbacks(options);
-            var before = services.Count;
             services.AddSpendArea(options);
-            Equal(before, services.Count, "without units or the priced switch, the Spend area registers nothing");
+            Check(services.All(descriptor => descriptor.ServiceType != typeof(MeteredFauxDurableModels)), "without the priced switch, the Spend area adds no metered faux models");
             using var provider = services.BuildServiceProvider();
             Check(provider.GetRequiredService<IDurableModels>() is FauxDurableModels, "the faux models answer as they are");
             Equal(BillingKind.Free, provider.GetRequiredService<IModelCatalog>().Providers.Single().Billing, "and the catalog stays free");

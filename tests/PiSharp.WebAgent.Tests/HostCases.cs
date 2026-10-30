@@ -158,8 +158,13 @@ internal static partial class Program
                 var options = new WebAgentOptions { DataDirectory = data };
                 await using (var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = data })) await app.StopAsync();
                 var first = ReadDb(options.DatabasePath, "SELECT id, applied_at FROM schema_migrations ORDER BY id;", r => (r.GetInt32(0), r.GetInt64(1)));
-                Equal("1,100,200,300", string.Join(",", first.Select(row => row.Item1)), "core, accounts, chats and settings migrations");
-                Equal(300L, ReadDb(options.DatabasePath, "PRAGMA user_version;", r => r.GetInt64(0)).Single(), "user_version");
+                // Areas add migrations in their own ranges (Spend 1000-1999 from W3), so the case checks the core four and the
+                // spend ledger's, and that user_version is the highest id, rather than a fixed list each new unit breaks.
+                var ids = first.Select(row => row.Item1).ToList();
+                Equal("1,100,200,300", string.Join(",", ids.Take(4)), "core, accounts, chats and settings migrations first");
+                Check(PiSharp.WebAgent.Spend.SpendLedgerMigrations.All.All(migration => ids.Contains(migration.Id)), "the spend ledger's migrations: " + string.Join(",", ids));
+                Equal(ids.Order().ToList(), ids, "applied in id order");
+                Equal((long)ids.Max(), ReadDb(options.DatabasePath, "PRAGMA user_version;", r => r.GetInt64(0)).Single(), "user_version is the highest id");
                 Equal("wal", ReadDb(options.DatabasePath, "PRAGMA journal_mode;", r => r.GetString(0)).Single(), "WAL");
                 var keys = Directory.GetFiles(options.KeysDirectory, "key-*.xml");
                 await using (var app = await WebAgentApp.StartAsync(root, new AppStart { DataDirectory = data }))
