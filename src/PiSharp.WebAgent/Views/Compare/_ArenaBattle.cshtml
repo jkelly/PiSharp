@@ -1,0 +1,115 @@
+@* Decision 0011 (run W5, E5): a blind battle's body, swapped whole by arena.js (GET /compare/arena/{id}/body): the views bar (Responses or
+   Agents; Metrics only once revealed, as the mockup's blind states hide it), the status line ("2 of 3 finished · answers held until all
+   finish", "3 of 3 finished · order shuffled by the server", "Vote saved · names revealed") with the Stream anyway switch (request battles;
+   "Finishing order can give a model away"), the columns (_ArenaColumn or _AgentArenaColumn, A first) and _ArenaVoteBar. data-status and
+   data-finished let the script tell a change from a repeat. Model: ArenaPageView. *@
+@using PiSharp.WebAgent.Evals
+@using PiSharp.WebAgent.Evals.Arena
+@model ArenaPageView
+@{
+    var battle = Model.Battle;
+    var held = battle.Status == ArenaStatus.Held;
+    var count = Model.Agent ? Model.AgentColumns.Count : Model.Columns.Count;
+    var id = battle.Id;
+}
+<div class="cmp-views" data-arena-battle data-status="@EvalJson.Wire(battle.Status)" data-state="@Model.State" data-finished="@Model.Finished" data-total="@Model.Total" data-subtitle="@Model.Subtitle">
+  <div class="d-flex flex-wrap align-items-center gap-2 px-3 border-bottom flex-shrink-0">
+    <ul class="nav nav-tabs border-0" role="tablist" aria-label="Compare views">
+      <li class="nav-item" role="presentation"><button class="nav-link active" id="arena-tab-responses-@id" data-bs-toggle="tab" data-bs-target="#arena-responses-@id" type="button" role="tab" aria-controls="arena-responses-@id" aria-selected="true"><i class="bi bi-layout-three-columns me-1" aria-hidden="true"></i>@(Model.Agent ? "Agents" : "Responses")</button></li>
+      @if (Model.Revealed)
+      {
+        <li class="nav-item" role="presentation"><button class="nav-link" id="arena-tab-metrics-@id" data-bs-toggle="tab" data-bs-target="#arena-metrics-@id" type="button" role="tab" aria-controls="arena-metrics-@id" aria-selected="false"><i class="bi bi-table me-1" aria-hidden="true"></i>Metrics</button></li>
+      }
+    </ul>
+    <div class="ms-auto d-flex flex-wrap align-items-center gap-2 arena-status">
+      <span class="fs-8 text-ps-faint text-truncate" role="status" data-arena-status>@if (held) {<span class="status-dot live me-1" aria-hidden="true"></span>}@Model.StatusText</span>
+      @if (!Model.Agent)
+      {
+        <div class="form-check form-switch mb-0" title="Show each answer as it streams. Finishing order can give a model away.">
+          <input class="form-check-input" type="checkbox" role="switch" id="arenaStreamAnyway-@id" data-arena-stream-anyway checked="@battle.StreamAnyway" disabled="@(!held)">
+          <label class="form-check-label fs-8" for="arenaStreamAnyway-@id">Stream anyway</label>
+        </div>
+      }
+    </div>
+  </div>
+  <div class="tab-content cmp-tab-content">
+    <div class="tab-pane fade show active cmp-pane" id="arena-responses-@id" role="tabpanel" aria-labelledby="arena-tab-responses-@id">
+      <div class="compare-grid" style="--cmp-cols:@count" data-arena-grid>
+        @if (Model.Agent)
+        {
+          foreach (var column in Model.AgentColumns)
+          {
+            <partial name="/Views/Compare/_AgentArenaColumn.cshtml" model="column" />
+          }
+        }
+        else
+        {
+          foreach (var column in Model.Columns)
+          {
+            <partial name="/Views/Compare/_ArenaColumn.cshtml" model="column" />
+          }
+        }
+      </div>
+      <partial name="/Views/Compare/_ArenaVoteBar.cshtml" model="Model.VoteBar" />
+    </div>
+    @if (Model.Revealed)
+    {
+      <div class="tab-pane fade cmp-pane cmp-metrics-pane" id="arena-metrics-@id" role="tabpanel" aria-labelledby="arena-tab-metrics-@id" tabindex="0">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-2" data-arena-metrics>
+            <thead>
+              <tr>
+                <th scope="col">Column</th>
+                <th scope="col">Model</th>
+                @if (Model.Agent)
+                {
+                  <th scope="col" class="text-end">Turns</th>
+                }
+                else
+                {
+                  <th scope="col" class="text-end">TTFT</th>
+                }
+                <th scope="col" class="text-end">Total time</th>
+                <th scope="col" class="text-end">Tokens in / out</th>
+                @if (!Model.Agent)
+                {
+                  <th scope="col" class="text-end">Tokens/s</th>
+                }
+                <th scope="col" class="text-end">Cost</th>
+                <th scope="col">@(Model.Agent ? "Outcome" : "stopReason")</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach (var row in Model.Metrics)
+              {
+                var metrics = row.Metrics;
+                var agentColumn = Model.AgentColumns.FirstOrDefault(column => column.Letter == row.Letter)?.Column;
+                <tr>
+                  <td><span class="arena-letter" aria-hidden="true">@row.Letter</span><span class="visually-hidden">@row.Letter</span></td>
+                  <td><span class="fw-medium">@row.Name</span>@if (row.Picked) {<span class="ps-chip ms-2">your pick</span>}<div class="ps-mono fs-8 text-ps-faint">@row.Detail</div></td>
+                  @if (Model.Agent)
+                  {
+                    <td class="text-end ps-mono">@(agentColumn?.Turns.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "–")</td>
+                  }
+                  else
+                  {
+                    <td class="text-end ps-mono">@(metrics?.TtftMs is { } ttft ? RunHistoryText.Seconds(ttft) : "–")</td>
+                  }
+                  <td class="text-end ps-mono">@(metrics?.DurationMs is { } total ? RunHistoryText.Duration(total) : "–")</td>
+                  <td class="text-end ps-mono">@(metrics?.InputTokens is { } input ? RunHistoryText.Tokens(input) : "–") / @(metrics?.OutputTokens is { } output ? RunHistoryText.Tokens(output) : "–")</td>
+                  @if (!Model.Agent)
+                  {
+                    <td class="text-end ps-mono">@(metrics?.TokensPerSecond is { } speed ? speed.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) : "–")</td>
+                  }
+                  <td class="text-end ps-mono">@(metrics?.CostMicros is { } cost ? (metrics.ListPrice ? "≈ " + RunHistoryText.Money(cost) + " list" : RunHistoryText.Money(cost)) : "–")</td>
+                  <td class="ps-mono fs-8">@(row.StopReason ?? "–")</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="fs-8 text-ps-faint mb-0">The server shuffled the column order for this round. <a href="/history?source=arena">Run history →</a></p>
+      </div>
+    }
+  </div>
+</div>

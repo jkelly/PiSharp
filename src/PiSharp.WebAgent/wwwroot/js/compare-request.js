@@ -14,6 +14,8 @@
 import { showToast, providerModelValue } from './shell.js';
 import { showSpendConfirm } from './spend-confirm.js';
 import { postRequest, getFragment, copyText, RequestError } from './request-api.js';
+// W5 E5 (blind-state lines): with the Blind switch on, Run all starts a blind round (arena-start.js) and opens it instead.
+import { blindOn, initBlindSwitch, startRequestRound } from './arena-start.js';
 
 let host;
 let prompt;
@@ -300,6 +302,18 @@ async function runAll(spend, groupId) {
   }
   busy = true;
   layout();
+  if (blindOn()) {
+    try {
+      await startRequestRound(body, { onRefused: (answer) => showOvercap(answer.message) });
+    } catch (error) {
+      if (error instanceof RequestError) markRefused(error);
+      toast('Not run', error.message);
+    } finally {
+      busy = false;
+      layout();
+    }
+    return;
+  }
   try {
     const answer = await postRequest('/api/compare/run', { ...body, ...(groupId ? { groupId } : {}), ...(spend ? { spend } : {}) });
     if (!answer?.posted) {
@@ -705,6 +719,7 @@ export function initCompareRequest(root) {
 
   wireTooltips();
   wirePicker();
+  initBlindSwitch((on) => { host.dataset.blind = on ? 'true' : 'false'; });
   prompt.addEventListener('input', (event) => {
     if (event.target.matches('[data-shared], [data-compare-system]')) sharedChanged();
     schedulePlan();

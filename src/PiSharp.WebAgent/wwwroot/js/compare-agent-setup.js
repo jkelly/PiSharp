@@ -15,6 +15,8 @@
 import { confirmAction, providerModelValue } from './shell.js';
 import { RequestError, getFragment, postRequest } from './request-api.js';
 import { $, $$, API, PAGES, busy, disposeTooltips, escapeHtml, hideModal, postFragment, requestId, setTooltip, toast } from './compare-agent-common.js';
+// W5 E5 (blind-state lines): with the Blind switch on, Run agents starts a blind agent round (arena-start.js) and opens it instead.
+import { blindOn, initBlindSwitch, startAgentRound } from './arena-start.js';
 
 const SLOTS = ['a', 'b', 'c', 'd'];
 const APPROVAL_TEXT = { ask: 'Ask', allowList: 'Allow-list', auto: 'Auto in workspaces' };
@@ -380,6 +382,7 @@ function createBody() {
 }
 
 async function create(body) {
+  if (blindOn()) return createBlind(body);
   try {
     return await postRequest(API, { ...body, requestId: requestId() });
   } catch (error) {
@@ -396,6 +399,24 @@ async function create(body) {
   }
 }
 
+// A blind round: the same create body, shuffled by the server; a copy over the size warning asks first, as a named run's does.
+async function createBlind(body) {
+  try {
+    return await startAgentRound({ ...body, requestId: requestId() });
+  } catch (error) {
+    if (!(error instanceof RequestError) || error.code !== 'too-large' || body.confirmLargeCopy) throw error;
+    const yes = await confirmAction({
+      title: 'Copy a large folder?',
+      body: error.message,
+      detail: 'Each model gets its own copy. You can leave more out under Workspace details instead.',
+      ok: 'Copy and run',
+      tone: 'primary',
+    });
+    if (!yes) return null;
+    return startAgentRound({ ...body, confirmLargeCopy: true, requestId: requestId() });
+  }
+}
+
 async function run(button) {
   showError('');
   let body;
@@ -408,6 +429,7 @@ async function run(button) {
   await busy(button, async () => {
     try {
       const status = await create(body);
+      if (status?.url) return;
       if (status?.id) window.location.assign(`/compare?mode=agent&run=${encodeURIComponent(status.id)}`);
     } catch (error) {
       showError(error.message);
@@ -473,6 +495,7 @@ export function initAgentSetup(page) {
   grid = $('[data-ac-grid]', root);
   if (!grid) return;
   wirePicker();
+  initBlindSwitch((on) => { root.dataset.blind = on ? 'true' : 'false'; });
   document.addEventListener('click', onClick);
   document.addEventListener('change', onChange);
   root.addEventListener('input', onInput);

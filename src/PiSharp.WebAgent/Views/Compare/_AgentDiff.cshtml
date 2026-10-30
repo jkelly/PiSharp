@@ -14,18 +14,23 @@
     var diff = Model.Diff;
     var budget = AgentDiffView.MaxLines;
     var cut = false;
+    @* W5 E5 (blind-state lines): an unvoted blind battle's diff names no model, carries no run id, and its switch asks arena.js. *@
+    var blind = ViewData["arena-blind"] is true;
+    // Razor writes data- attributes even when null, so each variant's attributes are written whole.
+    var target = blind ? $"data-arena-diff-content=\"{Html.Encode(column.Letter)}\"" : $"data-run=\"{Html.Encode(Model.Run.Id)}\" data-slot=\"{Html.Encode(slot)}\"";
+    string Switch(string other) => blind ? $"data-arena-diff=\"{Html.Encode(other.ToUpperInvariant())}\"" : $"data-ac-diff=\"{Html.Encode(other)}\"";
 }
-<div class="modal-content" data-ac-diff-content data-run="@Model.Run.Id" data-slot="@slot">
+<div class="modal-content" data-ac-diff-content @Html.Raw(target)>
   <div class="modal-header gap-2 ac-diff-header">
     <div class="ac-diff-heading">
-      <h2 class="modal-title" id="modal-agent-diff-title">Changes in @column.Letter · @column.Name</h2>
+      <h2 class="modal-title" id="modal-agent-diff-title">@(blind ? "Changes in " + column.Letter : $"Changes in {column.Letter} · {column.Name}")</h2>
       <div class="modal-subtitle">@Model.Subtitle</div>
     </div>
     <div class="ac-diff-switch">
       <div class="ac-mode" role="group" aria-label="Column">
         @foreach (var other in Model.Slots)
         {
-          <button class="btn btn-sm btn-ghost@(other == slot ? " active" : "")" type="button" aria-pressed="@(other == slot ? "true" : "false")" aria-label="Show @other.ToUpperInvariant()'s changes" data-ac-diff="@other">@other.ToUpperInvariant()</button>
+          <button class="btn btn-sm btn-ghost@(other == slot ? " active" : "")" type="button" aria-pressed="@(other == slot ? "true" : "false")" aria-label="Show @other.ToUpperInvariant()'s changes" @Html.Raw(Switch(other))>@other.ToUpperInvariant()</button>
         }
       </div>
     </div>
@@ -124,11 +129,18 @@
   </div>
   <div class="modal-footer">
     <div class="d-flex flex-wrap gap-2 me-auto">
-      @if (Model.CanCopyPatch)
+      @if (blind)
+      {
+        <span class="fs-8 text-ps-faint">Copy patch, Open as chat and Keep come after you vote.</span>
+      }
+      else if (Model.CanCopyPatch)
       {
         <button type="button" class="btn btn-ghost" data-ac-copy-patch="@slot"><i class="bi bi-copy me-1" aria-hidden="true"></i>Copy patch</button>
       }
-      @if (column.ChatUrl is { } chat)
+      @if (blind)
+      {
+      }
+      else if (column.ChatUrl is { } chat)
       {
         <a class="btn btn-ghost" href="@chat">Open chat</a>
       }
@@ -136,7 +148,7 @@
       {
         <button type="button" class="btn btn-ghost" data-ac-open-chat="@slot">Open as chat</button>
       }
-      @if (column.CanKeep)
+      @if (column.CanKeep && !blind)
       {
         <button type="button" class="btn btn-outline-secondary" data-ac-keep="@slot">Keep @column.Letter</button>
       }

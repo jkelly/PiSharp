@@ -1,0 +1,36 @@
+/* Decision 0011 (run W5, E5): the Arena (Compare's blind states, compare.html's _ArenaColumn, _AgentArenaColumn and _ArenaVoteBar), on top
+   of compare.css. Neutral grey tokens only: a pick is marked by a surface, not a status colour (status lives in .ps-chip[data-tone]).
+   Columns stay on one row and scroll inside the grid (compare.css), so the page itself never scrolls sideways at 375px. On Compare's
+   setup page the Blind switch locks the per-column overrides (a blind round uses the shared settings). */
+.arena-page .compare-prompt { max-height: 40vh; overflow-y: auto; }
+.arena-prompt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.55; max-height: 9rem; overflow-y: auto;
+  padding: .5rem .65rem; border: 1px solid var(--ps-border); border-radius: 10px; background: var(--ps-surface-2, var(--ps-bg)); }
+.arena-system summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: .25rem; }
+.arena-system summary::-webkit-details-marker { display: none; }
+.arena-system summary .bi-chevron-right { transition: transform .15s ease; }
+.arena-system[open] summary .bi-chevron-right { transform: rotate(90deg); }
+
+.arena-letter { width: 1.6rem; height: 1.6rem; border-radius: 50%; display: inline-grid; place-items: center; flex: none;
+  background: var(--ps-surface-3); color: var(--ps-text); font-weight: 600; font-size: .8125rem; }
+.arena-page .compare-col-head .provider-logo { width: 24px; height: 24px; flex: none; }
+.arena-col-title { min-width: 0; line-height: 1.3; }
+.arena-col-name { font-weight: 500; font-size: .875rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arena-picked { background: var(--ps-surface-3); }
+.arena-held { display: grid; place-items: center; text-align: center; min-height: 12rem; color: var(--ps-faint); font-size: .8125rem; }
+.arena-status { min-width: 0; }
+.arena-status [data-arena-status] { max-width: 100%; }
+
+.arena-votebar { flex: none; border-top: 1px solid var(--ps-border); padding: .6rem 1rem .7rem; background: var(--ps-bg); }
+.arena-votebar .arena-pick { min-width: 2.5rem; }
+.arena-votebar .form-select { max-width: 12rem; }
+.arena-new-tag { width: 9rem; }
+.arena-page .cmp-metrics-pane .table { min-width: 36rem; }
+
+[data-compare][data-blind="true"] [data-override="thinking"],
+[data-compare][data-blind="true"] [data-override="temperature"] { pointer-events: none; opacity: .5; }
+
+@media (max-width: 575.98px) {
+  .arena-votebar { padding: .55rem .75rem .65rem; }
+  .arena-page .compare-prompt { max-height: 32vh; }
+  .arena-prompt { max-height: 6rem; }
+}

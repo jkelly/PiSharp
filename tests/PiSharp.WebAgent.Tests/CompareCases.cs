@@ -389,7 +389,8 @@ internal static partial class Program
             Check(html.Contains("id=\"cmp-tab-responses\"", StringComparison.Ordinal) && html.Contains("id=\"cmp-tab-metrics\"", StringComparison.Ordinal), "the Responses and Metrics tabs");
             Check(html.Contains("No metrics <em>yet</em>", StringComparison.Ordinal), "no figures before a run");
             Check(html.Contains("id=\"cmpModeRequest\"", StringComparison.Ordinal) && html.Contains("id=\"cmpModeAgent\"", StringComparison.Ordinal), "the Request · Agent switch");
-            Check(!Regex.IsMatch(html, ">\\s*Blind\\s*<") && !html.Contains("data-blind", StringComparison.Ordinal), "no Blind switch (W5)");
+            // W5 E5: the Blind switch (blind rounds start at POST /api/evals/arena; ArenaCases covers them).
+            Check(Regex.IsMatch(html, ">\\s*Blind\\s*<") && html.Contains("data-arena-blind=\"request\"", StringComparison.Ordinal), "the Blind switch (W5)");
             Check(Regex.IsMatch(html, "data-preset-load>") && Regex.IsMatch(html, "data-preset-save>") && !html.Contains("Presets are not available yet", StringComparison.Ordinal),
                 "presets: enabled, for presets-host.js to wire");
             Check(html.Contains("data-compare-add", StringComparison.Ordinal) && html.Contains("2 slots left", StringComparison.Ordinal), "Add model, with the slots left");
