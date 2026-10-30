@@ -7,7 +7,10 @@
 // before the vote no contestant's model, provider, run or group appears in any response the page gets (the battle page, its body fragment,
 // the JSON and the SSE frames), with stream anyway too; after the vote the page reveals them, with metrics. An agent battle (faux agents
 // in copies of a small project) names no model in its page, its JSON or its diffs before the vote, and R6's run page of it waits for the
-// vote; Compare's setup pages carry the Blind switch.
+// vote; Compare's setup pages carry the Blind switch. Fix 1 (arena): before any answer shows, not even the bare model id (echo) appears;
+// outside the battle, History, /api/runs, the inspector, Settings › Data, History › Spend, the ledger's JSON and CSV and the Playground name
+// no contestant until the vote (the ledger no run or group either), and R6's run page can't be opened past its gate (a blank ?run=, both
+// parameters) nor its fragments read.
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -29,6 +32,9 @@ internal static partial class Program
     private static readonly string[] ArenaFauxNames = ["echo-small", "echo-thinking", "Echo small", "Echo thinking", "faux/echo", "providers/faux"];
 
     private static readonly string[] ArenaThree = ["echo", "echo-small", "echo-thinking"];
+
+    // The bare faux model id (any case: echo, Echo), which names a contestant too wherever no answer or task text could hold it.
+    private static readonly string[] ArenaBareNames = ["echo"];
 
     internal static IEnumerable<(string, Func<Task>)> ArenaCases() =>
     [
@@ -255,14 +261,19 @@ internal static partial class Program
             var row = ReadDb(database, $"SELECT group_id, data FROM eval_battles WHERE id = '{id}'", reader => (reader.GetString(0), reader.GetString(1))).Single();
             var battle = EvalJson.Deserialize<ArenaBattle>(row.Item2);
             var secrets = ArenaFauxNames.Concat([row.Item1]).Concat(battle.Contestants.Select(item => item.RunId!)).ToList();
-            ArenaBlind(created.Text, secrets, "the create answer");
+            // Fix 1 (arena): before any answer shows, not even the bare model id (echo, Echo) appears.
+            var spoken = secrets.Concat(ArenaBareNames).ToList();
+            ArenaBlind(created.Text, spoken, "the create answer");
 
             // The event stream, read to its end (it ends once the battle is no longer held), while the page is read held.
             var events = ArenaSseAsync(app, $"{EvalRoutes.ApiArena}/{id}/events");
             var page = await app.Get(url);
             Equal(200, page.Status, "the battle page");
             var main = ArenaMain(page.Text);
-            ArenaBlind(page.Text, secrets, "the held page");
+            ArenaBlind(page.Text, spoken, "the held page");
+            var heldBody = await app.Get(url + "/body");
+            Equal(200, heldBody.Status, "the held body fragment");
+            ArenaBlind(ArenaWithoutAnswers(heldBody.Text), spoken, "the body fragment while held");
             Check(!main.Contains("faux", StringComparison.OrdinalIgnoreCase) && !main.Contains("provider-logo", StringComparison.Ordinal), "the held page's main region names no provider and shows no logo");
             Check(page.Text.Contains("Held until all 3 answers finish", StringComparison.Ordinal) && Regex.Matches(page.Text, "data-arena-col=\"[ABC]\"").Count == 3,
                 "three held columns, A to C");
@@ -272,7 +283,7 @@ internal static partial class Program
             NoRazorText(page.Text, "the battle page");
             var json = await app.Get($"{EvalRoutes.ApiArena}/{id}");
             Equal("held", json.Body?["status"]?.GetValue<string>(), "held: " + json.Text);
-            ArenaBlind(json.Text, secrets, "the battle JSON");
+            ArenaBlind(json.Text, spoken, "the battle JSON");
             Check(json.Body?["revealed"] is null, "nothing revealed");
 
             var stream = await events;
@@ -282,6 +293,7 @@ internal static partial class Program
 
             var ready = await app.Get(url);
             ArenaBlind(ready.Text, secrets, "the ready page");
+            ArenaBlind(ArenaWithoutAnswers(ready.Text), spoken, "the ready page outside its answers");
             Check(!ArenaMain(ready.Text).Contains("faux", StringComparison.OrdinalIgnoreCase), "the ready page's main region names no provider");
             Equal(3, Regex.Matches(ready.Text, "data-arena-answer").Count, "every answer shows");
             Check(ready.Text.Contains("word80", StringComparison.Ordinal), "the answers show");
@@ -289,6 +301,20 @@ internal static partial class Program
             var fragment = await app.Get(url + "/body");
             Check(fragment.Status == 200 && fragment.Text.TrimStart().StartsWith("<div class=\"cmp-views\" data-arena-battle", StringComparison.Ordinal), "the body fragment: " + Cut(fragment.Text));
             ArenaBlind(fragment.Text, secrets, "the body fragment");
+            ArenaBlind(ArenaWithoutAnswers(fragment.Text), spoken, "the body fragment outside its answers");
+
+            // Fix 1 (arena): outside the battle nothing names a contestant before the vote either (History, /api/runs, the inspector,
+            // History › Spend, the ledger's JSON and CSV, the Playground), and the ledger names no run or group of the round.
+            var column = battle.Contestants[0].RunId!;
+            await ArenaOutsideBlindAsync(app, [.. ArenaFauxNames, .. ArenaBareNames], [row.Item1, .. battle.Contestants.Select(item => item.RunId!)], column,
+                "echo-small", "the ready request battle");
+            var playground = await app.Get("/playground?run=" + column);
+            Equal(200, playground.Status, "the Playground answers");
+            Check(WebUtility.HtmlDecode(playground.Text).Contains(PiSharp.WebAgent.Playground.PlaygroundPages.BlindNotice, StringComparison.Ordinal),
+                "the Playground refuses a blind battle's run: " + Cut(ArenaMain(playground.Text)));
+            ArenaBlind(playground.Text, [row.Item1, .. battle.Contestants.Select(item => item.RunId!), "word80"], "the Playground of a blind battle's run");
+            Equal(404, (await app.Get($"/playground/runs/{column}/output")).Status, "the Playground's output fragment of a blind battle's run");
+            Equal(404, (await app.Get($"/playground/runs/{column}/error")).Status, "the Playground's error fragment of a blind battle's run");
             var early = await app.SendAsync(HttpMethod.Post, $"{EvalRoutes.ApiArena}/{id}/vote", new JsonObject { ["kind"] = "pick", ["pick"] = "E", ["tag"] = "coding" }, origin: app.Origin);
             Equal(400, early.Status, "a letter the battle does not have: " + early.Text);
             ArenaBlind(early.Text, secrets, "a refused vote");
@@ -313,6 +339,12 @@ internal static partial class Program
             Equal(picked, top, "the pick leads");
             var runs = ReadDb(Path.Join(app.Root, "data", RunsDb.FileName), $"SELECT source FROM runs WHERE group_id = '{row.Item1}'", reader => reader.GetString(0));
             Check(runs.Count == 3 && runs.All(source => source == "arena"), "three runs under source arena: " + string.Join(",", runs));
+            // Once voted, the round is itself again everywhere.
+            Equal(200, (await app.Get("/api/runs/" + column)).Status, "the run's JSON after the vote");
+            Check(!(await app.Get("/runs/" + column)).Text.Contains("data-run-blind", StringComparison.Ordinal), "the inspector after the vote");
+            Check((await app.Get("/api/runs")).Body!["items"]!.AsArray().All(item => item?["blind"] is null), "/api/runs unmasks the round after the vote");
+            Check((await app.Get("/api/spend/ledger")).Body!["items"]!.AsArray().All(item => item?["blind"] is null), "the ledger unmasks the round after the vote");
+            Check(WebUtility.HtmlDecode((await app.Get("/playground?run=" + column)).Text).Contains("word80", StringComparison.Ordinal), "the Playground opens the run after the vote");
 
             // Stream anyway: the text so far shows while held, still with no name; Stop all then voids the round and reveals it.
             var second = await app.SendAsync(HttpMethod.Post, EvalRoutes.ApiArena, ArenaDraftJson("slow: " + string.Join(' ', Enumerable.Range(1, 150).Select(item => "part" + item)), ["echo", "echo-small"]), origin: app.Origin);
@@ -344,12 +376,12 @@ internal static partial class Program
                 ["agent"] = new JsonObject
                 {
                     ["requestId"] = "arena-agent-1",
-                    ["task"] = "!echo done > result.txt",
+                    ["task"] = "!printf done > result.txt",
                     ["projectPath"] = app.Project,
                     ["models"] = Models("echo", "echo-small"),
                     ["isolation"] = "copy",
                     ["approval"] = "auto",
-                    ["checkCommand"] = "echo checked",
+                    ["checkCommand"] = "exit 0",
                 },
             }, origin: app.App.Origin);
             Equal(200, created.Status, "created: " + created.Text);
@@ -359,15 +391,19 @@ internal static partial class Program
             var battle = EvalJson.Deserialize<ArenaBattle>(row.Item2);
             Equal(ArenaMode.Agent, battle.Mode, "an agent battle");
             Equal(EvalTags.Agent, battle.Tag, "proposing the agent tag");
-            var secrets = new[] { "echo-small", "Echo small", "faux/echo", "providers/faux", row.Item1 }.ToList();
+            // Fix 1 (arena): the task and check name no model, so not even the bare id (echo, Echo) may appear before the vote.
+            var names = new[] { "echo-small", "Echo small", "faux/echo", "providers/faux" }.Concat(ArenaBareNames).ToList();
+            var keys = new[] { row.Item1, row.Item1 + "-a", row.Item1 + "-b" };
+            var secrets = names.Concat([row.Item1]).ToList();
             ArenaBlind(created.Text, secrets, "the create answer");
+            var events = ArenaSseAsync(app.App, $"{EvalRoutes.ApiArena}/{id}/events", TimeSpan.FromSeconds(120));
             var again = await app.App.SendAsync(HttpMethod.Post, EvalRoutes.ApiArena, new JsonObject
             {
                 ["mode"] = "agent",
                 ["agent"] = new JsonObject
                 {
                     ["requestId"] = "arena-agent-1",
-                    ["task"] = "!echo done > result.txt",
+                    ["task"] = "!printf done > result.txt",
                     ["projectPath"] = app.Project,
                     ["models"] = Models("echo", "echo-small"),
                     ["isolation"] = "copy",
@@ -384,6 +420,20 @@ internal static partial class Program
             ArenaBlind(named.Text, ["echo-small", "Echo small", "faux/echo"], "R6's run page of an unvoted battle");
             var copy = await app.App.Get("/compare?mode=agent&from=" + row.Item1);
             Check(copy.Text.Contains("data-arena-blind-run", StringComparison.Ordinal), "and so does New run from it");
+            // Fix 1 (arena): the gate is on the id the page opens, so a blank ?run= or both parameters can't get past it.
+            foreach (var gated in new[] { "&run=%20&from=" + row.Item1, "&run=+&from=" + row.Item1, "&run=" + row.Item1 + "&from=" + row.Item1, "&from=" + row.Item1 + "&run=" })
+            {
+                var answer = await app.App.Get("/compare?mode=agent" + gated);
+                Check(answer.Status == 200 && answer.Text.Contains("data-arena-blind-run", StringComparison.Ordinal) && !answer.Text.Contains("data-agent-compare=", StringComparison.Ordinal),
+                    $"?mode=agent{gated} waits for the vote: " + Cut(ArenaMain(answer.Text)));
+                ArenaBlind(answer.Text, names, $"?mode=agent{gated}");
+            }
+            foreach (var fragment in new[] { "", "/workspace", "/diff?slot=a", "/keep?slot=b" })
+            {
+                var answer = await app.App.Get($"/compare/agent/runs/{row.Item1}{fragment}");
+                Equal(409, answer.Status, $"agent compare's run fragment {fragment} waits for the vote: " + Cut(answer.Text));
+                ArenaBlind(answer.Text, secrets, $"agent compare's run fragment {fragment}");
+            }
 
             JsonNode? state = null;
             await WaitUntilAsync(async () =>
@@ -393,8 +443,11 @@ internal static partial class Program
                 return state?["status"]?.GetValue<string>() is "ready" or "void";
             }, "both agents finish", TimeSpan.FromSeconds(90));
             Equal("ready", state!["status"]!.GetValue<string>(), "ready: " + state.ToJsonString());
+            var stream = await events;
+            ArenaBlind(stream, secrets, "the agent battle's SSE frames");
+            Check(stream.Contains("\"status\":\"ready\"", StringComparison.Ordinal), "frames up to ready: " + Cut(stream));
             var page = await app.App.Get("/compare/arena/" + id);
-            ArenaBlind(page.Text, secrets, "the agent battle page");
+            ArenaBlind(ArenaWithoutAnswers(page.Text), secrets, "the agent battle page");
             Check(!ArenaMain(page.Text).Contains("faux", StringComparison.OrdinalIgnoreCase), "its main region names no provider");
             Check(page.Text.Contains("Agent A", StringComparison.Ordinal) && page.Text.Contains("Turns, time and cost hidden until you vote", StringComparison.Ordinal)
                 && page.Text.Contains("data-arena-diff=\"A\"", StringComparison.Ordinal) && page.Text.Contains("id=\"modal-agent-diff\"", StringComparison.Ordinal), "blind agent columns with View diff");
@@ -408,6 +461,16 @@ internal static partial class Program
             ArenaBlind(diff.Text, ["data-run=", row.Item1], "the diff (no run)");
             Check(diff.Text.Contains("data-arena-diff=\"A\"", StringComparison.Ordinal) && !diff.Text.Contains("data-ac-keep", StringComparison.Ordinal), "its switch asks the arena, and Keep waits for the vote");
 
+            // Fix 1 (arena): outside the battle, nothing names a contestant before the vote: History, /api/runs, the inspector of a model,
+            // Settings › Data's workspaces, History › Spend and the ledger's JSON and CSV (which name no run or model key of it either).
+            await ArenaOutsideBlindAsync(app.App, names, keys, row.Item1 + "-a", "echo-small", "the ready agent battle");
+            var data = await app.App.Get("/settings/data");
+            Equal(200, data.Status, "Settings › Data");
+            ArenaBlind(data.Text, names, "Settings › Data before the vote");
+            Check(WebUtility.HtmlDecode(data.Text) is var dataText && dataText.Contains("blind round · workspace a", StringComparison.Ordinal)
+                && dataText.Contains("blind round · workspace b", StringComparison.Ordinal),
+                "Settings › Data lists the round's workspaces without their models: " + Cut(ArenaMain(data.Text)));
+
             var vote = await app.App.SendAsync(HttpMethod.Post, $"{EvalRoutes.ApiArena}/{id}/vote", new JsonObject { ["kind"] = "tie" }, origin: app.App.Origin);
             Equal(200, vote.Status, "voted: " + vote.Text);
             Equal("agent", vote.Body?["vote"]?["tag"]?.GetValue<string>(), "the default tag is agent");
@@ -416,6 +479,9 @@ internal static partial class Program
                 && revealed.Text.Contains("/compare?mode=agent&amp;run=" + row.Item1, StringComparison.Ordinal), "revealed, with the run's own page for Keep");
             var named2 = await app.App.Get("/compare?mode=agent&run=" + row.Item1);
             Check(!named2.Text.Contains("data-arena-blind-run", StringComparison.Ordinal) && named2.Text.Contains("data-agent-compare=\"run\"", StringComparison.Ordinal), "after the vote R6's page shows the run");
+            Equal(200, (await app.App.Get($"/compare/agent/runs/{row.Item1}")).Status, "and its fragment");
+            Check(WebUtility.HtmlDecode((await app.App.Get("/settings/data")).Text).Contains("faux/echo-small", StringComparison.Ordinal), "Settings › Data names the models after the vote");
+            Check(!(await app.App.Get($"/runs/{row.Item1}-a")).Text.Contains("data-run-blind", StringComparison.Ordinal), "the inspector opens a model after the vote");
             var board = await app.App.Get(EvalRoutes.ApiLeaderboard + "?mode=agent&tag=agent");
             Check(board.Body?["leaderboard"]?["rows"]?.AsArray().Count == 2, "the agent leaderboard: " + board.Text);
             var requestBoard = await app.App.Get(EvalRoutes.ApiLeaderboard + "?mode=request&tag=agent");
@@ -448,6 +514,98 @@ internal static partial class Program
         }
     }
 
+    /// <summary><paramref name="html"/> without the answers' text (the content of <c>data-arena-answer</c> and <c>data-arena-streaming</c>
+    /// elements), which is the models' own words: what is left is what the app itself says.</summary>
+    private static string ArenaWithoutAnswers(string html)
+    {
+        foreach (var marker in new[] { "data-arena-answer", "data-arena-streaming" })
+        {
+            var from = 0;
+            while (html.IndexOf(marker, from, StringComparison.Ordinal) is var at and >= 0)
+            {
+                var open = html.IndexOf('>', at);
+                if (open < 0) break;
+                // The element is a div: find its end tag, counting the divs inside it.
+                var depth = 1;
+                var cursor = open + 1;
+                var end = html.Length;
+                while (depth > 0)
+                {
+                    var nextOpen = html.IndexOf("<div", cursor, StringComparison.Ordinal);
+                    var nextClose = html.IndexOf("</div>", cursor, StringComparison.Ordinal);
+                    if (nextClose < 0) break;
+                    if (nextOpen >= 0 && nextOpen < nextClose)
+                    {
+                        depth++;
+                        cursor = nextOpen + 4;
+                    }
+                    else
+                    {
+                        depth--;
+                        end = nextClose;
+                        cursor = nextClose + 6;
+                    }
+                }
+                html = html[..(open + 1)] + html[end..];
+                from = open + 1;
+            }
+        }
+        return html;
+    }
+
+    /// <summary>Fix 1 (arena): what the app shows outside a battle that is ready but not voted. History and <c>/api/runs</c> list its runs
+    /// masked and name none of <paramref name="names"/>, and a filter on <paramref name="model"/> leaves them out; the inspector of
+    /// <paramref name="run"/> is the blind notice, and its JSON, raw JSON and events answer 409 blind; History › Spend, <c>/api/spend/ledger</c>
+    /// and its CSV name none of <paramref name="names"/> or <paramref name="keys"/> (run groups, run ids, model keys), list its requests as
+    /// "Arena battle · blind", and leave them out of a filter on <paramref name="model"/>.</summary>
+    private static async Task ArenaOutsideBlindAsync(WebAgentApp app, IReadOnlyList<string> names, IReadOnlyList<string> keys, string run, string model, string what)
+    {
+        var everything = names.Concat(keys).ToList();
+        var history = await app.Get("/history");
+        Equal(200, history.Status, what + ": History");
+        ArenaBlind(history.Text, names, what + ": History");
+        Check(history.Text.Contains("data-run-blind", StringComparison.Ordinal), what + ": History lists the round masked: " + Cut(ArenaMain(history.Text)));
+        var runs = await app.Get("/api/runs");
+        Equal(200, runs.Status, what + ": /api/runs " + runs.Text);
+        ArenaBlind(runs.Text, names, what + ": /api/runs");
+        Check(runs.Body!["items"]!.AsArray().Any(item => item?["blind"] is not null), what + ": /api/runs lists the round masked: " + Cut(runs.Text));
+        foreach (var filter in new[] { "?model=" + model, "?provider=faux", "?q=" + model })
+        {
+            var filtered = await app.Get("/api/runs" + filter);
+            Check(filtered.Status == 200 && filtered.Body!["items"]!.AsArray().All(item => item?["blind"] is null && !keys.Contains(item?["id"]?.GetValue<string>() ?? "")),
+                $"{what}: /api/runs{filter} leaves the round out: " + Cut(filtered.Text));
+        }
+        var inspector = await app.Get("/runs/" + run);
+        Check(inspector.Status == 200 && inspector.Text.Contains("data-run-blind", StringComparison.Ordinal), what + ": the inspector waits for the vote: " + Cut(ArenaMain(inspector.Text)));
+        ArenaBlind(inspector.Text, everything, what + ": the inspector");
+        foreach (var path in new[] { "", "/raw", "/events" })
+        {
+            var answer = await app.Get($"/api/runs/{run}{path}");
+            Check(answer.Status == 409 && answer.Body?["error"]?["code"]?.GetValue<string>() == "blind", $"{what}: /api/runs/(run){path} answers 409 blind: " + Cut(answer.Text));
+            ArenaBlind(answer.Text, everything, $"{what}: /api/runs/(run){path}");
+        }
+        var spend = await app.Get("/history/spend");
+        Equal(200, spend.Status, what + ": History › Spend");
+        ArenaBlind(ArenaMain(spend.Text), everything, what + ": History › Spend");
+        var ledger = await app.Get("/api/spend/ledger");
+        Equal(200, ledger.Status, what + ": /api/spend/ledger " + ledger.Text);
+        ArenaBlind(ledger.Text, everything, what + ": /api/spend/ledger");
+        var items = ledger.Body!["items"]!.AsArray();
+        Check(items.Count > 0 && items.All(item => item?["blind"] is not null), what + ": the ledger lists the round's requests masked: " + Cut(ledger.Text));
+        Check(spend.Text.Contains("data-spend-blind", StringComparison.Ordinal), what + ": History › Spend lists them masked");
+        var csv = await app.Get("/api/spend/ledger.csv");
+        Equal(200, csv.Status, what + ": the ledger CSV");
+        ArenaBlind(csv.Text, everything, what + ": the ledger CSV");
+        Check(csv.Text.Contains(ArenaBlindText.Title, StringComparison.Ordinal), what + ": the CSV lists them masked: " + Cut(csv.Text));
+        foreach (var filter in new[] { "?provider=faux&model=" + model, "?provider=faux", "?q=" + model })
+        {
+            var narrowed = await app.Get("/api/spend/ledger" + filter);
+            Check(narrowed.Status == 200 && narrowed.Body!["items"]!.AsArray().Count == 0, $"{what}: /api/spend/ledger{filter} leaves the round's requests out: " + Cut(narrowed.Text));
+            var page = await app.Get("/history/spend" + filter);
+            Check(page.Status == 200 && !page.Text.Contains("data-spend-blind", StringComparison.Ordinal), $"{what}: /history/spend{filter} leaves them out");
+        }
+    }
+
     /// <summary>The page's main region (the shell around it is the same for every page).</summary>
     private static string ArenaMain(string html)
     {
@@ -457,9 +615,9 @@ internal static partial class Program
     }
 
     /// <summary>Reads an event stream to its end (60 s at most).</summary>
-    private static async Task<string> ArenaSseAsync(WebAgentApp app, string path)
+    private static async Task<string> ArenaSseAsync(WebAgentApp app, string path, TimeSpan? within = null)
     {
-        using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        using var limit = new CancellationTokenSource(within ?? TimeSpan.FromSeconds(60));
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(app.Base, path));
         using var response = await app.Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, limit.Token);
         Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType, "an event stream");

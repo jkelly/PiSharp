@@ -7,6 +7,8 @@
 //   GET  /api/history/runs/{id}/spec    -> {spec}: the run's stored request for Re-run (404 unknown; 400 when it stored none: a chat's call).
 //   GET  /api/history/runs/{id}/har     -> the raw payloads as HAR 1.2 (404 when none were stored).
 //   GET  /api/history/runs/{id}/json    -> the run with its children, events and raw payload items.
+// W5 (fix 1, arena): spec, har and json answer 409 {error: {code: "blind", message, battle}} for a run of an Arena battle not voted yet, and
+// export leaves such runs out.
 //   POST /api/history/filters           {name, query} -> {filters}: saves (or replaces) a saved filter.
 //   POST /api/history/filters/manage    {filters: [{name, query}]} -> {filters}: replaces the list (Manage saved filters).
 // Writes are JSON POSTs (HostGuard: same origin, JSON only); every answer is no-store; errors are {error: {code, message}}.
@@ -15,6 +17,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Hosting;
 using PiSharp.WebAgent.Spend;
 
@@ -58,20 +61,22 @@ public static class RunHistoryModule
             var keep = body?["keepPinned"] is JsonValue value && value.TryGetValue<bool>(out var flag) && flag;
             return Json(new { deleted = store.Clear(keep), keepPinned = keep });
         }));
-        api.MapGet("/runs/{id}/spec", (string id, RunHistoryPages pages) => Answer(() =>
+        api.MapGet("/runs/{id}/spec", (string id, RunHistoryPages pages, IServiceProvider services) => Answer(() =>
         {
-            if (pages.Store.Get(id) is null) return NotFound(id);
+            if (pages.Store.Get(id) is not { } found) return NotFound(id);
+            if (Blind(services, found) is { } blind) return blind;
             return pages.RerunSpec(id) is { } spec ? Json(new JsonObject { ["spec"] = spec })
                 : Error(StatusCodes.Status400BadRequest, SpendErrors.Invalid, "This run did not store its request (a chat's call or an agent compare turn), so it cannot be sent again from here.");
         }));
-        api.MapGet("/runs/{id}/har", (string id, RunInspectorPages pages) => Answer(() =>
+        api.MapGet("/runs/{id}/har", (string id, RunInspectorPages pages, IServiceProvider services) => Answer(() =>
         {
             if (pages.Find(id) is not { } run) return NotFound(id);
+            if (Blind(services, run) is { } blind) return blind;
             return pages.Har(run) is { } har ? Results.File(System.Text.Encoding.UTF8.GetBytes(har.ToJsonString(Indented)), "application/json; charset=utf-8", run.Id + ".har")
                 : Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, "Raw payloads weren't stored for this run, so there is no HAR.");
         }));
-        api.MapGet("/runs/{id}/json", (string id, RunInspectorPages pages) => Answer(() => pages.Find(id) is { } run
-            ? Results.File(System.Text.Encoding.UTF8.GetBytes(pages.RunJson(run).ToJsonString(Indented)), "application/json; charset=utf-8", run.Id + ".json")
+        api.MapGet("/runs/{id}/json", (string id, RunInspectorPages pages, IServiceProvider services) => Answer(() => pages.Find(id) is { } run
+            ? Blind(services, run) ?? Results.File(System.Text.Encoding.UTF8.GetBytes(pages.RunJson(run).ToJsonString(Indented)), "application/json; charset=utf-8", run.Id + ".json")
             : NotFound(id)));
         api.MapPost("/filters", async (JsonObject? body, ISettingsStore settings, CancellationToken token) => await AnswerAsync(async () =>
         {
@@ -109,6 +114,12 @@ public static class RunHistoryModule
     private static IResult Json(object value, int status = StatusCodes.Status200OK) => Results.Json(value, SettingsStore.JsonOptions, statusCode: status);
 
     private static IResult NotFound(string id) => Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, $"There is no run {id}.");
+
+    // W5 (fix 1, arena): a run of an Arena battle not voted yet is refused (409, with its battle's page), since it names the model.
+    private static IResult? Blind(IServiceProvider services, RunRecord run) => ArenaBlindSet.Of(services).BattleOf(run) is { } battle
+        ? Json(new JsonObject { ["error"] = new JsonObject { ["code"] = "blind", ["message"] = ArenaBlindText.Refusal, ["battle"] = ArenaBlindText.Href(battle) } },
+            StatusCodes.Status409Conflict)
+        : null;
 
     private static IResult Error(int status, string code, string message) =>
         Json(new JsonObject { ["error"] = new JsonObject { ["code"] = code, ["message"] = message } }, status);

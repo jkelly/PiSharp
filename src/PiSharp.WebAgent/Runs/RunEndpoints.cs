@@ -10,6 +10,9 @@
 //   GET  /api/runs                   ?source&provider&model&status&kind&q&from&to&group&parent&pinned&limit&offset&totals -> {items, total, totals?}.
 //   GET  /api/runs/storage           {count, sizeBytes, path, settings}.
 //   GET  /api/runs/{id}              {run, running}; /api/runs/{id}/raw -> {rawState, items}.
+// W5 (fix 1, arena): a run of an Arena battle not voted yet is listed masked (no provider, model, account, usage, cost or timings; with
+// blind: its battle's page) and never matches a provider, model or text filter; its row, raw payloads and events answer 409 {error: {code:
+// "blind", message, battle}}.
 //   GET  /api/runs/{id}/events       SSE: "event" frames (id: seq; data {seq, atMs, event}) from after Last-Event-ID or ?after=, live while
 //                                    it runs, then one "status" frame (the run's outcome) and the end of the stream; ": ping" every 15 s.
 //   POST /api/runs/{id}/cancel       -> {cancelled}; POST /api/runs/{id}/pin {pinned} -> {id, pinned}; POST /api/runs/delete {ids} -> {deleted}.
@@ -23,6 +26,7 @@ using System.Text.Json.Nodes;
 using PiSharp.Web.Common;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Spend;
 
 namespace PiSharp.WebAgent.Runs;
@@ -58,13 +62,28 @@ public static class RunEndpoints
             return Task.FromResult(engine.Capabilities(provider, model) is { } capabilities ? Json(capabilities)
                 : Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, $"There is no model {provider}/{model}."));
         }));
-        api.MapGet("", (HttpRequest request, RunStore store) => RunAsync(() =>
+        api.MapGet("", (HttpRequest request, RunStore store, IServiceProvider services) => RunAsync(() =>
         {
             var query = Query(request);
+            // W5 (fix 1, arena): a blind battle's runs never match a filter that could single out one model, and are listed masked.
+            var blind = ArenaBlindSet.Of(services);
+            if (!blind.IsEmpty && (query.Provider is not null || query.Model is not null || query.Search is not null)) query = query with { ExceptKeys = blind.Keys };
             var page = store.List(query);
+            var items = new JsonArray();
+            foreach (var item in page.Items)
+            {
+                if (blind.BattleOf(item) is not { } battle)
+                {
+                    items.Add(JsonSerializer.SerializeToNode(item, SettingsStore.JsonOptions));
+                    continue;
+                }
+                var masked = JsonSerializer.SerializeToNode(ArenaBlindText.Mask(item), SettingsStore.JsonOptions)!.AsObject();
+                masked["blind"] = ArenaBlindText.Href(battle);
+                items.Add(masked);
+            }
             var answer = new JsonObject
             {
-                ["items"] = JsonSerializer.SerializeToNode(page.Items, SettingsStore.JsonOptions),
+                ["items"] = items,
                 ["total"] = page.Total,
                 ["limit"] = query.Limit,
                 ["offset"] = query.Offset,
@@ -80,11 +99,11 @@ public static class RunEndpoints
             settings = services.GetService<ISettingsStore>()?.Get<RunHistorySettings>() ?? RunHistorySettings.CreateDefault(),
             rawRetentionDays = RunHistorySettings.RawRetentionDays,
         }))));
-        api.MapGet("/{id}", (string id, RunStore store, RunLive live) => RunAsync(() => Task.FromResult(store.Get(id) is { } run
-            ? Json(new { run, running = live.Find(id) is { Ended: false } })
+        api.MapGet("/{id}", (string id, RunStore store, RunLive live, IServiceProvider services) => RunAsync(() => Task.FromResult(store.Get(id) is { } run
+            ? Blind(services, run) ?? Json(new { run, running = live.Find(id) is { Ended: false } })
             : NotFound(id))));
-        api.MapGet("/{id}/raw", (string id, RunStore store) => RunAsync(() => Task.FromResult(store.Get(id) is { } run
-            ? Json(new { id, rawState = run.RawState, items = store.Raw(id) })
+        api.MapGet("/{id}/raw", (string id, RunStore store, IServiceProvider services) => RunAsync(() => Task.FromResult(store.Get(id) is { } run
+            ? Blind(services, run) ?? Json(new { id, rawState = run.RawState, items = store.Raw(id) })
             : NotFound(id))));
         api.MapGet("/{id}/events", (string id, HttpContext http, RunStore store, RunLive live) => EventsAsync(id, http, store, live));
         api.MapPost("/{id}/cancel", (string id, RunEngine engine, RunStore store) => RunAsync(() =>
@@ -248,6 +267,11 @@ public static class RunEndpoints
             await NotFound(id).ExecuteAsync(http).ConfigureAwait(false);
             return;
         }
+        if (Blind(http.RequestServices, stored ?? store.Get(id) ?? new RunRecord { Id = id, Op = "", Source = "", Created = default }) is { } blind)
+        {
+            await blind.ExecuteAsync(http).ConfigureAwait(false);
+            return;
+        }
         http.Response.StatusCode = StatusCodes.Status200OK;
         http.Response.ContentType = "text/event-stream; charset=utf-8";
         http.Response.Headers.CacheControl = "no-cache, no-transform";
@@ -353,6 +377,13 @@ public static class RunEndpoints
     private static IResult Json(object value, int status = StatusCodes.Status200OK) => Results.Json(value, SettingsStore.JsonOptions, statusCode: status);
 
     private static IResult NotFound(string id) => Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, $"There is no run {id}.");
+
+    // W5 (fix 1, arena): a run of an Arena battle not voted yet (its row, events and raw payloads name the model) is refused: 409
+    // {error: {code: "blind", message, battle}}.
+    private static IResult? Blind(IServiceProvider services, RunRecord run) => ArenaBlindSet.Of(services).BattleOf(run) is { } battle
+        ? Json(new JsonObject { ["error"] = new JsonObject { ["code"] = "blind", ["message"] = ArenaBlindText.Refusal, ["battle"] = ArenaBlindText.Href(battle) } },
+            StatusCodes.Status409Conflict)
+        : null;
 
     private static IResult Error(int status, string code, string message, JsonNode? refused = null)
     {

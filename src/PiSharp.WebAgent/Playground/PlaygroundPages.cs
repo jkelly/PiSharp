@@ -3,10 +3,13 @@
 // it), else ?provider=&model=, else the default model (Settings › Defaults, as a new chat's). The draft is planned and estimated by the run
 // engine and the Spend Guard themselves, so the page shows what a run would really send and cost. The account is resolved as the engine
 // resolves it (none offline, else the chosen account or the provider's active one) and shown by its label only, never a credential.
+// W5 (fix 1, arena): a run of an Arena battle not voted yet is refused (?run= opens the default model with BlindNotice; its output and
+// error fragments are 404; View code links no inspector), since its request and output name its model.
 using System.Text.Json.Nodes;
 using PiSharp.Tools.Files;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Evals.Arena;
 using PiSharp.WebAgent.Runs;
 using PiSharp.WebAgent.Spend;
 
@@ -82,6 +85,12 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         {
             run = services.GetService<RunStore>()?.Get(runId.Trim());
             if (run is null) notice = $"There is no run {runId.Trim()}; it may have been deleted. The Playground opened on the default model.";
+            else if (Blind(run))
+            {
+                // W5 (fix 1, arena): a blind battle's run would show its model; until the vote the Playground opens the default model instead.
+                run = null;
+                notice = BlindNotice;
+            }
             else
             {
                 draft = FromRun(run);
@@ -126,15 +135,21 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
     {
         ArgumentNullException.ThrowIfNull(id);
         var run = services.GetService<RunStore>()?.Get(id);
-        return run is null ? null : Output(run, FromRun(run));
+        return run is null || Blind(run) ? null : Output(run, FromRun(run));
     }
 
     /// <summary>The error details of run <paramref name="id"/>, or null when there is no such run.</summary>
     public ErrorDetailsView? ErrorDetails(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
-        return services.GetService<RunStore>()?.Get(id) is { } run ? ErrorDetails(run) : null;
+        return services.GetService<RunStore>()?.Get(id) is { } run && !Blind(run) ? ErrorDetails(run) : null;
     }
+
+    /// <summary>What the page says when <c>?run=</c> names a run of a blind Arena battle (it names no run, model or provider).</summary>
+    public const string BlindNotice = "That run is part of a blind Arena battle that hasn't been voted on, so its model stays hidden. The Playground opened on the default model; vote first, then open the run here.";
+
+    // W5 (fix 1, arena): whether run is part of an Arena battle that is held or ready (its column, or an agent battle's run or model).
+    private bool Blind(RunRecord run) => ArenaBlindSet.Of(services).BattleOf(run) is not null;
 
     /// <summary>The estimate and input tokens of <paramref name="spec"/>; nothing is reserved or sent.</summary>
     public async Task<PlaygroundDraftAnswer> DraftAsync(RunSpec spec, CancellationToken cancellationToken = default)
@@ -173,7 +188,7 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         ArgumentNullException.ThrowIfNull(spec);
         var plan = Engine.Plan(spec);
         var code = RequestCode.Generate(plan, origin, BaseUrl(plan));
-        return !string.IsNullOrWhiteSpace(lastRun) && services.GetService<RunStore>()?.Get(lastRun.Trim()) is { } run
+        return !string.IsNullOrWhiteSpace(lastRun) && services.GetService<RunStore>()?.Get(lastRun.Trim()) is { } run && !Blind(run)
             ? code with { InspectorUrl = "/runs/" + Uri.EscapeDataString(run.Id) }
             : code;
     }

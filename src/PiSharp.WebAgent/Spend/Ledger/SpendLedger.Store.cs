@@ -145,6 +145,17 @@ public sealed partial class SpendLedger
         if (query.Source is { } source) Add("source = $source", "$source", source.Wire());
         if (query.Billing is { } billing) Add("billing = $billing", "$billing", Wire(billing));
         if (query.Run is { } run) Add("run = $run", "$run", run);
+        if (query.ExceptRuns is { Count: > 0 } except)
+        {
+            // A NULL run must not turn the condition NULL (which would drop the row); an op is run-<key>, or a later send of it (~n).
+            var keys = except.Where(key => !string.IsNullOrEmpty(key)).Distinct(StringComparer.Ordinal).ToList();
+            for (var index = 0; index < keys.Count; index++)
+            {
+                var name = "$except" + index.ToString(CultureInfo.InvariantCulture);
+                clauses.Add($"COALESCE(run, '') <> {name} AND op <> 'run-' || {name} AND substr(op, 1, length({name}) + 5) <> 'run-' || {name} || '~'");
+                parameters.Add((name, keys[index]));
+            }
+        }
         if (query.Status is { } status)
             clauses.Add(status switch
             {

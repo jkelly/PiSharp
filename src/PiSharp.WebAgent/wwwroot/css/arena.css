@@ -23,6 +23,8 @@
 .arena-votebar { flex: none; border-top: 1px solid var(--ps-border); padding: .6rem 1rem .7rem; background: var(--ps-bg); }
 .arena-votebar .arena-pick { min-width: 2.5rem; }
 .arena-votebar .form-select { max-width: 12rem; }
+/* W5 fix 1 (arena): the vote bar's panes are .d-flex (display: flex !important), which beats the UA's [hidden]; the hidden pane stays hidden. */
+[data-arena-votebar] [hidden] { display: none !important; }
 .arena-new-tag { width: 9rem; }
 .arena-page .cmp-metrics-pane .table { min-width: 36rem; }
 

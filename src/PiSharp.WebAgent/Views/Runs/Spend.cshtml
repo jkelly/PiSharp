@@ -51,7 +51,11 @@
     <div class="ps-card d-flex flex-wrap align-items-center gap-2 px-3 py-2 mb-3" role="status" data-uncertain-banner>
       <span class="ps-chip" data-tone="warn">@Model.UncertainCount uncertain</span>
       <span class="fs-7 flex-grow-1" style="min-width:min(100%,16rem)">
-        @if (Model.UncertainCount == 1)
+        @if (Model.UncertainCount == 1 && first.Blind is not null)
+        {
+          <text>A request of a blind Arena battle ended without reporting usage. It keeps counting toward your caps; resolve it after you vote, when its model is shown.</text>
+        }
+        else if (Model.UncertainCount == 1)
         {
           <span class="ps-mono">@first.Row.Provider/@first.Row.Model</span> <text>reserved</text> <span class="ps-mono">@SpendMoney.Format(first.Row.ReservedMicros ?? 0)</span>
           <text> in @(first.SourceLabel == "Chat" ? "a chat" : first.SourceLabel.ToLowerInvariant()) at @(first.Time + (first.Day == "Today" ? "" : " " + first.Day)), then @(first.Row.Reason ?? "no usage was reported"). It keeps counting toward your caps until you resolve it.</text>
@@ -61,7 +65,11 @@
           <text>@Model.UncertainCount requests reserved </text><span class="ps-mono">@SpendMoney.Format(Model.UncertainMicros)</span><text> and ended without reporting usage. They keep counting toward your caps until you resolve them.</text>
         }
       </span>
-      @if (Model.UncertainCount == 1)
+      @if (Model.UncertainCount == 1 && first.Blind is not null)
+      {
+        <a class="btn btn-sm btn-outline-secondary" href="@first.Blind">Open the blind battle</a>
+      }
+      else if (Model.UncertainCount == 1)
       {
         <button class="btn btn-sm btn-outline-secondary" type="button" data-resolve-op="@first.Op">Resolve…</button>
       }

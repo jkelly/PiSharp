@@ -247,6 +247,37 @@ public sealed class ArenaService : IDisposable
             .FirstOrDefault(battle => battle.Status is ArenaStatus.Held or ArenaStatus.Ready);
     }
 
+    /// <summary>What is blind now (brief rule 3, for every page outside the battle's own): the keys of each held or ready battle, either
+    /// mode: a request battle's run group and its columns' run ids; an agent battle's agent compare run id and its model keys
+    /// (<c>&lt;run&gt;-&lt;slot&gt;</c>, slot a being column A). A held battle is brought up to date first, so one whose runs ended or went
+    /// away stops hiding them as soon as it is ready-and-voted or void.</summary>
+    public ArenaBlindSet Blind()
+    {
+        var keys = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var status in new[] { ArenaStatus.Held, ArenaStatus.Ready })
+        {
+            foreach (var stored in store.WithStatus(status))
+            {
+                var battle = status == ArenaStatus.Held ? Refresh(stored) : stored;
+                if (battle.Status is not (ArenaStatus.Held or ArenaStatus.Ready)) continue;
+                if (battle.GroupId is { Length: > 0 } group) keys.TryAdd(group, battle.Id);
+                foreach (var contestant in battle.Contestants)
+                    if (contestant.RunId is { Length: > 0 } run) keys.TryAdd(run, battle.Id);
+                if (battle.Mode == ArenaMode.Agent && battle.GroupId is { Length: > 0 } agentRun)
+                    foreach (var slot in AgentCompareRunner.Slots.Take(battle.Contestants.Count))
+                        keys.TryAdd(AgentCompareRun.ModelKey(agentRun, slot), battle.Id);
+            }
+        }
+        return keys.Count == 0 ? ArenaBlindSet.Empty : new ArenaBlindSet(keys);
+    }
+
+    /// <summary>Whether <paramref name="runIdOrKey"/> (a run id, a run group, an agent compare run id or one of its model keys) belongs to a
+    /// battle that is held or ready, in either mode: its model stays hidden everywhere until the vote.</summary>
+    public bool Hidden(string? runIdOrKey) => Blind().Hides(runIdOrKey);
+
+    /// <summary>The held or ready battle that <paramref name="runIdOrKey"/> belongs to (see <see cref="Hidden"/>), or null.</summary>
+    public string? HidingBattle(string? runIdOrKey) => Blind().BattleOf(runIdOrKey);
+
     /// <summary>The tag a new battle of <paramref name="mode"/> proposes: a request battle the one the last request vote used, else
     /// <see cref="DefaultTag"/>; an agent battle always <see cref="EvalTags.Agent"/> (compare.html's agent select starts on agent; another
     /// agent tag is picked or typed per vote).</summary>

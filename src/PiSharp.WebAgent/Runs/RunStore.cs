@@ -511,6 +511,15 @@ public sealed class RunStore
                 .Replace("_", "\\_", StringComparison.Ordinal) + "%"));
             parameters.Add(("$exact", text));
         }
+        if (query.ExceptKeys is { Count: > 0 } except)
+        {
+            // COALESCE: a NULL group or parent must not turn the whole condition NULL (which would drop the row).
+            var keys = except.Where(key => !string.IsNullOrEmpty(key)).Distinct(StringComparer.Ordinal).ToList();
+            var names = keys.Select((_, index) => "$except" + index.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToList();
+            var set = string.Join(", ", names);
+            if (names.Count > 0) clauses.Add($"NOT (id IN ({set}) OR COALESCE(group_id, '') IN ({set}) OR COALESCE(parent_id, '') IN ({set}))");
+            parameters.AddRange(names.Zip(keys, (name, key) => (name, (object?)key)));
+        }
         return (clauses.Count == 0 ? "" : " WHERE " + string.Join(" AND ", clauses), parameters);
     }
 
