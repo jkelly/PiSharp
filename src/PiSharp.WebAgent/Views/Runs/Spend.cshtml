@@ -1,0 +1,77 @@
+@* Decision 0011 (run W3, S4): the mockups' history-spend page (route GET /history/spend), states default (with the uncertain banner),
+   uncertain-resolved (the resolved toast after a reload), filtered and empty: the header with Export CSV (the rows matching the filters),
+   _HistoryTabs, the uncertain banner, _SpendSummary, _SpendFilters with the active filter chips, _SpendLedger with its pagination, and
+   _SpendEmpty when the ledger holds nothing. Resolve… opens _ResolveReservationModal, whose content GET /history/spend/resolve?op= renders
+   (?resolve=op opens it when the page loads). spend-history.js runs the filters, the page size, the export toast and Resolve. Model:
+   SpendHistoryPage. *@
+@model SpendHistoryPage
+@{
+    ViewData["Title"] = "Spend · History";
+    ViewData[ShellViewData.Nav] = ShellNav.History;
+    ViewData[ShellViewData.Page] = "history-spend";
+    var csvName = SpendEndpoints.CsvName(DateTimeOffset.UtcNow);
+}
+@section Styles { <link href="~/css/spend.css" rel="stylesheet" asp-append-version="true" /> }
+@section TopbarStart { <h1 class="app-title">History</h1> }
+@section Modals { <partial name="/Views/Runs/_ResolveReservationModal.cshtml" model="Model.Resolve" /> }
+@section Scripts { <script type="module" src="~/js/spend-history.js" asp-append-version="true"></script> }
+<div class="page" data-spend-history>
+  <div class="page-header">
+    <div class="me-auto">
+      <div class="ps-eyebrow">Records</div>
+      <h2>History</h2>
+      <p>One row per provider request. Spend Guard reserves the worst case before each call, then settles to the cost the provider reports. Stored in <span class="ps-mono">webagent.db</span>.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      @if (Model.Ledger.Total > 0)
+      {
+        <a class="btn btn-outline-secondary" href="@Model.CsvHref" download="@csvName" data-spend-export data-file="@csvName" title="Export the requests that match the current filters"><i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>Export CSV</a>
+      }
+      else
+      {
+        <button class="btn btn-outline-secondary" type="button" disabled><i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>Export CSV</button>
+      }
+    </div>
+  </div>
+
+  <partial name="/Views/Runs/_HistoryTabs.cshtml" model='"spend"' />
+
+  @if (Model.UncertainCount > 0 && Model.Uncertain.Count > 0)
+  {
+    var first = Model.Uncertain[0];
+    <div class="ps-card d-flex flex-wrap align-items-center gap-2 px-3 py-2 mb-3" role="status" data-uncertain-banner>
+      <span class="ps-chip" data-tone="warn">@Model.UncertainCount uncertain</span>
+      <span class="fs-7 flex-grow-1" style="min-width:min(100%,16rem)">
+        @if (Model.UncertainCount == 1)
+        {
+          <span class="ps-mono">@first.Row.Provider/@first.Row.Model</span> <text>reserved</text> <span class="ps-mono">@SpendMoney.Format(first.Row.ReservedMicros ?? 0)</span>
+          <text> in @(first.SourceLabel == "Chat" ? "a chat" : first.SourceLabel.ToLowerInvariant()) at @(first.Time + (first.Day == "Today" ? "" : " " + first.Day)), then @(first.Row.Reason ?? "no usage was reported"). It keeps counting toward your caps until you resolve it.</text>
+        }
+        else
+        {
+          <text>@Model.UncertainCount requests reserved </text><span class="ps-mono">@SpendMoney.Format(Model.UncertainMicros)</span><text> and ended without reporting usage. They keep counting toward your caps until you resolve them.</text>
+        }
+      </span>
+      @if (Model.UncertainCount == 1)
+      {
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-resolve-op="@first.Op">Resolve…</button>
+      }
+      else
+      {
+        <a class="btn btn-sm btn-outline-secondary" href="/history/spend?status=uncertain">Review</a>
+      }
+    </div>
+  }
+
+  <partial name="/Views/Runs/_SpendSummary.cshtml" model="Model" />
+
+  @if (Model.Empty)
+  {
+    <partial name="/Views/Runs/_SpendEmpty.cshtml" model="Model" />
+  }
+  else
+  {
+    <partial name="/Views/Runs/_SpendFilters.cshtml" model="Model" />
+    <partial name="/Views/Runs/_SpendLedger.cshtml" model="Model" />
+  }
+</div>

@@ -1,0 +1,40 @@
+/* Decision 0011 (run W3, S4): the Spend pages' own styles, folded from the mockups' page-specific blocks (settings-spend, history-spend):
+   the caps table, billing modes, section heads and the price menu of Settings › Spend; the history tabs, the summary cells and the ledger
+   table of History › Spend. Neutral greys from the theme's tokens; colour only for status (the chips and the meter at its warning or
+   limit). No horizontal page scroll at 375px: the tables scroll inside .ps-table-wrap. */
+
+/* Settings › Spend */
+.spend-caps .table > :not(caption) > * > * { padding: .55rem .85rem; }
+.spend-caps .cap-sub { font-size: .75rem; color: var(--ps-faint); }
+.spend-caps .cap-num { font-size: .8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.spend-mode { font-size: .8125rem; color: var(--ps-text); white-space: nowrap; }
+.spend-mode .form-select { width: 11rem; max-width: 42vw; }
+.spend-section-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .2rem; }
+.spend-section-head > h3 { font-size: 1rem; margin: 0; }
+.spend-price-menu { width: 19rem; max-width: calc(100vw - 2rem); }
+.provider-row.is-modified, .setting-row.is-modified { box-shadow: inset 3px 0 0 var(--ps-warn); }
+.btn-check:focus-visible + .choice-card { box-shadow: 0 0 0 .2rem var(--ps-focus); }
+@media (max-width: 575.98px) {
+  .spend-caps .table > :not(caption) > * > * { padding: .5rem .6rem; }
+  .spend-mode { font-size: .75rem; }
+  .spend-mode .form-select { width: 8.5rem; }
+}
+
+/* History › Spend */
+.section-tabs { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; margin-bottom: 1rem; }
+.section-tabs .nav-link { white-space: nowrap; }
+.spend-summary { display: grid; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 992px) { .spend-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.spend-cell { padding: .85rem 1rem; min-width: 0; }
+.spend-cell + .spend-cell { border-top: 1px solid var(--ps-border); }
+@media (min-width: 992px) { .spend-cell + .spend-cell { border-top: 0; border-left: 1px solid var(--ps-border); } }
+.spend-amount { font-size: 1.35rem; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.spend-amount small { font-size: .8rem; font-weight: 400; color: var(--ps-faint); }
+.spend-sub { font-size: .75rem; color: var(--ps-faint); }
+.ledger-table td { vertical-align: middle; }
+.ledger-note { max-width: 13rem; }
+.ledger-table .btn-icon { --bs-btn-padding-x: .3rem; }
+.ledger-table .btn-icon .bi { font-size: .9rem; }
+@media (max-width: 575.98px) { .ps-table-wrap .ledger-table > :not(caption) > * > * { padding: .55rem .5rem; } }
+.resolve-formula { white-space: pre-line; }
+.pagination { --bs-pagination-active-bg: var(--ps-accent); --bs-pagination-active-border-color: var(--ps-accent); --bs-pagination-focus-box-shadow: 0 0 0 .2rem var(--bs-focus-ring-color); }

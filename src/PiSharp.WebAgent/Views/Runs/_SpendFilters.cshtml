@@ -1,0 +1,146 @@
+@* Decision 0011 (run W3, S4): the mockups' _SpendFilters (the History filters plus Account): search, a UTC date range, Provider → Model
+   (the model list is the chosen provider's), and under More filters the source, the account (grouped by billing mode) and the status, plus
+   quick filters; then the active filter chips with "N of M requests". A plain GET form (the filters live in the query string, so every
+   view is a link); spend-history.js applies a change at once. Left out: saving filters of your own (quick filters only). Model:
+   SpendHistoryPage. *@
+@using System.Globalization
+@model SpendHistoryPage
+@{
+    var filter = Model.Filter;
+    var options = Model.Options;
+    var more = filter.Source is not null || filter.Account is not null || filter.Status is not null;
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    var month = new DateOnly(today.Year, today.Month, 1);
+    static string Day(DateOnly? day) => day?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+    var statuses = new[] { LedgerStatus.Settled, LedgerStatus.Estimate, LedgerStatus.Uncertain, LedgerStatus.Released, LedgerStatus.Reserved };
+    var chips = new List<(string Text, string Href, string Name)>();
+    var reset = filter with { Page = 1 };
+    if (filter.Search is { } search) chips.Add(("search: " + search, (reset with { Search = null }).Href, "search"));
+    if (filter.From is not null || filter.To is not null) chips.Add(("date: " + (Day(filter.From) is { Length: > 0 } f ? f : "…") + " → " + (Day(filter.To) is { Length: > 0 } t ? t : "…"), (reset with { From = null, To = null }).Href, "date"));
+    if (filter.Provider is { } provider) chips.Add(("provider: " + provider, (reset with { Provider = null, Model = null }).Href, "provider"));
+    if (filter.Model is { } model) chips.Add(("model: " + model, (reset with { Model = null }).Href, "model"));
+    if (filter.Source is { } source) chips.Add(("source: " + source.Label(), (reset with { Source = null }).Href, "source"));
+    if (filter.Account is { } account) chips.Add(("account: " + (options.Accounts.SelectMany(group => group.Options).FirstOrDefault(option => option.Value == account)?.Text ?? account), (reset with { Account = null }).Href, "account"));
+    if (filter.Status is { } status) chips.Add(("status: " + SpendHistoryFilter.StatusWire(status), (reset with { Status = null }).Href, "status"));
+}
+<section class="ps-card p-3 mb-3" aria-label="Filters">
+  <form id="spendFilters" method="get" action="/history/spend" data-spend-filters>
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-6 col-lg-4">
+        <label class="ps-label d-block mb-1" for="sSearch">Search</label>
+        <div class="position-relative">
+          <i class="bi bi-search position-absolute top-50 translate-middle-y ms-2 text-ps-faint fs-8" aria-hidden="true"></i>
+          <input class="form-control form-control-sm ps-4" type="search" id="sSearch" name="q" value="@filter.Search" placeholder="Run id, op, model, note…" maxlength="200">
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <span class="ps-label d-block mb-1" id="sDateLabel">Date range (UTC)</span>
+        <div class="input-group input-group-sm" role="group" aria-labelledby="sDateLabel">
+          <label class="visually-hidden" for="sFrom">From</label>
+          <input class="form-control" type="date" id="sFrom" name="from" value="@Day(filter.From)" data-spend-auto>
+          <span class="input-group-text"><i class="bi bi-arrow-right" aria-hidden="true"></i></span>
+          <label class="visually-hidden" for="sTo">To</label>
+          <input class="form-control" type="date" id="sTo" name="to" value="@Day(filter.To)" data-spend-auto>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="ps-label d-block mb-1" for="sProvider">Provider</label>
+        <select class="form-select form-select-sm" id="sProvider" name="provider" data-spend-auto data-spend-provider>
+          <option value="" selected="@(filter.Provider is null)">All providers</option>
+          @foreach (var option in options.Providers)
+          {
+            <option value="@option.Value" selected="@(option.Value == filter.Provider)">@option.Text</option>
+          }
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="ps-label d-block mb-1" for="sModel">Model</label>
+        @if (filter.Provider is null)
+        {
+          <select class="form-select form-select-sm" id="sModel" disabled><option>Choose a provider first</option></select>
+        }
+        else
+        {
+          <select class="form-select form-select-sm" id="sModel" name="model" data-spend-auto data-spend-model>
+            <option value="" selected="@(filter.Model is null)">All models</option>
+            @foreach (var option in options.Models)
+            {
+              <option value="@option.Value" selected="@(option.Value == filter.Model)">@option.Text</option>
+            }
+          </select>
+        }
+      </div>
+    </div>
+    <button class="btn btn-sm btn-ghost mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#spendMoreFilters" aria-expanded="@(more ? "true" : "false")" aria-controls="spendMoreFilters"><i class="bi bi-sliders me-1" aria-hidden="true"></i>More filters</button>
+    <div class="@("collapse" + (more ? " show" : ""))" id="spendMoreFilters">
+      <div class="row g-2 align-items-end pt-2">
+        <div class="col-6 col-lg-3">
+          <label class="ps-label d-block mb-1" for="sSource">Source</label>
+          <select class="form-select form-select-sm" id="sSource" name="source" data-spend-auto>
+            <option value="" selected="@(filter.Source is null)">All sources</option>
+            @foreach (var option in SpendSources.All)
+            {
+              <option value="@option.Wire()" selected="@(option == filter.Source)">@option.Label()</option>
+            }
+          </select>
+        </div>
+        <div class="col-6 col-lg-3">
+          <label class="ps-label d-block mb-1" for="sAccount">Account</label>
+          <select class="form-select form-select-sm" id="sAccount" name="account" data-spend-auto>
+            <option value="" selected="@(filter.Account is null)">All accounts</option>
+            @foreach (var group in options.Accounts)
+            {
+              <optgroup label="@group.Label">
+                @foreach (var option in group.Options)
+                {
+                  <option value="@option.Value" selected="@(option.Value == filter.Account)">@option.Text</option>
+                }
+              </optgroup>
+            }
+          </select>
+        </div>
+        <div class="col-6 col-lg-3">
+          <label class="ps-label d-block mb-1" for="sStatus">Status</label>
+          <select class="form-select form-select-sm" id="sStatus" name="status" data-spend-auto>
+            <option value="" selected="@(filter.Status is null)">All statuses</option>
+            @foreach (var option in statuses)
+            {
+              <option value="@SpendHistoryFilter.StatusWire(option)" selected="@(option == filter.Status)">@SpendHistoryFilter.StatusWire(option)</option>
+            }
+          </select>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-bookmark me-1" aria-hidden="true"></i>Quick filters</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><h6 class="dropdown-header">Quick filters</h6></li>
+              <li><a class="dropdown-item" href="/history/spend?status=uncertain"><i class="bi bi-question-circle me-2" aria-hidden="true"></i>Uncertain only</a></li>
+              <li><a class="dropdown-item" href="/history/spend?status=estimate"><i class="bi bi-calculator me-2" aria-hidden="true"></i>Settled at an estimate</a></li>
+              <li><a class="dropdown-item" href="@("/history/spend?from=" + Day(today) + "&to=" + Day(today))"><i class="bi bi-calendar-day me-2" aria-hidden="true"></i>Today</a></li>
+              <li><a class="dropdown-item" href="@("/history/spend?from=" + Day(month))"><i class="bi bi-calendar-month me-2" aria-hidden="true"></i>This month</a></li>
+              <li><a class="dropdown-item" href="/history/spend?source=chat"><i class="bi bi-chat-square-text me-2" aria-hidden="true"></i>Chats only</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    @if (filter.Size != 25)
+    {
+      <input type="hidden" name="size" value="@filter.Size">
+    }
+    <button class="visually-hidden" type="submit">Apply filters</button>
+  </form>
+</section>
+
+@if (chips.Count > 0)
+{
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3" data-spend-chips>
+    <span class="ps-label">Active filters</span>
+    @foreach (var chip in chips)
+    {
+      <span class="ps-chip" data-tone="accent">@chip.Text <a class="text-reset" href="@chip.Href" aria-label="Remove @chip.Name filter"><i class="bi bi-x-lg" aria-hidden="true"></i></a></span>
+    }
+    <a class="fs-8 ps-mono" href="/history/spend">Clear all</a>
+    <span class="ms-auto fs-8 ps-mono text-ps-faint" data-spend-count>@Model.Ledger.Total.ToString("#,0", CultureInfo.InvariantCulture) of @Model.Ledger.TotalAll.ToString("#,0", CultureInfo.InvariantCulture) requests</span>
+  </div>
+}
