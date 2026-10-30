@@ -1,9 +1,10 @@
 // Decision 0011 (run W3, S3): the Spend Guard's own tables in webagent.db, in the Guard's part of the spend range (1100-1199; the ledger has
 // 1000-1099). spend_approvals holds the one-time answers the user gave in the confirm modal (proceed once, or cap the output): each belongs
 // to a run (a chat id, a Playground or Compare run id) and optionally one op, lives a few minutes, and is used up by the first call of that
-// run the guard stops (used_at and used_by, the ledger op of the reservation it let through, so a recovered request finds the output cap it
-// was sent with). spend_stops keeps what the guard decided about each call it stopped (keyed by the call's op), so the confirm modal can
-// open the cause's pane for a call stopped inside a run. Times are UTC Unix milliseconds. Nothing here is a secret.
+// run the guard stops (used_at and used_by, the first ledger op it let through). spend_approval_uses records every reservation an approval
+// let through (one row per ledger op: one for a single call, one per column of a Compare group), so each recovered request finds the output
+// cap it was sent with. spend_stops keeps what the guard decided about each call it stopped (keyed by the call's op), so the confirm modal
+// can open the cause's pane for a call stopped inside a run. Times are UTC Unix milliseconds. Nothing here is a secret.
 using PiSharp.WebAgent.Data;
 
 namespace PiSharp.WebAgent.Spend;
@@ -46,6 +47,22 @@ public static class SpendGuardMigrations
         CREATE INDEX IF NOT EXISTS spend_stops_run ON spend_stops (run, created_at);
         """);
 
+    /// <summary>1102: <c>spend_approval_uses</c>, every reservation (ledger op) an approval let through, so every column of an approved
+    /// Compare group, not only the first, is resent with the chosen output cap after a restart. Approvals used before it are carried over
+    /// from <c>used_by</c>.</summary>
+    public static SqlMigration ApprovalUses { get; } = new(1102, "spend: approval uses", $$"""
+        CREATE TABLE IF NOT EXISTS spend_approval_uses (
+          ledger_op TEXT PRIMARY KEY,
+          approval_id INTEGER NOT NULL,
+          recorded_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS spend_approval_uses_approval ON spend_approval_uses (approval_id);
+        INSERT OR IGNORE INTO spend_approval_uses (ledger_op, approval_id, recorded_at)
+          SELECT used_by, id, used_at FROM spend_approvals
+          WHERE used_at IS NOT NULL AND used_by IS NOT NULL AND used_by NOT IN ('{{SpendApprovalStore.Replaced}}', '{{SpendApprovalStore.Refused}}')
+          ORDER BY id DESC;
+        """);
+
     /// <summary>Every Guard migration, lowest id first.</summary>
-    public static IReadOnlyList<IWebAgentMigration> All { get; } = [Approvals, Stops];
+    public static IReadOnlyList<IWebAgentMigration> All { get; } = [Approvals, Stops, ApprovalUses];
 }

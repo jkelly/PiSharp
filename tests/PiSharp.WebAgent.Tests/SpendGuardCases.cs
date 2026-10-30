@@ -30,7 +30,8 @@ internal static partial class Program
     [
         Case("spend.guard.registration-decorates-the-final-models-once", async () =>
         {
-            Equal("1100:spend: approvals,1101:spend: stops", string.Join(",", SpendGuardMigrations.All.Select(migration => $"{migration.Id}:{migration.Name}")), "the migrations");
+            Equal("1100:spend: approvals,1101:spend: stops,1102:spend: approval uses", string.Join(",", SpendGuardMigrations.All.Select(migration => $"{migration.Id}:{migration.Name}")),
+                "the migrations");
             Check(SpendGuardMigrations.All.All(migration => MigrationArea.Of(migration.Id) == MigrationArea.Spend), "inside the spend range");
 
             var root = Temp("spend-guard-registration");
@@ -283,6 +284,66 @@ internal static partial class Program
             Equal((ReservationState.Settled, SettlementKind.Estimate), (aborted.State, aborted.Settlement ?? SettlementKind.Actual), "an aborted answer after output, too");
         }),
 
+        Case("spend.guard.partial-usage-after-output-is-uncertain-or-settles-at-the-estimate", async () =>
+        {
+            // A real provider reports usage before the stream ends (Anthropic's message_start: the input alone), and its error and aborted
+            // terminals carry it. That partial usage is never the actual cost: the estimate is used, raised to at least what it reports.
+            await using var world = GuardWorld.Create("spend-guard-partial");
+            var inputOnly = GuardUsage(1000, 0);
+            var large = GuardUsage(5000, 40);
+            var script = new GuardScript((call, token) => GuardAfterOutput(call.Model, call.Options!.Metadata!.ToJson(), "partial answer", token,
+                call.Options.Metadata.ToJson().Contains("-large\"", StringComparison.Ordinal) ? large : inputOnly));
+            var models = world.Over(script);
+            var model = GuardModel("metered", "m");
+            var messages = GuardMessages(3000);
+            var input = CostEstimator.InputTokens(CostEstimator.InputBytes(messages));
+            var seenTokens = CostEstimator.InputTokens(System.Text.Encoding.UTF8.GetByteCount("partial answer"));
+            var estimate = GuardPrices.Rates.WorstMicros(input, seenTokens);
+            var inputCost = SpendUsage.From(inputOnly).CostMicros!.Value;
+            Check(inputCost is > 0 && inputCost < estimate, $"the input-only usage ({inputCost}) costs less than the estimate ({estimate})");
+
+            var errored = await GuardCollect(models.StreamSimple(model, messages, GuardOptions("op-error", "c"), CancellationToken.None));
+            Check(errored[^1] is StreamError { Message.Usage.Input: 1000 }, "the error terminal carries the input usage");
+            var failed = (await world.Ledger.GetAsync("op-error"))!;
+            Equal((ReservationState.Uncertain, (SettlementKind?)null, (long?)null, estimate), (failed.State, failed.Settlement, failed.ActualMicros, failed.EstimateMicros ?? -1),
+                "an error after output with input-only usage is uncertain at the estimate, not settled at the input cost");
+            Check(failed.Reason!.Contains("after output", StringComparison.Ordinal) && failed.CountedMicros == failed.ReservedMicros, "still counted in full: " + failed.Reason);
+
+            await GuardCollect(models.StreamSimple(model, messages, GuardOptions("op-aborted", "c"), CancellationToken.None));
+            var aborted = (await world.Ledger.GetAsync("op-aborted"))!;
+            Equal((ReservationState.Settled, SettlementKind.Estimate, estimate), (aborted.State, aborted.Settlement ?? SettlementKind.Actual, aborted.ActualMicros ?? -1),
+                "an aborted answer after output with input-only usage settles at the estimate");
+
+            var largeCost = SpendUsage.From(large).CostMicros!.Value;
+            Check(largeCost > GuardPrices.Rates.WorstMicros(input, 40), $"the large usage ({largeCost}) costs more than the estimate");
+            await GuardCollect(models.StreamSimple(model, messages, GuardOptions("op-error-large", "c"), CancellationToken.None));
+            var failedLarge = (await world.Ledger.GetAsync("op-error-large"))!;
+            Equal((ReservationState.Uncertain, largeCost), (failedLarge.State, failedLarge.EstimateMicros ?? -1), "uncertain at no less than the partial usage reports");
+            await GuardCollect(models.StreamSimple(model, messages, GuardOptions("op-aborted-large", "c"), CancellationToken.None));
+            var abortedLarge = (await world.Ledger.GetAsync("op-aborted-large"))!;
+            Equal((ReservationState.Settled, SettlementKind.Estimate, largeCost), (abortedLarge.State, abortedLarge.Settlement ?? SettlementKind.Actual, abortedLarge.ActualMicros ?? -1),
+                "settled at no less than the partial usage reports");
+
+            // The same rules for a completion (its final message only).
+            AssistantMessage Ended(StopReason reason, string text, TokenUsage usage) =>
+                new(model.Api, model.Provider, model.Id, 1, text.Length > 0 ? [new TextContent(text)] : [], usage, reason);
+            async Task<Reservation> CompleteAsync(string op, AssistantMessage message)
+            {
+                await world.Executor.CompleteAsync(GuardCall(op, "c"), model.Descriptor, (send, token) => Task.FromResult(message));
+                return (await world.Ledger.GetAsync(op))!;
+            }
+            Equal(ReservationState.Uncertain, (await CompleteAsync("done-error", Ended(StopReason.Error, "partial answer", inputOnly))).State, "a completion's error after output");
+            var completedAborted = await CompleteAsync("done-aborted", Ended(StopReason.Aborted, "partial answer", inputOnly));
+            Equal((ReservationState.Settled, SettlementKind.Estimate), (completedAborted.State, completedAborted.Settlement ?? SettlementKind.Actual), "a completion's abort after output");
+            Equal(ReservationState.Released, (await CompleteAsync("done-error-before", Ended(StopReason.Error, "", inputOnly))).State,
+                "an error before any output is released even with input usage");
+            var counted = await CompleteAsync("done-aborted-tokens", Ended(StopReason.Aborted, "", GuardUsage(1000, 30)));
+            Equal((ReservationState.Settled, SettlementKind.Estimate, GuardPrices.Rates.WorstMicros(input, 30)),
+                (counted.State, counted.Settlement ?? SettlementKind.Actual, counted.ActualMicros ?? -1), "output tokens the provider counted are output seen");
+            var done = await CompleteAsync("done-stop", Ended(StopReason.Stop, "answer", GuardUsage(10, 5)));
+            Equal((SettlementKind.Actual, 105L), (done.Settlement ?? SettlementKind.Estimate, done.ActualMicros ?? -1), "a finished answer still settles at its usage");
+        }),
+
         Case("spend.guard.recovery-reuses-the-op", async () =>
         {
             await using var world = GuardWorld.Create("spend-guard-recovery");
@@ -422,6 +483,72 @@ internal static partial class Program
                 "a completion through the executor settles");
             await ThrowsAsync<ArgumentException>(() => world.Executor.ReserveGroupAsync([GuardCall("a", "r1"), GuardCall("b", "r2")]), "a group belongs to one run");
             await ThrowsAsync<ArgumentException>(() => world.Executor.ReserveGroupAsync([GuardCall("a", "r1"), GuardCall("a", "r1")]), "two calls never share an op");
+        }),
+
+        Case("spend.guard.recovered-compare-columns-keep-the-chosen-output-cap", async () =>
+        {
+            await using var world = GuardWorld.Create("spend-guard-group-recovery");
+            // Three columns at 4,000 output tokens ($0.0633 each) ask under a $0.10 run cap; capped at 500 ($0.0108 each) they fit.
+            await world.CapAsync(CapPeriod.Run, 100_000, CapAction.Ask);
+            IReadOnlyList<SpendCall> columns = [.. Enumerable.Range(1, 3).Select(index => GuardCall($"cmp-col-{index}", "cmp-r", source: "compare", maxTokens: 4000))];
+            var asked = await world.Guard.ReserveGroupAsync(columns);
+            Check(!asked.Reserved && asked.Refused?.ErrorCode == SpendErrors.Ask, "the group asks first");
+            var approval = await world.Guard.ApproveStoredAsync(new SpendApproval("cmp-r", SpendChoice.CapOutput) { MaxOutputTokens = 500 });
+            var approved = await world.Guard.ReserveGroupAsync(columns);
+            Check(approved.Reserved, "capped, the group fits");
+            Equal("500,500,500", string.Join(",", approved.Items.Select(item => item.MaxTokens)), "every column is sent with the chosen output cap");
+            foreach (var column in columns)
+                Equal((500, approval.Id), ((await world.Ledger.GetAsync(column.Op))?.OutputTokens ?? -1, (await world.Approvals.UsedByAsync(column.Op))?.Id ?? -1),
+                    "reserved at the capped output, with the approval recorded against " + column.Op);
+
+            // The process dies before the columns end; the next start finds their reservations (startup recovery made them uncertain).
+            world.Restart();
+            var recovered = await world.Guard.ReserveGroupAsync(columns);
+            Check(recovered.Reserved && recovered.Items.All(item => item.Reservation.Existing), "the recovered group reuses every reservation");
+            Equal("500,500,500", string.Join(",", recovered.Items.Select(item => item.MaxTokens)), "each recovered column keeps the chosen output cap");
+            Check(recovered.Items.All(item => item.Approval?.Id == approval.Id), "and the approval that let it through");
+
+            // Each column re-runs as a durable request under its own op after the restart.
+            var script = new GuardScript((call, token) => GuardAnswer(call.Model, "column", GuardUsage(10, 5)));
+            var models = world.Over(script);
+            foreach (var column in columns)
+                Check((await GuardCollect(models.StreamSimple(GuardModel("metered", "m"), GuardMessages(3000), GuardOptions(column.Op, "cmp-r", source: "compare", maxTokens: 4000),
+                    CancellationToken.None)))[^1] is StreamDone, "a recovered column is resent");
+            Equal("500,500,500", string.Join(",", script.Calls.Select(call => call.Options!.MaxTokens)), "each recovered column is resent with the capped maxTokens");
+            Equal("cmp-col-1:uncertain,cmp-col-2:uncertain,cmp-col-3:uncertain", string.Join(",", world.Rows().OrderBy(row => row.Op, StringComparer.Ordinal).Select(row => row.Op + ":" + row.State)),
+                "nothing reserved twice, and the rows wait for the user");
+
+            // An approval whose group still could not be sent let nothing through.
+            var refused = await world.Guard.ApproveStoredAsync(new SpendApproval("cmp-x", SpendChoice.CapOutput) { MaxOutputTokens = 500 });
+            var taken = (await world.Approvals.TakeAsync("cmp-x", null, ["cmp-x-1", " cmp-x-2 ", "cmp-x-1"]))!;
+            Equal((refused.Id, "cmp-x-1", refused.Id), (taken.Id, taken.UsedBy, (await world.Approvals.UsedByAsync("cmp-x-2"))?.Id ?? -1), "taken for both columns");
+            await world.Approvals.MarkUsedByAsync(taken.Id, SpendApprovalStore.Refused);
+            Check(await world.Approvals.UsedByAsync("cmp-x-1") is null && await world.Approvals.UsedByAsync("cmp-x-2") is null, "refused: no column keeps it");
+            await ThrowsAsync<ArgumentException>(() => world.Approvals.TakeAsync("cmp-x", null, Array.Empty<string>()), "an approval lets at least one reservation through");
+
+            // An approval used before the uses table existed is carried over from used_by.
+            var root = Temp("spend-guard-uses-upgrade");
+            try
+            {
+                var path = Path.Join(root, "webagent.db");
+                var before = new WebAgentDb(path, [CoreMigrations.AppInfo, SettingsStore.Migration, SpendGuardMigrations.Approvals, SpendGuardMigrations.Stops]);
+                before.Migrate();
+                before.Execute("""
+                    INSERT INTO spend_approvals (run, op, choice, max_output_tokens, created_at, expires_at, used_at, used_by) VALUES
+                      ('r', NULL, 'cap-output', 300, 1, 2, 1, 'op-old'), ('r', NULL, 'cap-output', 200, 1, 2, 1, 'refused');
+                    """);
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                var after = new WebAgentDb(path, [CoreMigrations.AppInfo, SettingsStore.Migration, .. SpendGuardMigrations.All]);
+                Equal("1102", string.Join(",", after.Migrate()), "the upgrade applies the uses table");
+                var store = new SpendApprovalStore(after);
+                Equal(300, (await store.UsedByAsync("op-old"))?.Approval.MaxOutputTokens ?? -1, "the old approval is found by its reservation");
+                Check(await store.UsedByAsync(SpendApprovalStore.Refused) is null, "a refused one is not carried over");
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                DeleteTemp(root);
+            }
         }),
 
         Case("spend.guard.deferred-answer-keeps-the-reservation", async () =>
@@ -630,17 +757,20 @@ internal static partial class Program
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
-    /// <summary>A stream that ends after <paramref name="text"/>, as its op says: <c>op-eof</c> just stops, <c>op-error</c> ends with a
-    /// provider error, <c>op-throw</c> throws, <c>op-aborted</c> ends aborted, any other op waits for its cancel.</summary>
-    private static async IAsyncEnumerable<StreamEvent> GuardAfterOutput(DurableModel model, string metadata, string text, [EnumeratorCancellation] CancellationToken cancellationToken)
+    /// <summary>A stream that ends after <paramref name="text"/>, as its op starts: <c>op-eof</c> just stops, <c>op-error</c> ends with a
+    /// provider error, <c>op-throw</c> throws, <c>op-aborted</c> ends aborted, any other op waits for its cancel. The error and aborted
+    /// terminals carry <paramref name="usage"/> (none by default): the partial usage a real provider reports before the end (Anthropic's
+    /// message_start).</summary>
+    private static async IAsyncEnumerable<StreamEvent> GuardAfterOutput(DurableModel model, string metadata, string text, [EnumeratorCancellation] CancellationToken cancellationToken,
+        TokenUsage? usage = null)
     {
         await Task.Yield();
-        var partial = GuardPartial(model);
+        var partial = GuardPartial(model) with { Usage = usage ?? TokenUsage.Zero };
         yield return new StreamStarted(partial);
         yield return new TextStarted(0, new TextContent(""));
         yield return new TextDelta(0, text);
-        if (metadata.Contains("\"op-eof\"", StringComparison.Ordinal)) yield break;
-        if (metadata.Contains("\"op-error\"", StringComparison.Ordinal))
+        if (metadata.Contains("\"op-eof", StringComparison.Ordinal)) yield break;
+        if (metadata.Contains("\"op-error", StringComparison.Ordinal))
         {
             yield return new StreamError(StopReason.Error, partial with
             {
@@ -648,8 +778,8 @@ internal static partial class Program
             });
             yield break;
         }
-        if (metadata.Contains("\"op-throw\"", StringComparison.Ordinal)) throw new IOException("the connection was reset");
-        if (metadata.Contains("\"op-aborted\"", StringComparison.Ordinal))
+        if (metadata.Contains("\"op-throw", StringComparison.Ordinal)) throw new IOException("the connection was reset");
+        if (metadata.Contains("\"op-aborted", StringComparison.Ordinal))
         {
             yield return new StreamError(StopReason.Aborted, partial with { Content = [new TextContent(text)], StopReason = StopReason.Aborted });
             yield break;

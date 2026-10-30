@@ -1,11 +1,13 @@
 // Decision 0011 (run W3, S3): where the Spend Guard keeps the user's one-time approvals and the calls it stopped (webagent.db, migrations
-// 1100-1101). An approval answers an Ask once: "proceed once" or "cap the output at N tokens". It belongs to a run (the chat id) and, when the
+// 1100-1102). An approval answers an Ask once: "proceed once" or "cap the output at N tokens". It belongs to a run (the chat id) and, when the
 // confirm modal answered one stopped call, to that call's op; it lives Lifetime (10 minutes) and is used up by the first call of its run
 // that the guard stops, whether or not that call can then be sent, so one answer never lets two requests through. A newer approval for the
 // same run and op replaces an unused older one (the user changed their mind). Taking one is a single BEGIN IMMEDIATE transaction, so two
-// calls of one run that are stopped at the same time cannot both use it. A used approval remembers the ledger op it let through
-// (used_by), so a recovered durable request that reuses that reservation is sent with the same output cap. The stops are the decisions the
-// guard made about calls it did not send, for the confirm modal of a call stopped inside a run. Old rows are pruned as new ones are written.
+// calls of one run that are stopped at the same time cannot both use it. A used approval remembers every ledger op it let through
+// (spend_approval_uses: the one reservation of a single call, or every column of a Compare group; used_by keeps the first), so a recovered
+// durable request that reuses any of those reservations is sent with the same output cap. An approval whose call still could not be sent
+// (Refused) let nothing through and keeps no use. The stops are the decisions the guard made about calls it did not send, for the confirm
+// modal of a call stopped inside a run. Old rows are pruned as new ones are written.
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
@@ -23,8 +25,9 @@ public sealed record StoredApproval(long Id, SpendApproval Approval, DateTimeOff
     /// <summary>When a stopped call used it up (or a newer approval replaced it); null while it waits.</summary>
     public DateTimeOffset? Used { get; init; }
 
-    /// <summary>The ledger op of the reservation it let through, <see cref="SpendApprovalStore.Replaced"/> when a newer approval replaced it,
-    /// or <see cref="SpendApprovalStore.Refused"/> when the call it answered still could not be sent; null while it waits.</summary>
+    /// <summary>The ledger op of the (first) reservation it let through, <see cref="SpendApprovalStore.Replaced"/> when a newer approval
+    /// replaced it, or <see cref="SpendApprovalStore.Refused"/> when the call it answered still could not be sent; null while it waits. Every
+    /// reservation it let through finds it through <see cref="SpendApprovalStore.UsedByAsync"/>.</summary>
     public string? UsedBy { get; init; }
 }
 
@@ -108,10 +111,22 @@ public sealed class SpendApprovalStore
     }
 
     /// <summary>Uses up the approval a stopped call of <paramref name="run"/> with <paramref name="op"/> answers to (as
-    /// <see cref="PeekAsync"/> finds it), marking it used by <paramref name="usedBy"/>; null when there is none. Only one caller gets it.</summary>
+    /// <see cref="PeekAsync"/> finds it), recording it against <paramref name="usedBy"/> (the ledger op of the reservation it lets through);
+    /// null when there is none. Only one caller gets it.</summary>
     public Task<StoredApproval?> TakeAsync(string? run, string? op, string usedBy, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(usedBy);
+        return TakeAsync(run, op, [usedBy], cancellationToken);
+    }
+
+    /// <summary>Uses up the approval a stopped group of <paramref name="run"/> with <paramref name="op"/> answers to (as
+    /// <see cref="PeekAsync"/> finds it), recording it against every ledger op of <paramref name="ledgerOps"/> (the reservations it lets
+    /// through: every new column of a Compare group), so <see cref="UsedByAsync"/> finds it for each; <see cref="StoredApproval.UsedBy"/> is
+    /// the first. Null when there is none. Only one caller gets it.</summary>
+    /// <exception cref="ArgumentException"><paramref name="ledgerOps"/> is empty, or one of them is blank or too long.</exception>
+    public Task<StoredApproval?> TakeAsync(string? run, string? op, IReadOnlyList<string> ledgerOps, CancellationToken cancellationToken = default)
+    {
+        var uses = LedgerOps(ledgerOps);
         cancellationToken.ThrowIfCancellationRequested();
         if (Blank(run) is not { } key) return Task.FromResult<StoredApproval?>(null);
         var now = Now();
@@ -119,27 +134,42 @@ public sealed class SpendApprovalStore
         {
             if (Waiting(connection, transaction, key, Blank(op), now) is not { } found) return null;
             WebAgentDb.Execute(connection, transaction, "UPDATE spend_approvals SET used_at = $at, used_by = $by WHERE id = $id AND used_at IS NULL;",
-                ("$at", now.ToUnixTimeMilliseconds()), ("$by", usedBy.Trim()), ("$id", found.Id));
-            return found with { Used = now, UsedBy = usedBy.Trim() };
+                ("$at", now.ToUnixTimeMilliseconds()), ("$by", uses[0]), ("$id", found.Id));
+            RecordUses(connection, transaction, found.Id, uses, now);
+            return found with { Used = now, UsedBy = uses[0] };
         }));
     }
 
-    /// <summary>Changes what a used approval says it was used by (<see cref="Refused"/> when its call still could not be sent).</summary>
+    /// <summary>Changes what a used approval says it was used by. <see cref="Refused"/> (its call or group still could not be sent) or
+    /// <see cref="Replaced"/> forgets every reservation it was recorded against, since it let none through; a ledger op records it against
+    /// that op alone.</summary>
     public Task MarkUsedByAsync(long id, string usedBy, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(usedBy);
         cancellationToken.ThrowIfCancellationRequested();
-        db.Execute("UPDATE spend_approvals SET used_by = $by WHERE id = $id AND used_at IS NOT NULL;", ("$by", usedBy.Trim()), ("$id", id));
+        var by = usedBy.Trim();
+        IReadOnlyList<string> uses = by is Refused or Replaced ? [] : LedgerOps([by]);
+        var now = Now();
+        db.Transaction((connection, transaction) =>
+        {
+            if (WebAgentDb.Execute(connection, transaction, "UPDATE spend_approvals SET used_by = $by WHERE id = $id AND used_at IS NOT NULL;", ("$by", by), ("$id", id)) == 0)
+                return 0;
+            WebAgentDb.Execute(connection, transaction, "DELETE FROM spend_approval_uses WHERE approval_id = $id;", ("$id", id));
+            RecordUses(connection, transaction, id, uses, now);
+            return 1;
+        });
         return Task.CompletedTask;
     }
 
-    /// <summary>The approval that let the reservation <paramref name="ledgerOp"/> through, or null.</summary>
+    /// <summary>The approval that let the reservation <paramref name="ledgerOp"/> through (a single call's, or any column of a Compare group
+    /// it answered), or null.</summary>
     public Task<StoredApproval?> UsedByAsync(string ledgerOp, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (Blank(ledgerOp) is not { } key) return Task.FromResult<StoredApproval?>(null);
         using var connection = db.Open();
-        return Task.FromResult(Approvals(connection, null, $"SELECT {ApprovalColumns} FROM spend_approvals WHERE used_by = $by ORDER BY id DESC LIMIT 1;",
+        return Task.FromResult(Approvals(connection, null,
+            $"SELECT {ApprovalColumns} FROM spend_approvals WHERE id = (SELECT approval_id FROM spend_approval_uses WHERE ledger_op = $by);",
             ("$by", key)).FirstOrDefault());
     }
 
@@ -199,6 +229,32 @@ public sealed class SpendApprovalStore
     /// <summary>The wire name of <paramref name="choice"/>: <c>proceed-once</c>, <c>cap-output</c>.</summary>
     public static string Wire(SpendChoice choice) => choice == SpendChoice.CapOutput ? "cap-output" : "proceed-once";
 
+    /// <summary>Records <paramref name="approvalId"/> as the approval that let each of <paramref name="ledgerOps"/> through (a later
+    /// approval of the same ledger op replaces it).</summary>
+    private static void RecordUses(SqliteConnection connection, SqliteTransaction transaction, long approvalId, IReadOnlyList<string> ledgerOps, DateTimeOffset now)
+    {
+        foreach (var ledgerOp in ledgerOps)
+            WebAgentDb.Execute(connection, transaction, """
+                INSERT INTO spend_approval_uses (ledger_op, approval_id, recorded_at) VALUES ($op, $id, $at)
+                ON CONFLICT (ledger_op) DO UPDATE SET approval_id = excluded.approval_id, recorded_at = excluded.recorded_at;
+                """, ("$op", ledgerOp), ("$id", approvalId), ("$at", now.ToUnixTimeMilliseconds()));
+    }
+
+    /// <summary><paramref name="ledgerOps"/> trimmed, checked and without repeats, in order.</summary>
+    /// <exception cref="ArgumentException">There is none, or one is blank or too long.</exception>
+    private static List<string> LedgerOps(IReadOnlyList<string> ledgerOps)
+    {
+        ArgumentNullException.ThrowIfNull(ledgerOps);
+        var found = new List<string>();
+        foreach (var ledgerOp in ledgerOps)
+        {
+            if (Blank(ledgerOp) is not { } key) throw new ArgumentException("A ledger op is never blank.", nameof(ledgerOps));
+            if (key.Length > SpendRequest.MaxKeyLength) throw new ArgumentException($"A ledger op is at most {SpendRequest.MaxKeyLength} characters.", nameof(ledgerOps));
+            if (!found.Contains(key, StringComparer.Ordinal)) found.Add(key);
+        }
+        return found.Count > 0 ? found : throw new ArgumentException("Name at least one ledger op the approval lets through.", nameof(ledgerOps));
+    }
+
     private StoredApproval? Waiting(SqliteConnection connection, SqliteTransaction? transaction, string run, string? op, DateTimeOffset now) =>
         Approvals(connection, transaction, $"""
             SELECT {ApprovalColumns} FROM spend_approvals
@@ -246,12 +302,14 @@ public sealed class SpendApprovalStore
             return new SpendStop(call.Op, call, decision, Time(reader.GetInt64(9)));
         }, parameters)];
 
-    /// <summary>Drops approvals that expired unused a day ago, and used approvals and stops older than <see cref="Retention"/>.</summary>
+    /// <summary>Drops approvals that expired unused a day ago, used approvals and stops older than <see cref="Retention"/>, and the uses of
+    /// approvals no longer kept.</summary>
     private static void Prune(SqliteConnection connection, SqliteTransaction transaction, DateTimeOffset now)
     {
         var old = (now - Retention).ToUnixTimeMilliseconds();
         WebAgentDb.Execute(connection, transaction, "DELETE FROM spend_approvals WHERE (used_at IS NULL AND expires_at < $day) OR (used_at IS NOT NULL AND used_at < $old);",
             ("$day", (now - TimeSpan.FromDays(1)).ToUnixTimeMilliseconds()), ("$old", old));
+        WebAgentDb.Execute(connection, transaction, "DELETE FROM spend_approval_uses WHERE approval_id NOT IN (SELECT id FROM spend_approvals);");
         WebAgentDb.Execute(connection, transaction, "DELETE FROM spend_stops WHERE created_at < $old;", ("$old", old));
     }
 

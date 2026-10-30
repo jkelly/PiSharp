@@ -3,9 +3,11 @@
 // A call is reserved first (SpendGuard: the worst case against every cap, the user's one-time approval when a cap asks); a refused call
 // sends nothing and ends with one error terminal whose message is the spend error. A reserved call is sent once, with maxTokens lowered only
 // when the user chose "cap the output", and the stream is watched as it passes through unchanged. Its reservation is settled from how it
-// ended: a final message with usage settles at the actual cost; an error or a cancel before any output releases it; a cancel after output
-// settles at the estimate (the input estimate plus the output seen, at the reservation's rates); a stream that ended without usage after
-// output, or that finished without reporting usage on a row that counts, becomes uncertain (counted until the user resolves it). A deferred
+// ended: a finished answer (stop, length or tool use) settles at the actual cost its usage reports; an error or a cancel before any output
+// releases it; a cancel after output settles at the estimate (the input estimate plus the output seen, at the reservation's rates); a
+// stream that failed or ended without a final answer after output, or that finished without reporting usage on a row that counts, becomes
+// uncertain (counted until the user resolves it). The usage on an error or abort is partial (providers report it before the end: Anthropic
+// at message_start, often the input alone), never the actual cost; it only raises that estimate to at least what it reports. A deferred
 // response (stop reason "deferred") keeps its reservation until the deferred answer arrives. A reserved lease that is never sent is released
 // when it is disposed. Settling never throws into the caller's stream: a ledger failure is logged, and the row stays reserved (startup
 // recovery makes it uncertain).
@@ -377,12 +379,19 @@ internal sealed class SpendStreamWatch
         return SawOutput ? SpendOutcome.EndedWithoutUsage(OutputTokens, SpendLedger.RecoveryReason) : SpendOutcome.FailedBeforeOutput("the stream ended before any output");
     }
 
-    /// <summary>How a call that ended with <paramref name="message"/> settles. Null for a deferred response.</summary>
+    /// <summary>How a call that ended with <paramref name="message"/> settles. Null for a deferred response. Its usage is the actual cost
+    /// only when the answer finished (stop, length, tool use). A provider reports usage before a stream ends (Anthropic at message_start),
+    /// so an error or abort may carry partial usage (often the input alone): after output, an error is uncertain and an abort settles at the
+    /// estimate, either at no less than that partial usage costs (it rides on the outcome); before any output, both release.</summary>
     public static SpendOutcome? FromMessage(AssistantMessage message, bool sawOutput, double outputTokens)
     {
         ArgumentNullException.ThrowIfNull(message);
         var usage = SpendUsage.From(message.Usage);
         var reported = usage.HasTokens || usage.CostMicros is > 0;
+        var partial = reported ? usage : null;
+        // Output tokens the provider counted are output seen, even when no content event arrived.
+        var output = sawOutput || usage.OutputTokens > 0;
+        var seen = double.IsFinite(usage.OutputTokens) ? Math.Max(outputTokens, usage.OutputTokens) : outputTokens;
         var error = SpendGuard.Cut(ErrorText(message));
         switch (message.StopReason)
         {
@@ -391,14 +400,14 @@ internal sealed class SpendStreamWatch
             case StopReason.Stop or StopReason.Length or StopReason.ToolUse:
                 return SpendOutcome.Completed(usage) with { OutputTokensSeen = outputTokens };
             case StopReason.Error:
-                if (reported) return SpendOutcome.Completed(usage) with { OutputTokensSeen = outputTokens, Reason = error };
-                return sawOutput ? SpendOutcome.EndedWithoutUsage(outputTokens, "the stream failed after output without reporting usage" + (error is null ? "" : ": " + error))
-                    : SpendOutcome.FailedBeforeOutput(error is null ? "provider error before any output" : "provider error before any output: " + error);
+                if (output)
+                    return SpendOutcome.EndedWithoutUsage(seen, (reported ? "the stream failed after output with partial usage" : "the stream failed after output without reporting usage") +
+                        (error is null ? "" : ": " + error)) with { Usage = partial };
+                return SpendOutcome.FailedBeforeOutput(error is null ? "provider error before any output" : "provider error before any output: " + error);
             case StopReason.Aborted:
-                if (reported) return SpendOutcome.Completed(usage) with { OutputTokensSeen = outputTokens };
-                return sawOutput ? SpendOutcome.CancelledAfterOutput(outputTokens, "cancelled after output") : SpendOutcome.FailedBeforeOutput("cancelled before any output");
+                return output ? SpendOutcome.CancelledAfterOutput(seen, "cancelled after output") with { Usage = partial } : SpendOutcome.FailedBeforeOutput("cancelled before any output");
             default:
-                return sawOutput ? SpendOutcome.EndedWithoutUsage(outputTokens, "the stream ended without a final answer")
+                return output ? SpendOutcome.EndedWithoutUsage(seen, "the stream ended without a final answer") with { Usage = partial }
                     : SpendOutcome.FailedBeforeOutput("the stream ended before any output");
         }
     }
