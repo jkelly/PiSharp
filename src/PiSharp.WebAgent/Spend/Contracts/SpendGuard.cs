@@ -70,7 +70,9 @@ public enum SpendOutcomeKind
 /// <param name="Kind">How it ended.</param>
 public sealed record SpendOutcome(SpendOutcomeKind Kind)
 {
-    /// <summary>What the provider reported, for <see cref="SpendOutcomeKind.Completed"/>.</summary>
+    /// <summary>What the provider reported: for <see cref="SpendOutcomeKind.Completed"/>, the actual usage; for
+    /// <see cref="SpendOutcomeKind.CancelledAfterOutput"/> and <see cref="SpendOutcomeKind.EndedWithoutUsage"/>, the partial usage it reported
+    /// before the end (never the actual cost: the estimate is at least what it costs), or null.</summary>
     public SpendUsage? Usage { get; init; }
 
     /// <summary>About how many output tokens arrived before the end (for the estimate).</summary>

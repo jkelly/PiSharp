@@ -16,8 +16,10 @@
 // it), which is a new provider call with a new key. A reused reservation is sent with the output cap its approval chose.
 //
 // Settling (SettleAsync, from how the call ended): StreamDone with usage -> the actual cost; an error or cancel before any output ->
-// released; a cancel after output -> settled at the estimate (the input estimate plus the output seen); a stream that ended without usage
-// (dropped, or finished without reporting any on a row that counts) -> uncertain, counted until the user resolves it.
+// released; a cancel after output -> settled at the estimate (the input estimate plus the output seen); a stream that failed or ended
+// without a final answer after output (dropped, or finished without reporting usage on a row that counts) -> uncertain, counted until the
+// user resolves it. Partial usage reported before such an end (Anthropic reports the input at message_start) is never taken as the actual
+// cost; the estimate is only raised to at least what it costs.
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.WebAgent.Contracts;
@@ -174,7 +176,8 @@ public sealed class SpendGuard : ISpendGuard
 
     /// <summary>Reserves every call of <paramref name="calls"/> or none (a Compare run's columns): the ledger checks each with the group's
     /// earlier ones counted. When the group is refused, the run's one-time approval (of the run, or of the first call's op) answers the whole
-    /// group once, as for one call. A call whose reservation still stands (a recovered one) is reused.</summary>
+    /// group once, as for one call, and is recorded against every call it lets through. A call whose reservation still stands (a recovered
+    /// one) is reused, and sent with the output cap of the approval that let it through.</summary>
     /// <exception cref="ArgumentException">The group is empty, a call has no op, two calls share an op, or the calls are of different runs.</exception>
     public async Task<GuardedGroupReservation> ReserveGroupAsync(IReadOnlyList<SpendCall> calls, CancellationToken cancellationToken = default)
     {
@@ -198,7 +201,11 @@ public sealed class SpendGuard : ISpendGuard
 
         var first = await ledger.ReserveGroupAsync(Requests(estimates, false, none), cancellationToken).ConfigureAwait(false);
         if (first.Reserved) return await GroupAsync(checkedCalls, estimates, first, null, cancellationToken).ConfigureAwait(false);
-        if (await approvals.TakeAsync(run, checkedCalls[0].Op, keys[0], cancellationToken).ConfigureAwait(false) is not { } approval)
+        // The approval is recorded against every column it lets through (each new reservation's ledger key), so each recovered column is
+        // resent with its output cap; a column whose reservation already stood keeps the approval it was first sent with. A refused group
+        // always has a new column (the ledger allows a reservation that already stands).
+        var fresh = keys.Where((_, index) => !first.Items[index].Existing).ToList();
+        if (await approvals.TakeAsync(run, checkedCalls[0].Op, fresh.Count > 0 ? fresh : keys, cancellationToken).ConfigureAwait(false) is not { } approval)
         {
             await StopGroupAsync(checkedCalls, first, cancellationToken).ConfigureAwait(false);
             return await GroupAsync(checkedCalls, estimates, first, null, cancellationToken).ConfigureAwait(false);
@@ -227,6 +234,8 @@ public sealed class SpendGuard : ISpendGuard
             // The first ending wins; an uncertain row (a recovered request's) changes only when the user resolves it.
             if (row is null || row.State != ReservationState.Reserved) return row;
             var estimate = EstimateMicros(row, outcome.OutputTokensSeen);
+            // A call that ended after output may carry the partial usage the provider reported before the end: never estimate below it.
+            if (outcome.Kind is SpendOutcomeKind.CancelledAfterOutput or SpendOutcomeKind.EndedWithoutUsage) estimate = Math.Max(estimate, ReportedMicros(row, outcome.Usage));
             switch (outcome.Kind)
             {
                 case SpendOutcomeKind.Completed:
@@ -365,6 +374,17 @@ public sealed class SpendGuard : ISpendGuard
     /// its rates, rounded up; 0 without a price.</summary>
     private static long EstimateMicros(Reservation row, double outputTokens) =>
         row.Price is { } price ? price.WorstMicros(row.InputTokens, double.IsFinite(outputTokens) && outputTokens > 0 ? outputTokens : 0) : 0;
+
+    /// <summary>What the partial <paramref name="usage"/> a provider reported before a call ended costs for <paramref name="row"/>, as the
+    /// ledger prices a settled answer (the reported cost, else the tokens at the row's rates; an entered price always at its rates); 0 without
+    /// usage, without a price, or for usage that is not a count.</summary>
+    private static long ReportedMicros(Reservation row, SpendUsage? usage)
+    {
+        if (usage is null || row.Price is not { } price) return 0;
+        if (new[] { usage.InputTokens, usage.OutputTokens, usage.CacheReadTokens, usage.CacheWriteTokens }.Any(tokens => !double.IsFinite(tokens) || tokens < 0)) return 0;
+        if (price.Source != SpendPriceSource.Entered && usage.CostMicros is { } reported and > 0) return reported;
+        return Math.Max(0, price.CostMicros(usage));
+    }
 
     /// <summary><paramref name="call"/> trimmed and checked.</summary>
     private static SpendCall Check(SpendCall call, bool requireOp)
