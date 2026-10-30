@@ -12,17 +12,24 @@
 @inject AgentComparePages Pages
 @{
     var query = Context.Request.Query;
-    var mode = await Pages.ModeAsync(query["run"].ToString(), query["from"].ToString(), Context.RequestAborted);
+    @* W5 E5 (blind-state lines): a run or a New run copy (?from=) of an unvoted blind battle would name its agents in column order. *@
+    var blindBattle = (Context.RequestServices.GetService(typeof(PiSharp.WebAgent.Evals.Arena.ArenaService)) as PiSharp.WebAgent.Evals.Arena.ArenaService)
+        ?.UnvotedAgentBattle(query["run"].ToString() is { Length: > 0 } blindRun ? blindRun : query["from"].ToString());
+    var mode = blindBattle is null ? await Pages.ModeAsync(query["run"].ToString(), query["from"].ToString(), Context.RequestAborted) : null;
 }
 <link href="~/css/compare-agent.css" rel="stylesheet" asp-append-version="true">
-@if (mode.Run is { } run)
+@if (blindBattle is not null)
+{
+  <partial name="/Views/Compare/_ArenaBlindNotice.cshtml" model="blindBattle.Id" />
+}
+else if (mode!.Run is { } run)
 {
   <partial name="/Views/Compare/_AgentRun.cshtml" model="run" />
   <partial name="/Views/Compare/_AgentWorkspaceModal.cshtml" model="run.Workspace" />
   <partial name="/Views/Compare/_AgentDiffModal.cshtml" model="null" />
   <partial name="/Views/Compare/_KeepResultModal.cshtml" model="null" />
 }
-else if (mode.Setup is { } setup)
+else if (mode!.Setup is { } setup)
 {
   <partial name="/Views/Compare/_AgentSetup.cshtml" model="setup" />
   <partial name="/Views/Compare/_AgentWorkspaceModal.cshtml" model="null" />

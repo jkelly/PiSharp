@@ -1,0 +1,7 @@
+@* Decision 0011 (run W5, E5): modal-agent-diff's content for an agent battle (GET /compare/arena/{id}/diff?letter=): R6's _AgentDiff with
+   view-data "arena-blind" set while the battle is not voted, so its title is "Changes in B" without the model's name, it carries no run
+   id, its A/B/C switch asks arena.js (data-arena-diff) instead of R6's script, and Copy patch, Open as chat and Keep wait for the reveal.
+   Model: ArenaAgentDiffView. *@
+@using PiSharp.WebAgent.Evals.Arena
+@model ArenaAgentDiffView
+<partial name="/Views/Compare/_AgentDiff.cshtml" model="Model.View" view-data='new ViewDataDictionary(ViewData) { ["arena-blind"] = Model.Blind, ["arena-battle"] = Model.BattleId }' />

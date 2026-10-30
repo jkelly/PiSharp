@@ -1,0 +1,75 @@
+@* Decision 0011 (run W5, E5): a blind battle (GET /compare/arena/{id}), after compare.html's blind states: blind-held (answers held until
+   all finish), blind (ready to vote), blind-voted (revealed), agent-blind and agent-blind-voted. The shared prompt (or the agent task) on
+   top, read-only, with Stop all while answers run and New round (request battles: the same prompt and models, shuffled again); then
+   _ArenaBattle, which arena.js swaps from GET /compare/arena/{id}/body as the battle's event stream (GET /api/evals/arena/{id}/events)
+   reports changes. Before the vote nothing on this page names a contestant (brief rule 3): no model picker, no presets, no estimate per
+   column; the spend confirm modal only answers New round, which is refused or sent before any answer exists. Agent battles host R6's
+   modal-agent-diff, filled from GET /compare/arena/{id}/diff?letter= (names hidden until the vote). No inline script (CSP script-src
+   'self'). Model: ArenaPageView. *@
+@using PiSharp.WebAgent.Evals
+@using PiSharp.WebAgent.Evals.Arena
+@model ArenaPageView
+@{
+    ViewData["Title"] = "Compare";
+    ViewData[ShellViewData.Nav] = ShellNav.Compare;
+    ViewData[ShellViewData.ContentClass] = "no-scroll";
+    ViewData[ShellViewData.Page] = "compare";
+    var battle = Model.Battle;
+    var held = battle.Status == ArenaStatus.Held;
+    var label = Model.Agent ? "Task" : "Shared prompt";
+}
+@section Styles {
+  <link href="~/css/compare.css" rel="stylesheet" asp-append-version="true" />
+  @if (Model.Agent)
+  {
+    <link href="~/css/compare-agent.css" rel="stylesheet" asp-append-version="true" />
+  }
+  <link href="~/css/arena.css" rel="stylesheet" asp-append-version="true" />
+}
+@section TopbarStart {
+  <h1 class="app-title">Compare <small class="d-none d-sm-inline" data-arena-subtitle>@Model.Subtitle</small></h1>
+}
+<div class="cmp-page arena-page@(Model.Agent ? " ac-page" : "")" data-arena="@battle.Id" data-arena-mode="@EvalJson.Wire(battle.Mode)" data-status="@EvalJson.Wire(battle.Status)">
+  <section class="compare-prompt" aria-label="@label">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span class="ps-label">@label</span>
+      <span class="ps-chip" data-tone="outline" title="The server shuffled the contestants into columns @string.Join(", ", battle.Letters) and hides names, logos, metrics and cost until you vote"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Blind</span>
+      <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+        <a class="btn btn-sm btn-ghost" href="@(Model.Agent ? "/compare?mode=agent" : "/compare")" title="Back to Compare's setup">Compare</a>
+        <button class="btn btn-sm btn-outline-danger" type="button" title="Stop every answer. A stopped round is revealed and never counted." data-arena-stop hidden="@(!held)"><i class="bi bi-stop-fill me-1" aria-hidden="true"></i>Stop all</button>
+        @if (!Model.Agent)
+        {
+          <button class="btn btn-sm btn-primary btn-ps" type="button" title="New round: the same prompt and models, shuffled again" data-arena-again hidden="@held"><i class="bi bi-play-fill me-1" aria-hidden="true"></i>New round</button>
+        }
+      </div>
+    </div>
+    @if (Model.SystemPrompt is { Length: > 0 } system)
+    {
+      <details class="arena-system mb-2">
+        <summary class="fs-8 text-ps-faint"><i class="bi bi-chevron-right" aria-hidden="true"></i>System prompt</summary>
+        <div class="arena-prompt fs-8 mt-1">@system</div>
+      </details>
+    }
+    <div class="arena-prompt" data-arena-prompt>@Model.Prompt</div>
+    @if (Model.Settings is { } settings)
+    {
+      <div class="fs-8 text-ps-faint mt-2">Overrides are locked in blind mode, so every answer uses the shared settings · @settings</div>
+    }
+  </section>
+  <div class="cmp-views" data-arena-body>
+    <partial name="/Views/Compare/_ArenaBattle.cshtml" model="Model" />
+  </div>
+</div>
+@section Modals {
+  @if (Model.Agent)
+  {
+    <partial name="/Views/Compare/_AgentDiffModal.cshtml" model="null" />
+  }
+  else
+  {
+    <partial name="_SpendConfirmModal" model="null" />
+  }
+}
+@section Scripts {
+  <script type="module" src="~/js/arena.js" asp-append-version="true"></script>
+}

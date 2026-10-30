@@ -1,0 +1,118 @@
+@* Decision 0011 (run W5, E5): compare.html's _ArenaVoteBar. Before the vote: "Which answer is better?" with A to D, Tie and All bad
+   (av-pick), or "Rank the answers" with one select per place and Submit ranking (av-rank, offered with 3 or more answers); Pick one and
+   Rank switch the panes; the Tag (the one used last, or agent in agent mode; New tag… adds one); the info icon's position-bias note;
+   and the state's hint. The buttons are disabled while answers are held ("Voting opens when all 3 answers are in"). After the vote: Vote
+   saved, what was voted ("You picked B: Echo small."), "Added to coding · now 33 votes" (provisional while a model has fewer comparisons
+   than Settings' threshold), Pin as test case (request battles; hidden until the page hosts modal-test-case, E7's), Keep (agent battles:
+   the run's own page, where Keep applies or branches its changes), and Leaderboard. A void battle says why nothing can be voted. arena.js
+   posts the vote (POST /api/evals/arena/{id}/vote) and swaps the body. Model: ArenaVoteBarView. *@
+@using PiSharp.WebAgent.Evals
+@using PiSharp.WebAgent.Evals.Arena
+@model ArenaVoteBarView
+@{
+    var battle = Model.Battle;
+    var letters = battle.Letters;
+    var agent = battle.Mode == ArenaMode.Agent;
+    var held = battle.Status == ArenaStatus.Held;
+    var canRank = letters.Count >= 3;
+    string[] places = ["1st", "2nd", "3rd", "4th"];
+    var id = battle.Id;
+}
+<section class="arena-votebar" aria-label="Vote" data-arena-votebar data-status="@EvalJson.Wire(battle.Status)">
+  @if (battle.Status is ArenaStatus.Held or ArenaStatus.Ready)
+  {
+    <div data-arena-panes data-pane="av-pick">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="fs-7 fw-semibold me-1" data-pane-only="av-pick">Which @(agent ? "agent did better" : "answer is better")?</span>
+        <span class="fs-7 fw-semibold me-1" data-pane-only="av-rank" hidden>Rank the @(agent ? "agents" : "answers")</span>
+        <div class="d-flex flex-wrap gap-1" role="group" aria-label="Your vote" data-pane-body="av-pick">
+          @foreach (var letter in letters)
+          {
+            <button class="btn btn-sm btn-outline-secondary arena-pick" type="button" data-arena-vote="pick" data-letter="@letter" disabled="@held">@letter</button>
+          }
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-arena-vote="tie" disabled="@held">Tie</button>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-arena-vote="all-bad" disabled="@held">All bad</button>
+        </div>
+        @if (canRank)
+        {
+          <div class="d-flex flex-wrap align-items-center gap-1" data-pane-body="av-rank" hidden>
+            @for (var place = 0; place < letters.Count; place++)
+            {
+              <div class="input-group input-group-sm w-auto">
+                <label class="input-group-text" for="avRank@(place + 1)-@id">@places[place]</label>
+                <select class="form-select" id="avRank@(place + 1)-@id" data-arena-rank="@place">
+                  @foreach (var letter in letters)
+                  {
+                    <option value="@letter" selected="@(letter == letters[place])">@letter</option>
+                  }
+                </select>
+              </div>
+            }
+            <button class="btn btn-sm btn-primary" type="button" data-arena-vote="rank" disabled="@held">Submit ranking</button>
+          </div>
+        }
+        <div class="ms-md-auto d-flex flex-wrap align-items-center gap-1">
+          @if (canRank)
+          {
+            <button class="btn btn-sm btn-ghost active" type="button" data-arena-show-pane="av-pick" aria-pressed="true">Pick one</button>
+            <button class="btn btn-sm btn-ghost" type="button" data-arena-show-pane="av-rank" aria-pressed="false" title="Rank every answer, best first">Rank</button>
+          }
+          <div class="input-group input-group-sm w-auto ms-1">
+            <label class="input-group-text" for="avTag-@id">Tag</label>
+            <select class="form-select" id="avTag-@id" data-arena-tag title="@(agent ? "Agent votes use agent tags, kept apart from request tags on the leaderboard" : "Defaults to the tag you used last")">
+              @foreach (var tag in Model.Tags)
+              {
+                <option value="@tag" selected="@(tag == Model.Tag)">@tag</option>
+              }
+              <option value="" data-arena-new-tag>@(agent ? "New agent tag…" : "New tag…")</option>
+            </select>
+          </div>
+          <input class="form-control form-control-sm arena-new-tag" type="text" maxlength="@EvalTags.MaxLength" placeholder="new tag" aria-label="New tag" data-arena-tag-input hidden>
+          <i class="bi bi-info-circle text-ps-faint px-1" tabindex="0" role="img" aria-label="About blind votes" data-bs-toggle="tooltip" title="@Model.BiasText"></i>
+        </div>
+      </div>
+      @if (held)
+      {
+        <div class="fs-8 text-ps-faint mt-1">Voting opens when all @letters.Count @(agent ? "agents finish" : "answers are in").@(agent ? "" : " Overrides are locked in blind mode, so every answer uses the shared settings.")</div>
+      }
+      else if (agent)
+      {
+        <div class="fs-8 text-ps-faint mt-1">Vote on the diffs and check results. Names, turns, time and cost appear after you vote. Every agent had the same task, base commit, tools, limits and check.</div>
+      }
+      else
+      {
+        <div class="fs-8 text-ps-faint mt-1">Names, metrics and cost appear after you vote. Overrides are locked in blind mode, so every answer uses the shared settings.</div>
+      }
+      <div class="fs-8 text-ps-danger mt-1" role="alert" data-arena-vote-error hidden></div>
+    </div>
+  }
+  else if (Model.Vote is { } vote)
+  {
+    <div class="d-flex flex-wrap align-items-center gap-2" data-arena-voted="@EvalJson.Wire(vote.Kind)">
+      <span class="ps-chip" data-tone="ok">Vote saved</span>
+      <span class="fs-7" data-arena-summary>@Model.Summary</span>
+      <span class="fs-8 text-ps-faint" data-arena-added>@Model.Added</span>
+      <div class="ms-md-auto d-flex flex-wrap gap-2">
+        @if (Model.PinRunId is { } run)
+        {
+          <button class="btn btn-sm btn-outline-secondary" type="button" title="Saves the prompt, the shared settings and an answer as the reference output" data-arena-pin data-pin-run="@run" data-pin-source="arena" hidden><i class="bi bi-pin-angle me-1" aria-hidden="true"></i>Pin as test case</button>
+        }
+        @if (Model.KeepUrl is { } keep)
+        {
+          <a class="btn btn-sm btn-outline-secondary" href="@keep" title="Open the run, where Keep applies this agent's changes to your project or keeps them on a branch" data-arena-keep>@(Model.KeepLetter is { } best ? "Keep " + best + "…" : "Open run")</a>
+        }
+        @if (Model.LeaderboardUrl is { } board)
+        {
+          <a class="btn btn-sm btn-ghost" href="@board">Leaderboard</a>
+        }
+      </div>
+    </div>
+  }
+  else
+  {
+    <div class="d-flex flex-wrap align-items-center gap-2" data-arena-void>
+      <span class="ps-chip" data-tone="warn">Not counted</span>
+      <span class="fs-7">This round was stopped or an answer failed, so it can't be voted on. Names are shown; nothing was added to a leaderboard.</span>
+    </div>
+  }
+</section>

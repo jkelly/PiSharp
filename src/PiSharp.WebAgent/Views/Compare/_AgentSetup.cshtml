@@ -154,6 +154,12 @@
       </div>
       <span class="fs-8 text-ps-faint d-none d-xxl-inline">Levels are clamped per model</span>
       <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+        @* W5 E5: the Blind switch (blind agent battles, POST /api/evals/arena with mode agent; arena-start.js). *@
+        <div class="form-check form-switch mb-0" title="Blind: the server shuffles the agents into A, B and C and hides names, logos, turns, time and cost until you vote">
+          <input class="form-check-input" type="checkbox" role="switch" id="acBlind" aria-describedby="acBlindHelp" data-arena-blind="agent">
+          <label class="form-check-label fs-7" for="acBlind">Blind</label>
+          <span class="visually-hidden" id="acBlindHelp">Shuffles the agents into columns A, B and C and hides names, logos, turns, time and cost until you vote. Needs 2 to 4 different models.</span>
+        </div>
         <button class="btn btn-sm btn-primary btn-ps" type="button" title="Run agents (Ctrl+Enter)" data-ac-run><i class="bi bi-play-fill me-1" aria-hidden="true"></i>Run agents</button>
         <button class="composer-estimate run-estimate" type="button" aria-label="@(Model.Cap.Length > 0 ? "Run cap: $" + Model.Cap : "No run cap")" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="ps-tip-left" title="@capTitle" data-ac-cap-chip>@(Model.Cap.Length > 0 ? "Cap $" + Model.Cap : "No run cap")</button>
       </div>

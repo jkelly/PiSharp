@@ -1,0 +1,12 @@
+@* Decision 0011 (run W5, E5): what R6's agent run page (GET /compare?mode=agent&run= or &from=) shows instead of a run that is a blind
+   battle not voted yet: its columns would name the models in column order. A link to the battle, where the vote reveals them.
+   Model: the battle's id. *@
+@model string
+<div class="cmp-page" data-agent-mode data-arena-blind-run>
+  <div class="empty-state py-5">
+    <div class="empty-icon"><i class="bi bi-eye-slash" aria-hidden="true"></i></div>
+    <h2 class="h6">This run is a blind round</h2>
+    <p class="fs-7 text-ps-faint mb-3">Its agents stay unnamed until you vote, so it opens as a blind battle.</p>
+    <a class="btn btn-sm btn-primary" href="/compare/arena/@Uri.EscapeDataString(Model)">Open the blind round</a>
+  </div>
+</div>

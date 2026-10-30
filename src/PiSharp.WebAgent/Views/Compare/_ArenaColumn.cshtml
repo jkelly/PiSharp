@@ -1,0 +1,96 @@
+@* Decision 0011 (run W5, E5): compare.html's _ArenaColumn, one answer of a blind request battle. Before the vote the head is only the
+   letter and "Answer B"; the body is "Held until all 3 answers finish, so speed can't give a model away" (blind-held) or the answer
+   (blind; with Stream anyway, the text so far, as plain text); the foot says metrics and cost stay hidden. After the vote (blind-voted) the
+   head shows the provider's logo, the model's name and provider/model · settings, with Your pick or the ranking's place, and the foot the
+   run's TTFT, total, tokens and cost. A void battle (an answer failed, or the round was stopped) is revealed with what went wrong. The view
+   carries no identity before the vote (ArenaPages), so nothing here can show one. Model text goes through the sanitizing
+   MarkdownRenderer. Model: ArenaColumnView. *@
+@using PiSharp.WebAgent.Chat
+@using PiSharp.WebAgent.Evals
+@using PiSharp.WebAgent.Evals.Arena
+@inject MarkdownRenderer Markdown
+@model ArenaColumnView
+@{
+    var answer = Model.Answer;
+    var reveal = Model.Reveal;
+}
+<section class="compare-col@(Model.Picked ? " is-picked" : "")" aria-label="@Model.Label" data-arena-col="@Model.Letter">
+  @if (reveal is null)
+  {
+    <div class="compare-col-head">
+      <span class="arena-letter" aria-hidden="true">@Model.Letter</span>
+      <span class="arena-col-name">Answer @Model.Letter</span>
+    </div>
+  }
+  else
+  {
+    <div class="compare-col-head@(Model.Picked ? " arena-picked" : "")" data-arena-head="@Model.Letter">
+      <span class="arena-letter" aria-hidden="true">@Model.Letter</span>
+      <partial name="/Views/Settings/_ProviderLogo.cshtml" model='new PiSharp.WebAgent.Settings.LogoModel(reveal.ProviderName, reveal.LogoUrl)' />
+      <span class="d-flex flex-column arena-col-title">
+        <span class="arena-col-name">@reveal.Name</span>
+        <span class="ps-mono fs-8 text-ps-faint text-truncate">@reveal.Detail</span>
+      </span>
+      @if (Model.Picked)
+      {
+        <span class="ps-chip ms-auto" data-arena-pick-chip>Your pick</span>
+      }
+      @if (Model.Rank is { } rank)
+      {
+        <span class="ps-chip@(Model.Picked ? "" : " ms-auto")" data-arena-rank-chip>@rank</span>
+      }
+    </div>
+  }
+  <div class="compare-col-body">
+    @if (Model.Held)
+    {
+      <div class="arena-held h-100" data-arena-held>
+        <div><span class="spinner-border spinner-border-sm d-block mx-auto mb-2" aria-hidden="true"></span>Held until all @Model.Count answers finish<span class="d-block fs-8">so speed can't give a model away</span></div>
+      </div>
+    }
+    else if (Model.Error is { } error)
+    {
+      <div class="alert alert-secondary py-2 px-3 fs-7 mb-2" role="status" data-arena-error>@error</div>
+      @if (answer.Text is { Length: > 0 } partial)
+      {
+        <div class="msg-content md" data-arena-answer>@Html.Raw(Markdown.Render(partial))</div>
+      }
+    }
+    else if (answer.Failed)
+    {
+      <p class="fs-7 text-ps-faint mb-0" data-arena-failed>This answer ended without a result. What went wrong shows once the round is revealed.</p>
+    }
+    else if (Model.Status == ArenaStatus.Held && !answer.Done)
+    {
+      if (answer.Text is { Length: > 0 } sofar)
+      {
+        <div class="cmp-pre fs-7" data-arena-streaming>@sofar</div>
+      }
+      else
+      {
+        <div class="cmp-pre fs-7 text-ps-faint" data-arena-streaming>Waiting for the first words…</div>
+      }
+    }
+    else if (answer.Text is { Length: > 0 } text)
+    {
+      <div class="msg-content md" data-arena-answer>@Html.Raw(Markdown.Render(text))</div>
+    }
+    else
+    {
+      <p class="fs-7 text-ps-faint mb-0">An empty answer.</p>
+    }
+  </div>
+  @if (reveal is null)
+  {
+    <div class="compare-col-foot"><span><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Metrics and cost hidden until you vote</span></div>
+  }
+  else
+  {
+    <div class="compare-col-foot" data-arena-foot>
+      @foreach (var item in Model.Foot)
+      {
+        <span>@item</span>
+      }
+    </div>
+  }
+</section>

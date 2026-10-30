@@ -410,8 +410,9 @@ internal static partial class Program
                 Equal(EvalJson.Serialize(board), EvalJson.Serialize(served), "the service's leaderboard is the same");
                 Equal(EvalsSettings.DefaultProvisionalBelow, served.Ratings.ProvisionalBelow, "no settings store: the default threshold");
                 Equal("request:coding", string.Join(",", leaderboards.Tags(votes).Select(tag => EvalJson.Wire(tag.Mode) + ":" + tag.Tag)), "its tags");
+                // W5 E5: other units' migrations (the arena's 2500) are registered by the same module; the rater's block stays empty.
                 Equal("2000,2001,2002,2003,2004", string.Join(",", services.Where(service => service.ServiceType == typeof(IWebAgentMigration))
-                    .Select(service => ((IWebAgentMigration)service.ImplementationInstance!).Id).Order()), "the rater adds no migration");
+                    .Select(service => ((IWebAgentMigration)service.ImplementationInstance!).Id).Where(id => id < 2200).Order()), "the rater adds no migration");
             }
             finally
             {

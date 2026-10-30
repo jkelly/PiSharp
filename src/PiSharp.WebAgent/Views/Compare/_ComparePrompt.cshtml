@@ -4,7 +4,7 @@
    Settings dropdown below; each column clamps or leaves out what its model does not take, and says so), View options (Sync scroll), Stop
    all (Esc), Run all (Ctrl+Enter) and the estimate by Run all (_RunEstimate: the Spend Guard's preflight of every column; the over-cap chip
    when a column would be asked about or blocked). The over-cap banner shows when the Spend Guard refused the group's reservation, so
-   nothing ran; Review opens modal-spend-confirm again. Blind is W5 and is left out. Model: ComparePage. *@
+   nothing ran; Review opens modal-spend-confirm again. W5 E5 adds the Blind switch (see Views/Compare/Arena.cshtml). Model: ComparePage. *@
 @model ComparePage
 @{
     var draft = Model.Draft;
@@ -56,6 +56,12 @@
     </div>
     <span class="fs-8 ps-mono text-ps-faint d-none d-xxl-inline">Levels are clamped per model</span>
     <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+      @* W5 E5: the Blind switch. On, Run all starts a blind round (POST /api/evals/arena) and opens it; overrides are locked. *@
+      <div class="form-check form-switch mb-0" title="Blind: the server shuffles the models into A, B and C and hides names, logos, metrics and cost until you vote">
+        <input class="form-check-input" type="checkbox" role="switch" id="cmpBlind" aria-describedby="cmpBlindHelp" data-arena-blind="request" disabled="@running">
+        <label class="form-check-label fs-7" for="cmpBlind">Blind</label>
+        <span class="visually-hidden" id="cmpBlindHelp">Shuffles the models into columns A, B and C and hides names, logos, metrics and cost until you vote. Overrides are locked, so every answer uses the shared settings.</span>
+      </div>
       <div class="dropdown">
         <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="View options" aria-label="View options"><i class="bi bi-three-dots"></i></button>
         <div class="dropdown-menu dropdown-menu-end px-3 py-2">

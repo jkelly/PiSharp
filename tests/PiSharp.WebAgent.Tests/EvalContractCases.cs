@@ -742,8 +742,10 @@ internal static partial class Program
         {
             var services = new ServiceCollection();
             EvalsModule.AddEvalsArea(services, new WebAgentOptions { DataDirectory = Temp("evals-module-unused") });
-            Equal("2000,2001,2002,2003,2004", string.Join(",", services.Where(service => service.ServiceType == typeof(IWebAgentMigration))
-                .Select(service => ((IWebAgentMigration)service.ImplementationInstance!).Id).Order()), "the module registers the contracts' migrations");
+            // W5 E5: the units' own migrations (each in its block, EvalMigrations.Ranges) come after the contracts'.
+            var registered = services.Where(service => service.ServiceType == typeof(IWebAgentMigration)).Select(service => ((IWebAgentMigration)service.ImplementationInstance!).Id).Order().ToList();
+            Equal("2000,2001,2002,2003,2004", string.Join(",", registered.Where(id => id < 2100)), "the module registers the contracts' migrations");
+            Check(registered.All(id => EvalMigrations.RangeOf(id) is not null), "every unit's migration is in its block of the range: " + string.Join(",", registered));
             foreach (var migration in EvalMigrations.All)
             {
                 Equal(MigrationArea.Evals, MigrationArea.Of(migration.Id), "in the evals area: " + migration.Id);
@@ -767,9 +769,10 @@ internal static partial class Program
                     await app.StopAsync();
                 }
                 var path = new WebAgentOptions { DataDirectory = data }.DatabasePath;
-                Equal("2000,2001,2002,2003,2004", string.Join(",", ReadDb(path, "SELECT id FROM schema_migrations WHERE id BETWEEN 2000 AND 2999 ORDER BY id;", reader => reader.GetInt32(0))),
+                // W5 E5: the contracts' block (the units add their own in theirs: the arena's 2500 makes eval_arena_rounds).
+                Equal("2000,2001,2002,2003,2004", string.Join(",", ReadDb(path, "SELECT id FROM schema_migrations WHERE id BETWEEN 2000 AND 2099 ORDER BY id;", reader => reader.GetInt32(0))),
                     "the app applies the evals migrations at start");
-                Equal(11L, ReadDb(path, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name LIKE 'eval_%';", reader => reader.GetInt64(0)).Single(), "the evals tables");
+                Equal(11L, ReadDb(path, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name LIKE 'eval_%' AND name <> 'eval_arena_rounds';", reader => reader.GetInt64(0)).Single(), "the evals tables");
             }
             finally { DeleteTemp(root); }
         }),
