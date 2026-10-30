@@ -37,6 +37,11 @@ internal sealed partial class WorkflowEngine<TData>
         return await runtime.OutcomesAsync(ids, context).ConfigureAwait(false);
     }
 
+    /// <summary>The result a fail-fast join reports: the first that did not complete, a failure before an abort. The join aborts the
+    /// children still live, so an aborted sibling ahead of the failed child is not the cause.</summary>
+    internal static T? FailFastCause<T>(IEnumerable<T> results, Func<T, WorkflowRunStatus> status) where T : class =>
+        results.Where(result => status(result) != WorkflowRunStatus.Completed).OrderBy(result => status(result) == WorkflowRunStatus.Aborted).FirstOrDefault();
+
     internal static IReadOnlyList<TaskId> Children(Checkpoint checkpoint) =>
         checkpoint.State is { } state && state.TryGetValue("children", out var list) && list is JsonArrayValue ids
             ? [.. ids.OfType<JsonNumberValue>().Select(id => new TaskId((long)id.Value))]
@@ -136,7 +141,7 @@ internal sealed class ParallelStep<TData>(string name, IReadOnlyList<CompiledBra
             var outcomes = await WorkflowEngine<TData>.CollectAsync(runtime, ids, context).ConfigureAwait(false);
             var results = branches.Select((branch, index) =>
                 new BranchResult<TData>(branch.Name, (WorkflowResult<TData>)engine.EngineOf(branch.Workflow).Result(ids[index], outcomes[index]))).ToList();
-            if (policy == JoinPolicy.FailFast && results.FirstOrDefault(result => !result.Result.Completed) is { } failed)
+            if (policy == JoinPolicy.FailFast && WorkflowEngine<TData>.FailFastCause(results, result => result.Result.Status) is { } failed)
             {
                 await engine.FailAsync(task, runtime, checkpoint, Name,
                     $"Branch '{failed.Branch}' of '{Name}' {failed.Result.Status.ToString().ToLowerInvariant()}: {failed.Result.Error}", "child_failed",
@@ -184,8 +189,8 @@ internal sealed class ForEachStep<TData, TItem, TChild>(string name, Func<TData,
             var batchOutcomes = await WorkflowEngine<TData>.CollectAsync(runtime, batch, context).ConfigureAwait(false);
             var bodyEngine = engine.EngineOf(body);
             if (options.JoinPolicy == JoinPolicy.FailFast &&
-                batchOutcomes.Select((outcome, index) => (WorkflowResult<TChild>)bodyEngine.Result(batch[index], outcome)).FirstOrDefault(result => !result.Completed)
-                    is { } failed)
+                WorkflowEngine<TData>.FailFastCause(batchOutcomes.Select((outcome, index) => (WorkflowResult<TChild>)bodyEngine.Result(batch[index], outcome)),
+                    result => result.Status) is { } failed)
             {
                 await engine.FailAsync(task, runtime, checkpoint, Name, $"An item of '{Name}' {failed.Status.ToString().ToLowerInvariant()}: {failed.Error}",
                     "child_failed", checkpoint.Data, context).ConfigureAwait(false);

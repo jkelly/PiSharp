@@ -49,20 +49,21 @@ internal static partial class Program
             var slowStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var slowCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var merged = 0;
+            // "slow" comes before "bad": the join aborts it, and the error still names the branch that failed.
             var workflow = Workflow.For<OrderData>("fanout")
                 .Parallel("fan", [
                     ParallelBranch<OrderData>.Of("quick", (data, _, _) => { data.Note = "quick"; return Task.CompletedTask; }),
-                    ParallelBranch<OrderData>.Of("bad", new DelegateAction<OrderData>("bad", async (_, _, token) =>
-                    {
-                        await slowStarted.Task.WaitAsync(token);
-                        return ActionResult.Fail("bad branch");
-                    })),
                     ParallelBranch<OrderData>.Of("slow", async (_, _, token) =>
                     {
                         slowStarted.TrySetResult();
                         try { await Task.Delay(Timeout.Infinite, token); }
                         catch (OperationCanceledException) { slowCancelled.TrySetResult(); throw; }
                     }),
+                    ParallelBranch<OrderData>.Of("bad", new DelegateAction<OrderData>("bad", async (_, _, token) =>
+                    {
+                        await slowStarted.Task.WaitAsync(token);
+                        return ActionResult.Fail("bad branch");
+                    })),
                 ], (_, _) => Interlocked.Increment(ref merged))
                 .Build();
             await using var host = await TestHost.OpenAsync(catalog => catalog.Add(workflow));
@@ -227,8 +228,9 @@ internal static partial class Program
                     new ForEachOptions { Concurrency = 3 })
                 .Build();
             await using var host = await TestHost.OpenAsync(catalog => catalog.Add(workflow));
-            // The slow items never end on their own: the step fails at the first failed item instead of waiting for the batch.
-            var result = await host.Runner.RunAsync(workflow, new OrderData { Trail = ["bad", "slow", "slow"] }).WaitAsync(TimeSpan.FromSeconds(30));
+            // The slow items never end on their own: the step fails at the first failed item instead of waiting for the batch. The join aborts
+            // the slow item before it, and the error still names the item that failed.
+            var result = await host.Runner.RunAsync(workflow, new OrderData { Trail = ["slow", "bad", "slow"] }).WaitAsync(TimeSpan.FromSeconds(30));
             Equal(WorkflowRunStatus.Failed, result.Status, "status");
             Equal("child_failed", result.ErrorKind, "kind");
             Check(result.Error!.Contains("bad item"), "reason: " + result.Error);
