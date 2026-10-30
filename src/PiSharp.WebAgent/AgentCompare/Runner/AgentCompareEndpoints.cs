@@ -2,12 +2,13 @@
 // same-origin and JSON-only rules cover them) and are idempotent (a repeated create answers the run its request id made; a repeated stop,
 // continue, keep, discard or open-chat answers what the first did):
 //   POST /api/compare/agent                    {requestId, task, systemPrompt?, projectPath, models: [{provider, model, thinking?, account?}] (1-4),
-//                                              isolation?, baseRef?, extraExcludes?, confirmLargeCopy?, checkCommand?, checkTimeoutSeconds?,
-//                                              maxTurns?, maxMinutes?, capMicros? | capUsd?, capAction? (ask|block), approval? (ask|allowList|auto)}
-//                                              -> the run's status (below); 400/409 {error: {code, message}} (invalid, project-missing,
-//                                              not-git, too-large).
-//   POST /api/compare/agent/inspect            {projectPath, isolation?, extraExcludes?, models? (a count or the list)} -> R4's ProjectInspection (the setup's
-//                                              isolation chip, uncommitted changes, copy size).
+//                                              isolation?, baseRef?, extraExcludes?, useGitignore?, confirmLargeCopy?, checkCommand?,
+//                                              checkTimeoutSeconds?, maxTurns?, maxMinutes?, capMicros? | capUsd?, capAction? (ask|block),
+//                                              approval? (ask|allowList|auto)} -> the run's status (below); 400/409 {error: {code, message}}
+//                                              (invalid, project-missing, not-git, too-large). useGitignore (default: the agent compare
+//                                              defaults' setting) is whether a copy also skips what .gitignore lists.
+//   POST /api/compare/agent/inspect            {projectPath, isolation?, extraExcludes?, useGitignore?, models? (a count or the list)} -> R4's
+//                                              ProjectInspection (the setup's isolation chip, uncommitted changes, copy size).
 //   GET  /api/compare/agent                    ?limit= -> {items: [summary]} newest first.
 //   GET  /api/compare/agent/{run}              -> the run's status: {id, state, task, systemPrompt, projectPath, created, started, finished, error,
 //                                              workspace, limits, approval, check, order, grants, spend, waiting, models: [model status]}.
@@ -19,7 +20,9 @@
 //                                              still waiting are answered, and a call that started waiting since keeps waiting.
 //   POST /api/compare/agent/{run}/stop         {slot?} (none: every model) -> status.
 //   POST /api/compare/agent/{run}/continue     {slot, scope?: turn|run} -> status (a budget Ask: one more turn, or the rest of the run).
-//   GET  /api/compare/agent/{run}/diff         ?slot= -> R4's WorkspaceDiff (files, hunks, patch).
+//   GET  /api/compare/agent/{run}/diff         ?slot= -> R4's WorkspaceDiff (files, hunks, patch). Once the workspace is discarded (or removed
+//                                              after 7 days), the diff kept with the run, with storedAt (and omittedFiles when the kept
+//                                              patch was cut at 1 MiB); 409 discarded when none was kept.
 //   GET  /api/compare/agent/{run}/keep-preview ?slot= -> R4's KeepPreview (the Keep modal).
 //   POST /api/compare/agent/{run}/apply        {slot, discardOthers?} -> {result: KeepResult, discarded, keptBack, status}; a refusal is 200
 //                                              with result.outcome "refused" (nothing changed).
@@ -75,6 +78,7 @@ public static class AgentCompareEndpoints
             {
                 Isolation = Enum<WorkspaceIsolation>(json, "isolation") ?? defaults.Isolation,
                 ExtraExcludes = AgentCompareSettings.NormalizeExcludes([.. defaults.ExtraExcludes ?? [], .. Strings(json, "extraExcludes")]),
+                UseGitignore = Bool(json, "useGitignore") ?? defaults.UseGitignore,
                 Slots = Math.Clamp(json["models"] is JsonArray chosen ? chosen.Count : Int(json, "models") ?? 3, 1, AgentCompareRunner.MaxModels),
                 WarnAboveBytes = defaults.CopyWarnBytes,
             }, token).ConfigureAwait(false);
@@ -182,6 +186,7 @@ public static class AgentCompareEndpoints
             Isolation = Enum<WorkspaceIsolation>(json, "isolation"),
             BaseRef = Text(json, "baseRef"),
             ExtraExcludes = Strings(json, "extraExcludes"),
+            UseGitignore = Bool(json, "useGitignore"),
             ConfirmLargeCopy = Bool(json, "confirmLargeCopy") ?? false,
             CheckCommand = Text(json, "checkCommand"),
             CheckTimeoutSeconds = Int(json, "checkTimeoutSeconds"),

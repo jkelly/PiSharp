@@ -59,6 +59,11 @@ public sealed record WorkspaceInspectOptions
     /// <summary>Extra gitignore-style patterns a copy skips, on top of <see cref="WorkspaceManagerOptions.DefaultExcludes"/>.</summary>
     public IReadOnlyList<string> ExtraExcludes { get; init; } = [];
 
+    /// <summary>Whether a copy also skips what .gitignore lists (the project's .gitignore files, those of the folders above it in its
+    /// repository, and the repository's info/exclude); default true. Off, a copy keeps ignored files; the default and extra excludes are
+    /// skipped either way. Worktrees are not affected (W4 fix 2).</summary>
+    public bool UseGitignore { get; init; } = true;
+
     /// <summary>How many models (workspaces) the run would have, for the disk estimates.</summary>
     public int Slots { get; init; } = 3;
 
@@ -127,9 +132,12 @@ public sealed record ProjectInspection
     /// <summary>Folders a copy leaves out because they can't be read (relative paths).</summary>
     public IReadOnlyList<string> Unreadable { get; init; } = [];
 
-    /// <summary>What a copy skips: <see cref="WorkspaceManagerOptions.DefaultExcludes"/>, then the extra patterns ("anything in
-    /// .gitignore" is always skipped too).</summary>
+    /// <summary>What a copy skips: <see cref="WorkspaceManagerOptions.DefaultExcludes"/>, then the extra patterns (and anything in
+    /// .gitignore when <see cref="UseGitignore"/>).</summary>
     public IReadOnlyList<string> Excludes { get; init; } = [];
+
+    /// <summary>Whether a copy also skips what .gitignore lists (<see cref="WorkspaceInspectOptions.UseGitignore"/>).</summary>
+    public bool UseGitignore { get; init; } = true;
 
     /// <summary>The size above which a copy needs the user's go-ahead.</summary>
     public required long WarnAboveBytes { get; init; }
@@ -172,6 +180,12 @@ public sealed record WorkspaceRequest
 
     /// <summary>Extra gitignore-style patterns a copy (and a worktree's untracked files) skips.</summary>
     public IReadOnlyList<string> ExtraExcludes { get; init; } = [];
+
+    /// <summary>Whether a copy also skips what .gitignore lists; default true. Recorded with the run, so its diffs and Apply walk the
+    /// copies by the same rule after a restart. Off, the copies (and their diffs) keep ignored files; the default and extra excludes are
+    /// skipped either way. Worktrees hold the base commit's tracked files, and their diffs leave out untracked files that .gitignore
+    /// lists whatever this says (W4 fix 2).</summary>
+    public bool UseGitignore { get; init; } = true;
 
     /// <summary>The copy size that needs <see cref="ConfirmLargeCopy"/>; default <see cref="WorkspaceManagerOptions.WarnAboveBytes"/>.</summary>
     public long? WarnAboveBytes { get; init; }
@@ -259,6 +273,9 @@ public sealed record WorkspaceRun
 
     /// <summary>What the copies skip (and a worktree's untracked files).</summary>
     public IReadOnlyList<string> Excludes { get; init; } = [];
+
+    /// <summary>Whether the copies also skip what .gitignore lists (<see cref="WorkspaceRequest.UseGitignore"/>).</summary>
+    public bool UseGitignore { get; init; } = true;
 
     /// <summary>The project's uncommitted changes the worktrees do not have ("Not copied"); empty for copies, which include them.</summary>
     public IReadOnlyList<UncommittedChange> NotCopied { get; init; } = [];
@@ -377,6 +394,14 @@ public sealed record WorkspaceDiff
 
     /// <summary>"3 files · +31 −9".</summary>
     public string Summary => WorkspaceText.Summary(Files.Count, Added, Removed);
+
+    /// <summary>For a diff read back from the patch kept with the run (<see cref="WorkspacePatch.Read"/>), after its workspace was
+    /// discarded or removed: when that patch was kept. Null for a diff of a workspace that is there.</summary>
+    public DateTimeOffset? StoredAt { get; init; }
+
+    /// <summary>For a kept patch: how many changed files it has no room for (<see cref="WorkspacePatch.Cut"/>); their lines are gone, so
+    /// <see cref="Patch"/> is not the whole change then.</summary>
+    public int OmittedFiles { get; init; }
 }
 
 /// <summary>What Keep would do for a slot (the Keep modal): the slot's files, the project's uncommitted changes in the same files (Apply

@@ -14,8 +14,9 @@ namespace PiSharp.WebAgent.AgentCompare;
 /// copy; the default) or <c>copy</c> (always a temporary copy). <c>worktree</c> is accepted too (refused for a folder outside git).</param>
 /// <param name="ExtraExcludes">Folders or patterns a copy leaves out on top of <see cref="WorkspaceManagerOptions.DefaultExcludes"/>
 /// (bin, obj, node_modules, .vs, .git); default none.</param>
-/// <param name="UseGitignore">Whether a copy also leaves out what .gitignore lists (default on). The workspace manager always honours
-/// .gitignore today, so turning it off is stored but not applied yet.</param>
+/// <param name="UseGitignore">Whether a copy also leaves out what .gitignore lists (default on). The runner passes it to the workspace
+/// manager (<see cref="WorkspaceRequest.UseGitignore"/>, recorded with the run); off, copies keep ignored files such as local settings and
+/// logs, and the default and extra excludes are still left out. Worktrees are not affected: they hold tracked files only.</param>
 /// <param name="CopyWarnGb">A copy larger than this many GB needs a confirmation (0.1 to 1,000; default 1).</param>
 /// <param name="MaxTurns">The most model requests (turns) each model may make in a run (1 to 200; default 40).</param>
 /// <param name="MaxMinutes">The most minutes each model may run, from when its task was sent (1 to 240; default 20).</param>

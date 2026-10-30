@@ -5,7 +5,8 @@
 //    <base>`. So the diff covers edits, deletions, new files and commits the agent made, binary files come as git binary patches, and the
 //    same index is what Keep the branch commits.
 //  - Copy: the base copy and the working copy are walked with the copy's rules (the base copy's .gitignore files, so an agent's edit to one
-//    does not hide its changes); a file is changed when its size, or its time and bytes, differ. Each changed file gets `git diff
+//    does not hide its changes; none when the run turned .gitignore off, W4 fix 2, so an ignored file the agent wrote is a change too); a
+//    file is changed when its size, or its time and bytes, differ. Each changed file gets `git diff
 //    --no-index` against the base (or /dev/null), with its header rewritten to name the relative path.
 // Every diff is made with --no-renames and --no-ext-diff/--no-textconv, so the user's diff drivers can't change what is shown or applied.
 // Run W4 (fix): a worktree slot's git commands name its repository folder and work tree (GIT_DIR, GIT_WORK_TREE; SlotGitAsync), recorded
@@ -185,7 +186,7 @@ public sealed partial class WorkspaceManager
     {
         var basePath = WorkspaceTree.Inside(Root, Path.Join(folder, BaseFolder));
         var slotPath = SlotDirectory(manifest.Run, entry.Slot);
-        var rules = CopyRules(manifest.Excludes, manifest.OuterIgnores, rulesRoot: basePath);
+        var rules = CopyRules(manifest.Excludes, manifest.OuterIgnores, rulesRoot: basePath, manifest.UseGitignore);
         var before = WorkspaceTree.Walk(basePath, rules, null, cancellationToken).Files.ToDictionary(file => file.Path, WorkspaceTree.PathComparer);
         var after = WorkspaceTree.Walk(slotPath, rules, null, cancellationToken).Files.ToDictionary(file => file.Path, WorkspaceTree.PathComparer);
         var changes = new List<(string Path, WorkspaceFileChange Change)>();

@@ -422,8 +422,10 @@ internal static partial class Program
             var discarded = await app.PostAsync($"/api/compare/agent/{id}/discard", new JsonObject { ["slot"] = "b" });
             Equal(200, discarded.Status, "B discarded: " + discarded.Text);
             var gone = WebUtility.HtmlDecode((await app.App.Get($"/compare/agent/runs/{id}/diff?slot=b")).Text);
-            Check(gone.Contains("result.txt", StringComparison.Ordinal) && !gone.Contains("class=\"ln add\"", StringComparison.Ordinal)
-                && !gone.Contains("data-ac-copy-patch", StringComparison.Ordinal), "a discarded workspace lists its files, without a diff: " + Cut(gone));
+            // W4 fix 2: the patch is kept with the run before the discard, so a discarded workspace still shows its lines and Copy patch.
+            Check(gone.Contains("result.txt", StringComparison.Ordinal) && gone.Contains("class=\"ln add\"", StringComparison.Ordinal)
+                && gone.Contains("data-ac-copy-patch=\"b\"", StringComparison.Ordinal) && gone.Contains("data-ac-diff-stored", StringComparison.Ordinal),
+                "a discarded workspace shows the diff kept with the run: " + Cut(gone));
             Check(WebUtility.HtmlDecode((await app.App.Get("/compare/agent/runs/" + id)).Text).Contains("Workspace discarded", StringComparison.Ordinal), "B's chip");
 
             var again = WebUtility.HtmlDecode((await app.App.Get("/compare?mode=agent&from=" + id)).Text);

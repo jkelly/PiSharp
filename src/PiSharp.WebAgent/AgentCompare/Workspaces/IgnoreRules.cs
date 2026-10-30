@@ -1,6 +1,7 @@
 // Decision 0011 (run W4, unit R4): gitignore matching for temporary copies. A copy skips the default excludes, the extra excludes and
-// "anything in .gitignore": the project's .gitignore files (each relative to its own folder, deeper files first, the last matching line of
-// a file deciding), the .gitignore files of the folders above it up to the repository root, and the repository's .git/info/exclude.
+// (unless its run turns UseGitignore off, W4 fix 2) "anything in .gitignore": the project's .gitignore files (each relative to its own
+// folder, deeper files first, the last matching line of a file deciding), the .gitignore files of the folders above it up to the
+// repository root, and the repository's .git/info/exclude.
 // Patterns follow gitignore(5): '#' comments, '!' negation, a trailing '/' for folders only, a '/' at the start or in the middle anchors
 // the pattern to its file's folder, '*' and '?' never match '/', '[...]' classes, and "**/", "/**" and "/**/" span folders. An excluded
 // folder is never entered, so nothing below it can be re-included (as in git). Matching ignores case on Windows (core.ignorecase).

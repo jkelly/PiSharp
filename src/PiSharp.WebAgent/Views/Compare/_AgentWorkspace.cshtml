@@ -1,6 +1,6 @@
 @* Decision 0011 (run W4, R6): modal-agent-workspace's content (compare.html's _AgentWorkspaceModal): how each model gets its own copy of the
    project. Git worktree (base branch and commit, the uncommitted changes worktrees leave out, disk) or temporary copy (what is skipped,
-   Also skip, the size warning, disk), where workspaces live and how long they are kept, and the not-a-sandbox warning. In setup it is
+   with "anything in .gitignore" only while Settings › Tools' switch, or the run, honours it; Also skip, the size warning, disk), where workspaces live and how long they are kept, and the not-a-sandbox warning. In setup it is
    editable (Use git worktrees / Use temporary copies set this run's isolation and base); once a run made its workspaces it is read-only.
    Rendered inside the modal shell (_AgentWorkspaceModal) and inside _AgentProject (compare-agent-setup.js moves it in).
    Model: AgentWorkspaceView. *@
@@ -93,7 +93,11 @@
 
     <div data-ac-ws-pane="copy" hidden="@(pane != "copy")">
       <div class="fs-7 mb-1">Skipped when copying</div>
-      <div class="ac-path text-ps-faint mb-2">@string.Join(" · ", skipped) · anything in .gitignore</div>
+      <div class="ac-path text-ps-faint mb-2" data-ac-ws-gitignore="@(Model.UseGitignore ? "true" : "false")">@string.Join(" · ", skipped)@(Model.UseGitignore ? " · anything in .gitignore" : "")</div>
+      @if (!Model.UseGitignore)
+      {
+        <div class="form-text mb-2">Files .gitignore lists are copied too (Settings › Tools › Agent compare).</div>
+      }
       <label class="form-label fs-7" for="acIsoExclude">Also skip</label>
       <input class="form-control form-control-sm font-monospace mb-1" id="acIsoExclude" value="@string.Join(", ", Model.ExtraExcludes)" placeholder="e.g. artifacts, *.log" spellcheck="false" maxlength="2000" disabled="@ro" data-ac-ws-excludes>
       <div class="form-text mb-3">Comma-separated, for this run. You're asked before a copy larger than @WorkspaceText.Size(Model.WarnAboveBytes) for each model.</div>

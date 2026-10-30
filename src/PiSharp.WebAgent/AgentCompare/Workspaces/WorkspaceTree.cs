@@ -38,7 +38,9 @@ internal sealed class TreeListing
 /// <param name="RulesRoot">Where the walked tree's own .gitignore files are read: the walked root itself, or for a working copy the
 /// pristine base copy, so an agent's edit to a .gitignore file does not change what its diff shows.</param>
 /// <param name="SkipFolders">Full paths never entered (the workspaces root when it lies inside the project).</param>
-internal sealed record TreeRules(IgnoreList Excludes, IgnoreStack Outer, string? RulesRoot, IReadOnlyList<string> SkipFolders);
+/// <param name="UseGitignore">Whether the walked tree's own .gitignore files are read (false: only <paramref name="Excludes"/> and
+/// <paramref name="Outer"/> apply, and the copy rules pass no outer sources then either).</param>
+internal sealed record TreeRules(IgnoreList Excludes, IgnoreStack Outer, string? RulesRoot, IReadOnlyList<string> SkipFolders, bool UseGitignore = true);
 
 /// <summary>File-system helpers for workspaces.</summary>
 internal static class WorkspaceTree
@@ -67,7 +69,9 @@ internal static class WorkspaceTree
         var listing = new TreeListing();
         var rulesRoot = rules.RulesRoot ?? root;
         var pending = new Stack<(string Full, string Relative, IgnoreStack Ignore)>();
-        pending.Push((root, "", rules.Outer.Push(IgnoreList.Read(Path.Join(rulesRoot, ".gitignore")))));
+        IgnoreList Gitignore(string relative, string folder) =>
+            rules.UseGitignore ? IgnoreList.Read(Path.Join(rulesRoot, relative, ".gitignore"), folder) : IgnoreList.Empty;
+        pending.Push((root, "", rules.Outer.Push(Gitignore("", ""))));
         while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -96,8 +100,7 @@ internal static class WorkspaceTree
                 if (isFolder)
                 {
                     listing.Folders.Add(path);
-                    var inner = IgnoreList.Read(Path.Join(rulesRoot, path, ".gitignore"), path + "/");
-                    children.Add((entry.FullName, path + "/", ignore.Push(inner)));
+                    children.Add((entry.FullName, path + "/", ignore.Push(Gitignore(path, path + "/"))));
                 }
                 else
                 {
