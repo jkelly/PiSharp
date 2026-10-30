@@ -17,6 +17,14 @@ public sealed partial class PersistentAgentSession
         lock (_gate) { ThrowAvailable(); return _registry ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration); }
     }
 
+    /// <summary>The registry as it is, for a read that only lists the session's tools (an extension's getAllTools): unlike
+    /// <see cref="CaptureToolCatalogRegistry"/>, a session that an owner operation holds (a resource close, reload or switch) answers
+    /// with the registry it has until that operation replaces it, as the original's registry answers while a server closes.</summary>
+    public SessionRuntimeRegistry ReadToolCatalogRegistry()
+    {
+        lock (_gate) { ThrowBindable(); return _registry ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration); }
+    }
+
     /// <summary>Reserves this idle session, validates the complete prepared pipeline and publishes the catalog and its loadout in
     /// memory with the supplied synchronous registry publication (source _refreshToolRegistry); the session file is not written,
     /// and the next request records the loadout's difference from the declared tools. The callback must only commit an already

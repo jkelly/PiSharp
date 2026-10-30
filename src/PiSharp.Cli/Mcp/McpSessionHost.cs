@@ -332,15 +332,20 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                         var gate = attachment.Session.BeforeInputAdmission;
                         attachment.Session.BeforeInputAdmission = async cancellation =>
                         {
-                            manager.SessionStarted();
+                            await manager.SessionStartedAsync().ConfigureAwait(false);
                             await manager.ReconnectSignedInAsync(cancellation).ConfigureAwait(false);
                             if (gate is not null) await gate(cancellation).ConfigureAwait(false);
+                            // Pi admits input while a server closes. Closing one (unregistered, or rebound by a reconnect) holds the session
+                            // until the close ended, and the session refuses input meanwhile: the input waits for the close instead.
+                            if (manager.Session() is { } current) await current.Owner.JoinReservationAsync(current.Attachment, cancellation).ConfigureAwait(false);
                         };
                         // index.ts session_start ensureDiscoveryActive: once the host started dispatching (a reload's generation at its
-                        // first input), activate the codemode or tool_search tool the configured servers need.
+                        // first input), activate the codemode or tool_search tool the configured servers need. The binding callback's
+                        // ambient transition state must not flow into it, or it could not wait for a server that closes meanwhile.
                         if (generation == 1)
-                            _ = hostStarted.Task.ContinueWith(_ => manager.SessionStarted(), CancellationToken.None,
-                                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                            using (ExecutionContext.SuppressFlow())
+                                _ = hostStarted.Task.ContinueWith(_ => manager.SessionStartedAsync(), CancellationToken.None,
+                                    TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
                         // index.ts mcp_servers_change: servers registered or unregistered during the session connect or close right away.
                         if (!mcpOff)
                         {

@@ -49,6 +49,43 @@ public sealed partial class ReplaceableAgentSession
         finally { mutations.Release(); }
     }
 
+    /// <summary>Runs <paramref name="access"/> on the attachment's session at once, or, when the session refuses it because an owner
+    /// operation holds it (a resource close, reload or switch holds its replacement reservation only inside an owner mutation), again
+    /// between owner mutations once that operation ended. Access the session admits never waits, so a tool call or an input callback
+    /// (which a pending catalog publication may be waiting for) is not held here; within this owner's own operations the access gets
+    /// the session's refusal.</summary>
+    public async Task AccessSessionAsync(AgentSessionAttachment attachment, Action<PersistentAgentSession> access, CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(access); ValidateAttachment(attachment);
+        try { access(attachment.Session); return; }
+        catch (SessionReplacementInProgressException) when (MayAwaitMutations()) { }
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, closing.Token, attachment.LifetimeToken);
+        await mutations.WaitAsync(linked.Token).ConfigureAwait(false);
+        try { ValidateAttachment(attachment); access(attachment.Session); }
+        finally { mutations.Release(); }
+    }
+
+    /// <summary>Joins the owner operation that holds the attachment's session, if one does, so input the session refuses meanwhile
+    /// ("Session replacement is in progress") is admitted once it ended. Returns at once when none does, when the attachment is no
+    /// longer current, and within this owner's own operations.</summary>
+    public async Task JoinReservationAsync(AgentSessionAttachment attachment, CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(attachment);
+        lock (gate) if (closed || !ReferenceEquals(current, attachment)) return;
+        if (!attachment.Session.ReservedForReplacement || !MayAwaitMutations()) return;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, closing.Token, attachment.LifetimeToken);
+        await mutations.WaitAsync(linked.Token).ConfigureAwait(false);
+        mutations.Release();
+    }
+
+    /// <summary>Whether this flow may wait for owner mutations: it runs in none of this owner's operations or callbacks, which would
+    /// wait for themselves (<see cref="RejectTransitionReentrancy"/>).</summary>
+    private bool MayAwaitMutations()
+    {
+        try { RejectTransitionReentrancy(); return true; }
+        catch (InvalidOperationException) { return false; }
+    }
+
     /// <summary>The captured attachment remains reserved through durable publication; close and
     /// replacement join this actual mutation rather than a caller-cancelled waiting wrapper.</summary>
     public async Task<SessionToolCatalogReceipt> PublishToolCatalogAsync(AgentSessionAttachment attachment,
