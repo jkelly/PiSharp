@@ -1,8 +1,9 @@
 @* Decision 0011 (run W4, R7): the mockups' _BenchToolList: New tool and Templates (examples, and PiSharp's built-ins with their real
    declarations), one card per tool (its name, description, parameters with * for required, its mocks or "built-in"; the pencil edits it in
-   _ToolEditorModal, the eye shows a built-in read-only; the switch sends it or not), then the tool choice (auto, none, required, any, a
-   specific tool), the parallel switch (what is sent depends on the model's API) and the schema preview of the selected tool. Every change
-   saves the setup. Model: BenchView. *@
+   _ToolEditorModal, the eye shows a built-in read-only; the switch sends it or not; "strict" marks a tool sent with Strict), then the tool
+   choice (auto, none, required, any, a specific tool), the parallel switch (what is sent depends on the model's API), the schema preview of
+   the selected tool and what this model does with Strict (danger when its API takes no strict tools, so Run refuses). data-strict-note is
+   the editor's line under Strict for this model (bench-tools.js). Every change saves the setup. Model: BenchView. *@
 @model BenchView
 @{
     var setup = Model.Setup;
@@ -10,7 +11,7 @@
     var kind = setup.ChoiceKind;
     var enabled = setup.Enabled;
 }
-<section class="pane pane-alt" aria-label="Tool definitions" data-bench-part="tools">
+<section class="pane pane-alt" aria-label="Tool definitions" data-bench-part="tools" data-strict-note="@Model.StrictEditorNote" data-strict-taken="@(Model.StrictTaken ? "true" : "false")">
   <div class="pane-header">
     <h2 class="pane-title">Tools</h2>
     @if (Model.NoTools)
@@ -69,6 +70,10 @@
           <div class="d-flex align-items-center gap-2 mt-1">
             <span class="fs-8 ps-mono text-ps-faint text-truncate min-w-0">@BenchSchema.ParametersLine(tool.Parameters)</span>
             <span class="ms-auto d-inline-flex gap-1">
+              @if (tool.Strict)
+              {
+                <span class="ps-chip" data-tone="@(Model.StrictTaken ? "ok" : "danger")" title="@(Model.StrictTaken ? "Sent with Strict (constrainedSampling)" : "This model's API takes no strict tools: Run refuses")" data-bench-strict="@tool.Name">strict</span>
+              }
               @if (tool.Builtin)
               {
                 <span class="ps-chip" data-tone="accent">built-in</span>
@@ -130,8 +135,9 @@
           <div class="ps-term-bar"><span class="dot"></span><span data-bench-schema-file>@(preview.Name).json</span><button class="btn btn-icon ms-auto" type="button" data-bench-copy="#benchSchemaPreview" title="Copy schema" aria-label="Copy schema"><i class="bi bi-copy"></i></button></div>
           <pre class="wrap" id="benchSchemaPreview"><code class="language-json" data-bench-schema>@BenchView.Definition(preview)</code></pre>
         </div>
-        <div class="fs-8 text-ps-faint mt-1"><i class="bi bi-info-circle me-1"></i>Strict arguments (<span class="ps-mono">constrainedSampling</span>) are not sent yet, so arguments can break the schema. The bench checks every call with Pi's argument check.</div>
       }
+      var (strictText, strictTone) = Model.StrictNote;
+      <div class="fs-8 mt-1 @(strictTone == "danger" ? "text-ps-danger" : "text-ps-faint")" data-bench-strict-note="@strictTone"><i class="bi @(strictTone == "danger" ? "bi-exclamation-triangle" : "bi-info-circle") me-1"></i>@strictText</div>
     }
   </div>
 </section>

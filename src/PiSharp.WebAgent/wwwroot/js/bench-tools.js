@@ -1,9 +1,13 @@
 // Decision 0011 (run W4, R7): the Tool Bench's tools: the tool list (_BenchToolList: select a card for the schema preview, switch a tool on
 // or off, the tool choice and the parallel switch) and the shared tool editor (#modal-tool-editor, R1's _ToolEditorModal), which this page
-// drives itself and extends with the bench's mock responses, the built-in note and Delete tool (templates in _BenchMocks). A definition is
-// checked here (the name, a JSON Schema object), then by POST /api/bench/tools/check (types, enums, patterns, required ⊆ properties, Pi's
-// compile check), and again by the server when the setup is saved. A built-in's declaration is PiSharp's own and read-only; only its mocks
-// change. Every change saves the whole setup (bench-setup.js); the page re-renders from the answer. Nothing here runs a tool.
+// drives itself and extends with the bench's mock responses, the built-in note, Delete tool and the line under Strict (templates in
+// _BenchMocks). Strict (constrainedSampling) is the tool's own switch: the bench enables the shared editor's #tool-strict, saves it as the
+// tool's strict flag (sent as strict: true where the model's API takes it; Run refuses it where not) and says, under the switch, what the
+// bench's model does with it (the tool list's data-strict-note), in place of the shared editor's own line. A definition is checked here
+// (the name, a JSON Schema object), then by POST /api/bench/tools/check (types, enums, patterns, required ⊆ properties, Pi's compile check;
+// with Strict on, what OpenAI's strict mode would also ask, as a warning), and again by the server when the setup is saved. A built-in's
+// declaration is PiSharp's own and read-only; only Strict and its mocks change. Every change saves the whole setup (bench-setup.js); the
+// page re-renders from the answer. Nothing here runs a tool.
 import { showToast, confirmAction } from './shell.js';
 import { postRequest, copyText } from './request-api.js';
 import { checkTool } from './request-tools.js';
@@ -126,6 +130,27 @@ function mockList() {
   return modal.querySelector('[data-mock-list]');
 }
 
+function strictSwitch() {
+  return modal.querySelector('#tool-strict');
+}
+
+function strictOn() {
+  return strictSwitch()?.checked === true;
+}
+
+// The line under Strict: what the bench's model does with it (the tool list's data-strict-note; danger when its API takes no strict tools).
+function showStrictNote() {
+  const note = modal.querySelector('[data-bench-strict-editor-note]');
+  if (!note) return;
+  const list = root.querySelector('[data-bench-part="tools"]');
+  const taken = list?.dataset.strictTaken !== 'false';
+  const text = note.querySelector('[data-bench-strict-text]');
+  if (text) text.textContent = list?.dataset.strictNote ?? '';
+  note.classList.toggle('text-ps-danger', !taken);
+  const icon = note.querySelector('[data-bench-strict-icon]');
+  if (icon) icon.className = `bi ${taken ? 'bi-info-circle' : 'bi-exclamation-triangle'} me-1`;
+}
+
 function ensureExtras() {
   if (modal.querySelector('[data-bench-mocks]')) return;
   const section = document.getElementById('bench-mock-section')?.content.firstElementChild?.cloneNode(true);
@@ -140,6 +165,13 @@ function ensureExtras() {
   if (remove) {
     remove.hidden = true;
     modal.querySelector('.modal-footer')?.prepend(remove);
+  }
+  // The shared editor's line under Strict is the Playground's; on this page the bench's line says what its model does with Strict.
+  const strictBox = strictSwitch()?.closest('.form-check');
+  const strictNote = document.getElementById('bench-strict-note')?.content.firstElementChild?.cloneNode(true);
+  if (strictBox && strictNote) {
+    for (const line of strictBox.parentElement?.querySelectorAll(':scope > .form-text') ?? []) line.hidden = true;
+    strictBox.after(strictNote);
   }
 }
 
@@ -207,6 +239,8 @@ function fill(tool, builtin) {
   field('name').value = tool?.name ?? '';
   field('description').value = tool?.description ?? '';
   field('parameters').value = JSON.stringify(tool?.parameters ?? { type: 'object', properties: {} }, null, 2);
+  const strict = strictSwitch();
+  if (strict) strict.checked = tool?.strict === true;
   editing.builtin = builtin === true;
   setReadOnly(editing.builtin);
   modal.querySelector('[data-tool-error]').hidden = true;
@@ -216,11 +250,16 @@ function fill(tool, builtin) {
 function showCheck(kind, text, errors = []) {
   const box = modal.querySelector('[data-tool-check]');
   box.replaceChildren();
-  const ok = kind === 'ok';
-  box.className = 'd-flex flex-wrap align-items-center gap-2 px-3 py-2 mt-2 rounded fs-8 ps-mono ' +
-    (ok ? 'bg-success-subtle text-success-emphasis' : kind === 'wait' ? 'bg-body-tertiary text-secondary' : 'bg-danger-subtle text-danger-emphasis');
+  const tones = {
+    ok: ['bg-success-subtle text-success-emphasis', 'bi-check-circle'],
+    wait: ['bg-body-tertiary text-secondary', 'bi-hourglass-split'],
+    warn: ['bg-warning-subtle text-warning-emphasis', 'bi-exclamation-circle'],
+    error: ['bg-danger-subtle text-danger-emphasis', 'bi-exclamation-triangle'],
+  };
+  const [tone, glyph] = tones[kind] ?? tones.error;
+  box.className = 'd-flex flex-wrap align-items-center gap-2 px-3 py-2 mt-2 rounded fs-8 ps-mono ' + tone;
   const icon = document.createElement('i');
-  icon.className = 'bi ' + (ok ? 'bi-check-circle' : kind === 'wait' ? 'bi-hourglass-split' : 'bi-exclamation-triangle');
+  icon.className = 'bi ' + glyph;
   const span = document.createElement('span');
   span.textContent = text;
   box.append(icon, span);
@@ -251,17 +290,22 @@ function check() {
     return result;
   }
   const summary = `${result.properties} ${result.properties === 1 ? 'property' : 'properties'} · ${result.required} required`;
-  if (editing?.builtin) {
+  const builtin = editing?.builtin === true;
+  const strict = strictOn();
+  if (builtin && !strict) {
     showCheck('ok', `PiSharp's own declaration · ${summary}`);
     return result;
   }
   showCheck('wait', `Valid JSON · ${summary} · checking the schema…`);
   checkTimer = window.setTimeout(async () => {
     try {
-      const answer = await postRequest('/api/bench/tools/check', { tool: result.tool });
+      const answer = await postRequest('/api/bench/tools/check', { tool: { ...result.tool, strict } });
       if (seq !== checkSeq) return;
-      if (answer.valid) showCheck('ok', `Valid JSON Schema · ${answer.summary ?? summary}`);
-      else showCheck('error', 'The schema has problems:', answer.errors ?? []);
+      const valid = `${builtin ? "PiSharp's own declaration" : 'Valid JSON Schema'} · ${answer.summary ?? summary}`;
+      const problems = strict ? answer.strictProblems ?? [] : [];
+      if (!answer.valid) showCheck('error', 'The schema has problems:', answer.errors ?? []);
+      else if (problems.length > 0) showCheck('warn', `${valid} · OpenAI's strict mode would refuse it:`, problems);
+      else showCheck('ok', strict ? `${valid} · fits strict mode` : valid);
     } catch (error) {
       if (seq === checkSeq) showCheck('error', error.message);
     }
@@ -289,6 +333,9 @@ export function openEditor(tool, template = null) {
   mockList()?.replaceChildren();
   for (const mock of tool?.mocks ?? []) addMockRow(mock);
   countMocks();
+  const strict = strictSwitch();
+  if (strict) strict.disabled = false;
+  showStrictNote();
   const source = tool ?? template;
   fill(source, tool ? tool.builtin === true : template?.builtin === true);
   window.bootstrap.Modal.getOrCreateInstance(modal).show();
@@ -309,7 +356,7 @@ async function save(event) {
   const name = result.tool.name;
   const { original, enabled, builtin } = editing;
   if (tools().some((item) => item.name === name && item.name !== original)) return fail(`There is already a tool named ${name}.`);
-  const tool = { name, description: result.tool.description, parameters: result.tool.parameters, enabled, builtin, mocks: mocks.mocks };
+  const tool = { name, description: result.tool.description, parameters: result.tool.parameters, enabled, builtin, strict: strictOn(), mocks: mocks.mocks };
   const submit = modal.querySelector('[data-tool-submit]');
   submit.disabled = true;
   try {
@@ -365,7 +412,7 @@ function wireEditor() {
       } catch { /* the server writes the templates as JSON */ }
       return;
     }
-    if (event.target.closest('[data-tool-field]')) check();
+    if (event.target.closest('[data-tool-field]') || event.target === strictSwitch()) check();
   });
   modal.addEventListener('input', (event) => {
     if (event.target.closest('[data-tool-field]')) check();

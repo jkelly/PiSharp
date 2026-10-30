@@ -1,7 +1,9 @@
 @* Decision 0011 (run W4, R7): the bench's part of the mockups' _ToolEditorModal, as inert templates that bench-tools.js places in the
    shared editor (#modal-tool-editor, R1's partial): the mock responses (a name, an optional match object, isError and the result text;
    auto-respond uses the first mock whose match is a subset of a call's arguments, a mock with no match is the fallback), the note shown
-   for a built-in (its declaration is read-only and it never runs here) and Delete tool. Model: BenchView. *@
+   for a built-in (its declaration is read-only and it never runs here), Delete tool, and the line under the editor's Strict switch that
+   says what the bench's model does with Strict (it replaces the shared editor's own line on this page; bench-tools.js fills it from the
+   tool list's data-strict-note). Model: BenchView. *@
 @model BenchView
 <template id="bench-mock-section">
   <div data-bench-mocks>
@@ -28,7 +30,10 @@
   </div>
 </template>
 <template id="bench-builtin-note">
-  <div class="alert alert-info py-2 px-3 fs-8 mb-3" role="note" data-bench-builtin-note><i class="bi bi-info-circle me-1"></i>PiSharp's own declaration: read-only. The Tool Bench never runs it; answer its calls with mocks or by hand.</div>
+  <div class="alert alert-info py-2 px-3 fs-8 mb-3" role="note" data-bench-builtin-note><i class="bi bi-info-circle me-1"></i>PiSharp's own declaration: read-only (only Strict and the mock responses change). The Tool Bench never runs it; answer its calls with mocks or by hand.</div>
+</template>
+<template id="bench-strict-note">
+  <div class="form-text" data-bench-strict-editor-note><i class="bi bi-info-circle me-1" data-bench-strict-icon></i><span data-bench-strict-text></span></div>
 </template>
 <template id="bench-tool-delete">
   <button type="button" class="btn btn-outline-danger me-auto" data-bench-delete-tool><i class="bi bi-trash3 me-1"></i>Delete tool</button>

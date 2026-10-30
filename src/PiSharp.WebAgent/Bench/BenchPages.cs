@@ -1,7 +1,8 @@
 // Decision 0011 (run W4, R7): what the Tool Bench's partials show, from a session: the toolbar (model, thinking, system prompt, Run or the
-// paused chip and Stop, the auto-respond rules), the tool list (definitions, the tool choice, the parallel switch, a schema preview), the
-// timeline (user messages, turns, calls with their schema check, results, the awaiting cards) and the call log. The page and every update
-// render the same partials (BenchPages.FragmentsAsync, through the FragmentRenderer), so the page never builds markup from model text.
+// paused chip and Stop, the auto-respond rules), the tool list (definitions, the tool choice, the parallel switch, a schema preview and
+// what this model does with Strict), the timeline (user messages, turns, calls with their schema check, results, the awaiting cards) and
+// the call log. The page and every update render the same partials (BenchPages.FragmentsAsync, through the FragmentRenderer), so the page
+// never builds markup from model text.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -116,6 +117,15 @@ public sealed record BenchView
             _ => "This model's API has no switch for parallel calls: Run refuses until you switch it back on.",
         };
 
+    /// <summary>Whether this model's API takes strict tools (true when PiSharp cannot run the model).</summary>
+    public bool StrictTaken => BenchStrict.Taken(Capabilities);
+
+    /// <summary>The line under the schema preview about Strict: its text and tone (<c>faint</c> or <c>danger</c>).</summary>
+    public (string Text, string Tone) StrictNote => BenchStrict.ListNote(Setup, Capabilities);
+
+    /// <summary>What the tool editor says under Strict for this model (<c>data-strict-note</c>).</summary>
+    public string StrictEditorNote => BenchStrict.EditorNote(Capabilities, ModelName);
+
     /// <summary>The page's setup, as JSON (<c>data-setup</c>).</summary>
     public string SetupJson => JsonSerializer.Serialize(Setup, SettingsStore.JsonOptions);
 
@@ -188,12 +198,13 @@ public sealed record BenchView
     /// <summary>A call id cut for a chip: "call_Tz41…".</summary>
     public static string Short(string id) => id.Length > 9 ? id[..9] + "…" : id;
 
-    /// <summary>A tool's definition as the schema preview shows it.</summary>
+    /// <summary>A tool's definition as the schema preview shows it (with its strict flag, as the mockup shows constrainedSampling).</summary>
     public static string Definition(BenchTool tool) => BenchSchema.Indented(new JsonObject
     {
         ["name"] = tool.Name,
         ["description"] = tool.Description ?? "",
         ["parameters"] = tool.Parameters?.DeepClone(),
+        ["strict"] = tool.Strict,
     });
 
     /// <summary>A tool as the page keeps it (<c>data-tool</c>).</summary>
