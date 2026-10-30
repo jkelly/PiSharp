@@ -42,6 +42,10 @@ public sealed record RunOutcome
     /// <summary>The usage.</summary>
     public RunUsage Usage { get; init; } = RunUsage.Zero;
 
+    /// <summary>The model the provider said answered (the final message's <c>responseModel</c>), or null to read it from
+    /// <see cref="Output"/>.</summary>
+    public string? ResponseModel { get; init; }
+
     /// <summary>The cost in micro-dollars, or null.</summary>
     public long? CostMicros { get; init; }
 
@@ -88,7 +92,7 @@ public sealed class RunStore
 
     private const string ListColumns = "id, op, kind, source, status, provider, model, api, account, group_id, parent_id, session, title, messages_ref, " +
         "output_text, stop_reason, error, notes, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, total_tokens, cost_micros, cost_kind, " +
-        "billing, spend_op, ttft_ms, duration_ms, tokens_per_second, pinned, " + RawStateColumn + ", created, started, finished, updated";
+        "billing, spend_op, ttft_ms, duration_ms, tokens_per_second, pinned, " + RawStateColumn + ", created, started, finished, updated, response_model";
 
     private const string FullColumns = ListColumns + ", options, messages, output";
 
@@ -159,7 +163,7 @@ public sealed class RunStore
                 UPDATE runs SET status = 'running', provider = $provider, model = $model, api = $api, account = $account, options = $options,
                     output = NULL, output_text = NULL, stop_reason = NULL, error = NULL, notes = NULL, input_tokens = 0, output_tokens = 0,
                     cache_read_tokens = 0, cache_write_tokens = 0, total_tokens = 0, cost_micros = NULL, cost_kind = NULL, spend_op = NULL,
-                    ttft_ms = NULL, duration_ms = NULL, tokens_per_second = NULL, raw_state = 'none', runner = $runner, started = $started,
+                    ttft_ms = NULL, duration_ms = NULL, tokens_per_second = NULL, response_model = NULL, raw_state = 'none', runner = $runner, started = $started,
                     finished = NULL, updated = $updated
                 WHERE id = $id;
                 DELETE FROM run_events WHERE run_id = $id;
@@ -187,7 +191,8 @@ public sealed class RunStore
                     notes = COALESCE($notes, notes), input_tokens = $input, output_tokens = $outputTokens, cache_read_tokens = $cacheRead,
                     cache_write_tokens = $cacheWrite, total_tokens = $total, cost_micros = $cost, cost_kind = $costKind, billing = COALESCE($billing, billing),
                     spend_op = COALESCE($spendOp, spend_op), ttft_ms = $ttft, duration_ms = $duration, tokens_per_second = $rate,
-                    raw_state = CASE WHEN $raw > 0 THEN 'stored' ELSE raw_state END, finished = $finished, updated = $finished
+                    response_model = $responseModel, raw_state = CASE WHEN $raw > 0 THEN 'stored' ELSE raw_state END, finished = $finished,
+                    updated = $finished
                 WHERE id = $id;
                 """,
                 ("$id", id), ("$status", outcome.Status), ("$output", outcome.Output?.ToJsonString()), ("$text", outcome.OutputText),
@@ -195,7 +200,7 @@ public sealed class RunStore
                 ("$outputTokens", outcome.Usage.Output), ("$cacheRead", outcome.Usage.CacheRead), ("$cacheWrite", outcome.Usage.CacheWrite),
                 ("$total", outcome.Usage.Total), ("$cost", outcome.CostMicros), ("$costKind", outcome.CostKind), ("$billing", outcome.Billing),
                 ("$spendOp", outcome.SpendOp), ("$ttft", outcome.TtftMs), ("$duration", outcome.DurationMs), ("$rate", Finite(outcome.TokensPerSecond)),
-                ("$raw", outcome.Raw.Count), ("$finished", Ms(outcome.Finished)));
+                ("$raw", outcome.Raw.Count), ("$finished", Ms(outcome.Finished)), ("$responseModel", ResponseModelOf(outcome.ResponseModel, outcome.Output)));
             if (changed == 0) return false;
             if (outcome.Events.Count > 0)
             {
@@ -443,10 +448,10 @@ public sealed class RunStore
         INSERT INTO runs (id, op, kind, source, status, provider, model, api, account, group_id, parent_id, session, title, options, messages,
             messages_ref, output, output_text, stop_reason, error, notes, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
             total_tokens, cost_micros, cost_kind, billing, spend_op, ttft_ms, duration_ms, tokens_per_second, pinned, raw_state, runner, created,
-            started, finished, updated)
+            started, finished, updated, response_model)
         VALUES ($id, $op, $kind, $source, $status, $provider, $model, $api, $account, $group, $parent, $session, $title, $options, $messages,
             $messagesRef, $output, $outputText, $stop, $error, $notes, $input, $outputTokens, $cacheRead, $cacheWrite, $total, $cost, $costKind,
-            $billing, $spendOp, $ttft, $duration, $rate, $pinned, $raw, $runner, $created, $started, $finished, $updated);
+            $billing, $spendOp, $ttft, $duration, $rate, $pinned, $raw, $runner, $created, $started, $finished, $updated, $responseModel);
         """;
 
     private (string, object?)[] Parameters(RunRecord run) =>
@@ -460,6 +465,7 @@ public sealed class RunStore
         ("$ttft", run.TtftMs), ("$duration", run.DurationMs), ("$rate", Finite(run.TokensPerSecond)), ("$pinned", run.Pinned ? 1 : 0), ("$raw", run.RawState),
         ("$runner", run.Status == RunStatus.Running ? Runner : null), ("$created", Ms(run.Created)), ("$started", run.Started is { } started ? Ms(started) : null),
         ("$finished", run.Finished is { } finished ? Ms(finished) : null), ("$updated", Ms(run.Updated == default ? run.Created : run.Updated)),
+        ("$responseModel", ResponseModelOf(run.ResponseModel, run.Output)),
     ];
 
     private static (string Where, List<(string, object?)> Parameters) Where(RunQuery query)
@@ -554,10 +560,20 @@ public sealed class RunStore
             Started = Time(33),
             Finished = Time(34),
             Updated = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(35)),
-            Options = full ? Json(36) as JsonObject : null,
-            Messages = full ? Json(37) : null,
-            Output = full ? Json(38) : null,
+            ResponseModel = Text(36),
+            Options = full ? Json(37) as JsonObject : null,
+            Messages = full ? Json(38) : null,
+            Output = full ? Json(39) : null,
         };
+    }
+
+    /// <summary>The response model to store: <paramref name="given"/>, else the <c>responseModel</c> string of the final message
+    /// <paramref name="output"/> (Pi wire JSON keeps it among the message's extra properties), else null.</summary>
+    internal static string? ResponseModelOf(string? given, JsonNode? output)
+    {
+        var text = !string.IsNullOrWhiteSpace(given) ? given
+            : output is JsonObject message && message["responseModel"] is JsonValue value && value.TryGetValue<string>(out var named) ? named : null;
+        return string.IsNullOrWhiteSpace(text) ? null : RunText.Cut(text.Trim(), 200);
     }
 
     private static double? Finite(double? value) => value is { } number && double.IsFinite(number) ? number : null;

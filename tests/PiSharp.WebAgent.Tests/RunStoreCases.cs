@@ -30,11 +30,11 @@ internal static partial class Program
                 var db = new RunsDb(path);
                 db.Db.Migrate();
                 db.Db.Migrate();
-                Equal("1:runs: runs, events, raw payloads", string.Join(",", ReadDb(path, "SELECT id, name FROM schema_migrations", reader => $"{reader.GetInt64(0)}:{reader.GetString(1)}")),
-                    "one migration, applied once");
+                Equal("1:runs: runs, events, raw payloads,2:runs: response model", string.Join(",", ReadDb(path, "SELECT id, name FROM schema_migrations ORDER BY id", reader => $"{reader.GetInt64(0)}:{reader.GetString(1)}")),
+                    "its migrations (W5 E4 added 2), each applied once");
                 var tables = ReadDb(path, "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name", reader => reader.GetString(0));
                 Check(tables.Contains("runs") && tables.Contains("run_events") && tables.Contains("run_raw"), "its tables: " + string.Join(",", tables));
-                Equal(1, RunsMigrations.All.Count, "runs.db's own list");
+                Equal(2, RunsMigrations.All.Count, "runs.db's own list");
                 Check(MigrationArea.All.All(area => area.Name != "runs"), "not a webagent.db area");
                 Equal(("presets", "compare"), (MigrationArea.Of(400)!.Name, MigrationArea.Of(500)!.Name), "W4's webagent.db ranges");
             }
