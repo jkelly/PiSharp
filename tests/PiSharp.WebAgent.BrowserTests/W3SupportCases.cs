@@ -20,7 +20,8 @@ internal static partial class Program
         await Expect(page.Locator("html")).ToHaveAttributeAsync("data-bs-theme", theme);
     }
 
-    /// <summary>The page shows <paramref name="theme"/>, does not scroll sideways, and no open dialog sticks out of the viewport.</summary>
+    /// <summary>The page shows <paramref name="theme"/>, does not scroll sideways, and no open dialog or dropdown menu sticks out of the
+    /// viewport (a menu placed past the left edge makes no scrollbar, so the page alone would not show it; W3 fix, tests-ci).</summary>
     internal static async Task FitsPhoneAsync(this IPage page, string what, string theme)
     {
         await Expect(page.Locator("html")).ToHaveAttributeAsync("data-bs-theme", theme);
@@ -28,14 +29,15 @@ internal static partial class Program
             throw new InvalidOperationException($"{what} ({theme}) scrolls sideways at {page.ViewportSize?.Width}px: " + await page.WideElementsAsync());
         var dialog = await page.EvaluateAsync<string?>("""
             () => {
-              for (const el of document.querySelectorAll('.modal.show .modal-dialog')) {
+              for (const el of document.querySelectorAll('.modal.show .modal-dialog, .dropdown-menu.show')) {
                 const r = el.getBoundingClientRect();
-                if (r.left < -1 || r.right > window.innerWidth + 1) return `${el.parentElement.id} (${Math.round(r.left)}..${Math.round(r.right)})`;
+                const name = el.classList.contains('modal-dialog') ? el.parentElement.id : '.' + [...el.classList].join('.');
+                if (r.left < -1 || r.right > window.innerWidth + 1) return `${name} (${Math.round(r.left)}..${Math.round(r.right)})`;
               }
               return null;
             }
             """);
-        Check(dialog is null, $"{what} ({theme}): the open dialog is wider than the screen: {dialog}");
+        Check(dialog is null, $"{what} ({theme}): the open dialog or menu does not fit the screen: {dialog}");
     }
 
     /// <summary>Whether any file under <paramref name="folder"/> holds <paramref name="secret"/> in plain text (UTF-8 or UTF-16), read while

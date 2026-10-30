@@ -11,8 +11,12 @@ using static Microsoft.Playwright.Assertions;
 // opens the stop's own modal, and Proceed once continues the run with "Continue.". History › Spend shows a running request's reservation;
 // the server is then killed mid-answer, and after the restart the chat's footer links the now uncertain spend to Resolve…, which opens
 // History › Spend's modal on "Settle at the reported cost" (the recovered request's resend reported its usage) and settles it there, and a
-// chat tab left open shows the settled cost without a reload. A refused send is answered 200 {posted: false}, so the browser logs nothing for it;
-// each case counts the refusals it expects (Window.RefusedAsync).
+// chat tab left open shows the settled cost without a reload. W3 fix (tests-ci): the confirm modal's other two panes in a browser, which only
+// server cases drove before. A daily Block cap for one source (Chat), added through the cap modal's "One source" pane, refuses the next
+// message on sc-period with what is left today after the chat's first answer, and "Cap output" sends it once inside what is left. Faux billed
+// as Unknown price (an override chosen in Settings › Spend › Accounts and saved through the save bar) asks on sc-unknown, with "enter a price"
+// leading to its Unknown prices row, a 2,048-token output cap and Proceed once, which creates the chat once. A refused send is answered 200
+// {posted: false}, so the browser logs nothing for it; each case counts the refusals it expects (Window.RefusedAsync).
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> W3SpendCases() =>
@@ -238,7 +242,158 @@ internal static partial class Program
             await Expect(chatTab.Locator("[data-spend-mark='uncertain']")).ToHaveCountAsync(0);
             await Expect(chatTab.Locator("[data-spend-mark='metered']").First).ToBeVisibleAsync();
         }),
+
+        Browse("browser.w3.spend.a-daily-source-cap-shows-what-is-left-today", AgentMode.FauxMetered, async (app, window) =>
+        {
+            var id = await app.CreateChatAsync("hello before the cap", "before");
+            await app.WaitIdleAsync(id);
+            var first = (await app.LedgerAsync()).Single();
+            Equal("settled|chat", Reservation(first, "state") + "|" + Reservation(first, "source"), "the first answer, settled, from a chat");
+            var spent = first["countedMicros"]!.GetValue<long>();
+            Check(spent is > 0 and < 100_000, "the first answer cost something under the cap: " + first.ToJsonString());
+
+            // The cap: Chat only, per UTC day, $0.10, Block, through the modal's "One source" pane.
+            var page = window.Page;
+            await page.GotoAsync("/settings/spend");
+            await page.Locator("[data-caps-empty] [data-cap-new]").ClickAsync();
+            var modal = page.Locator("#modal-spend-cap");
+            await Expect(modal).ToBeVisibleAsync();
+            await modal.Locator("#capScope").SelectOptionAsync("source");
+            await Expect(modal.Locator("[data-cap-scope-pane='source']")).ToBeVisibleAsync();
+            await modal.Locator("#capSource").SelectOptionAsync("chat");
+            await modal.Locator("label[for='capWinDay']").ClickAsync();
+            await modal.Locator("#capAmount").FillAsync("0.10");
+            await modal.Locator("label[for='capBlock']").ClickAsync();
+            await modal.Locator("[data-cap-save]").ClickAsync();
+            await page.ToastAsync("Cap saved");
+            var row = page.Locator("[data-cap-row]");
+            await Expect(row).ToHaveCountAsync(1);
+            await Expect(row).ToContainTextAsync($"{Usd(spent, 2)} / $0.10");
+            var cap = (await app.Get("/api/spend/caps")).Body!["caps"]!.AsArray().Single()!;
+            Equal("source|chat|day|100000|block|True", $"{cap["scope"]}|{cap["key"]}|{cap["period"]}|{cap["limitMicros"]}|{cap["action"]}|{(cap["enabled"]?.GetValue<bool>() == true ? "True" : "False")}",
+                "as chosen");
+
+            // The chat's next message does not fit what is left today: sc-period, Block, with a shorter output that fits.
+            await page.OpenChatAsync(id);
+            await Expect(page.Locator("[data-composer] [data-spend-over]")).ToHaveTextAsync("Over daily cap");
+            var box = page.Locator("[data-composer-input]");
+            await box.FillAsync("one more today");
+            await box.PressAsync("Enter");
+            var confirm = page.Locator("#modal-spend-confirm");
+            await Expect(confirm).ToBeVisibleAsync();
+            var content = confirm.Locator("[data-spend-confirm-content]");
+            await Expect(content).ToHaveAttributeAsync("data-pane", "sc-period");
+            await Expect(content).ToHaveAttributeAsync("data-verdict", "block");
+            await Expect(confirm.Locator("#modal-spend-confirm-title")).ToHaveTextAsync("Over the Chat daily cap");
+            await Expect(confirm.Locator("[data-spend-pane='sc-period']")).ToContainTextAsync($"Chat has used {Usd(spent, 4)} of its $0.10 daily cap, so {Usd(100_000 - spent, 4)} is left.");
+            await Expect(confirm.Locator(".kv", new() { HasTextString = "Left today for Chat" })).ToContainTextAsync(Usd(100_000 - spent, 4));
+            await Expect(confirm).ToContainTextAsync("inside what's left today.");
+            await Expect(confirm.Locator("a[href='/settings/spend#caps']")).ToHaveCountAsync(1);
+            await Expect(confirm.Locator(".modal-footer button", new() { HasTextString = "Proceed once" })).ToBeDisabledAsync();
+            await Expect(confirm).ToContainTextAsync("PiSharp never switches your model or account");
+            await confirm.Locator(".modal-footer [data-spend-choice='cancel']").ClickAsync();
+            await Expect(confirm).ToBeHiddenAsync();
+            await Expect(box).ToHaveValueAsync("one more today");
+            Equal(1, (await app.LedgerAsync()).Count, "nothing was reserved");
+            await window.RefusedAsync(1, "one refused send");
+
+            // Capping the output sends it once, inside what is left today, from the chat.
+            await box.PressAsync("Enter");
+            await Expect(content).ToHaveAttributeAsync("data-pane", "sc-period");
+            var fit = confirm.Locator("[data-spend-choice='cap-output']");
+            await Expect(fit).ToBeVisibleAsync();
+            await fit.ClickAsync();
+            await Expect(box).ToHaveValueAsync("");
+            await Expect(page.Answers().Last).ToContainTextAsync("Echo: one more today");
+            await app.WaitIdleAsync(id);
+            Equal(2, Mentions((await app.Get($"/chat/{id}/export.md")).Text, "### You"), "the message was posted once");
+            var ledger = await app.LedgerAsync();
+            Equal(2, ledger.Count, "one more request");
+            Equal("settled|chat|" + id, $"{Reservation(ledger[0], "state")}|{Reservation(ledger[0], "source")}|{Reservation(ledger[0], "run")}", "settled, from the chat");
+            Check(Reservation(ledger[0], "note")?.Contains("output capped at", StringComparison.Ordinal) == true, "with the output capped: " + ledger[0].ToJsonString());
+            var today = ledger.Sum(item => item["countedMicros"]!.GetValue<long>());
+            Check(today <= 100_000, $"today's chat spend stays inside the cap: {today}");
+            await page.GotoAsync("/settings/spend");
+            await Expect(page.Locator("[data-cap-row]")).ToContainTextAsync($"{Usd(today, 2)} / $0.10");
+            await window.RefusedAsync(2, "the capped send was checked first");
+        }),
+
+        Browse("browser.w3.spend.an-unknown-price-asks-and-points-to-enter-a-price", AgentMode.FauxMetered, async (app, window) =>
+        {
+            // Settings › Spend › Accounts: faux, detected Metered, is set to Unknown price and saved through the save bar.
+            var page = window.Page;
+            await page.GotoAsync("/settings/spend#accounts");
+            var mode = page.Locator("[data-spend-field='billing:faux|']");
+            await Expect(mode).ToHaveValueAsync("metered");
+            await Expect(page.Locator("[data-setting-row='unknown:faux']")).ToHaveCountAsync(0);
+            await mode.SelectOptionAsync("unknown");
+            var bar = page.Locator("[data-spend-form] [data-savebar]");
+            await Expect(bar).ToBeVisibleAsync();
+            await Expect(bar.Locator("[data-savebar-count]")).ToHaveTextAsync("1 unsaved change");
+            await bar.Locator("[data-save]").ClickAsync();
+            await page.ToastAsync("Spend settings saved");
+            await Expect(mode).ToHaveValueAsync("unknown");
+            await Expect(page.Locator("[data-setting-row='billing:faux|']")).ToContainTextAsync("override · detected Metered");
+            await Expect(page.Locator("[data-setting-row='unknown:faux']")).ToBeVisibleAsync();
+            var overrides = (await app.Get("/api/spend/settings")).Body!["billingOverrides"]!.AsArray();
+            Equal("faux||unknown", string.Join(",", overrides.Select(item => $"{item!["provider"]}|{item["account"]}|{item["mode"]}")), "the override");
+
+            // A new chat's send asks first, on sc-unknown; Cancel posts nothing.
+            await page.GotoAsync("/chat/new");
+            await Expect(page.Locator("[data-composer] [data-spend-over]")).ToHaveTextAsync("No price");
+            var box = page.Locator("[data-composer-input]");
+            await box.FillAsync("a price nobody knows");
+            await box.PressAsync("Enter");
+            var confirm = page.Locator("#modal-spend-confirm");
+            await Expect(confirm).ToBeVisibleAsync();
+            var content = confirm.Locator("[data-spend-confirm-content]");
+            await Expect(content).ToHaveAttributeAsync("data-pane", "sc-unknown");
+            await Expect(content).ToHaveAttributeAsync("data-verdict", "ask");
+            await Expect(confirm.Locator("#modal-spend-confirm-title")).ToHaveTextAsync("No price for this model");
+            await Expect(confirm.Locator(".kv", new() { HasTextString = "Worst case" })).ToContainTextAsync("unknown");
+            var enterPrice = confirm.Locator("a[href='/settings/spend#unknown-prices']");
+            await Expect(enterPrice).ToHaveTextAsync("enter a price");
+            await Expect(confirm.Locator("[data-spend-choice='cap-output']")).ToHaveAttributeAsync("data-max-output-tokens", "2048");
+            await Expect(confirm.Locator("[data-spend-choice='proceed-once']")).ToBeEnabledAsync();
+            await Expect(confirm).ToContainTextAsync("PiSharp never switches your model or account");
+            await confirm.Locator(".modal-footer [data-spend-choice='cancel']").ClickAsync();
+            await Expect(confirm).ToBeHiddenAsync();
+            Equal(0, (await app.Get("/api/chats")).Body!["items"]!.AsArray().Count, "no chat was created");
+            Equal(0, (await app.LedgerAsync()).Count, "nothing was reserved");
+            await window.RefusedAsync(1, "one refused send");
+
+            // Proceed once creates the chat once, on faux, with the unknown price recorded and no money counted.
+            await box.PressAsync("Enter");
+            await Expect(content).ToHaveAttributeAsync("data-pane", "sc-unknown");
+            await confirm.Locator("[data-spend-choice='proceed-once']").ClickAsync();
+            await Expect(page).ToHaveURLAsync(new Regex("/chat/[^/]+$"));
+            await page.ChatReadyAsync();
+            await Expect(page.Answers().Last).ToContainTextAsync("Echo: a price nobody knows");
+            var chats = (await app.Get("/api/chats")).Body!["items"]!.AsArray();
+            Equal(1, chats.Count, "one chat");
+            var id = chats[0]!["id"]!.GetValue<string>();
+            await app.WaitIdleAsync(id);
+            Equal(1, Mentions((await app.Get($"/chat/{id}/export.md")).Text, "### You"), "the message was posted once");
+            var sent = (await app.LedgerAsync()).Single();
+            Equal("faux|" + id, Reservation(sent, "provider") + "|" + Reservation(sent, "run"), "the chat's request on faux");
+            Check(sent["reservation"]!["reservedMicros"] is null, "nothing reserved in money for an unknown price: " + sent.ToJsonString());
+            await window.RefusedAsync(2, "the send was checked first");
+
+            // "enter a price" leads to faux's row under Unknown prices.
+            await box.FillAsync("and another");
+            await box.PressAsync("Enter");
+            await Expect(content).ToHaveAttributeAsync("data-pane", "sc-unknown");
+            await enterPrice.ClickAsync();
+            await Expect(page).ToHaveURLAsync(new Regex("/settings/spend#unknown-prices$"));
+            await Expect(page.Locator("[data-setting-row='unknown:faux']")).ToBeVisibleAsync();
+            await window.RefusedAsync(3, "three checked sends in all");
+            Equal(1, Mentions((await app.Get($"/chat/{id}/export.md")).Text, "### You"), "the last one posted nothing");
+        }),
     ];
+
+    /// <summary><paramref name="micros"/> as the pages write it with <paramref name="places"/> decimals (SpendMoney.Format).</summary>
+    private static string Usd(long micros, int places) =>
+        "$" + (micros / 1_000_000m).ToString("#,0." + new string('0', places), System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>A cap of <c>GET /api/spend/caps</c> as <c>scope|period|limitMicros|action|enabled</c>.</summary>
     private static string Cap(JsonNode cap) =>
