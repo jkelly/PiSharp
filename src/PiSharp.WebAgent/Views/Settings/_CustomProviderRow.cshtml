@@ -1,0 +1,63 @@
+@* Decision 0011 (run W3, CP): the mockups' _CustomProviderRow: a custom provider's logo (LM Studio and Ollama have marks, others the network
+   icon), name, id, api, key chip (no key, stored key with its masked hint, env · $VAR, or "key not used" for a literal or !command key
+   written by hand), headers and authHeader chips, base URL and models, and its status: the last test the user ran (reachable or the
+   failure), "not tested yet", or why it is not routed. Test (POST /api/custom-providers/{id}/test), Edit (the editor), Duplicate and
+   Delete (behind the confirm dialog) are custom-providers.js'. Model: CustomProviderRow. *@
+@using PiSharp.WebAgent.CustomProviders
+@model CustomProviderRow
+@{
+    var provider = Model.Provider;
+    var test = Model.LastTest;
+    var at = test is null ? null : test.TestedAt.UtcDateTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) + " UTC";
+}
+<div class="provider-row flex-wrap" data-cp-row="@provider.Id" data-cp-name="@provider.Name" data-cp-models="@provider.Models.Count">
+  <div class="d-flex align-items-center gap-3 flex-grow-1 cp-row-main">
+    @if (Model.LogoUrl is { } logo)
+    {
+      <span class="provider-logo" role="img" aria-label="@provider.Name logo"><img class="provider-logo-mark" src="@logo" alt="" width="20" height="20" decoding="async"></span>
+    }
+    else
+    {
+      <span class="provider-logo" role="img" aria-label="@provider.Name"><i class="bi bi-hdd-network" aria-hidden="true"></i></span>
+    }
+    <div class="cp-row-text">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="provider-name">@provider.Name</span><span class="provider-id">@provider.Id</span>
+        @if (provider.Api.Length > 0) { <span class="ps-chip" data-tone="outline">@provider.Api</span> }
+        <span class="ps-chip" data-tone="@Model.KeyTone" data-cp-key><i class="bi @Model.KeyIcon" aria-hidden="true"></i>@Model.KeyText</span>
+        @if (provider.HeaderNames.Count > 0) { <span class="ps-chip" data-tone="outline"><i class="bi bi-list-ul" aria-hidden="true"></i>@provider.HeaderNames.Count header@(provider.HeaderNames.Count == 1 ? "" : "s")</span> }
+        @if (provider.AuthHeader) { <span class="ps-chip" data-tone="outline">authHeader</span> }
+        @if (test is { Ok: false }) { <span class="ps-chip" data-tone="warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>unreachable</span> }
+      </div>
+      <div class="fs-8 text-ps-faint text-break"><span class="ps-mono">@(provider.BaseUrl.Length > 0 ? provider.BaseUrl : "no base URL")</span> · @Model.ModelsText</div>
+      <div class="fs-8 d-flex flex-wrap align-items-center gap-2 mt-1" data-cp-status>
+        @if (provider.Problem is { } problem)
+        {
+          <span class="status-dot warn"></span><span class="text-ps-warn">not routed</span><span class="text-ps-faint">@problem</span>
+        }
+        else if (test is { Ok: true })
+        {
+          <span class="status-dot ok"></span><span class="text-ps-ok">reachable</span><span class="ps-mono text-ps-faint">@test.LatencyMs ms · @(test.Models.Count) listed · checked @at</span>
+        }
+        else if (test is { Ok: false })
+        {
+          <span class="status-dot danger"></span><span class="text-ps-danger">@test.Message</span><span class="ps-mono text-ps-faint">checked @at</span>
+        }
+        else
+        {
+          <span class="status-dot"></span><span class="text-ps-faint">not tested yet</span>
+        }
+        @if (Model.Key == CustomKeySource.Environment && Model.VariableSet == false)
+        {
+          <span class="text-ps-faint">$@provider.KeyVariable is not set on this machine, so requests are not sent.</span>
+        }
+      </div>
+    </div>
+  </div>
+  <div class="d-flex align-items-center gap-1 ms-auto">
+    <button class="btn btn-sm btn-ghost" type="button" data-cp-test="@provider.Id"><i class="bi bi-activity me-1"></i>Test</button>
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-cp-edit="@provider.Id"><i class="bi bi-pencil me-1"></i>Edit</button>
+    <button class="btn btn-icon" type="button" title="Duplicate" aria-label="Duplicate @provider.Id" data-cp-duplicate="@provider.Id"><i class="bi bi-copy" aria-hidden="true"></i></button>
+    <button class="btn btn-icon text-ps-danger" type="button" title="Delete" aria-label="Delete @provider.Id" data-cp-delete="@provider.Id"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+  </div>
+</div>

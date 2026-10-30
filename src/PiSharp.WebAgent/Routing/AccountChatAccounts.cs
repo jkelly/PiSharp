@@ -1,8 +1,10 @@
 // Decision 0011 (run W2, WU6): the chat area's account seam (IChatAccounts, WU7) over the credentials area's account store (WU5). A new chat
 // binds its provider's active account; a chat's own account is found by id and must belong to the chat's provider. Only ids and labels
-// cross: never a secret. Registered in every mode (with --faux the faux provider has no accounts, so chats bind none).
+// cross: never a secret. Registered in every mode (with --faux the faux provider has no accounts, so chats bind none). W3, CP: a chat of a
+// custom provider binds none either; its requests use the provider's current key (AccountRouter), which Settings › Custom providers sets.
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Credentials;
+using PiSharp.WebAgent.CustomProviders;
 
 namespace PiSharp.WebAgent.Routing;
 
@@ -16,6 +18,7 @@ public sealed class AccountChatAccounts(IAccountStore accounts) : IChatAccounts
     {
         ArgumentNullException.ThrowIfNull(provider);
         cancellationToken.ThrowIfCancellationRequested();
+        if (!CustomProviderJson.IsBuiltin(provider)) return Task.FromResult<ChatAccount?>(null);
         return Task.FromResult<ChatAccount?>(accounts.Active(provider) is { } active ? new ChatAccount(active.Id, active.Label) : null);
     }
 

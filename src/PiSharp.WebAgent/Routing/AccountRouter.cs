@@ -11,11 +11,22 @@
 // variable. A provider's 401 or a rejected refresh marks the account expired, so later requests (and the settings pages) see it; a refresh
 // that failed on the network does not, and its error is retryable. Other provider errors pass through unchanged, except that the account's
 // own key or tokens, should a provider echo one, are replaced by "[redacted]" (the error text reaches the chat page).
+//
+// W3, CP: a custom provider of models.json is routed with the provider's own key, whatever account the chat names (chats of custom
+// providers bind none): its vault account when it has one, else a key-less generation whose credential is the file's $VAR reference (read
+// from a host environment that shows only the variables the provider references) or, with no key at all, the placeholder "no-key". An
+// unset variable or a rejected key ends the request with an AccountRouteErrors text that points to Settings > Custom providers; a key-less
+// generation is never marked expired (there is no account). Every generation reads the store's routes copy as its models.json, so model
+// overrides and custom headers apply, and a change of the file retires every generation for the next request. The variables a custom
+// provider references are read when its generation is made; a request that finds one changed (or set, or unset) retires that generation, so
+// the variable is read again on each request in effect (only a hash of the values is kept, in memory).
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using PiSharp.AI;
 using PiSharp.AI.Authentication.OAuth;
@@ -25,6 +36,7 @@ using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Hosting;
 using PiSharp.WebAgent.Credentials;
+using PiSharp.WebAgent.CustomProviders;
 
 namespace PiSharp.WebAgent.Routing;
 
@@ -40,18 +52,23 @@ public sealed class AccountRouter : IAsyncDisposable
     private readonly CredentialsOptions credentials;
     private readonly RoutingOptions options;
     private readonly ILogger log;
+    private readonly ICustomProviderSource? custom;
     private readonly ConcurrentDictionary<string, Lazy<Task<Generation>>> generations = new(StringComparer.Ordinal);
     private readonly ConcurrentQueue<Lazy<Task<Generation>>> retired = new();
+    private readonly ConcurrentDictionary<string, string> variableStamps = new(StringComparer.Ordinal);
     private int disposed;
+    private long customVersion;
 
-    /// <summary>A router over the accounts of <paramref name="accounts"/> and their secrets in <paramref name="vault"/>.</summary>
+    /// <summary>A router over the accounts of <paramref name="accounts"/> and their secrets in <paramref name="vault"/>, and the custom
+    /// providers of <paramref name="custom"/> (null: none).</summary>
     public AccountRouter(RuntimeModelCatalog catalog, IAccountStore accounts, ICredentialVault vault, CredentialsOptions credentials,
-        RoutingOptions options, ILogger<AccountRouter>? log = null)
+        RoutingOptions options, ILogger<AccountRouter>? log = null, ICustomProviderSource? custom = null)
     {
         ArgumentNullException.ThrowIfNull(catalog); ArgumentNullException.ThrowIfNull(accounts); ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(credentials); ArgumentNullException.ThrowIfNull(options);
         this.catalog = catalog; this.accounts = accounts; this.vault = vault; this.credentials = credentials; this.options = options;
         this.log = (ILogger?)log ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+        this.custom = custom;
         accounts.Changed += OnChanged;
     }
 
@@ -78,13 +95,22 @@ public sealed class AccountRouter : IAsyncDisposable
         var row = catalog.Find(model.Provider, model.Id)
             ?? throw new InvalidOperationException($"The model {model.Provider}/{model.Id} is not in the Web Agent's catalog, so the request was not sent.");
         var providerName = catalog.DisplayName(model.Provider);
-        var account = Admit(accountId, model.Provider, providerName);
+        RetireOnCustomChange();
+        var customProvider = catalog.Custom(model.Provider);
+        var account = customProvider is null ? Admit(accountId, model.Provider, providerName) : CustomAccount(customProvider, providerName);
+        var generationKey = account is not null ? account.Id : KeylessKey + customProvider!.Id;
+        if (customProvider is { Variables.Count: > 0 }) RetireOnVariableChange(generationKey, customProvider);
         Generation generation;
-        try { generation = await GenerationAsync(account, cancellationToken).ConfigureAwait(false); }
+        try
+        {
+            generation = account is not null
+                ? await GenerationAsync(generationKey, () => CreateAsync(account, customProvider), cancellationToken).ConfigureAwait(false)
+                : await GenerationAsync(generationKey, () => CreateKeylessAsync(customProvider!), cancellationToken).ConfigureAwait(false);
+        }
         catch (Exception error) when (error is CredentialUnavailableException or InvalidDataException or IOException or UnauthorizedAccessException)
         {
-            log.LogWarning("Account {Account} could not be read for {Provider}/{Model}.", account.Id, model.Provider, model.Id);
-            throw new AccountRouteException(AccountRouteErrors.Unavailable, AccountRouteErrors.Message(AccountRouteErrors.Unavailable, providerName));
+            log.LogWarning("Account {Account} could not be read for {Provider}/{Model}.", account?.Id ?? "(none)", model.Provider, model.Id);
+            throw new AccountRouteException(AccountRouteErrors.Unavailable, Describe(AccountRouteErrors.Unavailable, providerName, customProvider));
         }
         var route = generation.Route(row.Entry, model);
         IChatTransport transport = route;
@@ -113,41 +139,111 @@ public sealed class AccountRouter : IAsyncDisposable
         throw new AccountRouteException(reason, AccountRouteErrors.Message(reason, providerName));
     }
 
-    private async Task<Generation> GenerationAsync(AccountInfo account, CancellationToken cancellationToken)
+    /// <summary>The generation prefix of a custom provider routed without an account.</summary>
+    private const string KeylessKey = "custom:";
+
+    /// <summary>The vault account a custom provider's requests use (its active API key account), or null when it has none (the file's
+    /// reference, or no key); the reason it cannot be used otherwise.</summary>
+    private AccountInfo? CustomAccount(CustomProviderInfo provider, string providerName)
     {
-        var lazy = generations.GetOrAdd(account.Id, _ => new Lazy<Task<Generation>>(() => CreateAsync(account), LazyThreadSafetyMode.ExecutionAndPublication));
+        string? reason = null;
+        if (provider.FileKey == CustomKeySource.Environment)
+        {
+            if (provider.KeyVariable is { } variable && string.IsNullOrEmpty(credentials.Environment(variable))) reason = AccountRouteErrors.Unavailable;
+        }
+        else if (accounts.Active(provider.Id) is { Kind: AccountKind.ApiKey } stored)
+        {
+            if (stored.Status == AccountStatus.Expired) reason = AccountRouteErrors.Expired;
+            else if (stored.Status == AccountStatus.Unavailable) reason = AccountRouteErrors.Unavailable;
+            else return stored;
+        }
+        if (reason is null) return null;
+        log.LogInformation("A {Provider} request was not sent: its key is {Reason}.", provider.Id, reason);
+        throw new AccountRouteException(reason, Describe(reason, providerName, provider));
+    }
+
+    /// <summary>Retires every generation when the custom providers' file changed (a new routes copy), so the next request reads it.</summary>
+    private void RetireOnCustomChange()
+    {
+        if (custom is null) return;
+        var version = catalog.CustomVersion;
+        if (Interlocked.Exchange(ref customVersion, version) == version) return;
+        foreach (var key in generations.Keys)
+            if (generations.TryRemove(key, out var old)) retired.Enqueue(old);
+    }
+
+    /// <summary>Retires the generation <paramref name="key"/> when a variable that <paramref name="provider"/> references changed since the
+    /// last request, so the next generation reads it again. Only a SHA-256 hash of the values is kept.</summary>
+    private void RetireOnVariableChange(string key, CustomProviderInfo provider)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var name in provider.Variables)
+            hash.AppendData(Encoding.UTF8.GetBytes(name + "\u0001" + (credentials.Environment(name) is { } value ? "=" + value : "\u0002") + "\u0000"));
+        var stamp = Convert.ToHexString(hash.GetHashAndReset());
+        var previous = variableStamps.GetValueOrDefault(key);
+        if (previous == stamp) return;
+        variableStamps[key] = stamp;
+        if (previous is not null && generations.TryRemove(key, out var stale)) retired.Enqueue(stale);
+    }
+
+    private async Task<Generation> GenerationAsync(string key, Func<Task<Generation>> create, CancellationToken cancellationToken)
+    {
+        var lazy = generations.GetOrAdd(key, _ => new Lazy<Task<Generation>>(create, LazyThreadSafetyMode.ExecutionAndPublication));
         try { return await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false); }
         catch (Exception) when (lazy.Value.IsFaulted || lazy.Value.IsCanceled)
         {
             // A failed generation is not kept: the next request tries again (the account may be fixed meanwhile).
-            generations.TryRemove(KeyValuePair.Create(account.Id, lazy));
+            generations.TryRemove(KeyValuePair.Create(key, lazy));
             throw;
         }
     }
 
-    /// <summary>The account's runtime: its credential source and environment, the routing HTTP handler, the credentials area's sign-in
-    /// client, flows and clock, and a registry of the built-in catalog with the account's stored entry (and base URL setting).</summary>
-    private async Task<Generation> CreateAsync(AccountInfo account)
+    /// <summary>The account's runtime: its credential source and environment (and, for a custom provider, the variables its headers
+    /// reference), the routing HTTP handler, the credentials area's sign-in client, flows and clock, and a registry of the built-in catalog
+    /// and the routes copy of models.json with the account's stored entry (and base URL setting).</summary>
+    private async Task<Generation> CreateAsync(AccountInfo account, CustomProviderInfo? customProvider)
     {
         var source = new WebCredentialSource(account, vault, accounts, log);
-        var runtime = new LiveRouteRuntime(AccountEnvironment.For(account, credentials.Environment), () => options.ProviderHandler, credentials.CreateHttp,
-            Time, ModelsPath: null)
+        var environment = AccountEnvironment.For(account, credentials.Environment);
+        if (customProvider is { Variables.Count: > 0 })
+        {
+            var own = environment;
+            var variables = customProvider.Variables.ToHashSet(StringComparer.Ordinal);
+            environment = name => variables.Contains(name) ? credentials.Environment(name) : own(name);
+        }
+        var runtime = Runtime(environment, source, account.Provider, BaseUrl(account));
+        var registry = await runtime.CreateModelRegistryAsync(CancellationToken.None).ConfigureAwait(false);
+        log.LogDebug("Account {Account} ({Provider}) has a new route generation.", account.Id, account.Provider);
+        return new Generation(account.Id, account.Provider, account, source, runtime, registry, customProvider);
+    }
+
+    /// <summary>A custom provider's runtime without an account: the file's $VAR reference (from a host environment that shows only the
+    /// variables the provider references, and non-secret configuration), or the placeholder key when it has none.</summary>
+    private async Task<Generation> CreateKeylessAsync(CustomProviderInfo provider)
+    {
+        var source = new CustomKeyCredentialSource(provider.Id, provider.FileKey == CustomKeySource.Environment ? null : CustomProviderJson.PlaceholderKey);
+        var variables = provider.Variables.ToHashSet(StringComparer.Ordinal);
+        var runtime = Runtime(name => variables.Contains(name) || AccountEnvironment.Configuration.Contains(name) ? credentials.Environment(name) : null,
+            source, provider.Id, null);
+        var registry = await runtime.CreateModelRegistryAsync(CancellationToken.None).ConfigureAwait(false);
+        log.LogDebug("Custom provider {Provider} has a new route generation.", provider.Id);
+        return new Generation(KeylessKey + provider.Id, provider.Id, null, null, runtime, registry, provider);
+    }
+
+    private LiveRouteRuntime Runtime(Func<string, string?> environment, PiSharp.Cli.Authentication.IProviderCredentialSource source, string provider, string? baseUrl) =>
+        new(environment, () => options.ProviderHandler, credentials.CreateHttp, Time, ModelsPath: custom?.Current.RoutesPath)
         {
             Credentials = () => source,
-            OAuthFlows = (provider, context) => WebCredentialSource.SignInProviders.Contains(provider)
-                ? SignInFlows.CreateFlow(provider, context.Http, credentials, id => catalog.Find("github-copilot", id) is not null)
-                : throw new InvalidOperationException($"{provider} does not sign in in the Web Agent."),
+            OAuthFlows = (id, context) => WebCredentialSource.SignInProviders.Contains(id)
+                ? SignInFlows.CreateFlow(id, context.Http, credentials, model => catalog.Find("github-copilot", model) is not null)
+                : throw new InvalidOperationException($"{id} does not sign in in the Web Agent."),
             Transport = () => options.CodexTransport,
             HomeDirectory = credentials.Home,
             CreateCatalogClient = () => new HttpClient(new OfflineCatalogHandler()),
-            ConfigureRegistry = BaseUrl(account) is { } baseUrl
-                ? registry => registry.RegisterExtensionProvider(account.Provider, new System.Text.Json.Nodes.JsonObject { ["baseUrl"] = baseUrl })
+            ConfigureRegistry = baseUrl is not null
+                ? registry => registry.RegisterExtensionProvider(provider, new System.Text.Json.Nodes.JsonObject { ["baseUrl"] = baseUrl })
                 : null,
         };
-        var registry = await runtime.CreateModelRegistryAsync(CancellationToken.None).ConfigureAwait(false);
-        log.LogDebug("Account {Account} ({Provider}) has a new route generation.", account.Id, account.Provider);
-        return new Generation(account, source, runtime, registry);
-    }
 
     /// <summary>The <c>baseUrl</c> setting of an API key account (an http or https URL), or null.</summary>
     internal static string? BaseUrl(AccountInfo account) =>
@@ -169,7 +265,7 @@ public sealed class AccountRouter : IAsyncDisposable
     {
         var original = ErrorText(error.Message);
         var reason = await ClassifyAsync(generation, original, error.NativeSourceException, failuresBefore).ConfigureAwait(false);
-        var text = reason is null ? await RedactAsync(generation.Account.Id, original).ConfigureAwait(false) : Describe(reason, providerName);
+        var text = reason is null ? await RedactAsync(generation, original).ConfigureAwait(false) : Describe(reason, providerName, generation.Custom);
         if (text is null || text == original) return error;
         Report(generation, reason);
         return error with { Message = WithError(error.Message, text) };
@@ -180,7 +276,7 @@ public sealed class AccountRouter : IAsyncDisposable
     private async Task<StreamError?> ReviewAsync(Generation generation, ChatRequest request, Exception error, int failuresBefore, string providerName)
     {
         var reason = await ClassifyAsync(generation, error.Message, error, failuresBefore).ConfigureAwait(false);
-        var text = reason is not null ? Describe(reason, providerName) : error is LiveSessionException refused ? refused.Message : null;
+        var text = reason is not null ? Describe(reason, providerName, generation.Custom) : error is LiveSessionException refused ? refused.Message : null;
         if (text is null) return null;
         Report(generation, reason ?? "refused");
         var model = request.Model;
@@ -189,24 +285,32 @@ public sealed class AccountRouter : IAsyncDisposable
     }
 
     private void Report(Generation generation, string? reason) =>
-        log.LogWarning("A {Provider} request with account {Account} failed: {Reason}.", generation.Account.Provider, generation.Account.Id, reason ?? "provider error");
+        log.LogWarning("A {Provider} request with account {Account} failed: {Reason}.", generation.Provider, generation.Key, reason ?? "provider error");
 
     private const string Network = "network";
 
-    private static string Describe(string reason, string providerName) =>
-        reason == Network ? AccountRouteErrors.RefreshNetwork(providerName) : AccountRouteErrors.Message(reason, providerName);
+    private static string Describe(string reason, string providerName, CustomProviderInfo? customProvider) =>
+        reason == Network ? AccountRouteErrors.RefreshNetwork(providerName)
+        : customProvider is not null ? AccountRouteErrors.CustomMessage(reason, providerName, customProvider.FileKey == CustomKeySource.Environment ? customProvider.KeyVariable : null)
+        : AccountRouteErrors.Message(reason, providerName);
 
     /// <summary>Why a failed request failed, when it is the account's fault: it was removed, expired or became unavailable meanwhile (a
     /// rejected refresh marks it expired), a refresh failed on the network, the route found no credential, or the provider answered 401
     /// (which marks it expired). Null for anything else.</summary>
     private async Task<string?> ClassifyAsync(Generation generation, string? text, Exception? error, int failuresBefore)
     {
+        if (generation.Account is null)
+        {
+            // A custom provider without an account: nothing to mark; its key is the file's reference (or none).
+            if (IsMissingCredential(text, error)) return AccountRouteErrors.Unavailable;
+            return IsUnauthorized(text, error) ? AccountRouteErrors.Expired : null;
+        }
         var id = generation.Account.Id;
         var account = accounts.Get(id);
         if (account is null) return AccountRouteErrors.Removed;
         if (account.Status == AccountStatus.Expired) return AccountRouteErrors.Expired;
         if (account.Status == AccountStatus.Unavailable) return AccountRouteErrors.Unavailable;
-        if (generation.Source.Failures != failuresBefore && generation.Source.LastFailureTransient) return Network;
+        if (generation.Source is { } source && source.Failures != failuresBefore && source.LastFailureTransient) return Network;
         if (IsMissingCredential(text, error)) return AccountRouteErrors.Unavailable;
         if (IsUnauthorized(text, error))
         {
@@ -244,12 +348,16 @@ public sealed class AccountRouter : IAsyncDisposable
             text.Contains("status 401", StringComparison.Ordinal) || text.Contains("status code 401", StringComparison.Ordinal));
     }
 
-    /// <summary><paramref name="text"/> with the account's key and tokens replaced by <c>[redacted]</c>; the same text when none occurs.</summary>
-    private async Task<string?> RedactAsync(string accountId, string? text)
+    /// <summary><paramref name="text"/> with the account's key and tokens (or a custom provider's referenced variables) replaced by
+    /// <c>[redacted]</c>; the same text when none occurs.</summary>
+    private async Task<string?> RedactAsync(Generation generation, string? text)
     {
         if (string.IsNullOrEmpty(text)) return text;
+        foreach (var variable in generation.Custom?.Variables ?? [])
+            if (credentials.Environment(variable) is { Length: >= 8 } value && text.Contains(value, StringComparison.Ordinal)) text = text.Replace(value, "[redacted]", StringComparison.Ordinal);
+        if (generation.Account is not { } account) return text;
         AccountCredential? credential;
-        try { credential = await vault.ReadAsync(accountId).ConfigureAwait(false); }
+        try { credential = await vault.ReadAsync(account.Id).ConfigureAwait(false); }
         catch (Exception error) when (error is CredentialUnavailableException or InvalidDataException or IOException) { return text; }
         foreach (var secret in new[] { credential?.ApiKey, credential?.OAuth?.Access, credential?.OAuth?.Refresh })
             if (secret is { Length: >= 8 } && text.Contains(secret, StringComparison.Ordinal)) text = text.Replace(secret, "[redacted]", StringComparison.Ordinal);
@@ -283,14 +391,26 @@ public sealed class AccountRouter : IAsyncDisposable
 
     // ─── Generations and transports ─────────────────────────────────────────
 
-    /// <summary>One account's runtime, registry and model routes, as of one credential version.</summary>
-    private sealed class Generation(AccountInfo account, WebCredentialSource source, LiveRouteRuntime runtime, ModelRegistry registry) : IAsyncDisposable
+    /// <summary>One account's (or one key-less custom provider's) runtime, registry and model routes, as of one credential version.</summary>
+    private sealed class Generation(string key, string provider, AccountInfo? account, WebCredentialSource? source, LiveRouteRuntime runtime,
+        ModelRegistry registry, CustomProviderInfo? customProvider) : IAsyncDisposable
     {
         private readonly ConcurrentDictionary<(string Provider, string Id), LazyModelTransport> routes = new();
 
-        public AccountInfo Account { get; } = account;
+        /// <summary>The generation's key: the account id, or <c>custom:</c> and the provider id.</summary>
+        public string Key { get; } = key;
 
-        public WebCredentialSource Source { get; } = source;
+        public string Provider { get; } = provider;
+
+        /// <summary>The account, or null for a custom provider routed without one.</summary>
+        public AccountInfo? Account { get; } = account;
+
+        public WebCredentialSource? Source { get; } = source;
+
+        /// <summary>The custom provider, or null for a built-in provider's account.</summary>
+        public CustomProviderInfo? Custom { get; } = customProvider;
+
+        public int Failures => Source?.Failures ?? 0;
 
         public LazyModelTransport Route(RegistryModel entry, DurableModel model) =>
             routes.GetOrAdd((model.Provider, model.Id), _ => new LazyModelTransport(entry, model.Descriptor, () => registry, runtime));
@@ -312,7 +432,7 @@ public sealed class AccountRouter : IAsyncDisposable
 
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var failures = generation.Source.Failures;
+            var failures = generation.Failures;
             var yielded = false;
             Exception? thrown = null;
             IAsyncEnumerator<StreamEvent>? events = null;
@@ -355,5 +475,21 @@ public sealed class AccountRouter : IAsyncDisposable
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("The Web Agent does not refresh model catalogs over the network.");
+    }
+
+    /// <summary>The credential of a custom provider routed without an account: the placeholder key, or nothing (the file's reference is
+    /// the registry's then). It never reads the vault and holds no secret.</summary>
+    private sealed class CustomKeyCredentialSource(string provider, string? placeholder) : PiSharp.Cli.Authentication.IProviderCredentialSource
+    {
+        public Task<PiSharp.Cli.Authentication.StoredCredentialEntry?> ReadEntryAsync(string id, CancellationToken cancellationToken) =>
+            Task.FromResult(id == provider && placeholder is not null ? new PiSharp.Cli.Authentication.StoredCredentialEntry("api_key", placeholder, null) : null);
+
+        public Task<IReadOnlyList<(string Provider, string Type)>> ListAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<(string Provider, string Type)>>(placeholder is null ? [] : [(provider, "api_key")]);
+
+        public Task<OAuthCredentialSnapshot?> ReadAsync(string id, CancellationToken cancellationToken) => Task.FromResult<OAuthCredentialSnapshot?>(null);
+
+        public Task<OAuthCredentialSnapshot?> ModifyAsync(string id, Func<OAuthCredentialSnapshot?, CancellationToken, Task<OAuthCredentialSnapshot?>> mutation,
+            CancellationToken cancellationToken) => Task.FromResult<OAuthCredentialSnapshot?>(null);
     }
 }
