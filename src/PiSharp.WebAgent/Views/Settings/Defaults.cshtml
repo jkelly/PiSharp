@@ -2,7 +2,7 @@
    dropdowns (_ProviderModelSelect, Provider then Model, connected providers only) and the default thinking level, saved together through
    POST /api/settings/defaults from _SettingsSaveBar, and "Reset all…" (POST /api/settings/defaults/reset, after a confirm). New chats start
    with these; a chat keeps the model and thinking level it started with. Request defaults, retry, message queue, compaction, images and the
-   system prompt are later milestones. Model: DefaultsPage. *@
+   system prompt are not in this version (_NotInThisVersion, W5 integration fix 1). Model: DefaultsPage. *@
 @model DefaultsPage
 @{
     Layout = "_SettingsLayout";
@@ -74,7 +74,7 @@
     </div>
   </section>
 
-  <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Request defaults, retry and more", "Request defaults (temperature, max tokens, cache retention), retry, the message queue, compaction, images and the system prompt.", "request-defaults")' />
+  <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Request defaults, retry and more", "This version has no app-wide request defaults (temperature, max tokens, cache retention), retry, message queue, compaction, image or system prompt settings. The Playground sets the request options per run, and its presets keep them.", "request-defaults")' />
 
   <partial name="/Views/Settings/_SettingsSaveBar.cshtml" model="null" />
 </form>

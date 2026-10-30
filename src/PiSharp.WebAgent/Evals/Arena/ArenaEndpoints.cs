@@ -171,14 +171,15 @@ public static class ArenaEndpoints
     private static async Task<IResult> StartedAsync(ArenaStart start, ArenaService arena, IServiceProvider services)
     {
         if (start.Refusal is not { } refusal) return Json(Started(start.Battle, arena));
-        // The refusal is answered on the page where the user chose the models; it is about the group, never a column letter.
+        // The refusal is answered on the page where the user chose the models; it is about the group, never a column letter, and (W5
+        // integration fix 1) its message and modal are the blind variant, which names no provider, model or account.
         return Json(new JsonObject
         {
             ["posted"] = false,
             ["battleId"] = start.Battle.Id,
             ["code"] = refusal.Code,
-            ["message"] = refusal.Message,
-            ["spend"] = await RunEndpoints.SpendAsync(refusal, services).ConfigureAwait(false),
+            ["message"] = RunEndpoints.BlindRefusal,
+            ["spend"] = await RunEndpoints.SpendAsync(refusal, services, blind: true).ConfigureAwait(false),
         });
     }
 

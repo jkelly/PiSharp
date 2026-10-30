@@ -168,6 +168,43 @@ public sealed class RunEngine : IAsyncDisposable
         return new RunStart(true, [id], plan.Spec.GroupId, null);
     }
 
+    /// <summary>Starts one run on a call its caller reserved already (W5 integration fix 1: a suite run's hold, one call of its group
+    /// reservation): checked and planned as <see cref="StartAsync"/> does, then sent on <paramref name="lease"/>, so the headroom the hold
+    /// kept is never given back before the call goes out, and the call settles the hold's own ledger row (no second row). The lease must be
+    /// reserved for the run's provider, model and account; one that is not (or that caps the output below what the run can hold) is
+    /// released and the call is reserved anew, as <see cref="StartAsync"/> reserves it.</summary>
+    /// <exception cref="ArgumentException">The spec is not valid (<see cref="RunOptionException"/> for options the model does not take), or
+    /// the model or account is unknown. The lease is released first.</exception>
+    public async Task<RunStart> StartReservedAsync(RunSpec spec, GuardedLease lease, RunSpendAnswer? spend = null, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+        ArgumentNullException.ThrowIfNull(lease);
+        RunRequestPlan plan;
+        string? account;
+        try
+        {
+            plan = Plan(spec);
+            if (!plan.Allowed) throw new RunOptionException(plan);
+            account = await AccountAsync(plan, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await lease.ReleaseAsync("the call could not be sent").ConfigureAwait(false);
+            throw;
+        }
+        var held = lease.Reservation.Call;
+        if (!lease.Reserved || held.Provider != plan.Model.Provider || held.Model != plan.Model.Id || held.Account != account
+            || CapRefusal(plan, lease.Reservation.MaxTokens) is not null)
+        {
+            await lease.ReleaseAsync("reserved again as the run's own call").ConfigureAwait(false);
+            return await StartAsync(spec, spend, cancellationToken).ConfigureAwait(false);
+        }
+        var id = NewId();
+        // The hold's op, source and run, with the run's own input size (a judge's hold reserved the most a judgement can send).
+        Begin(id, plan, account, held with { InputBytes = CostEstimator.InputBytes(plan.Messages) }, lease, plan.Spec.GroupId);
+        return new RunStart(true, [id], plan.Spec.GroupId, null);
+    }
+
     /// <summary>Starts a group (a Compare run's columns) reserved all or none; each column is its own run of the group.</summary>
     /// <exception cref="ArgumentException">A spec is not valid (the message names its column), or the group is empty or too large.</exception>
     public async Task<RunStart> StartGroupAsync(IReadOnlyList<RunSpec> specs, string? groupId = null, RunSpendAnswer? spend = null,

@@ -27,6 +27,8 @@ public sealed class RunsController(RunHistoryPages history, RunInspectorPages in
             Response.StatusCode = StatusCodes.Status404NotFound;
             return View("NotFound", id);
         }
+        // W5 integration fix 1: a run of a blind round with no vote yet is a notice that links to the battle (RunBlinds).
+        if (RunBlinds.Of(HttpContext.RequestServices).Hidden(run) is { } battle) return View("Blind", new RunBlindView(run.Id, battle));
         if (!string.Equals(run.Id, id, StringComparison.Ordinal)) return Redirect("/runs/" + Uri.EscapeDataString(run.Id));
         return View(await inspector.ViewAsync(run, $"{Request.Scheme}://{Request.Host}", cancellationToken).ConfigureAwait(false));
     }

@@ -5,6 +5,8 @@
 // Model also match a grouped run when one of its models does. The totals strip sums the calls under the matching runs (the last 30 days
 // when no filter is set). Export writes the matching (or chosen) runs with their grouped rows as CSV or JSON (with the stored stream events
 // and raw payloads when asked); raw payloads were redacted before they were stored, and nothing here adds a credential.
+// W5 integration fix 1: the runs of a blind round that has no vote yet (RunBlinds) are left out of the rows, the counts, the totals strip,
+// the provider and model options and the exports, so nothing on the page names a contestant before the vote and the numbers still agree.
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -55,10 +57,11 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
         store.Count(); // Opens the store first: migrations, and runs a stopped app left running marked interrupted.
         var db = store.Db.Db;
         var now = Now;
+        var hidden = RunBlinds.Of(services).Groups().Keys.ToList();
         // The plain counts are the store's (RunQuery.TopLevelOnly); the filtered rows below stay this page's own query, since a provider or
         // model filter also matches a run through its children and a row carries its options and tool names, which RunStore.List leaves out.
-        var totalAll = store.Totals(new RunQuery { TopLevelOnly = true }).Count;
-        var (where, parameters) = RootWhere(filter, since: null);
+        var totalAll = store.Totals(new RunQuery { TopLevelOnly = true, HiddenGroups = hidden }).Count;
+        var (where, parameters) = RootWhere(filter, since: null, hidden);
         var total = Convert.ToInt64(db.Scalar($"SELECT COUNT(*) FROM runs r{where};", [.. parameters]) ?? 0L, CultureInfo.InvariantCulture);
         var pages = total == 0 ? 1 : (int)Math.Ceiling(total / (double)filter.Size);
         if (filter.Page > pages) filter = filter with { Page = pages };
@@ -74,16 +77,16 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
             Rows = RowsOf(db, records, now),
             Total = total,
             TotalAll = totalAll,
-            Totals = Totals(db, filter, now, totalAll),
-            Providers = Options(db, "SELECT DISTINCT provider FROM runs WHERE provider <> '' ORDER BY provider;", [], filter.Provider),
+            Totals = Totals(db, filter, now, totalAll, hidden),
+            Providers = Options(db, "SELECT DISTINCT provider FROM runs WHERE provider <> '' AND {visible} ORDER BY provider;", [], filter.Provider, hidden),
             Models = filter.Provider is null ? []
-                : Options(db, "SELECT DISTINCT model FROM runs WHERE provider = $provider AND model <> '' ORDER BY model;", [("$provider", filter.Provider)], filter.Model),
+                : Options(db, "SELECT DISTINCT model FROM runs WHERE provider = $provider AND model <> '' AND {visible} ORDER BY model;", [("$provider", filter.Provider)], filter.Model, hidden),
             Saved = [.. (saved.Filters ?? []).Select(item => new RunSavedFilterView(item.Name, item.Query, item.Href, RunSavedFilters.Describe(item.Query), Icon(item.Query),
                 item.Query == current && current.Length > 0))],
             DbPath = store.Db.Path,
             SizeBytes = store.SizeBytes(),
             RetentionText = history.RetentionDays is { } days ? "retention " + days.ToString(CultureInfo.InvariantCulture) + (days == 1 ? " day" : " days") : "kept forever",
-            PinnedCount = store.Totals(new RunQuery { TopLevelOnly = true, Pinned = true }).Count,
+            PinnedCount = store.Totals(new RunQuery { TopLevelOnly = true, Pinned = true, HiddenGroups = hidden }).Count,
         };
     }
 
@@ -93,7 +96,8 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
     public JsonObject? RerunSpec(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
-        if (Store.Get(id) is not { } run || !RunHistoryText.Replayable(run) || PlaygroundPages.FromRun(run) is not { } spec) return null;
+        if (Store.Get(id) is not { } run || RunBlinds.Of(services).Hidden(run) is not null || !RunHistoryText.Replayable(run)
+            || PlaygroundPages.FromRun(run) is not { } spec) return null;
         var source = run.Source is "playground" or "compare" or "bench" ? run.Source : "playground";
         var json = JsonSerializer.SerializeToNode(spec with { Source = source, GroupId = null, ParentId = null, Title = run.Title }, SettingsStore.JsonOptions)!.AsObject();
         foreach (var key in new[] { "spendSource", "thinkingLevel" }) json.Remove(key);
@@ -110,16 +114,18 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
         store.Count();
         var db = store.Db.Db;
         var limit = format == "json-raw" ? MaxRawExport : MaxExport;
+        var blinds = RunBlinds.Of(services);
+        var groups = blinds.Groups();
         List<string> roots;
         if (ids is not null)
         {
             var chosen = ids.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id.Trim()).Distinct(StringComparer.Ordinal).ToList();
             if (chosen.Count > MaxIds) throw new ArgumentException($"Export at most {MaxIds:N0} chosen runs at a time.");
-            roots = [.. chosen.Where(id => store.Get(id) is not null).Take(limit)];
+            roots = [.. chosen.Where(id => store.Get(id) is { } run && blinds.Hidden(run, groups) is null).Take(limit)];
         }
         else
         {
-            var (where, parameters) = RootWhere(filter ?? new RunHistoryFilter(), since: null);
+            var (where, parameters) = RootWhere(filter ?? new RunHistoryFilter(), since: null, [.. groups.Keys]);
             roots = [.. db.Query($"SELECT r.id FROM runs r{where} ORDER BY r.created DESC, r.id DESC LIMIT $limit;", reader => reader.GetString(0), [.. parameters, ("$limit", limit)])];
         }
         var stamp = Now.ToLocalTime().ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
@@ -204,11 +210,19 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
     }
 
     /// <summary>The WHERE clause (with its parameters) of the top-level runs <paramref name="filter"/> matches, created at or after
-    /// <paramref name="since"/> when given. The table is aliased <c>r</c>.</summary>
-    internal static (string Where, List<(string Name, object? Value)> Parameters) RootWhere(RunHistoryFilter filter, DateTimeOffset? since)
+    /// <paramref name="since"/> when given, leaving out the runs <paramref name="hidden"/> groups hide (a blind round's). The table is
+    /// aliased <c>r</c>.</summary>
+    internal static (string Where, List<(string Name, object? Value)> Parameters) RootWhere(RunHistoryFilter filter, DateTimeOffset? since,
+        IReadOnlyCollection<string>? hidden = null)
     {
         var clauses = new List<string> { "r.parent_id IS NULL" };
         var parameters = new List<(string Name, object? Value)>();
+        if (hidden is { Count: > 0 })
+        {
+            var (visible, names) = RunBlinds.Visible("r", hidden);
+            clauses.Add(visible);
+            parameters.AddRange(names);
+        }
         if (since is { } start)
         {
             clauses.Add("r.created >= $since");
@@ -305,9 +319,10 @@ public sealed partial class RunHistoryPages(IServiceProvider services)
         return (run, Text(37));
     }
 
-    private static IReadOnlyList<RunFilterOption> Options(WebAgentDb db, string sql, (string, object?)[] parameters, string? chosen)
+    private static IReadOnlyList<RunFilterOption> Options(WebAgentDb db, string sql, (string, object?)[] parameters, string? chosen, IReadOnlyCollection<string> hidden)
     {
-        var values = db.Query(sql, reader => reader.GetString(0), parameters).ToList();
+        var (visible, names) = RunBlinds.Visible("", hidden);
+        var values = db.Query(sql.Replace("{visible}", visible, StringComparison.Ordinal), reader => reader.GetString(0), [.. parameters, .. names]).ToList();
         if (chosen is not null && !values.Contains(chosen, StringComparer.Ordinal)) values.Add(chosen);
         return [.. values.Select(value => new RunFilterOption(value, value))];
     }

@@ -72,7 +72,19 @@ public sealed class SettingsController(ProviderDirectory directory, ISettingsSto
     {
         var tools = settings.Get<ToolsSettings>();
         var folder = tools.EffectiveWorkingDirectory;
-        return View("Tools", new ToolsPage(tools, FolderBrowser.Exists(folder), FolderBrowser.ContextFiles(folder)));
+        return View("Tools", new ToolsPage(tools, FolderBrowser.Exists(folder), FolderBrowser.ContextFiles(folder)) { Grants = Grants() });
+    }
+
+    // W5 integration fix 1: the chats' session grants (the approval broker's, which the chat area registers), each with its chat's title.
+    private List<SessionGrant> Grants()
+    {
+        var services = HttpContext.RequestServices;
+        if (services.GetService<Chat.ApprovalBroker>() is not { } broker) return [];
+        var bindings = services.GetService<Chat.ChatBindings>();
+        return [.. broker.AllGrants()
+            .SelectMany(pair => pair.Value.Select(rule => new SessionGrant(pair.Key, bindings?.Get(pair.Key)?.Title is { Length: > 0 } title ? title : "Untitled chat", rule)))
+            .OrderBy(grant => grant.ChatTitle, StringComparer.CurrentCultureIgnoreCase).ThenBy(grant => grant.ChatId, StringComparer.Ordinal)
+            .ThenBy(grant => grant.Rule.Tool, StringComparer.Ordinal).ThenBy(grant => grant.Rule.Command, StringComparer.Ordinal)];
     }
 
     // The callback host set by PI_OAUTH_CALLBACK_HOST, or null for the default.

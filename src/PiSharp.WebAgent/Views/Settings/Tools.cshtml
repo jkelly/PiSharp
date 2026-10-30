@@ -2,8 +2,10 @@
    picked with _FolderBrowser) with the context files found in it, and tool approvals: Ask before bash, edit and write (recommended, the
    default), Ask except the allow list, or Never ask (behind a confirm), with the allow list editor (a tool, and for bash a command pattern).
    Saved together through POST /api/settings/tools from _SettingsSaveBar. Read-only tools never ask, so the mockups' "Ask before every tool
-   call" has no mode. Recent workspaces, built-in tools and session grants are later milestones; agent compare's defaults are R6's
-   _AgentCompareDefaults (run W4), a form of its own after this one. Model: ToolsPage. *@
+   call" has no mode. W5 integration fix 1: "Always allowed this session" lists every chat's "Always allow in this chat" grants (until the
+   app restarts), each with a Revoke button (POST /api/chats/{id}/grants/revoke, settings-forms.js); recent workspaces and built-in tools
+   are not in this version (_NotInThisVersion). Agent compare's defaults are R6's _AgentCompareDefaults (run W4), a form of its own after
+   this one. Model: ToolsPage. *@
 @model ToolsPage
 @{
     Layout = "_SettingsLayout";
@@ -126,16 +128,29 @@
         </div>
       </div>
       <div class="col-lg-6">
-        <div class="ps-card h-100 p-3">
-          <div class="fw-semibold fs-7">Always allowed this session</div>
-          <div class="fs-8 text-ps-faint mb-2">Granted from the approval prompt; cleared when the server restarts.</div>
-          <span class="ps-chip" data-tone="outline">Coming in a later milestone</span>
+        <div class="ps-card h-100" data-session-grants>
+          <div class="px-3 pt-3 pb-2">
+            <div class="fw-semibold fs-7">Always allowed this session</div>
+            <div class="fs-8 text-ps-faint">Granted from the approval prompt ("Always allow in this chat"); cleared when the server restarts. Revoke one to be asked again.</div>
+          </div>
+          @foreach (var grant in Model.Grants)
+          {
+            <div class="provider-row py-2" data-session-grant data-chat="@grant.ChatId" data-tool="@grant.Rule.Tool" data-command="@grant.Rule.Command">
+              <span class="ps-chip" data-tone="accent">@grant.Rule.Tool</span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="ps-mono fs-7 text-break">@(grant.Rule.Command ?? "every call")</div>
+                <a class="fs-8 text-ps-faint text-truncate d-block" href="/chat/@Uri.EscapeDataString(grant.ChatId)">@grant.ChatTitle</a>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary" type="button" aria-label="Revoke @grant.Rule.Tool @(grant.Rule.Command ?? "every call") in @grant.ChatTitle" data-grant-revoke>Revoke</button>
+            </div>
+          }
+          <div class="px-3 pb-3 fs-8 text-ps-faint" data-session-grants-empty hidden="@(Model.Grants.Count > 0)">No chat has a grant.</div>
         </div>
       </div>
     </div>
   </section>
 
-  <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Built-in tools", "Which built-in tools new chats start with, and recent workspaces.", "builtin-tools")' />
+  <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Built-in tools", "This version has no setting for which built-in tools new chats start with, and keeps no list of recent workspaces: a chat works in the folder above, as it was when the chat started.", "builtin-tools")' />
 
   <partial name="/Views/Settings/_SettingsSaveBar.cshtml" model="null" />
 </form>

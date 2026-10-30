@@ -64,7 +64,9 @@ internal static partial class Program
             Check(codex.Contains("data-signin-provider=\"openai-codex\"", StringComparison.Ordinal) && codex.Contains("data-bs-target=\"#modal-chatgpt-signin\"", StringComparison.Ordinal),
                 "Codex signs in with ChatGPT");
             Check(!codex.Contains("data-key-provider=\"openai-codex\"", StringComparison.Ordinal), "Codex takes no key");
-            Check(codex.Contains("Coming in a later milestone", StringComparison.Ordinal), "usage limits come later");
+            // W5 integration fix 1: no planned milestone builds these sections, so they say "Not in this version", never "later".
+            Check(codex.Contains("Not in this version", StringComparison.Ordinal) && codex.Contains("id=\"usage-limits\"", StringComparison.Ordinal), "usage limits are not in this version");
+            Check(!codex.Contains("later milestone", StringComparison.OrdinalIgnoreCase), "no Codex section promises a later milestone");
             var copilot = await Page("/settings/providers/github-copilot");
             Check(copilot.Contains("data-signin-provider=\"github-copilot\"", StringComparison.Ordinal) && copilot.Contains("data-bs-target=\"#modal-oauth-signin\"", StringComparison.Ordinal),
                 "Copilot signs in with a device code");
@@ -97,13 +99,16 @@ internal static partial class Program
 
             var defaults = await Page("/settings/defaults");
             foreach (var part in new[] { "data-settings-form=\"defaults\"", "data-endpoint=\"/api/settings/defaults\"", "data-provider-model=\"dm\"", "data-thinking-levels",
-                         "data-savebar", "data-defaults-reset", "data-model-unset=\"true\"", "Coming in a later milestone" })
+                         "data-savebar", "data-defaults-reset", "data-model-unset=\"true\"", "Not in this version" })
                 Check(defaults.Contains(part, StringComparison.Ordinal), "Defaults has " + part);
             var tools = await Page("/settings/tools");
             foreach (var part in new[] { "data-settings-form=\"tools\"", "data-endpoint=\"/api/settings/tools\"", "data-folder-browser", "name=\"approvalMode\"",
-                         "value=\"allowList\"", "data-allow-template", "data-confirm-mode", "Coming in a later milestone" })
+                         "value=\"allowList\"", "data-allow-template", "data-confirm-mode", "Not in this version", "data-session-grants", "data-session-grants-empty" })
                 Check(tools.Contains(part, StringComparison.Ordinal), "Tools has " + part);
             Check(Regex.IsMatch(tools, "name=\"approvalMode\" id=\"[^\"]+\" value=\"ask\" checked"), "ask is the default mode");
+            foreach (var (name, page) in new[] { ("Defaults", defaults), ("Tools", tools), ("Codex", codex), ("OpenAI", openai) })
+                Check(!page.Contains("later milestone", StringComparison.OrdinalIgnoreCase), name + " promises no later milestone");
+            Check(!Regex.IsMatch(tools, "data-session-grants-empty[^>]*hidden"), "no chat has a grant yet, and the card says so");
 
             foreach (var name in SettingsScripts)
             {

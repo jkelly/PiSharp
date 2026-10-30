@@ -34,6 +34,10 @@
 //                                              rows and records; deleted false (with failed) when a part could not go yet (it goes at the next
 //                                              start); 404 when there is no such run. Repeating it answers the same delete.
 // Every answer is Cache-Control: no-store and written with SettingsStore.JsonOptions. No answer carries a credential: accounts are ids.
+// W5 integration fix 1 (blind means blind): the run of an agent battle that has no vote yet (RunBlinds.Group, the Arena's battles) is left
+// out of GET /api/compare/agent, and every /api/compare/agent/{run}/... endpoint answers it 409 {error: {code: "blind", message, battle}}:
+// its status, events, diffs and keep preview name the models in column order, and its writes answer with that status. The battle page
+// answers waiting calls, budget Asks and Stop through /api/evals/arena/{id}/..., which calls the runner in process.
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -62,6 +66,7 @@ public static class AgentCompareEndpoints
         api.AddEndpointFilter(async (context, next) =>
         {
             context.HttpContext.Response.Headers.CacheControl = "no-store";
+            if (context.HttpContext.Request.RouteValues["run"] is string run && BlindError(context.HttpContext.RequestServices, run) is { } blind) return blind;
             return await next(context).ConfigureAwait(false);
         });
 
@@ -88,8 +93,14 @@ public static class AgentCompareEndpoints
             }, token).ConfigureAwait(false);
             return Json(inspection);
         }));
-        api.MapGet("", (int? limit, AgentCompareRunner runner) => RunAsync(() =>
-            Task.FromResult(Json(new JsonObject { ["items"] = new JsonArray([.. runner.Store.List(limit ?? 50).Select(run => (JsonNode)AgentCompareStatus.Summary(run))]) }))));
+        api.MapGet("", (int? limit, AgentCompareRunner runner, IServiceProvider services) => RunAsync(() =>
+        {
+            var hidden = Runs.RunBlinds.Of(services).Groups();
+            return Task.FromResult(Json(new JsonObject
+            {
+                ["items"] = new JsonArray([.. runner.Store.List(limit ?? 50).Where(run => !hidden.ContainsKey(run.Id)).Select(run => (JsonNode)AgentCompareStatus.Summary(run))]),
+            }));
+        }));
         api.MapGet("/{run}", (string run, AgentCompareRunner runner, IServiceProvider services, CancellationToken token) => RunAsync(async () =>
             Json(await AgentCompareStatus.ToJsonAsync(runner.Require(run), runner, services, token).ConfigureAwait(false))));
         api.MapGet("/{run}/events", (string run, HttpContext context, AgentCompareRunner runner, IServiceProvider services) =>
@@ -271,6 +282,16 @@ public static class AgentCompareEndpoints
     }
 
     private static JsonObject Required(JsonObject? body) => body ?? throw AgentCompareException.BadRequest("Send a JSON body.");
+
+    /// <summary>The 409 answer for run <paramref name="run"/> while an unvoted blind battle hides it, or null when none does.</summary>
+    public static IResult? BlindError(IServiceProvider services, string run)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        return Runs.RunBlinds.Of(services).Group(run) is { } battle
+            ? Json(new JsonObject { ["error"] = new JsonObject { ["code"] = Runs.RunBlinds.Code, ["message"] = Runs.RunBlinds.Message, ["battle"] = battle } },
+                StatusCodes.Status409Conflict)
+            : null;
+    }
 
     // The calls an approve-all names: [{slot, taskId}], at most 200; null when the body has none.
     private static List<AgentApprovalItem>? Items(JsonObject json) => json["items"] switch

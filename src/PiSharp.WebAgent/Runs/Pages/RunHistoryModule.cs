@@ -10,6 +10,8 @@
 //   POST /api/history/filters           {name, query} -> {filters}: saves (or replaces) a saved filter.
 //   POST /api/history/filters/manage    {filters: [{name, query}]} -> {filters}: replaces the list (Manage saved filters).
 // Writes are JSON POSTs (HostGuard: same origin, JSON only); every answer is no-store; errors are {error: {code, message}}.
+// W5 integration fix 1: the spec, HAR and JSON of a run that an unvoted blind round hides answer 409 {error: {code: "blind", message,
+// battle}} (RunBlinds), and the export leaves such runs out.
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -58,20 +60,22 @@ public static class RunHistoryModule
             var keep = body?["keepPinned"] is JsonValue value && value.TryGetValue<bool>(out var flag) && flag;
             return Json(new { deleted = store.Clear(keep), keepPinned = keep });
         }));
-        api.MapGet("/runs/{id}/spec", (string id, RunHistoryPages pages) => Answer(() =>
+        api.MapGet("/runs/{id}/spec", (string id, RunHistoryPages pages, IServiceProvider services) => Answer(() =>
         {
-            if (pages.Store.Get(id) is null) return NotFound(id);
+            if (pages.Store.Get(id) is not { } found) return NotFound(id);
+            if (Blind(services, found) is { } blind) return blind;
             return pages.RerunSpec(id) is { } spec ? Json(new JsonObject { ["spec"] = spec })
                 : Error(StatusCodes.Status400BadRequest, SpendErrors.Invalid, "This run did not store its request (a chat's call or an agent compare turn), so it cannot be sent again from here.");
         }));
-        api.MapGet("/runs/{id}/har", (string id, RunInspectorPages pages) => Answer(() =>
+        api.MapGet("/runs/{id}/har", (string id, RunInspectorPages pages, IServiceProvider services) => Answer(() =>
         {
             if (pages.Find(id) is not { } run) return NotFound(id);
+            if (Blind(services, run) is { } blind) return blind;
             return pages.Har(run) is { } har ? Results.File(System.Text.Encoding.UTF8.GetBytes(har.ToJsonString(Indented)), "application/json; charset=utf-8", run.Id + ".har")
                 : Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, "Raw payloads weren't stored for this run, so there is no HAR.");
         }));
-        api.MapGet("/runs/{id}/json", (string id, RunInspectorPages pages) => Answer(() => pages.Find(id) is { } run
-            ? Results.File(System.Text.Encoding.UTF8.GetBytes(pages.RunJson(run).ToJsonString(Indented)), "application/json; charset=utf-8", run.Id + ".json")
+        api.MapGet("/runs/{id}/json", (string id, RunInspectorPages pages, IServiceProvider services) => Answer(() => pages.Find(id) is { } run
+            ? Blind(services, run) ?? Results.File(System.Text.Encoding.UTF8.GetBytes(pages.RunJson(run).ToJsonString(Indented)), "application/json; charset=utf-8", run.Id + ".json")
             : NotFound(id)));
         api.MapPost("/filters", async (JsonObject? body, ISettingsStore settings, CancellationToken token) => await AnswerAsync(async () =>
         {
@@ -109,6 +113,11 @@ public static class RunHistoryModule
     private static IResult Json(object value, int status = StatusCodes.Status200OK) => Results.Json(value, SettingsStore.JsonOptions, statusCode: status);
 
     private static IResult NotFound(string id) => Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, $"There is no run {id}.");
+
+    /// <summary>The 409 answer for a run an unvoted blind round hides, or null when none hides it.</summary>
+    internal static IResult? Blind(IServiceProvider services, RunRecord run) => RunBlinds.Of(services).Hidden(run) is { } battle
+        ? Json(new JsonObject { ["error"] = new JsonObject { ["code"] = RunBlinds.Code, ["message"] = RunBlinds.Message, ["battle"] = battle } }, StatusCodes.Status409Conflict)
+        : null;
 
     private static IResult Error(int status, string code, string message) =>
         Json(new JsonObject { ["error"] = new JsonObject { ["code"] = code, ["message"] = message } }, status);

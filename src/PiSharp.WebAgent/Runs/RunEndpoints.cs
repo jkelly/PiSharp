@@ -16,6 +16,9 @@
 // A run started by POST belongs to the app, so it keeps going when the tab that started it closes; a tab reconnects with Last-Event-ID.
 // Every answer is Cache-Control: no-store (the stream: no-cache, no-transform) and written with SettingsStore.JsonOptions. No answer carries
 // a credential: accounts are ids, headers a run sends are never credentials, and raw payloads were redacted before they were stored.
+// W5 integration fix 1: the list leaves out the runs of a blind round that has no vote yet (its total and totals too), and such a run's
+// /api/runs/{id}, /raw and /events answer 409 {error: {code: "blind", message, battle}} (RunBlinds); cancel, pin and delete still work.
+// A refusal of a blind round (SpendAsync with blind: true) names no provider, model or account.
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -58,9 +61,9 @@ public static class RunEndpoints
             return Task.FromResult(engine.Capabilities(provider, model) is { } capabilities ? Json(capabilities)
                 : Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, $"There is no model {provider}/{model}."));
         }));
-        api.MapGet("", (HttpRequest request, RunStore store) => RunAsync(() =>
+        api.MapGet("", (HttpRequest request, RunStore store, IServiceProvider services) => RunAsync(() =>
         {
-            var query = Query(request);
+            var query = Query(request) with { HiddenGroups = [.. RunBlinds.Of(services).Groups().Keys] };
             var page = store.List(query);
             var answer = new JsonObject
             {
@@ -80,11 +83,11 @@ public static class RunEndpoints
             settings = services.GetService<ISettingsStore>()?.Get<RunHistorySettings>() ?? RunHistorySettings.CreateDefault(),
             rawRetentionDays = RunHistorySettings.RawRetentionDays,
         }))));
-        api.MapGet("/{id}", (string id, RunStore store, RunLive live) => RunAsync(() => Task.FromResult(store.Get(id) is { } run
-            ? Json(new { run, running = live.Find(id) is { Ended: false } })
+        api.MapGet("/{id}", (string id, RunStore store, RunLive live, IServiceProvider services) => RunAsync(() => Task.FromResult(store.Get(id) is { } run
+            ? Blind(services, run) ?? Json(new { run, running = live.Find(id) is { Ended: false } })
             : NotFound(id))));
-        api.MapGet("/{id}/raw", (string id, RunStore store) => RunAsync(() => Task.FromResult(store.Get(id) is { } run
-            ? Json(new { id, rawState = run.RawState, items = store.Raw(id) })
+        api.MapGet("/{id}/raw", (string id, RunStore store, IServiceProvider services) => RunAsync(() => Task.FromResult(store.Get(id) is { } run
+            ? Blind(services, run) ?? Json(new { id, rawState = run.RawState, items = store.Raw(id) })
             : NotFound(id))));
         api.MapGet("/{id}/events", (string id, HttpContext http, RunStore store, RunLive live) => EventsAsync(id, http, store, live));
         api.MapPost("/{id}/cancel", (string id, RunEngine engine, RunStore store) => RunAsync(() =>
@@ -187,9 +190,13 @@ public static class RunEndpoints
         return Json(new { posted = false, code = refusal.Code, message = refusal.Message, groupId = start.GroupId, spend = await SpendAsync(refusal, services).ConfigureAwait(false) });
     }
 
+    /// <summary>What a blind round's refusal says instead of the Spend Guard's own message (which names the model).</summary>
+    public const string BlindRefusal = "The Spend Guard stopped this blind round before anything was reserved or sent: one of its models is over a cap or has no price.";
+
     /// <summary>The confirm modal's answer for a refused run (the same shape as <c>/api/spend/confirm</c>): the <c>spend</c> of a
-    /// <c>{posted:false}</c> answer. Compare's and the Tool Bench's run endpoints answer with it too.</summary>
-    public static async Task<JsonObject> SpendAsync(RunRefusal refusal, IServiceProvider services)
+    /// <c>{posted:false}</c> answer. Compare's and the Tool Bench's run endpoints answer with it too. With <paramref name="blind"/> (a blind
+    /// round's refusal) the message and the modal name no provider, model or account.</summary>
+    public static async Task<JsonObject> SpendAsync(RunRefusal refusal, IServiceProvider services, bool blind = false)
     {
         ArgumentNullException.ThrowIfNull(refusal);
         ArgumentNullException.ThrowIfNull(services);
@@ -199,7 +206,7 @@ public static class RunEndpoints
         {
             ["verdict"] = JsonSerializer.SerializeToNode(decision.Verdict, SettingsStore.JsonOptions),
             ["code"] = refusal.Code,
-            ["message"] = refusal.Message,
+            ["message"] = blind ? BlindRefusal : refusal.Message,
             ["pane"] = null,
             ["canProceed"] = decision.Verdict == SpendVerdict.Ask,
             ["capOutputTokens"] = null,
@@ -215,13 +222,13 @@ public static class RunEndpoints
         if (services.GetService<SpendPages>() is not { } pages || decision.Causes.Count == 0) return answer;
         try
         {
-            var view = pages.ConfirmView(refusal.Call, decision);
+            var view = pages.ConfirmView(refusal.Call, decision, blind);
             // "Cap the output" is offered only when the run would hold that cap (RunModelOptions.OutputCapRefusal).
             if (view.CapOutputTokens is { } tokens && refusal.CapOutputRefusal?.Invoke(tokens) is { } why)
                 view = view with
                 {
                     CapOutputTokens = null,
-                    Fit = $"Capping the output is not offered for this request: {why}.",
+                    Fit = blind ? "Capping the output is not offered for this round: one of its models can't hold that cap." : $"Capping the output is not offered for this request: {why}.",
                     Others = view.Others?.Replace(" Capping the output also answers that Ask, for this request only.", "", StringComparison.Ordinal),
                 };
             answer["pane"] = view.Pane;
@@ -246,6 +253,12 @@ public static class RunEndpoints
         if (running is null && stored is null)
         {
             await NotFound(id).ExecuteAsync(http).ConfigureAwait(false);
+            return;
+        }
+        // A live run's row is in the store from its start (RunEngine records it before the live log opens to anyone).
+        if ((stored ?? store.Get(id)) is { } shown && Blind(http.RequestServices, shown) is { } blind)
+        {
+            await blind.ExecuteAsync(http).ConfigureAwait(false);
             return;
         }
         http.Response.StatusCode = StatusCodes.Status200OK;
@@ -353,6 +366,8 @@ public static class RunEndpoints
     private static IResult Json(object value, int status = StatusCodes.Status200OK) => Results.Json(value, SettingsStore.JsonOptions, statusCode: status);
 
     private static IResult NotFound(string id) => Error(StatusCodes.Status404NotFound, SpendErrors.NotFound, $"There is no run {id}.");
+
+    private static IResult? Blind(IServiceProvider services, RunRecord run) => RunHistoryModule.Blind(services, run);
 
     private static IResult Error(int status, string code, string message, JsonNode? refused = null)
     {

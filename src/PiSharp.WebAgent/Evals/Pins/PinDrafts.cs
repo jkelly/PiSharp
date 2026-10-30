@@ -172,7 +172,8 @@ public static class PinRules
     public static string? Refusal(RunRecord run)
     {
         ArgumentNullException.ThrowIfNull(run);
-        if (run.Kind == RunKind.Parent || run.Source == "agent-compare") return AgentLater;
+        // An agent battle's model calls are arena rows under their model's row (W5 integration fix 1).
+        if (run.Kind == RunKind.Parent || run.Source == "agent-compare" || (run.Source == "arena" && run.ParentId is not null)) return AgentLater;
         if (run.Status == RunStatus.Running) return "This run is still going. Pin it once it finishes.";
         if (run.Status != RunStatus.Completed)
             return $"This run ended without an answer to keep as the reference output (it {(run.Status == RunStatus.Error ? "failed" : run.Status == RunStatus.Aborted ? "was stopped" : "was interrupted")}).";

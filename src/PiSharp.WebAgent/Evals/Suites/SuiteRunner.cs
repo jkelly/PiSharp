@@ -6,10 +6,11 @@
 // One group reservation per suite run. Before anything is sent, the runner reserves the worst case of every call the run will make (each
 // answer, and each judge call) as one all-or-nothing Spend Guard group under the run's key ("hold-<run>-<n>" ops, source drift): "Spend
 // Guard reserved the worst case first. Results fill in as answers finish." When the guard refuses the group, nothing is sent and no run
-// is stored (a manual run answers with the confirm modal's spend refusal; a scheduled one records a skipped slot). The run engine reserves
-// each call itself as it sends it, so the runner releases a call's hold just before the engine reserves it, and a judge's holds just before
-// the answer is checked; the run's total reservation never grows past the group's. Leftover holds (a cancelled or failed run) are released
-// at the end, and after a crash at the next start (recovery). The suite-run cap is checked before reserving: a run whose worst case is
+// is stored (a manual run answers with the confirm modal's spend refusal; a scheduled one records a skipped slot). Each call is sent on its
+// own hold (W5 integration fix 1: RunEngine.StartReservedAsync for an answer, the judge's JudgeContext.Holds for a judgement), which
+// settles at the call's actual cost, so no other reservation can take the headroom between the hold and the call, and the ledger keeps
+// one row per call; the run's total reservation never grows past the group's. Leftover holds (a cancelled or failed run, a judgement
+// never sent) are released at the end, and after a crash at the next start (recovery). The suite-run cap is checked before reserving: a run whose worst case is
 // above it is refused, manual or scheduled (it never runs over the cap).
 //
 // Answers run four at a time; a result goes queued → running → done or error (cancelled when the run stops first). The account of each
@@ -379,14 +380,14 @@ public sealed class SuiteRunner : IAsyncDisposable
     private async Task AnswerAsync(Execution execution, WorkItem item, CancellationToken token)
     {
         var lease = execution.Group.Leases[item.Hold];
-        await lease.ReleaseAsync("Sent as its own call: the run engine reserves it.").ConfigureAwait(false);
         var result = Queued(execution.Run.Id, item);
         if (token.IsCancellationRequested) return;
         store.SaveResult(result with { Status = ResultStatus.Running });
         RunStart start;
         try
         {
-            start = await engine.StartAsync(item.Spec, execution.Spend, token).ConfigureAwait(false);
+            // Sent on its hold: the headroom stays reserved until the call settles it (the engine releases it on a refusal or an error).
+            start = await engine.StartReservedAsync(item.Spec, lease, execution.Spend, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -414,10 +415,10 @@ public sealed class SuiteRunner : IAsyncDisposable
                 catch (Exception error) when (error is not OutOfMemoryException) { log.LogDebug(error, "Call {Call} ended with an error.", callId); }
             }
         }
-        await ReleaseJudgeHoldsAsync(execution, item).ConfigureAwait(false);
         var record = runs.Get(callId);
         if (record is null)
         {
+            await ReleaseJudgeHoldsAsync(execution, item).ConfigureAwait(false);
             Save(execution, Failed(result with { CallRunId = callId }, "The call's record is missing."));
             return;
         }
@@ -445,6 +446,7 @@ public sealed class SuiteRunner : IAsyncDisposable
         };
         if (status == ResultStatus.Cancelled)
         {
+            await ReleaseJudgeHoldsAsync(execution, item).ConfigureAwait(false);
             Save(execution, finished);
             return;
         }
@@ -460,6 +462,7 @@ public sealed class SuiteRunner : IAsyncDisposable
                     GroupId = execution.Run.Id,
                     Spend = execution.Spend,
                     ParentRunId = callId,
+                    Holds = [.. item.JudgeHolds.Select(hold => execution.Group.Leases[hold])],
                 }, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -467,6 +470,8 @@ public sealed class SuiteRunner : IAsyncDisposable
                 results = NotJudged(await checks.RunAsync(item.Case, answer, null, CancellationToken.None).ConfigureAwait(false));
             }
         }
+        // The holds of judgements that were not sent (a failed or empty answer, a stop): a sent one settled its own.
+        await ReleaseJudgeHoldsAsync(execution, item).ConfigureAwait(false);
         long judgeMetered = 0, judgeList = 0;
         foreach (var check in results)
         {
@@ -543,7 +548,7 @@ public sealed class SuiteRunner : IAsyncDisposable
     private async Task ReleaseJudgeHoldsAsync(Execution execution, WorkItem item)
     {
         foreach (var hold in item.JudgeHolds)
-            await execution.Group.Leases[hold].ReleaseAsync("Sent as its own call: the judge reserves it.").ConfigureAwait(false);
+            await execution.Group.Leases[hold].ReleaseAsync("Not sent: the answer was not judged.").ConfigureAwait(false);
     }
 
     private async Task ReleaseHoldsAsync(string runId, CancellationToken cancellationToken)
@@ -561,6 +566,9 @@ public sealed class SuiteRunner : IAsyncDisposable
         }
         foreach (var row in rows.Where(row => row.Op.StartsWith(prefix, StringComparison.Ordinal)))
         {
+            // A hold its call was sent on (runs.db has the call under the hold's op) is that call's own row: a call cut off by the crash
+            // stays as the Spend Guard keeps any dropped stream (uncertain until the user resolves it), never released here.
+            if (runs.GetByOp(row.Op) is not null) continue;
             try
             {
                 if (row.State == ReservationState.Reserved)
@@ -604,7 +612,7 @@ public sealed class SuiteRunner : IAsyncDisposable
         Op = HoldPrefix + runId + "-" + index.ToString(System.Globalization.CultureInfo.InvariantCulture),
         InputBytes = inputBytes,
         MaxTokens = maxTokens,
-        Note = "Suite run hold: released as the call is sent.",
+        Note = "Suite run: reserved before the run started; the call is sent on it.",
     };
 
     private static SuiteResult Queued(string runId, WorkItem item) => new()

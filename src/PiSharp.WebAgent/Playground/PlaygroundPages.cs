@@ -81,7 +81,13 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         if (!string.IsNullOrWhiteSpace(runId))
         {
             run = services.GetService<RunStore>()?.Get(runId.Trim());
-            if (run is null) notice = $"There is no run {runId.Trim()}; it may have been deleted. The Playground opened on the default model.";
+            // W5 integration fix 1: a blind round's run would name its model before the vote (RunBlinds).
+            if (run is not null && RunBlinds.Of(services).Hidden(run) is not null)
+            {
+                run = null;
+                notice = "That run is part of a blind round that has no vote yet, so it isn't loaded here. Vote on the round first. The Playground opened on the default model.";
+            }
+            else if (run is null) notice = $"There is no run {runId.Trim()}; it may have been deleted. The Playground opened on the default model.";
             else
             {
                 draft = FromRun(run);
@@ -126,14 +132,14 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
     {
         ArgumentNullException.ThrowIfNull(id);
         var run = services.GetService<RunStore>()?.Get(id);
-        return run is null ? null : Output(run, FromRun(run));
+        return run is null || RunBlinds.Of(services).Hidden(run) is not null ? null : Output(run, FromRun(run));
     }
 
     /// <summary>The error details of run <paramref name="id"/>, or null when there is no such run.</summary>
     public ErrorDetailsView? ErrorDetails(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
-        return services.GetService<RunStore>()?.Get(id) is { } run ? ErrorDetails(run) : null;
+        return services.GetService<RunStore>()?.Get(id) is { } run && RunBlinds.Of(services).Hidden(run) is null ? ErrorDetails(run) : null;
     }
 
     /// <summary>The estimate and input tokens of <paramref name="spec"/>; nothing is reserved or sent.</summary>

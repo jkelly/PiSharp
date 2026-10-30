@@ -61,8 +61,8 @@ label.is-unsupported { text-decoration: line-through; opacity: .6; }
 .folder-list { max-height: 320px; overflow-y: auto; }
 .folder-list .list-group-item { color: var(--ps-text); }
 
-/* A section a later milestone builds. */
-.later-milestone .ps-panel { border-style: dashed; }
+/* A mockup section this version does not build (_NotInThisVersion). */
+.not-in-version .ps-panel { border-style: dashed; }
 
 /* The device code wraps on a phone instead of widening the modal. */
 @media (max-width: 575.98px) {

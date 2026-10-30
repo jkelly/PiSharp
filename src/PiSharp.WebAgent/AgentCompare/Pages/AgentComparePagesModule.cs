@@ -18,6 +18,8 @@
 // page on another site can't send without a CORS preflight this app never answers. Every fragment also refuses a request the browser
 // marks as coming from another site or origin (Sec-Fetch-Site other than same-origin or none: 403), so an <img> or a no-cors fetch from a
 // website can't make the app read a run's workspaces or diffs either.
+// W5 integration fix 1 (blind means blind): a run of an agent battle that has no vote yet answers every /compare/agent/runs/{run}/...
+// fragment with 409 and the blind notice (_ArenaBlindNotice, which links to the battle): those fragments name the models in column order.
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PiSharp.Web.Common;
 using PiSharp.WebAgent.AgentCompare.Runner;
@@ -59,6 +61,11 @@ public static class AgentComparePagesModule
             var http = context.HttpContext;
             http.Response.Headers.CacheControl = "no-store";
             if (!SameOrigin(http.Request)) return Results.Text("Cross-site requests are refused.", statusCode: StatusCodes.Status403Forbidden);
+            if (http.Request.RouteValues["run"] is string run && Runs.RunBlinds.Of(http.RequestServices).Group(run) is { } battle)
+            {
+                var html = await http.RequestServices.GetRequiredService<FragmentRenderer>().RenderAsync(BlindPartial, BattleId(battle)).ConfigureAwait(false);
+                return Results.Content(html, "text/html; charset=utf-8", statusCode: StatusCodes.Status409Conflict);
+            }
             return await next(context).ConfigureAwait(false);
         });
 
@@ -118,6 +125,12 @@ public static class AgentComparePagesModule
         var site = request.Headers["Sec-Fetch-Site"].ToString().Trim();
         return site.Length == 0 || site.Equals("same-origin", StringComparison.OrdinalIgnoreCase) || site.Equals("none", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>The notice a blind battle's run shows instead of its views (model: the battle's id).</summary>
+    public const string BlindPartial = "/Views/Compare/_ArenaBlindNotice.cshtml";
+
+    // The battle's id from its page's address (/compare/arena/{id}).
+    private static string BattleId(string page) => Uri.UnescapeDataString(page[(page.LastIndexOf('/') + 1)..]);
 
     private static bool ValidSlot(string? slot) => slot is not null && AgentCompareRunner.Slots.Contains(slot.Trim().ToLowerInvariant());
 

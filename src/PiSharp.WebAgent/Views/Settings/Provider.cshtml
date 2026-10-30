@@ -1,7 +1,7 @@
 @* Decision 0011 (run W2, WU9): one detail view for every provider, mapping the mockups' settings-provider-openai and
    settings-provider-codex (route GET /settings/providers/{id}): _ProviderHeader; the expired warning (_ExpiredAccountCard) when the active
    account stopped working; the call to action (_ProviderConnect) while it has no account; its accounts (_ProviderAccounts with an
-   _AccountCard each); its models (_ProviderModels); the sections later milestones build; and _ProviderDangerZone. The credential modals
+   _AccountCard each); its models (_ProviderModels); the sections this version does not build (_NotInThisVersion); and _ProviderDangerZone. The credential modals
    come from _CredentialModals. W3 fix: a custom provider of models.json is edited in Settings › Custom providers (its key too), so its page
    says so and links there instead of offering the generic key modal, its accounts or the danger zone. Model: ProviderPage. *@
 @model ProviderPage
@@ -51,7 +51,7 @@
 
   @if (provider.Id == SignInFlows.CodexProvider)
   {
-    <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Usage limits", "Your ChatGPT plan allowance per account, refreshed from the Codex backend.", "usage-limits")' />
+    <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Usage limits", "This version does not read your ChatGPT plan allowance from the Codex backend. History › Spend lists the calls this app sent and what they cost.", "usage-limits")' />
   }
 
   @if (provider.Models.Count > 0)
@@ -68,11 +68,11 @@
 
   @if (provider.Id == SignInFlows.CodexProvider)
   {
-    <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Request defaults for Codex", "Text verbosity, reasoning summary, default thinking level and service tier for Codex requests.", "request-defaults")' />
+    <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Request defaults for Codex", "This version has no Codex defaults for text verbosity, reasoning summary or service tier. The default thinking level is in Settings › Defaults, and a chat or run picks its own.", "request-defaults")' />
   }
   else if (provider.TakesApiKey && !provider.NoCredentials)
   {
-    <partial name="/Views/Settings/_LaterMilestone.cshtml" model='new LaterMilestone("Connection settings", "Organization, project and custom headers for every request. A base URL override is set per key today: Replace key › Advanced.", "connection")' />
+    <partial name="/Views/Settings/_NotInThisVersion.cshtml" model='new NotInThisVersion("Connection settings", "This version sends no organization, project or custom headers. A base URL override is set per key: Replace key › Advanced.", "connection")' />
   }
 
   @if (!provider.NoCredentials && provider.Custom is null)

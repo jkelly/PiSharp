@@ -8,6 +8,11 @@
 // anyway", shows them as they come), ready when voting opens, voted once its one vote is saved, and void when a contestant failed or the
 // user stopped it (a void battle is revealed and never counted). Nothing here returns a contestant's name to a page before the vote: the
 // pages read ArenaBattle.ToBlind and the counts of Progress; the controller and endpoints decide what to show by the status.
+// W5 integration fix 1: the service is the Runs area's IRunBlindSource (HiddenGroups: the groups of the battles held or ready, which History,
+// /api/runs, the inspector and agent compare's endpoints hide until the vote); an agent battle's run is recorded under source arena with
+// the Arena's title (AgentCompareCreateRequest.Source and Title); and a saved vote pins its contestants' runs in runs.db (RunStore.Pin; an
+// agent battle's top row, which keeps its models and calls), so runs.db's retention never takes the leaderboard's cost and speed medians
+// (ArenaMetrics) or the reveal's inspector links from a counted vote.
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -50,7 +55,7 @@ public sealed record ArenaProgress(int Finished, int Total, IReadOnlyList<ArenaA
 public sealed record ArenaVoteResult(ArenaBattle Battle, ArenaVote Vote, bool Saved);
 
 /// <summary>Blind battles: create, start, follow, stop, vote.</summary>
-public sealed class ArenaService : IDisposable
+public sealed class ArenaService : IDisposable, IRunBlindSource
 {
     /// <summary>The tag proposed for a request battle when no vote has used one yet.</summary>
     public const string DefaultTag = "general";
@@ -188,6 +193,8 @@ public sealed class ArenaService : IDisposable
         {
             RequestId = "arena-" + requestId,
             Models = [.. Enumerable.Range(0, asked.Count).Select(position => request.Models[order[position]])],
+            Source = SpendSource.Arena,
+            Title = RunTitle,
         }, cancellationToken).ConfigureAwait(false);
         if (store.ByGroup(run.Id).FirstOrDefault() is { } existing) return Refresh(existing);
         var contestants = new List<ArenaContestant>();
@@ -245,6 +252,18 @@ public sealed class ArenaService : IDisposable
         if (string.IsNullOrWhiteSpace(runId)) return null;
         return store.ByGroup(runId.Trim()).Where(battle => battle.Mode == ArenaMode.Agent).Select(Refresh)
             .FirstOrDefault(battle => battle.Status is ArenaStatus.Held or ArenaStatus.Ready);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>The battles held (brought up to date first: one whose answers ended is ready, or void when one failed) or ready; a voted or
+    /// void battle hides nothing.</remarks>
+    public IReadOnlyDictionary<string, string> HiddenGroups()
+    {
+        var hidden = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var battle in store.WithStatus(ArenaStatus.Held).Select(Refresh).Concat(store.WithStatus(ArenaStatus.Ready)))
+            if (battle.Status is ArenaStatus.Held or ArenaStatus.Ready && battle.GroupId is { Length: > 0 } group)
+                hidden[group] = ArenaEndpoints.PageUrl(battle.Id);
+        return hidden;
     }
 
     /// <summary>The tag a new battle of <paramref name="mode"/> proposes: a request battle the one the last request vote used, else
@@ -352,6 +371,7 @@ public sealed class ArenaService : IDisposable
             Created = clock.GetUtcNow(),
         });
         if (saved) Raise(voted.Id);
+        Keep(voted);
         return new ArenaVoteResult(voted, vote, saved);
     }
 
@@ -389,6 +409,23 @@ public sealed class ArenaService : IDisposable
     }
 
     // ---- internals ----------------------------------------------------------------------------------------------------------------
+
+    // A counted vote keeps its runs: each request answer's row, or an agent battle's top row (a pin keeps its models and their calls).
+    // Pinning again is harmless, so a repeated vote pins what an earlier attempt may have missed; a run already gone stays gone.
+    private void Keep(ArenaBattle battle)
+    {
+        if (runs is null) return;
+        List<string> ids = battle.Mode == ArenaMode.Agent ? [.. battle.GroupId is { } group ? [group] : Array.Empty<string>()]
+            : [.. battle.Contestants.Select(contestant => contestant.RunId).OfType<string>()];
+        foreach (var id in ids)
+        {
+            try { runs.Pin(id, true); }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                services.GetService<ILoggerFactory>()?.CreateLogger<ArenaService>().LogWarning(error, "Run {Run} of battle {Battle} could not be pinned.", id, battle.Id);
+            }
+        }
+    }
 
     private List<RunSpec> Specs(CompareDraft draft)
     {

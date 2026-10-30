@@ -1,0 +1,31 @@
+@* Decision 0011 (run W5, integration fix 1): GET /runs/{id} for a run that a blind round with no vote yet hides (RunBlinds): its row would
+   name the round's models in column order, so the inspector says why it is hidden and links to the battle, where the vote reveals them.
+   Model: RunBlindView. *@
+@using PiSharp.WebAgent.Runs
+@model RunBlindView
+@{
+    ViewData["Title"] = "Blind round";
+    ViewData[ShellViewData.Nav] = ShellNav.History;
+    ViewData[ShellViewData.Page] = "inspector";
+}
+@section TopbarStart
+{
+  <nav class="app-breadcrumb" aria-label="Breadcrumb">
+    <a href="/history">History</a>
+    <span aria-hidden="true">›</span>
+    <h1 class="app-title current fs-7 mb-0">Blind round</h1>
+  </nav>
+}
+<div class="page">
+  <div class="ps-card">
+    <div class="empty-state py-5" data-run-blind>
+      <div class="empty-icon"><i class="bi bi-eye-slash" aria-hidden="true"></i></div>
+      <h2 class="h5 mb-1">This run is part of a blind round</h2>
+      <p class="fs-7 text-ps-faint mb-3">@RunBlinds.Message</p>
+      <div class="d-flex flex-wrap justify-content-center gap-2">
+        <a class="btn btn-sm btn-primary" href="@Model.Battle"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Open the blind round</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/history"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Back to History</a>
+      </div>
+    </div>
+  </div>
+</div>

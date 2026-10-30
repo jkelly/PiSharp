@@ -441,7 +441,8 @@ internal static partial class Program
             Equal(200, tools.Status, "Settings › Tools");
             Check(tools.Text.Contains("data-agent-compare-defaults", StringComparison.Ordinal) && tools.Text.Contains("id=\"agent-compare\"", StringComparison.Ordinal), "the section");
             Check(tools.Text.Contains("/js/compare-agent-defaults.js", StringComparison.Ordinal) && !tools.Text.Contains("<script>", StringComparison.Ordinal), "its module, no inline script");
-            Check(tools.Text.Contains("Coming in a later milestone", StringComparison.Ordinal), "built-in tools are still later");
+            Check(tools.Text.Contains("Not in this version", StringComparison.Ordinal) && tools.Text.Contains("id=\"builtin-tools\"", StringComparison.Ordinal),
+                "built-in tools are not in this version (W5 integration fix 1)");
             NoRazorText(tools.Text, "Settings › Tools");
             Check(Regex.IsMatch(tools.Text, "data-ac-approval-pane=\"auto\" hidden"), "Ask is shown, Auto's text waits");
             Check(Regex.IsMatch(tools.Text, "data-ac-approval-pane=\"ask\">"), "Ask's text");

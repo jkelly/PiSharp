@@ -148,10 +148,10 @@ public sealed partial class RunHistoryPages
         };
     }
 
-    private static RunTotalsView Totals(WebAgentDb db, RunHistoryFilter filter, DateTimeOffset now, long totalAll)
+    private static RunTotalsView Totals(WebAgentDb db, RunHistoryFilter filter, DateTimeOffset now, long totalAll, IReadOnlyCollection<string> hidden)
     {
         var filtered = filter.Active;
-        var (where, parameters) = RootWhere(filter, filtered ? null : now.AddDays(-30));
+        var (where, parameters) = RootWhere(filter, filtered ? null : now.AddDays(-30), hidden);
         var calls = $"""
             WITH roots AS (SELECT r.id FROM runs r{where}),
             calls AS (SELECT c.* FROM runs c WHERE c.kind = 'call' AND (c.id IN (SELECT id FROM roots) OR c.parent_id IN (SELECT id FROM roots)

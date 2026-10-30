@@ -167,6 +167,8 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         if (systemPrompt is not null && (systemPrompt.Length > MaxSystemPromptLength || systemPrompt.Contains('\0')))
             throw AgentCompareException.BadRequest($"A system prompt is at most {MaxSystemPromptLength:N0} characters.");
         if (request.Models is not { Count: >= 1 and <= MaxModels }) throw AgentCompareException.BadRequest($"Compare 1 to {MaxModels} models.");
+        if (request.Source is not (SpendSource.AgentCompare or SpendSource.Arena)) throw AgentCompareException.BadRequest("An agent compare run is recorded as agent compare or arena.");
+        var title = string.IsNullOrWhiteSpace(request.Title) ? null : ChatDisplay.Cut(request.Title.Trim().ReplaceLineEndings(" "), 100);
         var defaults = settings.Get<AgentCompareSettings>();
         var project = Project(request.ProjectPath);
         var isolation = request.Isolation ?? defaults.Isolation;
@@ -217,7 +219,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         var instructions = Instructions(check, systemPrompt);
         var models = new List<AgentCompareModelSpec>();
         for (var index = 0; index < request.Models.Count; index++)
-            models.Add(await ModelAsync(request.Models[index], Slots[index], task, instructions, cancellationToken).ConfigureAwait(false));
+            models.Add(await ModelAsync(request.Models[index], Slots[index], task, instructions, request.Source, cancellationToken).ConfigureAwait(false));
         if (request.CapMicros is { } total)
         {
             var metered = models.Count(model => model.ShareMicros is not null);
@@ -253,6 +255,8 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 SystemPrompt = systemPrompt,
                 Instructions = instructions,
                 Models = models,
+                Source = request.Source,
+                Title = title,
             },
             Order = order,
             Created = now,
@@ -700,7 +704,8 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
         await AbortQuietlyAsync(session, token).ConfigureAwait(false);
     }
 
-    private async Task<AgentCompareModelSpec> ModelAsync(AgentCompareModelRequest request, string slot, string task, string instructions, CancellationToken token)
+    private async Task<AgentCompareModelSpec> ModelAsync(AgentCompareModelRequest request, string slot, string task, string instructions, SpendSource source,
+        CancellationToken token)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.Provider) || string.IsNullOrWhiteSpace(request.Model))
             throw AgentCompareException.BadRequest("Name each model's provider and model.");
@@ -726,7 +731,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                     Provider = provider.Id,
                     Model = model.Id,
                     Account = account?.Id,
-                    Source = SpendSource.AgentCompare,
+                    Source = source,
                     InputBytes = Encoding.UTF8.GetByteCount(task) + Encoding.UTF8.GetByteCount(instructions),
                 }, token).ConfigureAwait(false);
                 billing = decision.Estimate.Billing;
@@ -796,11 +801,11 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 Id = run.Id,
                 Op = "agent-compare:" + run.Id,
                 Kind = RunKind.Parent,
-                Source = SpendSource.AgentCompare.Wire(),
+                Source = run.Spec.Source.Wire(),
                 Status = RunStatus.Running,
                 Provider = "",
                 Model = "",
-                Title = ChatDisplay.Cut(run.Spec.Task.ReplaceLineEndings(" "), 100),
+                Title = run.Spec.Title ?? ChatDisplay.Cut(run.Spec.Task.ReplaceLineEndings(" "), 100),
                 Options = Options(run),
                 Created = run.Created,
                 Started = run.Started ?? run.Created,
@@ -824,7 +829,7 @@ public sealed partial class AgentCompareRunner(AgentCompareStore store, AgentCom
                 Id = key,
                 Op = "agent-compare:" + key,
                 Kind = RunKind.Parent,
-                Source = SpendSource.AgentCompare.Wire(),
+                Source = run.Spec.Source.Wire(),
                 Status = RunStatus.Running,
                 Provider = spec.Provider,
                 Model = spec.Model,

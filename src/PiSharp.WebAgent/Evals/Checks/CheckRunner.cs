@@ -45,6 +45,10 @@ public sealed record JudgeContext
     /// <summary>The answer's runs.db row, or null: the judge run is recorded as its child (<c>parentId</c>), so History and the Run inspector
     /// show a judgement under the answer it judged, and a judge run is told apart from the target's answers of the same group.</summary>
     public string? ParentRunId { get; init; }
+
+    /// <summary>The suite run's holds for this answer's judgements, one per judge check in the case's order (W5 integration fix 1): each
+    /// judgement is sent on its hold (RunEngine.StartReservedAsync) instead of a reservation of its own. Null or short: reserved as usual.</summary>
+    public IReadOnlyList<GuardedLease>? Holds { get; init; }
 }
 
 /// <summary>Runs a test case's checks on an answer, and checks checks before they are saved.</summary>
@@ -116,19 +120,23 @@ public sealed class CheckRunner
         var results = new CheckResult?[checks.Count];
         for (var index = 0; index < checks.Count; index++)
             if (checks[index].Kind != CheckKind.Judge) results[index] = Evaluate(checks[index] with { Id = IdOf(checks[index], index) }, answer);
+        var judged = 0;
         for (var index = 0; index < checks.Count; index++)
         {
             if (checks[index].Kind != CheckKind.Judge) continue;
             cancellationToken.ThrowIfCancellationRequested();
             var check = checks[index];
             var id = IdOf(check, index);
+            // The suite run's hold for this judgement: holds follow JudgeChecks (the judge checks that name a judge), in order.
+            var hold = check.Judge is not null && context?.Holds is { } holds && judged < holds.Count ? holds[judged] : null;
+            if (check.Judge is not null) judged++;
             results[index] = context is null
                 ? new CheckResult(id, CheckKind.Judge, CheckVerdict.Error, "An LLM judge runs only in a suite run.")
                 : answer.Error is not null
                     ? new CheckResult(id, CheckKind.Judge, CheckVerdict.Error, "Not judged: the call failed, so there is no answer to judge.")
                     : answer.Text.Trim().Length == 0 && answer.ToolCalls.Count == 0
                         ? new CheckResult(id, CheckKind.Judge, CheckVerdict.Failed, "Not judged: the answer is empty.")
-                        : await judge.ScoreAsync(check with { Id = id }, testCase, answer, context, cancellationToken).ConfigureAwait(false);
+                        : await judge.ScoreAsync(check with { Id = id }, testCase, answer, context with { Holds = null }, cancellationToken, hold).ConfigureAwait(false);
         }
         return [.. results.Select(result => result!)];
     }
