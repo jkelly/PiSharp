@@ -1,5 +1,5 @@
 @* Decision 0011 (run W3, S4): the mockups' _HistoryTabs: Runs · Spend, the same markup on History and History › Spend, the active link
-   differs. Runs links /history, which W4 builds (until then its "later milestone" page). Model: string, the active tab (runs or spend). *@
+   differs. Runs links /history (W4, R3: RunsController's History › Runs). Model: string, the active tab (runs or spend). *@
 @model string
 <nav class="nav nav-tabs section-tabs" aria-label="History views">
   <a class="@("nav-link" + (Model == "runs" ? " active" : ""))" aria-current="@(Model == "runs" ? "page" : null)" href="/history">Runs</a>

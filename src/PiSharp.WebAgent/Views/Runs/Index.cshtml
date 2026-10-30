@@ -1,0 +1,69 @@
+@* Decision 0011 (run W4, R3): History › Runs (GET /history), after the mockups' history.html, states default, selected (rows checked:
+   _BulkActionBar), filtered (active filter chips, "N of M runs") and empty (_RunsEmpty): the header with Export (the runs matching the
+   filters as CSV, JSON or JSON with raw payloads) and Clear history… (_ClearHistoryModal), _HistoryTabs, _RunTotals, _RunFilters with the
+   chips, _BulkActionBar, _RunTable (an agent compare run is one row that expands to its models) and _Pagination. Row actions: Inspect
+   (/runs/{id}), Re-run (the stored request through /api/runs, the Spend Guard asking when it would), Load into playground, Pin, Delete (a
+   confirm); a chat's call opens its chat instead. "Pin as test" waits for W5. history.js runs the page. Model: RunHistoryPage. *@
+@model RunHistoryPage
+@{
+    ViewData["Title"] = "History";
+    ViewData[ShellViewData.Nav] = ShellNav.History;
+    ViewData[ShellViewData.Page] = "history";
+    var query = Model.Filter.QueryString(paging: false);
+    string Export(string format) => "/api/history/export?format=" + format + (query.Length > 0 ? "&" + query.TrimStart('?') : "");
+}
+@section Styles { <link href="~/css/history.css" rel="stylesheet" asp-append-version="true" /> }
+@section TopbarStart { <h1 class="app-title">History</h1> }
+@section Modals
+{
+  <partial name="/Views/Runs/_ClearHistoryModal.cshtml" model="Model" />
+  <partial name="/Views/Runs/_SaveRunFilterModal.cshtml" model="Model" />
+  <partial name="/Views/Runs/_ManageRunFiltersModal.cshtml" model="Model" />
+  <partial name="/Views/Shared/_SpendConfirmModal.cshtml" model="null" />
+}
+@section Scripts { <script type="module" src="~/js/history.js" asp-append-version="true"></script> }
+<div class="page" data-run-history data-state="@(Model.Empty ? "empty" : Model.Filter.Active ? "filtered" : "default")">
+  <div class="page-header">
+    <div class="me-auto">
+      <div class="ps-eyebrow">Records</div>
+      <h2>History</h2>
+      <p>Every model call from Chat, Playground, Compare and Tool Bench, with tokens, cost, latency and the raw request and response. An agent compare run is one row; each model's turns are in its own row. Stored in <span class="ps-mono">runs.db</span>.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      @if (Model.Empty)
+      {
+        <button class="btn btn-outline-secondary" type="button" disabled><i class="bi bi-download me-1" aria-hidden="true"></i>Export</button>
+        <button class="btn btn-outline-danger" type="button" disabled><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Clear history…</button>
+      }
+      else
+      {
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-download me-1" aria-hidden="true"></i>Export</button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><h6 class="dropdown-header">@(Model.Filter.Active ? "Current filters" : "All runs")</h6></li>
+            <li><a class="dropdown-item" href="@Export("csv")" download data-run-export="CSV"><i class="bi bi-filetype-csv me-2" aria-hidden="true"></i>CSV</a></li>
+            <li><a class="dropdown-item" href="@Export("json")" download data-run-export="JSON"><i class="bi bi-filetype-json me-2" aria-hidden="true"></i>JSON</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="@Export("json-raw")" download data-run-export="JSON with raw payloads" title="With each run's stored stream events and raw payloads (credentials were redacted before they were stored)"><i class="bi bi-file-earmark-zip me-2" aria-hidden="true"></i>JSON with raw payloads</a></li>
+          </ul>
+        </div>
+        <button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#modal-clear-history"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Clear history…</button>
+      }
+    </div>
+  </div>
+
+  <partial name="/Views/Runs/_HistoryTabs.cshtml" model='"runs"' />
+  <partial name="/Views/Runs/_RunTotals.cshtml" model="Model.Totals" />
+
+  @if (Model.Empty)
+  {
+    <partial name="/Views/Runs/_RunsEmpty.cshtml" model="Model" />
+  }
+  else
+  {
+    <partial name="/Views/Runs/_RunFilters.cshtml" model="Model" />
+    <partial name="/Views/Runs/_BulkActionBar.cshtml" model="Model" />
+    <partial name="/Views/Runs/_RunTable.cshtml" model="Model" />
+    <partial name="/Views/Runs/_Pagination.cshtml" model="Model" />
+  }
+</div>

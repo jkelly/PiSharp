@@ -50,6 +50,8 @@ PiSharp.WebAgent.Playground.PlaygroundModule.AddPlaygroundArea(builder.Services,
 PiSharp.WebAgent.Compare.CompareModule.AddCompareArea(builder.Services, options);
 // Settings › Data & storage (run W4, R9): after the areas it reports on; locations, retention, workspaces, export and import, danger zone.
 PiSharp.WebAgent.DataStorage.DataStorageModule.AddDataStorageArea(builder.Services, options, builder.Configuration);
+// History and the Run inspector (run W4, R3): GET /history, GET /runs/{id} and /api/history (export, clear, re-run, downloads, saved filters).
+PiSharp.WebAgent.Runs.RunHistoryModule.AddRunHistoryArea(builder.Services, options);
 
 var app = builder.Build();
 app.UseWebAgentCore();
@@ -66,6 +68,7 @@ PiSharp.WebAgent.AgentCompare.Runner.AgentCompareModule.MapAgentCompareRunner(ap
 PiSharp.WebAgent.Playground.PlaygroundModule.MapPlaygroundArea(app);
 PiSharp.WebAgent.Compare.CompareModule.MapCompareArea(app);
 PiSharp.WebAgent.DataStorage.DataStorageModule.MapDataStorageArea(app);
+PiSharp.WebAgent.Runs.RunHistoryModule.MapRunHistoryArea(app);
 app.MapWebAgentCore();
 app.Run();
 return 0;

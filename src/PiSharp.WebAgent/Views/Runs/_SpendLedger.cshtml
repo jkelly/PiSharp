@@ -1,7 +1,7 @@
 @* Decision 0011 (run W3, S4): the mockups' _SpendLedger and _Pagination: one row per provider request, newest first: when (UTC), the
    source, provider/model with the account (masked) and its billing, the worst case reserved, the actual cost (≈ list for a subscription,
    free, or price unknown), the status (settled, estimate, uncertain with Resolve…, released, reserved while running) with its note, and
-   Open chat for a chat's rows. Titles explain each figure from the row's own tokens and prices. Then "Showing 1–25 of N", rows per page
+   Open chat for a chat's rows (W4, R3: Inspect run, /runs/{id}, for Playground, Compare, Tool Bench and agent compare rows). Titles explain each figure from the row's own tokens and prices. Then "Showing 1–25 of N", rows per page
    (25, 50, 100) and the pages. Model: SpendHistoryPage. *@
 @using System.Globalization
 @model SpendHistoryPage
@@ -80,6 +80,10 @@ else
               @if (row.ChatHref is not null)
               {
                 <a class="btn btn-icon" href="@row.ChatHref" title="Open chat" aria-label="Open chat"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+              }
+              else if (RunHistoryText.LedgerRunHref(row.Row) is { } runHref)
+              {
+                <a class="btn btn-icon" href="@runHref" title="Inspect run" aria-label="Inspect the run of @row.Op" data-ledger-run><i class="bi bi-braces" aria-hidden="true"></i></a>
               }
             </td>
           </tr>

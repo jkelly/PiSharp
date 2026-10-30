@@ -1,0 +1,15 @@
+@* Decision 0011 (run W4, R3): the mockups' _RunsEmpty, when runs.db holds no run: Open Playground, Start a chat, and where runs.db is with
+   its retention (Settings › Data changes it). Model: RunHistoryPage. *@
+@model RunHistoryPage
+<div class="ps-card" data-runs-empty>
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></div>
+    <h3 class="ps-heading fs-2 text-body mb-2">No runs <em>yet</em></h3>
+    <p class="fs-7 mx-auto mb-4 runs-empty-text">Every model call from Chat, Playground, Compare and Tool Bench is recorded here with its tokens, cost, latency and raw request and response. Send something to get started.</p>
+    <div class="d-flex flex-wrap justify-content-center gap-2">
+      <a class="btn btn-primary" href="/playground"><i class="bi bi-sliders2 me-1" aria-hidden="true"></i>Open Playground</a>
+      <a class="btn btn-outline-secondary" href="/chat/new"><i class="bi bi-chat-square-text me-1" aria-hidden="true"></i>Start a chat</a>
+    </div>
+    <div class="fs-8 ps-mono text-ps-faint mt-4 text-break">@Model.DbPath · @Model.RetentionText · <a href="/settings/data">change</a></div>
+  </div>
+</div>

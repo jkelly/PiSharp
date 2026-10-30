@@ -1,0 +1,87 @@
+@* Decision 0011 (run W4, R3): the mockups' _RunHeader: the run id with Copy, chips for the stop reason (or outcome), the source,
+   provider/model and the billing with the account (named as the Spend pages name it, never a key); Re-run (the stored request through
+   /api/runs; the Spend Guard asks when it would), Load into playground, Download (HAR when raw payloads were stored, Run JSON), Delete (a
+   confirm), and ⋯ View code. A chat's call has no stored request: Open chat instead. Then Started, API, Thinking and Session, and the user
+   prompt. Model: RunInspectorView. *@
+@model RunInspectorView
+@{
+    var run = Model.Run;
+    var dot = run.Status switch { RunStatus.Running => "live", RunStatus.Completed => "ok", RunStatus.Error => "err", _ => "idle" };
+}
+<section class="ps-card p-3 p-md-4 mb-3" aria-label="Run summary" data-run-header>
+  <div class="d-flex flex-wrap align-items-start gap-3">
+    <div class="flex-grow-1 run-header-main">
+      <div class="ps-eyebrow mb-1">@(run.Kind == RunKind.Parent ? "Grouped run" : "Run")</div>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <h2 class="h4 ps-mono mb-0 text-break">@run.Id</h2>
+        <button class="btn btn-icon" type="button" data-copy="@run.Id" title="Copy run id" aria-label="Copy run id"><i class="bi bi-copy fs-8" aria-hidden="true"></i></button>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="ps-chip" data-tone="@(Model.Stop.Tone == "outline" && run.Status == RunStatus.Completed ? "ok" : Model.Stop.Tone)" title="stopReason" data-run-stop>@if (Model.Stop.Icon is not null) {<i class="@("bi " + Model.Stop.Icon)" aria-hidden="true"></i>}@Model.Stop.Text@if (Model.State == "error" && RunHistoryText.HttpStatus(run.Error) is { } code) {<text> · @code</text>}</span>
+        <span class="ps-chip" data-tone="outline"><i class="@("bi " + Model.SourceIcon)" aria-hidden="true"></i>@Model.SourceLabel</span>
+        @if (run.Provider.Length > 0)
+        {
+          <span class="ps-chip"><span class="@("status-dot " + dot)" aria-hidden="true"></span>@(run.Provider)/@run.Model</span>
+        }
+        @if (Model.BillingText is not null || Model.AccountText is not null)
+        {
+          <span class="ps-chip" data-tone="accent">@string.Join(" · ", new[] { Model.BillingText, Model.AccountText }.Where(part => !string.IsNullOrEmpty(part)))</span>
+        }
+        @if (run.Pinned)
+        {
+          <span class="ps-chip" data-tone="outline" title="Pinned runs never expire"><i class="bi bi-pin-angle-fill" aria-hidden="true"></i>pinned</span>
+        }
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      @if (Model.Replayable)
+      {
+        <button class="btn btn-sm btn-primary" type="button" data-run-rerun="@run.Id"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Re-run</button>
+        <a class="btn btn-sm btn-outline-secondary" href="@Model.PlaygroundHref"><i class="bi bi-sliders2 me-1" aria-hidden="true"></i>Load into playground</a>
+      }
+      else if (Model.SessionHref is not null)
+      {
+        <a class="btn btn-sm btn-outline-secondary" href="@Model.SessionHref"><i class="bi bi-chat-square-text me-1" aria-hidden="true"></i>Open chat</a>
+      }
+      @if (Model.ParentHref is not null)
+      {
+        <a class="btn btn-sm btn-outline-secondary" href="@Model.ParentHref"><i class="bi bi-diagram-2 me-1" aria-hidden="true"></i>Open parent run</a>
+      }
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-download me-1" aria-hidden="true"></i>Download</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          @if (Model.HasHar)
+          {
+            <li><a class="dropdown-item" href="@("/api/history/runs/" + Uri.EscapeDataString(run.Id) + "/har")" download="@(run.Id + ".har")" data-run-download="@(run.Id + ".har")"><i class="bi bi-filetype-json me-2" aria-hidden="true"></i>HAR <span class="ps-mono fs-8 text-ps-faint">@(run.Id).har</span></a></li>
+          }
+          else
+          {
+            <li><span class="dropdown-item disabled" title="Raw payloads weren't stored for this run"><i class="bi bi-filetype-json me-2" aria-hidden="true"></i>HAR <span class="ps-mono fs-8">not stored</span></span></li>
+          }
+          <li><a class="dropdown-item" href="@("/api/history/runs/" + Uri.EscapeDataString(run.Id) + "/json")" download="@(run.Id + ".json")" data-run-download="@(run.Id + ".json")"><i class="bi bi-braces me-2" aria-hidden="true"></i>Run JSON <span class="ps-mono fs-8 text-ps-faint">request, response, events</span></a></li>
+        </ul>
+      </div>
+      <button class="btn btn-sm btn-outline-danger" type="button" data-run-delete="@run.Id" data-run-label="@(Model.SourceLabel + (run.Provider.Length > 0 ? " · " + run.Provider + "/" + run.Model : ""))" data-run-after-delete="/history"><i class="bi bi-trash3 me-1" aria-hidden="true"></i>Delete</button>
+      @if (Model.Code is not null)
+      {
+        <div class="dropdown">
+          <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More run actions" title="More"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#modal-view-code"><i class="bi bi-code-slash me-2" aria-hidden="true"></i>View code</button></li>
+          </ul>
+        </div>
+      }
+    </div>
+  </div>
+  <hr class="my-3">
+  <div class="row gx-4 gy-1 fs-7">
+    <div class="col-md-6 col-xl-3"><div class="kv"><span class="k">Started</span><span class="v">@Model.Started</span></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kv"><span class="k">API</span><span class="v">@(run.Api ?? "—")</span></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kv"><span class="k">Thinking</span><span class="v">@Model.Thinking</span></div></div>
+    <div class="col-md-6 col-xl-3"><div class="kv"><span class="k">Session</span><span class="v text-truncate">@if (Model.SessionHref is not null) {<a href="@Model.SessionHref">@Model.Session</a>} else {@(Model.Session ?? "—")}</span></div></div>
+  </div>
+  @if (Model.Prompt is not null)
+  {
+    <div class="fs-8 text-secondary mt-2 text-truncate" title="User prompt"><i class="bi bi-chat-left-quote me-1 text-ps-faint" aria-hidden="true"></i>@Model.Prompt</div>
+  }
+</section>
