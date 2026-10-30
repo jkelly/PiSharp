@@ -11311,8 +11311,8 @@
       "originalSha256": "405df031795548fe6844251ffc57e100a1dedc7637d3f3ae9b59826ce2b2f82c"
     },
     {
-      "currentSha256": "b2c4feb97f35f4bf4ebce7d52be9c43c78996bbdcd720121e4efd4360e0b0c04",
-      "currentBytes": 36690,
+      "currentSha256": "1ce479c58a22257f4fb095f8cf95b25b2f609e16487cdb17187e803ee88ebfa1",
+      "currentBytes": 37373,
       "originalBytes": 36690,
       "path": "tests/PiSharp.CodingAgent.Tests/McpAdmittedHttpLoopbackTests.cs",
       "originalSha256": "b2c4feb97f35f4bf4ebce7d52be9c43c78996bbdcd720121e4efd4360e0b0c04"
@@ -11395,8 +11395,8 @@
       "originalSha256": "56891771a08d1a7a92b17c8d272adbef43dba6f9bc8ff554588aad7a260b5696"
     },
     {
-      "currentSha256": "b4a2e87513eee724889777dfdcb4fab81cde2008b56fa00aef07bee2f1315e1c",
-      "currentBytes": 21165,
+      "currentSha256": "460fb9ae8a0bfb7a5c325ddcdbadc3d3b86dc20a96d4f8bcac57cae076fe9506",
+      "currentBytes": 21316,
       "originalBytes": 21165,
       "path": "tests/PiSharp.CodingAgent.Tests/McpHostShutdownTests.cs",
       "originalSha256": "b4a2e87513eee724889777dfdcb4fab81cde2008b56fa00aef07bee2f1315e1c"
@@ -11416,8 +11416,8 @@
       "originalSha256": "8a70f6bd392372377762214613be3c5ffb08f0607db25522bd98eb62b944f094"
     },
     {
-      "currentSha256": "496b49fa011a41fff76e77b090dded982479cecb15c86a4dcd046fe65fa8366b",
-      "currentBytes": 24544,
+      "currentSha256": "c56aa1acc4550a51845d1a13187d1888367e17e0bb60265d3dc5a9f5ed8faaf9",
+      "currentBytes": 23482,
       "originalBytes": 24544,
       "path": "tests/PiSharp.CodingAgent.Tests/McpOwnedResourceDispatchTests.cs",
       "originalSha256": "496b49fa011a41fff76e77b090dded982479cecb15c86a4dcd046fe65fa8366b"
@@ -11430,8 +11430,8 @@
       "originalSha256": "7f1f541d36bf6197ca9765b93abb09411ab4f20fb1b5a353a4145cb83b915abd"
     },
     {
-      "currentSha256": "b97568011d519eefe4545caa79fa058c133e2dfb63d15acb283bcfcf82ebcc99",
-      "currentBytes": 37000,
+      "currentSha256": "c11b39ed2fd79632bf5508122f5df5386a12b4bacbe481318f46783331e9f50d",
+      "currentBytes": 36098,
       "originalBytes": 37000,
       "path": "tests/PiSharp.CodingAgent.Tests/McpPreparedPublicationTests.cs",
       "originalSha256": "b97568011d519eefe4545caa79fa058c133e2dfb63d15acb283bcfcf82ebcc99"
@@ -11451,22 +11451,22 @@
       "originalSha256": "8e45189e36186abb392cd97441a12fbacad1a322d4b8d4ae133944fdf74f1b2e"
     },
     {
-      "currentSha256": "89e8c61f1decde081a4c9b00c2ec0a03fd72e6a01cab11c35d9629f3a2aebcb7",
-      "currentBytes": 23782,
+      "currentSha256": "73784ef887415abb8d31b08f291109189f2e8e7cbe3109d03c6c1ddccaac53db",
+      "currentBytes": 24018,
       "originalBytes": 23782,
       "path": "tests/PiSharp.CodingAgent.Tests/McpProfileIntegrationTests.cs",
       "originalSha256": "89e8c61f1decde081a4c9b00c2ec0a03fd72e6a01cab11c35d9629f3a2aebcb7"
     },
     {
-      "currentSha256": "17e5d5d960ec3557e6f964781160f367c1d86774553c1ccf16ad37374d9336e0",
-      "currentBytes": 34512,
+      "currentSha256": "e0d65be22d91ba72284645ee6178111aae58cde002d52fc28e915aa11f43e177",
+      "currentBytes": 34779,
       "originalBytes": 34512,
       "path": "tests/PiSharp.CodingAgent.Tests/McpProfileResourceAdmissionTests.cs",
       "originalSha256": "17e5d5d960ec3557e6f964781160f367c1d86774553c1ccf16ad37374d9336e0"
     },
     {
-      "currentSha256": "b2a52522c30db20899ceb21095980c2533bdeddcb72ef1e3df617ec11b0bc2d9",
-      "currentBytes": 24645,
+      "currentSha256": "bcb19c5dfd1282eace74677292d29feb4949be815810be324d7470a2c8d03200",
+      "currentBytes": 26036,
       "originalBytes": 21385,
       "path": "tests/PiSharp.CodingAgent.Tests/McpProfileReviewTests.cs",
       "originalSha256": "0057d687895eac1d8da393818f2fd9e7339042c52c7926c75b90ad57729f9f29"
@@ -11493,8 +11493,8 @@
       "originalSha256": "ea1c83c975850f6ab23aa75e4d89c7ff36936ef4a36e6dd55271691a317c78d4"
     },
     {
-      "currentSha256": "8dd8c80c8c37bdd1f144310a56149813aba9e23a6b9508ff75caabf089a20993",
-      "currentBytes": 16656,
+      "currentSha256": "1f7b06b73460249dfedc6298ec642342967fbb2468753c18923cade6ebc9d172",
+      "currentBytes": 16382,
       "originalBytes": 16656,
       "path": "tests/PiSharp.CodingAgent.Tests/McpResourceFactoryCallerTests.cs",
       "originalSha256": "8dd8c80c8c37bdd1f144310a56149813aba9e23a6b9508ff75caabf089a20993"

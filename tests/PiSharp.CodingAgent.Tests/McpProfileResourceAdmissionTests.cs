@@ -154,9 +154,11 @@ internal static class McpProfileResourceAdmissionTests
                     var admitted = session.CaptureToolCatalogRegistry();
                     Check(admitted.RegisteredTools.Length == ResourceNames.Length && ResourceNames.All(name =>
                         admitted.RegisteredTools.Count(tool => tool.Adapter.Name == name) == 1));
+                    // Source setActiveToolsByName: an idle selection applies in memory; the next request declares it.
+                    var before = session.Snapshot.Log.Entries;
                     await session.SetActiveToolsAsync(ResourceNames, CancellationToken.None);
-                    Check(session.GetActiveTools().SequenceEqual(ResourceNames) &&
-                        admitted.Resolve(session.Snapshot.Context, Model).Configuration.Tools.Select(tool => tool.Name).SequenceEqual(ResourceNames));
+                    Check(session.GetActiveTools().SequenceEqual(ResourceNames) && session.Snapshot.Log.Entries.SequenceEqual(before) &&
+                        session.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(ResourceNames));
                 }
                 else Check(session.GetActiveTools().IsEmpty);
                 return f;
@@ -314,10 +316,10 @@ internal static class McpProfileResourceAdmissionTests
         var session = f.Owner.Current.Session; var model = f.Profile!.SelectedModel;
         var catalog = session.CaptureToolCatalogRegistry();
         Check(catalog.InvocationOwnerGeneration == f.Owner.Current.Generation && f.DiscoveryTools == 3);
-        var configuration = catalog.Resolve(session.Snapshot.Context, model).Configuration;
+        // The agent's configured tools: the in-memory loadout, which the transcript declares only at the next request.
         var call = new ToolCallContent("profile-resource", McpResourceTools.ReadResource, Json("""{"server":"demo","uri":"data://a.bin"}"""));
         var invocation = new ToolInvocation(new AssistantMessage(model.Api, model.Provider, model.Id, 1, [call], TokenUsage.Zero, StopReason.ToolUse), call, 0);
-        var result = await configuration.Tools.Single(tool => tool.Name == McpResourceTools.ReadResource).Executor.ExecuteAsync(invocation, default);
+        var result = await session.Snapshot.Agent.Tools.Single(tool => tool.Name == McpResourceTools.ReadResource).Executor.ExecuteAsync(invocation, default);
         Check(result.IsError && f.Channel.Methods.Count == 0 && f.Saves == 0);
         await f.Profile.DisposeAsync(); Check(f.Channel.Closes == 1);
     }
@@ -325,12 +327,13 @@ internal static class McpProfileResourceAdmissionTests
     private static async Task Pipeline()
     {
         await using var f = await Fixture.Create(true); var session = f.Owner.Current.Session;
-        var configuration = session.CaptureToolCatalogRegistry().Resolve(session.Snapshot.Context, Model).Configuration;
+        // The agent's configured tools: the in-memory loadout, which the transcript declares only at the next request.
+        var tools = session.Snapshot.Agent.Tools;
         foreach (var name in new[] { McpResourceTools.ListResources, McpResourceTools.ListTemplates, McpResourceTools.ReadResource })
         {
             var call = new ToolCallContent("factory-resource", name, name == McpResourceTools.ReadResource ? Json("""{"server":"demo","uri":"data://a.bin"}""") : Json("{}"));
             var invocation = new ToolInvocation(new AssistantMessage(Model.Api, Model.Provider, Model.Id, 1, [call], TokenUsage.Zero, StopReason.ToolUse), call, 0);
-            var result = await configuration.Tools.Single(tool => tool.Name == name).Executor.ExecuteAsync(invocation, default);
+            var result = await tools.Single(tool => tool.Name == name).Executor.ExecuteAsync(invocation, default);
             Check(!result.IsError && f.Channel.Identity is { OwnerId: "factory-resources", ToolCallId: "factory-resource" });
             Check(f.Channel.Identity!.SessionGeneration == f.Owner.Current.Generation);
         }
