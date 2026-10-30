@@ -305,6 +305,8 @@ public static partial class PresetRules
     [GeneratedRegex("^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")]
     private static partial Regex IdPattern();
 
-    [GeneratedRegex("^(?:sk-|sk_|pk_live|rk_live|xox[abprs]-|ghp_|gho_|ghu_|ghs_|github_pat_|glpat-|AIza|AKIA|ASIA|ya29\\.)[A-Za-z0-9_\\-\\.]{8,}", RegexOptions.CultureInvariant)]
+    // W5 retest 1: also every key prefix SecretText masks (xai-, gsk_, nvapi-, csk-, hf_, fw_), so a case or preset value with one of them is
+    // refused even when this app does not store that key (TestCase.CaseSpec's stored-credential match catches the keys it does store).
+    [GeneratedRegex("^(?:sk-|sk_|pk_live|rk_live|xox[abprs]-|ghp_|gho_|ghu_|ghs_|github_pat_|glpat-|AIza|AKIA|ASIA|ya29\\.|xai-|gsk_|nvapi-|csk-|hf_|fw_)[A-Za-z0-9_\\-\\.]{8,}", RegexOptions.CultureInvariant)]
     private static partial Regex KeyPattern();
 }
