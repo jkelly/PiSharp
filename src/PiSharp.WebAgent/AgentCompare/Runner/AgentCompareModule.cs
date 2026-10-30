@@ -5,6 +5,7 @@
 //     it; its StartingAsync attaches the approval override before the device opens) and the janitor's IWorkspaceActivity;
 //   - DeviceHostService's registration is replaced by the same service built over AgentCompareModels (the gate over the app's
 //     IDurableModels); the IDurableModels registration itself is unchanged, so the run engine and the rest keep the plain models.
+//   - the store, the gate and the runner read the app's TimeProvider when it registers one (a test's clock), else the system's.
 // MapAgentCompareRunner maps /api/compare/agent (AgentCompareEndpoints).
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -26,9 +27,10 @@ public static class AgentCompareModule
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
         services.AddWebAgentMigration(AgentCompareStore.Migration);
-        services.TryAddSingleton(provider => new AgentCompareStore(provider.GetRequiredService<WebAgentDb>(), provider.GetService<ILogger<AgentCompareStore>>()));
+        services.TryAddSingleton(provider => new AgentCompareStore(provider.GetRequiredService<WebAgentDb>(), provider.GetService<ILogger<AgentCompareStore>>(),
+            provider.GetService<TimeProvider>()));
         services.TryAddSingleton(provider => new AgentCompareGate(provider.GetRequiredService<AgentCompareStore>(), provider,
-            provider.GetService<ILogger<AgentCompareGate>>()));
+            provider.GetService<ILogger<AgentCompareGate>>(), provider.GetService<TimeProvider>()));
         services.TryAddSingleton(provider => ActivatorUtilities.CreateInstance<AgentCompareRunner>(provider));
         services.RemoveAll<DeviceHostService>();
         services.AddSingleton(provider => ActivatorUtilities.CreateInstance<DeviceHostService>(provider,

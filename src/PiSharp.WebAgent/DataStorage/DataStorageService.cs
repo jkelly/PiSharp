@@ -509,8 +509,10 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
     }
 
     /// <summary>Deletes every run (pinned ones too) with its events and raw payloads, and compacts runs.db. The result counts runs as the
-    /// page and History count them (top-level runs), so it says the number the confirmation named.</summary>
-    public Task<DataDangerResult> ClearHistoryAsync(string? confirm, CancellationToken cancellationToken = default)
+    /// page and History count them (top-level runs), so it says the number the confirmation named. Agent compare runs are runs too (W4 fix
+    /// 2): each is deleted with its sessions and workspaces (AgentCompareRunner.DeleteAllAsync; a model continued as a chat keeps both), and
+    /// the answer waits for those deletes.</summary>
+    public async Task<DataDangerResult> ClearHistoryAsync(string? confirm, CancellationToken cancellationToken = default)
     {
         RequireConfirm(confirm);
         var store = Runs ?? throw new InvalidOperationException("Run history is not part of this app.");
@@ -519,6 +521,12 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
         var rows = store.Clear(keepPinned: false);
         var deleted = (int)Math.Min(runs, rows); // Never more than were deleted (a retention cleanup may have run in between).
         var failed = new List<string>();
+        if (Runner is { } runner)
+        {
+            foreach (var run in await runner.DeleteAllAsync(cancellationToken).ConfigureAwait(false))
+                if (!run.Deleted && run.Failed.Count > 0)
+                    failed.Add($"Agent compare run {run.Id} was only partly deleted ({string.Join(", ", run.Failed)}); the rest goes when the app restarts.");
+        }
         try
         {
             store.Db.Db.Execute("VACUUM;");
@@ -532,7 +540,7 @@ public sealed class DataStorageService(WebAgentOptions options, ISettingsStore s
         var freed = Math.Max(0, before - store.SizeBytes());
         log?.LogInformation("Settings › Data: run history cleared ({Count} runs, {Rows} records, {Bytes} bytes freed).", deleted, rows, freed);
         var records = rows > deleted ? $" ({Plural(rows, "record")})" : "";
-        return Task.FromResult(new DataDangerResult("history", deleted, $"Deleted {Plural(deleted, "run")}{records} and freed {DataFolders.Size(freed)}.", failed));
+        return new DataDangerResult("history", deleted, $"Deleted {Plural(deleted, "run")}{records} and freed {DataFolders.Size(freed)}.", failed);
     }
 
     /// <summary>Stops and archives every chat (they stay in the archive for 30 days).</summary>

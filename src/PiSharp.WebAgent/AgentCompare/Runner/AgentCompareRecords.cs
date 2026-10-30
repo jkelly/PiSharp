@@ -81,6 +81,9 @@ public static class AgentCheckState
 
     /// <summary>It could not be started.</summary>
     public const string Error = "error";
+
+    /// <summary>The user stopped the model while its check ran (or before it started): the check and every process it started were ended.</summary>
+    public const string Stopped = "stopped";
 }
 
 /// <summary>What a model is waiting for.</summary>
@@ -390,6 +393,10 @@ public sealed record AgentCompareRun
     /// <summary>Its models, by slot.</summary>
     public required IReadOnlyList<AgentCompareModelState> Models { get; init; }
 
+    /// <summary>Whether the run is being deleted (AgentCompareRunner.DeleteAsync): it is no longer listed or answered, and a start finishes the
+    /// delete a stop interrupted.</summary>
+    public bool Deleting { get; init; }
+
     /// <summary>The model of <paramref name="slot"/>, or null.</summary>
     public AgentCompareModelState? Model(string slot) => Models.FirstOrDefault(model => model.Slot == slot);
 
@@ -403,6 +410,16 @@ public sealed record AgentCompareRun
     /// <summary>The key of <paramref name="slot"/>'s model: <c>&lt;run&gt;-&lt;slot&gt;</c>.</summary>
     public static string ModelKey(string run, string slot) => run + "-" + slot;
 }
+
+/// <summary>What deleting a run did.</summary>
+/// <param name="Id">The run.</param>
+/// <param name="Deleted">Whether its record is gone (false when something failed: the next start tries again).</param>
+/// <param name="Sessions">Its models' durable sessions deleted.</param>
+/// <param name="Workspaces">Its models' workspaces removed (the slots).</param>
+/// <param name="KeptForChats">The slots of models continued as a chat: their session (the chat) and workspace stay.</param>
+/// <param name="Failed">What could not be removed, with why.</param>
+public sealed record AgentCompareDeleted(string Id, bool Deleted, int Sessions, IReadOnlyList<string> Workspaces, IReadOnlyList<string> KeptForChats,
+    IReadOnlyList<string> Failed);
 
 /// <summary>A model to compare, as a create request names it.</summary>
 /// <param name="Provider">The provider id.</param>

@@ -85,6 +85,11 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
     internal SessionCatalog Catalog { get; }
     internal string SessionsDirectory => Path.Join(Info.DataDirectory, "sessions");
     internal string ArchiveDirectory => Path.Join(Info.DataDirectory, "archive");
+    internal string TrashDirectory => Path.Join(Info.DataDirectory, "trash");
+
+    // Whether a session's archive path is a deleted session's trash folder (DeleteSessionAsync), not a kept archive.
+    private bool IsTrash(string path) =>
+        string.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), Path.GetFullPath(TrashDirectory), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     /// <summary>Every session, oldest first, including unavailable ones.</summary>
     public IReadOnlyList<HostedSession> Sessions
@@ -181,6 +186,8 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
             await host.DisposeAsync().ConfigureAwait(false);
             throw;
         }
+        // Deleted sessions' folders a crash or a held file left behind (DeleteSessionAsync).
+        host.RemoveTrash();
         host.StartSchedules();
         return host;
     }
@@ -301,6 +308,71 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Deletes a session for good: stops all of its work (background too), closes it, removes its catalog rows (so its spawn keys are free
+    /// again) and deletes its directory. Unlike <see cref="ArchiveSessionAsync"/> nothing is kept. The directory is first moved to
+    /// <c>trash/</c> in the steps an archive takes (so a crash part way is finished when the device next opens), then removed; what cannot be
+    /// removed now (a file another process still holds) is removed when the device next opens. Its working directory is never touched.
+    /// </summary>
+    /// <exception cref="HostNotFoundException">No such session.</exception>
+    /// <exception cref="IOException">Its directory could not be moved; the session stays listed (unavailable) and a retry finishes it.</exception>
+    public async Task DeleteSessionAsync(string address, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        string target;
+        await mutations.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            var session = ResolveSession(address);
+            await session.StopAndCloseAsync().ConfigureAwait(false);
+            try
+            {
+                target = Path.Join(TrashDirectory, $"{session.Id}-{Guid.NewGuid():N}");
+                Catalog.BeginArchive(session.Id, target);
+                FinishArchive(session, target);
+            }
+            catch (Exception failure)
+            {
+                session.MarkUnavailable(failure);
+                throw;
+            }
+        }
+        finally
+        {
+            mutations.Release();
+        }
+        RemoveTrash(target);
+    }
+
+    // Removes a deleted session's directory (or, with no path, everything in trash/: what a crash or a held file left). A failure is reported
+    // and left for the next open.
+    private void RemoveTrash(string? path = null)
+    {
+        IEnumerable<string> targets;
+        try
+        {
+            targets = path is not null ? [path] : Directory.Exists(TrashDirectory) ? Directory.EnumerateFileSystemEntries(TrashDirectory).ToList() : [];
+        }
+        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
+        {
+            Options.OnReport?.Invoke(null, failure);
+            return;
+        }
+        foreach (var target in targets)
+        {
+            try
+            {
+                if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
+                else if (File.Exists(target)) File.Delete(target);
+            }
+            catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
+            {
+                Options.OnReport?.Invoke(null, failure);
+            }
+        }
+    }
+
     private void FinishArchive(HostedSession session, string target)
     {
         var sourceExists = Directory.Exists(session.DirectoryPath);
@@ -308,10 +380,13 @@ public sealed partial class DurableDeviceHost : IAsyncDisposable
         if (sourceExists && targetExists)
             throw new IOException($"Archive destination already exists: {target}");
         if (!sourceExists && !targetExists)
-            throw new IOException($"Neither the session directory nor its archive exists for {session.Id}.");
-        if (sourceExists)
         {
-            Directory.CreateDirectory(ArchiveDirectory);
+            // A deleted session whose folder is already gone from trash/ only needs its rows removed.
+            if (!IsTrash(target)) throw new IOException($"Neither the session directory nor its archive exists for {session.Id}.");
+        }
+        else if (sourceExists)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(target) ?? ArchiveDirectory);
             Directory.Move(session.DirectoryPath, target);
         }
         Catalog.RemoveSession(session.Id);

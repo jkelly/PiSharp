@@ -26,6 +26,10 @@
 //   POST /api/compare/agent/{run}/keep-branch  {slot, discardOthers?} -> as apply.
 //   POST /api/compare/agent/{run}/discard      {slot?} (none: every workspace of the run) -> {discarded, status}.
 //   POST /api/compare/agent/{run}/open-chat    {slot} -> {chatId, url: "/chat/{id}", status}.
+//   POST /api/compare/agent/{run}/delete       {} -> {id, deleted, sessions, workspaces, keptForChats, failed} (W4 fix 2): stops the run if it
+//                                              runs, then deletes its sessions, workspaces (a model continued as a chat keeps both), History
+//                                              rows and records; deleted false (with failed) when a part could not go yet (it goes at the next
+//                                              start); 404 when there is no such run. Repeating it answers the same delete.
 // Every answer is Cache-Control: no-store and written with SettingsStore.JsonOptions. No answer carries a credential: accounts are ids.
 using System.Globalization;
 using System.Text.Json;
@@ -150,6 +154,8 @@ public static class AgentCompareEndpoints
                 ["status"] = await AgentCompareStatus.ToJsonAsync(runner.Require(run), runner, services, token).ConfigureAwait(false),
             });
         }));
+        api.MapPost("/{run}/delete", (string run, AgentCompareRunner runner, CancellationToken token) => RunAsync(async () =>
+            Json(await runner.DeleteAsync(run, token).ConfigureAwait(false))));
         return routes;
     }
 

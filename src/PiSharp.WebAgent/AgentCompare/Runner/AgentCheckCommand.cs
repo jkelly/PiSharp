@@ -4,7 +4,8 @@
 // and every process it started are killed (Process.Kill with the whole tree), and the result says it timed out. It inherits the app's
 // environment minus variables named like credentials (*_API_KEY, *_TOKEN, *_SECRET, *_PASSWORD, *_KEY, PISHARP_WEBAGENT_DATA), so a test the
 // model wrote can't read the app's provider keys; workspaces are still copies, not sandboxes. A test summary in the output (dotnet test's
-// "Passed: 38" or "succeeded: 38", "38 passed", "Tests: 2 failed, 36 passed") becomes "38 passed" for the column.
+// "Passed: 38" or "succeeded: 38", "38 passed", "Tests: 2 failed, 36 passed") becomes "38 passed" for the column. Fix 2 (W4): a stop token (the
+// user stopped the model) ends it the same way (the whole process tree is killed) and the result says it was stopped, with the output so far.
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -21,12 +22,22 @@ public static partial class AgentCheckCommand
     /// <summary>The longest check command.</summary>
     public const int MaxCommandLength = 2000;
 
+    /// <summary>The note of a check stopped before it started.</summary>
+    public const string StoppedBefore = "[Not run: you stopped this model before its check started.]";
+
+    /// <summary>The note of a check stopped while it ran.</summary>
+    public const string StoppedWhileRunning = "[Stopped: you stopped this model while its check ran, so the check and every process it started were ended.]";
+
     /// <summary>How long the output may still be read after the command was killed.</summary>
     private static readonly TimeSpan DrainLimit = TimeSpan.FromSeconds(5);
 
-    /// <summary>Runs <paramref name="command"/> in <paramref name="directory"/> for at most <paramref name="timeout"/>.</summary>
-    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled (the process tree is killed first).</exception>
-    public static async Task<AgentCheckResult> RunAsync(string command, string directory, TimeSpan timeout, CancellationToken cancellationToken)
+    /// <summary>Runs <paramref name="command"/> in <paramref name="directory"/> for at most <paramref name="timeout"/>, or until
+    /// <paramref name="stop"/> (the user stopped the model): then it and every process it started are killed and the result is
+    /// <see cref="AgentCheckState.Stopped"/> (it is not started at all when <paramref name="stop"/> was cancelled already).</summary>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> (the app stopping) was cancelled (the process tree is
+    /// killed first).</exception>
+    public static async Task<AgentCheckResult> RunAsync(string command, string directory, TimeSpan timeout, CancellationToken cancellationToken,
+        CancellationToken stop = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(command);
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
@@ -52,6 +63,8 @@ public static partial class AgentCheckCommand
             };
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        if (stop.IsCancellationRequested) return Result(AgentCheckState.Stopped, null, StoppedBefore);
         Process process;
         try
         {
@@ -71,7 +84,7 @@ public static partial class AgentCheckCommand
             process.BeginErrorReadLine();
             try { process.StandardInput.Close(); } catch (IOException) { /* It exited already. */ }
 
-            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stop);
             limit.CancelAfter(timeout);
             try
             {
@@ -82,6 +95,7 @@ public static partial class AgentCheckCommand
                 Kill(process);
                 await Drain(output.Task, errors.Task).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
+                if (stop.IsCancellationRequested) return Result(AgentCheckState.Stopped, null, StoppedWhileRunning);
                 return Result(AgentCheckState.TimedOut, null,
                     $"[Stopped after {Duration(timeout)}: the check command ran longer than its timeout, so it and every process it started were ended.]");
             }
