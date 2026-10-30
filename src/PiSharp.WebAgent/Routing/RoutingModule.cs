@@ -4,11 +4,16 @@
 // registers no provider code path at all: the core keeps the faux models and catalog, and nothing can reach a provider. In both modes it
 // registers the chats' account seam (AccountChatAccounts over the credentials area's IAccountStore). Every registration is a TryAdd, so a
 // test or another host can put its own first. The area has no endpoints and no webagent.db migrations.
+//
+// W3, CP: when the custom providers area registered its store (ICustomProviderSource), the catalog and the router read its routes copy of
+// models.json (custom providers and model overrides); otherwise they are the built-in ones, as before. With --faux nothing changes: the
+// faux catalog stays, and no custom provider is routed.
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PiSharp.Durable;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Credentials;
+using PiSharp.WebAgent.CustomProviders;
 
 namespace PiSharp.WebAgent.Routing;
 
@@ -23,10 +28,12 @@ public static class RoutingModule
         services.TryAddSingleton<IChatAccounts>(provider => new AccountChatAccounts(provider.GetRequiredService<IAccountStore>()));
         if (options.Faux) return services;
         services.TryAddSingleton(_ => new RoutingOptions());
-        services.TryAddSingleton(_ => new RuntimeModelCatalog());
+        services.TryAddSingleton(provider => provider.GetService<ICustomProviderSource>() is { } custom
+            ? new RuntimeModelCatalog(custom, provider.GetService<IAccountStore>())
+            : new RuntimeModelCatalog());
         services.TryAddSingleton(provider => new AccountRouter(provider.GetRequiredService<RuntimeModelCatalog>(), provider.GetRequiredService<IAccountStore>(),
             provider.GetRequiredService<ICredentialVault>(), provider.GetRequiredService<CredentialsOptions>(), provider.GetRequiredService<RoutingOptions>(),
-            provider.GetService<ILogger<AccountRouter>>()));
+            provider.GetService<ILogger<AccountRouter>>(), provider.GetService<ICustomProviderSource>()));
         services.TryAddSingleton(provider => new WebDurableModels(provider.GetRequiredService<RuntimeModelCatalog>(), provider.GetRequiredService<AccountRouter>()));
         // Tried like every area registration (a test or host may put its own first); the core's faux fallbacks come after, so these win.
         services.TryAddSingleton<IModelCatalog>(provider => provider.GetRequiredService<RuntimeModelCatalog>());

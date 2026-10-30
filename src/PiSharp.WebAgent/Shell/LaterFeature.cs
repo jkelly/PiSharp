@@ -31,8 +31,6 @@ public sealed record LaterFeature(string Id, string Title, string Icon, string S
     /// <summary>The settings pages, by settings id.</summary>
     public static IReadOnlyDictionary<string, LaterFeature> SettingsPages { get; } = new Dictionary<string, LaterFeature>(StringComparer.OrdinalIgnoreCase)
     {
-        ["custom-providers"] = new("custom-providers", "Custom providers", "bi-hdd-network",
-            "Local servers and OpenAI- or Anthropic-compatible endpoints, in the same format as Pi's models.json.", Settings: true),
         ["spend"] = new("spend", "Spend", "bi-wallet2",
             "Limits on what metered providers can cost. Every request reserves its worst case before it is sent, then settles to the actual cost.", Settings: true),
         ["appearance"] = new("appearance", "Appearance", "bi-palette",

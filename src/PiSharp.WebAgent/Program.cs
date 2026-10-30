@@ -7,6 +7,7 @@ using PiSharp.WebAgent.Credentials;
 using PiSharp.WebAgent.Hosting;
 using PiSharp.WebAgent.Routing;
 using PiSharp.WebAgent.Settings;
+using PiSharp.WebAgent.CustomProviders;
 
 WebAgentOptions options;
 WebApplicationBuilder builder;
@@ -27,6 +28,7 @@ builder.Services.AddCredentialsArea(options);
 builder.Services.AddChatArea(options);
 builder.Services.AddRoutingArea(options);
 builder.Services.AddSettingsArea(options);
+builder.Services.AddCustomProvidersArea(options);
 builder.Services.AddWebAgentFallbacks(options);
 
 var app = builder.Build();
@@ -35,6 +37,7 @@ app.MapCredentialsArea();
 app.MapChatArea();
 app.MapRoutingArea();
 app.MapSettingsArea();
+app.MapCustomProvidersArea();
 app.MapWebAgentCore();
 app.Run();
 return 0;

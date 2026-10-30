@@ -58,6 +58,17 @@ public static class AccountRouteErrors
         _ => throw new ArgumentOutOfRangeException(nameof(reason)),
     };
 
+    /// <summary>The error text of <paramref name="reason"/> for a custom provider (W3, CP): its key is a vault account, the file's
+    /// <paramref name="variable"/> reference, or none, and it is changed in Settings › Custom providers.</summary>
+    internal static string CustomMessage(string reason, string providerName, string? variable) => Prefix + reason + "): " + reason switch
+    {
+        Expired => $"{providerName} rejected its key. Replace the key in Settings › Custom providers, then send the message again.",
+        Unavailable when variable is not null =>
+            $"{providerName} reads its key from the {variable} environment variable, which is not set on this machine. Set it, or change the key in Settings › Custom providers, then send the message again.",
+        Unavailable => $"{providerName} has no usable key now. Check it in Settings › Custom providers, then send the message again.",
+        _ => Message(reason, providerName),
+    };
+
     /// <summary>A sign-in refresh that failed on the network: retryable (it names a network error), and the account stays connected.</summary>
     internal static string RefreshNetwork(string providerName) =>
         $"Network error: the {providerName} sign-in could not be refreshed. The account is unchanged.";

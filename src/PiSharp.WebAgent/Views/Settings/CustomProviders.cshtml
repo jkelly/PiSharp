@@ -1,0 +1,131 @@
+@* Decision 0011 (run W3, CP): the mockups' settings-custom-providers page (route GET /settings/custom-providers), states default and empty:
+   the header (Import models.json, Export models.json, Add provider), the summary cards, where the file lives and how keys work, the empty
+   state with its starting points (LM Studio, Ollama, vLLM, an OpenAI-compatible URL), the provider list (_CustomProviderRow), Model
+   overrides (_CustomProviderOverrides, the mockups' _ModelOverrideList) and the file's preview (_CustomProviderPreview); the editor is
+   _CustomProviderModal. Every change goes through /api/custom-providers (custom-providers.js). Reachability is shown only after a test the
+   user clicked, never checked when the page loads. Left out: the mockups' "Fast or UltraFast" pointer (Defaults has no request speed yet).
+   Model: CustomProvidersPage. *@
+@using PiSharp.WebAgent.CustomProviders
+@model CustomProvidersPage
+@{
+    Layout = "_SettingsLayout";
+    ViewData["Title"] = "Custom providers";
+    ViewData[ShellViewData.SettingsSection] = "custom-providers";
+    var snapshot = Model.Snapshot;
+    var now = DateTimeOffset.UtcNow;
+    var (testedOk, testedFailed) = Model.Tested;
+    var overrideProviders = Model.Overrides.Select(row => row.Provider).Distinct().ToList();
+}
+@section Styles {
+  <link href="~/css/settings.css" rel="stylesheet" asp-append-version="true" />
+  <link href="~/css/custom-providers.css" rel="stylesheet" asp-append-version="true" />
+}
+@section Modals { <partial name="/Views/Settings/_CustomProviderModal.cshtml" model="Model" /> }
+@section Scripts { <script type="module" src="~/js/custom-providers.js" asp-append-version="true"></script> }
+<div data-custom-providers data-offline="@(Model.Offline ? "true" : "false")" data-file-valid="@(snapshot.Valid ? "true" : "false")">
+<header class="settings-header d-flex flex-wrap align-items-end gap-3">
+  <div class="flex-grow-1">
+    <div class="ps-eyebrow">Connections</div>
+    <h2>Custom providers</h2>
+    <p>Custom providers use the same format as Pi's <span class="ps-mono">models.json</span>. Add a local server (LM Studio, Ollama, vLLM, llama.cpp) or any OpenAI- or Anthropic-compatible endpoint. You can also override fields of built-in models, such as the context window, price or headers, without redefining them.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <label class="btn btn-outline-secondary mb-0" for="importModelsJson"><i class="bi bi-box-arrow-in-down me-1"></i>Import models.json</label>
+    <input class="visually-hidden" type="file" id="importModelsJson" accept=".json,application/json" data-cp-import>
+    @if (snapshot.Exists && snapshot.Valid)
+    {
+      <a class="btn btn-outline-secondary" href="@CustomProviderEndpoints.Prefix/export" download="models.json" data-cp-export><i class="bi bi-box-arrow-up me-1"></i>Export models.json</a>
+    }
+    else
+    {
+      <button class="btn btn-outline-secondary" type="button" disabled title="Nothing to export yet"><i class="bi bi-box-arrow-up me-1"></i>Export models.json</button>
+    }
+    <button class="btn btn-primary btn-ps" type="button" data-cp-add disabled="@(!snapshot.Valid)"><i class="bi bi-plus-lg me-1"></i>Add provider</button>
+  </div>
+</header>
+
+@if (Model.Offline)
+{
+  <div class="alert alert-secondary d-flex gap-2 align-items-start py-2 fs-7 mb-3" role="status" data-offline-note>
+    <i class="bi bi-wifi-off mt-1" aria-hidden="true"></i>
+    <div><strong>Offline mode.</strong> The app runs with <span class="ps-mono">--faux</span>: you can edit this list, but no custom provider is routed or tested, and chats use the faux models.</div>
+  </div>
+}
+@if (!snapshot.Valid)
+{
+  <div class="alert alert-danger d-flex gap-2 align-items-start mb-3" role="alert" data-cp-invalid>
+    <i class="bi bi-x-circle mt-1" aria-hidden="true"></i>
+    <div><strong>models.json has an error, so no custom provider or override is used.</strong> Fix the file in your editor (the change is picked up on the next request), or import a valid one.<div class="ps-mono fs-8 mt-1 text-break">@snapshot.Error</div></div>
+  </div>
+}
+
+<div class="row g-2 mb-3" data-cp-summary>
+  <div class="col-6 col-lg-3"><div class="ps-card p-3 h-100"><div class="ps-label">Custom providers</div><div class="fs-4 ps-mono">@Model.Rows.Count</div>
+    <div class="fs-8 text-ps-faint">@(Model.Empty ? "none configured" : testedOk + testedFailed == 0 ? "not tested yet" : $"{testedOk} reachable · {testedFailed} unreachable")</div></div></div>
+  <div class="col-6 col-lg-3"><div class="ps-card p-3 h-100"><div class="ps-label">Custom models</div><div class="fs-4 ps-mono">@snapshot.ModelCount</div>
+    <div class="fs-8 text-ps-faint">@(snapshot.ModelCount == 0 ? "—" : Model.Offline ? "none in the picker with --faux" : $"{Model.InPicker} in the picker now")</div></div></div>
+  <div class="col-6 col-lg-3"><div class="ps-card p-3 h-100"><div class="ps-label">Model overrides</div><div class="fs-4 ps-mono">@Model.Overrides.Count</div>
+    <div class="fs-8 text-ps-faint text-truncate">@(Model.Overrides.Count == 0 ? "catalog values only" : string.Join(" · ", overrideProviders))</div></div></div>
+  <div class="col-6 col-lg-3"><div class="ps-card p-3 h-100"><div class="ps-label">models.json</div>
+    @if (!snapshot.Exists)
+    {
+      <div class="fs-4 ps-mono text-ps-faint">none</div><div class="fs-8 text-ps-faint">created on first save</div>
+    }
+    else if (!snapshot.Valid)
+    {
+      <div class="fs-4 ps-mono text-ps-danger">invalid</div><div class="fs-8 text-ps-faint">fix it to use it</div>
+    }
+    else
+    {
+      <div class="fs-4 ps-mono text-ps-ok">valid</div><div class="fs-8 text-ps-faint">@(snapshot.Saved is { } saved ? CustomProvidersPage.SavedText(saved, now) : "")</div>
+    }
+  </div></div>
+</div>
+
+<div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+  <i class="bi bi-filetype-json mt-1" aria-hidden="true"></i>
+  <div>
+    Saved to <span class="ps-mono text-break">@snapshot.Path</span>, so you can copy the file between the Pi CLI and this app. <span class="ps-mono">//</span> comments and trailing commas are allowed when you edit it by hand; a save here rewrites it and keeps the previous file as <span class="ps-mono">models.json.bak</span>.
+    An API key is stored encrypted in this app's vault (it is never written into the file) or read from an environment variable (<span class="ps-mono">"apiKey": "$VAR"</span> or <span class="ps-mono">${VAR}</span>) on each request.
+    <span class="ps-mono">!command</span> keys are not offered here: running commands from a web form is out of scope, and a <span class="ps-mono">!command</span> written into the file by hand is not run.
+  </div>
+</div>
+
+@if (Model.Empty)
+{
+  <div class="ps-card mb-4" data-cp-empty>
+    <div class="empty-state">
+      <div class="empty-icon"><i class="bi bi-hdd-network" aria-hidden="true"></i></div>
+      <h3 class="ps-heading fs-2 text-body">No custom providers <em>yet</em></h3>
+      <p class="mb-3">Point PiSharp at a model server on this machine, or at any OpenAI- or Anthropic-compatible endpoint. Pick a starting point and the base URL and api type are filled in for you.</p>
+      <div class="d-flex flex-wrap gap-2 justify-content-center">
+        <button class="btn btn-outline-secondary" type="button" data-cp-template="lmstudio" disabled="@(!snapshot.Valid)"><i class="bi bi-pc-display me-1"></i>LM Studio <span class="ps-mono fs-8 text-ps-faint ms-1">:1234</span></button>
+        <button class="btn btn-outline-secondary" type="button" data-cp-template="ollama" disabled="@(!snapshot.Valid)"><i class="bi bi-pc-display me-1"></i>Ollama <span class="ps-mono fs-8 text-ps-faint ms-1">:11434</span></button>
+        <button class="btn btn-outline-secondary" type="button" data-cp-template="vllm" disabled="@(!snapshot.Valid)"><i class="bi bi-gpu-card me-1"></i>vLLM <span class="ps-mono fs-8 text-ps-faint ms-1">:8000</span></button>
+        <button class="btn btn-outline-secondary" type="button" data-cp-template="openai-compatible" disabled="@(!snapshot.Valid)"><i class="bi bi-link-45deg me-1"></i>OpenAI-compatible URL</button>
+      </div>
+      <div class="fs-8 text-ps-faint mt-3">Already have a models.json from the Pi CLI? <label class="link-primary text-decoration-underline" role="button" for="importModelsJson">Import it</label>.</div>
+    </div>
+  </div>
+}
+else
+{
+  <section class="settings-section" id="custom-provider-list">
+    <h3>Custom providers</h3>
+    <p class="section-desc">Each entry is a provider in the model picker. Test checks it with the free model list (<span class="ps-mono">GET {baseUrl}/models</span>), only when you click; nothing is checked when this page loads.</p>
+    <div class="ps-card" data-cp-list>
+      @foreach (var row in Model.Rows)
+      {
+        <partial name="/Views/Settings/_CustomProviderRow.cshtml" model="row" />
+      }
+      <div class="provider-row flex-wrap justify-content-between">
+        <span class="fs-8 text-ps-faint">@Model.Rows.Count provider@(Model.Rows.Count == 1 ? "" : "s") · @snapshot.ModelCount model@(snapshot.ModelCount == 1 ? "" : "s") · @(Model.LastCheck is { } checkedAt ? "last check " + checkedAt.UtcDateTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) + " UTC" : "not checked yet")</span>
+        <button class="btn btn-sm btn-ghost" type="button" data-cp-recheck disabled="@Model.Offline"><i class="bi bi-arrow-repeat me-1"></i>Re-check all</button>
+      </div>
+    </div>
+  </section>
+}
+
+<partial name="/Views/Settings/_CustomProviderOverrides.cshtml" model="Model" />
+<partial name="/Views/Settings/_CustomProviderPreview.cshtml" model="Model" />
+</div>
