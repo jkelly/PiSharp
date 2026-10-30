@@ -25,8 +25,9 @@ internal static partial class Program
             services.RemoveAll<IModelCatalog>();
             services.RemoveAll<IDurableModels>();
             services.RemoveAll<WebAgentDb>();
+            // The chat area's own tables too (ChatSpendSends: every send asks it for the approval it stored, W3 retest).
             services.AddSingleton(sp => new WebAgentDb(sp.GetRequiredService<WebAgentOptions>().DatabasePath,
-                [CoreMigrations.AppInfo, ChatBindings.Migration, SettingsStore.Migration, CredentialVault.Migration]));
+                [CoreMigrations.AppInfo, ChatBindings.Migration, SettingsStore.Migration, CredentialVault.Migration, ChatSpendSends.Migration]));
             // An ephemeral key ring: the test's credentials.json is never protected with a key in the user's profile.
             services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
             services.AddSingleton(sp => RoutingCredentials(new Dictionary<string, string>(), new FakeOAuth(), sp.GetRequiredService<WebAgentOptions>().DataDirectory));
