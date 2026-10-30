@@ -1,0 +1,79 @@
+@* Decision 0011 (run W4, R2): Compare (GET /compare), after the mockups' compare.html. Request mode: _ComparePrompt, then two tabs,
+   Responses (2 to 4 _CompareColumns side by side and the Add model column) and Metrics (_CompareMetrics), with the status line ("3 of 3
+   done · fastest … · best …", "2 streaming", "2 done · 1 failed (google 401)", "Not run · waiting for your decision"). Run all sends the
+   columns to POST /api/compare/run: the run engine starts them as one group, reserved by the Spend Guard all or none (never a provider
+   call from the page); a refused group opens modal-spend-confirm and is sent again only with the user's choice. The columns follow their
+   runs' events and, as each ends, swap in the server's _CompareColumn (Markdown through the sanitizing MarkdownRenderer). The URL becomes
+   ?group={id}, so a reload reopens the comparison, live while it runs. ?mode=agent renders R6's _AgentMode instead. Blind is W5. Modals:
+   _ModelPickerModal (Provider → Model; picks a column's model) and _SpendConfirmModal (the layout hosts _ShortcutsModal). Model:
+   ComparePage. *@
+@model ComparePage
+@{
+    ViewData["Title"] = "Compare";
+    ViewData[ShellViewData.Nav] = ShellNav.Compare;
+    ViewData[ShellViewData.ContentClass] = "no-scroll";
+    ViewData[ShellViewData.Page] = "compare";
+    var status = Model.Metrics.Status;
+    var tone = status.Tone switch { "live" => "text-ps-blue", "danger" => "text-ps-danger", _ => "text-ps-faint" };
+    var slots = CompareDraft.MaxColumns - Model.Columns.Count;
+}
+@section Styles {
+  <link href="~/css/compare.css" rel="stylesheet" asp-append-version="true">
+}
+@section TopbarStart {
+  <h1 class="app-title">Compare <small class="d-none d-sm-inline" data-compare-subtitle>@Model.Subtitle</small></h1>
+}
+@if (Model.AgentMode)
+{
+  <partial name="_AgentMode" model="Model" />
+}
+else
+{
+  <div class="cmp-page" data-compare data-group="@Model.GroupId" data-max-columns="@CompareDraft.MaxColumns" data-min-columns="@CompareDraft.MinColumns">
+    <partial name="_ComparePrompt" model="Model" />
+    @if (Model.Notice is { } notice)
+    {
+      <div class="alert alert-warning alert-dismissible fade show py-2 px-3 mx-3 mt-2 mb-0 fs-7 flex-shrink-0" role="status" data-compare-notice>
+        <i class="bi bi-info-circle me-1"></i>@notice
+        <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    }
+    <div class="cmp-views">
+      <div class="d-flex flex-wrap align-items-center gap-2 px-3 border-bottom flex-shrink-0">
+        <ul class="nav nav-tabs border-0" role="tablist" aria-label="Compare views">
+          <li class="nav-item" role="presentation"><button class="nav-link active" id="cmp-tab-responses" data-bs-toggle="tab" data-bs-target="#cmp-responses" type="button" role="tab" aria-controls="cmp-responses" aria-selected="true"><i class="bi bi-layout-three-columns me-1"></i>Responses</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" id="cmp-tab-metrics" data-bs-toggle="tab" data-bs-target="#cmp-metrics" type="button" role="tab" aria-controls="cmp-metrics" aria-selected="false"><i class="bi bi-table me-1"></i>Metrics</button></li>
+        </ul>
+        <span class="ms-auto fs-8 ps-mono text-truncate d-none d-sm-inline @tone" role="status" data-compare-status>@if (status.Tone == "live") {<span class="status-dot live me-1"></span>}<span data-compare-status-text>@status.Text</span></span>
+      </div>
+      <div class="tab-content cmp-tab-content">
+        <div class="tab-pane fade show active cmp-pane" id="cmp-responses" role="tabpanel" aria-labelledby="cmp-tab-responses">
+          <div class="compare-grid@(slots > 0 ? " has-add" : "")" style="--cmp-cols:@Model.Columns.Count" data-compare-grid>
+            @foreach (var column in Model.Columns)
+            {
+              <partial name="_CompareColumn" model="column" />
+            }
+            <div class="compare-col cmp-add-col" aria-label="Add a model" data-compare-add hidden="@(slots <= 0)">
+              <button class="compare-add flex-grow-1 bg-transparent" type="button" data-col-add disabled="@Model.Running">
+                <span><i class="bi bi-plus-circle fs-3 d-block mb-2"></i><span class="fw-semibold d-block text-body">Add model</span><span class="fs-8 d-block" data-compare-slots>Up to @CompareDraft.MaxColumns columns · @slots @(slots == 1 ? "slot" : "slots") left</span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="tab-pane fade cmp-pane cmp-metrics-pane" id="cmp-metrics" role="tabpanel" aria-labelledby="cmp-tab-metrics" tabindex="0" data-metrics-host>
+          <partial name="_CompareMetrics" model="Model.Metrics" />
+        </div>
+      </div>
+    </div>
+  </div>
+}
+@section Modals {
+  @if (!Model.AgentMode)
+  {
+    <partial name="_ModelPickerModal" model="Model.Picker" />
+    <partial name="_SpendConfirmModal" model="null" />
+  }
+}
+@section Scripts {
+  <script type="module" src="~/js/compare.js" asp-append-version="true"></script>
+}

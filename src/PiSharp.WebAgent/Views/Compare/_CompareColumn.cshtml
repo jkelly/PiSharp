@@ -1,0 +1,189 @@
+@* Decision 0011 (run W4, R2): the mockups' _CompareColumn: one model of the comparison. Head: the model chip (opens #modal-model-picker, the
+   Provider → Model dropdowns; a new model resets the column and keeps its overrides), the overrides of this column (thinking: inherit or one
+   of the model's own levels; temperature: inherit or a value, disabled with "not supported" when the model rejects it, keeping its value),
+   Mark best, Re-run (Stop this column while it streams) and Remove. Chips: best, fastest, the overrides and how the shared options apply
+   (ComparePlanner: "temperature n/a", "thinking xhigh → high"), subscription, then the run's state (its stop reason, streaming, stopped,
+   error). Body: nothing yet, the text so far (plain text with the cursor; compare.js appends the live deltas with textContent), the answer
+   as Markdown through the sanitizing MarkdownRenderer, or the error card (Fix for an account error, Retry, the stored response body). Foot:
+   the run row's own figures. Element ids carry the column's key. Model: CompareColumnView. *@
+@model CompareColumnView
+@inject MarkdownRenderer Markdown
+@{
+    var k = Model.Key;
+    var state = Model.State;
+    var run = Model.Run;
+    var streaming = Model.Streaming;
+    var column = Model.Column;
+    var label = $"{column.Provider}/{column.Model}";
+    var blocks = Model.Output.Blocks;
+    var thinking = blocks.Where(block => block.Kind == "thinking" && block.Text.Length > 0).ToList();
+    var texts = blocks.Where(block => block.Kind == "text").ToList();
+    var dot = !Model.Known ? "warn" : streaming ? "live" : state == "error" ? "danger" : "ok";
+    var canBest = state == "completed" && Model.GroupId is not null;
+    var kind = Model.AccountError ? "Account" : Model.Error?.Kind is "Error" or null ? "Provider" : Model.Error.Kind;
+    var aria = label + (Model.Best ? ", marked best" : "") + (streaming ? ", streaming" : "");
+}
+<section class="compare-col@(Model.Best ? " is-best" : "")" aria-label="@aria" data-compare-col data-key="@k" data-provider="@column.Provider" data-model="@column.Model" data-name="@Model.Name" data-state="@state" data-run-id="@run?.Id" data-group="@Model.GroupId" data-last-seq="@Model.Output.LastSeq" data-started="@((run?.Started ?? run?.Created)?.ToUnixTimeMilliseconds())" data-kept-thinking="@Model.KeptThinking" data-best="@(Model.Best ? "true" : "false")">
+  <div class="compare-col-head">
+    <button class="model-chip" type="button" title="Change model" aria-label="Change the model of @label" data-col-model disabled="@streaming">
+      <span class="status-dot @dot"></span>
+      <span class="model-chip-provider">@column.Provider</span>
+      <span class="model-chip-name">@Model.Name</span>
+      <i class="bi bi-chevron-down"></i>
+    </button>
+    <div class="ms-auto d-flex align-items-center">
+      <div class="dropdown" data-col-overrides>
+        <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Overrides for this column" aria-label="Overrides for @Model.Name" disabled="@(streaming || !Model.Known)"><i class="bi bi-sliders"></i></button>
+        <div class="dropdown-menu dropdown-menu-end p-3 cmp-overrides">
+          <div class="ps-label mb-2">Overrides · this column</div>
+          <label class="form-label fs-8 ps-mono mb-1" for="cmp-@(k)-thinking">thinking</label>
+          <select class="form-select form-select-sm ps-mono mb-2" id="cmp-@(k)-thinking" data-override="thinking">
+            <option value="" selected="@(column.Thinking is null)" data-inherit>inherit (@Model.SharedThinking)</option>
+            @foreach (var level in Model.Levels)
+            {
+              <option value="@level" selected="@(level == column.Thinking)">@level</option>
+            }
+          </select>
+          <label class="form-label fs-8 ps-mono mb-1" for="cmp-@(k)-temperature">temperature</label>
+          <input class="form-control form-control-sm ps-mono" id="cmp-@(k)-temperature" type="number" step="0.1" min="0" max="2" placeholder="@(Model.TemperatureTaken ? "inherit (" + Model.SharedTemperature + ")" : "not supported")" value="@column.Temperature?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" disabled="@(!Model.TemperatureTaken)" data-override="temperature">
+          <div class="form-text" data-override-note>@Model.OverrideNote</div>
+        </div>
+      </div>
+      <button class="btn btn-icon@(Model.Best ? " text-ps-accent" : "")" type="button" title="@(Model.Best ? "Marked as best" : "Mark as best")" aria-label="@(Model.Best ? "Unmark " + Model.Name + " as best" : "Mark " + Model.Name + " as best")" aria-pressed="@(Model.Best ? "true" : "false")" data-col-best disabled="@(!canBest)"><i class="bi @(Model.Best ? "bi-star-fill" : "bi-star")"></i></button>
+      @if (streaming)
+      {
+        <button class="btn btn-icon" type="button" title="Stop this column" aria-label="Stop @Model.Name" data-col-stop><i class="bi bi-stop-circle"></i></button>
+      }
+      else
+      {
+        <button class="btn btn-icon" type="button" title="Re-run this column with the comparison's prompt" aria-label="Re-run @Model.Name" data-col-rerun disabled="@(Model.GroupId is null || !Model.Known)"><i class="bi bi-arrow-repeat"></i></button>
+      }
+      <button class="btn btn-icon" type="button" title="Remove column" aria-label="Remove @Model.Name" data-col-remove disabled="@(!Model.CanRemove || streaming)"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="w-100 d-flex flex-wrap gap-1 cmp-chips">
+      @if (Model.Best)
+      {
+        <span class="ps-chip" data-tone="accent" data-chip="best"><i class="bi bi-star-fill"></i>best</span>
+      }
+      @if (Model.Fastest)
+      {
+        <span class="ps-chip" data-tone="ok" data-chip="fastest" title="The shortest total time of the completed columns"><i class="bi bi-lightning-charge-fill"></i>fastest</span>
+      }
+      <span class="cmp-chip-group" data-col-draft-chips>
+        @foreach (var chip in Model.Chips)
+        {
+          <span class="ps-chip" data-tone="@chip.Tone" title="@chip.Title" data-chip="@chip.Kind">@chip.Text</span>
+        }
+      </span>
+      @if (Model.Billing == BillingKind.Subscription)
+      {
+        <span class="ps-chip" data-tone="accent" title="List price only: a subscription is never counted toward money caps">subscription</span>
+      }
+      @if (!Model.Known)
+      {
+        <span class="ps-chip" data-tone="warn" title="PiSharp doesn't list this model now; choose another">not available</span>
+      }
+      @switch (state)
+      {
+        case "streaming":
+          <span class="ps-chip" data-tone="info" data-chip="state">streaming</span>
+          break;
+        case "completed":
+          <span class="ps-chip" data-tone="outline" data-chip="state" title="stopReason">@Model.StopChip</span>
+          break;
+        case "stopped":
+          <span class="ps-chip" data-tone="warn" data-chip="state"><i class="bi bi-stop-fill"></i>stopped</span>
+          break;
+        case "error":
+          <span class="ps-chip" data-tone="danger" data-chip="state">@Model.ErrorChip</span>
+          break;
+      }
+    </div>
+  </div>
+
+  <div class="compare-col-body" tabindex="0" aria-label="Answer of @Model.Name" data-col-body>
+    @if (run is null)
+    {
+      <div class="cmp-col-empty text-ps-faint fs-7" data-col-empty>
+        @if (Model.Known)
+        {
+          <i class="bi bi-play-circle me-1"></i><text>Not run yet. Run all sends the shared prompt to every column.</text>
+        }
+        else
+        {
+          <i class="bi bi-exclamation-triangle me-1"></i><text>@label isn't available. Choose another model.</text>
+        }
+      </div>
+    }
+    else
+    {
+      <details class="thinking" hidden="@(thinking.Count == 0)" data-col-thinking>
+        <summary><i class="bi bi-chevron-right"></i><i class="bi bi-lightbulb"></i> Thinking</summary>
+        <div class="thinking-body cmp-pre" data-stream-thinking>@string.Join("\n\n", thinking.Select(block => block.Text))</div>
+      </details>
+      if (streaming)
+      {
+        <div class="msg-content cmp-pre stream-cursor" data-stream-text>@string.Concat(texts.Select(block => block.Text))</div>
+      }
+      else if (state == "error")
+      {
+        <div class="msg-error" data-col-error>
+          <div class="d-flex align-items-start gap-2">
+            <i class="bi bi-x-octagon mt-1"></i>
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-semibold">@Model.ErrorTitle</div>
+              <div class="small text-break">@(Model.Output.SpendError?.Text ?? run.Error ?? "The run ended without an answer.")</div>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                @if (Model.AccountError)
+                {
+                  <a class="btn btn-sm btn-outline-danger" href="/settings/providers"><i class="bi bi-key me-1"></i>Fix</a>
+                }
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-col-retry disabled="@(Model.GroupId is null || !Model.Known)"><i class="bi bi-arrow-repeat me-1"></i>Retry</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        if (Model.Error?.RawBody is { } body)
+        {
+          <div class="ps-label mt-3 mb-1">Response body</div>
+          <div class="ps-term"><pre class="wrap"><code class="language-json">@body</code></pre></div>
+        }
+        else if (Model.Error?.RawNote is { } note)
+        {
+          <div class="fs-8 text-ps-faint mt-2">@note</div>
+        }
+        <div class="fs-8 text-ps-faint mt-2">Failure kind: @kind · not retried (PiSharp never retries a run by itself).</div>
+      }
+      else
+      {
+        foreach (var text in texts.Where(block => block.Text.Length > 0))
+        {
+          <div class="msg-content">@Html.Raw(Markdown.Render(text.Text))</div>
+        }
+        if (texts.All(block => block.Text.Length == 0) && run.OutputText is { Length: > 0 } partial)
+        {
+          <div class="msg-content">@Html.Raw(Markdown.Render(partial))</div>
+        }
+        if (state == "stopped")
+        {
+          <div class="fs-8 text-ps-faint mt-2"><i class="bi bi-stop-fill me-1"></i>Stopped before the answer finished@(run.OutputText is { Length: > 0 } ? "; the text above is what had streamed." : ".")</div>
+        }
+      }
+    }
+  </div>
+
+  <div class="compare-col-foot" data-col-foot>
+    @if (run is null)
+    {
+      <span class="text-ps-faint">@(Model.Billing switch { BillingKind.Free => "free", BillingKind.Subscription => "subscription", BillingKind.Metered => "metered", _ => "" })</span>
+    }
+    else
+    {
+      foreach (var item in Model.Foot)
+      {
+        <span class="@item.Tone" title="@item.Title" data-foot="@item.Label">@item.Value</span>
+      }
+      <a class="ms-auto text-ps-faint" href="@Model.Output.InspectorUrl" title="Open this run in the inspector" aria-label="Open the run of @Model.Name in the inspector" data-col-inspect><i class="bi bi-braces"></i></a>
+    }
+  </div>
+</section>

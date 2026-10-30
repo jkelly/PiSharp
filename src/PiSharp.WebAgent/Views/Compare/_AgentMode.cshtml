@@ -1,0 +1,23 @@
+@* Decision 0011 (run W4, R2 stub; owner: R6, agent compare views). Compare's agent mode (GET /compare?mode=agent): R6 replaces this stub
+   with compare.html's agent states (agent-setup, agent-dirty, agent-running, agent-approval, agent-done, agent-kept) and their partials
+   (_Agent*.cshtml, _KeepResultModal). The page (Views/Compare/Index.cshtml, R2's) renders this partial in place of request mode's prompt and
+   columns, inside main.app-content (a no-scroll flex column), with compare.css and compare.js loaded; compare.js only wires the
+   Request · Agent switch here (_CompareModeSwitch, which this partial renders). R6 loads its own module and modals from here (a
+   <script type="module" src> tag and the modal markup; no inline script: the CSP is script-src 'self') or asks R2 for a hosting line in
+   Index's Modals and Scripts sections. Model: ComparePage (R6 may @inject its own services). Until R6 lands, it says plainly that agent mode
+   is not built yet; nothing here is sample data. *@
+@model ComparePage
+<section class="compare-prompt" aria-label="Task" data-agent-mode>
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <span class="ps-label">Task</span>
+    <div class="ms-auto"></div>
+    <partial name="_CompareModeSwitch" model="Model" />
+  </div>
+</section>
+<div class="flex-grow-1 overflow-auto" data-agent-mode-body>
+  <div class="empty-state">
+    <div class="empty-icon"><i class="bi bi-robot"></i></div>
+    <h3 class="ps-heading fs-2 mb-2">Agent compare <em>isn't here yet</em></h3>
+    <p class="fs-7 mb-3 mx-auto cmp-empty-text">Agent mode runs each model on the same task with tools, each in its own copy of a project. Switch to Request to compare single answers.</p>
+  </div>
+</div>
