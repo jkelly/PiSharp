@@ -1,0 +1,36 @@
+{
+  "accounts": [
+    {
+      "id": "A-4",
+      "name": "Northstar Labs",
+      "segment": "enterprise",
+      "owner": "Ria"
+    }
+  ],
+  "opportunities": [
+    {
+      "account_id": "A-4",
+      "name": "Expansion",
+      "amount": 45000,
+      "stage": "proposal"
+    },
+    {
+      "account_id": "A-4",
+      "name": "Support renewal",
+      "amount": 12000,
+      "stage": "negotiation"
+    }
+  ],
+  "activities": [
+    {
+      "account_id": "A-4",
+      "date": "2026-10-25",
+      "note": "Requested security overview"
+    },
+    {
+      "account_id": "A-4",
+      "date": "2026-10-27",
+      "note": "Demo completed"
+    }
+  ]
+}

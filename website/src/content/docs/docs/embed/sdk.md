@@ -146,3 +146,15 @@ The libraries do not read your environment on their own. You pass in the things 
 - **Models and keys.** `PiSharp.AI` builds a transport from a model, an endpoint and a key that you supply. Helpers read provider keys from an environment lookup you pass in. `PiSharp.AI` reads Pi's model catalog files but has no public loader for a built-in copy, and the `auth.json` credential store belongs to the CLI. See [Chat and providers](/docs/embed/chat/).
 - **Tool permissions.** Built-in tools run only through an `IToolActionPolicy` that you write. The policy sees each final file path or command and decides. See [Built-in tools](/docs/embed/coding-agent/#built-in-tools).
 - **Paths.** Settings files, skill folders, prompt template folders and session files are absolute paths you choose. See [Coding agent](/docs/embed/coding-agent/).
+
+## Runnable agent examples
+
+The repository includes [32 sample projects](https://github.com/jkelly/PiSharp/tree/main/samples/agents), each with a fixture demo, input data, README and focused self-tests. They cover everyday workflows, native session branching, concurrent agents, a model/pricing catalog maintainer and a NuGet vulnerability maintainer.
+
+```powershell
+dotnet build samples/agents/PiSharp.Samples.slnx -m:1
+dotnet run --project samples/agents/01-InboxTriage
+pwsh -File samples/agents/scripts/run-all.ps1
+```
+
+Fixture demos require no API key. Live model execution and repository publishing are explicit options; the sample guide documents provider configuration, approval boundaries and inactive scheduling templates.

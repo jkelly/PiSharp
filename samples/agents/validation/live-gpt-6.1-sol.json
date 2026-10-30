@@ -1,0 +1,791 @@
+{
+  "model": "gpt-6.1-sol",
+  "api": "openai-responses",
+  "apiKeyEnvironment": "OPENAI_API_KEY",
+  "completedAtUtc": "2026-10-30T03:08:51.1941470Z",
+  "samples": 32,
+  "passed": 32,
+  "failed": 0,
+  "inputTokens": 31902.0,
+  "outputTokens": 6378.0,
+  "domainData": "fixtures",
+  "externalPublishing": false,
+  "results": [
+    {
+      "number": 1,
+      "title": "Inbox Triage",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "assess_message",
+        "list_messages"
+      ],
+      "executedTools": [
+        "assess_message",
+        "list_messages"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1307.0,
+      "outputTokens": 231.0,
+      "failures": [],
+      "durationSeconds": 8.11
+    },
+    {
+      "number": 2,
+      "title": "Email Reply Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "draft_reply",
+        "read_thread"
+      ],
+      "executedTools": [
+        "draft_reply",
+        "read_thread"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 954.0,
+      "outputTokens": 80.0,
+      "failures": [],
+      "durationSeconds": 7.23
+    },
+    {
+      "number": 3,
+      "title": "Meeting Follow-through",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "extract_actions",
+        "prepare_followup"
+      ],
+      "executedTools": [
+        "extract_actions",
+        "prepare_followup"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1051.0,
+      "outputTokens": 127.0,
+      "failures": [],
+      "durationSeconds": 7.15
+    },
+    {
+      "number": 4,
+      "title": "Daily Work Planner",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "build_plan",
+        "list_commitments"
+      ],
+      "executedTools": [
+        "build_plan",
+        "list_commitments"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1150.0,
+      "outputTokens": 167.0,
+      "failures": [],
+      "durationSeconds": 6.89
+    },
+    {
+      "number": 5,
+      "title": "Persistent Task Manager",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "inspect_task",
+        "list_tasks"
+      ],
+      "executedTools": [
+        "inspect_task",
+        "list_tasks"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1054.0,
+      "outputTokens": 95.0,
+      "failures": [],
+      "durationSeconds": 5.69
+    },
+    {
+      "number": 6,
+      "title": "Company Knowledge Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "get_passage",
+        "search_passages"
+      ],
+      "executedTools": [
+        "get_passage",
+        "search_passages"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1255.0,
+      "outputTokens": 96.0,
+      "failures": [],
+      "durationSeconds": 5.93
+    },
+    {
+      "number": 7,
+      "title": "Document Change Explainer",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "compare_sections",
+        "read_versions"
+      ],
+      "executedTools": [
+        "compare_sections",
+        "read_versions"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 698.0,
+      "outputTokens": 221.0,
+      "failures": [],
+      "durationSeconds": 6.27
+    },
+    {
+      "number": 8,
+      "title": "Form Intake Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "prepare_routing",
+        "validate_form"
+      ],
+      "executedTools": [
+        "prepare_routing",
+        "validate_form"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 966.0,
+      "outputTokens": 165.0,
+      "failures": [],
+      "durationSeconds": 6.83
+    },
+    {
+      "number": 9,
+      "title": "Helpdesk Resolution Agent",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "inspect_ticket",
+        "suggest_resolution"
+      ],
+      "executedTools": [
+        "inspect_ticket",
+        "suggest_resolution"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 956.0,
+      "outputTokens": 149.0,
+      "failures": [],
+      "durationSeconds": 6.93
+    },
+    {
+      "number": 10,
+      "title": "IT Troubleshooting Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "diagnose_device",
+        "inspect_device"
+      ],
+      "executedTools": [
+        "diagnose_device",
+        "inspect_device"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1114.0,
+      "outputTokens": 296.0,
+      "failures": [],
+      "durationSeconds": 9.47
+    },
+    {
+      "number": 11,
+      "title": "Order Status Concierge",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "estimate_delivery",
+        "lookup_order"
+      ],
+      "executedTools": [
+        "estimate_delivery",
+        "lookup_order"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 840.0,
+      "outputTokens": 243.0,
+      "failures": [],
+      "durationSeconds": 6.17
+    },
+    {
+      "number": 12,
+      "title": "Returns Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "calculate_refund",
+        "check_eligibility"
+      ],
+      "executedTools": [
+        "calculate_refund",
+        "check_eligibility"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1170.0,
+      "outputTokens": 250.0,
+      "failures": [],
+      "durationSeconds": 7.22
+    },
+    {
+      "number": 13,
+      "title": "CRM Update Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "find_contact",
+        "preview_update"
+      ],
+      "executedTools": [
+        "find_contact",
+        "preview_update"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1160.0,
+      "outputTokens": 94.0,
+      "failures": [],
+      "durationSeconds": 6.0
+    },
+    {
+      "number": 14,
+      "title": "Client Meeting Briefing",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "build_meeting_brief",
+        "fetch_meeting_context"
+      ],
+      "executedTools": [
+        "build_meeting_brief",
+        "fetch_meeting_context"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1229.0,
+      "outputTokens": 232.0,
+      "failures": [],
+      "durationSeconds": 7.63
+    },
+    {
+      "number": 15,
+      "title": "Customer Feedback Analyst",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "analyze_themes",
+        "rank_themes"
+      ],
+      "executedTools": [
+        "analyze_themes",
+        "rank_themes"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1002.0,
+      "outputTokens": 209.0,
+      "failures": [],
+      "durationSeconds": 7.84
+    },
+    {
+      "number": 16,
+      "title": "Receipt-to-Expense Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "classify_expense",
+        "parse_receipt_text"
+      ],
+      "executedTools": [
+        "classify_expense",
+        "parse_receipt_text"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 934.0,
+      "outputTokens": 106.0,
+      "failures": [],
+      "durationSeconds": 7.08
+    },
+    {
+      "number": 17,
+      "title": "Invoice Reconciliation Agent",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "calculate_payable",
+        "match_invoice"
+      ],
+      "executedTools": [
+        "calculate_payable",
+        "match_invoice"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1194.0,
+      "outputTokens": 258.0,
+      "failures": [],
+      "durationSeconds": 8.35
+    },
+    {
+      "number": 18,
+      "title": "Vendor Quote Comparator",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "normalize_quotes",
+        "rank_quotes"
+      ],
+      "executedTools": [
+        "normalize_quotes",
+        "rank_quotes"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1022.0,
+      "outputTokens": 242.0,
+      "failures": [],
+      "durationSeconds": 7.97
+    },
+    {
+      "number": 19,
+      "title": "Inventory Reorder Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "build_reorder_plan",
+        "calculate_stock_gaps"
+      ],
+      "executedTools": [
+        "build_reorder_plan",
+        "calculate_stock_gaps"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1109.0,
+      "outputTokens": 199.0,
+      "failures": [],
+      "durationSeconds": 6.75
+    },
+    {
+      "number": 20,
+      "title": "Weekly Operations Reporter",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "calculate_week_report",
+        "fetch_week_metrics"
+      ],
+      "executedTools": [
+        "calculate_week_report",
+        "fetch_week_metrics"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1885.0,
+      "outputTokens": 381.0,
+      "failures": [],
+      "durationSeconds": 9.31
+    },
+    {
+      "number": 21,
+      "title": "Spreadsheet Cleanup Agent",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "clean_csv",
+        "quality_report"
+      ],
+      "executedTools": [
+        "clean_csv",
+        "quality_report"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 662.0,
+      "outputTokens": 74.0,
+      "failures": [],
+      "durationSeconds": 6.81
+    },
+    {
+      "number": 22,
+      "title": "Repository Onboarding Guide",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "inspect_layout",
+        "write_guide"
+      ],
+      "executedTools": [
+        "inspect_layout",
+        "write_guide"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 685.0,
+      "outputTokens": 104.0,
+      "failures": [],
+      "durationSeconds": 5.65
+    },
+    {
+      "number": 23,
+      "title": "Bug Investigation and Fix Agent",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "patch_and_verify",
+        "reproduce"
+      ],
+      "executedTools": [
+        "patch_and_verify",
+        "reproduce"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 699.0,
+      "outputTokens": 116.0,
+      "failures": [],
+      "durationSeconds": 6.4
+    },
+    {
+      "number": 24,
+      "title": "Pull Request Review Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "scan_diff",
+        "write_review"
+      ],
+      "executedTools": [
+        "scan_diff",
+        "write_review"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 743.0,
+      "outputTokens": 186.0,
+      "failures": [],
+      "durationSeconds": 7.35
+    },
+    {
+      "number": 25,
+      "title": "Release Notes Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "classify_commits",
+        "draft_notes"
+      ],
+      "executedTools": [
+        "classify_commits",
+        "draft_notes"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 651.0,
+      "outputTokens": 88.0,
+      "failures": [],
+      "durationSeconds": 6.35
+    },
+    {
+      "number": 26,
+      "title": "Localization Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "validate_strings",
+        "write_review"
+      ],
+      "executedTools": [
+        "validate_strings",
+        "write_review"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 737.0,
+      "outputTokens": 90.0,
+      "failures": [],
+      "durationSeconds": 6.14
+    },
+    {
+      "number": 27,
+      "title": "Product Content Studio",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "prepare_visual_asset",
+        "write_copy"
+      ],
+      "executedTools": [
+        "prepare_visual_asset",
+        "write_copy"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 502.0,
+      "outputTokens": 109.0,
+      "failures": [],
+      "durationSeconds": 4.82
+    },
+    {
+      "number": 28,
+      "title": "Research Workbench",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "branch_inquiry",
+        "capture_evidence"
+      ],
+      "executedTools": [
+        "branch_inquiry",
+        "capture_evidence"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 822.0,
+      "outputTokens": 134.0,
+      "failures": [],
+      "durationSeconds": 7.21
+    },
+    {
+      "number": 29,
+      "title": "Project Delivery Coordinator",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "dispatch_analysts",
+        "synthesize_delivery"
+      ],
+      "executedTools": [
+        "dispatch_analysts",
+        "synthesize_delivery"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1566.0,
+      "outputTokens": 488.0,
+      "failures": [],
+      "durationSeconds": 12.96
+    },
+    {
+      "number": 30,
+      "title": "Desktop Workflow Assistant",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "prepare_brief",
+        "validate_request"
+      ],
+      "executedTools": [
+        "prepare_brief",
+        "validate_request"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 649.0,
+      "outputTokens": 76.0,
+      "failures": [],
+      "durationSeconds": 5.91
+    },
+    {
+      "number": 31,
+      "title": "Model Catalog and Pricing Maintainer",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "draft_change_review",
+        "inspect_providers",
+        "refresh_catalog"
+      ],
+      "executedTools": [
+        "draft_change_review",
+        "inspect_providers",
+        "refresh_catalog"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 1914.0,
+      "outputTokens": 630.0,
+      "failures": [],
+      "durationSeconds": 16.2
+    },
+    {
+      "number": 32,
+      "title": "NuGet Vulnerability Remediation Agent",
+      "requestedModel": "gpt-6.1-sol",
+      "api": "openai-responses",
+      "success": true,
+      "hostSuccess": true,
+      "expectedTools": [
+        "maintain_fixture"
+      ],
+      "executedTools": [
+        "maintain_fixture"
+      ],
+      "missingTools": [],
+      "modelsObserved": [
+        "gpt-6.1-sol"
+      ],
+      "inputTokens": 222.0,
+      "outputTokens": 442.0,
+      "failures": [],
+      "durationSeconds": 11.15
+    }
+  ],
+  "sourceBase": "f49f212fc476c9e3a1879bd11c5c209222a29e1f",
+  "scope": "Live agent/tool integration on current-main base with fixture-backed domain services",
+  "offlineValidation": {
+    "samplePrograms": 32,
+    "fixtureDemosPassed": 32,
+    "runtimeChecksPassed": 11,
+    "modelRegistryCasesPassed": 75
+  }
+}

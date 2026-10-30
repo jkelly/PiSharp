@@ -1,0 +1,31 @@
+{
+  "task": "Find the hotel-booking approval requirement. Search for relevant passages, retrieve the exact matching passage, then answer with its document ID, revision and section citation.",
+  "documents": [
+    {
+      "id": "doc-601",
+      "title": "Expense policy",
+      "revision": "2026-08",
+      "passages": [
+        {
+          "section": "Travel",
+          "text": "Hotel stays require manager approval before booking."
+        },
+        {
+          "section": "Meals",
+          "text": "Meals are reimbursable up to $50 per day."
+        }
+      ]
+    },
+    {
+      "id": "doc-602",
+      "title": "Remote work",
+      "revision": "2026-09",
+      "passages": [
+        {
+          "section": "Equipment",
+          "text": "Employees may request a keyboard through IT."
+        }
+      ]
+    }
+  ]
+}

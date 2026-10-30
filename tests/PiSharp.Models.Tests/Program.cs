@@ -26,6 +26,7 @@ internal static partial class Program
         }
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(CatalogCases());
+        cases.AddRange(MaintainedCatalogCases());
         cases.AddRange(ResolverCases());
         cases.AddRange(ModelsJsonCases());
         cases.AddRange(ConfigValueCases());

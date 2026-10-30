@@ -1,0 +1,21 @@
+{
+  "task": "Find contact C-17 and preview changing its stage to qualified. Report the before and after values, but do not save the update.",
+  "contacts": [
+    {
+      "id": "C-17",
+      "name": "Elena Park",
+      "company": "Northstar Labs",
+      "email": "elena@northstar.example",
+      "stage": "lead",
+      "owner": "Ria"
+    },
+    {
+      "id": "C-18",
+      "name": "Jon Patel",
+      "company": "Acme Tools",
+      "email": "jon@acme.example",
+      "stage": "customer",
+      "owner": "Luis"
+    }
+  ]
+}

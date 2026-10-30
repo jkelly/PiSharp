@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-29",
+  "capacity_minutes": 240,
+  "commitments": [
+    {
+      "id": "w-401",
+      "title": "Fix payment bug",
+      "priority": 5,
+      "minutes": 120,
+      "due": "2026-10-29"
+    },
+    {
+      "id": "w-402",
+      "title": "Review launch copy",
+      "priority": 3,
+      "minutes": 60,
+      "due": "2026-10-30"
+    },
+    {
+      "id": "w-403",
+      "title": "Clean archive",
+      "priority": 1,
+      "minutes": 180,
+      "due": "2026-11-06"
+    }
+  ]
+}

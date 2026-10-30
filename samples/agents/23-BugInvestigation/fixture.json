@@ -1,0 +1,17 @@
+{
+  "source": "public static bool IsAdult(int age) => age > 18;",
+  "cases": [
+    {
+      "age": 17,
+      "expected": false
+    },
+    {
+      "age": 18,
+      "expected": true
+    },
+    {
+      "age": 19,
+      "expected": true
+    }
+  ]
+}

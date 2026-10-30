@@ -1,0 +1,8 @@
+{
+  "receipt_text": "Cedar Cafe\n2026-10-24\nCoffee 4.50\nSandwich 12.00\nTax 1.32\nTotal 17.82",
+  "merchant_categories": {
+    "Cedar Cafe": "Meals"
+  },
+  "max_meal": 25.0,
+  "employee": "Maya Chen"
+}

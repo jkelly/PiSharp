@@ -1,0 +1,10 @@
+{
+  "product": "TrailCup",
+  "features": [
+    "Keeps drinks warm for six hours",
+    "Leak-resistant lid"
+  ],
+  "audience": "commuters",
+  "visualBrief": "A reusable mug on a morning train table",
+  "assetMode": "fixture-only"
+}
