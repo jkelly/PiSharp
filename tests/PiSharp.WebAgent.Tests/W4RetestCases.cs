@@ -2,6 +2,8 @@
 // is a GET another website can send, like agent compare's project inspection was before its fix: it now answers only the app's own pages
 // (Sec-Fetch-Site same-origin or none), and a network or device path is refused before anything touches it, since listing \\server\share
 // would offer the user's Windows credentials to that host. No case calls a provider or reaches the network (the host is .invalid).
+// After the W5 live test: This PC waits at most FolderBrowser.DriveWait for drives other than fixed disks, all asked at once, so a drive that
+// does not answer (a disconnected network drive) is left out instead of holding the list.
 using PiSharp.WebAgent.Settings;
 
 internal static partial class Program
@@ -61,6 +63,45 @@ internal static partial class Program
             {
                 SqliteClearPools();
                 DeleteTemp(root);
+            }
+        }),
+
+        Case("w4.retest.the-drive-list-does-not-wait-for-a-drive-that-does-not-answer", () =>
+        {
+            using var hold = new ManualResetEventSlim();
+            var asked = 0;
+            bool Silent()
+            {
+                Interlocked.Increment(ref asked);
+                hold.Wait();
+                return true;
+            }
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var ready = FolderBrowser.ReadyDrives(
+            [
+                (@"C:\", true, () => true),
+                (@"D:\", true, () => false),
+                (@"Y:\", false, Silent),
+                (@"Z:\", false, Silent),
+                (@"F:\", false, () => true),
+                (@"G:\", false, () => throw new InvalidOperationException("device error")),
+            ], TimeSpan.FromMilliseconds(500));
+            var took = watch.Elapsed;
+            hold.Set();
+            Equal(@"C:\|F:\", string.Join("|", ready), "the drives that said they are ready in time, in order");
+            Check(took < TimeSpan.FromSeconds(3), $"the list waited {took} for two drives that never answered");
+            Equal(2, Volatile.Read(ref asked), "both silent drives were asked, at once");
+            Equal(@"C:\", string.Join("|", FolderBrowser.ReadyDrives([(@"C:\", true, () => true), (@"G:\", false, () => throw new IOException("gone"))],
+                TimeSpan.FromSeconds(5))), "a drive whose check fails is left out once every drive has answered");
+
+            // The real list: the system drive, within the wait (a disconnected network drive held it for seconds before).
+            if (OperatingSystem.IsWindows())
+            {
+                watch.Restart();
+                var top = FolderBrowser.List(null);
+                Check(top.Folders.Any(folder => folder.Path == Path.GetPathRoot(Environment.SystemDirectory)),
+                    "This PC lists the system drive: " + string.Join(", ", top.Folders.Select(folder => folder.Name)));
+                Check(watch.Elapsed < FolderBrowser.DriveWait + TimeSpan.FromSeconds(3), $"This PC took {watch.Elapsed}");
             }
         }),
     ];

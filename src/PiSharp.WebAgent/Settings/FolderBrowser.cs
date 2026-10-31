@@ -6,6 +6,10 @@
 // A network or device path (\\server\share, \\?\, \\.\) is refused before anything touches it (W4 retest): listing one reaches the host it
 // names over SMB or WebDAV and offers it the user's Windows credentials, and another website can send this GET (SettingsEndpoints refuses
 // a request the browser marks as cross-site too). A network folder can still be typed as the working directory.
+// The drive list waits at most DriveWait for the drives to say whether they are ready (after the W5 live test): a disconnected network drive
+// takes seconds to say it is not, and asking each drive in turn held This PC until every one had. Fixed disks answer at once and are asked
+// inline; the others (network, removable, optical) are asked all at once, and one that has not answered by then is left out, as one that is
+// not ready is. Its folders can still be typed as the working directory.
 using PiSharp.WebAgent.AgentCompare.Workspaces;
 
 namespace PiSharp.WebAgent.Settings;
@@ -38,6 +42,9 @@ public static class FolderBrowser
     /// <summary>The most subfolders one listing holds.</summary>
     public const int MaximumFolders = 500;
 
+    /// <summary>How long the drive list waits for drives other than fixed disks to say whether they are ready.</summary>
+    public static readonly TimeSpan DriveWait = TimeSpan.FromSeconds(2);
+
     /// <summary>The top level's name in the breadcrumb.</summary>
     public const string TopName = "This PC";
 
@@ -55,7 +62,8 @@ public static class FolderBrowser
         if (string.IsNullOrWhiteSpace(path))
         {
             if (!OperatingSystem.IsWindows()) return List("/");
-            var drives = DriveInfo.GetDrives().Where(Ready).Select(drive => new FolderEntry(drive.Name.TrimEnd('\\', '/'), drive.Name, false, false)).ToList();
+            var ready = ReadyDrives([.. DriveInfo.GetDrives().Select(drive => (drive.Name, drive.DriveType == DriveType.Fixed, (Func<bool>)(() => Ready(drive))))], DriveWait);
+            var drives = ready.Select(name => new FolderEntry(name.TrimEnd('\\', '/'), name, false, false)).ToList();
             return new FolderListing(null, null, [new FolderCrumb(TopName, null)], drives, [], false);
         }
         // Before anything touches the path, and again once it is resolved.
@@ -132,6 +140,16 @@ public static class FolderBrowser
         }
         if (OperatingSystem.IsWindows()) crumbs.Insert(0, new FolderCrumb(TopName, null));
         return crumbs;
+    }
+
+    /// <summary>The names of <paramref name="drives"/> that say they are ready, in their order: a fixed disk is asked inline, the others all at
+    /// once, and one of those that has not answered within <paramref name="wait"/> is left out.</summary>
+    internal static IReadOnlyList<string> ReadyDrives(IReadOnlyList<(string Name, bool Fixed, Func<bool> Ready)> drives, TimeSpan wait)
+    {
+        var checks = drives.Select(drive => drive.Fixed ? Task.FromResult(drive.Ready()) : Task.Run(drive.Ready)).ToArray();
+        try { Task.WaitAll(checks, wait); }
+        catch (AggregateException) { /* A drive whose check failed is left out below. */ }
+        return [.. drives.Where((_, index) => checks[index].IsCompletedSuccessfully && checks[index].Result).Select(drive => drive.Name)];
     }
 
     private static bool Ready(DriveInfo drive)
