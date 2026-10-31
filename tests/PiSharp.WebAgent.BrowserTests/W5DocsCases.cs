@@ -22,10 +22,6 @@ internal static partial class Program
         // Pins (E7): agent compare runs and agent battles are refused as "agent test cases come later".
         new("agent test cases", "agent test cases",
             root => AppFilesMatching(root, "*.cs", @"\bAgentLater\b") is { Count: > 0 } ? null : "PinRules no longer refuses agent runs (AgentLater is gone)"),
-        // Pins (E7): the Tool Bench's views are not E7's, so the bench hosts no Pin as test.
-        new("the Tool Bench has no Pin as test", "a Pin as test button on the Tool Bench",
-            root => AppFilesMatching(root, "*.cshtml", "modal-test-case").Any(path => path.StartsWith("Views/Bench/", StringComparison.Ordinal))
-                ? "a Tool Bench view now opens modal-test-case" : null),
         // Run engine (W5 integration fix 1, fix 2 docs): a suite call whose hold no longer fits (another active account, which only a judge
         // without its own account can meet, or the run's Cap output one the call cannot hold) is released and reserved again as its own
         // call, which can be refused mid-run (the result is stored never sent). No in-app case reaches it end to end: faux models have no
@@ -75,7 +71,7 @@ internal static partial class Program
 
     private static readonly W4CoverageGap[] W5CoverageGaps =
     [
-        new("pinning from the other sources", "Pin as test from chat, the Playground, a Compare column, History and the inspector", ["data-pin-chat", "data-pin-run"]),
+        new("pinning from the other sources", "Pin as test from chat, the Playground, a Compare column, the Tool Bench, History and the inspector", ["data-pin-chat", "data-pin-run"]),
         new("Stream anyway", "Stream anyway", ["data-arena-stream-anyway"]),
         new("Stop all", "Stop all", ["data-arena-stop"]),
         new("New round", "New round", ["data-arena-again"]),
