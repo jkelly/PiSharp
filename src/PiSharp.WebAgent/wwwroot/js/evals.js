@@ -670,7 +670,7 @@ async function refreshRun() {
       live.replaceWith(fresh);
       if (wasRunning && fresh.dataset.running !== 'true') {
         showToast({ title: 'Run finished', body: `The run is ${fresh.dataset.runStatus ?? 'over'}.`, tone: fresh.dataset.runStatus === 'complete' ? 'ok' : 'warn' });
-        // A complete run's drift signals are stored just after it is marked complete: read it once more to show them.
+        // A complete run's drift signals are stored before it reads complete (W5 integration); one more read a moment later is only a margin.
         if (fresh.dataset.runStatus === 'complete') window.setTimeout(settleRun, SETTLE_MS);
       }
     }
@@ -717,7 +717,7 @@ async function refreshSuiteRun() {
     const answer = await getRequest(api.run(runId));
     const status = answer?.run?.status;
     if (status && status !== 'queued' && status !== 'running') {
-      // Reloaded a moment later, so the drift signals stored just after the run is marked complete show.
+      // Reloaded a moment later; the run's drift signals are stored before it reads complete (W5 integration), so the delay is only a margin.
       window.setTimeout(() => flashAndReload({ title: `Run #${answer.run.number} finished`, body: `The run is ${status}.`, tone: status === 'complete' ? 'ok' : 'warn' }),
         status === 'complete' ? SETTLE_MS : 0);
       return;

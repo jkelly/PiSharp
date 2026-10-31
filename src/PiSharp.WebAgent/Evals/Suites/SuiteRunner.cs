@@ -8,13 +8,16 @@
 // Guard reserved the worst case first. Results fill in as answers finish." When the guard refuses the group, nothing is sent and no run
 // is stored (a manual run answers with the confirm modal's spend refusal; a scheduled one records a skipped slot). Each call is sent on its
 // own hold (W5 integration fix 1: RunEngine.StartReservedAsync for an answer, the judge's JudgeContext.Holds for a judgement), which
-// settles at the call's actual cost, so no other reservation can take the headroom between the hold and the call, and the ledger keeps
-// one row per call; the run's total reservation never grows past the group's. Leftover holds (a cancelled or failed run, a judgement
+// settles at the call's actual cost, so, while the hold still fits the call, no other reservation can take the headroom between the hold
+// and the call, and the ledger keeps one row per call; the run's total reservation never grows past the group's. A call whose hold no
+// longer fits (another account than the hold's, or a held output cap the call cannot hold) is released and reserved again as its own
+// call, which can be refused mid-run: the result is then stored never sent (decision 0011, "Not done"). Leftover holds (a cancelled or failed run, a judgement
 // never sent) are released at the end, and after a crash at the next start (recovery). The suite-run cap is checked before reserving: a run whose worst case is
 // above it is refused, manual or scheduled (it never runs over the cap).
 //
-// Answers run four at a time; a result goes queued → running → done or error (cancelled when the run stops first). The account of each
-// target is resolved once when the run starts and pinned on every call, so a run never switches accounts halfway. The app stopping marks
+// Answers run four at a time; a result goes queued → running → done or error (cancelled when the run stops first). The account each
+// target binds when the run starts is pinned on every call, so such a target never switches accounts halfway; a target that binds none
+// then (no account yet) is sent unpinned, so its calls take an account made active mid-run, reserved again as their own calls. The app stopping marks
 // a running run interrupted (its finished results stay, its unfinished ones are cancelled, its holds released); a run left active by a
 // crash is marked interrupted when the app starts again, and its slot is never run again (the slot row stays). Recovery is retried (on
 // every scheduler tick and start) until a pass has marked every such run, so one failure never leaves a run going until the next restart.

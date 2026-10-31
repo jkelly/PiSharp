@@ -538,8 +538,8 @@ internal static partial class Program
         return runId;
     }
 
-    /// <summary>Waits for two signals of <paramref name="level"/> on <paramref name="runId"/>: the Suites unit stores a run's drift signals
-    /// just after it marks the run complete.</summary>
+    /// <summary>Waits for two signals of <paramref name="level"/> on <paramref name="runId"/>. The Suites unit stores a run's drift signals
+    /// before the run reads complete (W5 integration), so once the run is complete this returns at its first read.</summary>
     private static Task EvSignalsAsync(WebAgentApp app, string runId, string level) =>
         WaitUntilAsync(async () => (await app.Get(EvalRoutes.ApiRuns + "/" + runId)).Body?["signals"] is JsonArray signals &&
             signals.Count(signal => signal?["level"]?.GetValue<string>() == level) >= 2, "the run's " + level + " signals", TimeSpan.FromSeconds(30));

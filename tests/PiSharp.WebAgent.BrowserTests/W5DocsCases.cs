@@ -5,9 +5,10 @@
 // use to reach it, and stays listed exactly while no browser case uses one of them; every hook must still be in the app. The record must
 // also call W5 built: its milestone row is not "planned", it has the W5 sections, and nothing in "Not done" still waits for W5.
 // W5 fix 2 (docs): two gaps the integration left out of "Not done" were held here: a held suite call is reserved again as its own call when
-// its hold no longer fits (RunEngine.StartReservedAsync), which can be refused mid-run and which no in-app case reaches end to end, and no
-// case pinned down that a run's drift signals are stored before the run reads complete (W5 fix 2 (tests-ci) closed that one). The
-// W5 section's sentence on suite calls sent on their holds must name the reserve-again path while the engine has it.
+// its hold no longer fits (RunEngine.StartReservedAsync), which can be refused mid-run and which no browser case reaches (W5 fix 2 (suites)
+// reaches it in process), and no case pinned down that a run's drift signals are stored before the run reads complete (W5 fix 2
+// (tests-ci) closed that one). The W5 section's sentence on suite calls sent on their holds must name the reserve-again path while the
+// engine has it.
 internal static partial class Program
 {
     private const string W5CoverageLineStart = "- W5's browser cases leave out:";
@@ -22,31 +23,42 @@ internal static partial class Program
         // Pins (E7): agent compare runs and agent battles are refused as "agent test cases come later".
         new("agent test cases", "agent test cases",
             root => AppFilesMatching(root, "*.cs", @"\bAgentLater\b") is { Count: > 0 } ? null : "PinRules no longer refuses agent runs (AgentLater is gone)"),
-        // Run engine (W5 integration fix 1, fix 2 docs): a suite call whose hold no longer fits (another active account, which only a judge
-        // without its own account can meet, or the run's Cap output one the call cannot hold) is released and reserved again as its own
-        // call, which can be refused mid-run (the result is stored never sent). No in-app case reaches it end to end: faux models have no
-        // accounts, and only the drift analyzer's synthetic never-sent answers cover the stored result. A case that reaches it would see the
-        // hold's release note, so a test that names that note closes the "no in-app case" part.
+        // Run engine (W5 integration fix 1, fix 2 docs): a suite call whose hold no longer fits (another active account, which a judge
+        // without its own account or a target that bound no account when the run started can meet, or the run's Cap output one the call
+        // cannot hold, which the runner does not check before it reserves) is released and reserved again as its own call, which can be
+        // refused mid-run (the result is stored never sent). W5 fix 2 (suites) reaches both in process (EvalSuiteCases); no browser case
+        // does, since faux models have no accounts. A browser case that reaches it would see the hold's release note, so one that names
+        // that note closes the "no browser case" part (W5 retest 2: the line said "no in-app case" until the in-process cases met it).
         new("a held suite call reserved again", "is reserved again as its own call", HeldCallReservedAgainChanged),
     ];
 
+    /// <summary>The in-process cases that reach a suite call reserved again (W5 fix 2, suites), as the "Not done" line names them.</summary>
+    private static readonly string[] HeldCallReservedAgainCases =
+    [
+        "evals.suites.a-call-reserved-again-mid-run-is-refused-unsent-and-raises-no-drift",
+        "evals.suites.a-held-output-cap-a-target-cannot-hold-is-reserved-again-and-refused-unsent",
+    ];
+
     /// <summary>Null while RunEngine.StartReservedAsync still reserves a held call again when its hold no longer fits, faux models have no
-    /// account, the drift analyzer's synthetic never-sent case is there and no in-app case names the hold's release note; else what
-    /// changed.</summary>
+    /// account, SuiteRunner pins only an account it bound and checks no Cap output answer against its targets, the in-process cases that
+    /// reach it are there and no browser case names the hold's release note; else what changed.</summary>
     private static string? HeldCallReservedAgainChanged(string root)
     {
         const string engine = "src/PiSharp.WebAgent/Runs/RunEngine.cs";
+        const string runner = "src/PiSharp.WebAgent/Evals/Suites/SuiteRunner.cs";
         const string note = "reserved again as the run's own call";
         if (!SourceHas(root, engine, note, "held.Account != account", "CapRefusal(plan, lease.Reservation.MaxTokens) is not null"))
             return "RunEngine.StartReservedAsync no longer reserves a call again when its hold's account or output cap does not fit (\"" + note + "\")";
         if (!SourceHas(root, engine, "if (plan.Model.Api == RunModelOptions.FauxApi) return null;"))
             return "a faux model's run now resolves an account, so \"faux models have no accounts\" no longer holds";
-        if (!SourceHas(root, "tests/PiSharp.WebAgent.Tests/EvalDriftCases.cs", "evals.drift.answers-never-sent-and-undecided-judges-raise-nothing"))
-            return "the drift analyzer's synthetic never-sent case (answers-never-sent-and-undecided-judges-raise-nothing) is gone";
-        var reaching = Directory.EnumerateFiles(Path.Join(root, "tests", "PiSharp.WebAgent.Tests"), "*.cs", SearchOption.TopDirectoryOnly)
-            .Where(path => File.ReadAllText(path).Contains(note, StringComparison.Ordinal)).Select(Path.GetFileName)
-            .Concat(BrowserCaseTexts(root).Where(item => item.Value.Contains(note, StringComparison.Ordinal)).Select(item => item.Key)).ToList();
-        return reaching.Count > 0 ? "an in-app case now reaches it (" + string.Join(", ", reaching) + " names \"" + note + "\")" : null;
+        if (!SourceHas(root, runner, "return accounts is null ? null : (await accounts.BindAsync(provider, cancellationToken)"))
+            return "SuiteRunner no longer leaves a target that bound no account unpinned, so \"the runner pins only an account it bound\" no longer holds";
+        if (SourceHas(root, runner, "CapRefusal(") || SourceHas(root, runner, "CheckCap("))
+            return "SuiteRunner now checks a Cap output answer against its targets before it reserves";
+        if (HeldCallReservedAgainCases.FirstOrDefault(id => !SourceHas(root, "tests/PiSharp.WebAgent.Tests/EvalSuiteCases.cs", id)) is { } gone)
+            return "the in-process case " + gone + " is gone";
+        var reaching = BrowserCaseTexts(root).Where(item => item.Value.Contains(note, StringComparison.Ordinal)).Select(item => item.Key).ToList();
+        return reaching.Count > 0 ? "a browser case now reaches it (" + string.Join(", ", reaching) + " names \"" + note + "\")" : null;
     }
 
     // W5 fix 2 (tests-ci): W5PinCases, W5SuiteCases and W5ArenaPlayCases reach every part this list named (Stream anyway, Stop all, New round,
@@ -70,6 +82,15 @@ internal static partial class Program
                 if (closed is null && !listed) problems.Add($"Not done misses an open W5 gap: {gap.Name} (its line says \"{gap.Phrase}\")");
                 if (closed is not null && listed)
                     problems.Add($"Not done still lists \"{gap.Name}\", but {closed}: drop its line (\"{gap.Phrase}\") and this gap, or revise both");
+            }
+            // W5 retest 2: while the reserve-again gap is open, its line names the in-process cases that reach it and no longer says no
+            // in-app case does.
+            if (HeldCallReservedAgainChanged(root) is null)
+            {
+                foreach (var id in HeldCallReservedAgainCases.Select(id => id["evals.suites.".Length..]))
+                    if (!notDone.Contains(id, StringComparison.Ordinal)) problems.Add($"Not done's reserve-again line does not name the in-process case {id}");
+                if (notDone.Contains("No in-app case reaches this", StringComparison.Ordinal))
+                    problems.Add("Not done still says no in-app case reaches a suite call reserved again, but EvalSuiteCases does in process");
             }
             Check(problems.Count == 0, string.Join("; ", problems));
             return Task.CompletedTask;
