@@ -105,8 +105,9 @@ internal static partial class Program
             return app;
         }
 
-        /// <summary>Runs the app until it exits by itself (a start it must refuse), and returns its exit code and output.</summary>
-        public static async Task<(int ExitCode, string Output)> RunToExitAsync(AppStart start, IReadOnlyList<string> hostArguments)
+        /// <summary>Runs the app until it exits by itself (a start it must refuse, or an idle exit), and returns its exit code and output;
+        /// after <paramref name="limit"/> (default 60 seconds) it is killed and the call fails.</summary>
+        public static async Task<(int ExitCode, string Output)> RunToExitAsync(AppStart start, IReadOnlyList<string> hostArguments, TimeSpan? limit = null)
         {
             var output = new StringBuilder();
             using var process = Process.Start(StartInfo(start, hostArguments))!;
@@ -114,7 +115,7 @@ internal static partial class Program
             process.ErrorDataReceived += (_, e) => { lock (output) output.AppendLine(e.Data); };
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            using var timeout = new CancellationTokenSource(limit ?? TimeSpan.FromSeconds(60));
             try { await process.WaitForExitAsync(timeout.Token); }
             catch (OperationCanceledException)
             {
