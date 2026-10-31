@@ -3,9 +3,14 @@
    (turn number, time, duration, stop reason, parallel calls, thinking, its text through the sanitizing MarkdownRenderer, or its error;
    a running turn streams into [data-bench-stream] by textContent), each tool call (_BenchTimeline's tool card: arguments, Pi's schema
    check and its violations), then each call's result (auto · mock, manual, auto · no mock matched, isError, its wait) or, while the bench
-   is paused, _AwaitingResultCard. The last turn of a finished conversation carries the totals of every turn. Model: BenchView. *@
+   is paused, _AwaitingResultCard. The last turn of a finished conversation carries the totals of every turn. W5 (fix 2, pins): a turn
+   whose run completed carries Pin as test at the end of its header (an icon button, as the user row's remove button), which opens
+   _TestCaseModal (#modal-test-case, hosted by Index) with the turn's run (data-pin-run, data-pin-source="bench") when runs.db still has it
+   and PinRules offers it: the case stores the request that turn sent (the conversation up to it, with the calls' results) and its answer,
+   a toolUse turn's calls included. Model: BenchView. *@
 @model BenchView
 @inject MarkdownRenderer Markdown
+@inject RunStore Runs
 @{
     var session = Model.Session;
     var removable = Model.State is not (BenchStates.Running or BenchStates.Awaiting);
@@ -77,6 +82,10 @@ else
           @if (calls.Count > 1)
           {
             <span class="ps-chip" data-tone="outline"><i class="bi bi-distribute-vertical"></i>@calls.Count parallel calls</span>
+          }
+          @if (turn.Completed && PiSharp.WebAgent.Evals.Pins.PinRules.Offered(Runs.Get(turn.RunId)))
+          {
+            <button class="btn btn-icon p-1 ms-auto" type="button" title="Pin as test case: saves this turn's full request and its answer as the reference" aria-label="Pin turn @turn.Index as a test case" data-bs-toggle="modal" data-bs-target="#modal-test-case" data-pin-run="@turn.RunId" data-pin-source="bench"><i class="bi bi-pin-angle fs-8"></i></button>
           }
         </div>
         @if (!string.IsNullOrEmpty(turn.Thinking))

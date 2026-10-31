@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
+using PiSharp.WebAgent.Bench;
 using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
@@ -19,7 +20,8 @@ using PiSharp.WebAgent.Runs;
 // provider options, a key-shaped value under a neutral header name, or a stored key's value anywhere is refused without echoing it, and so
 // is the same request sent to the cases API). Also: targets, refusals (a run still going, a
 // stopped run, an agent run, a blind battle before its vote), the chat transcript replayed as the provider received it, the suggested
-// checks and the modal's texts. Faux and priced-faux transports only.
+// checks and the modal's texts. W5 fix 2 (pins): the Tool Bench hosts the modal and offers Pin as test on each finished turn, and its turns
+// pin as runnable cases. Faux and priced-faux transports only.
 internal static partial class Program
 {
     internal static IEnumerable<(string, Func<Task>)> PinCases() =>
@@ -602,6 +604,77 @@ internal static partial class Program
                 && arenaCase["origin"]?["runId"]?.GetValue<string>() == picked.RunId && arenaCase["tags"]?.ToJsonString() == "[\"coding\"]"
                 && arenaCase["spec"]?["model"]?.GetValue<string>() == picked.Identity.Model, "the picked answer, with its battle: " + arenaCase.ToJsonString());
             PinAllPassed(await PinRunSuiteAsync(app, arenaSaved["suite"]!["id"]!.GetValue<string>()), 1, "the Arena case's suite run");
+            Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
+        }),
+
+        // W5 fix 2 (pins): the Tool Bench hosts the modal, and each finished turn offers Pin as test (a failed turn, or one whose run History
+        // deleted, does not); a toolUse turn and the answer after its result both pin as runnable cases.
+        Case("pins.tool-bench-turns-pin-and-run-in-their-suite", async () =>
+        {
+            await using var app = await WebAgentApp.StartAsync("pin-bench");
+            var created = await app.SendAsync(HttpMethod.Post, "/api/bench/sessions", new JsonObject
+            {
+                ["setup"] = BenchSetupJson(autoRespond: true),
+                ["messages"] = new JsonArray("""tool: get_weather {"location":"Oslo"}"""),
+            }, origin: app.Origin);
+            Equal(200, created.Status, "a bench session: " + created.Text);
+            var id = created.Body!["id"]!.GetValue<string>();
+            var before = (await app.Get("/bench?session=" + id)).Text;
+            Check(before.Contains("id=\"modal-test-case\"", StringComparison.Ordinal) && before.Contains("/js/pin.js", StringComparison.Ordinal), "the Tool Bench hosts the modal and pin.js");
+            Check(!before.Contains("data-pin-run=", StringComparison.Ordinal), "nothing to pin before a turn");
+
+            var events = BenchSessionFramesAsync(app, id, BenchStates.Finished);
+            var run = await app.SendAsync(HttpMethod.Post, $"/api/bench/sessions/{id}/run", new JsonObject(), origin: app.Origin);
+            Check(run.Status == 200 && run.Body?["posted"]?.GetValue<bool>() == true, "Run: " + Cut(run.Text));
+            await events;
+            async Task<string> Timeline() => (await app.Get($"/api/bench/sessions/{id}/view")).Body!["html"]!["timeline"]!.GetValue<string>();
+            static List<string> Turns(string html) => [.. Regex.Matches(html, "data-turn=\"\\d+\" data-turn-run=\"([^\"]+)\"").Select(match => match.Groups[1].Value)];
+            static string Pin(string run) => $"data-pin-run=\"{run}\" data-pin-source=\"bench\"";
+            var timeline = await Timeline();
+            var turns = Turns(timeline);
+            Equal(2, turns.Count, "two turns, the tool call and the answer after its mock: " + Cut(timeline));
+            Check(turns.All(turn => timeline.Contains(Pin(turn), StringComparison.Ordinal)) && timeline.Contains("data-bs-target=\"#modal-test-case\"", StringComparison.Ordinal),
+                "each finished turn offers Pin as test: " + Cut(timeline));
+            var page = (await app.Get("/bench?session=" + id)).Text;
+            Check(turns.All(turn => page.Contains(Pin(turn), StringComparison.Ordinal)), "and so does the page");
+
+            // The answer after the tool's result: the whole conversation up to it is the request.
+            var answer = await PinModalAsync(app, $"source=bench&run={turns[1]}");
+            Equal("ready", answer.State, "ready: " + Cut(answer.Html));
+            Check(answer.Text.Contains("Tool finished: get_weather", StringComparison.Ordinal) && answer.Text.Contains("1 user message, 1 answer and 1 tool result", StringComparison.Ordinal)
+                && answer.Text.Contains("1 tool", StringComparison.Ordinal), "the reference and the request: " + Cut(PinBody(answer.Text)));
+            var saved = await PinSaveAsync(app, PinBodyOf(answer, newSuite: "Bench turns"));
+            Check(saved["created"]?.GetValue<bool>() == true && saved["suiteCreated"]?.GetValue<bool>() == true, "saved in a new suite: " + saved.ToJsonString());
+            var suiteId = saved["suite"]!["id"]!.GetValue<string>();
+            var stored = await PinCaseAsync(app, answer.CaseId!);
+            var spec = stored["spec"]!;
+            Check(spec["messages"] is JsonArray messages && string.Join(",", messages.Select(message => message?["role"]?.GetValue<string>())) == "user,assistant,toolResult"
+                && spec["tools"]?[0]?["name"]?.GetValue<string>() == "get_weather" && spec["account"] is null && spec["groupId"] is null && spec["source"] is null,
+                "the turn's request, without its account or group: " + spec.ToJsonString());
+            Check(stored["origin"]?["source"]?.GetValue<string>() == "bench" && stored["origin"]?["runId"]?.GetValue<string>() == turns[1]
+                && stored["reference"]?["text"]?.GetValue<string>().Contains("Tool finished: get_weather", StringComparison.Ordinal) == true, "from the turn, with its answer: " + stored.ToJsonString());
+
+            // The tool call turn: its reference is the call, and it starts with a tool check.
+            var call = await PinModalAsync(app, $"source=bench&run={turns[0]}");
+            Equal("ready", call.State, "ready: " + Cut(call.Html));
+            Check(call.Checks.Any(check => check["kind"]?.GetValue<string>() == "tool" && check["tool"]?.GetValue<string>() == "get_weather"), "a tool check for the call: "
+                + string.Join(" ", call.Checks.Select(check => check.ToJsonString())));
+            Check((await PinSaveAsync(app, PinBodyOf(call, suiteId: suiteId)))["created"]?.GetValue<bool>() == true, "added to the suite");
+            PinAllPassed(await PinRunSuiteAsync(app, suiteId), 2, "the bench cases' suite run");
+
+            // A turn that failed is not offered, and neither is a turn whose run History deleted.
+            var failed = await app.SendAsync(HttpMethod.Post, $"/api/bench/sessions/{id}/messages", new JsonObject { ["text"] = "error: no weather today", ["run"] = true }, origin: app.Origin);
+            Check(failed.Body?["posted"]?.GetValue<bool>() == true, "Add & run: " + Cut(failed.Text));
+            await BenchStateAsync(app, id, BenchStates.Error);
+            timeline = await Timeline();
+            var all = Turns(timeline);
+            Check(all.Count == 3 && !timeline.Contains($"data-pin-run=\"{all[2]}\"", StringComparison.Ordinal) && turns.All(turn => timeline.Contains(Pin(turn), StringComparison.Ordinal)),
+                "the failed turn offers no Pin as test: " + Cut(timeline));
+            Equal("refused", (await PinModalAsync(app, $"source=bench&run={all[2]}")).State, "and its pin is refused");
+            var deleted = await app.SendAsync(HttpMethod.Post, "/api/runs/delete", new JsonObject { ["ids"] = new JsonArray(turns[0]) }, origin: app.Origin);
+            Equal(1, deleted.Body?["deleted"]?.GetValue<int>(), "History's delete: " + deleted.Text);
+            timeline = await Timeline();
+            Check(!timeline.Contains($"data-pin-run=\"{turns[0]}\"", StringComparison.Ordinal) && timeline.Contains(Pin(turns[1]), StringComparison.Ordinal), "a deleted run is not offered: " + Cut(timeline));
             Check(!app.Log.Contains("fail:", StringComparison.Ordinal), "no server errors: " + app.Log);
         }),
 

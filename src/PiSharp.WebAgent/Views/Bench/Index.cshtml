@@ -5,7 +5,8 @@
    supplied by hand) and default. Each model turn is one guarded, recorded run of the run engine (one runs.db group per conversation); the
    loop and the auto-respond rules run on the server (BenchRunner), so a bench keeps going when the tab closes, and the bench never runs a
    tool. ?session={id} opens a session. Modals: _ModelPickerModal, _ToolEditorModal (with the bench's mock editor, _BenchMocks) and
-   _SpendConfirmModal; the layout hosts _ShortcutsModal. Model: BenchView. *@
+   _SpendConfirmModal; the layout hosts _ShortcutsModal. W5 (fix 2, pins): _TestCaseModal, for a finished turn's Pin as test.
+   Model: BenchView. *@
 @model BenchView
 @{
     ViewData["Title"] = "Tool Bench";
@@ -53,6 +54,8 @@
      setup, and a loaded preset opens a new session). *@
   <partial name="_SavePresetModal" model='PiSharp.WebAgent.Presets.SavePresetView.Host("bench")' />
   <partial name="_LoadPresetModal" model='PiSharp.WebAgent.Presets.LoadPresetView.Host("bench")' />
+  @* W5 (fix 2, pins): Pin as test case, from a finished turn of the timeline (_BenchTimelineBody). *@
+  <partial name="_TestCaseModal" model="null" />
 }
 @section Scripts {
   <script type="module" src="~/js/bench.js" asp-append-version="true"></script>
