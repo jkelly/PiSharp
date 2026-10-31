@@ -38,14 +38,19 @@ public static class SpendMoney
         double.IsFinite(tokens) && double.IsFinite(perMillion) ? (decimal)tokens * (decimal)perMillion : 0m;
 
     /// <summary>An amount for the pages: <c>$1.84</c>; four decimals under a dollar when <paramref name="decimals"/> is null (as the chat's
-    /// message footers show costs: <c>$0.0357</c>), else exactly <paramref name="decimals"/> (0 to 6).</summary>
+    /// message footers show costs: <c>$0.0357</c>), else exactly <paramref name="decimals"/> (0 to 6). A cost above zero too small for the
+    /// places reads <c>&lt;$0.0001</c> (or <c>&lt;$0.01</c>), not <c>$0.0000</c>.</summary>
     public static string Format(long micros, int? decimals = 2)
     {
         var usd = ToUsd(micros);
         var places = decimals ?? (Math.Abs(usd) < 1 ? 4 : 2);
         ArgumentOutOfRangeException.ThrowIfLessThan(places, 0, nameof(decimals));
         ArgumentOutOfRangeException.ThrowIfGreaterThan(places, 6, nameof(decimals));
-        var text = Math.Abs(usd).ToString(places == 0 ? "#,0" : "#,0." + new string('0', places), CultureInfo.InvariantCulture);
+        var format = places == 0 ? "#,0" : "#,0." + new string('0', places);
+        // W5 live test: Claude Haiku's one-sentence answer cost 40 micro-USD, which four decimals showed as $0.0000, as if it were free.
+        if (micros > 0 && decimal.Round(usd, places, MidpointRounding.AwayFromZero) == 0)
+            return "<$" + (1m / (decimal)Math.Pow(10, places)).ToString(format, CultureInfo.InvariantCulture);
+        var text = Math.Abs(usd).ToString(format, CultureInfo.InvariantCulture);
         return (usd < 0 ? "-$" : "$") + text;
     }
 

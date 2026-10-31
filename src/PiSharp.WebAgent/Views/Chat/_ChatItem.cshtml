@@ -266,6 +266,11 @@
                         {
                           <span title="Cache read tokens"><i class="bi bi-lightning-charge"></i>@ChatDisplay.Count(meta.CacheRead) cached</span>
                         }
+                        if (meta.CacheWrite > 0)
+                        {
+                          @* W5 live test: OpenAI reported 3 uncached input tokens and 1,772 written to the cache, so ↑ 3 alone hid most of the cost. *@
+                          <span title="Cache write tokens"><i class="bi bi-database"></i>@ChatDisplay.Count(meta.CacheWrite) cache write</span>
+                        }
                       }
                       @if (spendMark is not null)
                       {

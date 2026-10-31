@@ -1,12 +1,17 @@
+using Microsoft.Extensions.DependencyInjection;
 using PiSharp.Durable;
 using PiSharp.Durable.Client;
 using PiSharp.Durable.Hosting;
 using PiSharp.Durable.Hosting.Testing;
+using PiSharp.Web.Common;
 using PiSharp.WebAgent.Chat;
+using PiSharp.WebAgent.Contracts;
+using PiSharp.WebAgent.Shell;
 
 // Decision 0011 (run W2, WU7): ChatService on a real durable device with faux models: create and send, a request id that comes twice makes
 // one chat and one message, fork and edit-and-resend make branches (a retry makes no second one), a busy chat refuses a model change and a
-// compaction with 409, rename, export and delete.
+// compaction with 409, rename, export and delete. W5 live test: a new chat starts on a connected provider, and the model picker offers only
+// connected providers (plus the selected one), as Settings › Defaults and Settings › Providers say.
 internal static partial class Program
 {
     private static int Users(IReadOnlyList<TranscriptItem> items, string text) => items.OfType<UserItem>().Count(item => item.Text == text);
@@ -127,6 +132,33 @@ internal static partial class Program
             Equal(0, (await chat.Chats.ListAsync(10)).Count, "gone from the sidebar");
             Equal(404, Throws<ChatException>(() => chat.Chats.Require(binding.SessionId), "a deleted chat").Status, "404");
             Check(chat.Bindings.Get(binding.SessionId)!.IsArchived, "kept as archived");
+        }),
+        Case("chat.service.new-chat-starts-on-a-connected-provider", async () =>
+        {
+            // With only an OpenAI key, every page started on the catalog's first provider, which had no account (W5 live test).
+            var directory = SetupDirectory([SetupKey()]);
+            await using var chat = await ChatHarness.StartAsync("chat-service-connected", configure: services =>
+            {
+                services.AddSingleton<IModelCatalog>(SetupCatalog());
+                services.AddSingleton(directory);
+            });
+            var page = chat.Chats.NewChat();
+            Equal("openai/gpt-x", $"{page.Provider}/{page.Model}", "the first connected provider's first model, not the catalog's first");
+            await chat.Settings.SaveAsync(new DefaultsSettings("anthropic", "claude-a"));
+            Equal("openai", chat.Chats.NewChat().Provider, "a saved default whose provider isn't connected is passed over");
+            await chat.Settings.SaveAsync(new DefaultsSettings("openai", "gpt-plain"));
+            Equal("openai/gpt-plain", $"{chat.Chats.NewChat().Provider}/{chat.Chats.NewChat().Model}", "a connected saved default");
+            var renderer = chat.Services.GetRequiredService<FragmentRenderer>();
+            var picker = await renderer.RenderAsync("~/Views/Shared/_ProviderModelSelect.cshtml", new ProviderModelSelect("mp") { Provider = "openai", Model = "gpt-x" });
+            Check(picker.Contains("value=\"openai\"", StringComparison.Ordinal), "the connected provider");
+            Check(!picker.Contains("value=\"anthropic\"", StringComparison.Ordinal) && !picker.Contains("value=\"openai-codex\"", StringComparison.Ordinal),
+                "no provider without an account");
+            var bound = await renderer.RenderAsync("~/Views/Shared/_ProviderModelSelect.cshtml", new ProviderModelSelect("mp") { Provider = "anthropic", Model = "claude-a" });
+            Check(bound.Contains("value=\"anthropic\"", StringComparison.Ordinal), "a chat's own provider still shows after it disconnects");
+            var listed = await renderer.RenderAsync("~/Views/Shared/_ProviderModelSelect.cshtml",
+                new ProviderModelSelect("ovr") { Providers = ["anthropic", "openai-codex"] });
+            Check(listed.Contains("value=\"anthropic\"", StringComparison.Ordinal) && listed.Contains("value=\"openai-codex\"", StringComparison.Ordinal) &&
+                !listed.Contains("value=\"openai\"", StringComparison.Ordinal), "a caller's own list is kept as it is");
         }),
     ];
 }

@@ -5,12 +5,13 @@ using static Microsoft.Playwright.Assertions;
 
 // Decision 0011 (run W4, fix 2 presets): a preset loads in place on the Playground and on Compare, with its account. On a sealed live app
 // (real routing; every outbound request goes to a closed loopback proxy, so nothing is sent) with two OpenAI keys, Personal (the active
-// account) and Work: a Playground preset naming Work selects Work in Model & auth's account choice without a page load, the next estimate
-// sends it, the choice comes back after a switch to another provider and back, and a preset saved from the page keeps it; a Compare preset
-// with one column on Work and one on the active account loads in place (no page load, ?preset=), each column carries its account (the
-// overrides' choice and the chip), the plan sends it, and a preset saved from the page keeps each column's account. On the faux app, a
-// Compare preset loaded over a comparison that ran replaces it in place: the group leaves the page (it stays in History), the Metrics tab is
-// empty, and Run all starts a new group. Every case fails on any page or console error.
+// account) and Work, and one Anthropic key (the other connected provider the switch goes to): a Playground preset naming Work selects Work
+// in Model & auth's account choice without a page load, the next estimate sends it, the choice comes back after a switch to another
+// provider and back, and a preset saved from the page keeps it; a Compare preset with one column on Work and one on the active account
+// loads in place (no page load, ?preset=), each column carries its account (the overrides' choice and the chip), the plan sends it, and a
+// preset saved from the page keeps each column's account. On the faux app, a Compare preset loaded over a comparison that ran replaces it
+// in place: the group leaves the page (it stays in History), the Metrics tab is empty, and Run all starts a new group. Every case fails on
+// any page or console error.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> W4PresetLoadCases() =>
@@ -19,6 +20,12 @@ internal static partial class Program
         {
             var personal = await W4StoreKeyAsync(app, "Personal");
             var work = await W4StoreKeyAsync(app, "Work");
+            // The provider picker offers connected providers only (W5 live test), so the switch below needs a second one: Anthropic, one key.
+            var other = await app.PostAsync("/api/credentials/accounts", new JsonObject
+            {
+                ["provider"] = "anthropic", ["apiKey"] = "sk-ant-api03-PLANTED" + Guid.NewGuid().ToString("N"), ["label"] = "Other provider",
+            });
+            Equal(200, other.Status, "an Anthropic key: " + other.Text);
             var model = await W4OpenAIModelAsync(app);
             var playgroundPreset = await W4SavePresetAsync(app, "playground", new JsonObject
             {
@@ -67,6 +74,7 @@ internal static partial class Program
             // Another provider has none of these accounts; back on OpenAI, Work is chosen again.
             var providers = page.Locator("[data-request-config] [data-provider-model] [data-provider-select]");
             var another = await providers.EvaluateAsync<string>("select => [...select.options].map(option => option.value).find(value => value && value !== 'openai')");
+            Equal("anthropic", another, "the other connected provider");
             await providers.SelectOptionAsync(another);
             await Expect(choice).ToBeHiddenAsync();
             await Expect(select).ToHaveValueAsync("");

@@ -435,9 +435,9 @@ public static class ChatDisplay
             $"Average output rate: {Count(output)} output tokens ÷ {(elapsed / 1000).ToString("#,0.###", CultureInfo.InvariantCulture)} seconds. Uses the displayed message duration, including wait and tool time.");
     }
 
-    /// <summary>US dollars: four decimals under a dollar, else two.</summary>
+    /// <summary>US dollars: four decimals under a dollar, else two; a cost above zero under $0.00005 reads <c>&lt;$0.0001</c>, as Spend shows it.</summary>
     public static string Money(double dollars) =>
-        "$" + dollars.ToString(Math.Abs(dollars) < 1 ? "0.0000" : "#,0.00", CultureInfo.InvariantCulture);
+        dollars is > 0 and < 0.00005 ? "<$0.0001" : "$" + dollars.ToString(Math.Abs(dollars) < 1 ? "0.0000" : "#,0.00", CultureInfo.InvariantCulture);
 
     /// <summary>A message's cost for its footer, by billing kind: a subscription's list price ("≈ $x list") or a metered price ("$x"); null for
     /// free and unknown-price providers (the Spend Guard prices those later) and when nothing was used.</summary>

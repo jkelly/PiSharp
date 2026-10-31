@@ -375,7 +375,11 @@ public sealed class ComparePages(IServiceProvider services, ILogger<ComparePages
         }
         if (Catalog is { } catalog)
         {
-            foreach (var model in catalog.Providers.SelectMany(provider => catalog.Models(provider.Id)))
+            // The other columns come from connected providers, as the model picker offers them (every provider while none is connected).
+            var connected = PiSharp.WebAgent.Settings.ProviderDirectory.ConnectedIdsOf(services);
+            var offered = catalog.Providers.Where(provider => connected is null || connected.Contains(provider.Id)).ToList();
+            if (offered.Count == 0) offered = [.. catalog.Providers];
+            foreach (var model in offered.SelectMany(provider => catalog.Models(provider.Id)))
             {
                 if (columns.Count >= CompareDraft.MinColumns) break;
                 if (hidden.IsHidden(model.Provider, model.Id) || columns.Any(column => column.Provider == model.Provider && column.Model == model.Id)) continue;

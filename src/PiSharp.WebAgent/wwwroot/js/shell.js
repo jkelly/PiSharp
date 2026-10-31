@@ -190,7 +190,15 @@ function revealSettingsItem() {
   nav.scrollLeft = active.offsetLeft - nav.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
 }
 
-/** Wires the shell once per page: theme, Provider -> Model dropdowns, confirm forms and global shortcuts. */
+// A closing modal sets aria-hidden while the button that closed it (the model picker's Use model) still has focus, which the browser blocks
+// with a warning (W5 live test, Compare and Tool Bench). Bootstrap's events bubble, so one listener lets go of the focus first; Bootstrap
+// then returns it to the element that opened the modal.
+function releaseFocus(event) {
+  const focused = document.activeElement;
+  if (event.target instanceof HTMLElement && focused instanceof HTMLElement && event.target.contains(focused)) focused.blur();
+}
+
+/** Wires the shell once per page: theme, Provider -> Model dropdowns, confirm forms, global shortcuts and modal focus. */
 export function initShell() {
   if (started) return;
   started = true;
@@ -199,4 +207,5 @@ export function initShell() {
   document.addEventListener('change', onChange);
   document.addEventListener('submit', onSubmit);
   document.addEventListener('keydown', onKeydown);
+  document.addEventListener('hide.bs.modal', releaseFocus);
 }

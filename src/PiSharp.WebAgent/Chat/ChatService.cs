@@ -893,11 +893,17 @@ public sealed class ChatService(DeviceHostService device, ChatBindings bindings,
                 return (provider ?? new CatalogProvider(providerId, providerId, null, [], BillingKind.Unknown), new CatalogModel(providerId, modelId, modelId));
             throw ChatException.Invalid($"{providerId}/{modelId} is not one of the models this app offers.");
         }
+        // As Settings › Defaults says: the saved default while its provider is connected, else the first connected provider's first model.
+        // With nothing connected (or no provider directory) the first catalog model stays, so the page still has a model to show.
+        var connected = PiSharp.WebAgent.Settings.ProviderDirectory.ConnectedIdsOf(services);
+        var usable = connected is not null && catalog.Providers.Any(provider => connected.Contains(provider.Id) && catalog.Models(provider.Id).Count > 0);
+        bool Offered(string provider) => !usable || connected!.Contains(provider);
         var defaults = settings.Get<DefaultsSettings>();
-        if (defaults.Provider is { } p && defaults.Model is { } m && catalog.FindProvider(p) is { } chosenProvider && catalog.FindModel(p, m) is { } chosenModel)
+        if (defaults.Provider is { } p && defaults.Model is { } m && Offered(p) && catalog.FindProvider(p) is { } chosenProvider &&
+            catalog.FindModel(p, m) is { } chosenModel)
             return (chosenProvider, chosenModel);
         var hidden = settings.Get<ModelsSettings>();
-        foreach (var provider in catalog.Providers)
+        foreach (var provider in catalog.Providers.Where(provider => Offered(provider.Id)))
         {
             var models = catalog.Models(provider.Id);
             if ((models.FirstOrDefault(model => !hidden.IsHidden(provider.Id, model.Id)) ?? models.FirstOrDefault()) is { } first) return (provider, first);

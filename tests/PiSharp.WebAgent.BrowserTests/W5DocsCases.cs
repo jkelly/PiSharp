@@ -64,8 +64,9 @@ internal static partial class Program
     // W5 fix 2 (tests-ci): W5PinCases, W5SuiteCases and W5ArenaPlayCases reach every part this list named (Stream anyway, Stop all, New round,
     // a new vote tag, an agent battle's approvals, budget Continue and Keep, the schedule's cap field and Turn off, the check editor's Try, Save
     // and Remove, tool-argument rules, a suite's targets and Rename, Cancel run, removing a case and the votes CSV), so their gaps and phrases
-    // are gone. What the line still lists has no page hook a case could use yet (a phone-width run page, samplingParams on real wire formats),
-    // or shares its hook with parts a case reaches: the Tool Bench's Pin as test (W5 fix 2 (pins)) uses data-pin-run, as the other run pins do.
+    // are gone. What the line still lists has no case yet, though a phone-width unvoted agent battle has a hook (GET /compare?mode=agent&run=
+    // <id> renders data-arena-blind-run; checked by hand at 375px in the W5 live test), samplingParams on real wire formats has none, and the
+    // Tool Bench's Pin as test (W5 fix 2 (pins)) shares data-pin-run with the run pins a case reaches.
     private static readonly W4CoverageGap[] W5CoverageGaps = [];
 
     private static IEnumerable<(string, Func<Task>)> W5DocsCases() =>

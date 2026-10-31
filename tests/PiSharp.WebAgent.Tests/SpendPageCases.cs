@@ -158,6 +158,21 @@ internal static partial class Program
             }
         }),
 
+        // W5 live test: a launch without XAI_API_KEY still listed the first launch's "Environment · XAI_API_KEY" account on Settings › Spend
+        // and in the cap dialog. An environment account whose variable is gone is unavailable: nothing can be sent on it, so it is not listed;
+        // an expired stored key still is (it is the user's to replace).
+        Case("spend.pages.an-unset-environment-variable-is-not-a-billed-account", () =>
+        {
+            var accounts = new EstAccounts(
+                EstAccount("env-faux-faux_api_key", "faux", PiSharp.WebAgent.Credentials.AccountKind.Environment, source: "FAUX_API_KEY", status: PiSharp.WebAgent.Credentials.AccountStatus.Unavailable),
+                EstAccount("env-xai-xai_api_key", "xai", PiSharp.WebAgent.Credentials.AccountKind.Environment, source: "XAI_API_KEY", status: PiSharp.WebAgent.Credentials.AccountStatus.Unavailable),
+                EstAccount("acc-0123456789abcdef", "faux", PiSharp.WebAgent.Credentials.AccountKind.ApiKey, status: PiSharp.WebAgent.Credentials.AccountStatus.Expired));
+            var catalog = new PiSharp.WebAgent.Faux.FauxModelCatalog(PiSharp.WebAgent.Faux.FauxModelCatalog.CreateModels(), PiSharp.WebAgent.Faux.FauxPricing.Price);
+            var settings = new EstSettings();
+            var rows = new BillingModes(catalog, settings, new ModelPrices(catalog, settings), accounts).Accounts();
+            Equal("faux:acc-0123456789abcdef", string.Join(",", rows.Select(row => row.Provider + ":" + (row.Account?.Id ?? "-"))), "only the expired stored key");
+        }),
+
         Case("spend.pages.settings-caps-and-confirm-round-trip", async () =>
         {
             var envKey = Planted("sk-proj-");
@@ -434,7 +449,8 @@ internal static partial class Program
                 Sp4CheckFragment(fragment.Text);
                 var resolveText = WebUtility.HtmlDecode(fragment.Text);
                 foreach (var part in new[] { "Settle at $0.32", "Release $0.38", "Save amount", "Counts toward</span><span class=\"v\">today and anthropic monthly</span>", "After settling: today $0.32 of $5.00",
-                             "After releasing: today $0.00 of $5.00", "account acc-1" })
+                             // The settled row's $0.003 stays: under a cent, but not nothing (W5 live test).
+                             "After releasing: today <$0.01 of $5.00", "account acc-1" })
                     Check(resolveText.Contains(part, StringComparison.Ordinal), "the modal has " + part + ": " + Sp4Around(resolveText, "Counts toward"));
                 Equal(409, (await app.Get("/history/spend/resolve?op=op-settled")).Status, "a settled row has nothing to resolve");
                 Equal(404, (await app.Get("/history/spend/resolve?op=nope")).Status, "no such row");

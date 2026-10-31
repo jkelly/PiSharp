@@ -377,7 +377,11 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
             log?.LogDebug(error, "The default model could not be read for agent compare.");
         }
         if (catalog is null) return models;
-        foreach (var model in catalog.Providers.SelectMany(provider => catalog.Models(provider.Id)))
+        // The other model comes from a connected provider, as the model picker offers them (every provider while none is connected).
+        var connected = PiSharp.WebAgent.Settings.ProviderDirectory.ConnectedIdsOf(services);
+        var offered = catalog.Providers.Where(provider => connected is null || connected.Contains(provider.Id)).ToList();
+        if (offered.Count == 0) offered = [.. catalog.Providers];
+        foreach (var model in offered.SelectMany(provider => catalog.Models(provider.Id)))
         {
             if (models.Count >= 2) break;
             if (hidden.IsHidden(model.Provider, model.Id) || models.Contains((model.Provider, model.Id))) continue;

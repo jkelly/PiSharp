@@ -23,9 +23,10 @@ public sealed record RunHistoryFilter
     /// <summary>The stop reasons among <see cref="Statuses"/> (matched against a run's stop reason; the rest match its status).</summary>
     public static IReadOnlyList<string> StopReasons { get; } = ["stop", "length", "toolUse"];
 
-    /// <summary>The sources the Source select lists (the mockups' five).</summary>
+    /// <summary>The sources the Source select lists: the mockups' five, then W5's blind votes and Drift Watch suites (History records their
+    /// calls too; the W5 live test found them in the totals but not in the select).</summary>
     public static IReadOnlyList<SpendSource> Sources { get; } =
-        [SpendSource.Chat, SpendSource.Playground, SpendSource.Compare, SpendSource.AgentCompare, SpendSource.Bench];
+        [SpendSource.Chat, SpendSource.Playground, SpendSource.Compare, SpendSource.AgentCompare, SpendSource.Bench, SpendSource.Arena, SpendSource.Drift];
 
     /// <summary>The longest search text kept.</summary>
     public const int MaxSearch = 200;

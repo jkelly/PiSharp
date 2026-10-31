@@ -27,8 +27,14 @@ internal static partial class Program
             var partial = await answer.InnerTextAsync();
             Check(!partial.Contains("w120", StringComparison.Ordinal), "the answer is seen while it streams: " + partial);
             await Expect(page.Layout()).ToHaveAttributeAsync("data-busy", "true");
+            // W5 live test: the running controls are .d-flex, which beat [hidden] until site.css's [hidden] rule, so they showed after the run.
+            await Expect(page.Locator("[data-running-controls] [data-action='steer']")).ToBeVisibleAsync();
+            await Expect(page.Locator("[data-send]")).ToBeHiddenAsync();
             await Expect(answer).ToContainTextAsync("w120", new() { Timeout = 30_000 });
             await page.IdleAsync(agent, chatId);
+            await Expect(page.Layout()).ToHaveAttributeAsync("data-busy", "false");
+            await Expect(page.Locator("[data-running-controls]")).ToBeHiddenAsync();
+            await Expect(page.Locator("[data-send]")).ToBeVisibleAsync();
             await Expect(page.Answers()).ToHaveCountAsync(1);
             await Expect(page.Thread().Locator("article.msg-user")).ToHaveCountAsync(1);
             await Expect(answer).ToHaveAttributeAsync("data-stop", "stop");

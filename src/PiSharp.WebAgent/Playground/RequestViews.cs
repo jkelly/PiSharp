@@ -35,8 +35,13 @@ public sealed record RequestAuthView(string ProviderName, string? AccountLabel, 
     /// <summary>The label of the provider's active account, or null when it has none.</summary>
     public string? ActiveLabel { get; init; }
 
+    /// <summary>Whether <see cref="AccountLabel"/> is a custom provider's key from models.json (such as <c>env · OPENAI_API_KEY</c>) rather
+    /// than an account: custom providers keep no accounts unless their key is stored (W5 live test).</summary>
+    public bool CustomKey { get; init; }
+
     /// <summary>Where the credential comes from.</summary>
     public string Source => Offline ? "None · runs offline"
+        : CustomKey ? "The custom provider's key (models.json)"
         : Chosen is not null ? AccountLabel is null ? "Account not on this machine" : "The account you chose"
         : AccountLabel is null ? "No account connected" : "The provider's active account";
 

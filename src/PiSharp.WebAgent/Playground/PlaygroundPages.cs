@@ -383,13 +383,27 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         // W4 fix 2: the provider's accounts, for Model & auth's account choice (ids and labels only); a preset or a run may name one.
         var accounts = RequestAccounts.List(services, draft.Provider, offline, log);
         var active = draft.Account is null ? account : await AccountAsync(draft with { Account = null }, offline, cancellationToken).ConfigureAwait(false);
-        return new RequestAuthView(provider?.DisplayName ?? draft.Provider, account?.Label, provider?.Billing ?? BillingKind.Unknown, offline)
+        // W5 live test: a custom provider whose models.json key is an environment variable (or none, on this machine) has no account, and
+        // read "No account connected" although it runs; name its key the way Settings › Providers does.
+        var custom = account is null && draft.Account is null && !offline ? CustomKeyLabel(draft.Provider) : null;
+        return new RequestAuthView(provider?.DisplayName ?? draft.Provider, account?.Label ?? custom, provider?.Billing ?? BillingKind.Unknown, offline)
         {
             Chosen = offline ? null : draft.Account,
             Accounts = accounts,
-            ActiveLabel = active?.Label,
+            ActiveLabel = active?.Label ?? custom,
+            CustomKey = custom is not null,
         };
     }
+
+    private string? CustomKeyLabel(string provider) =>
+        services.GetService<PiSharp.WebAgent.Settings.ProviderDirectory>()?.Find(provider) is { Custom: { } facts, IsConnected: true }
+            ? facts.KeySource switch
+            {
+                PiSharp.WebAgent.CustomProviders.CustomKeySource.Environment when facts.Variable is { } variable => "env · " + variable,
+                PiSharp.WebAgent.CustomProviders.CustomKeySource.None => "no key needed",
+                _ => null,
+            }
+            : null;
 
     private string? BaseUrl(RunRequestPlan plan) => string.IsNullOrWhiteSpace(plan.Model.BaseUrl) ? null : plan.Model.BaseUrl;
 

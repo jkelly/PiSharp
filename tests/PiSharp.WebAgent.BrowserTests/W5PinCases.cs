@@ -7,7 +7,7 @@ using static Microsoft.Playwright.Assertions;
 // answer), the server's draft shows that run's prompt and answer as the reference, and Save stores a case the API reads back with the
 // source, the run (or the chat and its entry), the request and the reference: the Playground's output into a new suite; a chat answer's
 // footer; History's row menu into the suite that already exists (the modal offers the newest suite first); the inspector's More menu; and
-// a Compare column. On a suite page, Add case writes a request by hand (with a quick Contains check, no reference) and Edit case renames it,
+// a Compare column; and a Tool Bench turn (W5 live test). On a suite page, Add case writes a request by hand (with a quick Contains check, no reference) and Edit case renames it,
 // tags it and drops its check; each save reloads the page with the case as saved.
 internal static partial class Program
 {
@@ -91,6 +91,34 @@ internal static partial class Program
                 "Echo: Pin me from Compare.", "From Compare", newSuite: "Compare pins");
             var stored = await app.W5PinnedAsync(pinned, "compare", run, "Pin me from Compare.", "Echo: Pin me from Compare.");
             Equal(model, stored["spec"]?["model"]?.GetValue<string>(), "the case asks the column's model");
+        }),
+
+        // W5 live test: Pin as test from a Tool Bench turn (W5 fix 2 (pins) added the button after these cases were written). The answer after
+        // a manual tool result pins with the whole conversation: the user's message, the call, the result and the tool's definition.
+        Browse("browser.w5.pins.tool-bench-turn-pins-its-conversation", AgentMode.FauxMetered, async (app, window) =>
+        {
+            var page = window.Page;
+            await page.GotoAsync("/bench");
+            var bench = page.Locator("[data-bench]");
+            await Expect(bench).ToBeVisibleAsync();
+            await W4BenchTemplateAsync(page);
+            const string prompt = "tool: get_weather {\"location\":\"Oslo, Norway\"}";
+            await W4BenchSendAsync(page, prompt);
+            await Expect(bench).ToHaveAttributeAsync("data-state", "awaiting", new() { Timeout = 30_000 });
+            var awaiting = page.Locator("[data-awaiting]");
+            await awaiting.Locator("[data-result-text]").FillAsync("{\"tempC\": 4, \"sky\": \"drizzle\"}");
+            await awaiting.Locator("[data-result-send='continue']").ClickAsync();
+            await Expect(bench).ToHaveAttributeAsync("data-bench-state", "finished", new() { Timeout = 30_000 });
+
+            await Expect(page.Locator("[data-pin-run][data-pin-source='bench']")).ToHaveCountAsync(2);
+            var pin = page.Locator("[data-pin-run][data-pin-source='bench'][aria-label='Pin turn 2 as a test case']");
+            var run = (await pin.GetAttributeAsync("data-pin-run"))!;
+            var pinned = await page.W5PinAsync(pin, prompt, "Tool finished: get_weather", "From the Tool Bench", newSuite: "Bench pins");
+            var stored = await app.W5PinnedAsync(pinned, "bench", run, prompt, "Tool finished: get_weather");
+            Check(stored["spec"]?["tools"]?.AsArray().Any(tool => tool?["name"]?.GetValue<string>() == "get_weather") == true,
+                "the case sends the bench's tool: " + stored["spec"]?.ToJsonString());
+            Check(stored["spec"]?["messages"]?.AsArray().Any(message => message?["text"]?.GetValue<string>()?.Contains("drizzle", StringComparison.Ordinal) == true) == true,
+                "and the tool result the answer read: " + stored["spec"]?.ToJsonString());
         }),
 
         Browse("browser.w5.pins.suite-page-adds-a-case-by-hand-and-edits-it", AgentMode.FauxMetered, async (app, window) =>

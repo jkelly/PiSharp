@@ -75,10 +75,12 @@ public sealed class BillingModes : IBillingModes
 
     /// <summary>Every account and how it is billed, for Settings › Spend: the catalog's providers in display order, each provider's accounts
     /// (<see cref="IAccountStore.List"/> order), and one row without an account for a provider that needs none; then accounts of providers
-    /// the catalog does not list, unless <see cref="Offline"/> (they are not used offline).</summary>
+    /// the catalog does not list, unless <see cref="Offline"/> (they are not used offline). An environment or ambient account whose variable is
+    /// no longer set (<see cref="AccountStatus.Unavailable"/>) is left out: nothing can be sent on it, and the W5 live test found the first
+    /// launch's XAI_API_KEY and OPENROUTER_API_KEY still listed as "Environment" accounts after a launch without them.</summary>
     public IReadOnlyList<BillingAccount> Accounts()
     {
-        var all = accounts?.List() ?? [];
+        var all = (accounts?.List() ?? []).Where(account => account.Status != AccountStatus.Unavailable).ToList();
         var rows = new List<BillingAccount>();
         foreach (var provider in catalog.Providers)
         {

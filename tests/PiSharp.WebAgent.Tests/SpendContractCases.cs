@@ -111,6 +111,9 @@ internal static partial class Program
             Equal("$1.84|$0.3800|$0.0357|$1,206.00|$12|≈ $0.21 list|-$0.50", string.Join("|", SpendMoney.Format(1_840_000), SpendMoney.Format(380_000, 4),
                 SpendMoney.Format(35_700, null), SpendMoney.Format(1_206_000_000), SpendMoney.Format(12_000_000, 0), SpendMoney.FormatList(210_000),
                 SpendMoney.Format(-500_000)), "formatting");
+            // W5 live test: a cost above zero that rounds to nothing still shows it was paid; zero and refunds stay as they are.
+            Equal("<$0.0001|<$0.01|<$1|$0.0001|$0.0000|-$0.0000", string.Join("|", SpendMoney.Format(40, null), SpendMoney.Format(4_999),
+                SpendMoney.Format(400_000, 0), SpendMoney.Format(50, 4), SpendMoney.Format(0, 4), SpendMoney.Format(-40, 4)), "tiny amounts");
             Throws<ArgumentOutOfRangeException>(() => SpendMoney.Format(1, 7), "seven decimals");
             foreach (var (text, micros) in new (string, long)[] { ("$1.50", 1_500_000), ("1,000", 1_000_000_000), (" 0.0000004 ", 0), ("0", 0), ("$ 2", 2_000_000) })
                 Check(SpendMoney.TryParseUsd(text, out var parsed) && parsed == micros, $"\"{text}\" is {micros}");

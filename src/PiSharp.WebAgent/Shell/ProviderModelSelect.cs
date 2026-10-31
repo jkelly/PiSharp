@@ -27,7 +27,8 @@ public sealed record ProviderModelSelect(string IdPrefix)
     /// <summary>Small controls (<c>form-select-sm</c>), as on the settings pages.</summary>
     public bool Small { get; init; }
 
-    /// <summary>The provider ids to offer, in catalog order; null offers every catalog provider.</summary>
+    /// <summary>The provider ids to offer, in catalog order; null offers the connected providers (and the selected one), or every catalog
+    /// provider when nothing is connected or the app has no provider directory.</summary>
     public IReadOnlyCollection<string>? Providers { get; init; }
 
     /// <summary>Whether models hidden in Settings › Models are listed too (the selected model always is).</summary>

@@ -11,6 +11,11 @@
    estimates, the setup wizard and the searchable model list.
    ===================================================================== */
 
+/* Bootstrap's display utilities (.d-flex and the rest, display: … !important) beat the [hidden] attribute, so an element a script hid
+   stayed on screen: the chat composer's Follow-up, Steer and Stop showed after every run (W5 live test). Loaded after Bootstrap, so hidden
+   always wins; the areas' own [hidden] rules predate this one. */
+[hidden] { display: none !important; }
+
 /* ---------- App shell ---------- */
 .app { display: flex; height: 100vh; height: 100dvh; min-width: 0; }
 

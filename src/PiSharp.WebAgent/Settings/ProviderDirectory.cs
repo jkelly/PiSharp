@@ -275,6 +275,10 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
     /// <summary>The ids of the providers that are connected (a usable account, or no credentials needed).</summary>
     public IReadOnlySet<string> ConnectedIds() => List().Where(entry => entry.IsConnected).Select(entry => entry.Id).ToHashSet(StringComparer.Ordinal);
 
+    /// <summary>The connected provider ids from <paramref name="services"/>' directory, or null when the app has no directory (every catalog
+    /// provider is offered then). Pages resolve it lazily, so no area depends on the Settings area's registration order.</summary>
+    public static IReadOnlySet<string>? ConnectedIdsOf(IServiceProvider services) => services.GetService<ProviderDirectory>()?.ConnectedIds();
+
     private IReadOnlyList<CustomProviderInfo> CustomProviders() => customs?.Current.Providers ?? [];
 
     private CustomProviderInfo? CustomOf(string id) => customs is null || CustomProviderJson.IsBuiltin(id) ? null : customs.Current.Find(id);
