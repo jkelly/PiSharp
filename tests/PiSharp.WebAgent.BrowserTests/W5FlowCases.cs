@@ -9,7 +9,9 @@ using static Microsoft.Playwright.Assertions;
 // the toast's Open suite opens it. Run now opens run #1, which completes with every answer passing; Set as baseline accepts it. Then the
 // provider's answers start to report another model: Run again (run #2) raises response-model drift at once, and Run again (run #3) shows
 // the confirmation ("Run #2 saw it first, and this run confirms it."); Drift Watch lists the target as drift. The leaderboard counts the
-// vote, provisional (one comparison is under the threshold). Every call went to the scripted provider and nowhere else.
+// vote, provisional (one comparison is under the threshold). Every call went to the scripted provider and nowhere else. W5 fix 2: run #2's
+// answers are held until its page shows it running, so the page's own poll is what first shows it complete, and that very render already
+// has the response-model drift row (the integration stores a run's signals before it reads complete); W5RunRenderProbe records the renders.
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> W5FlowCases() =>
@@ -125,10 +127,22 @@ internal static partial class Program
             var accepted = (await app.Get("/api/evals/suites/" + suiteId)).Body!["baselines"]!.AsArray();
             Check(accepted.Count == 1 && accepted[0]!["runId"]?.GetValue<string>() == first, "run #1 is the baseline: " + accepted.ToJsonString());
 
-            // The provider updates its model silently: run #2 sees the change, run #3 confirms it.
+            // The provider updates its model silently: run #2 sees the change, run #3 confirms it. Run #2's answers wait until its page shows
+            // it running; the render that first shows it complete (the page's poll) already has the drift row.
             provider.Suffix = "2026-09";
+            await page.AddInitScriptAsync(W5RunRenderProbe);
+            provider.Hold();
             await page.Locator("[data-eval-run-header] [data-run-suite]").ClickAsync();
+            await page.WaitForURLAsync(url => url.Contains("/evals/runs/sr", StringComparison.Ordinal) && !url.Contains(first, StringComparison.Ordinal));
+            await Expect(page.Locator("[data-eval-run-header]")).ToContainTextAsync("Run #2");
+            await Expect(page.Locator("[data-eval-run-live]")).ToHaveAttributeAsync("data-running", "true");
+            await WaitUntilAsync(() => Task.FromResult(provider.Asked.Count == 2 + 3 + 3), "run #2 asked its three answers, held");
+            provider.Release();
             await page.W5RunPageEndedAsync(2, "complete");
+            var renders = await page.W5RunRendersAsync();
+            Check(renders.Count >= 2 && renders[0] is { How: "load", Status: not "complete" }, "run #2's page opened while it ran: " + string.Join(" | ", renders));
+            var shown = renders.First(render => render.Status == "complete");
+            Check(shown is { How: "poll", Drift: "drift" }, "the poll that first shows run #2 complete shows its response-model drift too: " + string.Join(" | ", renders));
             var raised = page.Locator("[data-run-signal='response-model']");
             await Expect(raised).ToHaveAttributeAsync("data-level", "drift", new() { Timeout = 15_000 });
             await Expect(raised).ToContainTextAsync($"{winner}-2026-05");
@@ -165,4 +179,37 @@ internal static partial class Program
             Equal(0, provider.Other.Count, "nothing else was asked of it: " + string.Join(", ", provider.Other));
         }),
     ];
+
+    /// <summary>One render of a run page's live part (<c>[data-eval-run-live]</c>): as the page loaded or as its poll swapped it in, the run's
+    /// status, whether it was still running, and the level of its response-model drift row (empty when there is none).</summary>
+    internal sealed record W5RunRender(string How, string Status, string Running, string Drift);
+
+    /// <summary>An init script (W5 fix 2) that records each render of a run page's live part in <c>window.__w5RunRenders</c>: the one the page
+    /// loaded with, then every one its poll swaps in.</summary>
+    internal const string W5RunRenderProbe = """
+        (() => {
+          const renders = [];
+          window.__w5RunRenders = renders;
+          const note = (live, how) => renders.push({
+            how, status: live.dataset.runStatus ?? '', running: live.dataset.running ?? '',
+            drift: live.querySelector("[data-run-signal='response-model']")?.dataset.level ?? '' });
+          document.addEventListener('DOMContentLoaded', () => {
+            const live = document.querySelector('[data-eval-run-live]');
+            if (!live) return;
+            note(live, 'load');
+            new MutationObserver((records) => {
+              for (const record of records)
+                for (const node of record.addedNodes) if (node instanceof Element && node.matches('[data-eval-run-live]')) note(node, 'poll');
+            }).observe(document.body, { childList: true, subtree: true });
+          });
+        })();
+        """;
+
+    /// <summary>The renders <see cref="W5RunRenderProbe"/> recorded on the page's current document, in order.</summary>
+    internal static async Task<List<W5RunRender>> W5RunRendersAsync(this IPage page)
+    {
+        var items = await page.EvaluateAsync<System.Text.Json.JsonElement>("() => window.__w5RunRenders ?? []");
+        return [.. items.EnumerateArray().Select(item => new W5RunRender(item.GetProperty("how").GetString() ?? "", item.GetProperty("status").GetString() ?? "",
+            item.GetProperty("running").GetString() ?? "", item.GetProperty("drift").GetString() ?? ""))];
+    }
 }

@@ -77,6 +77,7 @@ internal static partial class Program
         private readonly List<string> other = [];
         private readonly Task loop;
         private string suffix = "2026-05";
+        private TaskCompletionSource? held;
 
         private W5ScriptedProvider(TcpListener listener)
         {
@@ -95,6 +96,25 @@ internal static partial class Program
         {
             get { lock (gate) return suffix; }
             set { lock (gate) suffix = value; }
+        }
+
+        /// <summary>Holds every completion asked from now on (each is counted in <see cref="Asked"/> and waits) until
+        /// <see cref="Release"/> (W5 fix 2: so a page shows a run going before it ends).</summary>
+        public void Hold()
+        {
+            lock (gate) held ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        /// <summary>Lets the held completions answer, and answers the ones after them at once again.</summary>
+        public void Release()
+        {
+            TaskCompletionSource? open;
+            lock (gate)
+            {
+                open = held;
+                held = null;
+            }
+            open?.TrySetResult();
         }
 
         /// <summary>The models of the completions asked so far, in order.</summary>
@@ -131,14 +151,21 @@ internal static partial class Program
                     var reader = new BufferedStream(stream);
                     var (method, path, body) = await ReadRequestAsync(reader);
                     if (method == "POST" && path.EndsWith("/chat/completions", StringComparison.Ordinal))
-                        await WriteAsync(stream, "200 OK", "text/event-stream", Completion(body));
+                    {
+                        var answer = Completion(body);
+                        Task? wait;
+                        lock (gate) wait = held?.Task;
+                        if (wait is not null) await wait.WaitAsync(stop.Token);
+                        await WriteAsync(stream, "200 OK", "text/event-stream", answer);
+                    }
                     else
                     {
                         lock (gate) other.Add(method + " " + path);
                         await WriteAsync(stream, "404 Not Found", "application/json", """{"error":{"message":"not found"}}""");
                     }
                 }
-                catch (Exception error) when (error is IOException or SocketException or System.Text.Json.JsonException or InvalidOperationException or FormatException)
+                catch (Exception error) when (error is IOException or SocketException or System.Text.Json.JsonException or InvalidOperationException or FormatException
+                    or OperationCanceledException)
                 {
                     // A dropped connection or a request this endpoint does not read: the app sees a failed call.
                 }
@@ -243,6 +270,7 @@ internal static partial class Program
 
         public async ValueTask DisposeAsync()
         {
+            Release();
             await stop.CancelAsync();
             listener.Stop();
             try { await loop; } catch (Exception error) when (error is OperationCanceledException or ObjectDisposedException or SocketException) { }
@@ -568,8 +596,7 @@ internal static partial class Program
             var view = (await app.Get("/api/evals/runs/" + run)).Body;
             return view?["run"]?["status"]?.GetValue<string>() == "complete" && view["running"]?.GetValue<bool>() == false;
         }, $"suite run {run} is complete", TimeSpan.FromSeconds(60));
-        // Its drift signals are stored just after it is marked complete.
-        await Task.Delay(500);
+        // W5 fix 2: no wait for its drift signals any more: they are stored before the run reads complete (W5 integration).
         return run;
     }
 

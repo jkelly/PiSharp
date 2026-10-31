@@ -26,7 +26,6 @@ internal static partial class Program
 
     private static readonly W4CoverageGap[] W5CoverageGaps =
     [
-        new("pinning from the other sources", "Pin as test from chat, the Playground, a Compare column, History and the inspector", ["data-pin-chat", "data-pin-run"]),
         new("Stream anyway", "Stream anyway", ["data-arena-stream-anyway"]),
         new("Stop all", "Stop all", ["data-arena-stop"]),
         new("New round", "New round", ["data-arena-again"]),
