@@ -232,7 +232,7 @@ internal static partial class Program
             var suite = await app.W5PlainSuiteAsync("Every hour");
             await app.W5CaseAsync(suite, "Pre-release", "Is 1.0.0-rc.1 valid SemVer?");
             // Every hour from the next minute (UTC): a slot before the schedule is turned on never runs, so the first slot is the coming one,
-            // at least 15 s ahead so it is not passed while the schedule is saved.
+            // at least 10 s ahead so it is not passed while the schedule is saved (one API call).
             var now = DateTimeOffset.UtcNow;
             var slot = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, TimeSpan.Zero).AddMinutes(now.Second < 50 ? 1 : 2);
             var saved = await app.PostAsync($"/api/evals/suites/{suite}/schedule", new JsonObject
