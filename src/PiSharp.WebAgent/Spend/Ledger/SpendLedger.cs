@@ -333,6 +333,22 @@ public sealed partial class SpendLedger : ISpendLedger
     }
 
     /// <inheritdoc/>
+    public Task<IReadOnlyList<string>> ProvidersAsync(SpendLedgerQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var normalized = query.Normalize();
+        return ReadAsync<IReadOnlyList<string>>((connection, transaction) =>
+        {
+            var (where, parameters) = Filter(normalized);
+            using var command = WebAgentDb.Command(connection, transaction, "SELECT DISTINCT provider FROM spend_reservations" + where + " ORDER BY provider;", parameters);
+            using var reader = command.ExecuteReader();
+            var providers = new List<string>();
+            while (reader.Read()) if (!reader.IsDBNull(0)) providers.Add(reader.GetString(0));
+            return providers;
+        }, cancellationToken);
+    }
+
+    /// <inheritdoc/>
     /// <exception cref="ArgumentException">The provider or model is blank.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is not 1 to <see cref="MaxRecentActuals"/>.</exception>
     public Task<IReadOnlyList<long>> RecentActualsAsync(string provider, string model, int count = 20, CancellationToken cancellationToken = default)

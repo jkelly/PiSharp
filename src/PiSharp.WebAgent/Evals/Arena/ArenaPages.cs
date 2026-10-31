@@ -356,7 +356,9 @@ public sealed class ArenaPages(ArenaService arena, IServiceProvider services)
         tags.Remove(tag);
         tags.Insert(0, tag);
         var voted = arena.Voted(battle.Mode);
-        var bar = new ArenaVoteBarView { Battle = battle.ToBlind(), Tags = tags, Tag = tag, LeftShare = LeftShare(voted) };
+        var provisionalBelow = services.GetService<ISettingsStore>()?.Get<EvalsSettings>().ProvisionalBelow ?? EvalsSettings.DefaultProvisionalBelow;
+        // The tooltip's share waits for the leaderboard's threshold too (one vote is not a habit).
+        var bar = new ArenaVoteBarView { Battle = battle.ToBlind(), Tags = tags, Tag = tag, LeftShare = LeftShare(voted, provisionalBelow) };
         if (vote is null || reveals is null) return bar;
         var best = vote.Best is { } letter ? reveals.FirstOrDefault(reveal => reveal.Letter == letter) : null;
         var summary = vote.Kind switch
@@ -367,7 +369,6 @@ public sealed class ArenaPages(ArenaService arena, IServiceProvider services)
             _ => $"Your ranking: {string.Join(", ", vote.Ranking ?? [])}, split into weighted pairs.",
         };
         var count = voted.Count(item => item.Vote.Tag == vote.Tag);
-        var provisionalBelow = services.GetService<ISettingsStore>()?.Get<EvalsSettings>().ProvisionalBelow ?? EvalsSettings.DefaultProvisionalBelow;
         var comparisons = Leaderboards.ComparisonsOf(battle.Mode, vote.Tag, voted, out _);
         var perModel = comparisons.SelectMany(pair => new[] { pair.Left.Key, pair.Right.Key }).GroupBy(key => key, StringComparer.Ordinal).Select(group => group.Count());
         var provisional = perModel.Any(total => total < provisionalBelow);
@@ -403,8 +404,9 @@ public sealed class ArenaPages(ArenaService arena, IServiceProvider services)
         return ranks;
     }
 
-    /// <summary>The share of decided pairs (not ties) the left column won, over every vote of a mode; null before any.</summary>
-    public static double? LeftShare(IEnumerable<VotedBattle> votes)
+    /// <summary>The share of decided pairs (not ties) the left column won, over every vote of a mode; null while fewer than
+    /// <paramref name="minimum"/> are decided.</summary>
+    public static double? LeftShare(IEnumerable<VotedBattle> votes, int minimum = 1)
     {
         var decided = 0;
         var left = 0;
@@ -420,7 +422,7 @@ public sealed class ArenaPages(ArenaService arena, IServiceProvider services)
                 if (pair.LeftScore == 1) left++;
             }
         }
-        return decided == 0 ? null : (double)left / decided;
+        return decided == 0 || decided < minimum ? null : (double)left / decided;
     }
 
     private static IReadOnlyList<string> Foot(RunRecord? record, ContestantMetrics? metrics)

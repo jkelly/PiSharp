@@ -30,7 +30,7 @@ else
     <table class="table table-hover align-middle ledger-table" data-spend-ledger>
       <thead>
         <tr>
-          <th scope="col">Time</th>
+          <th scope="col" title="UTC, the days the caps and the date range use; each row's title has your local time, as History shows it">Time (UTC)</th>
           <th scope="col" class="d-none d-md-table-cell">Source</th>
           <th scope="col">Provider / model</th>
           <th scope="col" class="text-end d-none d-md-table-cell" title="Worst case reserved before the request: input tokens × input rate + max output tokens × output rate">Reserved</th>
@@ -44,7 +44,7 @@ else
         {
           var faint = row.Reserved == "—";
           <tr data-spend-row="@row.Op" data-status="@row.Status">
-            <td class="text-nowrap"><div class="ps-mono fs-8">@row.Time</div><div class="fs-8 text-ps-faint">@row.Day</div></td>
+            <td class="text-nowrap" title="@row.LocalTime" data-local-time><div class="ps-mono fs-8">@row.Time</div><div class="fs-8 text-ps-faint">@row.Day</div></td>
             <td class="d-none d-md-table-cell"><span class="ps-chip" title="@row.SourceLabel"><i class="bi @row.SourceIcon" aria-hidden="true"></i><span class="visually-hidden">@row.SourceLabel</span></span></td>
             @if (row.Blind is not null)
             {

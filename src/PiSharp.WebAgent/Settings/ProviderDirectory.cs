@@ -279,6 +279,22 @@ public sealed class ProviderDirectory(IModelCatalog catalog, IAccountStore accou
     /// provider is offered then). Pages resolve it lazily, so no area depends on the Settings area's registration order.</summary>
     public static IReadOnlySet<string>? ConnectedIdsOf(IServiceProvider services) => services.GetService<ProviderDirectory>()?.ConnectedIds();
 
+    /// <summary>What names the key of <paramref name="entry"/> where an account's label would: a connected custom provider whose models.json
+    /// key is an environment variable (<c>env · VAR</c>) or none (<c>no key needed</c>) keeps no account, and read as "Active account" or
+    /// "No account connected" although it runs (W5 live test). Null otherwise: a stored key is an account, and its label says so.</summary>
+    public static string? CustomKeyLabel(ProviderEntry? entry) => entry is { Custom: { } facts, IsConnected: true }
+        ? facts.KeySource switch
+        {
+            CustomKeySource.Environment when facts.Variable is { } variable => "env · " + variable,
+            CustomKeySource.None => "no key needed",
+            _ => null,
+        }
+        : null;
+
+    /// <summary><see cref="CustomKeyLabel(ProviderEntry?)"/> of <paramref name="provider"/> in <paramref name="services"/>' directory, or null when
+    /// the app has none.</summary>
+    public static string? CustomKeyLabelOf(IServiceProvider services, string? provider) => CustomKeyLabel(services.GetService<ProviderDirectory>()?.Find(provider));
+
     private IReadOnlyList<CustomProviderInfo> CustomProviders() => customs?.Current.Providers ?? [];
 
     private CustomProviderInfo? CustomOf(string id) => customs is null || CustomProviderJson.IsBuiltin(id) ? null : customs.Current.Find(id);

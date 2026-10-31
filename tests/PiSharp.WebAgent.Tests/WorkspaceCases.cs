@@ -148,7 +148,7 @@ internal static partial class Program
             Equal(WorkspaceKind.Copy, inspection.Kind, "automatic isolation picks a copy");
             Equal(expected.Length, inspection.CopyFiles, "the files a copy holds");
             Equal((long?)expectedBytes, inspection.CopyBytes, "the copy's size counts only what is copied");
-            Equal("bin,obj,node_modules,.vs,.git,artifacts", string.Join(",", inspection.Excludes), "the excludes, defaults first");
+            Equal("bin,obj,node_modules,.vs,.git,__pycache__,.pytest_cache,.mypy_cache,.ruff_cache,artifacts", string.Join(",", inspection.Excludes), "the excludes, defaults first");
             Check(inspection.Label.StartsWith("temporary copy · ", StringComparison.Ordinal), "the copy chip");
             Check(!inspection.OverWarnLimit, "small");
 

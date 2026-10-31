@@ -92,9 +92,14 @@ public sealed class EvalPages
                 rows.Add(new LeaderboardRowView(row.Model, row.Metrics, ModelOf(row.Model.Identity), low, Math.Max(0, high - low), track.Percent(row.Model.Rating)));
             }
         }
+        // After the W5 live test: one vote read "You picked the left answer 100% of the time", so the share waits for as many decided
+        // comparisons as a model needs to stop being provisional.
         string? position = null;
-        if (board is { Mode: ArenaMode.Request, Position.LeftShare: { } share })
-            position = $"You picked the left answer {EvalText.Percent(share)} of the time. Answers are shuffled into columns for every vote.";
+        if (board is { Mode: ArenaMode.Request, Position.Pairs: > 0 } && board.Position.LeftShare is { } share)
+            position = board.Position.Pairs >= board.Ratings.ProvisionalBelow
+                ? $"You picked the left answer {EvalText.Percent(share)} of the time. Answers are shuffled into columns for every vote."
+                : $"Answers are shuffled into columns for every vote. How often you pick the left answer shows once {board.Ratings.ProvisionalBelow} " +
+                  $"comparisons are decided ({board.Position.Pairs} so far; ties don't count).";
         return new LeaderboardPage { Mode = which, Tag = chosen, Tags = tags, Board = board, Rows = rows, PositionText = position };
     }
 
@@ -196,7 +201,9 @@ public sealed class EvalPages
         return views;
     }
 
-    private static string AccountText(SuiteTarget target) => string.IsNullOrWhiteSpace(target.Account) ? "Active account" : target.Account.Trim();
+    // A custom provider keyed by an environment variable or no key has no account to be active: its key is named (after the W5 live test).
+    private string AccountText(SuiteTarget target) => !string.IsNullOrWhiteSpace(target.Account) ? target.Account.Trim()
+        : PiSharp.WebAgent.Settings.ProviderDirectory.CustomKeyLabelOf(services, target.Provider) ?? "Active account";
 
     // ----- one suite -----
 

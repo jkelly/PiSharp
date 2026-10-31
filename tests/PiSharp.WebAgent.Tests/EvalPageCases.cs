@@ -101,6 +101,11 @@ internal static partial class Program
             var writing = await EvPageAsync(app, EvalRoutes.LeaderboardOf("writing"), "Leaderboard");
             Check(writing.Contains("data-state=\"provisional\" data-mode=\"request\" data-tag=\"writing\"", StringComparison.Ordinal), "?tag=writing shows the writing board, provisional");
             Check(writing.Contains("data-provisional", StringComparison.Ordinal) && writing.Contains("data-position-bias", StringComparison.Ordinal), "the provisional chip and the bias line");
+            // After the W5 live test: one vote is no share yet; the line says when it shows.
+            var writingBias = Regex.Match(WebUtility.HtmlDecode(writing), "data-position-bias>([^<]*)").Groups[1].Value;
+            Check(!writingBias.Contains("You picked the left answer", StringComparison.Ordinal) &&
+                Regex.IsMatch(writingBias, @"How often you pick the left answer shows once 10 comparisons are decided \(\d so far; ties don't count\)\."),
+                "one vote shows no left-answer share: " + writingBias);
             Equal(3, Regex.Matches(writing, "data-leaderboard-row").Count, "a row per model");
             Check(Regex.IsMatch(writing, "aria-current=\"true\" href=\"[^\"]*\" data-tag-link=\"writing\""), "writing is the chosen tag");
             Check(writing.Contains("data-tag-menu>Tag: writing</button>", StringComparison.Ordinal), "the tag menu names it");

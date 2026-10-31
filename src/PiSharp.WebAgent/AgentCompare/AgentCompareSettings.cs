@@ -13,7 +13,7 @@ namespace PiSharp.WebAgent.AgentCompare;
 /// <param name="Isolation">How workspaces are made: <c>automatic</c> (a git worktree for a git repo with a commit, otherwise a temporary
 /// copy; the default) or <c>copy</c> (always a temporary copy). <c>worktree</c> is accepted too (refused for a folder outside git).</param>
 /// <param name="ExtraExcludes">Folders or patterns a copy leaves out on top of <see cref="WorkspaceManagerOptions.DefaultExcludes"/>
-/// (bin, obj, node_modules, .vs, .git); default none.</param>
+/// (bin, obj, node_modules, .vs, .git and Python's caches); default none.</param>
 /// <param name="UseGitignore">Whether a copy also leaves out what .gitignore lists (default on). The runner passes it to the workspace
 /// manager (<see cref="WorkspaceRequest.UseGitignore"/>, recorded with the run); off, copies keep ignored files such as local settings and
 /// logs, and the default and extra excludes are still left out. Worktrees are not affected: they hold tracked files only.</param>

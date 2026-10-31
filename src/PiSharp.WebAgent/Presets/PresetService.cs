@@ -468,7 +468,8 @@ public sealed class PresetService(PresetStore store, IServiceProvider services, 
         {
             rows.Add(("Model", "not saved"));
         }
-        if (preset.Has(PresetParts.Model)) rows.Add(("Account", preset.Account is { } account ? SettingsText.ShortId(account) : preset.Columns?.Any(column => column.Account is not null) == true ? "per column" : "the provider's active account"));
+        if (preset.Has(PresetParts.Model)) rows.Add(("Account", preset.Account is { } account ? SettingsText.ShortId(account) : preset.Columns?.Any(column => column.Account is not null) == true ? "per column"
+            : (preset.Columns is not { Count: > 0 } && preset.Models.Count > 0 ? lookup.CustomKeyLabel(preset.Models[0].Provider) : null) ?? "the provider's active account"));
         rows.Add(("Thinking", preset.Options?.Thinking ?? "off"));
         foreach (var (name, text) in preset.Options?.Entries() ?? [])
             if (name != "thinking") rows.Add((name, text));
@@ -579,6 +580,9 @@ public sealed class PresetService(PresetStore store, IServiceProvider services, 
             var providerName = entry?.Name ?? catalog?.FindProvider(provider)?.DisplayName ?? provider;
             return new PresetModelView(provider, model, name, providerName, entry?.LogoUrl ?? ProviderLogos.Url(provider), caps?.Api, Problem(provider, model) is null);
         }
+
+        /// <summary>The key label of a custom provider that keeps no account (<see cref="ProviderDirectory.CustomKeyLabel"/>), or null.</summary>
+        public string? CustomKeyLabel(string provider) => ProviderDirectory.CustomKeyLabel(providers.Value.GetValueOrDefault(provider));
 
         public PresetAvailability Availability(Preset preset)
         {

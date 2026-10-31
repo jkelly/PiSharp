@@ -109,6 +109,9 @@ internal static partial class Program
             await Expect(page.Locator("[data-suite-name]")).ToHaveTextAsync("Release notes");
             await Expect(page.Locator("[data-suite-cases]")).ToContainTextAsync("Pre-release label");
             await Expect(page.Locator("[data-suite-targets]")).ToContainTextAsync(winner);
+            // The keyless custom provider has no account to be active: the target names its key (after the W5 live test).
+            await Expect(page.Locator("[data-suite-targets]")).ToContainTextAsync("no key needed");
+            await Expect(page.Locator("[data-suite-targets]")).Not.ToContainTextAsync("Active account");
 
             // Run now: run #1 completes and every answer passes; Set as baseline accepts it.
             await page.Locator("[data-suite-header] [data-run-suite]").ClickAsync();

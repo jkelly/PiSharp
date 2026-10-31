@@ -33,7 +33,10 @@ public sealed partial class SpendPages
         ResolveReservationView? resolve = null;
         if (filter.Resolve is { } op && await ledger.GetAsync(op, cancellationToken).ConfigureAwait(false) is { State: ReservationState.Uncertain } row && !blind.Hides(row))
             resolve = await ResolveViewAsync(row, cancellationToken).ConfigureAwait(false);
-        var options = FilterOptions(filter);
+        // The providers that have rows (a blind battle's left out until its vote), not every catalog provider (after the W5 live test).
+        var used = await ledger.ProvidersAsync(blind.IsEmpty ? new SpendLedgerQuery() : new SpendLedgerQuery { ExceptRuns = blind.Keys }, cancellationToken)
+            .ConfigureAwait(false);
+        var options = FilterOptions(filter, used);
         return new SpendHistoryPage
         {
             Filter = filter,
@@ -252,11 +255,14 @@ public sealed partial class SpendPages
         return parts.Count == 0 ? null : "Not counted toward money caps: " + string.Join(" · ", parts) + ".";
     }
 
-    private SpendFilterOptions FilterOptions(SpendHistoryFilter filter)
+    /// <summary>The filters' choices: the providers in <paramref name="used"/> (those with ledger rows), with an account, or chosen, in the
+    /// catalog's order and then by id; the chosen provider's models; the accounts by billing mode.</summary>
+    private SpendFilterOptions FilterOptions(SpendHistoryFilter filter, IReadOnlyList<string> used)
     {
         var rows = billing.Accounts();
-        var providers = catalog.Providers.Select(provider => new SpendOption(provider.Id, provider.Id)).ToList();
-        foreach (var extra in rows.Select(row => row.Provider).Append(filter.Provider).OfType<string>().Distinct(StringComparer.Ordinal))
+        var offered = used.Concat(rows.Select(row => row.Provider)).Append(filter.Provider).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var providers = catalog.Providers.Where(provider => offered.Contains(provider.Id)).Select(provider => new SpendOption(provider.Id, provider.Id)).ToList();
+        foreach (var extra in offered.Order(StringComparer.Ordinal))
             if (!providers.Any(option => option.Value == extra)) providers.Add(new SpendOption(extra, extra));
         var models = filter.Provider is { } chosen ? catalog.Models(chosen).Select(model => new SpendOption(model.Id, model.Id)).ToList() : [];
         if (filter.Model is { } model && !models.Any(option => option.Value == model)) models.Add(new SpendOption(model, model));
@@ -566,6 +572,10 @@ public sealed record SpendLedgerRow(Reservation Row, string Time, string Day, st
     string? ReservedTitle, string Actual, string? ActualSub, string? ActualTitle, string Status, string? StatusTone, string? Note, string? ChatHref, bool CanResolve)
 {
     public string Op => Row.Op;
+
+    /// <summary>The row's time in the host's time zone, as History shows its runs (the time cell's title). The ledger's own times are UTC, the
+    /// days its caps and date range use (after the W5 live test, which found History and the ledger a time zone apart with nothing saying so).</summary>
+    public string LocalTime => "Local time " + Row.Created.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
     /// <summary>W5: the page of the Arena battle (held or ready) this request belongs to, or null. A blind row's <see cref="Row"/> is masked
     /// (<see cref="SpendPages.MaskBlind"/>).</summary>

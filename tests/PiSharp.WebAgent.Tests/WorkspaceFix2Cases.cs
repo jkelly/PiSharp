@@ -49,7 +49,7 @@ internal static partial class Program
             Check(!off.UseGitignore, "the inspection says .gitignore is not honoured");
             Equal((int?)copiedToo.Length, off.CopyFiles, "off: what .gitignore lists is counted; the excluded folders still aren't");
             Check(off.CopyBytes > on.CopyBytes, $"so the copy is larger ({off.CopyBytes} > {on.CopyBytes})");
-            Equal("bin,obj,node_modules,.vs,.git,artifacts", string.Join(",", off.Excludes), "the excludes apply either way");
+            Equal("bin,obj,node_modules,.vs,.git,__pycache__,.pytest_cache,.mypy_cache,.ruff_cache,artifacts", string.Join(",", off.Excludes), "the excludes apply either way");
 
             var run = await lab.Manager.CreateAsync(new WorkspaceRequest
             { Run = "cmp_gi_off", ProjectPath = project, Slots = WsSlots("a"), ExtraExcludes = ["artifacts"], UseGitignore = false });

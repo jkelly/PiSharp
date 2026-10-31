@@ -70,7 +70,8 @@ public sealed record LeaderboardPage
     /// <summary>Its rows, best first.</summary>
     public IReadOnlyList<LeaderboardRowView> Rows { get; init; } = [];
 
-    /// <summary>"You picked the left answer 54% of the time. ...", or null before any decided pair.</summary>
+    /// <summary>"You picked the left answer 54% of the time. ..." once the provisional threshold's number of pairs is decided, a line saying
+    /// when it shows before that, or null before any decided pair.</summary>
     public string? PositionText { get; init; }
 
     /// <summary>Whether no battle is voted yet in any mode (<c>_LeaderboardEmpty</c>).</summary>

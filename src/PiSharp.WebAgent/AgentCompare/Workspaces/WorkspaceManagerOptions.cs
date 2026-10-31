@@ -10,8 +10,10 @@ public sealed class WorkspaceManagerOptions
     public const string FolderName = "workspaces";
 
     /// <summary>What a copy always skips (by name, at any depth), before the project's <c>.gitignore</c> rules and the extra excludes.
-    /// <c>.git</c> is never copied; the others are build output, packages and editor state.</summary>
-    public static IReadOnlyList<string> DefaultExcludes { get; } = ["bin", "obj", "node_modules", ".vs", ".git"];
+    /// <c>.git</c> is never copied; the others are build output, packages, editor state and Python's caches, which a check command such
+    /// as pytest writes into the workspace (after the W5 live test: without a .gitignore they were counted as the model's changes).</summary>
+    public static IReadOnlyList<string> DefaultExcludes { get; } =
+        ["bin", "obj", "node_modules", ".vs", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"];
 
     /// <summary>The default size above which a copy needs the user's go-ahead: 1 GB.</summary>
     public const long DefaultWarnAboveBytes = 1L << 30;

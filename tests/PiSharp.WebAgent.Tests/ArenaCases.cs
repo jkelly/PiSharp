@@ -242,6 +242,7 @@ internal static partial class Program
             Check(reversed.Rows.Select(row => row.Model.Identity.Key + "=" + row.Model.Rating.ToString("0.000", CultureInfo.InvariantCulture))
                 .SequenceEqual(requestBoard.Rows.Select(row => row.Model.Identity.Key + "=" + row.Model.Rating.ToString("0.000", CultureInfo.InvariantCulture))), "vote order makes no difference");
             Check(ArenaPages.LeftShare(votes) is { } share && share is > 0 and < 1, "the left-position share is measured");
+            Check(ArenaPages.LeftShare(votes, 1000) is null, "and waits for its minimum of decided pairs (the vote bar passes the provisional threshold)");
         }),
 
         Case("arena.request.no-contestant-name-before-the-vote-in-html-json-or-sse", async () =>

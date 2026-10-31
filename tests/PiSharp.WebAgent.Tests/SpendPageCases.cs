@@ -417,6 +417,13 @@ internal static partial class Program
 
                 var page = await Page("/history/spend");
                 Equal(5, Regex.Matches(page, "<tr data-spend-row=").Count, "five rows");
+                // After the W5 live test: the times say they are UTC (the caps' and date range's days), and each has the local time History shows.
+                Check(page.Contains(">Time (UTC)</th>", StringComparison.Ordinal), "the time column says UTC");
+                Equal(5, Regex.Matches(page, "title=\"Local time \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\" data-local-time>").Count, "each row's local time");
+                // The Provider filter offers the providers with rows or an account (faux's), the catalog's first, not every catalog provider.
+                var providerSelect = Regex.Match(page, "<select[^>]*id=\"sProvider\"[^>]*>(.*?)</select>", RegexOptions.Singleline).Groups[1].Value;
+                Equal("|faux|anthropic|google|openai|openai-codex", string.Join("|", Regex.Matches(providerSelect, "<option value=\"([^\"]*)\"").Select(match => match.Groups[1].Value)),
+                    "the Provider filter's choices");
                 Check(page.Contains("data-uncertain-banner", StringComparison.Ordinal) && page.Contains("1 uncertain", StringComparison.Ordinal), "the uncertain banner");
                 Check(page.Contains("data-resolve-op=\"op-uncertain\"", StringComparison.Ordinal), "Resolve… for the uncertain row");
                 Check(page.Contains("href=\"/chat/chat-1\" title=\"Open chat\"", StringComparison.Ordinal), "a chat row opens its chat");

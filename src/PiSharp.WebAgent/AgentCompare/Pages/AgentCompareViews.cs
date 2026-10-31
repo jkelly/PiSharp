@@ -152,8 +152,12 @@ public sealed record AgentSetupColumnView
     /// <summary>How the provider bills.</summary>
     public BillingKind Billing { get; init; } = BillingKind.Unknown;
 
-    /// <summary>The account a run would bind now (the provider's active account), or null.</summary>
+    /// <summary>The account a run would bind now (the provider's active account), a custom provider's key (<see cref="CustomKey"/>), or null.</summary>
     public string? AccountLabel { get; init; }
+
+    /// <summary>Whether <see cref="AccountLabel"/> names a custom provider's models.json key (<c>env · VAR</c>, <c>no key needed</c>), not an
+    /// account (after the W5 live test).</summary>
+    public bool CustomKey { get; init; }
 
     /// <summary>Turns per model.</summary>
     public int MaxTurns { get; init; } = AgentCompareSettings.DefaultMaxTurns;
@@ -206,7 +210,8 @@ public sealed record AgentSetupColumnView
     /// <summary>The override panel's note.</summary>
     public string OverrideNote => !Known ? "This model is not available; choose another."
         : (Levels.Count <= 1 ? "This model doesn't think." : $"Thinks at {string.Join(", ", Levels.Skip(1))}.")
-          + (AccountLabel is { Length: > 0 } label ? $" Runs on {label}, the account that's active when the run starts." : "");
+          + (AccountLabel is not { Length: > 0 } label ? ""
+              : CustomKey ? $" Runs on {label}, the custom provider's key (models.json)." : $" Runs on {label}, the account that's active when the run starts.");
 
     /// <summary><see cref="PiSharp.AI.ThinkingLevels.Clamp"/> over <paramref name="levels"/>.</summary>
     public static string Clamp(IReadOnlyList<string> levels, string level) =>

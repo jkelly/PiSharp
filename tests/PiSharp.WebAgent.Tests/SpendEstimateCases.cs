@@ -825,5 +825,6 @@ internal static partial class Program
         public Task<SpendLedgerPage> QueryAsync(SpendLedgerQuery query, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<SpendTotal> TotalAsync(SpendLedgerQuery query, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<SpendCacheMeter> CacheMeterAsync(DateTimeOffset month, string? provider = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<string>> ProvidersAsync(SpendLedgerQuery query, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

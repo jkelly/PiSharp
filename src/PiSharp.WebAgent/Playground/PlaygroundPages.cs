@@ -395,15 +395,7 @@ public sealed class PlaygroundPages(IServiceProvider services, ILogger<Playgroun
         };
     }
 
-    private string? CustomKeyLabel(string provider) =>
-        services.GetService<PiSharp.WebAgent.Settings.ProviderDirectory>()?.Find(provider) is { Custom: { } facts, IsConnected: true }
-            ? facts.KeySource switch
-            {
-                PiSharp.WebAgent.CustomProviders.CustomKeySource.Environment when facts.Variable is { } variable => "env · " + variable,
-                PiSharp.WebAgent.CustomProviders.CustomKeySource.None => "no key needed",
-                _ => null,
-            }
-            : null;
+    private string? CustomKeyLabel(string provider) => PiSharp.WebAgent.Settings.ProviderDirectory.CustomKeyLabelOf(services, provider);
 
     private string? BaseUrl(RunRequestPlan plan) => string.IsNullOrWhiteSpace(plan.Model.BaseUrl) ? null : plan.Model.BaseUrl;
 

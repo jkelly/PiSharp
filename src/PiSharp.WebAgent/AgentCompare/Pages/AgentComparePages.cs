@@ -156,10 +156,13 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
         }
         else thinking = thinking.Trim();
         string? account = null;
+        string? customKey = null;
         if (entry is not null)
         {
             try { account = (await (services.GetService<IChatAccounts>() ?? NoChatAccounts.Instance).BindAsync(entry.Id, cancellationToken).ConfigureAwait(false))?.Label; }
             catch (Exception error) when (error is not OperationCanceledException) { log?.LogDebug(error, "The account of {Provider} could not be read.", entry.Id); }
+            // A custom provider keyed by an environment variable or no key has no account: its key is named instead (after the W5 live test).
+            if (account is null) customKey = PiSharp.WebAgent.Settings.ProviderDirectory.CustomKeyLabelOf(services, entry.Id);
         }
         return new AgentSetupColumnView
         {
@@ -174,7 +177,8 @@ public sealed class AgentComparePages(IServiceProvider services, ILogger<AgentCo
             KeptThinking = kept,
             SharedThinking = shared,
             Billing = entry?.Billing ?? BillingKind.Unknown,
-            AccountLabel = account,
+            AccountLabel = account ?? customKey,
+            CustomKey = customKey is not null,
             MaxTurns = maxTurns,
             MaxMinutes = maxMinutes,
             CanRemove = canRemove,

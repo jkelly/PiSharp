@@ -3,8 +3,9 @@
 //    so --data moves it). The project's uncommitted changes are listed (ProjectInspection.Uncommitted, WorkspaceRun.NotCopied) and are not
 //    copied: every model starts from the same commit.
 //  - Other folders (or Isolation = Copy): a pristine base copy (<run>\base) plus one working copy per model, skipping bin, obj,
-//    node_modules, .vs, .git, the extra excludes and (unless the run turns UseGitignore off, W4 fix 2) anything .gitignore ignores; a copy
-//    above 1 GB needs the user's go-ahead. The run's manifest records the switch, so its diffs and Apply walk the copies the same way.
+//    node_modules, .vs, .git, Python's caches (WorkspaceManagerOptions.DefaultExcludes), the extra excludes and (unless the run turns
+//    UseGitignore off, W4 fix 2) anything .gitignore ignores; a copy above 1 GB needs the user's go-ahead. The run's manifest records the
+//    switch, so its diffs and Apply walk the copies the same way.
 //  - Diff (WorkspaceManager.Diff.cs), Apply and Keep the branch (WorkspaceManager.Keep.cs), Discard and the cleanup (here): leftovers of an
 //    unfinished run are removed at start, and every workspace older than the retention (7 days) is removed at start and once a day
 //    (WorkspaceJanitor).

@@ -456,6 +456,10 @@ public interface ISpendLedger
     /// model, in micro-USD: what "typical" is the median of.</summary>
     Task<IReadOnlyList<long>> RecentActualsAsync(string provider, string model, int count = 20, CancellationToken cancellationToken = default);
 
+    /// <summary>The providers of the rows that match <paramref name="query"/> (its paging left out), by id: what History › Spend's
+    /// Provider filter offers.</summary>
+    Task<IReadOnlyList<string>> ProvidersAsync(SpendLedgerQuery query, CancellationToken cancellationToken = default);
+
     /// <summary>The prompt cache meter of the UTC month that holds <paramref name="month"/>, for every provider or one.</summary>
     Task<SpendCacheMeter> CacheMeterAsync(DateTimeOffset month, string? provider = null, CancellationToken cancellationToken = default);
 }
