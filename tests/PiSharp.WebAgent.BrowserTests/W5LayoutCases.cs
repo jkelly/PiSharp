@@ -11,7 +11,8 @@ using static Microsoft.Playwright.Assertions;
 //   1. The pages, empty and in use: the leaderboard (request and agent), Suites, a suite, its first and last runs, Drift Watch, a suite or
 //      run that does not exist (served 404, in a profile of its own that allows that one error), Compare's request and agent setups with
 //      Blind on, and the battle pages (held, ready, voted, void).
-//   2. An agent battle's page before the vote (with its blind View diff dialog) and after it.
+//   2. An agent battle's page before the vote (with its blind View diff dialog) and after it, and so its agent compare run page: before the
+//      vote the blind notice, linking to the battle, in place of the run's columns; after it the run.
 //   3. The dialogs and menus: the schedule (each repeat pane), Set baseline (from the suite's menu, a run and Drift Watch), the check editor
 //      (each kind's pane), the suite's and a case's menus, Delete suite's confirmation, the leaderboard's tag menu, and Pin as test case on
 //      a battle's reveal (with Add check open); each is dismissed, so nothing changes.
@@ -75,7 +76,12 @@ internal static partial class Program
         Browse("browser.w5.layout.agent-battles-fit-a-phone-in-both-themes", AgentMode.FauxMetered, async (app, window) =>
         {
             var page = window.Page;
+            var workspaces = Path.Join(app.Data, "workspaces");
+            var before = Directory.Exists(workspaces) ? Directory.GetDirectories(workspaces).Select(folder => Path.GetFileName(folder)).ToHashSet() : [];
             var battle = await app.W5AgentBattleAsync("phone-agent-1", "echo", "echo-small");
+            // The battle's agent compare run, which no page or answer names before the vote: the folder of its copy workspaces.
+            var run = Directory.GetDirectories(workspaces).Select(folder => Path.GetFileName(folder)).Single(name => !before.Contains(name));
+            var runPage = "/compare?mode=agent&run=" + Uri.EscapeDataString(run);
             foreach (var theme in new[] { "dark", "light" })
             {
                 await page.GotoAsync("/compare/arena/" + battle);
@@ -86,10 +92,19 @@ internal static partial class Program
                 await Expect(page.Locator("#modal-agent-diff")).ToContainTextAsync("result.txt");
                 await page.FitsPhoneAsync("an agent battle › modal-agent-diff", theme);
                 await page.DismissModalAsync("modal-agent-diff");
+
+                // Its run page shows the blind notice in place of the run's columns, with the way to the battle.
+                await page.GotoAsync(runPage);
+                var notice = page.Locator("[data-arena-blind-run]");
+                await Expect(notice).ToContainTextAsync("This run is a blind round");
+                await Expect(notice.Locator($"a[href='/compare/arena/{battle}']")).ToBeVisibleAsync();
+                await Expect(page.Locator("[data-agent-compare='run']")).ToHaveCountAsync(0);
+                await page.FitsPhoneAsync("an agent battle's run page before the vote", theme);
             }
             await page.UseThemeAsync("dark");
             await app.W5VoteAsync(battle, "tie");
-            await W5FitPagesAsync(page, [("/compare/arena/" + battle, "[data-arena-voted]"), ("/evals/leaderboard?mode=agent", "[data-leaderboard-row]")]);
+            await W5FitPagesAsync(page, [("/compare/arena/" + battle, "[data-arena-voted]"), (runPage, "[data-agent-compare='run']"),
+                ("/evals/leaderboard?mode=agent", "[data-leaderboard-row]")]);
         }, width: 375, height: 812),
 
         Browse("browser.w5.layout.w5-dialogs-fit-a-phone-in-both-themes", AgentMode.FauxMetered, async (app, window) =>

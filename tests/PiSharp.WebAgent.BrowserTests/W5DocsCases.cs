@@ -2,7 +2,8 @@
 // holds W4's (and with its helpers: AppFilesMatching, BrowserCaseTexts, AppHookTexts). Each open W5 gap names a phrase of its line and the
 // source facts that show it: while they hold, "Not done" must say it, and once a change closes the gap the phrase must go (or the line, the
 // phrase and the facts are revised together). Each part of the line "W5's browser cases leave out" names the page hooks a browser case would
-// use to reach it, and stays listed exactly while no browser case uses one of them; every hook must still be in the app. The record must
+// use to reach it, and stays listed exactly while no browser case uses one of them; every hook must still be in the app (since the W5 live
+// test every part has a case, so the line is gone, and stays gone while no part is listed). The record must
 // also call W5 built: its milestone row is not "planned", it has the W5 sections, and nothing in "Not done" still waits for W5.
 // W5 fix 2 (docs): two gaps the integration left out of "Not done" were held here: a held suite call is reserved again as its own call when
 // its hold no longer fits (RunEngine.StartReservedAsync), which can be refused mid-run and which no browser case reaches (W5 fix 2 (suites)
@@ -64,9 +65,9 @@ internal static partial class Program
     // W5 fix 2 (tests-ci): W5PinCases, W5SuiteCases and W5ArenaPlayCases reach every part this list named (Stream anyway, Stop all, New round,
     // a new vote tag, an agent battle's approvals, budget Continue and Keep, the schedule's cap field and Turn off, the check editor's Try, Save
     // and Remove, tool-argument rules, a suite's targets and Rename, Cancel run, removing a case and the votes CSV), so their gaps and phrases
-    // are gone. What the line still lists has no case yet, though a phone-width unvoted agent battle has a hook (GET /compare?mode=agent&run=
-    // <id> renders data-arena-blind-run; checked by hand at 375px in the W5 live test), samplingParams on real wire formats has none, and the
-    // Tool Bench's Pin as test (W5 fix 2 (pins)) shares data-pin-run with the run pins a case reaches.
+    // are gone. After the W5 live test the rest got cases: the Tool Bench's Pin as test (W5PinCases), the run page of an unvoted agent battle
+    // at phone width (W5LayoutCases: data-arena-blind-run) and samplingParams on a real wire format (W5SamplingCases, on the scripted provider).
+    // So the line is gone, and while this list is empty Not done must not have it.
     private static readonly W4CoverageGap[] W5CoverageGaps = [];
 
     private static IEnumerable<(string, Func<Task>)> W5DocsCases() =>
@@ -102,6 +103,11 @@ internal static partial class Program
             var root = RepositoryRoot();
             var lines = DecisionSection(root, "Not done").Split('\n').Select(line => line.TrimEnd('\r'))
                 .Where(line => line.StartsWith(W5CoverageLineStart, StringComparison.Ordinal)).ToList();
+            if (W5CoverageGaps.Length == 0)
+            {
+                Check(lines.Count == 0, $"every part the W5 browser cases left out has a case, but Not done still has the line \"{W5CoverageLineStart} …\"");
+                return Task.CompletedTask;
+            }
             Check(lines.Count == 1, $"Not done has one line \"{W5CoverageLineStart} …\" (found {lines.Count})");
             var line = lines[0];
             var app = AppHookTexts(root);

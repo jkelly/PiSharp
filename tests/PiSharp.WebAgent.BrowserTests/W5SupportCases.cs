@@ -13,7 +13,8 @@ using static Microsoft.Playwright.Assertions;
 // scripted provider instead: W5ScriptedProvider is an OpenAI-compatible chat completions endpoint on a loopback port of this process (a
 // TcpListener: this project has no ASP.NET Core), answering every request at once with "Answer: <the last user message>", 10 input and 5
 // output tokens, and the requested model's id plus a suffix as the model it reports (kestrel-7b-2026-05), which a case switches
-// (Suffix = "2026-09") to script a silent model update. W5LiveApp starts the app without --faux, sealed as Agent's Live mode is (no
+// (Suffix = "2026-09") to script a silent model update. It keeps each request's body (Bodies), so a case reads what a run put on the wire
+// (W5SamplingCases). W5LiveApp starts the app without --faux, sealed as Agent's Live mode is (no
 // provider keys, tokens, AWS, Google, Azure or Cloudflare settings from this machine, and every proxy a closed loopback port) except that
 // NO_PROXY is 127.0.0.1, so the one place the app can reach is this computer's loopback address, where the scripted provider listens; its
 // custom provider (Settings › Providers' POST /api/custom-providers: openai-completions, no key) is loopback and so Free: nothing is paid
@@ -74,6 +75,7 @@ internal static partial class Program
         private readonly CancellationTokenSource stop = new();
         private readonly Lock gate = new();
         private readonly List<string> asked = [];
+        private readonly List<JsonObject> bodies = [];
         private readonly List<string> other = [];
         private readonly Task loop;
         private string suffix = "2026-05";
@@ -119,6 +121,9 @@ internal static partial class Program
 
         /// <summary>The models of the completions asked so far, in order.</summary>
         public IReadOnlyList<string> Asked { get { lock (gate) return [.. asked]; } }
+
+        /// <summary>The request bodies of the completions asked so far, in order (copies).</summary>
+        public IReadOnlyList<JsonObject> Bodies { get { lock (gate) return [.. bodies.Select(body => (JsonObject)body.DeepClone())]; } }
 
         /// <summary>Every other request (method and path), which the provider answered 404.</summary>
         public IReadOnlyList<string> Other { get { lock (gate) return [.. other]; } }
@@ -192,6 +197,7 @@ internal static partial class Program
             lock (gate)
             {
                 asked.Add(model);
+                if (request is JsonObject json) bodies.Add((JsonObject)json.DeepClone());
                 reported = model + "-" + suffix;
             }
             JsonObject Chunk(JsonArray choices) => new() { ["id"] = "chatcmpl-w5", ["object"] = "chat.completion.chunk", ["created"] = 1, ["model"] = reported, ["choices"] = choices };
