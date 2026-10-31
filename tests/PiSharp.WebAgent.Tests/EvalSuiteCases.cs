@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using PiSharp.Contracts;
 using PiSharp.Durable;
 using PiSharp.Durable.Hosting.Testing;
+using PiSharp.WebAgent.Chat;
 using PiSharp.WebAgent.Contracts;
 using PiSharp.WebAgent.Data;
 using PiSharp.WebAgent.Evals;
@@ -32,7 +33,10 @@ using EvalCheck = PiSharp.WebAgent.Evals.Check;
 // with every call guarded and recorded as source drift under the run's group; a slot is skipped while the previous run is going; cancel and
 // recovery (retried on each tick until every crashed run is marked); a Spend Guard refusal starts nothing, and its Ask answer starts the
 // same run id; the typical cost counts full runs only; accepting a baseline twice adds nothing; responseModel on run records (runs.db
-// migration 2); and the JSON API in the built app.
+// migration 2); and the JSON API in the built app. Fix W5 suites 2: a call whose hold no longer matches it is reserved again by the run
+// engine (RunEngine.StartReservedAsync) and refused there, in a real run: once for an account made active mid-run (a Block cap on it), once
+// for a held output cap the target cannot hold; either way it is stored unsent, its holds are released, and Drift Watch raises nothing.
+// SuHost can add faux models that report a provider's API (still answered offline) and the accounts a target binds.
 internal static partial class Program
 {
     /// <summary>The test clock's start: 09:10 UTC.</summary>
@@ -650,9 +654,181 @@ internal static partial class Program
                 DeleteTemp(root);
             }
         }),
+
+        Case("evals.suites.a-call-reserved-again-mid-run-is-refused-unsent-and-raises-no-drift", async () =>
+        {
+            // Fix W5 suites 2: RunEngine.StartReservedAsync sends a call on its hold unless the hold no longer matches the call (another
+            // account, say); then it releases the hold and reserves the call anew, where a cap saved since can refuse it. A target that bound
+            // no account when its run started (none was active) binds the account made active mid-run, so its later calls are reserved
+            // again under it: a Block cap on that account refuses them, and nothing of them is sent. (In the built app a custom provider binds
+            // no account at all, and a target that bound one keeps it for the whole run, which the last run below shows, so this host's
+            // accounts stand in for Settings › Accounts.)
+            var accounts = new SuAccounts(FauxDurableModels.ProviderId, ("acct-a", "Work"), ("acct-b", "Personal"));
+            await using var host = SuHost.Create("su-reserve-again", [(SuRouted, "openai-completions")], accounts);
+            var (suite, _) = SuSeed(host, "Account made active halfway", targets: [new SuiteTarget(FauxDurableModels.ProviderId, SuRouted.Id)], k: 3, cases: 3);
+            var first = await SuRunNow(host, suite.Id);
+            Check(host.Store.Results(first.Id).All(result => result is { Status: ResultStatus.Done, Sent: true }), "every baseline answer was sent");
+            var firstRows = (await host.Ledger.QueryAsync(new SpendLedgerQuery { Run = first.Id, Limit = SpendLedgerQuery.MaxLimit })).Items;
+            Check(firstRows.Count == 9 && firstRows.All(row => row is { State: ReservationState.Settled, Account: null }), "run #1 bound no account: none was active");
+            Check(host.Suites.AcceptBaseline(suite.Id, first.Id, null, replaceReferences: false).Accepted.Count == 1, "run #1 is the baseline");
+
+            var asked = host.Script.Asked.Count;
+            host.Script.Hold();
+            var start = await host.Runner.StartAsync(suite.Id, new SuiteRunRequest());
+            Check(start is { Posted: true, Run: not null }, "run #2 started: " + start.Refused?.Message + start.Spend?.Message);
+            var runId = start.Run!.Id;
+            await WaitUntilAsync(() => Task.FromResult(host.Script.Asked.Count >= asked + SuiteRunner.Concurrency), "the first calls are in flight on their holds");
+            accounts.SetActive("acct-b");
+            await host.Ledger.SaveCapAsync(new SpendCap(0, CapScope.Account, "acct-b", CapPeriod.Request, 1, CapAction.Block));
+            host.Script.Release();
+            var run = await SuFinished(host, runId);
+            Check(run is { Status: SuiteRunStatus.Complete, Problem: null }, "the run completes: " + EvalJson.Wire(run.Status) + " " + run.Problem);
+            Equal(asked + SuiteRunner.Concurrency, host.Script.Asked.Count, "only the calls in flight reached the model");
+
+            var results = host.Store.Results(runId);
+            Equal(9, results.Count, "3 cases × k 3");
+            var sent = results.Where(result => result.Sent).ToList();
+            var refused = results.Where(result => !result.Sent).ToList();
+            Check(sent.Count == SuiteRunner.Concurrency && sent.All(result => result is { Status: ResultStatus.Done, Verdict: CheckVerdict.Passed, CallRunId: not null }),
+                "the calls in flight were sent on their holds and answered: " + string.Join("; ", results.Select(result => EvalJson.Wire(result.Status) + " " + result.Error)));
+            Equal(5, refused.Count, "the later calls were not sent");
+            Check(refused.All(result => result is { Status: ResultStatus.Error, Verdict: CheckVerdict.Failed, CallRunId: null, CostMicros: null, Fingerprint: null } &&
+                    result.Error is { } error && error.StartsWith("This request could cost up to ", StringComparison.Ordinal) &&
+                    error.Contains("per-request cap", StringComparison.Ordinal) && error.Contains("for one account", StringComparison.Ordinal) &&
+                    error.EndsWith("It is set to Block, so the request can't be sent as it is. Nothing was sent.", StringComparison.Ordinal)),
+                "each is stored unsent with the Spend Guard's refusal of its new reservation under acct-b: " + string.Join(" | ", refused.Select(result => result.Error)));
+
+            // One ledger row per sent call (its hold, settled), the released holds of the calls reserved again, and nothing else: the
+            // guard's refusal of a new reservation writes no row, and nothing is left reserved.
+            var prefix = SuiteRunner.HoldPrefix + runId + "-";
+            var rows = (await host.Ledger.QueryAsync(new SpendLedgerQuery { Run = runId, Limit = SpendLedgerQuery.MaxLimit })).Items;
+            Check(rows.Count == 9 && rows.All(row => row.Op.StartsWith(prefix, StringComparison.Ordinal)),
+                "the run's nine holds and no other row: " + string.Join(", ", rows.Select(row => row.Op + " " + EvalJson.Wire(row.State))));
+            var calls = host.Runs.List(new RunQuery { GroupId = runId }).Items;
+            Check(calls.Count == SuiteRunner.Concurrency && calls.All(call => call is { Status: RunStatus.Completed, Account: null, Source: "drift" } &&
+                    call.SpendOp == call.Op && call.Op.StartsWith(prefix, StringComparison.Ordinal)),
+                "a recorded call per sent answer, each sent on its hold with no account; the refused ones never started: " + calls.Count);
+            var settled = rows.Where(row => row.State == ReservationState.Settled).Select(row => row.Op).ToHashSet(StringComparer.Ordinal);
+            Check(settled.Count == SuiteRunner.Concurrency && settled.SetEquals(calls.Select(call => call.SpendOp!)), "one settled row per sent call: its hold");
+            var released = rows.Where(row => row.State == ReservationState.Released).ToList();
+            Check(released.Count == 5 && released.All(row => row.Reason == "reserved again as the run's own call" && row.ActualMicros is null),
+                "the holds of the calls reserved again were released: " + string.Join(" | ", released.Select(row => row.Reason)));
+            Check((await host.Ledger.QueryAsync(new SpendLedgerQuery { Limit = SpendLedgerQuery.MaxLimit })).Items.All(row => row.State != ReservationState.Reserved),
+                "nothing is left reserved");
+            Equal(sent.Sum(result => result.CostMicros ?? 0), run.CostMicros, "the run's cost is its sent calls'");
+
+            // Drift Watch leaves the unsent answers out: case 3 (never sent) is not broken, and nothing is suspect or drift.
+            var signals = host.Store.Signals(suite.Id);
+            Check(signals.All(signal => signal.Level == DriftLevel.Info), "no suspect or drift signal (the held calls' latency may be info): " +
+                string.Join(" | ", signals.Select(signal => EvalJson.Wire(signal.Level) + " " + signal.Message)));
+            var analysis = host.Runner.AnalyzeDrift(runId).Single();
+            Equal(5, analysis.Comparison.LeftOutAfter, "the five unsent answers are missing answers, not failures");
+            Check(analysis.Comparison is { BrokenCases.Count: 0, CasesWorse: 0, PairedCases: 2 }, $"two cases compared, none broken or worse: {analysis.Comparison.PairedCases} paired");
+            Check(analysis.Findings.All(finding => DriftRules.InitialLevel(finding.Rule) == DriftLevel.Info), "no quality rule finds anything");
+
+            // A target that bound an account keeps it: switching the active account mid-run reserves nothing again.
+            accounts.SetActive("acct-a");
+            asked = host.Script.Asked.Count;
+            host.Script.Hold();
+            var pinned = await host.Runner.StartAsync(suite.Id, new SuiteRunRequest());
+            Check(pinned is { Posted: true, Run: not null }, "run #3 started: " + pinned.Refused?.Message + pinned.Spend?.Message);
+            await WaitUntilAsync(() => Task.FromResult(host.Script.Asked.Count >= asked + SuiteRunner.Concurrency), "run #3's first calls are in flight");
+            accounts.SetActive("acct-b");
+            host.Script.Release();
+            var third = await SuFinished(host, pinned.Run!.Id);
+            Check(third.Status == SuiteRunStatus.Complete && host.Store.Results(third.Id).All(result => result is { Status: ResultStatus.Done, Sent: true }),
+                "every call of run #3 was sent: " + string.Join("; ", host.Store.Results(third.Id).Select(result => result.Error)));
+            var pinnedRows = (await host.Ledger.QueryAsync(new SpendLedgerQuery { Run = third.Id, Limit = SpendLedgerQuery.MaxLimit })).Items;
+            Check(pinnedRows.Count == 9 && pinnedRows.All(row => row is { State: ReservationState.Settled, Account: "acct-a" } &&
+                    row.Op.StartsWith(SuiteRunner.HoldPrefix + third.Id + "-", StringComparison.Ordinal)),
+                "each on its hold under acct-a, the account it bound: " + string.Join(", ", pinnedRows.Select(row => row.Op + " " + row.Account)));
+        }),
+
+        Case("evals.suites.a-held-output-cap-a-target-cannot-hold-is-reserved-again-and-refused-unsent", async () =>
+        {
+            // Fix W5 suites 2: the other way a hold no longer fits its call is its output cap. A hold's max tokens is set when the run's group
+            // is reserved, lowered only by the run's own "cap the output" answer to an Ask cap (a cap saved later never changes a hold), so the
+            // run here is started with that answer, below the case's max tokens. faux/echo holds the cap and is sent on its holds; Anthropic
+            // budget thinking needs at least 2,048 tokens, so each echo-budget hold is released, and the call reserved anew is refused (the
+            // engine refuses a "cap the output" its run cannot hold before reserving it): nothing is sent, and its judgement hold is released.
+            await using var host = SuHost.Create("su-cap-refusal", [(SuBudget, "anthropic-messages")]);
+            var suite = host.Suites.CreateSuite(new Suite
+            {
+                Id = EvalIds.New(EvalIds.Suite), Name = "Budget thinking capped", K = 3, CapMicros = 1_000_000,
+                Targets = [new SuiteTarget(FauxDurableModels.ProviderId, "echo"), new SuiteTarget(FauxDurableModels.ProviderId, SuBudget.Id, Thinking: "low")],
+            }).Suite;
+            var judge = new EvalCheck { Kind = CheckKind.Judge, Judge = new JudgeSpec(FauxDurableModels.ProviderId, "echo-small", "Score how well the answer restates the question.") };
+            var draft = SuCase(suite.Id, "Case 1", "Write a SemVer 2.0.0 regex.", [new EvalCheck { Kind = CheckKind.Contains, Text = "Echo" }, judge]);
+            host.Suites.CreateCase(draft with { Spec = draft.Spec with { MaxTokens = 4096 } });
+            var budgetTarget = host.Suites.RequireSuite(suite.Id).Targets.Single(target => target.Model == SuBudget.Id).Id;
+            var first = await SuRunNow(host, suite.Id);
+            Check(host.Store.Results(first.Id).All(result => result is { Status: ResultStatus.Done, Sent: true, Verdict: CheckVerdict.Passed }),
+                "every baseline answer was sent and passed, budget thinking at 4,096 tokens too: " + string.Join("; ", host.Store.Results(first.Id).Select(result => result.Error)));
+            Check(host.Suites.AcceptBaseline(suite.Id, first.Id, null, replaceReferences: false).Accepted.Count == 2, "run #1 is both targets' baseline");
+
+            await host.Ledger.SaveCapAsync(new SpendCap(0, CapScope.Everything, null, CapPeriod.Request, 1, CapAction.Ask));
+            var asked = await host.Runner.StartAsync(suite.Id, new SuiteRunRequest());
+            Check(asked is { Posted: false, Spend.Code: SpendErrors.Ask } && asked.Spend.Call.Run is not null, "an Ask cap asks: " + asked.Spend?.Code + asked.Refused?.Code);
+            var runId = asked.Spend!.Call.Run!;
+            var before = host.Script.Asked.Count;
+            var capped = await host.Runner.StartAsync(suite.Id, new SuiteRunRequest { RunId = runId, Spend = new RunSpendAnswer(SpendChoice.CapOutput, 1000) });
+            Check(capped is { Posted: true } && capped.Run!.Id == runId, "capping the output at 1,000 tokens starts the run: " + capped.Spend?.Message + capped.Refused?.Message);
+            var run = await SuFinished(host, runId);
+            Check(run is { Status: SuiteRunStatus.Complete, Problem: null }, "the run completes: " + EvalJson.Wire(run.Status) + " " + run.Problem);
+            Equal(before + 6, host.Script.Asked.Count, "echo's three answers and their three judgements reached the models; echo-budget was never asked");
+
+            var results = host.Store.Results(runId);
+            Equal(6, results.Count, "1 case × 2 targets × k 3");
+            var echo = results.Where(result => result.TargetId != budgetTarget).ToList();
+            var budget = results.Where(result => result.TargetId == budgetTarget).ToList();
+            Check(echo.Count == 3 && echo.All(result => result is { Status: ResultStatus.Done, Sent: true, Verdict: CheckVerdict.Passed, CallRunId: not null }),
+                "faux/echo holds the cap: sent on its holds and judged: " + string.Join("; ", echo.Select(result => result.Error)));
+            const string Refusal = "Capping the output of faux/echo-budget at 1,000 tokens would not hold: Anthropic budget thinking needs a max tokens of at least 2,048";
+            Check(budget.Count == 3 && budget.All(result => result is { Status: ResultStatus.Error, Sent: false, Verdict: CheckVerdict.Failed, CallRunId: null, CostMicros: null } &&
+                    result.Checks.Count == 0 && result.Error is { } error && error.StartsWith(Refusal, StringComparison.Ordinal) &&
+                    error.EndsWith(". Nothing was sent.", StringComparison.Ordinal)),
+                "each echo-budget call is stored unsent with the cap's refusal: " + string.Join(" | ", budget.Select(result => result.Error)));
+
+            var prefix = SuiteRunner.HoldPrefix + runId + "-";
+            var rows = (await host.Ledger.QueryAsync(new SpendLedgerQuery { Run = runId, Limit = SpendLedgerQuery.MaxLimit })).Items;
+            Check(rows.Count == 12 && rows.All(row => row.Op.StartsWith(prefix, StringComparison.Ordinal)),
+                "six answer holds and six judgement holds, and no other row: " + string.Join(", ", rows.Select(row => row.Op + " " + EvalJson.Wire(row.State))));
+            var calls = host.Runs.List(new RunQuery { GroupId = runId }).Items;
+            Check(calls.Count == 6 && calls.All(call => call is { Status: RunStatus.Completed } && call.Model != SuBudget.Id && call.SpendOp == call.Op &&
+                    call.Op.StartsWith(prefix, StringComparison.Ordinal)),
+                "echo's answers and judgements recorded, each sent on its hold; no echo-budget call started: " + string.Join(", ", calls.Select(call => call.Model)));
+            var answerIds = echo.Select(result => result.CallRunId!).ToHashSet(StringComparer.Ordinal);
+            Check(calls.Where(call => answerIds.Contains(call.Id)).All(call => call.Notes?.Contains("The output was capped at 1,000 tokens", StringComparison.Ordinal) == true),
+                "echo's answers went out with the 1,000-token cap their holds carried");
+            var settled = rows.Where(row => row.State == ReservationState.Settled).Select(row => row.Op).ToHashSet(StringComparer.Ordinal);
+            Check(settled.SetEquals(calls.Select(call => call.SpendOp!)), "one settled row per sent call: its hold");
+            var released = rows.Where(row => row.State == ReservationState.Released).ToList();
+            Equal(3, released.Count(row => row.Reason == "reserved again as the run's own call"), "echo-budget's answer holds were released to be reserved again");
+            Equal(3, released.Count(row => row.Reason == "Not sent: the answer was not judged."), "and their judgement holds, never sent, too");
+            Equal(6, released.Count, "nothing else was released");
+            Check((await host.Ledger.QueryAsync(new SpendLedgerQuery { Limit = SpendLedgerQuery.MaxLimit })).Items.All(row => row.State != ReservationState.Reserved),
+                "nothing is left reserved");
+
+            var signals = host.Store.Signals(suite.Id);
+            Check(signals.All(signal => signal.Level == DriftLevel.Info), "no suspect or drift signal from the unsent answers: " +
+                string.Join(" | ", signals.Select(signal => EvalJson.Wire(signal.Level) + " " + signal.Message)));
+            var analyses = host.Runner.AnalyzeDrift(runId);
+            Equal(2, analyses.Count, "both targets analysed");
+            var unsent = analyses.Single(analysis => analysis.TargetId == budgetTarget);
+            Check(unsent.Comparison is { LeftOutAfter: 3, PairedCases: 0, BrokenCases.Count: 0 }, $"echo-budget's three unsent answers are missing, not failures: {unsent.Comparison.LeftOutAfter} left out");
+            Check(analyses.All(analysis => analysis.Findings.All(finding => DriftRules.InitialLevel(finding.Rule) == DriftLevel.Info)), "no quality rule finds anything");
+        }),
     ];
 
     // ----- helpers -----
+
+    /// <summary>A faux model that reports the OpenAI chat completions API (<see cref="SuModels"/>): a provider model, so a suite target on it
+    /// binds the provider's active account.</summary>
+    private static FauxModel SuRouted { get; } = new("echo-routed", "Echo routed", 128_000);
+
+    /// <summary>A faux reasoning model that reports the Anthropic messages API (<see cref="SuModels"/>): budget thinking, so its output cap
+    /// must hold 2,048 tokens.</summary>
+    private static FauxModel SuBudget { get; } = new("echo-budget", "Echo budget", 200_000, 32_000, Reasoning: true);
 
     /// <summary>A UTC time on the test day at <paramref name="hour"/>:00.</summary>
     private static DateTimeOffset SuAt(int hour) => new(SuStart.Year, SuStart.Month, SuStart.Day, hour, 0, 0, TimeSpan.Zero);
@@ -727,6 +903,25 @@ internal static partial class Program
         }
     }
 
+    /// <summary>The accounts of <paramref name="provider"/> that suite targets bind, answering as the app's AccountChatAccounts does for a
+    /// provider with accounts: a target binds the provider's active account (none while none is active), and an account is found by its
+    /// id. <see cref="SetActive"/> is what Settings › Accounts' Set active does to the account store.</summary>
+    internal sealed class SuAccounts(string provider, params (string Id, string Label)[] accounts) : IChatAccounts
+    {
+        private readonly Dictionary<string, ChatAccount> known = accounts.ToDictionary(account => account.Id, account => new ChatAccount(account.Id, account.Label),
+            StringComparer.Ordinal);
+        private volatile ChatAccount? active;
+
+        /// <summary>Makes <paramref name="accountId"/> the provider's active account (only what binds next follows).</summary>
+        public void SetActive(string accountId) => active = known[accountId];
+
+        public Task<ChatAccount?> BindAsync(string providerId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(providerId == provider ? active : null);
+
+        public Task<ChatAccount?> FindAsync(string providerId, string accountId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(providerId == provider && known.TryGetValue(accountId, out var account) ? account : null);
+    }
+
     /// <summary>The priced faux catalog whose prices a test can scale (a catalog price change) or remove (an unknown price).</summary>
     internal sealed class SuCatalog(IModelCatalog inner) : IModelCatalog
     {
@@ -752,8 +947,10 @@ internal static partial class Program
     }
 
     /// <summary>The priced faux models, naming <see cref="ResponseModel"/> as each answer's <c>responseModel</c> (as a provider's transport
-    /// keeps it on the final message) when it is set.</summary>
-    internal sealed class SuModels(MeteredFauxDurableModels inner) : IDurableModels
+    /// keeps it on the final message) when it is set. A model id in <paramref name="apis"/> reports that API instead of faux's (still
+    /// answered offline by the faux models), so the run engine treats it as a provider model: it binds an account, and it plans the API's
+    /// own rules (Anthropic budget thinking's least output cap, say).</summary>
+    internal sealed class SuModels(MeteredFauxDurableModels inner, IReadOnlyDictionary<string, string>? apis = null) : IDurableModels
     {
         private volatile string? responseModel;
 
@@ -763,7 +960,12 @@ internal static partial class Program
             set => responseModel = value;
         }
 
-        public DurableModel? GetModel(string provider, string modelId) => inner.GetModel(provider, modelId);
+        public DurableModel? GetModel(string provider, string modelId)
+        {
+            var model = inner.GetModel(provider, modelId);
+            if (model is not null && apis is not null && apis.TryGetValue(model.Id, out var api)) return model with { Api = api };
+            return model;
+        }
 
         public ImmutableArray<ChordObject> GetModelsOfType(string type, string? provider) => inner.GetModelsOfType(type, provider);
 
@@ -849,7 +1051,9 @@ internal static partial class Program
 
         public ISpendLedger Ledger => provider.GetRequiredService<ISpendLedger>();
 
-        public static SuHost Create(string name)
+        /// <summary>A host over the faux models, plus each of <paramref name="routed"/> (priced as faux, reporting its API: see
+        /// <see cref="SuModels"/>), with <paramref name="accounts"/> as the accounts targets bind when given (none otherwise).</summary>
+        public static SuHost Create(string name, IReadOnlyList<(FauxModel Model, string Api)>? routed = null, IChatAccounts? accounts = null)
         {
             var root = Temp(name);
             // Faux without --faux-metered: the priced models and catalog are this host's own (below), registered before the guard wraps them.
@@ -857,10 +1061,13 @@ internal static partial class Program
             options.EnsureDirectories();
             var clock = new SuClock(SuStart);
             var script = new SuScript();
-            var faux = new FauxDurableModels([FauxDurableModels.Echo, FauxDurableModels.EchoSmall, FauxModelCatalog.EchoThinking]) { RespondAsync = script.RespondAsync };
+            var extra = routed ?? [];
+            var faux = new FauxDurableModels([FauxDurableModels.Echo, FauxDurableModels.EchoSmall, FauxModelCatalog.EchoThinking, .. extra.Select(item => item.Model)])
+                { RespondAsync = script.RespondAsync };
             var catalog = new SuCatalog(new FauxModelCatalog(faux, FauxPricing.Price));
-            var models = new SuModels(new MeteredFauxDurableModels(faux, FauxPricing.Price));
+            var models = new SuModels(new MeteredFauxDurableModels(faux, FauxPricing.Price), extra.ToDictionary(item => item.Model.Id, item => item.Api, StringComparer.Ordinal));
             var services = new ServiceCollection().AddLogging();
+            if (accounts is not null) services.AddSingleton(accounts);
             services.AddSingleton<TimeProvider>(clock);
             services.AddSingleton(faux);
             services.AddWebAgentCore(options);
