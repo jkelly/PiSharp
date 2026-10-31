@@ -24,23 +24,11 @@ internal static partial class Program
                 ? "a Tool Bench view now opens modal-test-case" : null),
     ];
 
-    private static readonly W4CoverageGap[] W5CoverageGaps =
-    [
-        new("Stream anyway", "Stream anyway", ["data-arena-stream-anyway"]),
-        new("Stop all", "Stop all", ["data-arena-stop"]),
-        new("New round", "New round", ["data-arena-again"]),
-        new("a new vote tag", "a new tag", ["data-arena-tag-input", "data-arena-new-tag"]),
-        new("an agent battle's approvals and budget", "an agent battle's approvals and budget Continue", ["data-arena-approve", "data-arena-continue"]),
-        new("an agent battle's Keep", "Keep after an agent battle's vote", ["data-arena-keep"]),
-        new("the schedule's cap field and Turn off", "the schedule's cap field and Turn off", ["data-cap-input", "data-ss-off"]),
-        new("the check editor's Try, Save and Remove", "the check editor's Try, Save and Remove", ["data-ce-try-button", "data-ce-save", "data-ce-remove"]),
-        new("tool-argument rules", "tool-argument rules", ["data-ce-add-arg"]),
-        new("a suite's targets", "adding or removing a target", ["data-add-target", "data-remove-target"]),
-        new("a suite's Rename", "a suite's Rename", ["data-rename-suite", "data-rename-form"]),
-        new("Cancel run", "Cancel run", ["data-cancel-run"]),
-        new("removing a case", "removing a case", ["data-delete-case"]),
-        new("the votes CSV", "the votes CSV", ["data-votes-csv"]),
-    ];
+    // W5 fix 2 (tests-ci): W5PinCases, W5SuiteCases and W5ArenaPlayCases reach every part this list named (Stream anyway, Stop all, New round,
+    // a new vote tag, an agent battle's approvals, budget Continue and Keep, the schedule's cap field and Turn off, the check editor's Try, Save
+    // and Remove, tool-argument rules, a suite's targets and Rename, Cancel run, removing a case and the votes CSV), so their gaps and phrases
+    // are gone. What the line still lists has no page hook a case could use yet (a phone-width run page, samplingParams on real wire formats).
+    private static readonly W4CoverageGap[] W5CoverageGaps = [];
 
     private static IEnumerable<(string, Func<Task>)> W5DocsCases() =>
     [
