@@ -4,9 +4,9 @@
 // phrase and the facts are revised together). Each part of the line "W5's browser cases leave out" names the page hooks a browser case would
 // use to reach it, and stays listed exactly while no browser case uses one of them; every hook must still be in the app. The record must
 // also call W5 built: its milestone row is not "planned", it has the W5 sections, and nothing in "Not done" still waits for W5.
-// W5 fix 2 (docs): two gaps the integration left out of "Not done" are held here: a held suite call is reserved again as its own call when
+// W5 fix 2 (docs): two gaps the integration left out of "Not done" were held here: a held suite call is reserved again as its own call when
 // its hold no longer fits (RunEngine.StartReservedAsync), which can be refused mid-run and which no in-app case reaches end to end, and no
-// case pins down that a run's drift signals are stored before the run reads complete (SuiteRunner's "Drift first (W5 integration)"). The
+// case pinned down that a run's drift signals are stored before the run reads complete (W5 fix 2 (tests-ci) closed that one). The
 // W5 section's sentence on suite calls sent on their holds must name the reserve-again path while the engine has it.
 internal static partial class Program
 {
@@ -28,9 +28,6 @@ internal static partial class Program
         // accounts, and only the drift analyzer's synthetic never-sent answers cover the stored result. A case that reaches it would see the
         // hold's release note, so a test that names that note closes the "no in-app case" part.
         new("a held suite call reserved again", "is reserved again as its own call", HeldCallReservedAgainChanged),
-        // Suite runner (W5 integration, e7a01316): Finish stores the drift signals before the run reads complete, and no case pins that
-        // order down, since the browser cases' run helper waits once a run reads complete.
-        new("the drift-before-complete order", "that a run's drift signals are stored before the run reads complete", DriftFirstOrderChanged),
     ];
 
     /// <summary>Null while RunEngine.StartReservedAsync still reserves a held call again when its hold no longer fits, faux models have no
@@ -52,41 +49,12 @@ internal static partial class Program
         return reaching.Count > 0 ? "an in-app case now reaches it (" + string.Join(", ", reaching) + " names \"" + note + "\")" : null;
     }
 
-    /// <summary>Null while SuiteRunner's Finish analyses drift before it stores the run complete ("Drift first (W5 integration)") and the
-    /// browser cases' W5SuiteRunAsync still waits once a run reads complete; else what changed.</summary>
-    private static string? DriftFirstOrderChanged(string root)
-    {
-        var runner = Source(root, "src/PiSharp.WebAgent/Evals/Suites/SuiteRunner.cs");
-        var first = runner.IndexOf("Drift first (W5 integration)", StringComparison.Ordinal);
-        if (first < 0) return "SuiteRunner no longer says \"Drift first (W5 integration)\"";
-        var analyse = runner.IndexOf("AnalyzeDrift(done)", first, StringComparison.Ordinal);
-        var store = runner.IndexOf("store.UpdateRun(done)", first, StringComparison.Ordinal);
-        if (analyse < 0 || store < 0 || analyse > store) return "SuiteRunner's Finish no longer analyses drift before it stores the run complete";
-        var support = Source(root, "tests/PiSharp.WebAgent.BrowserTests/W5SupportCases.cs");
-        var helper = support.IndexOf("W5SuiteRunAsync(", StringComparison.Ordinal);
-        var end = helper < 0 ? -1 : support.IndexOf("return run;", helper, StringComparison.Ordinal);
-        return end >= 0 && support[helper..end].Contains("Task.Delay(", StringComparison.Ordinal)
-            ? null : "the browser cases' W5SuiteRunAsync no longer waits once a run reads complete";
-    }
-
-    private static readonly W4CoverageGap[] W5CoverageGaps =
-    [
-        new("pinning from the other sources", "Pin as test from chat, the Playground, a Compare column, the Tool Bench, History and the inspector", ["data-pin-chat", "data-pin-run"]),
-        new("Stream anyway", "Stream anyway", ["data-arena-stream-anyway"]),
-        new("Stop all", "Stop all", ["data-arena-stop"]),
-        new("New round", "New round", ["data-arena-again"]),
-        new("a new vote tag", "a new tag", ["data-arena-tag-input", "data-arena-new-tag"]),
-        new("an agent battle's approvals and budget", "an agent battle's approvals and budget Continue", ["data-arena-approve", "data-arena-continue"]),
-        new("an agent battle's Keep", "Keep after an agent battle's vote", ["data-arena-keep"]),
-        new("the schedule's cap field and Turn off", "the schedule's cap field and Turn off", ["data-cap-input", "data-ss-off"]),
-        new("the check editor's Try, Save and Remove", "the check editor's Try, Save and Remove", ["data-ce-try-button", "data-ce-save", "data-ce-remove"]),
-        new("tool-argument rules", "tool-argument rules", ["data-ce-add-arg"]),
-        new("a suite's targets", "adding or removing a target", ["data-add-target", "data-remove-target"]),
-        new("a suite's Rename", "a suite's Rename", ["data-rename-suite", "data-rename-form"]),
-        new("Cancel run", "Cancel run", ["data-cancel-run"]),
-        new("removing a case", "removing a case", ["data-delete-case"]),
-        new("the votes CSV", "the votes CSV", ["data-votes-csv"]),
-    ];
+    // W5 fix 2 (tests-ci): W5PinCases, W5SuiteCases and W5ArenaPlayCases reach every part this list named (Stream anyway, Stop all, New round,
+    // a new vote tag, an agent battle's approvals, budget Continue and Keep, the schedule's cap field and Turn off, the check editor's Try, Save
+    // and Remove, tool-argument rules, a suite's targets and Rename, Cancel run, removing a case and the votes CSV), so their gaps and phrases
+    // are gone. What the line still lists has no page hook a case could use yet (a phone-width run page, samplingParams on real wire formats),
+    // or shares its hook with parts a case reaches: the Tool Bench's Pin as test (W5 fix 2 (pins)) uses data-pin-run, as the other run pins do.
+    private static readonly W4CoverageGap[] W5CoverageGaps = [];
 
     private static IEnumerable<(string, Func<Task>)> W5DocsCases() =>
     [

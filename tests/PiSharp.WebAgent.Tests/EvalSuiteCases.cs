@@ -37,6 +37,8 @@ using EvalCheck = PiSharp.WebAgent.Evals.Check;
 // engine (RunEngine.StartReservedAsync) and refused there, in a real run: once for an account made active mid-run (a Block cap on it), once
 // for a held output cap the target cannot hold; either way it is stored unsent, its holds are released, and Drift Watch raises nothing.
 // SuHost can add faux models that report a provider's API (still answered offline) and the accounts a target binds.
+// W5 fix 2 (tests-ci): a run's drift signals are stored before it reads complete, held by
+// a trigger on eval_runs that counts them inside the update that marks the run complete, and by the run page's JSON polled while it ends.
 internal static partial class Program
 {
     /// <summary>The test clock's start: 09:10 UTC.</summary>
@@ -343,6 +345,69 @@ internal static partial class Program
             Check(host.Store.Signals(suite.Id).Count == 0 && host.Store.Baselines(suite.Id).Single().RunId == confirming.Id, "nothing open; run #4 is the baseline");
             Equal(2, host.Store.Baselines(suite.Id, currentOnly: false).Count, "the old baseline is kept, replaced");
             Check(host.Store.Cases(suite.Id).All(testCase => testCase.Reference?.Text?.StartsWith("Echo: ", StringComparison.Ordinal) == true), "references from run #4");
+        }),
+
+        Case("evals.suites.drift-signals-are-stored-before-the-run-reads-complete", async () =>
+        {
+            // W5 fix 2 (tests-ci): the W5 integration moved the drift analysis ahead of storing the run as complete (SuiteRunner.Finish), so
+            // the run and suite pages never show a finished run without its signals. Two probes hold that order. A trigger on eval_runs
+            // records, inside the very UPDATE that marks the run complete, how many signals the run has stored by then: a reorder records
+            // none, however fast the analysis is. And the run page's JSON (SuiteEndpoints.RunJson, what GET /api/evals/runs/{id} answers),
+            // polled without a pause while the run ends, must carry the response-model drift in the first answer that reads complete.
+            await using var host = SuHost.Create("su-drift-order");
+            var (suite, _) = SuSeed(host, "Drift order", k: 2, cases: 2);
+            var target = suite.Targets.Single();
+            host.Models.ResponseModel = "echo-2026-05";
+            var first = await SuRunNow(host, suite.Id);
+            Check(host.Suites.AcceptBaseline(suite.Id, first.Id, null, replaceReferences: false).Accepted.Single().RunId == first.Id, "run #1 is the baseline");
+            var db = Path.Join(host.Options.DataDirectory, "webagent.db");
+            SuCompletionProbe(db);
+
+            // The provider updates its model silently; run #2's answers are held until the poller runs.
+            host.Models.ResponseModel = "echo-2026-09";
+            host.Script.Hold();
+            var start = await host.Runner.StartAsync(suite.Id, new SuiteRunRequest());
+            Check(start is { Posted: true, Run: { Number: 2 } }, "run #2 started: " + start.Refused?.Message + start.Spend?.Message);
+            var runId = start.Run!.Id;
+            var going = new TaskCompletionSource<JsonObject>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var poller = Task.Run(() =>
+            {
+                try
+                {
+                    var deadline = DateTime.UtcNow.AddSeconds(60);
+                    for (var polls = 1; DateTime.UtcNow < deadline; polls++)
+                    {
+                        var view = SuiteEndpoints.RunJson(runId, host.Store, host.Runner);
+                        var status = view["run"]?["status"]?.GetValue<string>();
+                        if (status == "complete") return (View: view, Polls: polls);
+                        Check(status is "queued" or "running", "run #2 ends complete, not " + status);
+                        going.TrySetResult(view);
+                    }
+                    throw new TimeoutException("Run #2 did not read complete within a minute.");
+                }
+                catch (Exception error)
+                {
+                    going.TrySetException(error);
+                    throw;
+                }
+            });
+            var before = await going.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            host.Script.Release();
+            var (complete, polls) = await poller.WaitAsync(TimeSpan.FromSeconds(90));
+            await SuFinished(host, runId);
+
+            Check(before["signals"] is JsonArray { Count: 0 }, "no signal while the run goes: " + before["signals"]?.ToJsonString());
+            var probed = ReadDb(db, $"SELECT response_model, signals FROM su_completion_probe WHERE run_id = '{runId}'",
+                reader => (ResponseModel: reader.GetInt64(0), Signals: reader.GetInt64(1)));
+            Check(probed.Count == 1, "the probe saw run #2 marked complete once: " + probed.Count);
+            Check(probed[0].ResponseModel == 1 && probed[0].Signals >= 1,
+                $"when run #2 was marked complete, its response-model signal was stored already ({probed[0].ResponseModel} of {probed[0].Signals} signals)");
+            var signals = complete["signals"]!.AsArray();
+            Check(signals.Any(signal => signal?["rule"]?.GetValue<string>() == "response-model" && signal["level"]?.GetValue<string>() == "drift" &&
+                signal["targetId"]?.GetValue<string>() == target.Id),
+                $"the first of {polls} polls that reads run #2 complete already carries its response-model drift: " + signals.ToJsonString());
+            Equal(probed[0].Signals, (long)host.Store.RunSignals(runId).Count, "and nothing was stored for it after that");
+            Equal(DriftLevel.Drift, host.Store.RunSignals(runId).Single(signal => signal.Rule == DriftRule.ResponseModel).Level, "drift at once");
         }),
 
         Case("evals.suites.cancel-keeps-finished-answers-and-releases-holds", async () =>
@@ -871,6 +936,29 @@ internal static partial class Program
         var run = await SuFinished(host, start.Run!.Id);
         Check(run.Status == SuiteRunStatus.Complete, $"run #{run.Number} complete: {EvalJson.Wire(run.Status)} {run.Problem}");
         return run;
+    }
+
+    /// <summary>Adds a probe to the webagent.db at <paramref name="db"/> (W5 fix 2): a trigger on eval_runs that, inside the UPDATE that marks
+    /// a run complete, writes how many drift signals (and response-model ones) the run has stored by then into <c>su_completion_probe</c>.
+    /// SQLite runs the trigger in the same statement as the update, so what it counts is exactly what a reader sees next to the complete
+    /// run, whatever the timing.</summary>
+    private static void SuCompletionProbe(string db)
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+            { DataSource = db, Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadWrite, Pooling = false }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE su_completion_probe (run_id TEXT NOT NULL, response_model INTEGER NOT NULL, signals INTEGER NOT NULL);
+            CREATE TRIGGER su_completion_probe AFTER UPDATE OF status ON eval_runs
+            WHEN NEW.status = 'complete' AND OLD.status <> 'complete'
+            BEGIN
+              INSERT INTO su_completion_probe (run_id, response_model, signals) VALUES (NEW.id,
+                (SELECT COUNT(*) FROM eval_drift_signals WHERE run_id = NEW.id AND rule = 'response-model'),
+                (SELECT COUNT(*) FROM eval_drift_signals WHERE run_id = NEW.id));
+            END;
+            """;
+        command.ExecuteNonQuery();
     }
 
     /// <summary>A clock that moves only when told to.</summary>
